@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>TUMBLE TOWN</title>
+<meta name="description" content="Bring down the world's landmarks, one stone at a time.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b0d10'/%3E%3Cpath d='M13 27V11l3-6 3 6v16z' fill='%23c9bfa4'/%3E%3Crect x='14' y='13' width='4' height='4' fill='%23dfeaf2'/%3E%3Cpath d='M6 27l4-5 2 5zM22 27l3-4 2 4z' fill='%238a5341'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./src/ui/style.css">
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="loading">
+    <div class="load-inner">
+      <div class="load-title">TUMBLE TOWN</div>
+      <div class="load-sub">WESTMINSTER · LONDON</div>
+      <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+      <div class="load-status" id="load-status">initialising</div>
+    </div>
+  </div>
+
+  <div id="ui" hidden>
+    <!-- Top bar -->
+    <header id="topbar">
+      <div class="tb-block">
+        <div class="tb-label">FUNDS</div>
+        <div class="tb-value money" id="hud-money">$0</div>
+      </div>
+      <div class="tb-block">
+        <div class="tb-label">INCOME</div>
+        <div class="tb-value" id="hud-income">$0/s</div>
+      </div>
+      <div class="tb-center">
+        <div class="tb-target-name" id="hud-target">ELIZABETH TOWER</div>
+        <div class="integrity-wrap">
+          <div class="integrity-bar"><div class="integrity-fill" id="hud-integrity"></div></div>
+          <div class="integrity-pct" id="hud-integrity-pct">100%</div>
+        </div>
+        <div class="tb-sub" id="hud-height">96.3 m standing</div>
+      </div>
+      <div class="tb-block right">
+        <div class="tb-label">DEFENDERS</div>
+        <div class="tb-value danger" id="hud-defenders">0</div>
+      </div>
+      <div class="tb-block right">
+        <div class="tb-label">UNITS</div>
+        <div class="tb-value" id="hud-units">0</div>
+      </div>
+    </header>
+
+    <!-- Unit purchase bar -->
+    <nav id="buildbar"></nav>
+
+    <!-- Contextual prompt -->
+    <div id="prompt" hidden></div>
+
+    <!-- Selected-target readout -->
+    <div id="targetcard" hidden>
+      <div class="tc-title">DESIGNATED TARGET</div>
+      <div class="tc-row"><span>Section</span><b id="tc-section">—</b></div>
+      <div class="tc-row"><span>Height</span><b id="tc-height">—</b></div>
+      <div class="tc-row"><span>Guns on target</span><b id="tc-guns">0</b></div>
+      <button id="tc-clear">CLEAR</button>
+    </div>
+
+    <!-- Perf / debug readout -->
+    <div id="perf"></div>
+
+    <!-- Kill feed -->
+    <div id="feed"></div>
+
+    <!-- End-of-level -->
+    <div id="endcard" hidden>
+      <div class="ec-inner">
+        <div class="ec-title" id="ec-title">TOWER DOWN</div>
+        <div class="ec-sub" id="ec-sub"></div>
+        <div class="ec-stats" id="ec-stats"></div>
+        <button id="ec-again">RUN IT AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

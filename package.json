@@ -1,0 +1,20 @@
+{
+  "name": "tumble-town",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bring down the world's landmarks, one stone at a time.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "@dimforge/rapier3d-simd-compat": "^0.20.0",
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

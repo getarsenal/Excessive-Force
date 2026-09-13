@@ -1,0 +1,13 @@
+{
+  "id": "westminster",
+  "name": "Westminster, London",
+  "lat": 51.50072,
+  "lon": -0.12462,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -9.629,
+  "maxElevation": 18.902,
+  "metersPerDemPixel": 5.9478,
+  "seaLevel": -2.352,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

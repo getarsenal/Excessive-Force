@@ -1,0 +1,502 @@
+import * as THREE from 'three';
+import { BillboardParticles, makeSmokeTexture, makeSparkTexture } from './particles.js';
+
+/**
+ * Explosions, built in layers.
+ *
+ * A single sprite never looks like an explosion. What sells one is the order
+ * things happen in: a white flash before you can see anything, a fireball that
+ * expands fast and then stalls, debris that outruns the fireball, smoke that
+ * keeps rising after the fire is gone, and a dust ring that runs along the
+ * ground. Each layer here has its own timing curve, and they deliberately
+ * overlap rather than being one animation.
+ */
+
+const FIREBALL_VERT = /* glsl */`
+  uniform float uTime;
+  uniform float uSeed;
+  uniform float uGrow;
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying float vNoise;
+
+  // Cheap 3D value noise — enough to make the surface boil.
+  float hash(vec3 p) {
+    p = fract(p * 0.3183099 + vec3(0.71, 0.113, 0.419));
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+  float noise(vec3 x) {
+    vec3 i = floor(x), f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+          mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+      mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+          mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+  }
+
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec3 p = normalize(position);
+
+    // Two octaves rolling outward at different rates; the offset by uSeed
+    // means no two blasts share a silhouette.
+    float n = noise(p * 2.6 + vec3(uSeed, uSeed * 1.7, -uTime * 0.65)) * 0.62
+            + noise(p * 6.1 + vec3(-uSeed, uTime * 0.9, uSeed)) * 0.28;
+    vNoise = n;
+
+    // Lumpiness relaxes as the ball expands and cools.
+    float lump = mix(0.46, 0.12, clamp(uGrow, 0.0, 1.0));
+    vec3 displaced = p * (1.0 + (n - 0.5) * lump);
+
+    vPos = displaced;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+  }
+`;
+
+const FIREBALL_FRAG = /* glsl */`
+  uniform float uLife;     // 0..1
+  uniform float uIntensity;
+  varying vec3 vNormal;
+  varying vec3 vPos;
+  varying float vNoise;
+
+  void main() {
+    // Hot core, cooler rim: the fireball is optically thick, so edges read
+    // darker and sootier than the centre.
+    float facing = abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)));
+    float core = pow(clamp(facing, 0.0, 1.0), 0.85);
+
+    float heat = clamp((1.0 - uLife * 1.15) * (0.42 + vNoise * 0.9), 0.0, 1.0);
+    heat *= mix(0.55, 1.35, core);
+
+    // Blackbody-ish ramp: white -> yellow -> orange -> deep red -> soot.
+    vec3 soot   = vec3(0.055, 0.042, 0.036);
+    vec3 deep   = vec3(0.52, 0.11, 0.02);
+    vec3 orange = vec3(1.00, 0.33, 0.05);
+    vec3 yellow = vec3(1.32, 0.82, 0.24);
+    vec3 white  = vec3(1.60, 1.34, 1.00);
+
+    vec3 col = soot;
+    col = mix(col, deep,   smoothstep(0.02, 0.26, heat));
+    col = mix(col, orange, smoothstep(0.18, 0.46, heat));
+    col = mix(col, yellow, smoothstep(0.62, 0.88, heat));
+    col = mix(col, white,  smoothstep(0.92, 1.0, heat));
+
+    // Fade to soot rather than to nothing, so it hands off to the smoke.
+    float a = (1.0 - smoothstep(0.45, 1.0, uLife)) * (0.40 + core * 0.40);
+    gl_FragColor = vec4(col * uIntensity, clamp(a, 0.0, 1.0));
+  }
+`;
+
+const SHOCK_VERT = /* glsl */`
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const SHOCK_FRAG = /* glsl */`
+  uniform float uLife;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+  void main() {
+    float r = length(vUv - 0.5) * 2.0;
+    // A thin bright annulus that widens and softens as it travels.
+    float w = mix(0.030, 0.16, uLife);
+    float ring = smoothstep(1.0, 1.0 - w, r) * smoothstep(1.0 - w * 2.3, 1.0 - w, r);
+    float a = ring * (1.0 - smoothstep(0.25, 1.0, uLife));
+    if (a < 0.004) discard;
+    gl_FragColor = vec4(uColor, a * 0.85);
+  }
+`;
+
+class Fireball {
+  constructor() {
+    const geo = new THREE.IcosahedronGeometry(1, 4);
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }, uLife: { value: 0 }, uSeed: { value: 0 },
+        uGrow: { value: 0 }, uIntensity: { value: 1 },
+      },
+      vertexShader: FIREBALL_VERT,
+      fragmentShader: FIREBALL_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh.visible = false;
+    this.mesh.renderOrder = 12;
+    this.active = false;
+    this.age = 0;
+    this.life = 1;
+    this.radius = 1;
+  }
+
+  fire(pos, radius, life, intensity) {
+    this.mesh.position.copy(pos);
+    this.radius = radius;
+    this.life = life;
+    this.age = 0;
+    this.active = true;
+    this.mesh.visible = true;
+    this.material.uniforms.uSeed.value = Math.random() * 100;
+    this.material.uniforms.uIntensity.value = intensity;
+    this.mesh.scale.setScalar(radius * 0.16);
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    this.age += dt;
+    const t = this.age / this.life;
+    if (t >= 1) { this.active = false; this.mesh.visible = false; return; }
+
+    // Fast expansion that stalls — real fireballs decelerate hard as they
+    // entrain air, and a linear grow reads as a cartoon balloon.
+    const grow = 1.0 - Math.pow(1.0 - t, 2.6);
+    this.mesh.scale.setScalar(this.radius * (0.16 + grow * 0.92));
+    // Rise slightly as it becomes buoyant.
+    this.mesh.position.y += dt * this.radius * 0.32 * t;
+
+    this.material.uniforms.uTime.value = this.age;
+    this.material.uniforms.uLife.value = t;
+    this.material.uniforms.uGrow.value = grow;
+  }
+}
+
+class Shockwave {
+  constructor() {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    this.material = new THREE.ShaderMaterial({
+      uniforms: { uLife: { value: 0 }, uColor: { value: new THREE.Color(0xffb974) } },
+      vertexShader: SHOCK_VERT,
+      fragmentShader: SHOCK_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh.visible = false;
+    this.mesh.renderOrder = 11;
+    this.active = false;
+  }
+
+  fire(pos, radius, life) {
+    this.mesh.position.copy(pos);
+    this.maxRadius = radius;
+    this.life = life;
+    this.age = 0;
+    this.active = true;
+    this.mesh.visible = true;
+  }
+
+  update(dt) {
+    if (!this.active) return;
+    this.age += dt;
+    const t = this.age / this.life;
+    if (t >= 1) { this.active = false; this.mesh.visible = false; return; }
+    const r = this.maxRadius * (1.0 - Math.pow(1.0 - t, 2.2));
+    this.mesh.scale.set(r * 2, 1, r * 2);
+    this.material.uniforms.uLife.value = t;
+  }
+}
+
+export class ExplosionFX {
+  constructor(scene, quality) {
+    this.scene = scene;
+    this.quality = quality;
+    this.time = 0;
+
+    const smokeTex = makeSmokeTexture(quality.name === 'low' ? 64 : 128);
+    const sparkTex = makeSparkTexture(64);
+
+    // Fire and smoke are separate systems so they can use different blending:
+    // fire adds light, smoke occludes it.
+    this.fire = new BillboardParticles(
+      Math.round(quality.maxSmokePuffs * 0.45), smokeTex,
+      { blending: THREE.AdditiveBlending, emissive: 1.5, renderOrder: 13 },
+    );
+    this.smoke = new BillboardParticles(
+      quality.maxSmokePuffs, smokeTex,
+      { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 9 },
+    );
+    this.sparks = new BillboardParticles(
+      Math.round(quality.maxDebris * 1.4), sparkTex,
+      { blending: THREE.AdditiveBlending, emissive: 2.4, renderOrder: 14 },
+    );
+    this.dust = new BillboardParticles(
+      Math.round(quality.maxSmokePuffs * 0.7), smokeTex,
+      { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 8 },
+    );
+
+    for (const s of [this.smoke, this.dust, this.fire, this.sparks]) scene.add(s.mesh);
+
+    const ballCount = quality.name === 'low' ? 5 : quality.name === 'medium' ? 8 : 14;
+    this.fireballs = Array.from({ length: ballCount }, () => {
+      const f = new Fireball();
+      scene.add(f.mesh);
+      return f;
+    });
+    this.shocks = Array.from({ length: ballCount }, () => {
+      const s = new Shockwave();
+      scene.add(s.mesh);
+      return s;
+    });
+
+    // A short-lived light per blast is what makes nearby stone flare.
+    const lightCount = quality.name === 'low' ? 2 : quality.name === 'medium' ? 4 : 7;
+    this.lights = Array.from({ length: lightCount }, () => {
+      const l = new THREE.PointLight(0xffb060, 0, 190, 2.0);
+      l.visible = false;
+      scene.add(l);
+      return { light: l, age: 0, life: 0, peak: 0 };
+    });
+
+    this._c = {
+      fireHot: new THREE.Color(0xfff0c8),
+      fireMid: new THREE.Color(0xff8a26),
+      fireCold: new THREE.Color(0x421505),
+      smokeDark: new THREE.Color(0x2b2620),
+      smokeLight: new THREE.Color(0x8d8578),
+      dust: new THREE.Color(0xa89a82),
+      dustFade: new THREE.Color(0x776d5c),
+      spark: new THREE.Color(0xffd08a),
+      sparkCold: new THREE.Color(0x803000),
+      stone: new THREE.Color(0xbcae92),
+    };
+    this._v = new THREE.Vector3();
+  }
+
+  _freeFireball() { return this.fireballs.find((f) => !f.active) || null; }
+  _freeShock() { return this.shocks.find((s) => !s.active) || null; }
+  _freeLight() { return this.lights.find((l) => l.life <= 0) || this.lights[0]; }
+
+  /**
+   * A high-explosive detonation.
+   * @param {THREE.Vector3} pos
+   * @param {number} power 0.4 (AT4) .. 3.0 (HIMARS)
+   * @param {object} opts { ground: boolean, normal: THREE.Vector3 }
+   */
+  detonate(pos, power, opts = {}) {
+    const q = this.quality;
+    const scale = Math.pow(power, 0.72);
+    const radius = 5.2 * scale;
+
+    const ball = this._freeFireball();
+    if (ball) ball.fire(pos, radius, 0.52 + 0.2 * scale, 1.0 + scale * 0.25);
+
+    if (opts.ground) {
+      const sw = this._freeShock();
+      if (sw) {
+        const p = this._v.copy(pos);
+        p.y = (opts.groundY ?? pos.y) + 0.6;
+        sw.fire(p, radius * 4.2, 0.55 + 0.12 * scale);
+      }
+    }
+
+    const lg = this._freeLight();
+    lg.light.visible = true;
+    lg.light.position.copy(pos);
+    lg.light.distance = radius * 14;
+    lg.peak = 900 * scale * scale;
+    lg.life = 0.42 + 0.1 * scale;
+    lg.age = 0;
+
+    // ── Fire: a dense burst that dies within half a second.
+    const fireN = Math.round(THREE.MathUtils.clamp(16 * scale, 8, 54) * (q.name === 'low' ? 0.5 : 1));
+    for (let i = 0; i < fireN; i++) {
+      const dir = randomDir();
+      const sp = (7 + Math.random() * 17) * scale;
+      this.fire.spawn({
+        x: pos.x + dir.x * radius * 0.28,
+        y: pos.y + dir.y * radius * 0.28,
+        z: pos.z + dir.z * radius * 0.28,
+        vx: dir.x * sp, vy: dir.y * sp + 2.4 * scale, vz: dir.z * sp,
+        life: 0.34 + Math.random() * 0.42,
+        size0: radius * 0.34, size1: radius * (0.9 + Math.random() * 0.7),
+        color0: this._c.fireHot, color1: this._c.fireMid,
+        drag: 3.4, grav: 3.0, spin: (Math.random() - 0.5) * 3.2, alpha: 0.95,
+      });
+    }
+
+    // ── Smoke: slower, bigger, lasts long after the fire is out.
+    const smokeN = Math.round(THREE.MathUtils.clamp(22 * scale, 10, 70) * (q.name === 'low' ? 0.45 : 1));
+    for (let i = 0; i < smokeN; i++) {
+      const dir = randomDir();
+      const sp = (3.5 + Math.random() * 9) * scale;
+      this.smoke.spawn({
+        x: pos.x + dir.x * radius * 0.35,
+        y: pos.y + dir.y * radius * 0.35,
+        z: pos.z + dir.z * radius * 0.35,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.7 + 4.2 * scale, vz: dir.z * sp,
+        life: 2.6 + Math.random() * 3.4 * scale,
+        size0: radius * 0.5, size1: radius * (2.1 + Math.random() * 1.9),
+        color0: this._c.smokeDark, color1: this._c.smokeLight,
+        drag: 1.15, grav: 1.5, turb: 2.4 * scale,
+        spin: (Math.random() - 0.5) * 0.9, alpha: 0.72,
+      });
+    }
+
+    // ── Sparks and glowing fragments, thrown further than the fireball.
+    const sparkN = Math.round(THREE.MathUtils.clamp(26 * scale, 12, 90) * (q.name === 'low' ? 0.4 : 1));
+    for (let i = 0; i < sparkN; i++) {
+      const dir = randomDir();
+      const sp = (16 + Math.random() * 44) * scale;
+      this.sparks.spawn({
+        x: pos.x, y: pos.y, z: pos.z,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.8 + 6 * scale, vz: dir.z * sp,
+        life: 0.7 + Math.random() * 1.5,
+        size0: 0.34 * scale, size1: 0.06 * scale,
+        color0: this._c.spark, color1: this._c.sparkCold,
+        drag: 0.5, grav: -16.0, alpha: 1.0,
+      });
+    }
+
+    if (opts.ground) this.groundBurst(pos, scale, opts.groundY ?? pos.y);
+  }
+
+  /** Dust running outward along the ground at the base of a blast. */
+  groundBurst(pos, scale, groundY) {
+    const n = Math.round(THREE.MathUtils.clamp(18 * scale, 8, 46) * (this.quality.name === 'low' ? 0.45 : 1));
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = (9 + Math.random() * 20) * scale;
+      this.dust.spawn({
+        x: pos.x, y: groundY + 0.5 + Math.random() * 1.2, z: pos.z,
+        vx: Math.cos(a) * sp, vy: 1.4 + Math.random() * 3.0, vz: Math.sin(a) * sp,
+        life: 2.2 + Math.random() * 2.8,
+        size0: 1.6 * scale, size1: (9 + Math.random() * 9) * scale,
+        color0: this._c.dust, color1: this._c.dustFade,
+        drag: 1.5, grav: 0.4, turb: 1.2,
+        spin: (Math.random() - 0.5) * 0.6, alpha: 0.55,
+      });
+    }
+  }
+
+  /**
+   * Pulverised masonry. Called for every stone the structure destroys, so it
+   * has to stay cheap — this is the difference between a hole appearing and a
+   * hole *bursting*.
+   */
+  stoneBurst(x, y, z, size, colorHint) {
+    const c = colorHint || this._c.stone;
+    const n = size > 1.2 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const dir = randomDir();
+      const sp = 4 + Math.random() * 11;
+      this.dust.spawn({
+        x, y, z,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.6 + 2.0, vz: dir.z * sp,
+        life: 1.1 + Math.random() * 1.7,
+        size0: size * 0.8, size1: size * (3.2 + Math.random() * 2.6),
+        color0: c, color1: this._c.dustFade,
+        drag: 1.9, grav: -1.1, turb: 0.7,
+        spin: (Math.random() - 0.5) * 1.4, alpha: 0.5,
+      });
+    }
+  }
+
+  /** Dust kicked up where a heavy section slams into the ground. */
+  impactDust(x, y, z, energy) {
+    const scale = THREE.MathUtils.clamp(energy, 0.4, 4.0);
+    const n = Math.round(6 * scale);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = (6 + Math.random() * 16) * scale;
+      this.dust.spawn({
+        x, y: y + 0.4, z,
+        vx: Math.cos(a) * sp, vy: 2.2 + Math.random() * 4.5, vz: Math.sin(a) * sp,
+        life: 2.0 + Math.random() * 2.6,
+        size0: 1.4 * scale, size1: (7 + Math.random() * 8) * scale,
+        color0: this._c.dust, color1: this._c.dustFade,
+        drag: 1.6, grav: 0.5, turb: 1.0, alpha: 0.5,
+      });
+    }
+  }
+
+  /** Muzzle flash for a firing gun. */
+  muzzleFlash(pos, dir, power) {
+    const scale = Math.pow(power, 0.5);
+    const lg = this._freeLight();
+    lg.light.visible = true;
+    lg.light.position.copy(pos);
+    lg.light.distance = 60 * scale;
+    lg.peak = 300 * scale;
+    lg.life = 0.1;
+    lg.age = 0;
+
+    for (let i = 0; i < Math.round(7 * scale); i++) {
+      const d = randomDir();
+      const sp = 14 + Math.random() * 26;
+      this.fire.spawn({
+        x: pos.x, y: pos.y, z: pos.z,
+        vx: dir.x * sp * 1.7 + d.x * sp * 0.45,
+        vy: dir.y * sp * 1.7 + d.y * sp * 0.45,
+        vz: dir.z * sp * 1.7 + d.z * sp * 0.45,
+        life: 0.11 + Math.random() * 0.14,
+        size0: 1.3 * scale, size1: 3.4 * scale,
+        color0: this._c.fireHot, color1: this._c.fireMid,
+        drag: 5.0, grav: 0, alpha: 0.95,
+      });
+    }
+    for (let i = 0; i < Math.round(5 * scale); i++) {
+      const d = randomDir();
+      const sp = 6 + Math.random() * 12;
+      this.smoke.spawn({
+        x: pos.x + dir.x * 2, y: pos.y, z: pos.z + dir.z * 2,
+        vx: dir.x * sp + d.x * 3, vy: 1.5 + Math.random() * 2, vz: dir.z * sp + d.z * 3,
+        life: 1.3 + Math.random() * 1.4,
+        size0: 1.2 * scale, size1: 6.5 * scale,
+        color0: this._c.smokeLight, color1: this._c.smokeLight,
+        drag: 1.9, grav: 0.7, turb: 1.0, alpha: 0.34,
+      });
+    }
+  }
+
+  /** Thin smoke trail behind a shell in flight. */
+  trail(pos, scale = 1) {
+    this.smoke.spawn({
+      x: pos.x, y: pos.y, z: pos.z,
+      vx: 0, vy: 0.9, vz: 0,
+      life: 0.9 + Math.random() * 1.0,
+      size0: 0.55 * scale, size1: 3.4 * scale,
+      color0: this._c.smokeLight, color1: this._c.smokeLight,
+      drag: 1.0, grav: 0.35, turb: 0.5, alpha: 0.26,
+    });
+  }
+
+  update(dt) {
+    this.time += dt;
+    for (const f of this.fireballs) f.update(dt);
+    for (const s of this.shocks) s.update(dt);
+
+    for (const l of this.lights) {
+      if (l.life <= 0) continue;
+      l.age += dt;
+      const t = l.age / l.life;
+      if (t >= 1) { l.life = 0; l.light.visible = false; l.light.intensity = 0; continue; }
+      // Sharp attack, exponential decay — the flash is over before the eye
+      // resolves it, which is exactly right.
+      l.light.intensity = l.peak * Math.pow(1 - t, 3.0) * (t < 0.06 ? t / 0.06 : 1);
+    }
+
+    this.fire.update(dt, this.time);
+    this.smoke.update(dt, this.time);
+    this.sparks.update(dt, this.time);
+    this.dust.update(dt, this.time);
+  }
+}
+
+function randomDir() {
+  // Uniform on the sphere.
+  const u = Math.random() * 2 - 1;
+  const a = Math.random() * Math.PI * 2;
+  const r = Math.sqrt(1 - u * u);
+  return { x: Math.cos(a) * r, y: u, z: Math.sin(a) * r };
+}
