@@ -2,9 +2,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    # The feature branch is included so the level can be played from a hosted
-    # build before it is merged; remove it once this lands on main.
-    branches: [main, claude/landmark-destruction-game-4gxy06]
+    # main only. Setting the Pages source to GitHub Actions restricts the
+    # github-pages environment to the default branch, so a run from any other
+    # branch builds fine and is then refused at the deploy step — listing one
+    # here just produces a failed run on every push.
+    branches: [main]
   workflow_dispatch:
 
 permissions:
