@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # The feature branch is included so the level can be played from a hosted
+    # build before it is merged; remove it once this lands on main.
+    branches: [main, claude/landmark-destruction-game-4gxy06]
   workflow_dispatch:
 
 permissions:
