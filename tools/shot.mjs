@@ -14,6 +14,8 @@ const browser = await chromium.launch({
     '--use-gl=angle', '--use-angle=swiftshader',
     '--enable-unsafe-swiftshader', '--disable-gpu-sandbox',
     '--no-sandbox', '--ignore-gpu-blocklist',
+    // Let Web Audio start without a real gesture so audio can be tested.
+    '--autoplay-policy=no-user-gesture-required',
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

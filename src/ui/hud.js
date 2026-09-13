@@ -28,6 +28,7 @@ export class HUD {
     this.onSelect = opts.onSelect || (() => {});
     this.onClearTarget = opts.onClearTarget || (() => {});
     this.onRestart = opts.onRestart || (() => {});
+    this.onToggleSound = opts.onToggleSound || (() => {});
 
     this.el = {
       money: document.getElementById('hud-money'),
@@ -57,6 +58,16 @@ export class HUD {
     this._buildBar();
 
     this.el.tcClear.addEventListener('click', () => this.onClearTarget());
+    this.soundOn = true;
+    this.el.sound = document.getElementById('sound-toggle');
+    if (this.el.sound) {
+      this.el.sound.addEventListener('click', () => {
+        this.soundOn = !this.soundOn;
+        this.el.sound.textContent = this.soundOn ? 'SOUND ON' : 'SOUND OFF';
+        this.el.sound.classList.toggle('off', !this.soundOn);
+        this.onToggleSound(this.soundOn);
+      });
+    }
     this.el.ecAgain.addEventListener('click', () => this.onRestart());
 
     this._promptTimer = 0;

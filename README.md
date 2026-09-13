@@ -132,6 +132,33 @@ trajectory at long range when the lofted shot would hang too long. Dispersion is
 applied to the solution, so misses scatter along the line of fire the way gun
 dispersion actually does.
 
+## Sound
+
+Two things matter more than the samples.
+
+**Sound is slow.** It covers 343 m per second, so a HIMARS firing 2.5 km away is
+heard seven seconds after the flash, and a shell landing across the river cracks
+noticeably after you watch the stone leave. Artillery is the one genre where that
+delay *is* the character of the thing, so guns and impacts are scheduled by real
+travel time rather than played on the frame they happen — capped at 3 s, beyond
+which late audio reads as a bug rather than as distance.
+
+**Repetition is what makes game audio sound cheap.** Six MLRS rockets on a 0.35 s
+interval from one buffer is a machine gun, not a ripple. Every voice gets its own
+pitch and gain jitter, and a per-sound cooldown collapses stacked triggers, so
+twenty stones landing at once is one rockfall instead of twenty clipped
+transients. A limiter on the master bus keeps a barrage from distorting, and
+there is a hard 24-voice cap.
+
+Collapse has no sample — it's a long, low, structureless roar, so it's
+synthesised from integrated (brown) noise through a lowpass, scaled by how much
+building is actually coming down. Cheaper than shipping a big loop and it scales
+with the event.
+
+Positioning is distance gain plus a stereo pan taken from the camera, not
+PannerNodes: at bird's-eye range the HRTF work is inaudible and this costs a
+couple of multiplies per voice.
+
 ## The garrison
 
 Roughly sixty defenders hold the tower — sandbagged positions at the foot,

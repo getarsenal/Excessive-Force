@@ -191,6 +191,18 @@ html, body {
   pointer-events: none; letter-spacing: 0.02em;
 }
 
+#sound-toggle {
+  position: absolute; right: var(--ui-pad); top: 92px;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
+  font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
+  padding: 6px 10px; cursor: pointer;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#sound-toggle:hover { border-color: var(--edge-bright); color: var(--text); }
+#sound-toggle.off { color: var(--danger); border-color: rgba(232, 96, 76, 0.4); }
+/* The target card takes this corner when it appears, so step the button down. */
+#targetcard:not([hidden]) ~ #sound-toggle { top: 232px; }
+
 /* ── Kill feed ───────────────────────────────────────────────────────── */
 #feed {
   position: absolute; right: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);

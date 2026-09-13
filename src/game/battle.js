@@ -29,6 +29,7 @@ export class Battle {
     this.fx = ctx.fx;
     this.quality = ctx.quality;
     this.engine = ctx.engine;
+    this.audio = ctx.audio || null;
     this.onEvent = ctx.onEvent || (() => {});
 
     this.models = new ModelLibrary();
@@ -291,6 +292,16 @@ export class Battle {
 
     const dir = vel.clone().normalize();
     this.fx.muzzleFlash(from, dir, def.warhead.fx);
+    if (this.audio) {
+      const p = def.projectile;
+      const heavy = def.warhead.fx;
+      this.audio.play(p.kind === 'rocket' ? 'rocket' : 'gun', from, {
+        // Pitch tracks calibre: the AT4 is a crack, the Paladin a thud.
+        rate: THREE.MathUtils.clamp(1.35 - heavy * 0.22, 0.55, 1.4),
+        gain: 0.45 + heavy * 0.25,
+        rolloff: 260 + heavy * 140,
+      });
+    }
     this.engine.addShake(Math.min(0.13, def.warhead.fx * 0.035));
     this.shotsFired++;
 
@@ -375,6 +386,16 @@ export class Battle {
     const camDist = this.camera.position.distanceTo(point);
     this.engine.addShake(THREE.MathUtils.clamp(w.fx * 26 / Math.max(camDist, 30), 0.02, 0.75));
 
+    if (this.audio) {
+      this.audio.play('explosion', point, {
+        rate: THREE.MathUtils.clamp(1.3 - w.fx * 0.2, 0.55, 1.35),
+        gain: 0.5 + w.fx * 0.2,
+        rolloff: 300 + w.fx * 180,
+      });
+      // Masonry actually coming down gets its own low roar on top of the bang.
+      if (destroyed > 10) this.audio.rumble(Math.min(1, destroyed / 90), point);
+    }
+
     if (destroyed > 6) this.onEvent('bigimpact', { point, destroyed });
   }
 
@@ -423,6 +444,14 @@ export class Battle {
   _pushTracers(shots, dt) {
     for (const s of shots) {
       this._tracerList.push({ from: s.from.clone(), to: s.to.clone(), age: 0 });
+    }
+    if (this.audio && shots.length) {
+      const s = shots[Math.floor(Math.random() * shots.length)];
+      const mg = s.defender?.type === 'mg';
+      this.audio.play(mg ? 'mg' : 'enemy', s.from, {
+        gain: mg ? 0.3 : 0.26, rolloff: 200,
+        cooldown: mg ? 0.16 : 0.1,
+      });
     }
 
     const live = [];

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { detectQuality, AdaptiveGovernor } from './core/quality.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig } from './core/engine.js';
+import { Audio } from './core/audio.js';
 import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
@@ -35,6 +36,12 @@ async function boot() {
   const canvas = document.getElementById('game-canvas');
   const engine = new Engine(canvas, quality);
   const physics = new PhysicsWorld(quality);
+  const audio = new Audio();
+  // Browsers won't start an AudioContext without a gesture, so the first tap
+  // on the canvas is what brings sound up.
+  const unlockAudio = () => { audio.unlock(); };
+  canvas.addEventListener('pointerdown', unlockAudio, { once: true });
+  window.addEventListener('keydown', unlockAudio, { once: true });
 
   await progress(18, 'surveying westminster');
   const terrain = await loadTerrain('westminster', quality);
@@ -103,7 +110,7 @@ async function boot() {
   let hud;
   const battle = new Battle({
     scene: engine.scene, camera: engine.camera, engine, physics, terrain,
-    structures, primary: tower, garrison, fx, quality, groundY,
+    structures, primary: tower, garrison, fx, quality, groundY, audio,
     onEvent: (kind, data) => handleEvent(kind, data),
   });
 
@@ -115,6 +122,7 @@ async function boot() {
     },
     onClearTarget: () => battle.clearTarget(),
     onRestart: () => window.location.reload(),
+    onToggleSound: (on) => audio.setEnabled(on),
   });
 
   function handleEvent(kind, data) {
@@ -163,6 +171,11 @@ async function boot() {
         fx.impactDust(t.x, terrain.heightAt(t.x, t.z), t.z,
           Math.min(3.5, isl.members.length / 90));
         engine.addShake(Math.min(0.55, isl.members.length / 900));
+        const where = new THREE.Vector3(t.x, t.y, t.z);
+        audio.rumble(Math.min(1, isl.members.length / 260), where);
+        audio.play('explosion', where, {
+          rate: 0.55, gain: 0.35, rolloff: 420, cooldown: 0.18,
+        });
         st.fragmentIsland(o.island);
       }
     }
@@ -296,6 +309,7 @@ async function boot() {
 
     for (const s of structures) s.syncTransforms();
 
+    audio.setListener(engine.camera);
     battle.update(dt);
     fx.update(dt);
     hud.update(dt);
@@ -319,7 +333,7 @@ async function boot() {
   }
   frame();
 
-  Object.assign(window, { engine, physics, tower, wing, terrain, rig, battle, garrison, fx, quality });
+  Object.assign(window, { engine, physics, tower, wing, terrain, rig, battle, garrison, fx, quality, audio });
 
   /**
    * Step the simulation without rendering.
