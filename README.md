@@ -75,6 +75,33 @@ spans only ~28 m of relief, which quantises visibly in 8-bit). The same grid
 feeds Rapier as a heightfield, so a round that falls short hits the ground you
 are looking at, and one that falls very short goes in the Thames.
 
+### The real city
+
+`tools/bake_buildings.py` pulls every building footprint around the site from
+OpenStreetMap and bakes it to `public/assets/city/<level>.json` — polygons in
+metres from the level origin, with heights from the `height` and
+`building:levels` tags. The game extrudes those at load time. Without the bake
+it falls back to a hand-placed approximation of Westminster, and says which one
+it used in the console.
+
+```bash
+python3 tools/bake_buildings.py westminster
+```
+
+**Why not Google's Photorealistic 3D Tiles?** They are gorgeous and they are the
+wrong shape for this game. A photogrammetry tileset is one fused mesh: there are
+no separable buildings in it, no interiors, and no way to take a piece off. It is
+the same problem we rejected for the tower itself — a hollow surface that
+shatters like an eggshell with nothing inside. They also need a Google Cloud key,
+billing, and carry attribution and derivative-work terms.
+
+A footprint is a polygon, and a polygon can be laid up out of stone by the same
+masonry builder the tower uses. Keeping the city as geometry we generate is what
+leaves the door open to making it destructible on the same terms as the landmark.
+
+Google's tiles would still make a superb *backdrop* beyond the playfield, where
+nothing is ever shot at. That's a real option, just a separate one from this.
+
 ---
 
 ## The arsenal

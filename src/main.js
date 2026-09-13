@@ -5,6 +5,7 @@ import { Engine, CameraRig } from './core/engine.js';
 import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
+import { loadCity, buildCity } from './world/city.js';
 import { Structure } from './structure/structure.js';
 import { buildElizabethTower, buildPalaceWing } from './structure/landmarks/bigben.js';
 import { MATERIAL_PROPS } from './structure/builder.js';
@@ -49,7 +50,21 @@ async function boot() {
   const origin = new THREE.Vector3(0, groundY, 0);
 
   await progress(30, 'building london');
-  engine.scene.add(buildContext(terrain, quality));
+  // Real OpenStreetMap footprints when they've been baked; otherwise the
+  // hand-placed approximation, so the level still reads as a city either way.
+  const city = await loadCity('westminster');
+  const cityGroup = city ? buildCity(city, terrain, quality, { excludeRadius: 70 }) : null;
+  if (cityGroup) {
+    engine.scene.add(cityGroup);
+    // Report the file's own provenance rather than assuming it is real data —
+    // a test fixture must never be mistaken for OpenStreetMap.
+    console.log(`[tumble] city: ${cityGroup.userData.built} of `
+      + `${cityGroup.userData.available} buildings — ${city.source}`);
+  } else {
+    engine.scene.add(buildContext(terrain, quality));
+    console.log('[tumble] city: hand-placed approximation'
+      + ' (run tools/bake_buildings.py for real footprints)');
+  }
 
   await progress(44, 'quarrying anston stone');
   const towerBlocks = buildElizabethTower(quality);
