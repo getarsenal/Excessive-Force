@@ -221,8 +221,9 @@ export function buildPalaceWing(quality) {
       B.ring(0, z0 + len / 2, depth, len, 1.5, y, h, stone, M.LIMESTONE, c % 2);
       y += h; c++;
     }
-    // Cross walls every 12 m give the wing real internal structure.
-    for (let zc = z0 + 12; zc < z0 + len; zc += 12) {
+    // Cross walls every 8 m give the wing real internal structure, and give
+    // the roof bearing often enough that it does not rely on spanning.
+    for (let zc = z0 + 8; zc < z0 + len; zc += 8) {
       let wy = 0;
       while (wy < height) {
         const h = Math.min(course, height - wy);
@@ -231,6 +232,14 @@ export function buildPalaceWing(quality) {
       }
     }
     // Pitched roof.
+    // A spine wall down the ridge, so the narrowing upper courses of the roof
+    // have something under them rather than relying on the slab below.
+    let sy = height;
+    while (sy < height + 6.0) {
+      const hh = Math.min(course, height + 6.0 - sy);
+      B.slab(0, sy + hh / 2, z0 + len / 2, 1.6, hh, len - 2, stone, M.BRICK);
+      sy += hh;
+    }
     const roofSteps = Math.max(3, Math.round(7 / s));
     for (let i = 0; i < roofSteps; i++) {
       const t = i / roofSteps;

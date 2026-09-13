@@ -33,6 +33,11 @@ const SETTLED = 16;
 const EPS = 0.075;          // joint tolerance when deciding adjacency
 const WELD_THRESHOLD = 26;  // above this, a detached group welds instead of freeing
 
+// How many stones bearing support may travel sideways along a course. Four is
+// enough for a lintel or a slab between close supports, and short enough that a
+// wall cut through at its base still comes down.
+const LATERAL_SPAN = 4;
+
 export class Structure {
   /**
    * @param {import('../core/physics.js').PhysicsWorld} physics
@@ -97,6 +102,7 @@ export class Structure {
     this._reach = new Uint8Array(n);
     this._stack = new Int32Array(n);
     this._comp = new Int32Array(n);
+    this._spanBudget = new Uint8Array(n);
     this._m4 = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._v = new THREE.Vector3();
@@ -131,20 +137,37 @@ export class Structure {
    */
   _buildAdjacency() {
     const n = this.count;
+
+    // World-space AABB half-extents. A yawed box is wider in world axes than
+    // its own half-extents, and testing with the unrotated ones silently
+    // under-connects every curved wall — a drum or dome laid with polyRing
+    // ends up with half the neighbours it should have, and the support solver
+    // then believes it is hanging in mid-air.
+    const ax = new Float32Array(n);
+    const az = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const c = Math.abs(Math.cos(this.ry[i]));
+      const sn = Math.abs(Math.sin(this.ry[i]));
+      ax[i] = this.hx[i] * c + this.hz[i] * sn;
+      az[i] = this.hx[i] * sn + this.hz[i] * c;
+    }
+    this._aabbX = ax;
+    this._aabbZ = az;
+
     let cell = 0;
-    for (let i = 0; i < n; i++) cell = Math.max(cell, this.hx[i], this.hy[i], this.hz[i]);
+    for (let i = 0; i < n; i++) cell = Math.max(cell, ax[i], this.hy[i], az[i]);
     cell = Math.max(cell * 2.2, 0.8);
     this.cellSize = cell;
 
     const grid = new Map();
     const key = (x, y, z) => `${x},${y},${z}`;
     const cellRange = (i) => ({
-      x0: Math.floor((this.px[i] - this.hx[i] - EPS) / cell),
-      x1: Math.floor((this.px[i] + this.hx[i] + EPS) / cell),
+      x0: Math.floor((this.px[i] - ax[i] - EPS) / cell),
+      x1: Math.floor((this.px[i] + ax[i] + EPS) / cell),
       y0: Math.floor((this.py[i] - this.hy[i] - EPS) / cell),
       y1: Math.floor((this.py[i] + this.hy[i] + EPS) / cell),
-      z0: Math.floor((this.pz[i] - this.hz[i] - EPS) / cell),
-      z1: Math.floor((this.pz[i] + this.hz[i] + EPS) / cell),
+      z0: Math.floor((this.pz[i] - az[i] - EPS) / cell),
+      z1: Math.floor((this.pz[i] + az[i] + EPS) / cell),
     });
 
     for (let i = 0; i < n; i++) {
@@ -160,9 +183,9 @@ export class Structure {
     }
 
     const overlaps = (i, j) =>
-      Math.abs(this.px[i] - this.px[j]) <= this.hx[i] + this.hx[j] + EPS &&
+      Math.abs(this.px[i] - this.px[j]) <= ax[i] + ax[j] + EPS &&
       Math.abs(this.py[i] - this.py[j]) <= this.hy[i] + this.hy[j] + EPS &&
-      Math.abs(this.pz[i] - this.pz[j]) <= this.hz[i] + this.hz[j] + EPS;
+      Math.abs(this.pz[i] - this.pz[j]) <= az[i] + az[j] + EPS;
 
     const neighbours = new Array(n);
     let edgeCount = 0;
@@ -217,6 +240,29 @@ export class Structure {
       for (const j of below[i]) this.belowList[cursor++] = j;
     }
     this.belowStart[n] = cursor;
+
+    // Same-course neighbours, which is how a lintel or a slab carries across a
+    // gap. Deliberately excludes anything above: masonry spans sideways, it
+    // does not hang from the storey over its head.
+    const side = new Array(n);
+    let sideEdges = 0;
+    for (let i = 0; i < n; i++) {
+      const out = [];
+      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+        const j = this.adjList[a];
+        if (Math.abs(this.py[j] - this.py[i]) < Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
+      }
+      side[i] = out;
+      sideEdges += out.length;
+    }
+    this.sideStart = new Int32Array(n + 1);
+    this.sideList = new Int32Array(sideEdges);
+    cursor = 0;
+    for (let i = 0; i < n; i++) {
+      this.sideStart[i] = cursor;
+      for (const j of side[i]) this.sideList[cursor++] = j;
+    }
+    this.sideStart[n] = cursor;
 
     // Top-down iteration order for the load pass.
     const py = this.py;
@@ -435,9 +481,9 @@ export class Structure {
     const dist2 = (i, j) => {
       // Gap between the two boxes, not between their centres — a long stone
       // next to a small one should still read as touching.
-      const dx = Math.max(0, Math.abs(this.px[i] - this.px[j]) - this.hx[i] - this.hx[j]);
+      const dx = Math.max(0, Math.abs(this.px[i] - this.px[j]) - this._aabbX[i] - this._aabbX[j]);
       const dy = Math.max(0, Math.abs(this.py[i] - this.py[j]) - this.hy[i] - this.hy[j]);
-      const dz = Math.max(0, Math.abs(this.pz[i] - this.pz[j]) - this.hz[i] - this.hz[j]);
+      const dz = Math.max(0, Math.abs(this.pz[i] - this.pz[j]) - this._aabbZ[i] - this._aabbZ[j]);
       return dx * dx + dy * dy + dz * dz;
     };
 
@@ -892,24 +938,56 @@ export class Structure {
     const reach = this._reach;
     reach.fill(0);
 
-    // (a) Flood from the foundations.
-    const stack = this._stack;
-    let sp = 0;
-    for (let i = 0; i < n; i++) {
-      if ((this.flags[i] & ALIVE) && (this.flags[i] & GROUNDED) && !(this.flags[i] & (FREE | ISLAND))) {
-        reach[i] = 1;
-        stack[sp++] = i;
+    // (a) Bearing support, walked bottom-up.
+    //
+    // A stone is supported only if something *underneath* it is supported.
+    // Flooding through all adjacency instead — which is what this did first —
+    // counts sideways and even overhead contact as support, and that is wrong
+    // in a way that quietly breaks buildings: cut a wall clean through and the
+    // band above it stays up, because it still touches a roof slab that
+    // reaches the ground somewhere else. Masonry does not hang from its
+    // neighbours.
+    //
+    // Walking in ascending height order means one pass settles it, since
+    // everything below a stone has already been decided by the time we reach
+    // it. Arches, corbels and bonded courses all still work: their voussoirs
+    // genuinely do have lower neighbours.
+    const byHeight = this.heightOrder;
+    for (let k = n - 1; k >= 0; k--) {
+      const i = byHeight[k];
+      if (!(this.flags[i] & ALIVE)) continue;
+      if (this.flags[i] & (FREE | ISLAND)) continue;
+      if (this.flags[i] & GROUNDED) { reach[i] = 1; continue; }
+      for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
+        if (reach[this.belowList[a]]) { reach[i] = 1; break; }
       }
     }
-    while (sp > 0) {
-      const i = stack[--sp];
-      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
-        const j = this.adjList[a];
-        if (reach[j]) continue;
+
+    // Spanning. A lintel over a door, a slab between two walls and a modest
+    // corbel all carry load sideways for a short distance, and a model with no
+    // beam action at all would drop every floor and roof in the building the
+    // instant it was built. So bearing support spreads along a course, but only
+    // a few stones — far enough to cross an opening, nowhere near far enough to
+    // hold up an unsupported wall.
+    const span = this._spanBudget;
+    span.fill(0);
+    const queue = this._stack;
+    let head = 0, tail = 0;
+    for (let i = 0; i < n; i++) {
+      if (reach[i]) { span[i] = LATERAL_SPAN; queue[tail++] = i; }
+    }
+    while (head < tail && tail < n) {
+      const i = queue[head++];
+      const budget = span[i] - 1;
+      if (budget <= 0) continue;
+      for (let a = this.sideStart[i]; a < this.sideStart[i + 1]; a++) {
+        const j = this.sideList[a];
+        if (span[j] >= budget) continue;
         if (!(this.flags[j] & ALIVE)) continue;
         if (this.flags[j] & (FREE | ISLAND)) continue;
+        span[j] = budget;
         reach[j] = 1;
-        stack[sp++] = j;
+        if (tail < n) queue[tail++] = j;
       }
     }
 
@@ -964,13 +1042,20 @@ export class Structure {
     // stone shoved half a metre doesn't count as demolished.
     const detached = [];
     let standing = 0;
+    let winStanding = 0;
+    const mask = this._winMask;
     for (let i = 0; i < n; i++) {
       if (!(this.flags[i] & ALIVE)) continue;
       if (this.flags[i] & (FREE | ISLAND)) continue;
-      if (reach[i]) { standing += this.mass[i]; continue; }
+      if (reach[i]) {
+        standing += this.mass[i];
+        if (mask && mask[i]) winStanding += this.mass[i];
+        continue;
+      }
       detached.push(i);
     }
     this.standingMass = standing;
+    this._winStanding = winStanding;
 
     for (const group of this._connectedGroups(detached)) {
       this._releaseGroup(group);
@@ -1235,6 +1320,36 @@ export class Structure {
       return 1;
     }
     return 0;
+  }
+
+  /**
+   * Restrict the progress metric to named sections.
+   *
+   * The Taj's plinth is a 95 m solid platform and outweighs everything built on
+   * it, so measuring the whole structure means the dome can fall and the number
+   * barely moves — and winning would mean grinding down a terrace nobody wants
+   * to shoot at. Naming the sections that constitute the monument makes the
+   * readout and the win condition track the thing the level is about.
+   */
+  setScoreTags(tags) {
+    if (!tags || !tags.length) { this._winMask = null; return; }
+    const set = new Set(tags);
+    const mask = new Uint8Array(this.count);
+    let total = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (!set.has(this.tagOf[i])) continue;
+      mask[i] = 1;
+      if (this.flags[i] & ALIVE) total += this.mass[i];
+    }
+    this._winMask = mask;
+    this._winTotal = total;
+    this._winStanding = total;
+  }
+
+  /** Fraction of the scored sections still standing, or of everything if unset. */
+  get monumentIntegrity() {
+    if (!this._winMask || !this._winTotal) return this.integrity;
+    return Math.max(0, Math.min(1, this._winStanding / this._winTotal));
   }
 
   /** Fraction of the original structure still standing, 0..1. */

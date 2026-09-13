@@ -186,6 +186,78 @@ export class Garrison {
     }
   }
 
+  /**
+   * Taj Mahal garrison. The shape of the building dictates the shape of the
+   * defence: long open sightlines across the plinth, snipers on four 41 m
+   * minarets that see the whole approach, and AT teams on the tomb roof.
+   * Dropping a minaret takes its sniper with it, which is the one piece of the
+   * garrison you can remove without touching the tomb.
+   */
+  populateTajMahal(origin, groundY, counts = {}) {
+    const PLINTH = 95.5;
+    const PLINTH_H = 7.0;
+    const HALF = 28.5;
+    const ROOF = PLINTH_H + 33.0;
+
+    // Sandbagged positions along the plinth edge.
+    const perimeter = counts.plinth ?? 16;
+    for (let i = 0; i < perimeter; i++) {
+      const t = i / perimeter;
+      const a = t * Math.PI * 2;
+      const half = PLINTH / 2 - 2.5;
+      // Walk the square edge rather than a circle so they sit on the parapet.
+      const c = Math.cos(a), sn = Math.sin(a);
+      const m = Math.max(Math.abs(c), Math.abs(sn));
+      const p = new THREE.Vector3(
+        origin.x + (c / m) * half, groundY + PLINTH_H + 1.0, origin.z + (sn / m) * half,
+      );
+      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, a, 7);
+    }
+
+    // The four great iwans — covered positions looking straight down the
+    // approaches.
+    for (const [nx, nz, yaw] of [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]]) {
+      for (const off of [-5, 5]) {
+        const p = new THREE.Vector3(
+          origin.x + nx * (HALF - 1.5) - nz * off,
+          groundY + PLINTH_H + 6.0,
+          origin.z + nz * (HALF - 1.5) + nx * off,
+        );
+        this.place('rifleman', p, yaw, 6);
+      }
+    }
+
+    // Tomb roof: AT teams with the best field of fire on the level.
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const p = new THREE.Vector3(
+        origin.x + sx * 21, groundY + ROOF + 2.0, origin.z + sz * 21,
+      );
+      this.place('at', p, Math.atan2(sx, sz), 9);
+    }
+
+    // Minaret tops: snipers, 41 m up, seeing everything.
+    const base = PLINTH / 2 - 6.0;
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const p = new THREE.Vector3(
+        origin.x + sx * (base + 0.9), groundY + PLINTH_H + 43.0, origin.z + sz * (base + 0.9),
+      );
+      this.place('sniper', p, Math.atan2(sx, sz), 9);
+      // And a second, lower position on the shaft.
+      const q = new THREE.Vector3(
+        origin.x + sx * (base + 0.4), groundY + PLINTH_H + 24.0, origin.z + sz * (base + 0.4),
+      );
+      this.place('mg', q, Math.atan2(sx, sz), 8);
+    }
+
+    // Mosque and jawab roofs.
+    for (const side of [-1, 1]) {
+      for (const off of [-16, 0, 16]) {
+        const p = new THREE.Vector3(origin.x + side * 88, groundY + 19.5, origin.z + off);
+        this.place(off === 0 ? 'at' : 'rifleman', p, side > 0 ? Math.PI / 2 : -Math.PI / 2, 9);
+      }
+    }
+  }
+
   get aliveCount() { return this.defenders.reduce((n, d) => n + (d.alive ? 1 : 0), 0); }
 
   /** Kill anything caught in a blast. */

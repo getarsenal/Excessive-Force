@@ -54,6 +54,8 @@ export class HUD {
       ecAgain: document.getElementById('ec-again'),
     };
 
+    if (this.el.target && battle.level) this.el.target.textContent = battle.level.target;
+
     this.cards = new Map();
     this._buildBar();
 
@@ -139,7 +141,7 @@ export class HUD {
     this.el.money.textContent = `$${Math.floor(b.money).toLocaleString()}`;
     this.el.income.textContent = `$${b.income.toFixed(0)}/s`;
 
-    const integ = b.primary.integrity;
+    const integ = b.primary.monumentIntegrity;
     const pct = Math.round(integ * 100);
     this.el.integrity.style.width = `${Math.max(0, integ * 100)}%`;
     this.el.integrityPct.textContent = `${pct}%`;
@@ -184,11 +186,10 @@ export class HUD {
   showEnd(kind, summary) {
     this.el.endcard.hidden = false;
     const won = kind === 'win';
-    this.el.ecTitle.textContent = won ? 'TOWER DOWN' : 'ASSAULT STALLED';
+    this.el.ecTitle.textContent = won ? 'TARGET DOWN' : 'ASSAULT STALLED';
     this.el.ecTitle.className = `ec-title ${won ? 'win' : 'lose'}`;
-    this.el.ecSub.textContent = won
-      ? 'Elizabeth Tower · Westminster'
-      : 'Out of funds with the tower still standing';
+    const site = this.battle.level?.subtitle ?? '';
+    this.el.ecSub.textContent = won ? site : 'Out of funds with the target still standing';
 
     const mins = Math.floor(summary.time / 60);
     const secs = Math.floor(summary.time % 60);

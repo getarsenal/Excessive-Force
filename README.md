@@ -6,8 +6,12 @@ A 3D artillery-demolition game. You command the guns from a bird's-eye view,
 buy units as money comes in, designate where to hit, and try to put a 96-metre
 tower on the ground while its garrison shoots back.
 
-The first level is the **Elizabeth Tower** at Westminster, standing on the real
-terrain of the site.
+Two levels so far, each on the real terrain of its site:
+
+| | Level | The problem |
+|---|---|---|
+| `?level=westminster` | **Elizabeth Tower** | A cantilever. Undercut one face and 81 m of tower goes over that way. |
+| `?level=agra` | **Taj Mahal** | A compression shell. Shelling the dome makes holes; it comes down when you take the chamber wall underneath it. |
 
 ---
 
@@ -45,6 +49,41 @@ that. So each damaged slice is checked: if the centre of mass above it has
 moved outside what's left bearing underneath, everything above is released and
 goes over. This is why undercutting one face works, and why the tower falls in
 the direction you cut rather than a direction someone chose in advance.
+
+### Two landmarks, two different problems
+
+This is why the structural model had to be real rather than scripted. A tower
+and a dome fail in completely different ways, and nothing in the engine knows
+which is which — the same three rules produce both.
+
+The Elizabeth Tower is a cantilever. Cut one face and both corner buttresses and
+the overturning check fires: 81 m of masonry releases as one section and rotates
+over in the direction you cut.
+
+The Taj is a compression shell. Its weight runs from the dome, through the drum,
+into the octagonal chamber wall around the cenotaph, and down to the plinth.
+Pouring fire into the dome itself mostly makes holes. Cutting the chamber wall
+drops the whole drum and dome — measured, 89 m to 60.7 m in one second, with
+1,800 stones in the air at once.
+
+Getting there surfaced four real bugs in the engine, all of which had been
+silently wrong on the tower too:
+
+- **Adjacency ignored rotation.** Curved walls are laid as yawed blocks, whose
+  world AABB is wider than their own half-extents. Testing with the unrotated
+  ones under-connected every drum and dome.
+- **The bond dropped stones.** Alternate courses shift half a stone so joints
+  don't stack — but when an edge holds exactly one stone, that shift pushed it
+  past the end of the edge and it was skipped. A finely-approximated circle has
+  one stone per edge, so *every odd course of every curved wall was empty*.
+- **The joint gap was a percentage.** Stones shrink slightly so they don't start
+  interpenetrating. At 3 % a 1 m stone still touches its neighbour; a 4 m core
+  block loses 12 cm and silently stops connecting to anything.
+- **Support came from any direction.** Flooding through all adjacency counts
+  sideways and overhead contact as support, so a wall cut clean through stayed
+  up because it still brushed a roof slab. Support now comes from below, and
+  spreads sideways only a few stones — far enough for a lintel, nowhere near
+  far enough to hold up a wall.
 
 ### It runs on a phone
 

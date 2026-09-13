@@ -1,0 +1,13 @@
+{
+  "id": "agra",
+  "name": "Taj Mahal, Agra",
+  "lat": 27.1751,
+  "lon": 78.04214,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 137.277,
+  "maxElevation": 184.909,
+  "metersPerDemPixel": 8.4999,
+  "seaLevel": 149.598,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

@@ -31,7 +31,8 @@ page.on('pageerror', (e) => logs.push(`[PAGEERROR] ${e.message}\n${e.stack || ''
 page.on('requestfailed', (r) => logs.push(`[REQFAIL] ${r.url()} ${r.failure()?.errorText}`));
 page.on('response', (r) => { if (r.status() >= 400) logs.push(`[HTTP ${r.status()}] ${r.url()}`); });
 
-await page.goto('http://localhost:5173/', { waitUntil: 'load', timeout: 120000 });
+const url = process.env.TT_URL || 'http://localhost:5173/';
+await page.goto(url, { waitUntil: 'load', timeout: 120000 });
 
 // Wait until the loading overlay is gone, or bail with whatever we have.
 let ready = false;

@@ -30,6 +30,7 @@ export class Battle {
     this.quality = ctx.quality;
     this.engine = ctx.engine;
     this.audio = ctx.audio || null;
+    this.level = ctx.level || null;
     this.onEvent = ctx.onEvent || (() => {});
 
     this.models = new ModelLibrary();
@@ -481,7 +482,8 @@ export class Battle {
 
     // Win when the tower is genuinely down: either most of its mass has left
     // the standing structure, or it has lost two thirds of its height.
-    if (this.primary.integrity < 0.30 || heightFrac < 0.34) {
+    const win = this.level?.win ?? { integrity: 0.30, heightFrac: 0.34 };
+    if (this.primary.monumentIntegrity < win.integrity || heightFrac < win.heightFrac) {
       this.state = 'won';
       this.onEvent('win', this.summary());
       return;
@@ -500,7 +502,7 @@ export class Battle {
   summary() {
     return {
       score: Math.round(this.score),
-      integrity: this.primary.integrity,
+      integrity: this.primary.monumentIntegrity,
       heightStanding: this.primary.standingHeight() - this.originGround,
       startHeight: this.startHeight - this.originGround,
       defendersKilled: this.defendersKilled,

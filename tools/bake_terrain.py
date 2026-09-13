@@ -50,6 +50,25 @@ LEVELS = {
             ],
         },
     },
+    "agra": {
+        "name": "Taj Mahal, Agra",
+        "lat": 27.17510,
+        "lon": 78.04214,
+        "span": 900.0,
+        "zoom": 14,
+        # The Yamuna runs immediately behind the mausoleum. Held ~260 m north
+        # so the carved channel clears the plinth's foundations; the real bank
+        # is closer, but the game needs the ground under the monument intact.
+        "river": {
+            "width": 200.0,
+            "points": [
+                [-900, 215], [-520, 245], [-160, 275], [200, 285],
+                [560, 255], [900, 205],
+            ],
+        },
+        # The charbagh garden south of the mausoleum, and the forecourt.
+        "parks": [[0, -340, 300], [-260, -300, 170], [260, -300, 170]],
+    },
 }
 
 
@@ -194,7 +213,7 @@ def bake(level_id: str):
     # south of the tower so the ground shader has something to vary on.
     gx = np.linspace(-cfg["span"], cfg["span"], size)[None, :]
     gy = np.linspace(cfg["span"], -cfg["span"], size)[:, None]
-    for ox, oy, r in [(-620, 260, 330), (-120, -330, 150)]:
+    for ox, oy, r in cfg.get("parks", [(-620, 260, 330), (-120, -330, 150)]):
         d = np.hypot(np.broadcast_to(gx, (size, size)) - ox,
                      np.broadcast_to(gy, (size, size)) - oy)
         mask[:, :, 2] = np.maximum(mask[:, :, 2], np.clip(1.0 - d / r, 0.0, 1.0))

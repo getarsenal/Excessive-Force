@@ -8,7 +8,7 @@ import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
 import { loadCity, buildCity } from './world/city.js';
 import { Structure } from './structure/structure.js';
-import { buildElizabethTower, buildPalaceWing } from './structure/landmarks/bigben.js';
+import { resolveLevel } from './game/levels.js';
 import { MATERIAL_PROPS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { Garrison } from './game/defenders.js';
@@ -30,6 +30,11 @@ async function boot() {
   console.log('[tumble] quality', quality.id, '· wasm simd', quality.simd,
     '· body budget', quality.activeBodies);
 
+  const level = resolveLevel();
+  console.log('[tumble] level', level.id, '·', level.name);
+  const sub = document.querySelector('.load-sub');
+  if (sub) sub.textContent = level.name.toUpperCase();
+
   await progress(6, 'starting physics');
   await initPhysics();
 
@@ -43,8 +48,8 @@ async function boot() {
   canvas.addEventListener('pointerdown', unlockAudio, { once: true });
   window.addEventListener('keydown', unlockAudio, { once: true });
 
-  await progress(18, 'surveying westminster');
-  const terrain = await loadTerrain('westminster', quality);
+  await progress(18, `surveying ${level.name.split(',')[1]?.trim() || level.name}`);
+  const terrain = await loadTerrain(level.terrain, quality);
   engine.scene.add(terrain.buildMesh());
   terrain.addToPhysics(physics);
 
@@ -59,8 +64,10 @@ async function boot() {
   await progress(30, 'building london');
   // Real OpenStreetMap footprints when they've been baked; otherwise the
   // hand-placed approximation, so the level still reads as a city either way.
-  const city = await loadCity('westminster');
-  const cityGroup = city ? buildCity(city, terrain, quality, { excludeRadius: 70 }) : null;
+  const city = await loadCity(level.terrain);
+  const cityGroup = city
+    ? buildCity(city, terrain, quality, { excludeRadius: level.cityExcludeRadius })
+    : null;
   if (cityGroup) {
     engine.scene.add(cityGroup);
     // Report the file's own provenance rather than assuming it is real data —
@@ -73,11 +80,11 @@ async function boot() {
       + ' (run tools/bake_buildings.py for real footprints)');
   }
 
-  await progress(44, 'quarrying anston stone');
-  const towerBlocks = buildElizabethTower(quality);
-  const wingBlocks = buildPalaceWing(quality);
+  await progress(44, 'quarrying stone');
+  const specs = level.structures(quality);
+  const totalBlocks = specs.reduce((a, sp) => a + sp.blocks.length, 0);
 
-  await progress(56, `setting ${(towerBlocks.length + wingBlocks.length).toLocaleString()} stones`);
+  await progress(56, `setting ${totalBlocks.toLocaleString()} stones`);
 
   const fx = new ExplosionFX(engine.scene, quality);
   const dustColour = new THREE.Color();
@@ -87,21 +94,27 @@ async function boot() {
   };
 
   const t0 = performance.now();
-  const tower = new Structure(physics, towerBlocks, { groundY, origin, onChunkDestroyed });
-  const wing = new Structure(physics, wingBlocks, { groundY, origin, onChunkDestroyed });
-  console.log('[tumble] built', tower.count + wing.count, 'stones in',
-    (performance.now() - t0).toFixed(0), 'ms');
-  engine.scene.add(tower.group, wing.group);
-  const structures = [tower, wing];
+  const structures = [];
+  let primary = null;
+  for (const spec of specs) {
+    const st = new Structure(physics, spec.blocks, { groundY, origin, onChunkDestroyed });
+    st.key = spec.key;
+    engine.scene.add(st.group);
+    structures.push(st);
+    if (spec.primary) primary = st;
+    if (spec.primary && level.scoreTags) st.setScoreTags(level.scoreTags);
+  }
+  primary = primary || structures[0];
+  console.log('[tumble] built', structures.reduce((a, st) => a + st.count, 0),
+    'stones in', (performance.now() - t0).toFixed(0), 'ms');
 
   await progress(74, 'posting the garrison');
   const garrison = new Garrison(engine.scene, structures, quality);
-  garrison.populateElizabethTower(origin, groundY);
-  garrison.populatePalaceWing(origin, groundY);
+  level.garrison(garrison, origin, groundY);
 
   const rig = new CameraRig(engine.camera, canvas, {
-    tx: 0, ty: groundY + 42, tz: 0,
-    distance: 235, yaw: -0.78, pitch: 0.40,
+    tx: 0, ty: groundY + level.camera.height, tz: 0,
+    distance: level.camera.distance, yaw: level.camera.yaw, pitch: level.camera.pitch,
   });
   rig.groundHeight = (x, z) => terrain.heightAt(x, z);
 
@@ -110,7 +123,7 @@ async function boot() {
   let hud;
   const battle = new Battle({
     scene: engine.scene, camera: engine.camera, engine, physics, terrain,
-    structures, primary: tower, garrison, fx, quality, groundY, audio,
+    structures, primary, garrison, fx, quality, groundY, audio, level,
     onEvent: (kind, data) => handleEvent(kind, data),
   });
 
@@ -148,7 +161,8 @@ async function boot() {
         // Let the collapse actually finish before covering it with a panel —
         // the tower coming down is the thing the player came for.
         hud.feed('STRUCTURE FAILING', 'big');
-        rig.focus(new THREE.Vector3(0, groundY + 30, 0), 300);
+        rig.focus(new THREE.Vector3(0, groundY + level.camera.height * 0.7, 0),
+          level.camera.distance * 1.3);
         setTimeout(() => hud.showEnd('win', battle.summary()), 7000);
         break;
       case 'lose':
@@ -327,13 +341,17 @@ async function boot() {
     if (perfEl) {
       perfEl.textContent =
         `${fps} fps · phys ${physMs.toFixed(1)}ms · ${physics.awakeCount} awake / ` +
-        `${physics.dynamicSet.size} sim · ${tower.destroyedCount + wing.destroyedCount} stones gone · ` +
-        `${tower.islands.size + wing.islands.size} sections · ${quality.id}`;
+        `${physics.dynamicSet.size} sim · ` +
+        `${structures.reduce((a, st) => a + st.destroyedCount, 0)} stones gone · ` +
+        `${structures.reduce((a, st) => a + st.islands.size, 0)} sections · ${quality.id}`;
     }
   }
   frame();
 
-  Object.assign(window, { engine, physics, tower, wing, terrain, rig, battle, garrison, fx, quality, audio });
+  Object.assign(window, {
+    engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level,
+    structures, tower: primary, primary,
+  });
 
   /**
    * Step the simulation without rendering.
