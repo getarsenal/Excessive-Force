@@ -208,18 +208,30 @@ export class CameraRig {
     this._bind();
   }
 
+  /**
+   * Gestures:
+   *   one finger  -> orbit (aim the view)
+   *   two fingers -> pan the camera's location, and pinch to zoom
+   *   mouse: drag orbits, right/middle/shift-drag pans, wheel zooms
+   *
+   * Once a gesture goes to two fingers it stays a pan until every finger
+   * lifts. Without that lock, taking one finger off mid-pinch would snap the
+   * gesture back to orbit and spin the view on the way out of the gesture.
+   */
   _bind() {
     const dom = this.dom;
+
     const down = (e) => {
       if (!this.enabled) return;
-      dom.setPointerCapture?.(e.pointerId);
-      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
-      this._moved = 0;
+      try { dom.setPointerCapture?.(e.pointerId); } catch { /* not capturable */ }
+      this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this._pointers.size === 1) {
-        this._dragMode = (e.button === 2 || e.shiftKey) ? 'pan' : 'orbit';
+        this._moved = 0;
+        this._dragMode = (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'orbit';
       } else if (this._pointers.size === 2) {
-        this._dragMode = 'pinch';
+        this._dragMode = 'twofinger';
         this._lastPinch = this._pinchDistance();
+        this._lastCentroid = this._centroid();
       }
     };
 
@@ -231,31 +243,49 @@ export class CameraRig {
       p.x = e.clientX; p.y = e.clientY;
       this._moved += Math.abs(dx) + Math.abs(dy);
 
-      if (this._dragMode === 'orbit' && this._pointers.size === 1) {
-        this.desiredYaw -= dx * 0.0042;
-        this.desiredPitch = clamp(this.desiredPitch + dy * 0.0034, this.minPitch, this.maxPitch);
-      } else if (this._dragMode === 'pan' && this._pointers.size === 1) {
-        this._pan(dx, dy);
-      } else if (this._dragMode === 'pinch' && this._pointers.size === 2) {
+      if (this._dragMode === 'twofinger') {
+        if (this._pointers.size < 2) return;
+        // Pan by how far the midpoint of the two fingers travelled, and zoom
+        // by how much their separation changed. Using the centroid rather than
+        // one finger's delta means a pure pinch doesn't also drag the map.
+        const c = this._centroid();
+        if (this._lastCentroid) {
+          this._pan(c.x - this._lastCentroid.x, c.y - this._lastCentroid.y, c.x, c.y);
+        }
+        this._lastCentroid = c;
+
         const d = this._pinchDistance();
-        if (this._lastPinch > 0) {
+        if (this._lastPinch > 0 && d > 0) {
           this.desiredDistance = clamp(
-            this.desiredDistance * (this._lastPinch / Math.max(d, 1)),
+            this.desiredDistance * (this._lastPinch / d),
             this.minDistance, this.maxDistance,
           );
         }
         this._lastPinch = d;
-        // Two-finger drag also pans, which is how people expect maps to work.
-        const ids = [...this._pointers.values()];
-        if (ids.length === 2) this._pan(dx * 0.5, dy * 0.5);
+        return;
+      }
+
+      if (this._pointers.size !== 1) return;
+      if (this._dragMode === 'orbit') {
+        this.desiredYaw -= dx * 0.0042;
+        this.desiredPitch = clamp(this.desiredPitch + dy * 0.0034, this.minPitch, this.maxPitch);
+      } else if (this._dragMode === 'pan') {
+        this._pan(dx, dy, e.clientX, e.clientY);
       }
     };
 
     const up = (e) => {
       this._pointers.delete(e.pointerId);
-      dom.releasePointerCapture?.(e.pointerId);
-      if (this._pointers.size === 0) this._dragMode = null;
-      else if (this._pointers.size === 1) this._dragMode = 'orbit';
+      try { dom.releasePointerCapture?.(e.pointerId); } catch { /* already gone */ }
+      if (this._pointers.size === 0) {
+        this._dragMode = null;
+        this._lastCentroid = null;
+      } else if (this._dragMode === 'twofinger') {
+        // Stay in the two-finger gesture; just re-seed from what's left so the
+        // next delta isn't measured against a finger that is gone.
+        this._lastCentroid = this._centroid();
+        this._lastPinch = this._pinchDistance();
+      }
     };
 
     dom.addEventListener('pointerdown', down);
@@ -283,12 +313,80 @@ export class CameraRig {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
 
-  _pan(dx, dy) {
-    // Pan in the camera's ground plane, scaled by zoom so it feels constant.
-    const scale = this.distance * 0.0016;
-    const cos = Math.cos(this.yaw), sin = Math.sin(this.yaw);
-    this.desiredTarget.x -= (dx * cos - dy * sin) * scale;
-    this.desiredTarget.z -= (dx * sin + dy * cos) * scale;
+  _centroid() {
+    let x = 0, y = 0, n = 0;
+    for (const p of this._pointers.values()) { x += p.x; y += p.y; n++; }
+    return n ? { x: x / n, y: y / n } : null;
+  }
+
+  /**
+   * The camera's ground-plane basis.
+   *
+   * The rig places the camera at target + (sin(yaw)·cp·d, …, cos(yaw)·cp·d),
+   * so it looks back along -(sin yaw, cos yaw). From that:
+   *   forward = (-sin yaw, 0, -cos yaw)   screen-up, away from the camera
+   *   right   = ( cos yaw, 0, -sin yaw)   screen-right
+   */
+  _basis() {
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    return { fx: -s, fz: -c, rx: c, rz: -s };
+  }
+
+  /** Metres of ground per screen pixel at the focus distance. */
+  _metresPerPixel() {
+    const vFov = (this.camera.fov * Math.PI) / 180;
+    return (2 * Math.tan(vFov / 2) * this.distance) / Math.max(window.innerHeight, 1);
+  }
+
+  /**
+   * Where a screen pixel lands on the horizontal plane through the focus point.
+   * Returns null when the ray runs parallel to the plane or points away from it,
+   * which happens once the camera is nearly level with the ground.
+   */
+  _screenToGround(sx, sy, out) {
+    const ndcX = (sx / window.innerWidth) * 2 - 1;
+    const ndcY = -((sy / window.innerHeight) * 2 - 1);
+    const v = (this._rayTmp || (this._rayTmp = new THREE.Vector3()));
+    v.set(ndcX, ndcY, 0.5).unproject(this.camera).sub(this.camera.position);
+    if (Math.abs(v.y) < 1e-6) return null;
+    const t = (this.target.y - this.camera.position.y) / v.y;
+    if (t <= 0 || !isFinite(t)) return null;
+    return out.copy(this.camera.position).addScaledVector(v, t);
+  }
+
+  /**
+   * Drag the ground, map-style: whatever is under the cursor stays under it.
+   *
+   * The exact way to do this is to ask where the pointer was pointing on the
+   * ground before the move and where it points now, then shift the focus by the
+   * difference. No trigonometry, no foreshortening fudge, and it stays correct
+   * at any yaw, pitch or zoom.
+   *
+   * The earlier version derived a direction from yaw by hand and had one sign
+   * wrong on each axis. That is why panning didn't read as merely inverted —
+   * the error changed character as you orbited, so every drag felt arbitrary.
+   * The fallback below is that same trigonometric estimate, kept only for the
+   * case where the camera is so close to level that the ray never meets the
+   * ground plane.
+   */
+  _pan(dx, dy, sx, sy) {
+    if (sx !== undefined && sy !== undefined) {
+      const a = this._panA || (this._panA = new THREE.Vector3());
+      const b = this._panB || (this._panB = new THREE.Vector3());
+      const from = this._screenToGround(sx - dx, sy - dy, a);
+      const to = from ? this._screenToGround(sx, sy, b) : null;
+      if (from && to) {
+        this.desiredTarget.x += from.x - to.x;
+        this.desiredTarget.z += from.z - to.z;
+        return;
+      }
+    }
+
+    const { fx, fz, rx, rz } = this._basis();
+    const mpp = this._metresPerPixel();
+    const grazing = Math.max(Math.sin(this.pitch), 0.25);
+    this.desiredTarget.x += (-rx * dx + fx * dy / grazing) * mpp;
+    this.desiredTarget.z += (-rz * dx + fz * dy / grazing) * mpp;
   }
 
   /** True if the last pointer interaction was a drag rather than a tap. */
@@ -304,15 +402,15 @@ export class CameraRig {
     const k = this._keys;
     if (k.size) {
       const speed = this.distance * 0.9 * dt;
-      const cos = Math.cos(this.yaw), sin = Math.sin(this.yaw);
-      let fx = 0, fz = 0;
-      if (k.has('KeyW') || k.has('ArrowUp')) fz -= 1;
-      if (k.has('KeyS') || k.has('ArrowDown')) fz += 1;
-      if (k.has('KeyA') || k.has('ArrowLeft')) fx -= 1;
-      if (k.has('KeyD') || k.has('ArrowRight')) fx += 1;
-      if (fx || fz) {
-        this.desiredTarget.x += (fx * cos - fz * sin) * speed;
-        this.desiredTarget.z += (fx * sin + fz * cos) * speed;
+      const { fx, fz, rx, rz } = this._basis();
+      let fwd = 0, strafe = 0;
+      if (k.has('KeyW') || k.has('ArrowUp')) fwd += 1;
+      if (k.has('KeyS') || k.has('ArrowDown')) fwd -= 1;
+      if (k.has('KeyD') || k.has('ArrowRight')) strafe += 1;
+      if (k.has('KeyA') || k.has('ArrowLeft')) strafe -= 1;
+      if (fwd || strafe) {
+        this.desiredTarget.x += (fx * fwd + rx * strafe) * speed;
+        this.desiredTarget.z += (fz * fwd + rz * strafe) * speed;
       }
       if (k.has('KeyQ')) this.desiredYaw += dt * 1.1;
       if (k.has('KeyE')) this.desiredYaw -= dt * 1.1;

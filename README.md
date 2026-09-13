@@ -162,10 +162,11 @@ fires.
 
 | | |
 |---|---|
-| Drag | Orbit |
-| Right-drag / Shift-drag / two fingers | Pan |
-| Wheel / pinch | Zoom |
-| WASD, arrows, Q/E | Pan and rotate |
+| One finger / drag | Aim the view (orbit) |
+| Two fingers | Move the camera's location |
+| Pinch / wheel | Zoom |
+| Right-drag, middle-drag or Shift-drag | Move the camera's location (mouse) |
+| WASD, arrows, Q/E | Move and rotate |
 | Tap the tower | Designate a target — every gun in range fires at it |
 | Tap a unit card, then the ground | Deploy |
 | 1–9 | Pick a unit |
