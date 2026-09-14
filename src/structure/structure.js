@@ -1689,6 +1689,7 @@ export class Structure {
 
     this._leanDirty = true;
     this.markMeshDirty();
+    if (this.onLean) this.onLean(L);
 
     // Keep the bearing analysis alive while it leans. The solver only runs
     // when something has changed, so without this a structure that is still

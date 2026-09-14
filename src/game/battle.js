@@ -75,9 +75,77 @@ export class Battle {
     this.powerScale = 1;
 
     this.tracerFX = new TracerFX(this.scene, this.quality);
+    this._setupHealthBars();
     this._setupTargetMarker();
     this._setupGhost();
     this._setupConfirmRing();
+  }
+
+  /**
+   * Damage readouts over the guns.
+   *
+   * A unit under fire gave no sign of it until it exploded, so losing an M777
+   * to a sniper you never noticed felt arbitrary rather than like a mistake you
+   * could have avoided. Two instanced quads — a dark backing and a coloured
+   * fill — drawn only for units that have actually been hit.
+   */
+  _setupHealthBars() {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.translate(0.5, 0, 0);            // grows from the left edge
+    const mk = (colour, order) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({
+        color: colour, transparent: true, opacity: 0.9,
+        depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+      }), 64);
+      m.frustumCulled = false;
+      m.count = 0;
+      m.renderOrder = order;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(64 * 3), 3);
+      this.scene.add(m);
+      return m;
+    };
+    this.hpBack = mk(0xffffff, 26);
+    this.hpFill = mk(0xffffff, 27);
+    this._hpM4 = new THREE.Matrix4();
+    this._hpV = new THREE.Vector3();
+    this._hpS = new THREE.Vector3();
+    this._hpC = new THREE.Color();
+  }
+
+  _updateHealthBars() {
+    let w = 0;
+    const camQ = this.camera.quaternion;
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      const frac = Math.max(0, Math.min(1, u.health / u.maxHealth));
+      if (frac > 0.995 || w >= 64) continue;
+      // Scaled with distance so the bar stays legible without ever growing
+      // large enough to clutter a close-up.
+      const dist = this.camera.position.distanceTo(u.pos);
+      const width = Math.max(3.2, dist * 0.022);
+      const height = width * 0.13;
+      const y = u.pos.y + (u.def.model === 'infantry' ? 3.0 : 4.2);
+
+      this._hpV.set(u.pos.x - width / 2, y, u.pos.z);
+      this._hpS.set(width, height, 1);
+      this._hpM4.compose(this._hpV, camQ, this._hpS);
+      this.hpBack.setMatrixAt(w, this._hpM4);
+      this.hpBack.instanceColor.setXYZ(w, 0.04, 0.05, 0.06);
+
+      this._hpS.set(width * frac, height * 0.78, 1);
+      this._hpM4.compose(this._hpV, camQ, this._hpS);
+      this.hpFill.setMatrixAt(w, this._hpM4);
+      this._hpC.setHex(frac > 0.6 ? 0x6fd08c : frac > 0.28 ? 0xe0a33c : 0xe8604c);
+      this.hpFill.instanceColor.setXYZ(w, this._hpC.r, this._hpC.g, this._hpC.b);
+      w++;
+    }
+    this.hpBack.count = w;
+    this.hpFill.count = w;
+    for (const m of [this.hpBack, this.hpFill]) {
+      m.instanceMatrix.needsUpdate = true;
+      m.instanceColor.needsUpdate = true;
+    }
   }
 
   _setupTargetMarker() {
@@ -113,6 +181,36 @@ export class Battle {
     g.visible = false;
     this.ghost = g;
     this.scene.add(g);
+
+    // The range ring. Every unit has a range and until now the only way to
+    // find out whether a position could reach the target was to buy the gun
+    // and watch it sit there — which costs money you cannot get back.
+    const ring = new THREE.RingGeometry(0.985, 1.0, 96);
+    ring.rotateX(-Math.PI / 2);
+    const rangeRing = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({
+      color: 0x58a6ff, transparent: true, opacity: 0.45,
+      depthWrite: false, side: THREE.DoubleSide,
+    }));
+    rangeRing.visible = false;
+    rangeRing.renderOrder = 18;
+    this.rangeRing = rangeRing;
+    this.scene.add(rangeRing);
+  }
+
+  /**
+   * Show where a unit placed here could reach.
+   *
+   * Drawn as a flat ring at the deployment point rather than a dome, because
+   * the decision being made is a plan-view one: can this position cover the
+   * face of the building I want to cut?
+   */
+  showRange(point, def) {
+    if (!point || !def) { this.rangeRing.visible = false; return; }
+    this.rangeRing.position.set(point.x, point.y + 0.4, point.z);
+    this.rangeRing.scale.setScalar(def.range);
+    const reaches = point.distanceTo(this.primary.origin) <= def.range;
+    this.rangeRing.material.color.setHex(reaches ? 0x6fd08c : 0xe0a33c);
+    this.rangeRing.visible = true;
   }
 
   /**
@@ -211,6 +309,18 @@ export class Battle {
     for (const u of this.units) {
       if (!u.alive) continue;
       if (u.pos.distanceTo(point) < 7) return { ok: false, reason: 'occupied' };
+    }
+    // And not inside a building. Nothing stopped this before, so a gun placed
+    // on a street that happened to be a block would simply be swallowed — it
+    // fired from inside the masonry, the camera followed it in, and the screen
+    // went black.
+    if (!onRoof && this.cityPlots) {
+      for (const b2 of this.cityPlots) {
+        if (Math.abs(b2.x - point.x) < b2.w / 2 + 2.5
+            && Math.abs(b2.z - point.z) < b2.d / 2 + 2.5) {
+          return { ok: false, reason: 'inside a building' };
+        }
+      }
     }
     return { ok: true };
   }
@@ -662,6 +772,7 @@ export class Battle {
     this.garrison.sync();
     this.tracerFX.update(dt);
     this._updateRings(dt);
+    this._updateHealthBars();
 
     if (this.targetMarker.visible) {
       this.targetMarker.rotation.y += dt * 0.7;

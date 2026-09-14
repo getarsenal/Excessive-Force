@@ -519,6 +519,87 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     g.add(mesh);
   }
 
+  // ── Kerbs. A pale strip round each block turns "boxes on a field" into
+  // "buildings on streets", which is most of what the eye uses to read a plan
+  // from above. One flat quad per block, laid just proud of the terrain.
+  const kerbs = [];
+  for (const p of plots) {
+    const kerb = new THREE.BoxGeometry(p.w + 5.5, 0.24, p.d + 5.5);
+    kerb.translate(p.x, terrain.heightAt(p.x, p.z) + 0.12, p.z);
+    tintOne(kerb, 0xb9b3a4, 0.85 + rng() * 0.25);
+    kerbs.push(kerb);
+  }
+  if (kerbs.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(kerbs, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }),
+    );
+    mesh.receiveShadow = shadows;
+    mesh.renderOrder = 1;
+    g.add(mesh);
+  }
+
+  // ── Street lamps. Barely a pixel each at playing distance, but a regular
+  // rhythm of verticals along a frontage is what makes a street read as a
+  // street rather than as a gap between two blocks.
+  const lamps = [];
+  for (const p of plots) {
+    if (rng() > 0.6 * dense) continue;
+    const n = 1 + Math.floor(rng() * 2);
+    for (let k = 0; k < n; k++) {
+      const alongX = rng() < 0.5;
+      const off = (rng() - 0.5) * (alongX ? p.w : p.d) * 0.8;
+      const side = rng() < 0.5 ? 1 : -1;
+      const x = p.x + (alongX ? off : side * (p.w / 2 + 2.6));
+      const z = p.z + (alongX ? side * (p.d / 2 + 2.6) : off);
+      if (terrain.isWater(x, z)) continue;
+      const y = terrain.heightAt(x, z);
+      const post = new THREE.CylinderGeometry(0.1, 0.14, 6.2, 5);
+      post.translate(x, y + 3.1, z);
+      lamps.push(post);
+      const head = new THREE.BoxGeometry(0.8, 0.3, 0.4);
+      head.translate(x, y + 6.2, z);
+      lamps.push(head);
+    }
+  }
+  if (lamps.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(lamps, false),
+      new THREE.MeshStandardMaterial({ color: 0x2b3138, roughness: 0.6, metalness: 0.35 }),
+    );
+    mesh.castShadow = shadows;
+    g.add(mesh);
+  }
+
+  // ── River traffic. A couple of barges give the water a sense of scale and
+  // of being *used*, and they move, which nothing else on the river does.
+  const hulls = [];
+  for (let i = 0; i < 9; i++) {
+    // Walk out from the centre line until we find open water.
+    let x = null, z = (rng() * 2 - 1) * span * 0.8;
+    for (let probe = 40; probe < span * 0.9; probe += 14) {
+      if (terrain.isWater(probe, z)) { x = probe + (rng() - 0.5) * 20; break; }
+    }
+    if (x === null || !terrain.isWater(x, z)) continue;
+    const len = 16 + rng() * 22;
+    const hull = new THREE.BoxGeometry(6.5, 2.6, len);
+    hull.translate(x, terrain.waterLevel + 0.5, z);
+    tintOne(hull, [0x4a4034, 0x3b4a52, 0x5a4a3a][Math.floor(rng() * 3)], 0.9);
+    hulls.push(hull);
+    const house = new THREE.BoxGeometry(4.6, 2.6, 5.5);
+    house.translate(x, terrain.waterLevel + 3.1, z + len * 0.3);
+    tintOne(house, 0xc9c2b2, 0.9);
+    hulls.push(house);
+  }
+  if (hulls.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(hulls, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }),
+    );
+    mesh.castShadow = shadows;
+    g.add(mesh);
+  }
+
   // ── Parked vehicles along the street frontages. Tiny, but they are the thing
   // that fixes the scale of everything else in the frame.
   const cars = [];

@@ -9,6 +9,7 @@ import { buildContext } from './world/context.js';
 import { loadCity, buildCity } from './world/city.js';
 import { Structure } from './structure/structure.js';
 import { resolveLevel } from './game/levels.js';
+import { UNITS, UNITS_BY_ID } from './game/units.js';
 import { MATERIAL_PROPS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
@@ -152,6 +153,20 @@ async function boot() {
 
   battle.craters = new CraterFX(engine.scene, terrain, quality);
 
+  // Warm the model cache in the background. Deploying a gun for the first time
+  // otherwise means a Draco decode on the spot, which lands as a visible hitch
+  // at exactly the moment the player is watching the thing they just bought.
+  (async () => {
+    for (const u of UNITS) {
+      if (u.model === 'infantry') continue;
+      try {
+        await battle.models.load(u.model, u.modelLength, { tint: u.tint });
+      } catch (e) { console.warn(`[tumble] ${u.model} unavailable:`, e.message); }
+    }
+  })();
+  // Footprints, so a gun cannot be deployed inside a building.
+  battle.cityPlots = (cityGroup || contextGroup)?.userData?.plots || null;
+
   hud = new HUD(battle, {
     onSelect: (id) => {
       battle.selectUnit(id);
@@ -195,6 +210,28 @@ async function boot() {
         break;
       default: break;
     }
+  }
+
+  // A structure that is out of plumb groans about it, and once it lets go the
+  // world slows for a beat. The collapse is what the player came for; giving it
+  // a moment to land is the cheapest drama in the game.
+  for (const st of structures) {
+    st.onLean = (lean) => {
+      if (lean.angle < 0.006) return;
+      audio.groan(Math.min(1, lean.angle / 0.13),
+        new THREE.Vector3(lean.pivotX, lean.pivotY + 20, lean.pivotZ));
+    };
+    st.onSectionFalling = (island) => {
+      if (island.mass < 400000) return;      // a minor section; no fuss
+      const t = island.body.translation();
+      const where = new THREE.Vector3(t.x, t.y, t.z);
+      audio.rumble(1, where);
+      engine.addShake(0.8);
+      hud.feed('STRUCTURE COLLAPSING', 'big');
+      // Half speed for two seconds, eased back. Long enough to read what is
+      // happening, short enough not to feel like a cutscene.
+      testMenu.dramaticPause(2.0, 0.45);
+    };
   }
 
   // Welded sections fragment when they land hard enough.
@@ -243,6 +280,7 @@ async function boot() {
         const ok = battle.validPlacement(hit.point);
         battle.pulse(hit.point, ok.ok ? 0x6fd08c : 0xe8604c, 14);
         battle.deploy(battle.selectedUnitId, hit.point);
+        battle.rangeRing.visible = false;
       } else {
         battle.pulse(hit.point, 0xe8604c, 9, true);
         hud.showPrompt('deploy on open ground', 'warn');
@@ -263,20 +301,29 @@ async function boot() {
   canvas.addEventListener('pointermove', (e) => {
     if (!battle.selectedUnitId || e.pointerType === 'touch') {
       battle.ghost.visible = false;
+      battle.rangeRing.visible = false;
       return;
     }
     const hit = pick(e.clientX, e.clientY);
     if (!hit || (hit.kind !== 'ground' && hit.kind !== 'roof')) {
-      battle.ghost.visible = false; return;
+      battle.ghost.visible = false;
+      battle.rangeRing.visible = false;
+      return;
     }
     const ok = battle.validPlacement(hit.point).ok;
     battle.ghost.position.copy(hit.point).setY(hit.point.y + 0.25);
     battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
     battle.ghost.visible = true;
+    battle.showRange(hit.point, UNITS_BY_ID[battle.selectedUnitId]);
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Escape') { battle.selectedUnitId = null; hud.hidePrompt(); battle.ghost.visible = false; }
+    if (e.code === 'Escape') {
+      battle.selectedUnitId = null;
+      hud.hidePrompt();
+      battle.ghost.visible = false;
+      battle.rangeRing.visible = false;
+    }
     // Number keys pick the corresponding slot in the build bar.
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= 9) {
@@ -369,6 +416,7 @@ async function boot() {
     testMenu.update(rawDt);
 
     water.material.uniforms.uTime.value = now * 0.001;
+    if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
 
     const shake = engine.updateShake(rawDt);
     rig.update(rawDt, shake);

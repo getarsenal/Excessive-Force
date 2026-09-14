@@ -422,6 +422,16 @@ export class TestMenu {
       min: 0, max: 8, step: 0.05,
       get: () => c.engine.sun.intensity, set: (v) => { c.engine.sun.intensity = v; },
     });
+    this._slider(vis, 'Ambient floor', {
+      min: 0, max: 1.5, step: 0.02,
+      get: () => c.engine.ambient.intensity,
+      set: (v) => { c.engine.ambient.intensity = v; },
+    });
+    this._slider(vis, 'Environment fill', {
+      min: 0, max: 3, step: 0.05,
+      get: () => c.engine.scene.environmentIntensity,
+      set: (v) => { c.engine.scene.environmentIntensity = v; },
+    });
     this._slider(vis, 'Sky fill', {
       min: 0, max: 3, step: 0.02,
       get: () => c.engine.hemi.intensity, set: (v) => { c.engine.hemi.intensity = v; },
@@ -465,6 +475,24 @@ export class TestMenu {
     });
     this._toggle(vis, 'Tracers', {
       get: () => b.tracerFX.enabled, set: (v) => { b.tracerFX.enabled = v; },
+    });
+    this._toggle(vis, 'Impact scorch marks', {
+      get: () => !!(b.craters && b.craters.enabled),
+      set: (v) => { if (b.craters) { b.craters.enabled = v; if (!v) b.craters.clear(); } },
+    });
+    this._toggle(vis, 'Unit damage bars', {
+      get: () => b.hpBack.visible,
+      set: (v) => { b.hpBack.visible = v; b.hpFill.visible = v; },
+    });
+    this._toggle(vis, 'Street detail', {
+      get: () => {
+        const d = c.cityGroup && c.cityGroup.getObjectByName('detail');
+        return d ? d.visible : false;
+      },
+      set: (v) => {
+        const d = c.cityGroup && c.cityGroup.getObjectByName('detail');
+        if (d) d.visible = v;
+      },
     });
 
     // ── Camera ─────────────────────────────────────────────────────────────
@@ -621,10 +649,14 @@ export class TestMenu {
   spawnAt(id, n, bearing, range) {
     const c = this.ctx, b = c.battle, st = b.primary;
     let placed = 0;
-    for (let k = 0; k < n * 6 && placed < n; k++) {
-      const a = bearing + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.055;
+    // Widen the search as it goes. Streets are narrow, buildings are now solid,
+    // and a single bearing at a single range will often find nothing at all.
+    for (let k = 0; k < 260 && placed < n; k++) {
+      const ring = Math.floor(k / 40);
+      const a = bearing + (k % 2 ? 1 : -1) * Math.ceil((k % 40) / 2) * 0.05;
+      const r = range * (1 + ring * 0.07);
       const p = new THREE.Vector3(
-        st.origin.x + Math.sin(a) * range, 0, st.origin.z + Math.cos(a) * range,
+        st.origin.x + Math.sin(a) * r, 0, st.origin.z + Math.cos(a) * r,
       );
       p.y = c.terrain.heightAt(p.x, p.z);
       if (!b.validPlacement(p).ok) continue;
@@ -942,12 +974,18 @@ export class TestMenu {
           'a gun may be placed inside the target');
         const far = new THREE.Vector3(t.span * 0.99, 0, 0);
         assert(!b.validPlacement(far).ok, 'a gun may be placed off the map');
+        if (b.cityPlots && b.cityPlots.length) {
+          const inside = b.cityPlots.find((p) => Math.hypot(p.x, p.z) > 140);
+          const pt = new THREE.Vector3(inside.x, 0, inside.z);
+          pt.y = t.heightAt(pt.x, pt.z);
+          assert(!b.validPlacement(pt).ok, 'a gun may be placed inside a building');
+        }
         const good = new THREE.Vector3(o.x + 150, 0, o.z + 150);
         good.y = t.heightAt(good.x, good.z);
         if (!t.isWater(good.x, good.z)) {
           assert(b.validPlacement(good).ok, 'open ground 210 m out was rejected');
         }
-        return 'inside, off-map and water all rejected';
+        return 'inside the target, inside a building, off-map and water all rejected';
       }],
 
       ['the economy pays for damage', () => {
@@ -979,6 +1017,67 @@ export class TestMenu {
         fx.update(0.05);
         assert(fx.tracers.includes(t) ? t.t > p0 : true, 'the tracer did not advance');
         return `${fx.tracers.length} in flight, ${t.speed} m/s`;
+      }],
+
+      ['every gun points the way it is aimed', () => {
+        // The two towed pieces are modelled across their own axis and the
+        // tracked vehicles along it, so one group needs a quarter turn and the
+        // other must not have one. Measured from the model rather than eyeballed
+        // — a gun facing ninety degrees away from its own shells is the kind of
+        // thing that survives a dozen playtests because it looks deliberate.
+        const wrong = [];
+        for (const u of UNITS) {
+          if (u.model === 'infantry') continue;
+          const w = b.models.cache.get(`${u.model}:${u.modelLength}:${u.tint ?? ''}`);
+          if (!w) continue;
+          w.updateMatrixWorld(true);
+          const size = new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3());
+          const alongX = size.x > size.z;
+          const turned = Math.abs(Math.abs(u.modelYaw ?? 0) - Math.PI / 2) < 0.01;
+          if (alongX !== turned) {
+            wrong.push(`${u.name} is long along ${alongX ? 'X' : 'Z'} `
+              + `but ${turned ? 'is' : 'is not'} quarter-turned`);
+          }
+        }
+        assert(wrong.length === 0, wrong.join('; '));
+        return 'towed guns turned, tracked guns not';
+      }],
+
+      ['the deployment preview shows reach and damage', () => {
+        const st = b.primary;
+        const p = new THREE.Vector3(st.origin.x + 150, 0, st.origin.z + 150);
+        p.y = c.terrain.heightAt(p.x, p.z);
+        b.showRange(p, UNITS_BY_ID.m119);
+        assert(b.rangeRing.visible, 'the range ring did not appear');
+        assert(Math.abs(b.rangeRing.scale.x - UNITS_BY_ID.m119.range) < 1,
+          'the ring is not drawn at the unit\'s range');
+        b.rangeRing.visible = false;
+
+        // Damage bars: only for units that have actually been hit.
+        this.clearUnits();
+        this.spawnAt('at4', 1, 0, 160);
+        const u = b.units.find((x) => x.alive);
+        assert(u, 'no unit to test the bar on');
+        b._updateHealthBars();
+        assert(b.hpFill.count === 0, 'an undamaged unit is showing a damage bar');
+        u.health = u.maxHealth * 0.4;
+        b._updateHealthBars();
+        assert(b.hpFill.count === 1, 'a damaged unit is not showing one');
+        this.clearUnits();
+        return 'range ring and damage bars behave';
+      }],
+
+      ['the collapse gets a beat of slow motion', () => {
+        const before = this.timeScale;
+        this.dramaticPause(1.2, 0.4);
+        this.update(0.1);
+        assert(this.timeScale < before, 'time did not slow');
+        // And it comes back on its own rather than leaving the game in
+        // permanent slow motion, which is exactly the bug worth guarding.
+        for (let i = 0; i < 40; i++) this.update(0.05);
+        assert(Math.abs(this.timeScale - before) < 1e-6,
+          `time scale stuck at ${this.timeScale}`);
+        return 'slows, then restores itself';
       }],
 
       ['click feedback exists', () => {
@@ -1125,6 +1224,18 @@ export class TestMenu {
     return this.lastResults;
   }
 
+  /**
+   * Slow the world briefly, then ease back.
+   *
+   * Lives here because the time scale does, and because a single owner of
+   * "how fast is the game running" is the only way the tuning slider and the
+   * collapse beat can coexist without fighting each other.
+   */
+  dramaticPause(seconds, scale) {
+    if (this.paused) return;
+    this._drama = { left: seconds, total: seconds, scale, from: this.timeScale };
+  }
+
   refresh() {
     if (!this.open) return;
     for (const fn of this._rows) {
@@ -1133,6 +1244,19 @@ export class TestMenu {
   }
 
   update(dt) {
+    if (this._drama) {
+      const d = this._drama;
+      d.left -= dt;
+      if (d.left <= 0) {
+        this.timeScale = d.from;
+        this._drama = null;
+      } else {
+        // Snap down, then ease back over the last third of the beat.
+        const tail = d.total * 0.34;
+        const k = d.left > tail ? 0 : 1 - d.left / tail;
+        this.timeScale = d.scale + (d.from - d.scale) * k;
+      }
+    }
     if (!this.open) return;
     this._lastRefresh += dt;
     if (this._lastRefresh < 0.2) return;

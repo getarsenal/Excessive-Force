@@ -19,6 +19,7 @@ const SKY_VERT = /* glsl */`
 `;
 
 const SKY_FRAG = /* glsl */`
+  uniform float uTime;
   uniform vec3 uZenith;
   uniform vec3 uMid;
   uniform vec3 uHorizon;
@@ -26,6 +27,19 @@ const SKY_FRAG = /* glsl */`
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   varying vec3 vWorld;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+               mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    return vnoise(p) * 0.6 + vnoise(p * 2.1 + 5.2) * 0.3 + vnoise(p * 4.3) * 0.1;
+  }
 
   void main() {
     vec3 dir = normalize(vWorld);
@@ -39,6 +53,20 @@ const SKY_FRAG = /* glsl */`
 
     // Below the horizon fade to a warm ground haze rather than hard black.
     col = mix(col, uGround, clamp(-h * 4.0, 0.0, 1.0));
+
+    // Cloud. Three octaves of a cheap hash noise projected onto the dome,
+    // drifting slowly. An empty gradient sky is the one part of the frame with
+    // nothing in it at all, and at this camera angle it is a third of the
+    // picture — a little structure up there is worth a great deal.
+    if (h > 0.02) {
+      vec2 cp = dir.xz / max(h + 0.22, 0.06) * 0.55 + vec2(uTime * 0.0035, 0.0);
+      float f = fbm(cp) * 0.55 + fbm(cp * 2.3 + 17.0) * 0.3 + fbm(cp * 5.1) * 0.15;
+      float cover = smoothstep(0.52, 0.78, f) * smoothstep(0.02, 0.22, h);
+      // Lit from the sun's side, grey underneath.
+      float lit = 0.55 + 0.45 * max(dot(normalize(uSunDir), dir), 0.0);
+      col = mix(col, mix(vec3(0.62, 0.65, 0.70), vec3(1.02, 0.99, 0.94), lit),
+                cover * 0.88);
+    }
 
     float sd = max(dot(dir, normalize(uSunDir)), 0.0);
     // Disc, then forward scatter, then a broad warm bias across that half of
@@ -61,6 +89,7 @@ export function createSky(sunDirection) {
       uGround: { value: new THREE.Color(0x9c8f78) },
       uSunDir: { value: sunDirection.clone().normalize() },
       uSunColor: { value: new THREE.Color(0xffd5a0) },
+      uTime: { value: 0 },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,

@@ -179,6 +179,53 @@ export class Audio {
    *
    * @param {number} magnitude 0..1
    */
+  /**
+   * The sound a building makes while it is deciding.
+   *
+   * A low, detuned, slowly bending tone — masonry grinding on masonry as a
+   * section settles onto what is left of its bearing. It is the audio half of
+   * the lean, and it does a job the visual cannot: it tells the player
+   * something is happening even when they are looking somewhere else.
+   *
+   * @param {number} severity 0..1, how far past saving the structure is
+   */
+  groan(severity, pos) {
+    if (!this.ready || !this.enabled || this._failed) return;
+    const now = this.ctx.currentTime;
+    if (now - (this._lastPlayed.get('groan') ?? -1e9) < 1.8) return;
+    this._lastPlayed.set('groan', now);
+
+    const m = THREE.MathUtils.clamp(severity, 0.1, 1);
+    const dur = 1.6 + m * 1.8;
+    const g = this.ctx.createGain();
+    let level = 0.26 * (0.4 + m);
+    if (pos) {
+      const dist = this._listenerPos.distanceTo(pos);
+      level *= 420 / (420 + dist);
+    }
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, level), now + 0.35);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    // Two oscillators a few cents apart beat against each other, which is what
+    // makes it sound like stone under strain rather than a synthesiser.
+    for (const [base, detune] of [[41, -9], [41, 11], [82, 4]]) {
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(base, now);
+      o.frequency.linearRampToValueAtTime(base * (1 - 0.09 * m), now + dur);
+      o.detune.value = detune;
+      const lp = this.ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 180 + m * 120;
+      lp.Q.value = 4.5;
+      o.connect(lp).connect(g);
+      o.start(now);
+      o.stop(now + dur + 0.05);
+    }
+    g.connect(this.bus);
+  }
+
   rumble(magnitude, pos) {
     if (!this.ready || !this.enabled || this._failed) return;
     const now = this.ctx.currentTime;

@@ -78,8 +78,12 @@ export const UNITS = [
     id: 'm119', name: 'M119A3', full: 'M119A3 105 mm Howitzer', tier: 'GUN',
     cost: 700, unlockFrac: 0.038,
     tint: ARTILLERY_GREEN, model: 'M119', modelLength: 6.1,
-    // The source model is built facing across its own axis; a quarter turn
-    // clockwise puts the barrel where the gun is actually pointing.
+    // The two towed guns are modelled along X — trail to muzzle across the
+    // model's own axis — while the self-propelled vehicles are modelled nose
+    // forward along Z. So these two need a quarter turn clockwise to put the
+    // barrel where the gun is actually pointing, and the others must not have
+    // one. (Measured: the M119 and M777 bounding boxes are 3.4:1 and 2.3:1
+    // along X; the M109, M270 and M142 are long along Z.)
     modelYaw: -Math.PI / 2,
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
@@ -113,7 +117,6 @@ export const UNITS = [
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
-    modelYaw: -Math.PI / 2,
     projectile: { kind: 'arc', speed: 235, gravity: 9.81, trail: 1.0 },
     warhead: { lethal: 2.8, radius: 9.0, power: 9200, fx: 2.0, kinetic: 0.7 },
     dispersion: 4.0,
@@ -122,7 +125,7 @@ export const UNITS = [
   {
     id: 'm270', name: 'M270 MLRS', full: 'M270A2 MLRS', tier: 'MRL',
     cost: 3600, unlockFrac: 0.25,
-    tint: ARTILLERY_GREEN, model: 'M270', modelLength: 7.0, modelYaw: -Math.PI / 2,
+    tint: ARTILLERY_GREEN, model: 'M270', modelLength: 7.0,
     range: 2000, reload: 15.0, setup: 4.0,
     crew: 0, health: 480,
     projectile: { kind: 'rocket', speed: 300, gravity: 9.81, trail: 1.4 },
@@ -134,7 +137,7 @@ export const UNITS = [
   {
     id: 'm142', name: 'HIMARS', full: 'M142 HIMARS', tier: 'MRL',
     cost: 5200, unlockFrac: 0.37,
-    tint: ARTILLERY_GREEN, model: 'M142', modelLength: 7.0, modelYaw: -Math.PI / 2,
+    tint: ARTILLERY_GREEN, model: 'M142', modelLength: 7.0,
     range: 2600, reload: 18.0, setup: 3.5,
     crew: 0, health: 420,
     projectile: { kind: 'rocket', speed: 360, gravity: 9.81, trail: 1.6 },

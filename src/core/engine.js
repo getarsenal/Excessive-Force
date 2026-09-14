@@ -136,6 +136,13 @@ export class Engine {
     this.hemi = new THREE.HemisphereLight(0x8cb2e0, 0x6a5a38, 0.5);
     this.scene.add(this.hemi);
 
+    // A small uniform floor. The sky fill and the environment map both fall off
+    // with the surface normal, so a face pointing directly away from every
+    // light still lands on zero — and a black polygon in the middle of a lit
+    // scene reads as a hole, not as shadow.
+    this.ambient = new THREE.AmbientLight(0x6f7e92, 0.28);
+    this.scene.add(this.ambient);
+
     // A rim from behind separates the tower from the sky haze.
     this.rim = new THREE.DirectionalLight(0x8fc0f0, 0.5);
     this.rim.position.set(280, 120, -260);
