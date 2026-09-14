@@ -19,9 +19,9 @@ const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     uVignette: { value: 0.85 },
-    uWarm: { value: 0.03 },
-    uSaturation: { value: 1.12 },
-    uContrast: { value: 1.11 },
+    uWarm: { value: 0.05 },
+    uSaturation: { value: 1.05 },
+    uContrast: { value: 1.055 },
     uShake: { value: new THREE.Vector2(0, 0) },
   },
   vertexShader: /* glsl */`
@@ -68,6 +68,17 @@ const GradeShader = {
   `,
 };
 
+/**
+ * Where the key light sits relative to whatever the camera is looking at.
+ *
+ * Exported because the render loop has to keep the shadow frustum following the
+ * focus, and having the offset written out in two places is how the sun and its
+ * shadows end up disagreeing about where the sun is.
+ *
+ * Elevation is about 20°: |y| / hypot(x, z) = 168 / 462.
+ */
+export const SUN_OFFSET = new THREE.Vector3(-396, 168, 238);
+
 export class Engine {
   constructor(canvas, quality) {
     this.quality = quality;
@@ -82,7 +93,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatioCap));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.toneMappingExposure = 1.26;
 
     if (quality.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
@@ -107,12 +118,22 @@ export class Engine {
   _setupLights() {
     const q = this.quality;
 
-    // Mid-afternoon: a strong, distinctly warm sun against a cool sky fill.
-    // The colour *difference* between key and fill is what gives masonry its
-    // relief — a neutral sun and a neutral ambient produce the flat grey
-    // stonework this used to have, no matter how bright either one is.
-    this.sun = new THREE.DirectionalLight(0xfff3dd, 4.0);
-    this.sun.position.set(-320, 260, 190);
+    // Late afternoon, and low.
+    //
+    // The sun used to sit at thirty-five degrees, which from a bird's-eye
+    // camera is almost overhead: every roof was lit, every wall was lit, and
+    // the ground between the buildings had nothing on it. A city seen from the
+    // air is beautiful because of the shadows — at twenty degrees a thirty-
+    // metre block throws eighty metres of shadow across the streets, and that
+    // is what turns a field of boxes into a place with depth and rhythm. It
+    // also separates the buildings from each other and from the ground, which
+    // no amount of recolouring was ever going to do.
+    //
+    // The colour *difference* between key and fill matters as much as either:
+    // a neutral sun and a neutral ambient produce flat grey stonework however
+    // bright they are, so this is warm and the fill is cool.
+    this.sun = new THREE.DirectionalLight(0xffe9c8, 3.6);
+    this.sun.position.copy(SUN_OFFSET);
     if (q.shadowMapSize > 0) {
       this.sun.castShadow = true;
       this.sun.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
@@ -121,10 +142,13 @@ export class Engine {
       // everything past it rendered as though it were in shadow — two bright
       // wedges spreading out from the covered square, which is unmistakable
       // once the surrounding city is dense enough to show it.
-      const d = 620;
-      Object.assign(this.sun.shadow.camera, { left: -d, right: d, top: d, bottom: -d, near: 1, far: 2200 });
-      this.sun.shadow.bias = -0.0012;
-      this.sun.shadow.normalBias = 1.1;
+      // A low sun needs a deeper frustum than a high one: the same ground is
+      // now seen along a much shallower ray, so the near and far planes have to
+      // span a lot more distance to hold it.
+      const d = 680;
+      Object.assign(this.sun.shadow.camera, { left: -d, right: d, top: d, bottom: -d, near: 1, far: 3200 });
+      this.sun.shadow.bias = -0.0009;
+      this.sun.shadow.normalBias = 0.9;
       this.sun.shadow.camera.updateProjectionMatrix();
     }
     this.scene.add(this.sun);
@@ -133,25 +157,30 @@ export class Engine {
     // Kept well below the sun: a strong blue hemisphere washes every upward
     // face (roofs especially) with sky colour and the whole city goes flat and
     // cold. Ambient should fill shadow, not compete with the key light.
-    this.hemi = new THREE.HemisphereLight(0x8cb2e0, 0x6a5a38, 0.5);
+    this.hemi = new THREE.HemisphereLight(0x9cc0ea, 0x7a6642, 0.66);
     this.scene.add(this.hemi);
 
     // A small uniform floor. The sky fill and the environment map both fall off
     // with the surface normal, so a face pointing directly away from every
     // light still lands on zero — and a black polygon in the middle of a lit
     // scene reads as a hole, not as shadow.
-    this.ambient = new THREE.AmbientLight(0x6f7e92, 0.28);
+    this.ambient = new THREE.AmbientLight(0x7d8ca2, 0.34);
     this.scene.add(this.ambient);
 
     // A rim from behind separates the tower from the sky haze.
-    this.rim = new THREE.DirectionalLight(0x8fc0f0, 0.5);
+    this.rim = new THREE.DirectionalLight(0x9fccf4, 0.55);
     this.rim.position.set(280, 120, -260);
     this.scene.add(this.rim);
 
-    // Light enough that the far bank and the skyline still read, heavy enough
-    // to hide where the terrain data runs out. Tinted toward the sky rather
-    // than grey, so distance reads as air and not as dust.
-    this.scene.fog = new THREE.FogExp2(0xa9c4de, 0.00036);
+    // Aerial perspective.
+    //
+    // Warmer and a little heavier than it was, because with the sun this low
+    // the air between the camera and the far bank is full of light. Distance
+    // now lifts and desaturates the way it does over a real city at the end of
+    // the afternoon, which is most of what makes a wide shot read as *deep*
+    // rather than as a flat map. It has to stay close to the sky's horizon
+    // colour or the skyline shows up as a seam.
+    this.scene.fog = new THREE.FogExp2(0xd8d3c4, 0.00052);
   }
 
   _setupComposer() {
@@ -207,7 +236,7 @@ export class Engine {
     // north-facing roofs and the shaded side of every street read as black —
     // a hemisphere light alone gives them one flat ambient tone and nothing to
     // reflect.
-    this.scene.environmentIntensity = 0.95;
+    this.scene.environmentIntensity = 1.08;
     this.envMap = rt.texture;
     pmrem.dispose();
     // Hand the dome back; the caller adds it to the real scene.

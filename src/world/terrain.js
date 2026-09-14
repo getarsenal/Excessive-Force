@@ -416,8 +416,14 @@ function tileNoise(x, y, size, freq) {
   return (a * (1 - sx) + b * sx) * (1 - sy) + (cc * (1 - sx) + d * sx) * sy;
 }
 
-/** Cheap deterministic value noise for ground mottling. */
-function valueNoise(x, z) {
+/**
+ * Cheap deterministic value noise for ground mottling.
+ *
+ * Exported because the street mesh breaks up its asphalt with the same field
+ * the terrain uses, and two different noise functions over the same ground
+ * produce two different-looking grounds sitting on top of each other.
+ */
+export function valueNoise(x, z) {
   const xi = Math.floor(x), zi = Math.floor(z);
   const fx = x - xi, fz = z - zi;
   const sx = fx * fx * (3 - 2 * fx);

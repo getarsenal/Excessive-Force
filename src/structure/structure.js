@@ -2300,7 +2300,7 @@ export class Structure {
 
     const island = {
       id, body, members, localPos, localQuat, impacts: 0,
-      settling,
+      settling, age: opts.age || 0,
       origin: { x: mx, y: my, z: mz },
       mass: mt,
     };
@@ -2390,7 +2390,9 @@ export class Structure {
         }
       }
       if (stranded.length) {
-        for (const g of this._connectedGroups(stranded)) this._weldIsland(g, vel);
+        for (const g of this._connectedGroups(stranded)) {
+          this._weldIsland(g, vel, { age: island.age || 0 });
+        }
       }
       return;
     }
@@ -2403,24 +2405,44 @@ export class Structure {
     }
     const ex = maxX - minX, ey = maxY - minY, ez = maxZ - minZ;
     const axis = ex >= ey && ex >= ez ? 'x' : ey >= ez ? 'y' : 'z';
-    const mid = axis === 'x' ? (minX + maxX) / 2 : axis === 'y' ? (minY + maxY) / 2 : (minZ + maxZ) / 2;
-    const a = [], b = [];
+    const lo = axis === 'x' ? minX : axis === 'y' ? minY : minZ;
+    const hi = axis === 'x' ? maxX : axis === 'y' ? maxY : maxZ;
+
+    // Cut into more than two when there is a lot to get through.
+    //
+    // Halving is the right shape for a section that has just landed and is
+    // breaking in the middle, but it is a poor way to reduce a thousand stones
+    // to rubble: five generations of it, each waiting out its own rest timer,
+    // is most of a minute during which the wreck is still visibly made of
+    // building-sized pieces. Slicing to roughly a hundred and fifty stones a
+    // piece gets there in one or two.
+    const slices = Math.max(2, Math.min(5, Math.round(members.length / 150)));
+    const span = Math.max(1e-3, hi - lo);
+    const parts = Array.from({ length: slices }, () => []);
     for (const i of members) {
       const v = axis === 'x' ? this.px[i] : axis === 'y' ? this.py[i] : this.pz[i];
-      (v < mid ? a : b).push(i);
+      const k = Math.min(slices - 1, Math.floor(((v - lo) / span) * slices));
+      parts[k].push(i);
     }
-    // Re-split each half into truly connected pieces so we never weld two
-    // fragments that are no longer touching.
-    for (const half of [a, b]) {
-      if (half.length === 0) continue;
-      for (const g of this._connectedGroups(half)) this._weldIsland(g, vel);
-    }
-    for (const isl of this.islands.values()) {
-      if (isl.body && isl.impacts === 0) {
-        isl.body.setLinvel(vel.lin, true);
-        isl.body.setAngvel(vel.ang, true);
+    // Re-split each slice into truly connected pieces so we never weld two
+    // fragments that are no longer touching. The age carries over: a piece of
+    // something that has been lying on the ground for three seconds has itself
+    // been lying there for three seconds, and resetting that clock on every
+    // split is what made each generation wait all over again.
+    for (const part of parts) {
+      if (part.length === 0) continue;
+      for (const g of this._connectedGroups(part)) {
+        this._weldIsland(g, vel, { age: island.age || 0 });
       }
     }
+    // (The pieces this call created already carry `vel` — `_weldIsland` takes
+    // it, and the freed stones are given it above. There used to be a sweep
+    // here that pushed it onto every island in the structure with no recorded
+    // impact, which is nearly all of them: each split therefore re-kicked the
+    // entire rubble field back up to the speed of whatever had just broken.
+    // Nothing ever slowed down, so nothing ever qualified to be split, and a
+    // collapse took the better part of a minute to finish coming apart while
+    // the whole heap drifted gently across the map.)
   }
 
   /**
@@ -2440,6 +2462,17 @@ export class Structure {
     // a tower that sinks a few centimetres into its crater and leans two
     // degrees is damaged, not demolished, and a player looking at it would say
     // the same. Past the threshold it is coming down, and it counts as rubble.
+    // Age everything, here, where the loop is unconditional.
+    //
+    // The clock used to be advanced inside the split loop below, which stops
+    // after six splits and again when the body budget is full — so on a big
+    // collapse the great majority of islands were never visited and never aged,
+    // and the "it has been down long enough, break it up" backstop could not
+    // fire for precisely the pile it exists for.
+    for (const island of this.islands.values()) {
+      if (!island.settling) island.age = (island.age || 0) + dt;
+    }
+
     for (const island of this.islands.values()) {
       if (!island.settling || !island.body) continue;
       const t = island.body.translation();
@@ -2474,9 +2507,15 @@ export class Structure {
     let did = 0;
     for (const island of this.islands.values()) {
       if (did >= 6) break;
-      // Splitting always costs bodies. Past the budget, leave the rubble welded
-      // — a coarse heap that runs is better than a fine one that does not.
-      if (this.physics.dynamicSet.size > this.physics.activeBudget) break;
+      // Splitting always costs bodies, and past the budget there are none to
+      // spend — but "past the budget" is not the same as "out of room". Most of
+      // what is holding a slot after a collapse is debris that has already come
+      // to rest, and that can be frozen back into scenery for nothing. Giving
+      // up without asking is why a phone was left with a four-hundred-stone
+      // section of tower lying on the ground intact: the budget was full of
+      // pebbles that had stopped moving two seconds earlier.
+      if (this.physics.dynamicSet.size > this.physics.activeBudget
+          && this.physics.reclaim(32) <= 0) break;
       const body = island.body;
       if (!body) continue;
       // A clump this size already reads as rubble. Splitting further multiplies
@@ -2487,7 +2526,6 @@ export class Structure {
       // still a building; leave it whole rather than shattering it in place.
       if (island.settling) continue;
 
-      island.age = (island.age || 0) + dt;
       // Two ways to earn a split, and a collapse needs both.
       //
       // "Has stopped", not "is asleep": Rapier only sleeps a body that has been

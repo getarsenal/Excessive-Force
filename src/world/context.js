@@ -18,6 +18,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 // Shared with the OSM city builder, so the fallback layout and the real
 // footprints are the same city rather than two different ones.
 import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
+import { valueNoise } from './terrain.js';
 
 export function buildContext(terrain, quality) {
   const group = new THREE.Group();
@@ -167,6 +168,11 @@ export function buildContext(terrain, quality) {
   if (bodies.length) group.add(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
   if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
 
+  // Streets run down the middle of the gaps the block grid leaves, so they
+  // have to share its origin: the loop above starts at -reach, not at zero,
+  // and lines drawn on a grid of the right pitch but the wrong phase miss
+  // every gap and cut straight through the terraces instead.
+  group.add(buildStreets(terrain, quality, PITCH, reach, -reach));
   group.add(buildBridge(terrain, quality));
   group.add(buildEmbankment(terrain));
   group.add(buildStreetDetail(terrain, quality, plots, rng));
@@ -182,8 +188,11 @@ export function buildContext(terrain, quality) {
 function mergeTinted(geos, material, palette, rng, quality) {
   for (const g of geos) {
     const n = g.attributes.position.count;
+    // Value jitter, not hue jitter: multiplying a colour scales every channel,
+    // so this separates neighbouring buildings without ever inventing a colour
+    // that is not in the palette.
     const c = new THREE.Color(palette[Math.floor(rng() * palette.length)]);
-    c.multiplyScalar(0.84 + rng() * 0.3);
+    c.multiplyScalar(0.80 + rng() * 0.36);
     const arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
@@ -192,6 +201,107 @@ function mergeTinted(geos, material, palette, rng, quality) {
   const mesh = new THREE.Mesh(merged, material);
   mesh.castShadow = quality.shadowMapSize > 0;
   mesh.receiveShadow = quality.shadowMapSize > 0;
+  return mesh;
+}
+
+/**
+ * The street network.
+ *
+ * The single thing most responsible for the level reading as boxes on a field.
+ * The city was already laid out on a grid — terraces ringing courtyards on an
+ * 86 m pitch, with the space between them left as street — but nothing was ever
+ * *drawn* on that space, so from the air it was the same undifferentiated warm
+ * ground as everywhere else and the buildings appeared to be standing on a
+ * beach. The blocks were there; the city was not.
+ *
+ * What the eye actually reads in a plan view is the grid: dark carriageway,
+ * pale pavement either side, and the hard straight edge between them. That edge
+ * is worth more than any amount of noise on the ground, because it is the only
+ * thing in the frame with a known width — it is what tells you how big
+ * everything else is.
+ *
+ * Built as one merged strip mesh laid on the terrain: five lanes across each
+ * street (kerb, pavement, road, pavement, kerb) carried in vertex colours, and
+ * stepped along its length so it follows the ground instead of cutting through
+ * it. Segments over water are skipped, which is what leaves the bridge as the
+ * only way across.
+ */
+function buildStreets(terrain, quality, pitch, reach, origin) {
+  const WIDTH = 17;              // kerb to kerb
+  const STEP = 11;               // length of one quad along the street
+  const LIFT = 0.22;             // clear of the terrain's own z-fighting range
+
+  // Lane boundaries across the street, as a fraction of WIDTH from the centre,
+  // with the colour of the band that starts there.
+  const asphalt = new THREE.Color(0x35383d);
+  const pavement = new THREE.Color(0xa8a294);
+  const kerb = new THREE.Color(0xc4bdab);
+  const LANES = [
+    [-0.50, kerb], [-0.42, pavement], [-0.26, asphalt],
+    [0.26, pavement], [0.42, kerb], [0.50, null],
+  ];
+
+  const pos = [];
+  const col = [];
+  const tmp = new THREE.Color();
+
+  // One quad of street: `along` is the axis it runs down, `t` the position
+  // along it, `c` the cross-street coordinate of the centre line.
+  const strip = (axis, t0, t1, c) => {
+    for (let li = 0; li < LANES.length - 1; li++) {
+      const [f0, colour] = LANES[li];
+      const f1 = LANES[li + 1][0];
+      if (!colour) continue;
+      const a0 = c + f0 * WIDTH, a1 = c + f1 * WIDTH;
+      // Corners, in world space, with the road's own axis chosen per call.
+      const P = (t, a) => (axis === 'x' ? [t, a] : [a, t]);
+      const quad = [
+        P(t0, a0), P(t1, a0), P(t1, a1),
+        P(t0, a0), P(t1, a1), P(t0, a1),
+      ];
+      for (const [x, z] of quad) {
+        pos.push(x, terrain.heightAt(x, z) + LIFT, z);
+        // A little value jitter keyed to position, so a long run of asphalt is
+        // not one perfectly flat tone for four hundred metres.
+        const j = 0.88 + 0.24 * valueNoise(x * 0.03, z * 0.03);
+        tmp.copy(colour).multiplyScalar(j);
+        col.push(tmp.r, tmp.g, tmp.b);
+      }
+    }
+  };
+
+  const clear = (x, z) => !terrain.isWater(x, z);
+  const lanes = Math.ceil((reach - origin) / pitch);
+  for (let k = 0; k < lanes; k++) {
+    // Halfway between two rows of block centres, which is where the gap is.
+    const c = origin + (k + 0.5) * pitch;
+    if (Math.abs(c) > reach) continue;
+    for (let t = -reach; t < reach; t += STEP) {
+      // Both directions at once: a street running down x at cross-coordinate c,
+      // and its twin running down z. Skipped over water and over the landmark's
+      // own plot, which has its own forecourt.
+      if (clear(t, c) && clear(t + STEP, c) && Math.hypot(t, c) > 78) {
+        strip('x', t, t + STEP, c);
+      }
+      if (clear(c, t) && clear(c, t + STEP) && Math.hypot(c, t) > 78) {
+        strip('z', t, t + STEP, c);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.96, metalness: 0.0,
+    // Asphalt is the darkest thing on the map and sits flat under a low sun, so
+    // without a floor it reads as a hole rather than a surface.
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  }));
+  mesh.receiveShadow = quality.shadowMapSize > 0;
+  mesh.frustumCulled = false;
+  mesh.name = 'streets';
   return mesh;
 }
 

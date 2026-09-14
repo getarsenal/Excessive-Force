@@ -163,10 +163,18 @@ html, body {
 .unit-card.unaffordable .uc-cost { color: var(--danger); }
 
 .uc-icon {
-  height: 30px; display: flex; align-items: center; justify-content: center;
-  margin-bottom: 3px;
+  height: 36px; display: flex; align-items: center; justify-content: center;
+  margin-bottom: 2px;
 }
-.uc-icon img { max-height: 30px; max-width: 100%; object-fit: contain; filter: brightness(1.25); }
+/* Scaled up from the 40x24 drawing box rather than drawn larger, so one set of
+   coordinates serves both the card and any future bigger use of the same art. */
+.uc-svg {
+  width: 100%; max-width: 56px; height: auto;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+  transition: transform 0.14s ease;
+}
+.unit-card:hover:not(.locked) .uc-svg { transform: translateX(-2px) scale(1.06); }
+.unit-card.selected .uc-svg { filter: drop-shadow(0 0 5px rgba(88, 166, 255, 0.7)); }
 .uc-name {
   font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

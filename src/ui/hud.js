@@ -1,4 +1,5 @@
 import { UNITS } from '../game/units.js';
+import { unitIcon } from './icons.js';
 
 /**
  * HUD.
@@ -7,20 +8,6 @@ import { UNITS } from '../game/units.js';
  * Nothing here owns game state, so there is exactly one source of truth and no
  * chance of the bar and the simulation disagreeing about what you can afford.
  */
-
-const ICONS = {
-  m119: 'assets/M119_MenuIcon.png',
-  m777: 'assets/M777_MenuIcon.png',
-  m109: 'assets/M109_MenuIcon.png',
-  m270: 'assets/M270_MenuIcon.png',
-  m142: 'assets/M142_ManuIcon.png',
-};
-
-// Simple inline silhouettes for the infantry tiers, which have no icon art.
-const INF_SVG = `<svg viewBox="0 0 24 24" width="26" height="26" fill="none"
-  stroke="#c9d4e0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <circle cx="9" cy="4.4" r="2.1"/><path d="M9 6.6v6M9 12.6l-2 5M9 12.6l2.6 4.6"/>
-  <path d="M6.6 9.2h4.8M11.4 8.4l8.4-2.6"/></svg>`;
 
 export class HUD {
   constructor(battle, opts = {}) {
@@ -123,13 +110,9 @@ export class HUD {
       card.dataset.id = u.id;
       card.title = `${u.full} — ${u.blurb}`;
 
-      const icon = ICONS[u.id]
-        ? `<img src="${ICONS[u.id]}" alt="">`
-        : INF_SVG;
-
       card.innerHTML = `
         <div class="uc-tier">${u.tier}</div>
-        <div class="uc-icon">${icon}</div>
+        <div class="uc-icon">${unitIcon(u.id) || ''}</div>
         <div class="uc-name">${u.name}</div>
         <div class="uc-cost">$${u.cost.toLocaleString()}</div>
         <div class="uc-lock">LOCKED</div>`;

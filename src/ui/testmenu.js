@@ -1090,6 +1090,42 @@ export class TestMenu {
         assert(b._rings.some((r) => r.age < 0.01), 'the world pulse did not fire');
         return `${pool.length} screen ripples, ${b._rings.length} world rings`;
       }],
+      ['the city has streets, and they are in the gaps', () => {
+        // Streets are the single thing that makes a plan view read as a city
+        // rather than as boxes on a field, and they are drawn on a grid that
+        // has to share its phase with the one the blocks were laid on. Getting
+        // that wrong is invisible in the code and unmistakable on screen: the
+        // roads march straight through the terraces. So check both — that the
+        // mesh exists at all, and that it is where the buildings are not.
+        const city = this.ctx.cityGroup;
+        const streets = city?.getObjectByName('streets');
+        assert(streets, 'there is no street mesh in the city');
+        const tris = streets.geometry.attributes.position.count / 3;
+        assert(tris > 2000, `only ${Math.round(tris)} triangles of street`);
+
+        // Sample the road surface against the footprints it is meant to miss.
+        const plots = city.userData.plots || [];
+        assert(plots.length > 40, `only ${plots.length} plots to check against`);
+        const pos = streets.geometry.attributes.position;
+        let inside = 0, sampled = 0;
+        for (let i = 0; i < pos.count; i += 211) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          sampled++;
+          for (const p of plots) {
+            // Allow the pavement to run up to the wall; only count road that
+            // is properly buried inside a building.
+            if (Math.abs(p.x - x) < p.w / 2 - 2 && Math.abs(p.z - z) < p.d / 2 - 2) {
+              inside++; break;
+            }
+          }
+        }
+        const frac = sampled ? inside / sampled : 0;
+        assert(frac < 0.06,
+          `${(frac * 100).toFixed(0)}% of the road surface is inside a building `
+          + '— the street grid is out of phase with the block grid');
+        return `${Math.round(tris)} triangles, ${(frac * 100).toFixed(1)}% under buildings`;
+      }],
+
       // ── Destructive: leaves the level a pile of rubble, so it runs last.
       // Everything above needs a building to be standing in front of it.
       ['undercutting the base brings it down', () => this._calm(() => {
@@ -1198,13 +1234,26 @@ export class TestMenu {
           + `${worstY.toFixed(0)} m up`);
 
         // And the rubble is rubble, not a building lying on its side.
+        //
+        // Given its own window, because this is a claim about a *settled*
+        // wreck: the loop above stops the moment the tower is down, which is
+        // the right moment to measure how far it fell and much too early to
+        // ask what its pieces look like. Breaking up is progressive — a
+        // section splits, the parts land, those split — and it needs a few
+        // seconds on the ground, which is exactly as long as it takes in play.
+        for (let k = 0; k < 34; k++) c.fastForward(0.25);
         let biggest = 0;
         for (const isl of st.islands.values()) {
           if (isl.settling) continue;
           biggest = Math.max(biggest, isl.members.length);
         }
-        assert(biggest <= 420,
-          `a landed section is still welded into one ${biggest}-stone slab`);
+        // Scaled to the structure, because a tier that builds the same tower
+        // out of half as many stones should not get twice the licence to leave
+        // it in one piece.
+        const lump = Math.max(48, Math.min(420, Math.round(st.count * 0.08)));
+        assert(biggest <= lump,
+          `a landed section is still welded into one ${biggest}-stone slab `
+          + `(the most a ${st.count}-stone structure may leave is ${lump})`);
 
         return slender > 2.5
           ? `leaned ${leaned.toFixed(1)}°, then lost ${dropped.toFixed(0)} m`

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { detectQuality, AdaptiveGovernor } from './core/quality.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
-import { Engine, CameraRig } from './core/engine.js';
+import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
 import { Audio } from './core/audio.js';
 import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
@@ -423,7 +423,8 @@ async function boot() {
     const shake = engine.updateShake(rawDt);
     rig.update(rawDt, shake);
     engine.sun.target.position.set(rig.target.x, rig.target.y, rig.target.z);
-    engine.sun.position.set(rig.target.x - 320, rig.target.y + 260, rig.target.z + 190);
+    engine.sun.position.set(
+      rig.target.x + SUN_OFFSET.x, rig.target.y + SUN_OFFSET.y, rig.target.z + SUN_OFFSET.z);
     engine.render();
 
     frames++; fpsAcc += dtMs;

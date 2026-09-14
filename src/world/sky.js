@@ -83,12 +83,12 @@ export function createSky(sunDirection) {
   const geo = new THREE.SphereGeometry(4000, 48, 28);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      uZenith: { value: new THREE.Color(0x2f6fc4) },
-      uMid: { value: new THREE.Color(0x77a8dd) },
-      uHorizon: { value: new THREE.Color(0xdfe3dc) },
-      uGround: { value: new THREE.Color(0x9c8f78) },
+      uZenith: { value: new THREE.Color(0x2a62bb) },
+      uMid: { value: new THREE.Color(0x84b2df) },
+      uHorizon: { value: new THREE.Color(0xf2e2c6) },
+      uGround: { value: new THREE.Color(0xa8977c) },
       uSunDir: { value: sunDirection.clone().normalize() },
-      uSunColor: { value: new THREE.Color(0xffd5a0) },
+      uSunColor: { value: new THREE.Color(0xffc788) },
       uTime: { value: 0 },
     },
     vertexShader: SKY_VERT,
@@ -139,6 +139,8 @@ const WATER_FRAG = /* glsl */`
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform vec3 uSky;
+  uniform vec3 uSkyHorizon;
+  uniform vec3 uSkyZenith;
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   uniform float uTime;
@@ -150,12 +152,36 @@ const WATER_FRAG = /* glsl */`
     vec3 viewDir = normalize(cameraPosition - vWorld);
 
     // Slope of the wave field gives a cheap normal.
+    //
+    // The last three terms are ripple rather than wave, and they are the
+    // difference between water and corrugated iron. Three sine trains alone
+    // have harmonically related wavelengths of twenty to seventy metres, so
+    // their slopes line up and the broad specular lobe paints them as regular
+    // diagonal bands right across the channel. These are short, steep, and
+    // deliberately at irrational-ish ratios to the swell and to each other, so
+    // the crests never queue up and the glare breaks into glitter.
+    // Ripple fades out with distance, and has to.
+    //
+    // These wavelengths are a metre or two. Past a few hundred metres one pixel
+    // covers several of them, the cosines alias against the pixel grid, and the
+    // far half of the river fills with a crawling moiré that is far worse than
+    // the banding the ripple was added to fix. Fading the detail term out is
+    // the standard answer and it costs one smoothstep: near water glitters,
+    // distant water is smooth swell, and there is no distance at which the
+    // shader is being asked to resolve something it cannot.
+    float fade = 1.0 - smoothstep(70.0, 380.0, length(cameraPosition - vWorld));
     float dx = cos(vWorld.x * 0.085 + uTime * 1.4) * 0.022
              + cos(vWorld.x * 0.27 + uTime * 2.6) * 0.019
-             + cos(vWorld.x * 0.62 + vWorld.z * 0.4 + uTime * 3.4) * 0.012;
+             + cos(vWorld.x * 0.62 + vWorld.z * 0.4 + uTime * 3.4) * 0.012
+             + fade * (cos(vWorld.x * 1.37 - vWorld.z * 0.91 + uTime * 5.1) * 0.030
+                     + cos(vWorld.x * 2.63 + vWorld.z * 1.77 - uTime * 6.7) * 0.021
+                     + cos(vWorld.z * 3.91 - vWorld.x * 0.53 + uTime * 8.3) * 0.014);
     float dz = cos(vWorld.z * 0.13 + uTime * 1.9) * 0.020
              + cos(vWorld.z * 0.27 - uTime * 2.6) * 0.016
-             + cos(vWorld.z * 0.58 - vWorld.x * 0.33 + uTime * 3.1) * 0.011;
+             + cos(vWorld.z * 0.58 - vWorld.x * 0.33 + uTime * 3.1) * 0.011
+             + fade * (cos(vWorld.z * 1.19 + vWorld.x * 1.07 - uTime * 4.9) * 0.031
+                     + cos(vWorld.z * 2.41 - vWorld.x * 1.63 + uTime * 7.1) * 0.020
+                     + cos(vWorld.x * 3.67 + vWorld.z * 0.47 - uTime * 8.9) * 0.013);
     vec3 n = normalize(vec3(-dx, 1.0, -dz));
 
     // Depth tint: a river is green-brown where it is shallow and much darker
@@ -169,15 +195,35 @@ const WATER_FRAG = /* glsl */`
     float d = clamp(vDepth / 2.6, 0.0, 1.0);
     vec3 col = mix(uShallow, uDeep, d);
 
-    float fres = pow(1.0 - max(dot(viewDir, n), 0.0), 3.0);
-    col = mix(col, uSky, 0.09 + fres * 0.46);
+    // Reflect the *sky*, not a single colour.
+    //
+    // A flat reflection tint is why the river read as one band of cyan poster
+    // paint from end to end: real water is a mirror, so what is in it changes
+    // across the frame — warm and bright where it is reflecting the low sun,
+    // deep blue where it is reflecting the zenith behind you. Bouncing the view
+    // ray off the wave normal and shading it against the same three-stop
+    // gradient the dome uses costs three mixes and gives the whole channel a
+    // gradient along its length that follows the light.
+    vec3 refl = reflect(-viewDir, n);
+    float up = clamp(refl.y, 0.0, 1.0);
+    vec3 skyCol = mix(uSkyHorizon, uSky, smoothstep(0.0, 0.32, up));
+    skyCol = mix(skyCol, uSkyZenith, smoothstep(0.28, 0.85, up));
+    // Forward scatter: the half of the sky around the sun is much brighter than
+    // the rest, and on water that is the difference between a river and a strip.
+    float toSun = max(dot(refl, normalize(uSunDir)), 0.0);
+    skyCol += uSunColor * pow(toSun, 7.0) * 0.42;
 
-    // Sun glitter. Kept below the bloom threshold: a specular lobe on a wave
-    // field this smooth lands as a handful of very bright pixels, and bloom
-    // then spreads each one into a soft white blob the size of a barge.
+    float fres = pow(1.0 - max(dot(viewDir, n), 0.0), 4.0);
+    col = mix(col, skyCol, 0.12 + fres * 0.62);
+
+    // Sun glitter, in two lobes: a tight one for the individual sparks and a
+    // broad one for the glare path they sit in. Kept below the bloom threshold
+    // — a hard specular on a wave field this smooth lands as a handful of very
+    // bright pixels, and bloom then spreads each into a blob the size of a barge.
     vec3 h = normalize(normalize(uSunDir) + viewDir);
-    col += uSunColor * pow(max(dot(n, h), 0.0), 220.0) * 0.55;
-    col += uSunColor * pow(max(dot(n, h), 0.0), 24.0) * 0.05;
+    float spec = max(dot(n, h), 0.0);
+    col += uSunColor * pow(spec, 260.0) * 0.60;
+    col += uSunColor * pow(spec, 18.0) * 0.085;
 
     // Foam where the water meets the bank, and a hint of it on the crests.
     //
@@ -313,7 +359,11 @@ export function createWater(terrain, sunDirection, quality) {
       // cyan — the Thames is a grey-green estuary, not a swimming pool.
       uShallow: { value: new THREE.Color(0x74804c) },
       uDeep: { value: new THREE.Color(0x415f57) },
-      uSky: { value: new THREE.Color(0x93aec4) },
+      // The same three stops the dome is built from, so what the river
+      // reflects and what is actually above it agree.
+      uSky: { value: new THREE.Color(0x84b2df) },
+      uSkyHorizon: { value: new THREE.Color(0xe8dcc6) },
+      uSkyZenith: { value: new THREE.Color(0x2f68bd) },
       uSunDir: { value: sunDirection.clone().normalize() },
       uSunColor: { value: new THREE.Color(0xffe0b0) },
     },

@@ -137,6 +137,31 @@ export class PhysicsWorld {
       if (freed >= need) break;
       if (body.isSleeping()) { this.demote(body); freed++; }
     }
+
+    // Second pass: bodies that have stopped without being asleep.
+    //
+    // Rapier only sleeps a body that has been still for a while, and the debris
+    // from a collapse is a heap of several hundred pieces jostling each other —
+    // each nudge resets its neighbours' timers, so a pile can shuffle gently for
+    // a very long time without a single body ever qualifying. Waiting for sleep
+    // therefore meant the budget stayed full of settled rubble, nothing could
+    // be reclaimed, and the fragmenter had no room to break up the sections
+    // that were still welded: on a phone that left a four-hundred-stone piece
+    // of tower lying on the ground in one piece.
+    //
+    // A third of a metre a second is slow enough that freezing it there is
+    // invisible, and nothing in free fall stays under it for more than a frame
+    // or two.
+    if (freed < need) {
+      for (const body of this.dynamicSet) {
+        if (freed >= need) break;
+        const v = body.linvel(), w = body.angvel();
+        if (Math.hypot(v.x, v.y, v.z) > 0.34) continue;
+        if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
+        this.demote(body);
+        freed++;
+      }
+    }
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
   }
 
@@ -158,15 +183,34 @@ export class PhysicsWorld {
     if (steps === 0) return 0;
 
     if (this.contactListeners.length) {
+      // Collect first, dispatch after.
+      //
+      // `drainContactForceEvents` holds a Rust borrow on the whole world for as
+      // long as it is running, and wasm-bindgen enforces that: touching the
+      // world from inside the callback aborts the process with "recursive use
+      // of an object detected which would lead to unsafe aliasing". The
+      // listeners on the other side of this are not passive — a hard landing
+      // shatters a welded section, which destroys one rigid body and builds
+      // several more — so calling them in place is calling into the world from
+      // inside the borrow, and it takes the whole simulation down with it.
+      //
+      // Nothing is resolved inside the callback either, not even a collider
+      // lookup: the handles are numbers, and numbers can be carried out.
+      const raw = this._contactBuf || (this._contactBuf = []);
+      raw.length = 0;
       this.eventQueue.drainContactForceEvents((e) => {
         const mag = e.totalForceMagnitude();
         if (mag < 4000) return;
-        const c1 = this.world.getCollider(e.collider1());
-        const c2 = this.world.getCollider(e.collider2());
+        raw.push(e.collider1(), e.collider2(), mag);
+      });
+      for (let i = 0; i < raw.length; i += 3) {
+        const c1 = this.world.getCollider(raw[i]);
+        const c2 = this.world.getCollider(raw[i + 1]);
         const o1 = c1 && this.owners.get(c1.parent()?.handle);
         const o2 = c2 && this.owners.get(c2.parent()?.handle);
-        for (const fn of this.contactListeners) fn(o1, o2, mag);
-      });
+        for (const fn of this.contactListeners) fn(o1, o2, raw[i + 2]);
+      }
+      raw.length = 0;
     }
     return steps;
   }
