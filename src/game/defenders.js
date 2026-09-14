@@ -90,6 +90,15 @@ function skipFor(d) {
   return 1.6;
 }
 
+/**
+ * The stand-in soldier, used until the real model arrives.
+ *
+ * A hundred defenders have to be one draw call, which rules out a hundred
+ * scene-graph copies of a GLB — so the model is flattened into a single
+ * geometry and fed to an InstancedMesh. That flattening is asynchronous, and
+ * the garrison is posted during the loading screen, so this is what stands in
+ * the windows for the second or two before the real thing lands.
+ */
 function soldierGeometry() {
   const parts = [];
   const push = (geo, x, y, z) => { geo.translate(x, y, z); parts.push(geo); };
@@ -99,6 +108,128 @@ function soldierGeometry() {
   push(new THREE.BoxGeometry(0.26, 0.26, 0.26), 0, 1.55, 0);
   push(new THREE.BoxGeometry(0.1, 0.1, 0.86), 0.16, 1.22, 0.3);
   return BufferGeometryUtils.mergeGeometries(parts, false);
+}
+
+/**
+ * Flatten a GLB into one instanceable geometry.
+ *
+ * Bakes every mesh's world transform into its vertices, drops attributes the
+ * merge cannot reconcile, normalises the result to a real soldier's height and
+ * stands it on the ground plane. Skinned meshes come through in their bind
+ * pose, which is exactly what is wanted: these are figures at a window seen
+ * from two hundred metres, not animated characters.
+ */
+export async function loadSoldierGeometry(loader, file, targetHeight = 1.8) {
+  const gltf = await loader.loadAsync(`assets/${file}.glb`);
+  const root = gltf.scene;
+  root.updateMatrixWorld(true);
+
+  const parts = [];
+  let material = null;
+  root.traverse((o) => {
+    if (!o.isMesh || !o.geometry) return;
+    const g = o.geometry.clone();
+    g.applyMatrix4(o.matrixWorld);
+    // Merging refuses geometries whose attribute sets differ, and a character
+    // GLB is full of skinning and tangent data no instanced mesh will use.
+    for (const name of Object.keys(g.attributes)) {
+      if (name !== 'position' && name !== 'normal' && name !== 'uv') {
+        g.deleteAttribute(name);
+      }
+    }
+    if (!g.attributes.normal) g.computeVertexNormals();
+    if (!g.attributes.uv) {
+      const n = g.attributes.position.count;
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+    }
+    parts.push(g);
+    if (!material) material = Array.isArray(o.material) ? o.material[0] : o.material;
+  });
+  if (!parts.length) return null;
+
+  const merged = parts.length === 1
+    ? parts[0]
+    : BufferGeometryUtils.mergeGeometries(parts, false);
+  if (!merged) return null;
+
+  merged.computeBoundingBox();
+  const bb = merged.boundingBox;
+  const height = Math.max(0.01, bb.max.y - bb.min.y);
+  const k = targetHeight / height;
+  merged.translate(
+    -(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2,
+  );
+  merged.scale(k, k, k);
+
+  const simplified = simplifyByClustering(merged, 26);
+  if (simplified && simplified !== merged) merged.dispose();
+  return { geometry: simplified || merged, material };
+}
+
+/**
+ * Vertex-cluster decimation.
+ *
+ * The source soldier is a hundred thousand vertices — a perfectly reasonable
+ * number for one hero character and a catastrophic one for a hundred of them in
+ * an instanced mesh, which would be three and a half million triangles a frame
+ * before anything else is drawn.
+ *
+ * So: overlay a grid on the model, collapse every vertex in a cell onto that
+ * cell's average, and drop the triangles that degenerate as a result. It is the
+ * bluntest simplification there is and it does not preserve silhouettes the way
+ * a proper edge-collapse would — but these are figures standing in windows two
+ * hundred metres away, and at that size the difference is invisible while the
+ * saving is thirty-fold.
+ */
+export function simplifyByClustering(geo, cells = 26) {
+  const src = geo.index ? geo.toNonIndexed() : geo;
+  const pos = src.attributes.position;
+  const n = pos.count;
+  if (n < 3000) return geo;
+
+  src.computeBoundingBox();
+  const bb = src.boundingBox;
+  const sx = Math.max(1e-6, bb.max.x - bb.min.x) / cells;
+  const sy = Math.max(1e-6, bb.max.y - bb.min.y) / cells;
+  const sz = Math.max(1e-6, bb.max.z - bb.min.z) / cells;
+
+  const key = new Int32Array(n);
+  const sums = new Map();     // cell -> [x, y, z, count, outIndex]
+  for (let i = 0; i < n; i++) {
+    const cx = Math.floor((pos.getX(i) - bb.min.x) / sx);
+    const cy = Math.floor((pos.getY(i) - bb.min.y) / sy);
+    const cz = Math.floor((pos.getZ(i) - bb.min.z) / sz);
+    const k = (cy * (cells + 2) + cz) * (cells + 2) + cx;
+    key[i] = k;
+    let e = sums.get(k);
+    if (!e) sums.set(k, (e = [0, 0, 0, 0, -1]));
+    e[0] += pos.getX(i); e[1] += pos.getY(i); e[2] += pos.getZ(i); e[3]++;
+  }
+
+  const outPos = [];
+  for (const e of sums.values()) {
+    e[4] = outPos.length / 3;
+    outPos.push(e[0] / e[3], e[1] / e[3], e[2] / e[3]);
+  }
+
+  const outIdx = [];
+  for (let t = 0; t < n; t += 3) {
+    const a = sums.get(key[t])[4];
+    const b = sums.get(key[t + 1])[4];
+    const c = sums.get(key[t + 2])[4];
+    if (a === b || b === c || a === c) continue;   // collapsed to a sliver
+    outIdx.push(a, b, c);
+  }
+  if (!outIdx.length) return geo;
+
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(new Float32Array(outPos), 3));
+  out.setIndex(outPos.length / 3 > 65535
+    ? new THREE.BufferAttribute(new Uint32Array(outIdx), 1)
+    : new THREE.BufferAttribute(new Uint16Array(outIdx), 1));
+  out.computeVertexNormals();
+  if (src !== geo) src.dispose();
+  return out;
 }
 
 /** A tube on a bipod, for the roof crews. */
@@ -177,6 +308,7 @@ export class Garrison {
     this.mesh = mk(soldierGeometry(), 0xffffff, 256);
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 48);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 96);
+    this._mk = mk;
 
     this._m4 = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -186,6 +318,40 @@ export class Garrison {
     this._col = new THREE.Color();
     this._from = new THREE.Vector3();
     this._to = new THREE.Vector3();
+  }
+
+  /**
+   * Swap the box stand-in for the real figure once its model has loaded.
+   *
+   * The instance buffers carry over untouched — they are matrices and colours,
+   * and neither cares what geometry they are drawn with — so the garrison
+   * changes appearance between one frame and the next with nothing else
+   * disturbed. Keeping the per-type colour tint means the real model still
+   * reads as riflemen, MG crews, snipers and AT teams rather than as a hundred
+   * identical soldiers.
+   */
+  useSoldierModel(geometry, material) {
+    if (!geometry) return false;
+    const old = this.mesh;
+    const mat = material
+      ? material.clone()
+      : new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.03 });
+    mat.vertexColors = false;
+    // The instance colour is the type tint; a base map would fight it.
+    if (mat.color) mat.color.set(0xffffff);
+
+    const mesh = new THREE.InstancedMesh(geometry, mat, 256);
+    mesh.castShadow = this.quality.shadowMapSize > 0;
+    mesh.frustumCulled = false;
+    mesh.instanceMatrix = old.instanceMatrix;
+    mesh.instanceColor = old.instanceColor;
+    mesh.count = old.count;
+    mesh.visible = old.visible;
+    this.scene.remove(old);
+    old.geometry.dispose();
+    this.scene.add(mesh);
+    this.mesh = mesh;
+    return true;
   }
 
   /**

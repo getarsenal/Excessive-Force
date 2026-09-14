@@ -172,6 +172,53 @@ export class PhysicsWorld {
   }
 
   /** Sweep settled dynamic bodies back to fixed. Call once per rendered frame. */
+  /**
+   * Catch debris that has run away.
+   *
+   * A stone wedged inside another when it is promoted to dynamic gets a
+   * penetration-recovery push that can be enormous, and once one piece is doing
+   * four hundred metres a second it takes whatever it touches with it. Every so
+   * often the whole map ends up with masonry kilometres from where it started —
+   * invisible in play, but it wrecks anything that reasons about where the
+   * building *is*, and it is a fair amount of simulation spent on nothing.
+   *
+   * Nothing legitimate in this game moves faster than a rocket, so anything
+   * that does is clamped, and anything that has left the map is removed.
+   */
+  cullRunaways(bounds) {
+    const dead = [];
+    let clamped = 0;
+    for (const body of this.dynamicSet) {
+      if (body.isSleeping()) continue;
+      const v = body.linvel();
+      const speed = Math.hypot(v.x, v.y, v.z);
+      // 120 m/s is comfortably above anything a blast legitimately imparts —
+      // the heaviest warhead in the game throws stone at about ninety.
+      if (speed > 120) {
+        const k = 120 / speed;
+        body.setLinvel({ x: v.x * k, y: v.y * k, z: v.z * k }, true);
+        clamped++;
+      }
+      const t = body.translation();
+      if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)
+          || t.y < -240 || t.y > 900
+          || Math.abs(t.x) > bounds || Math.abs(t.z) > bounds) {
+        dead.push(body);
+      }
+    }
+    for (const b of dead) {
+      const owner = this.owners.get(b.handle);
+      if (owner && owner.structure && owner.chunk !== undefined) {
+        owner.structure.destroyChunk(owner.chunk);
+      } else {
+        this.remove(b);
+      }
+    }
+    this.runawaysCulled = (this.runawaysCulled || 0) + dead.length;
+    this.runawaysClamped = (this.runawaysClamped || 0) + clamped;
+    return dead.length;
+  }
+
   recycleSettled(settleFrames) {
     const toDemote = [];
     for (const body of this.dynamicSet) {

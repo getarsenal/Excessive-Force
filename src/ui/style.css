@@ -123,6 +123,7 @@ html, body {
   min-width: 38px; text-align: right;
 }
 .tb-sub { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; margin-top: 3px; }
+.tb-sub.leaning { color: var(--warn); font-weight: 600; }
 
 /* ── Build bar ───────────────────────────────────────────────────────── */
 #buildbar {

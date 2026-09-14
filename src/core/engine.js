@@ -196,7 +196,11 @@ export class Engine {
     scratch.add(sky);
     const rt = pmrem.fromScene(scratch, 0.04);
     this.scene.environment = rt.texture;
-    this.scene.environmentIntensity = 0.55;
+    // Carries most of the fill on faces the sun never reaches. Without it,
+    // north-facing roofs and the shaded side of every street read as black —
+    // a hemisphere light alone gives them one flat ambient tone and nothing to
+    // reflect.
+    this.scene.environmentIntensity = 0.95;
     this.envMap = rt.texture;
     pmrem.dispose();
     // Hand the dome back; the caller adds it to the real scene.

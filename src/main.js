@@ -11,7 +11,8 @@ import { Structure } from './structure/structure.js';
 import { resolveLevel } from './game/levels.js';
 import { MATERIAL_PROPS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
-import { Garrison } from './game/defenders.js';
+import { CraterFX } from './fx/craters.js';
+import { Garrison, loadSoldierGeometry } from './game/defenders.js';
 import { Battle } from './game/battle.js';
 import { HUD } from './ui/hud.js';
 import { Picker } from './core/picking.js';
@@ -70,6 +71,7 @@ async function boot() {
   await progress(30, 'building london');
   // Real OpenStreetMap footprints when they've been baked; otherwise the
   // hand-placed approximation, so the level still reads as a city either way.
+  let contextGroup = null;
   const city = await loadCity(level.terrain);
   const cityGroup = city
     ? buildCity(city, terrain, quality, { excludeRadius: level.cityExcludeRadius })
@@ -81,8 +83,11 @@ async function boot() {
     console.log(`[tumble] city: ${cityGroup.userData.built} of `
       + `${cityGroup.userData.available} buildings — ${city.source}`);
   } else {
-    engine.scene.add(buildContext(terrain, quality));
-    console.log('[tumble] city: hand-placed approximation'
+    contextGroup = buildContext(terrain, quality);
+    engine.scene.add(contextGroup);
+    console.log(`[tumble] city: hand-placed approximation, `
+      + `${contextGroup.userData.plots.length} buildings, `
+      + `${contextGroup.userData.roofs.length} deployable roofs`
       + ' (run tools/bake_buildings.py for real footprints)');
   }
 
@@ -132,6 +137,20 @@ async function boot() {
     structures, primary, garrison, fx, quality, groundY, audio, level,
     onEvent: (kind, data) => handleEvent(kind, data),
   });
+
+  // The real soldier from FIREBASE, flattened into one instanceable geometry.
+  // Loaded after the garrison is posted rather than before it, so a slow or
+  // missing asset costs the box stand-in instead of the whole level.
+  loadSoldierGeometry(battle.models.loader, 'Enemy_Soldier', 1.85)
+    .then((m) => {
+      if (m && garrison.useSoldierModel(m.geometry, m.material)) {
+        console.log('[tumble] garrison: Enemy_Soldier.glb,',
+          m.geometry.attributes.position.count, 'verts per figure');
+      }
+    })
+    .catch((e) => console.warn('[tumble] soldier model unavailable', e.message));
+
+  battle.craters = new CraterFX(engine.scene, terrain, quality);
 
   hud = new HUD(battle, {
     onSelect: (id) => {
@@ -204,7 +223,7 @@ async function boot() {
   // ── Input: tap the structure to designate a target, tap the ground to
   // deploy the selected unit.
   const picker = new Picker(canvas, engine.camera, terrain);
-  const pick = (x, y) => picker.pick(x, y, structures);
+  const pick = (x, y) => picker.pick(x, y, structures, cityGroup || contextGroup);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -220,7 +239,7 @@ async function boot() {
     if (!hit) return;
 
     if (battle.selectedUnitId) {
-      if (hit.kind === 'ground') {
+      if (hit.kind === 'ground' || hit.kind === 'roof') {
         const ok = battle.validPlacement(hit.point);
         battle.pulse(hit.point, ok.ok ? 0x6fd08c : 0xe8604c, 14);
         battle.deploy(battle.selectedUnitId, hit.point);
@@ -247,7 +266,9 @@ async function boot() {
       return;
     }
     const hit = pick(e.clientX, e.clientY);
-    if (!hit || hit.kind !== 'ground') { battle.ghost.visible = false; return; }
+    if (!hit || (hit.kind !== 'ground' && hit.kind !== 'roof')) {
+      battle.ghost.visible = false; return;
+    }
     const ok = battle.validPlacement(hit.point).ok;
     battle.ghost.position.copy(hit.point).setY(hit.point.y + 0.25);
     battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
@@ -288,7 +309,10 @@ async function boot() {
     for (let i = 0; i < steps; i++) {
       physics.step(step);
       physics.recycleSettled(quality.settleFrames);
-      for (const s of structures) { s.solveStability(); s.maintainIslands(); s.syncTransforms(); }
+      physics.cullRunaways(terrain.span * 1.6);
+      for (const s of structures) {
+        s.solveStability(); s.maintainIslands(); s.tickLean(step); s.syncTransforms();
+      }
       battle.update(step);
       fx.update(step);
     }
@@ -313,7 +337,7 @@ async function boot() {
 
   const testMenu = new TestMenu({
     battle, engine, physics, terrain, rig, quality, level, structures, water,
-    cityGroup, hud, picker, fx, garrison, governor,
+    cityGroup: cityGroup || contextGroup, hud, picker, fx, garrison, governor,
     fastForward,
     stats: () => ({ fps, physMs: +physMs.toFixed(2) }),
     shaderErrors: () => shaderLog,
@@ -331,7 +355,8 @@ async function boot() {
     physics.setBudget(governor.update(dtMs));
     physics.step(dt);
     physics.recycleSettled(quality.settleFrames);
-    for (const s of structures) { s.solveStability(); s.maintainIslands(); }
+    physics.cullRunaways(terrain.span * 1.6);
+    for (const s of structures) { s.solveStability(); s.maintainIslands(); s.tickLean(dt); }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;
 
     for (const s of structures) s.syncTransforms();
@@ -366,6 +391,10 @@ async function boot() {
   Object.assign(window, {
     engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level,
     structures, tower: primary, primary, picker, hud, water, testMenu,
+    cityGroup: cityGroup || contextGroup,
+    // Exposed so a console session or the headless harness can build the same
+    // vectors the game does rather than duck-typing them.
+    THREE,
   });
   window.__fastForward = fastForward;
   // The headless harness drives the same suite the panel does, so a regression

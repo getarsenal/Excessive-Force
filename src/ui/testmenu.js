@@ -207,6 +207,12 @@ export class TestMenu {
     this._stat(diag, 'Body budget', () => c.physics.activeBudget);
     this._stat(diag, 'Stones destroyed', () => sum(c.structures, (s) => s.destroyedCount));
     this._stat(diag, 'Loose sections', () => sum(c.structures, (s) => s.islands.size));
+    this._stat(diag, 'Out of plumb', () => `${b.primary.leanDegrees.toFixed(2)}°`);
+    this._stat(diag, 'Peak bearing stress',
+      () => `${((b.primary.lastStressRatio || 0) * 100).toFixed(0)}% of capacity`);
+    this._stat(diag, 'Worst slice cut to',
+      () => `${((b.primary.lastCutFrac ?? 1) * 100).toFixed(0)}% bearing`);
+    this._stat(diag, 'Debris culled', () => c.physics.runawaysCulled || 0);
     this._stat(diag, 'Shells in flight', () => b.projectiles.inFlight);
     this._stat(diag, 'Live tracers', () => b.tracerFX.tracers.length);
     this._stat(diag, 'Rounds fired at you', () => b.tracerFX.fired);
@@ -343,11 +349,24 @@ export class TestMenu {
       min: 500, max: 60000, step: 500,
       get: () => this.blastPower ?? 9000, set: (v) => { this.blastPower = v; },
     });
+    this._stat(st, 'Mortar bond (worst)', () => {
+      let lo = 1;
+      for (const s2 of c.structures) {
+        for (let i = 0; i < s2.count; i++) {
+          if (s2.flags[i] & 1) lo = Math.min(lo, s2.bond[i]);
+        }
+      }
+      return `${(lo * 100).toFixed(0)}%`;
+    });
     this._buttons(st, null, [
       ['DETONATE AT AIM', () => this.detonate()],
       ['CUT THE BASE', () => this.cutBase()],
+      ['FORCE A LEAN', () => this.forceLean()],
       ['RELOAD LEVEL', () => location.reload()],
     ]);
+    this._note(st, 'A slice carrying an off-centre load crushes on its '
+      + 'compression edge, which tips the load further out. Past 7.5° the '
+      + 'section is handed to the physics engine and falls.');
 
     // ── Physics ────────────────────────────────────────────────────────────
     const phys = this._section('PHYSICS & TIME');
@@ -486,19 +505,25 @@ export class TestMenu {
   aimPoint(frac) {
     const b = this.ctx.battle;
     const st = b.primary;
+    // Standing masonry only. Loose stone is not a target — and because this
+    // works from the *extremes* of what it scans, a single piece of debris that
+    // has been thrown clear drags the whole height range with it and puts the
+    // aim point underground.
+    const standing = (i) => (st.flags[i] & 1) && !(st.flags[i] & (2 | 8));
     let lo = Infinity, hi = -Infinity;
     for (let i = 0; i < st.count; i++) {
-      if (!(st.flags[i] & 1)) continue;
+      if (!standing(i)) continue;
       lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
     }
     if (!isFinite(lo)) return st.origin.clone();
     const want = lo + (hi - lo) * frac;
-    let best = null, bestD = Infinity;
+    let best = -1, bestD = Infinity;
     for (let i = 0; i < st.count; i++) {
-      if (!(st.flags[i] & 1)) continue;
+      if (!standing(i)) continue;
       const d = Math.abs(st.py[i] - want);
       if (d < bestD) { bestD = d; best = i; }
     }
+    if (best < 0) return st.origin.clone();
     return new THREE.Vector3(st.px[best], st.py[best], st.pz[best]);
   }
 
@@ -518,6 +543,18 @@ export class TestMenu {
     b.fx.detonate(p, Math.min(3, r / 6), { ground: false });
     this.ctx.engine.addShake(0.4);
     this._note(this.sections.get('STRUCTURE'), `last blast destroyed ${n} stones`);
+  }
+
+  /** Push the primary straight into its lean, for looking at the mechanism. */
+  forceLean() {
+    const st = this.ctx.battle.primary;
+    st.solveStability(true);
+    if (!st.lean) {
+      // Nothing is failing yet; cut a face first so there is something to tip.
+      this.cutBase();
+      st.solveStability(true);
+    }
+    if (st.lean) st.lean.target = Math.max(st.lean.target, 0.06);
   }
 
   /** Undercut one face at the base — the canonical way to topple a tower. */
@@ -557,6 +594,59 @@ export class TestMenu {
       b.unlockAll = unlock;
       placed++;
     }
+    return placed;
+  }
+
+  /**
+   * A compass bearing from the primary with nothing else in the way.
+   *
+   * Tries the four cardinal directions and takes the first whose sight line to
+   * the top of the structure is clear of every *other* building on the level.
+   */
+  _clearBearing(range) {
+    const c = this.ctx, b = c.battle, st = b.primary;
+    const aim = new THREE.Vector3(st.origin.x, b.originGround + 40, st.origin.z);
+    const others = c.structures.filter((s) => s !== st);
+    for (const a of [Math.PI, 0, Math.PI / 2, -Math.PI / 2]) {
+      const from = new THREE.Vector3(
+        st.origin.x + Math.sin(a) * range, b.originGround + 3,
+        st.origin.z + Math.cos(a) * range,
+      );
+      if (lineOfSight(others, from, aim, 0, 0)) return a;
+    }
+    return Math.PI;
+  }
+
+  /** Put `n` guns of one type on a bearing at a given range from the primary. */
+  spawnAt(id, n, bearing, range) {
+    const c = this.ctx, b = c.battle, st = b.primary;
+    let placed = 0;
+    for (let k = 0; k < n * 6 && placed < n; k++) {
+      const a = bearing + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.055;
+      const p = new THREE.Vector3(
+        st.origin.x + Math.sin(a) * range, 0, st.origin.z + Math.cos(a) * range,
+      );
+      p.y = c.terrain.heightAt(p.x, p.z);
+      if (!b.validPlacement(p).ok) continue;
+      const money = b.money, unlock = b.unlockAll;
+      b.unlockAll = true;
+      b.money = Math.max(b.money, UNITS_BY_ID[id].cost);
+      b.deploy(id, p);
+      b.money = money; b.unlockAll = unlock;
+      placed++;
+    }
+    return placed;
+  }
+
+  /** Remove every deployed unit, so a test starts from a known board. */
+  clearUnits() {
+    const b = this.ctx.battle;
+    for (const u of b.units) {
+      if (!u.alive) continue;
+      u.alive = false;
+      b.scene.remove(u.group);
+    }
+    b.units.length = 0;
   }
 
   camera(pitch, distance) {
@@ -750,16 +840,25 @@ export class TestMenu {
         // A howitzer, not an AT4: the whole point of the light tiers is that
         // they barely scratch stone, so asserting damage with one would assert
         // the opposite of the design.
+        //
+        // The guns are placed deliberately rather than on the generic ring.
+        // The ring puts them wherever there is space, which on Westminster can
+        // be behind the palace wing — a legitimate firing position that a real
+        // battery would have to shoot over, but not what this test is about.
+        this.clearUnits();
+        const st = b.primary;
         const before = sum(c.structures, (s) => s.destroyedCount);
-        const was = this._spawnId;
-        this._spawnId = 'm119';
-        this.spawnRing(2);
-        this._spawnId = was;
+        const shots0 = b.shotsFired;
+        const placed = this.spawnAt('m119', 2, this._clearBearing(220), 220);
         this.aimAt(0.35);
-        c.fastForward(24);
+        c.fastForward(26);
         const gone = sum(c.structures, (s) => s.destroyedCount) - before;
-        assert(gone > 0, 'a pair of M119s destroyed nothing in 24 s');
-        return `${gone} stones`;
+        const fired = b.shotsFired - shots0;
+        assert(placed > 0, 'no firing position was available');
+        assert(gone > 0,
+          `nothing destroyed in 26 s — ${placed} guns, ${fired} rounds fired, `
+          + `state ${b.state}, target ${b.target ? 'set' : 'none'}`);
+        return `${gone} stones from ${fired} rounds`;
       })],
 
       ['the structure stands under its own weight', () => {
@@ -799,6 +898,41 @@ export class TestMenu {
         assert(!t.isWater(b.primary.origin.x, b.primary.origin.z),
           'the target is standing in the river');
         return `${quads} quads over ${wetCells} wet cells`;
+      }],
+
+      ['guns can be put on a rooftop', () => {
+        const city = c.cityGroup;
+        const roofs = city && city.userData ? city.userData.roofs : null;
+        assert(roofs && roofs.length > 0, 'the city exposes no deployable roofs');
+        // Pick the roof the way a player would: project its centre to the
+        // screen and tap it, then check what comes back.
+        let tested = 0, placed = 0;
+        for (const r of roofs.slice(0, 40)) {
+          const s = c.picker.toScreen(new THREE.Vector3(r.x, r.top, r.z));
+          if (s.behind) continue;
+          const hit = c.picker.pick(s.x, s.y, c.structures, city);
+          if (!hit || hit.kind !== 'roof') continue;
+          tested++;
+          if (!b.validPlacement(hit.point).ok) continue;
+          const before = b.units.length;
+          const money = b.money, unlock = b.unlockAll;
+          b.unlockAll = true; b.money = 1e6;
+          b.deploy('m119', hit.point);
+          b.money = money; b.unlockAll = unlock;
+          if (b.units.length > before) {
+            const u = b.units[b.units.length - 1];
+            assert(u.onRoof, 'the unit was not flagged as being on a roof');
+            assert(u.pos.y > c.terrain.heightAt(u.pos.x, u.pos.z) + 4,
+              `deployed at ${u.pos.y.toFixed(1)} m, barely above the `
+              + `${c.terrain.heightAt(u.pos.x, u.pos.z).toFixed(1)} m ground`);
+            placed++;
+          }
+          if (placed >= 2) break;
+        }
+        assert(tested > 0, `${roofs.length} roofs exist but none picked as one`);
+        assert(placed > 0, `${tested} roofs picked but nothing could be placed`);
+        this.clearUnits();
+        return `${placed} of ${tested} on-screen roofs took a gun`;
       }],
 
       ['deployment rules hold', () => {
@@ -857,6 +991,87 @@ export class TestMenu {
         assert(b._rings.some((r) => r.age < 0.01), 'the world pulse did not fire');
         return `${pool.length} screen ripples, ${b._rings.length} world rings`;
       }],
+      // ── Destructive: leaves the level a pile of rubble, so it runs last.
+      // Everything above needs a building to be standing in front of it.
+      ['undercutting the base brings it down', () => this._calm(() => {
+        // The headline behaviour, and the one that was most wrong: shelling the
+        // base of a landmark used to do nothing at all until it did everything.
+        //
+        // What counts as success depends on the shape of the thing. A tower is
+        // a cantilever and must visibly go out of plumb before it comes down —
+        // that intermediate state is the whole point of the mechanism. The Taj
+        // is a dome on a terrace with an aspect ratio of one; it has no lean in
+        // it and never did, so demanding one would be demanding a bug.
+        const st = b.primary;
+        this.clearUnits();
+        const h0 = st.standingHeight();
+        const gy = b.originGround;
+
+        // Footprint, for the slenderness test.
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+          minX = Math.min(minX, st.px[i]); maxX = Math.max(maxX, st.px[i]);
+          minZ = Math.min(minZ, st.pz[i]); maxZ = Math.max(maxZ, st.pz[i]);
+        }
+        const width = Math.max(1, Math.min(maxX - minX, maxZ - minZ));
+        const slender = (h0 - gy) / width;
+
+        // Aim at the foot of the *monument*. On a level that scores only part
+        // of the structure, the terrace underneath it is not the base worth
+        // cutting — the piers carrying the dome are.
+        // Cut *one face*, above grade. Both matter. Spreading the damage round
+        // the perimeter erodes a building evenly and it settles straight down;
+        // it is undercutting one side that produces a lean. And the lowest
+        // stone of all is usually a buried foundation block, where shells
+        // accomplish nothing.
+        const mask = st._winMask;
+        const face = st.origin.z - 3.0;
+        const foot = () => {
+          let best = -1, by = Infinity;
+          for (let i = 0; i < st.count; i++) {
+            if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+            if (mask && !mask[i]) continue;
+            if (st.pz[i] > face) continue;
+            if (st.py[i] < gy + 0.5) continue;
+            if (st.py[i] < by) { by = st.py[i]; best = i; }
+          }
+          return best;
+        };
+
+        let leaned = 0;
+        for (let round = 0; round < 40; round++) {
+          const i = foot();
+          if (i < 0) break;
+          st.explode(
+            { x: st.px[i], y: st.py[i] + 1.5, z: st.pz[i] }, 1.9, 6.6, 6400,
+            { dir: { x: 0, y: -0.1, z: 1 }, kinetic: 0.85 },
+          );
+          st.stabilityDirty = true;
+          // Sampled through the wait, not just at the end of it. A lean builds
+          // and resolves inside a couple of seconds, so checking once a round
+          // can step straight over the part being asserted.
+          for (let k = 0; k < 5; k++) {
+            c.fastForward(0.24);
+            leaned = Math.max(leaned, st.leanDegrees);
+          }
+          if (st.standingHeight() < h0 - 25) break;
+        }
+        const dropped = st.standingHeight() < h0 ? h0 - st.standingHeight() : 0;
+        const integ = st.monumentIntegrity;
+        if (slender > 2.5) {
+          assert(leaned > 0.4,
+            `a tower ${slender.toFixed(1)}:1 slender never went out of plumb `
+            + `(worst ${leaned.toFixed(2)}°)`);
+        }
+        assert(dropped > 20 || integ < 0.6,
+          `it kept ${(integ * 100).toFixed(0)}% of itself and lost only `
+          + `${dropped.toFixed(1)} m with its base shot out`);
+        return slender > 2.5
+          ? `leaned ${leaned.toFixed(1)}°, then lost ${dropped.toFixed(0)} m`
+          : `${slender.toFixed(1)}:1 squat — no lean expected; down to `
+            + `${(integ * 100).toFixed(0)}%`;
+      })],
     ];
   }
 

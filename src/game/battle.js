@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
-import { solveBallistic, solveDirect, ProjectileManager } from './projectiles.js';
+import { solveArc, solveBallistic, solveDirect, ProjectileManager } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
+import { lineOfSight } from '../structure/occupancy.js';
 
 /**
  * The game itself: deployment, targeting, the economy, and the loss condition.
@@ -191,7 +192,13 @@ export class Battle {
   /** Can a unit stand here? */
   validPlacement(point) {
     if (!point) return { ok: false, reason: 'no ground' };
-    if (this.terrain.isWater(point.x, point.z)) return { ok: false, reason: 'in the river' };
+    // A rooftop has already been established as a flat surface by the picker;
+    // what is underneath it — river, road, another building — is beside the
+    // point once you are standing on top of it.
+    const onRoof = point.onRoof === true;
+    if (!onRoof && this.terrain.isWater(point.x, point.z)) {
+      return { ok: false, reason: 'in the river' };
+    }
     const span = this.terrain.span;
     if (Math.abs(point.x) > span * 0.92 || Math.abs(point.z) > span * 0.92) {
       return { ok: false, reason: 'off map' };
@@ -221,8 +228,9 @@ export class Battle {
       this.spent += def.cost;
     }
 
-    const y = this.terrain.heightAt(point.x, point.z);
+    const y = point.onRoof ? point.y : this.terrain.heightAt(point.x, point.z);
     const pos = new THREE.Vector3(point.x, y, point.z);
+    pos.onRoof = point.onRoof === true;
 
     const unit = {
       def, pos,
@@ -234,6 +242,7 @@ export class Battle {
       salvoLeft: 0,
       salvoTimer: 0,
       group: new THREE.Group(),
+      onRoof: pos.onRoof,
       yaw: 0,
       kills: 0,
       damageDealt: 0,
@@ -265,7 +274,9 @@ export class Battle {
       }
       return;
     }
-    const wrapper = await this.models.load(def.modelFile || def.model, def.modelLength);
+    const wrapper = await this.models.load(
+      def.modelFile || def.model, def.modelLength, { tint: def.tint },
+    );
     if (!unit.alive) return;
     const inst = this.models.instance(wrapper);
     inst.rotation.y = def.modelYaw ?? 0;
@@ -388,7 +399,29 @@ export class Battle {
 
     let vel;
     const p = def.projectile;
-    if (p.kind === 'arc' || p.kind === 'rocket') {
+    if (p.flat) {
+      // Direct fire: full charge on the *low* solution. A howitzer laid over
+      // open sights is not lobbing the shell over the target, it is driving it
+      // through the wall, and the trajectory should read that way — fast, taut
+      // and arriving while you are still watching the muzzle.
+      //
+      // Unless something is in the way. A crew that cannot see the target over
+      // the roof in front of them elevates until they can; a gun that instead
+      // fires flat into the nearest building is not a direct-fire gun, it is a
+      // broken one. So: low arc if it is clear, high arc if it is not.
+      const low = solveArc(from, aim, p.speed, p.gravity, false);
+      if (low && this._trajectoryClear(from, low, p.gravity)) {
+        vel = low;
+      } else {
+        // Elevate — but on a *reduced charge*. The high solution at full charge
+        // is the classic trap: at short range it throws the shell very nearly
+        // straight up, and it is still climbing when its flight time runs out.
+        // The minimum-energy solver picks the charge a real crew would.
+        const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0);
+        if (!lofted && !low) return false;
+        vel = lofted ? lofted.vel : low;
+      }
+    } else if (p.kind === 'arc' || p.kind === 'rocket') {
       // Rockets burn for their first second, so they need less launch energy;
       // the solver is given a correspondingly lower ceiling.
       const maxSpeed = p.kind === 'rocket' ? p.speed * 0.62 : p.speed;
@@ -423,6 +456,37 @@ export class Battle {
 
     unit.yaw = Math.atan2(aim.x - unit.pos.x, aim.z - unit.pos.z);
     unit.group.rotation.y = unit.yaw;
+    return true;
+  }
+
+  /**
+   * Does this shell clear everything between the gun and the target?
+   *
+   * Walks the parabola in a handful of steps and tests each leg against the
+   * structures' solidity grids, stopping short of the target so the building
+   * being shot at doesn't count as an obstruction. Cheap enough to run on every
+   * round, and it is only asked of direct-fire weapons, which are the only ones
+   * with a trajectory flat enough for it to matter.
+   */
+  _trajectoryClear(from, vel, gravity) {
+    const a = this._trajA || (this._trajA = new THREE.Vector3());
+    const bpt = this._trajB || (this._trajB = new THREE.Vector3());
+    // Time to the apex-or-target; sampling the first 85% avoids condemning the
+    // shot because the last leg runs into the wall it is aimed at.
+    const flight = Math.max(0.1, (2 * Math.max(0, vel.y)) / gravity);
+    const span = Math.min(flight, 6) * 0.85;
+    const steps = 7;
+    a.copy(from);
+    for (let i = 1; i <= steps; i++) {
+      const t = (span * i) / steps;
+      bpt.set(
+        from.x + vel.x * t,
+        from.y + vel.y * t - 0.5 * gravity * t * t,
+        from.z + vel.z * t,
+      );
+      if (!lineOfSight(this.structures, a, bpt, 0, 0)) return false;
+      a.copy(bpt);
+    }
     return true;
   }
 
@@ -502,7 +566,9 @@ export class Battle {
         if (d > w.radius) continue;
         u.health -= w.power * (1 - d / w.radius) * 0.06;
       }
-      for (const s of this.structures) s.explode(point, w.lethal * 0.5, w.radius * 0.5, w.power * 0.3);
+      for (const s of this.structures) {
+        s.explode(point, w.lethal * 0.5, w.radius * 0.5, w.power * 0.3, { kinetic: 0.2 });
+      }
       const gy0 = this.terrain.heightAt(point.x, point.z);
       this.fx.detonate(point, w.fx, { ground: point.y - gy0 < 4.0, groundY: gy0 });
       if (this.audio) {
@@ -514,9 +580,16 @@ export class Battle {
     }
 
     const power = w.power * this.powerScale;
+    // The direction the round was travelling when it arrived, so the masonry
+    // leaves the far side rather than puffing outward in a symmetric ball.
+    const v = proj.vel;
+    const speed = Math.hypot(v.x, v.y, v.z) || 1;
+    const dir = { x: v.x / speed, y: v.y / speed, z: v.z / speed };
+    const blast = { dir, kinetic: w.kinetic ?? 0.3 };
+
     let destroyed = 0;
     for (const s of this.structures) {
-      destroyed += s.explode(point, w.lethal, w.radius, power);
+      destroyed += s.explode(point, w.lethal, w.radius, power, blast);
     }
 
     const killed = this.garrison.splash(point, w.radius * 1.25, power);
@@ -529,6 +602,9 @@ export class Battle {
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 4.0;
     this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
+    // A round that falls short leaves a mark. Cheap, and it turns a miss into
+    // information: you can see where the sheaf is actually landing.
+    if (nearGround && this.craters) this.craters.add(point.x, groundY, point.z, w.radius);
 
     // Shake falls off with distance from the camera so a hit across the map
     // doesn't rattle the viewport as hard as one under your nose.

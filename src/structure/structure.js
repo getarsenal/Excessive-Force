@@ -34,10 +34,50 @@ const SETTLED = 16;
 const EPS = 0.075;          // joint tolerance when deciding adjacency
 const WELD_THRESHOLD = 26;  // above this, a detached group welds instead of freeing
 
-// How many stones bearing support may travel sideways along a course. Four is
-// enough for a lintel or a slab between close supports, and short enough that a
-// wall cut through at its base still comes down.
-const LATERAL_SPAN = 4;
+/**
+ * How far bearing support may travel sideways, in **metres**.
+ *
+ * This used to be a hop count — four stones along a course. That is the wrong
+ * unit, and it is why blowing the base out of the Elizabeth Tower left it
+ * standing: four hops of 1.15 m stone is 4.6 m of reach from *each* side of a
+ * hole, so an eight-metre crater was spanned from both edges and the solver
+ * concluded the wall above it was fine. Worse, the reach changed with the
+ * quality tier, because a finer subdivision means smaller stones and shorter
+ * hops for the same physical distance.
+ *
+ * In metres it is a statement about masonry: a stone lintel spans a couple of
+ * metres, a flat slab acting as a beam spans further, and nothing spans a
+ * crater. `spanReach` below scales the budget with how beam-like each stone is.
+ */
+const SPAN_BASE = 0.9;
+const SPAN_PER_FLATNESS = 1.5;
+const SPAN_MAX_FLATNESS = 3.0;
+
+/**
+ * Working compressive strength of the masonry, in pascals, before any damage.
+ * Governed by the mortar joints rather than the stone itself.
+ */
+const MASONRY_STRENGTH = 14e6;
+
+/**
+ * How far out of plumb a section gets before it is past saving, in radians.
+ *
+ * Seven and a half degrees puts the top of a 96 m tower twelve metres off its
+ * base. Generous on purpose: the lean is the most legible thing in the game —
+ * it is how the player finds out the shelling is working — and cutting it short
+ * at the first sign of trouble throws that away.
+ */
+const LEAN_CRITICAL = 0.13;
+
+/**
+ * The stress ratio recorded for a slice with no equilibrium at all.
+ *
+ * It has to be a number rather than infinity because it feeds the creep rate,
+ * and the creep rate is what sets how long the player gets to watch a tower go
+ * over. Too high and the lean is a single frame between "standing" and "gone",
+ * which is the thing this whole mechanism exists to avoid.
+ */
+const NO_EQUILIBRIUM = 1.8;
 
 export class Structure {
   /**
@@ -69,6 +109,11 @@ export class Structure {
     this.maxHealth = new Float32Array(n);
     this.mass = new Float32Array(n);
     this.load = new Float32Array(n);
+    // Mortar bond, 1 down to a floor. Blast shatters the joints well beyond the
+    // crater it leaves, and a course of stone whose mortar has been shaken to
+    // dust carries a fraction of what it did — which is most of why shelling
+    // the base of a tower matters far more than the hole itself suggests.
+    this.bond = new Float32Array(n).fill(1);
     this.strength = new Float32Array(n);
     this.structural = new Uint8Array(n);
     this.colliderOf = new Int32Array(n).fill(-1);
@@ -103,7 +148,17 @@ export class Structure {
     this._reach = new Uint8Array(n);
     this._stack = new Int32Array(n);
     this._comp = new Int32Array(n);
-    this._spanBudget = new Uint8Array(n);
+    this._spanBudget = new Float32Array(n);
+    this._bearing = new Uint8Array(n);   // supported from directly below
+    this._stress = new Float32Array(n);  // last computed bearing stress, Pa
+
+    // How far each stone can carry load sideways. A flat slab is a beam and
+    // spans; a cube is a wall stone and barely does.
+    this.spanReach = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const flat = Math.max(this.hx[i], this.hz[i]) / Math.max(0.05, this.hy[i]);
+      this.spanReach[i] = SPAN_BASE + SPAN_PER_FLATNESS * Math.min(SPAN_MAX_FLATNESS, flat);
+    }
     this._m4 = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
     this._v = new THREE.Vector3();
@@ -132,6 +187,8 @@ export class Structure {
     for (let i = 0; i < n; i++) if (this.flags[i] & ALIVE) total += this.mass[i];
     this.totalMass = total;
     this.aliveMass = total;
+    // Below this, a slice is carrying ornament rather than building.
+    this._significantLoad = Math.max(40000, total * 0.03);
     this.fallenMass = 0;
 
     this.solveStability(true);
@@ -341,21 +398,204 @@ export class Structure {
   }
 
   /**
-   * Overturning.
+   * Eccentric bearing: the reason a cut tower comes down.
    *
-   * Connectivity alone says a tower with one wall shot away is still fine —
-   * the remaining walls reach the ground, so nothing is "unsupported". Real
-   * towers don't behave like that. Once the centre of mass of everything above
-   * a cut moves outside what's left holding it up, the structure rotates about
-   * the edge of its remaining bearing and goes over.
+   * Connectivity alone says a tower with one wall shot away is fine — the other
+   * three walls still reach the ground, so nothing is "unsupported". A rigid-
+   * body overturning test agrees, because the centre of mass of a symmetric
+   * tower stays comfortably inside what is left of a square base. Both are
+   * wrong, and between them they are why blowing the base out of the Elizabeth
+   * Tower used to leave it standing there.
    *
-   * So for each damaged slice we compare the centre of mass above it against
-   * how far the surviving stone in that slice actually reaches in the direction
-   * the mass has shifted. If the mass hangs out past the bearing, everything
-   * above is released as one section — and then Rapier does the toppling, which
-   * is why it falls in the direction you cut rather than a scripted one.
+   * What actually happens is a stress problem, not a balance problem. Masonry
+   * has no tensile strength. Once the load arriving at a course is off-centre,
+   * the section cannot develop the tension needed to keep the far side in
+   * contact, so the joint opens, the bearing area shrinks to the compressed
+   * part only, and the whole load concentrates on what is left. That is a
+   * runaway: less area means more eccentricity means less area still.
    *
-   * This is what makes undercutting one face a real tactic.
+   * So this does the standard no-tension analysis, per horizontal slice:
+   *
+   *   1. Take the surviving bearing stones in the slice and the weight of
+   *      everything above it.
+   *   2. Assume a linear stress distribution across the section and work out
+   *      which stones come out in tension.
+   *   3. Throw those out — they have lifted off — and redo it with what is
+   *      left, until every remaining stone is in compression.
+   *   4. The peak stress on the compression edge is then real. Compare it to
+   *      what the damaged masonry can still carry.
+   *
+   * Stones past their capacity are crushed, which shifts the bearing further
+   * and brings the next tick round harder. When the compressed zone collapses
+   * to nothing — the resultant has walked outside the section entirely — there
+   * is no equilibrium at all and the slice is gone.
+   *
+   * @param {Uint8Array} load  what presses down — includes a leaning section
+   *                           that has gone dynamic but not yet fallen
+   * @param {Uint8Array} reach  what is still fixed, and so can bear
+   * @returns {{band:number, ratio:number, crushed:number}} the worst slice
+   */
+  _bearingAnalysis(load, reach) {
+    const n = this.count;
+    const B = this.bandCount;
+
+    // Weight carried into each slice, accumulated from the top down.
+    this._bMass.fill(0); this._bMomX.fill(0); this._bMomZ.fill(0);
+    for (let i = 0; i < n; i++) {
+      if (!load[i]) continue;
+      const b = this.bandOf[i];
+      const m = this.mass[i];
+      this._bMass[b] += m;
+      this._bMomX[b] += this.px[i] * m;
+      this._bMomZ[b] += this.pz[i] * m;
+    }
+
+    const active = this._bearActive || (this._bearActive = new Uint8Array(n));
+    let worstBand = -1, worstRatio = 0, crushedTotal = 0;
+    // The most deeply cut slice carrying real load, whether or not it is
+    // failing. A slice that has lost a quarter of its bearing is a slice the
+    // building is visibly sitting on differently, and that is worth handing to
+    // the physics engine even when the arithmetic says it still holds.
+    let cutBand = -1, cutFrac = 1;
+    let aboveMass = 0, aboveMomX = 0, aboveMomZ = 0;
+
+    for (let b = B - 1; b >= 1; b--) {
+      aboveMass += this._bMass[b];
+      aboveMomX += this._bMomX[b];
+      aboveMomZ += this._bMomZ[b];
+      // Only slices carrying a real share of the building are interesting. A
+      // pinnacle or a chattri weighs a few tonnes, sits on almost nothing, and
+      // will report itself in crisis on every tick — which used to short out
+      // the whole scan before it reached the slice that mattered.
+      if (aboveMass < this._significantLoad) continue;
+
+      const s0 = this.bandStart[b - 1], s1 = this.bandStart[b];
+      if (s1 <= s0) continue;
+
+      const comX = aboveMomX / aboveMass;
+      const comZ = aboveMomZ / aboveMass;
+      const P = aboveMass * 9.81;
+
+      // ── 1. the surviving bearing in this slice
+      let area = 0;
+      for (let k = s0; k < s1; k++) {
+        const j = this.bandList[k];
+        const ok = reach[j] && this.structural[j] ? 1 : 0;
+        active[j] = ok;
+        if (ok) area += 4 * this.hx[j] * this.hz[j];
+      }
+      if (area <= 0.01) continue;
+      const frac = area / Math.max(1e-6, this.bandArea0[b - 1]);
+      if (frac > 0.985) continue;                                   // untouched
+      if (frac < cutFrac) { cutFrac = frac; cutBand = b; }
+
+      // ── 2-3. drop the stones that come out in tension, and redo it
+      let cx = 0, cz = 0, peak = 0, peakDir = 0, ok = false;
+      for (let iter = 0; iter < 8; iter++) {
+        area = 0; cx = 0; cz = 0;
+        for (let k = s0; k < s1; k++) {
+          const j = this.bandList[k];
+          if (!active[j]) continue;
+          const a = 4 * this.hx[j] * this.hz[j];
+          area += a; cx += this.px[j] * a; cz += this.pz[j] * a;
+        }
+        if (area <= 0.01) break;
+        cx /= area; cz /= area;
+
+        let ex = comX - cx, ez = comZ - cz;
+        const e = Math.hypot(ex, ez);
+        if (e < 1e-4) {
+          // Concentric: uniform stress, nothing lifts off.
+          peak = P / area;
+          peakDir = 0;
+          ok = true;
+          break;
+        }
+        const ux = ex / e, uz = ez / e;
+
+        // Second moment of the surviving bearing about its centroid, measured
+        // along the direction the load has shifted.
+        let I = 0;
+        for (let k = s0; k < s1; k++) {
+          const j = this.bandList[k];
+          if (!active[j]) continue;
+          const a = 4 * this.hx[j] * this.hz[j];
+          const s = (this.px[j] - cx) * ux + (this.pz[j] - cz) * uz;
+          // Parallel-axis term, so a wide stone resists rotation on its own.
+          const half = Math.abs(this.hx[j] * ux) + Math.abs(this.hz[j] * uz);
+          I += a * (s * s + half * half / 3);
+        }
+        if (I <= 1e-6) break;
+
+        // σ(s) = P/A + P·e·s/I. Lift off anything the formula puts in tension.
+        let lifted = 0, hi = 0;
+        for (let k = s0; k < s1; k++) {
+          const j = this.bandList[k];
+          if (!active[j]) continue;
+          const s = (this.px[j] - cx) * ux + (this.pz[j] - cz) * uz;
+          const sigma = P / area + (P * e * s) / I;
+          this._stress[j] = sigma;
+          if (sigma < 0) { active[j] = 0; lifted++; } else if (sigma > hi) hi = sigma;
+        }
+        peak = hi;
+        peakDir = Math.atan2(ux, uz);
+        if (lifted === 0) { ok = true; break; }
+      }
+
+      if (!ok || area <= 0.01) {
+        // No compressed zone survives: the resultant is outside the section
+        // altogether and there is no equilibrium to be had. Recorded as
+        // decisively failing, but the scan carries on — a slice further down
+        // may be worse still, and it is the lowest failure that decides where
+        // the building breaks.
+        if (worstRatio < NO_EQUILIBRIUM) { worstRatio = NO_EQUILIBRIUM; worstBand = b; }
+        continue;
+      }
+
+      // ── 4. what the damaged masonry can still carry
+      let capacity = 0, capArea = 0;
+      for (let k = s0; k < s1; k++) {
+        const j = this.bandList[k];
+        if (!active[j]) continue;
+        const a = 4 * this.hx[j] * this.hz[j];
+        const props = MATERIAL_PROPS[this.mat[j]];
+        capArea += a;
+        capacity += a * props.strength * MASONRY_STRENGTH
+          * (this.health[j] / this.maxHealth[j]) * this.bond[j];
+      }
+      const allow = capArea > 0 ? capacity / capArea : 1;
+      const ratio = peak / Math.max(1, allow);
+      if (ratio > worstRatio) { worstRatio = ratio; worstBand = b; }
+
+      // Overstressed: crush the stones on the compression edge. They are the
+      // ones actually failing, and removing them is what walks the bearing
+      // further off-centre on the next tick.
+      if (ratio > 1) {
+        const ux = Math.sin(peakDir), uz = Math.cos(peakDir);
+        let best = -1, bestS = -Infinity;
+        for (let k = s0; k < s1; k++) {
+          const j = this.bandList[k];
+          if (!active[j]) continue;
+          const s = (this.px[j] - cx) * ux + (this.pz[j] - cz) * uz;
+          if (s > bestS) { bestS = s; best = j; }
+        }
+        if (best >= 0) {
+          this.health[best] = 0;
+          reach[best] = 0;
+          crushedTotal++;
+          this.stabilityDirty = true;
+        }
+      }
+    }
+
+    return { band: worstBand, ratio: worstRatio, crushed: crushedTotal, cutBand, cutFrac };
+  }
+
+  /**
+   * Legacy rigid-body overturning check, kept for the case the bearing
+   * analysis cannot see: a slice that is still in compression everywhere but
+   * whose bearing has been cut back so far on one side that the mass above it
+   * simply hangs off the edge.
    */
   _checkOverturning(reach) {
     const n = this.count;
@@ -685,7 +925,7 @@ export class Structure {
         // the masonry depth, and it costs one subtraction per stone at build
         // time rather than a baking pass.
         const nb = this.adjStart[i + 1] - this.adjStart[i];
-        const ao = 1 - THREE.MathUtils.clamp((nb - 7) / 16, 0, 1) * 0.34;
+        const ao = 1 - THREE.MathUtils.clamp((nb - 7) / 16, 0, 1) * 0.22;
 
         // Weathering: soot and rain streaking gathers low and on the underside
         // of cornices, which is how a real Victorian tower is coloured.
@@ -726,6 +966,14 @@ export class Structure {
       const h = this.ry[i] * 0.5;
       this._q.set(0, Math.sin(h), 0, Math.cos(h));
     }
+    // A settling structure is drawn leaning. The stones' own coordinates stay
+    // upright and authoritative; the tilt is applied here and baked in only if
+    // and when the section actually goes over.
+    if (this.lean && this._leaning(i)) {
+      const lq = this._leanTransform();
+      this._leanPosition(i, this._v);
+      this._q.premultiply(lq);
+    }
     this._s.set(this.hx[i] * 2, this.hy[i] * 2, this.hz[i] * 2);
     this._m4.compose(this._v, this._q, this._s);
     entry.mesh.setMatrixAt(k, this._m4);
@@ -753,6 +1001,18 @@ export class Structure {
   syncTransforms() {
     let moved = 0;
     this._ensureQuatArrays();
+
+    // A lean moves thousands of stones that are otherwise perfectly static, so
+    // their matrices have to be rewritten while it is running.
+    if (this._leanDirty && this.lean) {
+      for (let i = 0; i < this.count; i++) {
+        if (!this._leaning(i)) continue;
+        this._writeMatrix(i);
+        moved++;
+      }
+      this._leanDirty = false;
+      this._meshDirty = true;
+    }
 
     // Free bodies.
     for (let i = 0; i < this.count; i++) {
@@ -806,6 +1066,15 @@ export class Structure {
   /**
    * Apply an explosion. `lethal` is the radius inside which stone is pulverised;
    * out to `radius` stones take falling damage and get thrown.
+   *
+   * `opts.dir` is the direction the round was travelling and `opts.kinetic` how
+   * much of its effect comes from momentum rather than blast. A shoulder-fired
+   * HEAT round detonates on the surface and throws rubble in every direction;
+   * a 155 mm shell arriving at 200 m/s carries that momentum straight through
+   * the wall, and the masonry leaves the far side. Getting this right is what
+   * makes the direction you shoot from legible in the debris — hit the north
+   * face and the stone lands to the south.
+   *
    * Returns the number of stones destroyed.
    */
   explode(center, lethal, radius, power, opts = {}) {
@@ -856,8 +1125,59 @@ export class Structure {
 
     for (const i of destroyed) this.destroyChunk(i, center);
 
-    // Throw the survivors on the rim outward. This is what turns a hole into a
-    // spray of masonry rather than a clean bite.
+    // Shock damage to the mortar, out to well beyond the crater.
+    //
+    // A stone that survives a near miss looking untouched is not undamaged: the
+    // joints around it have been shaken apart, and a course whose mortar has
+    // gone carries a fraction of what it did. Without this the model says a
+    // tower with one face cleanly removed still has a fivefold margin in
+    // compression — which is arithmetically true of undamaged masonry, and has
+    // nothing to do with what is left after six rounds of 105 mm.
+    const shockR = radius * 2.4;
+    const shockR2 = shockR * shockR;
+    for (let i = 0; i < this.count; i++) {
+      if (!(this.flags[i] & ALIVE)) continue;
+      if (this.bond[i] <= 0.16) continue;
+      const dx = this.px[i] - center.x;
+      const dy = this.py[i] - center.y;
+      const dz = this.pz[i] - center.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > shockR2) continue;
+      const f = 1 - Math.sqrt(d2) / shockR;
+      this.bond[i] = Math.max(0.15, this.bond[i] - f * f * 0.7);
+    }
+
+    // Anything already leaning takes the hit as a real impulse on the section,
+    // so shelling a tower that is out of plumb visibly rocks it.
+    if (this.islands.size) {
+      for (const island of this.islands.values()) {
+        if (!island.settling || !island.body) continue;
+        const t = island.body.translation();
+        const dx = t.x - center.x, dy = t.y - center.y, dz = t.z - center.z;
+        const d = Math.hypot(dx, dy, dz) || 1;
+        if (d > radius * 9) continue;
+        // Deliberately not scaled to the island's mass. A shell genuinely does
+        // rock a loose two-hundred-stone chunk and genuinely does not move a
+        // thirteen-thousand-tonne tower; the impulse being negligible against
+        // the big one is the correct answer, not a missing feature.
+        const scale = power * 30 / (1 + d * 0.2);
+        island.body.applyImpulseAtPoint(
+          {
+            x: (opts.dir ? opts.dir.x : dx / d) * scale,
+            y: (opts.dir ? opts.dir.y : dy / d) * scale * 0.3,
+            z: (opts.dir ? opts.dir.z : dz / d) * scale,
+          },
+          { x: center.x, y: center.y, z: center.z },
+          true,
+        );
+      }
+    }
+
+    // Throw the survivors on the rim. This is what turns a hole into a spray of
+    // masonry rather than a clean bite — and the mix of radial blast and the
+    // round's own momentum is what aims that spray.
+    const dir = opts.dir || null;
+    const kinetic = Math.max(0, Math.min(1, opts.kinetic ?? 0.3));
     const budget = this.physics.reclaim(Math.min(thrown.length, 220));
     let used = 0;
     for (const t of thrown) {
@@ -865,10 +1185,25 @@ export class Structure {
       if (t.falloff < 0.12) continue;
       const inv = 1 / (t.d || 1);
       const mag = power * t.falloff * 0.0055 * this.mass[t.i];
+
+      let ix = t.dx * inv, iy = t.dy * inv, iz = t.dz * inv;
+      if (dir) {
+        // Blend the radial push toward the line of flight. Stones already on
+        // the far side get the full downrange kick; stones on the near side are
+        // partly shielded and mostly just spall outward.
+        const facing = ix * dir.x + iy * dir.y + iz * dir.z;   // +1 downrange
+        const w = kinetic * (0.55 + 0.45 * Math.max(0, facing));
+        ix = ix * (1 - w) + dir.x * w;
+        iy = iy * (1 - w) + dir.y * w;
+        iz = iz * (1 - w) + dir.z * w;
+        const len = Math.hypot(ix, iy, iz) || 1;
+        ix /= len; iy /= len; iz /= len;
+      }
+
       const imp = {
-        x: t.dx * inv * mag,
-        y: t.dy * inv * mag + mag * 0.28,
-        z: t.dz * inv * mag,
+        x: ix * mag,
+        y: iy * mag + mag * (0.28 - kinetic * 0.16),
+        z: iz * mag,
       };
       if (this.freeChunk(t.i, imp)) used++;
     }
@@ -1001,42 +1336,56 @@ export class Structure {
     // it. Arches, corbels and bonded courses all still work: their voussoirs
     // genuinely do have lower neighbours.
     const byHeight = this.heightOrder;
+    const bearing = this._bearing;
+    bearing.fill(0);
     for (let k = n - 1; k >= 0; k--) {
       const i = byHeight[k];
       if (!(this.flags[i] & ALIVE)) continue;
       if (this.flags[i] & (FREE | ISLAND)) continue;
-      if (this.flags[i] & GROUNDED) { reach[i] = 1; continue; }
+      if (this.flags[i] & GROUNDED) { reach[i] = 1; bearing[i] = 1; continue; }
       for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
-        if (reach[this.belowList[a]]) { reach[i] = 1; break; }
+        if (reach[this.belowList[a]]) { reach[i] = 1; bearing[i] = 1; break; }
       }
     }
 
-    // Spanning. A lintel over a door, a slab between two walls and a modest
-    // corbel all carry load sideways for a short distance, and a model with no
-    // beam action at all would drop every floor and roof in the building the
-    // instant it was built. So bearing support spreads along a course, but only
-    // a few stones — far enough to cross an opening, nowhere near far enough to
-    // hold up an unsupported wall.
+    // Spanning, measured in metres of reach rather than in stones.
+    //
+    // A lintel over a door, a slab between two walls and a modest corbel all
+    // carry load sideways for a short distance, and a model with no beam action
+    // at all drops every floor and roof in the building on the first frame. But
+    // the budget has to be a physical distance: in hops it changed with the
+    // quality tier, and four hops of small stone reached far enough from both
+    // sides of an eight-metre crater to declare the wall above it supported.
+    // That single line is most of why the tower used to survive having its base
+    // shot out.
+    // Relaxed in a fixed number of sweeps rather than with a work queue: the
+    // longest reach is a few metres and the stones are of the order of a metre,
+    // so six passes settle it, and a bounded loop cannot be made to spin by a
+    // pathological joint graph.
     const span = this._spanBudget;
     span.fill(0);
-    const queue = this._stack;
-    let head = 0, tail = 0;
-    for (let i = 0; i < n; i++) {
-      if (reach[i]) { span[i] = LATERAL_SPAN; queue[tail++] = i; }
-    }
-    while (head < tail && tail < n) {
-      const i = queue[head++];
-      const budget = span[i] - 1;
-      if (budget <= 0) continue;
-      for (let a = this.sideStart[i]; a < this.sideStart[i + 1]; a++) {
-        const j = this.sideList[a];
-        if (span[j] >= budget) continue;
-        if (!(this.flags[j] & ALIVE)) continue;
-        if (this.flags[j] & (FREE | ISLAND)) continue;
-        span[j] = budget;
-        reach[j] = 1;
-        if (tail < n) queue[tail++] = j;
+    for (let i = 0; i < n; i++) if (bearing[i]) span[i] = this.spanReach[i];
+    for (let pass = 0; pass < 6; pass++) {
+      let changed = false;
+      for (let k = 0; k < n; k++) {
+        const i = byHeight[k];
+        const budget = span[i];
+        if (budget <= 0) continue;
+        for (let a = this.sideStart[i]; a < this.sideStart[i + 1]; a++) {
+          const j = this.sideList[a];
+          if (!(this.flags[j] & ALIVE)) continue;
+          if (this.flags[j] & (FREE | ISLAND)) continue;
+          const step = Math.hypot(this.px[j] - this.px[i], this.pz[j] - this.pz[i]);
+          // A stone's own reach caps what it can pass on: a deep slab relays
+          // further than a thin course of wall stones.
+          const left = Math.min(budget - step, this.spanReach[j]);
+          if (left <= span[j] + 0.01) continue;
+          span[j] = left;
+          reach[j] = 1;
+          changed = true;
+        }
       }
+      if (!changed) break;
     }
 
     // (b) Load pass over the still-supported set.
@@ -1091,12 +1440,23 @@ export class Structure {
     const detached = [];
     let standing = 0;
     let winStanding = 0;
+    let top = this.groundY;
     const mask = this._winMask;
     for (let i = 0; i < n; i++) {
       if (!(this.flags[i] & ALIVE)) continue;
-      if (this.flags[i] & (FREE | ISLAND)) continue;
+      if (this.flags[i] & FREE) continue;
+      if (this.flags[i] & ISLAND) {
+        // A leaning-but-not-fallen section is still standing masonry.
+        if (this._isSettling(i)) {
+          standing += this.mass[i];
+          top = Math.max(top, this.py[i] + this.hy[i]);
+          if (mask && mask[i]) winStanding += this.mass[i];
+        }
+        continue;
+      }
       if (reach[i]) {
         standing += this.mass[i];
+        top = Math.max(top, this.py[i] + this.hy[i]);
         if (mask && mask[i]) winStanding += this.mass[i];
         continue;
       }
@@ -1104,26 +1464,424 @@ export class Structure {
     }
     this.standingMass = standing;
     this._winStanding = winStanding;
+    // Cached here rather than rescanned by `standingHeight`, because the flags
+    // alone cannot tell the difference between masonry that is standing and
+    // rubble the body budget could not afford to set in motion. Both are
+    // "alive and not dynamic"; only the support solver knows which is which.
+    this._standingTop = top;
 
+    // A large section still sitting on surviving masonry has not fallen — it
+    // has *settled onto it*. Handing it to the physics engine in that state is
+    // the difference between a tower that vanishes downward the instant the
+    // solver condemns it and one that sags into its crater, leans, and then
+    // makes up its mind.
+    let leanBand = -1, leanRatio = 0;
     for (const group of this._connectedGroups(detached)) {
-      this._releaseGroup(group);
+      let groupMass = 0;
+      for (const i of group) groupMass += this.mass[i];
+      // Leaning is a whole-structure gesture: it rotates everything above a
+      // slice. Arming it for a detached pinnacle would tilt the entire tower
+      // because one piece of ornament came loose, so it is reserved for a
+      // section big enough that "the building is going over" is a fair
+      // description of what just happened.
+      if (group.length > WELD_THRESHOLD
+          && groupMass > this._significantLoad * 3
+          && this._restingCount(group, reach) >= 4) {
+        // It has lost its bearing but it is still sitting on the stumps. Let
+        // it lean off them rather than dropping it: a section this size handed
+        // straight to the contact solver sinks through its own base.
+        let lowest = this.bandCount;
+        for (const i of group) lowest = Math.min(lowest, this.bandOf[i]);
+        if (leanBand < 0 || lowest < leanBand) leanBand = lowest;
+        leanRatio = Math.max(leanRatio, NO_EQUILIBRIUM * 0.9);
+      } else {
+        this._releaseGroup(group);
+      }
     }
     if (detached.length) this.stabilityDirty = true;
 
-    // Connectivity is satisfied at this point; overturning is the separate
-    // question of whether what's left can still *balance* the mass above it.
-    const toppled = this._checkOverturning(reach);
-    if (toppled) {
+    // Connectivity is satisfied at this point. What remains is the question it
+    // cannot answer: can what is left still *carry* the mass above it without
+    // the joints opening up? That is the bearing analysis, and it is what
+    // brings a cut tower down.
+    //
+    // A section that has already gone dynamic but is still leaning in place is
+    // folded into the load it puts on the base, so the crushing underneath it
+    // carries on and the lean keeps getting worse.
+    const carried = this._carried || (this._carried = new Uint8Array(n));
+    let anyCarried = false;
+    if (this.islands.size) {
+      carried.fill(0);
+      for (const island of this.islands.values()) {
+        if (!island.settling) continue;
+        for (const j of island.members) {
+          if (this.flags[j] & ALIVE) { carried[j] = 1; anyCarried = true; }
+        }
+      }
+    }
+    const loadMask = anyCarried ? this._mergeMask(reach, carried) : reach;
+
+    const bearing2 = this._bearingAnalysis(loadMask, reach);
+    if (bearing2.band > 0 && bearing2.ratio > 0.5
+        && (bearing2.band < leanBand || leanBand < 0)) {
+      leanBand = bearing2.band;
+      leanRatio = Math.max(leanRatio, bearing2.ratio);
+    }
+
+    // Everything that is failing — overloaded, off-centre, or simply resting on
+    // stumps — becomes the *same* thing: a lean. There is one control path out
+    // of "standing" and it runs through `tickLean`, which grows the tilt at a
+    // rate set by how badly the bearing is overworked and only hands the
+    // section to the physics engine once it is past the point of recovery.
+    //
+    // The alternative, handing a failing structure straight to the contact
+    // solver, is what this used to do, and it is why the tower either ignored
+    // the shelling completely or vanished downward in a single frame: a
+    // thirteen-thousand-tonne welded body resting on a damaged base sinks
+    // through it. Falling is the right answer eventually — but only after it
+    // has visibly gone over, and by then it is falling through air.
+    if (leanBand > 0) this._armLean(leanBand, leanRatio, loadMask, reach);
+
+    this.lastStressRatio = bearing2.ratio;
+    this.lastStressBand = bearing2.band;
+    this.lastCutFrac = bearing2.cutFrac;
+    const moved = 0;
+
+    // A leaning section is damaged, not demolished. It is still up, it is still
+    // the thing the player is trying to bring down, and the readout has to say
+    // so — otherwise the integrity bar empties the instant the tower tilts and
+    // the level is won while it is still standing there at eighty degrees.
+    if (this.lean) {
+      let extra = 0, extraWin = 0;
+      for (let i = 0; i < n; i++) {
+        if (reach[i] || !this._leaning(i)) continue;
+        extra += this.mass[i];
+        top = Math.max(top, this.py[i] + this.hy[i]);
+        if (mask && mask[i]) extraWin += this.mass[i];
+      }
+      this.standingMass += extra;
+      this._winStanding += extraWin;
+      this._standingTop = top;
+    }
+
+    // The rigid-body overturning test still has a job: a slice can be in
+    // compression everywhere and still have the mass above it hanging off the
+    // edge of what is left.
+    const toppled = moved ? 0 : this._checkOverturning(reach);
+    if (toppled || moved || bearing2.crushed) {
       let remaining = 0;
       for (let i = 0; i < n; i++) {
         if (!(this.flags[i] & ALIVE)) continue;
-        if (this.flags[i] & (FREE | ISLAND)) continue;
+        if (this.flags[i] & FREE) continue;
+        if (this.flags[i] & ISLAND) {
+          if (this._isSettling(i)) remaining += this.mass[i];
+          continue;
+        }
         if (reach[i]) remaining += this.mass[i];
       }
       this.standingMass = remaining;
     }
 
-    return detached.length + crushed.length + toppled;
+    return detached.length + crushed.length + toppled + moved + bearing2.crushed;
+  }
+
+  /**
+   * Settlement, and the lean that comes with it.
+   *
+   * A masonry structure carrying an off-centre load does not stand perfectly
+   * still until the moment it fails. The overloaded edge crushes — not much,
+   * and not fast, but continuously — and the whole thing above rotates about
+   * the compression edge as it does. That rotation moves the centre of mass
+   * further out, which loads the edge harder, which crushes it faster. Towers
+   * lean for years doing this; a tower being shelled does it in seconds.
+   *
+   * Modelling it as a rotation rather than by handing the mass to the contact
+   * solver is a deliberate choice. Thirteen thousand tonnes of welded masonry
+   * resting on a damaged stump is a mass ratio no iterative solver will hold:
+   * it sinks through its own base and the tower drops like a lift. A rigid
+   * rotation about the bearing edge is what actually happens, costs nothing,
+   * and stays under control right up to the point where the structure really
+   * is going over — and *then* Rapier gets it, and does the part it is good at.
+   */
+  _armLean(band, ratio, loadMask, reach) {
+    const b = band;
+    if (b <= 0) return;
+    // Once a lean is running, keep it: re-arming on a different slice every
+    // tick would make the pivot jitter.
+    if (this.lean) {
+      // Keep feeding the running lean: the creep rate is driven by how hard
+      // the bearing is working *now*, so without this it stalls at whatever
+      // angle it reached in the first second and never moves again.
+      this.lean.ratio = Math.max(this.lean.ratio, ratio);
+      if (this.lean.band <= b) return;
+      // Something lower has started to fail. That becomes the new hinge, and
+      // the tilt it has already accumulated carries over.
+      const carryAngle = this.lean.angle, carryVel = this.lean.vel;
+      const carryTarget = this.lean.target;
+      this.lean = null;
+      this._leanCarry = { angle: carryAngle, vel: carryVel, target: carryTarget };
+    }
+
+    // Which way is it going? The direction from the surviving bearing's
+    // centroid toward the centre of mass it is carrying.
+    const s0 = this.bandStart[b - 1], s1 = this.bandStart[b];
+    let area = 0, cx = 0, cz = 0;
+    for (let k = s0; k < s1; k++) {
+      const j = this.bandList[k];
+      if (!reach[j] || !this.structural[j]) continue;
+      const a = 4 * this.hx[j] * this.hz[j];
+      area += a; cx += this.px[j] * a; cz += this.pz[j] * a;
+    }
+    if (area <= 0.01) return;
+    cx /= area; cz /= area;
+
+    let mAbove = 0, mx = 0, mz = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (this.bandOf[i] < b) continue;
+      if (!(this.flags[i] & ALIVE) || (this.flags[i] & FREE)) continue;
+      if ((this.flags[i] & ISLAND) && !this._isSettling(i)) continue;
+      const m = this.mass[i];
+      mAbove += m; mx += this.px[i] * m; mz += this.pz[i] * m;
+    }
+    // Nothing worth tilting above this slice.
+    if (mAbove < this._significantLoad * 3) return;
+    let dx = mx / mAbove - cx, dz = mz / mAbove - cz;
+    const off = Math.hypot(dx, dz);
+    if (off < 0.05) { dx = 1; dz = 0; } else { dx /= off; dz /= off; }
+
+    const carry = this._leanCarry || { angle: 0, vel: 0, target: 0 };
+    this._leanCarry = null;
+    this.lean = {
+      band: b,
+      pivotX: cx, pivotY: this.groundY + b * this.bandHeight, pivotZ: cz,
+      // It rotates *toward* (dx, dz), which is a rotation about the horizontal
+      // axis perpendicular to that.
+      axisX: -dz, axisZ: dx,
+      angle: carry.angle, vel: carry.vel, target: carry.target,
+      ratio,
+    };
+  }
+
+  /**
+   * Advance the lean. Called once a frame with real time.
+   *
+   * The target angle creeps while the bearing is overworked; the actual angle
+   * chases it through a lightly damped spring, which is what gives a shelled
+   * tower its sway — hit it and it rings, leave it and it settles into its new
+   * attitude. Past the critical angle the centre of mass is outside the base
+   * for real and the section is handed to the physics engine to fall.
+   */
+  tickLean(dt) {
+    const L = this.lean;
+    if (!L) return 0;
+
+    // Creep: how hard the bearing edge is working, past the point where
+    // masonry starts to crush at all.
+    const over = Math.max(0, (L.ratio || 0) - 0.5);
+    L.target += over * 0.034 * dt;
+    L.ratio *= Math.pow(0.6, dt);      // decays unless the analysis renews it
+
+    // Lightly damped second-order chase, so it sways rather than sliding.
+    const k = 26, c = 1.6;
+    L.vel += (k * (L.target - L.angle) - c * L.vel) * dt;
+    L.angle += L.vel * dt;
+    if (L.angle < 0) { L.angle = 0; L.vel = Math.max(0, L.vel); }
+
+    this._leanDirty = true;
+    this.markMeshDirty();
+
+    // Keep the bearing analysis alive while it leans. The solver only runs
+    // when something has changed, so without this a structure that is still
+    // genuinely overloaded stops creeping the moment the dust settles, and the
+    // lean freezes at whatever angle it reached in the first second.
+    L.poll = (L.poll || 0) + dt;
+    if (L.poll > 0.4) { L.poll = 0; this.stabilityDirty = true; }
+
+    if (L.angle > LEAN_CRITICAL) {
+      // Going over. Hand it to Rapier from exactly where it is standing now.
+      this._bakeLean();
+      const reach = this._reach;
+      this._goDynamic(L.band, reach);
+      this.lean = null;
+      this.stabilityDirty = true;
+      return 1;
+    }
+    // Keep the colliders roughly with the geometry so shells still hit the
+    // tower where it is drawn. Four-hertz is plenty at these angles and avoids
+    // rewriting several thousand collider transforms every frame.
+    this._leanColliderTimer = (this._leanColliderTimer || 0) + dt;
+    if (this._leanColliderTimer > 0.25) {
+      this._leanColliderTimer = 0;
+      this._syncLeanColliders();
+    }
+    return 0;
+  }
+
+  /** The lean as a rotation, reused rather than rebuilt per stone. */
+  _leanTransform() {
+    const L = this.lean;
+    if (!L) return null;
+    const q = this._leanQ || (this._leanQ = new THREE.Quaternion());
+    const axis = this._leanAxis || (this._leanAxis = new THREE.Vector3());
+    axis.set(L.axisX, 0, L.axisZ).normalize();
+    q.setFromAxisAngle(axis, L.angle);
+    return q;
+  }
+
+  /** Is this stone carried by the current lean? */
+  _leaning(i) {
+    const L = this.lean;
+    return !!L && this.bandOf[i] >= L.band
+      && (this.flags[i] & ALIVE) && !(this.flags[i] & (FREE | ISLAND));
+  }
+
+  /** Write the leaned position of a stone into `out`. */
+  _leanPosition(i, out) {
+    const L = this.lean;
+    const q = this._leanTransform();
+    out.set(this.px[i] - L.pivotX, this.py[i] - L.pivotY, this.pz[i] - L.pivotZ);
+    out.applyQuaternion(q);
+    out.set(out.x + L.pivotX, out.y + L.pivotY, out.z + L.pivotZ);
+    return out;
+  }
+
+  _syncLeanColliders() {
+    const L = this.lean;
+    if (!L) return;
+    const q = this._leanTransform();
+    const v = this._v;
+    const rot = this._leanRot || (this._leanRot = new THREE.Quaternion());
+    const own = this._leanOwn || (this._leanOwn = new THREE.Quaternion());
+    for (let i = 0; i < this.count; i++) {
+      if (!this._leaning(i)) continue;
+      const h = this.colliderOf[i];
+      if (h < 0) continue;
+      const col = this.physics.world.getCollider(h);
+      if (!col) continue;
+      this._leanPosition(i, v);
+      const half = this.ry[i] * 0.5;
+      own.set(0, Math.sin(half), 0, Math.cos(half));
+      rot.copy(q).multiply(own);
+      col.setTranslationWrtParent({ x: v.x, y: v.y, z: v.z });
+      col.setRotationWrtParent({ x: rot.x, y: rot.y, z: rot.z, w: rot.w });
+    }
+  }
+
+  /** Fold the lean into the stones' own transforms and forget it. */
+  _bakeLean() {
+    const L = this.lean;
+    if (!L) return;
+    const q = this._leanTransform().clone();
+    const v = this._v;
+    this._ensureQuatArrays();
+    const own = new THREE.Quaternion();
+    const rot = new THREE.Quaternion();
+    for (let i = 0; i < this.count; i++) {
+      if (!this._leaning(i)) continue;
+      this._leanPosition(i, v);
+      this.px[i] = v.x; this.py[i] = v.y; this.pz[i] = v.z;
+      own.set(this.qx[i], this.qy[i], this.qz[i], this.qw[i]);
+      rot.copy(q).multiply(own);
+      this.qx[i] = rot.x; this.qy[i] = rot.y; this.qz[i] = rot.z; this.qw[i] = rot.w;
+    }
+    this.lean = null;
+    this._leanDirty = false;
+  }
+
+  /** How far out of plumb the structure is right now, in degrees. */
+  get leanDegrees() {
+    let worst = this.lean ? this.lean.angle * 180 / Math.PI : 0;
+    for (const island of this.islands.values()) {
+      if (!island.settling) continue;
+      worst = Math.max(worst, (island.tilt || 0) * 180 / Math.PI);
+    }
+    return worst;
+  }
+
+  /**
+   * Is this section sitting on something, or hanging in the air?
+   *
+   * The joint graph answers that for a clean break, but not for a shelled one:
+   * cut a course out of a tower and the masonry above has no *neighbour*
+   * beneath it, yet it is plainly still sitting on the stumps and the rubble in
+   * the crater. Treating that as unsupported is what made a tower drop ninety
+   * metres in a single frame the moment the last stone of one course went.
+   *
+   * So: joint contact if there is any, and failing that, whether there is still
+   * masonry standing in the few metres underneath it.
+   */
+  _restingCount(group, reach) {
+    let n = 0;
+    for (const i of group) {
+      for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
+        if (reach[this.belowList[a]]) { n++; break; }
+      }
+    }
+    if (n) return n;
+
+    let lowBand = this.bandCount;
+    for (const i of group) lowBand = Math.min(lowBand, this.bandOf[i]);
+    // The ground itself counts: a section whose feet are at grade is resting on
+    // the earth, not falling toward it.
+    if (lowBand <= 1) return 8;
+    for (let b = Math.max(0, lowBand - 3); b < lowBand; b++) {
+      for (let k = this.bandStart[b]; k < this.bandStart[b + 1]; k++) {
+        const j = this.bandList[k];
+        if (reach[j] && this.structural[j]) n++;
+      }
+    }
+    return n >= 8 ? n : 0;
+  }
+
+  /** Union of two masks into a scratch buffer, for the load accounting. */
+  _mergeMask(a, b) {
+    const out = this._maskScratch || (this._maskScratch = new Uint8Array(this.count));
+    for (let i = 0; i < this.count; i++) out[i] = (a[i] || b[i]) ? 1 : 0;
+    return out;
+  }
+
+  /**
+   * Hand the damaged superstructure to the physics engine.
+   *
+   * Up to this point everything standing is a *fixed* body: it cannot move, so
+   * it cannot settle, lean or wobble, and the only thing a solver can do with
+   * it is decide it has failed and teleport it into a falling state. That is
+   * why shelling the base used to produce either nothing at all or an abrupt
+   * collapse, with none of the sag and sway in between.
+   *
+   * So once a slice is genuinely overstressed, everything above it stops being
+   * fixed and becomes one dynamic body resting on the masonry that survives
+   * beneath it. From that moment Rapier owns the outcome: the section settles
+   * into the crater under its own weight, leans toward the side that lost its
+   * bearing, and either finds a new equilibrium — visibly out of plumb — or
+   * keeps going and comes down. Nothing about the direction or the timing is
+   * scripted; it falls the way you cut it.
+   *
+   * The base stays fixed on purpose. A heavy dynamic body resting on static
+   * geometry is something a constraint solver handles well; the same body
+   * resting on a stack of loose one-tonne stones is a mass ratio of ten
+   * thousand to one, which it does not.
+   */
+  _goDynamic(band, reach) {
+    const doomed = [];
+    for (let bb = band; bb < this.bandCount; bb++) {
+      for (let k = this.bandStart[bb]; k < this.bandStart[bb + 1]; k++) {
+        const j = this.bandList[k];
+        if (reach[j]) doomed.push(j);
+      }
+    }
+    if (doomed.length < 12) return 0;
+
+    for (const j of doomed) reach[j] = 0;
+    let moved = 0;
+    for (const group of this._connectedGroups(doomed)) {
+      if (group.length < 12) { this._releaseGroup(group); moved += group.length; continue; }
+      const island = this._weldIsland(group, null, { settling: true });
+      if (island) moved += group.length;
+    }
+    this.stabilityDirty = true;
+    this.lastOverturnHeight = this.groundY + band * this.bandHeight;
+    return moved;
   }
 
   /** Split a set of indices into connected components over the joint graph. */
@@ -1175,11 +1933,12 @@ export class Structure {
    * The section then topples as a slab — which is what a real masonry section
    * does — and fragments when it lands.
    */
-  _weldIsland(group, inheritVel) {
+  _weldIsland(group, inheritVel, opts = {}) {
     const rapier = this.rapier;
     const alive = group.filter((i) => (this.flags[i] & ALIVE));
     if (alive.length === 0) return null;
     if (alive.length === 1) { this.freeChunk(alive[0]); return null; }
+    const settling = !!opts.settling;
 
     // Mass-weighted centre so it pivots where it should.
     let mx = 0, my = 0, mz = 0, mt = 0;
@@ -1189,11 +1948,14 @@ export class Structure {
     }
     mx /= mt; my /= mt; mz /= mt;
 
+    // A settling section is meant to sag and sway visibly before it decides,
+    // so it gets very little damping; a section already in free fall gets a
+    // little more, or a long spire wobbles like a metronome on the way down.
     const body = this.physics.world.createRigidBody(
       rapier.RigidBodyDesc.dynamic()
         .setTranslation(mx, my, mz)
-        .setLinearDamping(0.03)
-        .setAngularDamping(0.12)
+        .setLinearDamping(settling ? 0.9 : 0.03)
+        .setAngularDamping(settling ? 0.55 : 0.12)
         .setCcdEnabled(alive.length < 400),
     );
 
@@ -1225,7 +1987,10 @@ export class Structure {
       this.flags[i] |= ISLAND;
       this.flags[i] &= ~FREE;
       this.islandOf[i] = id;
-      this.fallenMass += this.mass[i];
+      // A settling section has not fallen yet — it is standing, out of plumb.
+      // Counting it as rubble the moment it goes dynamic would crater the
+      // integrity readout and win the level while the tower is still up.
+      if (!settling) this.fallenMass += this.mass[i];
     }
 
     if (inheritVel) {
@@ -1233,7 +1998,12 @@ export class Structure {
       body.setAngvel(inheritVel.ang, true);
     }
 
-    const island = { id, body, members, localPos, localQuat, impacts: 0 };
+    const island = {
+      id, body, members, localPos, localQuat, impacts: 0,
+      settling,
+      origin: { x: mx, y: my, z: mz },
+      mass: mt,
+    };
     this.islands.set(id, island);
     this.physics.dynamicSet.add(body);
     this.physics.owners.set(body.handle, { structure: this, island: id, settleTimer: 0 });
@@ -1359,15 +2129,54 @@ export class Structure {
    */
   maintainIslands() {
     if (this.islands.size === 0) return 0;
+
+    // A settling section is still part of the building until it has visibly
+    // left. Watching how far it has actually moved is the only honest test:
+    // a tower that sinks a few centimetres into its crater and leans two
+    // degrees is damaged, not demolished, and a player looking at it would say
+    // the same. Past the threshold it is coming down, and it counts as rubble.
+    for (const island of this.islands.values()) {
+      if (!island.settling || !island.body) continue;
+      const t = island.body.translation();
+      const drop = island.origin.y - t.y;
+      const slide = Math.hypot(t.x - island.origin.x, t.z - island.origin.z);
+      const r = island.body.rotation();
+      // Angle between the body's up axis and world up, from the quaternion.
+      const tilt = Math.acos(Math.max(-1, Math.min(1,
+        1 - 2 * (r.x * r.x + r.z * r.z))));
+      island.tilt = tilt;
+      island.drop = drop;
+      if (drop > 1.6 || slide > 1.6 || tilt > 0.12) {
+        island.settling = false;
+        this.fallenMass += island.mass;
+        this.stabilityDirty = true;
+        // It is past the point of settling; take the brakes off so it falls
+        // like masonry rather than sinking through treacle.
+        island.body.setLinearDamping(0.03);
+        island.body.setAngularDamping(0.12);
+        if (this.onSectionFalling) this.onSectionFalling(island);
+      }
+    }
+
     for (const island of this.islands.values()) {
       if (!island.body || !island.body.isSleeping()) continue;
       if (island.members.length <= WELD_THRESHOLD) continue;
+      // A section that found a new equilibrium leaning against its own base is
+      // still a building; leave it whole rather than shattering it in place.
+      if (island.settling) continue;
       island.restTimer = (island.restTimer || 0) + 1;
       if (island.restTimer < 30) continue;
       this.fragmentIsland(island.id);
       return 1;
     }
     return 0;
+  }
+
+  /** Is this stone part of a section that is leaning but has not yet fallen? */
+  _isSettling(i) {
+    if (!(this.flags[i] & ISLAND)) return false;
+    const isl = this.islands.get(this.islandOf[i]);
+    return !!(isl && isl.settling);
   }
 
   /**
@@ -1413,15 +2222,9 @@ export class Structure {
 
   /** Highest point still attached to the ground — drives the "topple" check. */
   standingHeight() {
-    let top = this.groundY;
-    for (let i = 0; i < this.count; i++) {
-      if (!(this.flags[i] & ALIVE)) continue;
-      if (this.flags[i] & (FREE | ISLAND)) continue;
-      const y = this.py[i] + this.hy[i];
-      if (y > top) top = y;
-    }
-    return top;
+    return this._standingTop ?? this.groundY;
   }
+
 
   chunkForCollider(handle) {
     const i = this.colliderToChunk.get(handle);

@@ -30,6 +30,7 @@ export class Picker {
     this.raycaster = new THREE.Raycaster();
     this._ndc = new THREE.Vector2();
     this._v = new THREE.Vector3();
+    this._n = new THREE.Vector3();
   }
 
   /** Pointer coordinates -> NDC, using the canvas's own box. */
@@ -99,8 +100,25 @@ export class Picker {
    * @returns {{kind:'structure'|'ground', point:THREE.Vector3, label:?string,
    *            structure:?object, chunk:number}|null}
    */
-  pick(clientX, clientY, structures) {
+  pick(clientX, clientY, structures, city) {
     const ray = this.ray(clientX, clientY);
+
+    // Flat roofs are legitimate ground. A gun on one has sightlines the street
+    // does not, and getting up there is a decision worth offering — so the city
+    // is picked against as well, and an upward-facing hit on it is a rooftop.
+    let roof = null;
+    if (city && city.visible) {
+      const hits = this.raycaster.intersectObject(city, true);
+      for (const h of hits) {
+        if (!h.face) continue;
+        this._n.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+        if (this._n.y < 0.85) continue;         // a wall, or the underside
+        roof = h.point.clone();
+        roof.onRoof = true;
+        roof.roofDistance = h.distance;
+        break;
+      }
+    }
 
     let best = null;
     if (structures) {
@@ -127,7 +145,16 @@ export class Picker {
     }
 
     const ground = this.terrainPoint(ray);
-    if (best && (!ground || best.distance <= ray.origin.distanceTo(ground) + 0.5)) return best;
+    const groundDist = ground ? ray.origin.distanceTo(ground) : Infinity;
+
+    // Nearest wins. A roof only counts when the ray reaches it before the
+    // ground behind the building and before any masonry in front of it.
+    if (best && best.distance <= Math.min(groundDist, roof ? roof.roofDistance : Infinity) + 0.5) {
+      return best;
+    }
+    if (roof && roof.roofDistance < groundDist) {
+      return { kind: 'roof', point: roof, label: 'rooftop', structure: null, chunk: -1 };
+    }
     if (ground) return { kind: 'ground', point: ground, label: null, structure: null, chunk: -1 };
     return best;
   }

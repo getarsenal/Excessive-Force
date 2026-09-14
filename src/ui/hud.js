@@ -186,7 +186,19 @@ export class HUD {
     this.el.integrity.className = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}`;
 
     const h = b.primary.standingHeight() - b.originGround;
-    this.el.height.textContent = `${h.toFixed(1)} m standing`;
+    // The lean is the clearest signal the shelling is working, and for a while
+    // it is the *only* one — the height barely moves while a tower goes four
+    // degrees out of plumb. Worth its own readout.
+    const lean = b.primary.leanDegrees;
+    this.el.height.textContent = lean > 0.15
+      ? `${h.toFixed(1)} m · ${lean.toFixed(1)}° OUT OF PLUMB`
+      : `${h.toFixed(1)} m standing`;
+    this.el.height.classList.toggle('leaning', lean > 0.15);
+    if (lean > 1.2 && !this._leanWarned) {
+      this._leanWarned = true;
+      this.feed('STRUCTURE LEANING', 'big');
+    }
+    if (lean < 0.2) this._leanWarned = false;
 
     this.el.defenders.textContent = String(b.garrison.aliveCount);
     this.el.units.textContent = String(b.units.filter((u) => u.alive).length);
