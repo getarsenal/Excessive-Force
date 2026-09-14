@@ -3,6 +3,7 @@ import { UNITS, UNITS_BY_ID } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS } from '../game/levels.js';
 import { lineOfSight } from '../structure/occupancy.js';
+import { solveArc } from '../game/projectiles.js';
 
 /**
  * The test menu.
@@ -767,6 +768,35 @@ export class TestMenu {
   tests() {
     const c = this.ctx, b = c.battle;
     return [
+      // First, deliberately. This is a claim about a *pristine* structure —
+      // that a building the solver has just assembled does not sag, slump or
+      // shed anything when left alone. Run it after the tests that put real
+      // shells into the tower and it is asking something else entirely: a
+      // building with two hundred stones blown out of it is perfectly
+      // entitled to keep moving, and it started doing exactly that once
+      // detaching a collider began to work.
+      ['the structure stands under its own weight', () => {
+        const st = b.primary;
+        const before = st.standingHeight();
+        const wasFire = b.garrison.fireEnabled;
+        const units = b.units.filter((u) => u.alive);
+        const healths = units.map((u) => u.health);
+        b.garrison.fireEnabled = false;
+        // Nothing shooting, nothing should move.
+        const hadTarget = b.target ? b.target.clone() : null;
+        b.clearTarget();
+        const auto = b.autoEngage;
+        b.autoEngage = false;
+        c.fastForward(6);
+        b.autoEngage = auto;
+        b.garrison.fireEnabled = wasFire;
+        if (hadTarget) b.setTarget(hadTarget, b.targetLabel);
+        units.forEach((u, i) => { u.health = healths[i]; });
+        const drop = before - st.standingHeight();
+        assert(drop < 1.5, `lost ${drop.toFixed(2)} m of height with nothing firing`);
+        return `settled within ${drop.toFixed(2)} m`;
+      }],
+
       ['picking round-trips within 2.5 px', () => {
         const r = c.picker.selfTest(25, 2.5);
         assert(r.samples >= 20, `only ${r.samples} samples hit the ground`);
@@ -803,14 +833,26 @@ export class TestMenu {
       ['defenders stand on real masonry', () => {
         const g = b.garrison;
         assert(g.defenders.length > 0, 'the garrison is empty');
-        let bad = 0;
+        // Living men, on masonry that is still masonry.
+        //
+        // Counting the dead makes this measure the wrong thing: a defender who
+        // died because his stone was blown loose is *correctly* far from it,
+        // since the stone has since fallen forty metres. What the assertion is
+        // actually about is that a man on his feet is pinned to a piece of the
+        // building he is standing on, rather than to something across the site.
+        let bad = 0, checked = 0;
         for (const d of g.defenders) {
+          if (!d.alive) continue;
           const i = d.chunk;
           const s = d.structure;
+          if (!(s.flags[i] & 1) || (s.flags[i] & 10)) continue;   // dead or falling
+          checked++;
           const dist = Math.hypot(s.px[i] - d.pos.x, s.py[i] - d.pos.y, s.pz[i] - d.pos.z);
           if (dist > 10) bad++;
         }
-        assert(bad === 0, `${bad} defenders are more than 10 m from their stone`);
+        assert(checked > 0, 'no living defender is pinned to standing masonry');
+        assert(bad === 0,
+          `${bad} of ${checked} defenders are more than 10 m from their stone`);
         const cover = {};
         for (const d of g.defenders) cover[d.cover || 'none'] = (cover[d.cover || 'none'] || 0) + 1;
         assert(!cover.none, `${cover.none} defenders have no stated position type`);
@@ -893,27 +935,6 @@ export class TestMenu {
         return `${gone} stones from ${fired} rounds`;
       })],
 
-      ['the structure stands under its own weight', () => {
-        const st = b.primary;
-        const before = st.standingHeight();
-        const wasFire = b.garrison.fireEnabled;
-        const units = b.units.filter((u) => u.alive);
-        const healths = units.map((u) => u.health);
-        b.garrison.fireEnabled = false;
-        // Nothing shooting, nothing should move.
-        const hadTarget = b.target ? b.target.clone() : null;
-        b.clearTarget();
-        const auto = b.autoEngage;
-        b.autoEngage = false;
-        c.fastForward(6);
-        b.autoEngage = auto;
-        b.garrison.fireEnabled = wasFire;
-        if (hadTarget) b.setTarget(hadTarget, b.targetLabel);
-        units.forEach((u, i) => { u.health = healths[i]; });
-        const drop = before - st.standingHeight();
-        assert(drop < 1.5, `lost ${drop.toFixed(2)} m of height with nothing firing`);
-        return `settled within ${drop.toFixed(2)} m`;
-      }],
 
       ['water covers the river and nothing else', () => {
         const w = c.water;
@@ -1025,22 +1046,61 @@ export class TestMenu {
         // other must not have one. Measured from the model rather than eyeballed
         // — a gun facing ninety degrees away from its own shells is the kind of
         // thing that survives a dozen playtests because it looks deliberate.
-        const wrong = [];
+        // The old version of this only checked that a quarter turn *existed*
+        // on the pieces modelled across their axis, which both towed guns pass
+        // whichever way they are pointing — so it sat there green while the
+        // M777 fired its shells out of the back of the trails for a week. It
+        // now finds the barrel and checks where the barrel ends up.
+        //
+        // Finding it: the barrel is the thin end. Sample the maximum radius
+        // from the model's own spine in slices along its long axis; the end
+        // with the smaller mean radius is the muzzle.
+        const wrong = [], found = [];
+        const v = new THREE.Vector3();
         for (const u of UNITS) {
           if (u.model === 'infantry') continue;
           const w = b.models.cache.get(`${u.model}:${u.modelLength}:${u.tint ?? ''}`);
           if (!w) continue;
           w.updateMatrixWorld(true);
-          const size = new THREE.Box3().setFromObject(w).getSize(new THREE.Vector3());
+          const box = new THREE.Box3().setFromObject(w);
+          const size = box.getSize(new THREE.Vector3());
           const alongX = size.x > size.z;
-          const turned = Math.abs(Math.abs(u.modelYaw ?? 0) - Math.PI / 2) < 0.01;
-          if (alongX !== turned) {
-            wrong.push(`${u.name} is long along ${alongX ? 'X' : 'Z'} `
-              + `but ${turned ? 'is' : 'is not'} quarter-turned`);
+          const lo = alongX ? box.min.x : box.min.z;
+          const hi = alongX ? box.max.x : box.max.z;
+          const cy = (box.min.y + box.max.y) / 2;
+          const cc = alongX ? (box.min.z + box.max.z) / 2 : (box.min.x + box.max.x) / 2;
+          const N = 20, rad = new Array(N).fill(0);
+          w.traverse((o) => {
+            if (!o.isMesh || !o.geometry?.attributes?.position) return;
+            const pos = o.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+              v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+              const t = ((alongX ? v.x : v.z) - lo) / Math.max(1e-6, hi - lo);
+              const k = Math.max(0, Math.min(N - 1, Math.floor(t * N)));
+              const r = Math.hypot((alongX ? v.z : v.x) - cc, v.y - cy);
+              if (r > rad[k]) rad[k] = r;
+            }
+          });
+          const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+          const rLo = mean(rad.slice(0, 5)), rHi = mean(rad.slice(-5));
+          // A launcher box has no barrel and no thin end; skip those.
+          if (Math.abs(rLo - rHi) < 0.18) { found.push(`${u.name} n/a`); continue; }
+
+          // Local direction the muzzle points, then the model yaw applied.
+          const local = new THREE.Vector3();
+          if (alongX) local.set(rHi < rLo ? 1 : -1, 0, 0);
+          else local.set(rHi < rLo ? 1 : -1, 0, 0).set(0, 0, rHi < rLo ? 1 : -1);
+          local.applyAxisAngle(new THREE.Vector3(0, 1, 0), u.modelYaw ?? 0);
+          // A unit aims by setting group.rotation.y from atan2(dx, dz), i.e.
+          // its forward is +Z. So after the model yaw the barrel must be +Z.
+          if (local.z < 0.9) {
+            wrong.push(`${u.name} barrel points (${local.x.toFixed(1)}, `
+              + `${local.z.toFixed(1)}) after its yaw, not down +Z`);
           }
+          found.push(`${u.name} ${alongX ? 'X' : 'Z'}${rHi < rLo ? '+' : '-'}`);
         }
         assert(wrong.length === 0, wrong.join('; '));
-        return 'towed guns turned, tracked guns not';
+        return found.join(', ');
       }],
 
       ['the deployment preview shows reach and damage', () => {
@@ -1090,6 +1150,149 @@ export class TestMenu {
         assert(b._rings.some((r) => r.age < 0.01), 'the world pulse did not fire');
         return `${pool.length} screen ripples, ${b._rings.length} world rings`;
       }],
+      ['collider handles survive being stored', () => {
+        // The bug this exists for was invisible and cost the engine its
+        // physics. Rapier's JS bindings return a collider handle that is not
+        // an integer index — it is a 64-bit value reinterpreted as a double,
+        // and for a young world it comes out as a denormal near 1e-312. Every
+        // chunk stored one in an Int32Array, which truncates it to zero, so
+        // the whole building recorded handle 0, the reverse map never matched,
+        // and detaching a stone's collider removed collider zero or nothing.
+        //
+        // What that looked like in play: a destroyed stone kept its collider,
+        // so the building's physical shape never changed, and a section that
+        // had gone dynamic sank through the ghost of itself at the solver's
+        // penetration-recovery speed — a constant metre a second that never
+        // accelerated, which is a ninety-metre tower drifting away instead of
+        // falling over.
+        const st = b.primary;
+        let checked = 0, bad = 0, zero = 0, unmapped = 0;
+        for (let i = 0; i < st.count && checked < 400; i++) {
+          if (!(st.flags[i] & 1)) continue;
+          const h = st.colliderOf[i];
+          if (h < 0) continue;
+          checked++;
+          if (h === 0) zero++;
+          const col = c.physics.world.getCollider(h);
+          if (!col || col.handle !== h) bad++;
+          if (st.colliderToChunk.get(h) !== i) unmapped++;
+        }
+        assert(checked > 50, `only ${checked} chunks had a collider handle`);
+        assert(zero < checked,
+          `every one of ${checked} handles stored as 0 — they are being `
+          + 'truncated, almost certainly by an integer typed array');
+        assert(bad === 0, `${bad}/${checked} handles do not resolve to themselves`);
+        assert(unmapped === 0, `${unmapped}/${checked} are missing from the reverse map`);
+        return `${checked} handles round-trip`;
+      }],
+
+      ['shells arrive instead of loitering', () => {
+        // A Paladin used to put its round up at ninety metres a second on an
+        // eight-second arc, because the solver went straight to the minimum-
+        // energy lob. A 155 mm shell is not a mortar bomb.
+        const from = new THREE.Vector3(0, b.originGround + 2, 300);
+        const to = new THREE.Vector3(0, b.originGround + 30, 0);
+        const slow = [];
+        const times = [];
+        for (const u of UNITS) {
+          const p = u.projectile;
+          if (p.kind !== 'arc') continue;
+          const vel = solveArc(from, to, p.speed, p.gravity, false);
+          if (!vel) { slow.push(`${u.name} cannot reach 300 m flat`); continue; }
+          const horiz = Math.hypot(vel.x, vel.z);
+          const t = horiz > 0.01 ? from.distanceTo(to) / horiz : 99;
+          times.push(`${u.name} ${t.toFixed(1)}s`);
+          if (t > 3.0) slow.push(`${u.name} takes ${t.toFixed(1)}s over 300 m`);
+        }
+        assert(slow.length === 0, slow.join('; '));
+        return times.join(', ');
+      }],
+
+      ['defenders fall when their footing goes', () => this._calm(() => {
+        // A sandbagged position on the plinth is anchored to whichever stone
+        // happened to be nearest when it was posted — up to eight metres away,
+        // and the field-of-fire nudge can then move the man several more. So
+        // the masonry he stands on and the stone whose flags decide his fate
+        // were routinely different stones, and shelling the plinth out from
+        // under him left him hanging at five metres, still shooting.
+        const st = b.primary;
+        const g = b.garrison;
+        const gy = b.originGround;
+        const high = g.defenders.filter((d) => d.alive && d.pos.y - gy > 1.6).length;
+        assert(high > 4, `only ${high} defenders are off the ground to test`);
+
+        const unsupported = () => {
+          let n = 0;
+          for (const d of g.defenders) {
+            if (!d.alive || d.pos.y - gy < 1.6) continue;
+            const occ = d.structure.occupancy;
+            if (!occ) continue;
+            if (!occ.solidAt(d.pos.x, d.pos.y - 1.0, d.pos.z)
+                && !occ.solidAt(d.pos.x, d.pos.y - 2.2, d.pos.z)) n++;
+          }
+          return n;
+        };
+        assert(unsupported() === 0,
+          `${unsupported()} defenders are standing on nothing before a shot is fired`);
+
+        // Take the floor out from under specific men, rather than guessing
+        // where their floor is — the two levels put their ground positions at
+        // different heights and on different structures.
+        // Deterministic, and it costs the building almost nothing.
+        //
+        // Blasting a hole is the wrong instrument here twice over: how much
+        // masonry a given radius removes depends on the geometry under each
+        // man, so the test passed on one level and not the other, and a blast
+        // wide enough to work everywhere took the tower down to a third of
+        // itself and disarmed the lean assertion at the end of the suite. What
+        // is under test is the footing check, so remove exactly the stones the
+        // footing check looks at and nothing else.
+        const standing = g.defenders.filter((d) => d.alive && d.pos.y - gy > 1.6);
+
+        // Pick men who actually have something under them, rather than the
+        // first three in the list. Stone sizes differ by quality tier and
+        // position types differ by level, so a fixed slice finds a mortar on a
+        // roof slab on one configuration and three men over open air on
+        // another — which fails the test for the one reason it should not.
+        const floorOf = (d) => {
+          const st2 = d.structure;
+          const under = [];
+          for (let i = 0; i < st2.count; i++) {
+            if (!(st2.flags[i] & 1) || (st2.flags[i] & 10)) continue;
+            const dy = d.pos.y - st2.py[i];
+            if (dy < 0.2 || dy > 3.2) continue;
+            if (Math.abs(st2.px[i] - d.pos.x) > 2.6) continue;
+            if (Math.abs(st2.pz[i] - d.pos.z) > 2.6) continue;
+            under.push(i);
+          }
+          return under;
+        };
+        const marked = [];
+        for (const d of standing) {
+          const under = floorOf(d);
+          if (!under.length) continue;
+          marked.push({ d, under });
+          if (marked.length >= 3) break;
+        }
+        assert(marked.length > 0,
+          `none of ${standing.length} raised defenders had masonry beneath them`);
+
+        const before = g.aliveCount;
+        let removed = 0;
+        for (const { d, under } of marked) {
+          for (const i of under) { d.structure.destroyChunk(i); removed++; }
+          d.structure.stabilityDirty = true;
+        }
+        c.fastForward(0.8);
+        const after = g.aliveCount;
+        assert(after < before,
+          `removed ${removed} stones from under ${marked.length} defenders and `
+          + 'killed none of them');
+        assert(unsupported() === 0,
+          `${unsupported()} defenders left hanging in the air with no masonry beneath them`);
+        return `${removed} stones pulled, ${before - after} fell, none left floating`;
+      })],
+
       ['the city has streets, and they are in the gaps', () => {
         // Streets are the single thing that makes a plan view read as a city
         // rather than as boxes on a field, and they are drawn on a grid that
@@ -1141,6 +1344,7 @@ export class TestMenu {
         this.clearUnits();
         const h0 = st.standingHeight();
         const gy = b.originGround;
+        const intactAtStart = st.monumentIntegrity;
 
         // Footprint, for the slenderness test.
         let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -1161,7 +1365,7 @@ export class TestMenu {
         // stone of all is usually a buried foundation block, where shells
         // accomplish nothing.
         const mask = st._winMask;
-        const face = st.origin.z - 3.0;
+        const face = st.origin.z - 1.0;
         const foot = () => {
           let best = -1, by = Infinity;
           for (let i = 0; i < st.count; i++) {
@@ -1175,7 +1379,11 @@ export class TestMenu {
         };
 
         let leaned = 0;
-        for (let round = 0; round < 40; round++) {
+        // Enough rounds to actually finish the job. Forty was sized against a
+        // pristine tower; this test runs last, so it now starts against one
+        // that is already well chewed, and a cut that stops half way through
+        // leaves the thing standing for no better reason than the loop ran out.
+        for (let round = 0; round < 80; round++) {
           const i = foot();
           if (i < 0) break;
           st.explode(
@@ -1203,10 +1411,29 @@ export class TestMenu {
         }
         const dropped = st.standingHeight() < h0 ? h0 - st.standingHeight() : 0;
         const integ = st.monumentIntegrity;
-        if (slender > 2.5) {
+        // The lean is only required of a tall building that is still *there*.
+        //
+        // Slenderness alone is not the premise: by the time this runs, last in
+        // a destructive suite, the tower has taken real shellfire from the
+        // tests above it — which it did not before detaching a collider worked
+        // — and a tower already reduced to a third of itself is a stump. A
+        // stump has no lean in it and demanding one is demanding a bug.
+        // Whatever state it is in now, a slender tower must have gone out of
+        // plumb at *some* point on its way here — that is the high-water mark,
+        // and it is the only honest way to assert the mechanism from the last
+        // test in a suite that has already half demolished the thing.
+        if (slender > 2.5 || intactAtStart > 0.55) {
+          assert((st.peakLean || 0) > 0.4 || slender < 2.0,
+            `this structure has never been out of plumb by more than `
+            + `${(st.peakLean || 0).toFixed(2)}° at any point`);
+        }
+
+        const requiresLean = slender > 2.5 && intactAtStart > 0.55;
+        if (requiresLean) {
           assert(leaned > 0.4,
-            `a tower ${slender.toFixed(1)}:1 slender never went out of plumb `
-            + `(worst ${leaned.toFixed(2)}°)`);
+            `a tower ${slender.toFixed(1)}:1 slender and `
+            + `${(intactAtStart * 100).toFixed(0)}% intact never went out of `
+            + `plumb (worst ${leaned.toFixed(2)}°)`);
         }
         assert(dropped > 20 || integ < 0.6,
           `it kept ${(integ * 100).toFixed(0)}% of itself and lost only `
@@ -1255,10 +1482,11 @@ export class TestMenu {
           `a landed section is still welded into one ${biggest}-stone slab `
           + `(the most a ${st.count}-stone structure may leave is ${lump})`);
 
-        return slender > 2.5
+        return requiresLean
           ? `leaned ${leaned.toFixed(1)}°, then lost ${dropped.toFixed(0)} m`
-          : `${slender.toFixed(1)}:1 squat — no lean expected; down to `
-            + `${(integ * 100).toFixed(0)}%`;
+          : `${slender.toFixed(1)}:1 at ${(intactAtStart * 100).toFixed(0)}%; `
+            + `peak lean ${(st.peakLean || 0).toFixed(1)}°; `
+            + `down to ${(integ * 100).toFixed(0)}%`;
       })],
     ];
   }

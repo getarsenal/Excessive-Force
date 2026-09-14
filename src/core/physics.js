@@ -122,8 +122,19 @@ export class PhysicsWorld {
   remove(body) {
     this.dynamicSet.delete(body);
     this.owners.delete(body.handle);
+    // Marked before the removal, and checked by anything that keeps its own
+    // reference to a body. Rapier hands out wrappers around raw indices, so
+    // calling any method on one after its body is gone traps in wasm — and a
+    // wasm trap leaves the world permanently borrowed, so every `step` after
+    // it throws "recursive use of an object detected" and the simulation is
+    // over. There is no API to ask a body whether it still exists, so we have
+    // to remember.
+    body.__removed = true;
     this.world.removeRigidBody(body);
   }
+
+  /** Is this body still in the world? */
+  static alive(body) { return !!body && body.__removed !== true; }
 
   /**
    * Recycle the longest-settled debris when we're at budget and something more

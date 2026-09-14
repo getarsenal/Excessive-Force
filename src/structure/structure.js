@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MATERIALS, MATERIAL_PROPS } from './builder.js';
 import { Occupancy } from './occupancy.js';
+import { PhysicsWorld } from '../core/physics.js';
 
 /**
  * A destructible masonry structure.
@@ -91,6 +92,16 @@ const NO_EQUILIBRIUM = 1.8;
  */
 const LEAN_GRAVITY = 2.6;
 
+/**
+ * The fastest any piece of a collapsing section may be moving when the physics
+ * engine takes it over, in metres per second.
+ *
+ * Small on purpose. Everything after this moment should be gravity's doing;
+ * this is only here to make sure the stack is past its balance point rather
+ * than balanced exactly on it.
+ */
+const TOPPLE_NUDGE = 1.6;
+
 export class Structure {
   /**
    * @param {import('../core/physics.js').PhysicsWorld} physics
@@ -128,7 +139,30 @@ export class Structure {
     this.bond = new Float32Array(n).fill(1);
     this.strength = new Float32Array(n);
     this.structural = new Uint8Array(n);
-    this.colliderOf = new Int32Array(n).fill(-1);
+    /**
+     * Rapier collider handle per chunk. Float64, and it has to be.
+     *
+     * This was an Int32Array, which looks obviously right and was silently
+     * destroying every handle in the building. Rapier's JS bindings hand back a
+     * handle that is *not* an integer index — it is a 64-bit value reinterpreted
+     * as a double, and for a young world that comes out as a denormal around
+     * 1e-312. Storing one in an Int32Array truncates it to zero. So every chunk
+     * in every structure recorded its collider as handle 0, the map keyed on the
+     * real handle never matched, and `_detachCollider` spent the whole game
+     * removing collider zero — or nothing — instead of the stone it was asked
+     * to remove.
+     *
+     * What that looks like in play: a stone that is blasted or freed keeps its
+     * original collider on the static body, so the building's *physical* shape
+     * never changes even as its geometry does, and a section that has gone
+     * dynamic sinks through the ghost of itself at the solver's penetration
+     * recovery speed — a constant metre a second, never accelerating, which is
+     * the tower "drifting away slowly" instead of falling.
+     *
+     * A Float64Array round-trips the value exactly, and -1 is still a perfectly
+     * good sentinel.
+     */
+    this.colliderOf = new Float64Array(n).fill(-1);
     this.bodyOf = new Array(n).fill(null);
     this.islandOf = new Int32Array(n).fill(-1);
     this.tagOf = new Array(n).fill(null);
@@ -1070,7 +1104,7 @@ export class Structure {
     // Island members ride their parent body.
     for (const island of this.islands.values()) {
       const body = island.body;
-      if (!body || body.isSleeping()) continue;
+      if (!PhysicsWorld.alive(body) || body.isSleeping()) continue;
       const t = body.translation();
       const r = body.rotation();
       this._q.set(r.x, r.y, r.z, r.w);
@@ -1191,7 +1225,7 @@ export class Structure {
     // so shelling a tower that is out of plumb visibly rocks it.
     if (this.islands.size) {
       for (const island of this.islands.values()) {
-        if (!island.settling || !island.body) continue;
+        if (!island.settling || !PhysicsWorld.alive(island.body)) continue;
         const t = island.body.translation();
         const dx = t.x - center.x, dy = t.y - center.y, dz = t.z - center.z;
         const d = Math.hypot(dx, dy, dz) || 1;
@@ -1289,11 +1323,16 @@ export class Structure {
       this.occupancy.addChunk(this, i, -1);
     }
     const h = this.colliderOf[i];
-    if (h < 0) return;
-    const col = this.physics.world.getCollider(h);
-    if (col) this.physics.world.removeCollider(col, true);
-    this.colliderToChunk.delete(h);
+    // Always forget the handle, even if the lookup below finds nothing: a
+    // stale entry is how one stone ends up removing another stone's collider.
     this.colliderOf[i] = -1;
+    if (h < 0) return;
+    this.colliderToChunk.delete(h);
+    const col = this.physics.world.getCollider(h);
+    // And only remove it if it is still the collider we think it is. Handles
+    // are reused, so a slot freed elsewhere can come back holding somebody
+    // else's collider between one frame and the next.
+    if (col && col.handle === h) this.physics.world.removeCollider(col, true);
   }
 
   /** Give a stone its own dynamic body. Returns false if the budget is spent. */
@@ -1869,6 +1908,13 @@ export class Structure {
 
     this._leanDirty = true;
     this.markMeshDirty();
+    // The worst it has ever been, kept for the life of the structure. The
+    // suite's collapse test runs last by necessity and by then the tower has
+    // taken enough real damage to be a stump, which has no lean in it — so
+    // without a high-water mark there is nothing left to assert the mechanism
+    // against on the level it matters most for.
+    const deg = L.angle * 180 / Math.PI;
+    if (deg > (this.peakLean || 0)) this.peakLean = deg;
     if (this.onLean) this.onLean(L);
 
     // Keep the bearing analysis alive while it leans. The solver only runs
@@ -2125,31 +2171,72 @@ export class Structure {
     // chewed through it one split at a time, which is exactly what the tower
     // looked like when it had "fallen".
     //
-    // Cut into segments of a few bands each, they separate in the air under
-    // their own rotation, land at different times, and shatter individually —
-    // and each one is small enough to break up on impact instead of waiting.
-    const SEG_BANDS = Math.max(2, Math.round(3.2 / this.bandHeight));
-    const byBand = new Map();
-    for (const j of doomed) {
-      const seg = Math.floor((this.bandOf[j] - band) / SEG_BANDS);
-      let list = byBand.get(seg);
-      if (!list) byBand.set(seg, list = []);
-      list.push(j);
-    }
+    // It goes over as one body. Not as a stack — as one.
+    //
+    // Splitting the falling section into segments seemed obviously better, and
+    // is catastrophically wrong, for a reason that only shows up when you
+    // measure it. A tower topples because *its* centre of mass is outside
+    // *its* base. Cut it into pieces and each piece is perfectly stable on the
+    // one below: a segment tilted seven degrees has its centre of mass a
+    // fraction of a metre off a twelve-metre base, and every interface in the
+    // stack is comfortable. So nothing tips. The pile shears sideways instead,
+    // held up by its own lower segments the whole way down, and creeps off
+    // across the map. Measured at three segments: the section's top sat at
+    // 65 m for six solid seconds while its centre of mass fell three metres.
+    // As one body the same section sweeps its top from 120 m to 100 m in the
+    // same time and is still accelerating. It is not a question of how many;
+    // any subdivision throws away the only thing that makes a tower fall over.
+    //
+    // The damaged bearing is lost at handover as well: separate bodies rest on
+    // their full footprint, not on the narrow strip the shelling left.
+    //
+    // So the fall is one rigid body, which is what it physically is, and
+    // breaking it into rubble is the *landing's* job — which is now fast
+    // enough to do it (a nine-hundred-stone section is a hundred and thirty
+    // within six seconds of touching down).
+    const byBand = new Map([[0, doomed]]);
 
-    // Carry the lean's rotation through as real angular momentum.
+    // Carry the lean's rotation through — but bounded.
     //
     // Handing the segments over at rest threw away everything the lean had
     // built: a stack tilted seven degrees, released with no velocity and the
     // heavy damping meant for a section still settling, simply stood there
-    // leaning, held up by friction. It has to leave the hinge moving the way
-    // it was already moving.
+    // leaning, held up by friction. So they leave the hinge moving.
+    //
+    // Moving at the *rigid* rate, though, is worse, and in a way that is not
+    // obvious until you watch it. The velocity field of a body rotating about
+    // its foot grows with height — which is correct for one rigid body and
+    // catastrophic for a stack of independent ones. Each segment leaves on its
+    // own tangent, nothing supplies the internal forces that would keep them
+    // rotating together, and the tower does not topple at all: it *shears*,
+    // like a pushed deck of cards, and the whole stack slides away across the
+    // map at four metres a second, held up the entire time by its own lower
+    // segments. Gravity never gets a look in — measured, the top section's
+    // vertical speed sat at 1.9 m/s for five seconds while it travelled sixty
+    // metres sideways and out over the river.
+    //
+    // Keeping the *shape* of the field and capping its magnitude gives the
+    // right thing: the top leads the way over, the base barely moves, and the
+    // stack goes past its balance point and falls under gravity — which is
+    // what Rapier is good at and what the lean spent six seconds setting up.
     const L = this._lastLeanState;
     let vel = null;
     if (L && L.vel > 0) {
       const n2 = Math.hypot(L.axisX, L.axisZ) || 1;
-      const wx = (L.axisX / n2) * L.vel, wz = (L.axisZ / n2) * L.vel;
-      vel = { w: { x: wx, y: 0, z: wz }, pivot: { x: L.pivotX, y: L.pivotY, z: L.pivotZ } };
+      let wx = (L.axisX / n2) * L.vel, wz = (L.axisZ / n2) * L.vel;
+      let maxR = 0;
+      for (const j of doomed) {
+        const dy = this.py[j] - L.pivotY;
+        const dx = this.px[j] - L.pivotX, dz = this.pz[j] - L.pivotZ;
+        maxR = Math.max(maxR, Math.hypot(dx, dy, dz));
+      }
+      const fastest = Math.hypot(wx, wz) * maxR;
+      const scale = fastest > TOPPLE_NUDGE ? TOPPLE_NUDGE / fastest : 1;
+      vel = {
+        w: { x: wx, y: 0, z: wz },
+        scale,
+        pivot: { x: L.pivotX, y: L.pivotY, z: L.pivotZ },
+      };
     }
 
     let moved = 0;
@@ -2289,12 +2376,13 @@ export class Structure {
       // Rigid rotation about the lean's hinge: v = omega x r at this segment's
       // own centre, so the top of a toppling tower leaves faster than its foot.
       const { w, pivot } = opts.spin;
+      const s = opts.spin.scale ?? 1;
       const rx = mx - pivot.x, ry = my - pivot.y, rz = mz - pivot.z;
       body.setAngvel(w, true);
       body.setLinvel({
-        x: w.y * rz - w.z * ry,
-        y: w.z * rx - w.x * rz,
-        z: w.x * ry - w.y * rx,
+        x: (w.y * rz - w.z * ry) * s,
+        y: (w.z * rx - w.x * rz) * s,
+        z: (w.x * ry - w.y * rx) * s,
       }, true);
     }
 
@@ -2344,7 +2432,21 @@ export class Structure {
 
   _dissolveIsland(island) {
     this.islands.delete(island.id);
-    if (island.body) this.physics.remove(island.body);
+    // Removing a rigid body takes every collider attached to it with it, so
+    // each member's recorded handle is about to name a collider that no longer
+    // exists. Left behind, the next `_detachCollider` on one of those stones
+    // looks the handle up, finds whatever Rapier has since put in that slot,
+    // and removes *that* — a stone somewhere else in the building silently
+    // loses its collider, and enough of those ends in a panic inside the
+    // solver. Harmless while every handle was truncated to zero and nothing
+    // was ever really removed; not harmless now that they work.
+    if (island.body) {
+      for (const i of island.members) {
+        const h = this.colliderOf[i];
+        if (h >= 0) { this.colliderToChunk.delete(h); this.colliderOf[i] = -1; }
+      }
+      this.physics.remove(island.body);
+    }
     island.body = null;
   }
 
@@ -2356,7 +2458,7 @@ export class Structure {
    */
   fragmentIsland(id, impactPoint) {
     const island = this.islands.get(id);
-    if (!island || !island.body) return;
+    if (!island || !PhysicsWorld.alive(island.body)) return;
     const members = [...island.members].filter((i) => this.flags[i] & ALIVE);
     if (members.length === 0) { this._dissolveIsland(island); return; }
 
@@ -2421,7 +2523,13 @@ export class Structure {
     const parts = Array.from({ length: slices }, () => []);
     for (const i of members) {
       const v = axis === 'x' ? this.px[i] : axis === 'y' ? this.py[i] : this.pz[i];
-      const k = Math.min(slices - 1, Math.floor(((v - lo) / span) * slices));
+      // Clamped at both ends and NaN-proof. A stone whose position has gone
+      // non-finite — a body the solver has thrown a long way, or one caught
+      // mid-removal — produces a NaN slice index, and `parts[NaN]` is
+      // undefined, which took the whole frame down from inside the fragmenter.
+      let k = Math.floor(((v - lo) / span) * slices);
+      if (!Number.isFinite(k)) k = 0;
+      k = Math.max(0, Math.min(slices - 1, k));
       parts[k].push(i);
     }
     // Re-split each slice into truly connected pieces so we never weld two
@@ -2474,7 +2582,7 @@ export class Structure {
     }
 
     for (const island of this.islands.values()) {
-      if (!island.settling || !island.body) continue;
+      if (!island.settling || !PhysicsWorld.alive(island.body)) continue;
       const t = island.body.translation();
       const drop = island.origin.y - t.y;
       const slide = Math.hypot(t.x - island.origin.x, t.z - island.origin.z);
@@ -2517,7 +2625,7 @@ export class Structure {
       if (this.physics.dynamicSet.size > this.physics.activeBudget
           && this.physics.reclaim(32) <= 0) break;
       const body = island.body;
-      if (!body) continue;
+      if (!PhysicsWorld.alive(body)) continue;
       // A clump this size already reads as rubble. Splitting further multiplies
       // bodies without changing the picture, and a landed collapse can cascade
       // into hundreds of them in a couple of seconds if nothing says stop.

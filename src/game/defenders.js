@@ -364,16 +364,9 @@ export class Garrison {
     const def = DEFENDER_TYPES[type];
     if (!def) return false;
 
-    let bestStruct = null, bestChunk = -1, bestD = maxDist * maxDist;
-    for (const s of this.structures) {
-      for (let i = 0; i < s.count; i++) {
-        if (!(s.flags[i] & 1)) continue;
-        const dx = s.px[i] - pos.x, dy = s.py[i] - pos.y, dz = s.pz[i] - pos.z;
-        const d = dx * dx + dy * dy + dz * dz;
-        if (d < bestD) { bestD = d; bestStruct = s; bestChunk = i; }
-      }
-    }
-    if (bestChunk < 0) return false;
+    const anchor = this._nearestStone(pos, maxDist);
+    if (!anchor) return false;
+    const bestStruct = anchor.structure, bestChunk = anchor.chunk;
 
     const d = {
       type, def,
@@ -393,8 +386,39 @@ export class Garrison {
     };
 
     this._settleIntoPosition(d);
+    // Re-anchor to where he actually ended up.
+    //
+    // The stone he is pinned to decides whether he lives, so it needs to be
+    // the stone he is standing on. It was chosen before `_settleIntoPosition`,
+    // which then walks him up to five metres looking for a field of fire — and
+    // as the building settles on the first few frames the original stone can
+    // move further still. The two drift apart, and a man whose recorded anchor
+    // is ten metres away is a man who survives the destruction of the masonry
+    // under his feet and keeps firing from thin air.
+    const re = this._nearestStone(d.pos, Math.max(maxDist, 9));
+    if (re) { d.structure = re.structure; d.chunk = re.chunk; }
     this.defenders.push(d);
     return true;
+  }
+
+  /**
+   * The nearest living stone to a point, preferring one underfoot.
+   *
+   * Weighted so a stone below counts as closer than one at the same distance
+   * to the side: what holds a man up is the floor, not the wall beside him.
+   */
+  _nearestStone(pos, maxDist) {
+    let bestStruct = null, bestChunk = -1, bestD = maxDist * maxDist;
+    for (const s of this.structures) {
+      for (let i = 0; i < s.count; i++) {
+        if (!(s.flags[i] & 1)) continue;
+        const dx = s.px[i] - pos.x, dy = s.py[i] - pos.y, dz = s.pz[i] - pos.z;
+        let d = dx * dx + dy * dy + dz * dz;
+        if (dy < 0 && dy > -2.6) d *= 0.45;        // underfoot beats alongside
+        if (d < bestD) { bestD = d; bestStruct = s; bestChunk = i; }
+      }
+    }
+    return bestChunk < 0 ? null : { structure: bestStruct, chunk: bestChunk };
   }
 
   /**
@@ -620,6 +644,14 @@ export class Garrison {
 
   // ─────────────────────────────────────────────────────────────── combat ──
 
+  /** The defender drawn as instance `id` of the figure mesh, if any. */
+  defenderForInstance(id) {
+    const order = this._drawOrder;
+    if (!order || id < 0 || id >= order.length) return null;
+    const d = order[id];
+    return d && d.alive ? d : null;
+  }
+
   get aliveCount() { return this.defenders.reduce((n, d) => n + (d.alive ? 1 : 0), 0); }
 
   countsByType() {
@@ -649,7 +681,7 @@ export class Garrison {
    * Defenders riding a stone that has been destroyed or knocked loose go with
    * it. This is checked every frame because it is the main way they die.
    */
-  reconcileStructure() {
+  reconcileStructure(groundY = -Infinity) {
     let lost = 0;
     for (const d of this.defenders) {
       if (!d.alive) continue;
@@ -657,7 +689,25 @@ export class Garrison {
       const f = s.flags[d.chunk];
       const dead = !(f & 1);
       const falling = (f & 2) || (f & 8);
-      if (dead || falling) { d.alive = false; lost++; }
+      if (dead || falling) { d.alive = false; lost++; continue; }
+
+      // And check there is still a floor under him.
+      //
+      // The anchor chunk is only the nearest stone that existed when he was
+      // posted — up to eight metres away, and `_settleIntoPosition` can then
+      // nudge him several more looking for a field of fire. So the masonry he
+      // is actually standing on and the stone whose flags decide whether he
+      // lives are routinely not the same stone, and shelling the plinth out
+      // from under a sandbagged position left the whole section hanging in the
+      // air at five metres with nothing beneath it, still shooting.
+      //
+      // Cheap because the solidity grid already exists for line of sight: two
+      // lookups against a 2 m grid, not a search through seven thousand stones.
+      if (d.pos.y - groundY < 1.6) continue;        // he is on the actual ground
+      const solid = s.occupancy
+        && (s.occupancy.solidAt(d.pos.x, d.pos.y - 1.0, d.pos.z)
+          || s.occupancy.solidAt(d.pos.x, d.pos.y - 2.2, d.pos.z));
+      if (s.occupancy && !solid) { d.alive = false; lost++; }
     }
     return lost;
   }
@@ -851,6 +901,11 @@ export class Garrison {
   /** Rebuild the instance buffers. Only live defenders are drawn. */
   sync() {
     let w = 0, mw = 0, bw = 0;
+    // Which defender each drawn figure is, so a tap on one can be traced back.
+    // The instanced mesh is packed with only the living, in no fixed order, so
+    // without this the raycast knows a soldier was hit and nothing else.
+    const order = this._drawOrder || (this._drawOrder = []);
+    order.length = 0;
     for (const d of this.defenders) {
       if (!d.alive) continue;
       this._q.setFromAxisAngle(this._axis, d.facing);
@@ -883,6 +938,7 @@ export class Garrison {
       this.mesh.setMatrixAt(w, this._m4);
       this._col.setHex(d.def.colour);
       this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
+      order[w] = d;
       w++;
     }
     this.mesh.count = w;

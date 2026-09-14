@@ -262,7 +262,8 @@ async function boot() {
   // ── Input: tap the structure to designate a target, tap the ground to
   // deploy the selected unit.
   const picker = new Picker(canvas, engine.camera, terrain);
-  const pick = (x, y) => picker.pick(x, y, structures, cityGroup || contextGroup);
+  const pick = (x, y) =>
+    picker.pick(x, y, structures, cityGroup || contextGroup, garrison);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -289,7 +290,12 @@ async function boot() {
       }
       return;
     }
-    if (hit.kind === 'structure') {
+    if (hit.kind === 'defender') {
+      // Aim at the man himself, not the point on him the ray happened to hit,
+      // so the battery converges on the position rather than on a shoulder.
+      battle.setTarget(hit.defender.pos, hit.label, hit.defender);
+      hud.feed(`TARGET: ${(hit.label || 'defender').toUpperCase()}`, 'big');
+    } else if (hit.kind === 'structure') {
       battle.setTarget(hit.point, hit.label);
       hud.feed(`TARGET: ${(hit.label || 'structure').toUpperCase()}`, '');
     } else {

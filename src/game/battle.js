@@ -408,9 +408,13 @@ export class Battle {
 
   // ───────────────────────────────────────────────────────────── targeting ──
 
-  setTarget(point, label) {
+  setTarget(point, label, defender = null) {
     this.target = point.clone();
     this.targetLabel = label || null;
+    // Held so the designation can clear itself when the man is dead. A target
+    // ring left hovering over a corpse would keep the whole battery firing at
+    // an empty window.
+    this.targetDefender = defender;
     this.targetMarker.position.copy(point);
     this.targetMarker.visible = true;
     this.pulse(point, 0xff6a4d, 9, true);
@@ -420,6 +424,7 @@ export class Battle {
   clearTarget() {
     this.target = null;
     this.targetLabel = null;
+    this.targetDefender = null;
     this.targetMarker.visible = false;
     this.onEvent('target', null);
   }
@@ -513,11 +518,20 @@ export class Battle {
 
     let vel;
     const p = def.projectile;
-    if (p.flat) {
-      // Direct fire: full charge on the *low* solution. A howitzer laid over
-      // open sights is not lobbing the shell over the target, it is driving it
-      // through the wall, and the trajectory should read that way — fast, taut
-      // and arriving while you are still watching the muzzle.
+    if (p.flat || p.kind === 'arc') {
+      // Every gun shoots flat first, and lofts only when it has to.
+      //
+      // Artillery used to go straight to the minimum-energy lob, which is how
+      // a Paladin ended up throwing its shell at ninety metres a second on an
+      // eight-second arc — a 155 mm round drifting across the sky like a
+      // mortar bomb, which is what "the shells are extremely slow" was. The
+      // difference between a howitzer and a direct-fire gun in this game is
+      // whether it *can* shoot over things, not whether its shells crawl.
+      //
+      // Full charge on the *low* solution. A howitzer laid over open sights is
+      // not lobbing the shell over the target, it is driving it through the
+      // wall, and the trajectory should read that way — fast, taut and
+      // arriving while you are still watching the muzzle.
       //
       // Unless something is in the way. A crew that cannot see the target over
       // the roof in front of them elevates until they can; a gun that instead
@@ -763,7 +777,9 @@ export class Battle {
     }
 
     // Defenders.
-    const lost = this.garrison.reconcileStructure();
+    if (this.targetDefender && !this.targetDefender.alive) this.clearTarget();
+
+    const lost = this.garrison.reconcileStructure(this.originGround);
     if (lost) {
       this.defendersKilled += lost;
       this.money += lost * MONEY_PER_DEFENDER;

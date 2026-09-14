@@ -105,8 +105,15 @@ export const UNITS = [
     tint: ARTILLERY_GREEN, model: 'M777', modelLength: 10.7,
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,
-    modelYaw: -Math.PI / 2,
-    projectile: { kind: 'arc', speed: 215, gravity: 9.81, trail: 0.9 },
+    // The opposite quarter turn to the M119, because the two towed guns are
+    // modelled facing opposite ways along their own X axis. Measured, not
+    // guessed: sampling the maximum radius from the spine in twenty slices
+    // along the long axis finds the barrel as the thin end — the M119's is at
+    // +X (mean radius 0.38 against 0.68 at the other end) and the M777's is at
+    // -X (0.91 against 1.48). Giving both the same yaw left this one pointing
+    // exactly backwards.
+    modelYaw: Math.PI / 2,
+    projectile: { kind: 'arc', speed: 360, gravity: 9.81, trail: 0.9 },
     warhead: { lethal: 2.6, radius: 8.4, power: 8200, fx: 1.8, kinetic: 0.7 },
     dispersion: 5.0,
     blurb: '155 mm towed. This is where stone starts leaving in lorry-loads.',
@@ -117,7 +124,7 @@ export const UNITS = [
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
-    projectile: { kind: 'arc', speed: 235, gravity: 9.81, trail: 1.0 },
+    projectile: { kind: 'arc', speed: 420, gravity: 9.81, trail: 1.0 },
     warhead: { lethal: 2.8, radius: 9.0, power: 9200, fx: 2.0, kinetic: 0.7 },
     dispersion: 4.0,
     blurb: 'Armoured, self-propelled, shrugs off small arms. Sets up in seconds.',

@@ -100,8 +100,29 @@ export class Picker {
    * @returns {{kind:'structure'|'ground', point:THREE.Vector3, label:?string,
    *            structure:?object, chunk:number}|null}
    */
-  pick(clientX, clientY, structures, city) {
+  pick(clientX, clientY, structures, city, garrison) {
     const ray = this.ray(clientX, clientY);
+
+    // Defenders first, and ahead of everything.
+    //
+    // A man standing in a window is a metre in front of the masonry behind him
+    // and a fraction of its size, so on any nearest-hit ordering the wall wins
+    // almost every tap. Since designating a defender is the *only* way to have
+    // the battery shoot at one deliberately, losing that tap to the stone he is
+    // leaning on makes the whole garrison untargetable — which is exactly how
+    // it behaved. A small forward bias costs a little precision on the wall and
+    // buys the ability to point at a person.
+    let man = null;
+    if (garrison && garrison.mesh && garrison.mesh.count > 0) {
+      const hits = this.raycaster.intersectObject(garrison.mesh, false);
+      for (const h of hits) {
+        const d = garrison.defenderForInstance(h.instanceId);
+        if (!d) continue;
+        man = { kind: 'defender', point: h.point.clone(), label: d.def.name,
+          structure: null, chunk: -1, defender: d, distance: h.distance };
+        break;
+      }
+    }
 
     // Flat roofs are legitimate ground. A gun on one has sightlines the street
     // does not, and getting up there is a decision worth offering — so the city
@@ -146,6 +167,16 @@ export class Picker {
 
     const ground = this.terrainPoint(ray);
     const groundDist = ground ? ray.origin.distanceTo(ground) : Infinity;
+
+    // The bias: a defender wins unless something is comfortably in front of him.
+    if (man) {
+      const nearest = Math.min(
+        best ? best.distance : Infinity,
+        roof ? roof.roofDistance : Infinity,
+        groundDist,
+      );
+      if (man.distance <= nearest + 2.5) return man;
+    }
 
     // Nearest wins. A roof only counts when the ray reaches it before the
     // ground behind the building and before any masonry in front of it.
