@@ -56,7 +56,10 @@ async function boot() {
   terrain.addToPhysics(physics);
 
   const sunDir = engine.sun.position.clone().normalize();
-  engine.scene.add(createSky(sunDir));
+  const sky = createSky(sunDir);
+  // Pre-filter the sky into an environment map before the dome joins the
+  // scene, so metals have something to reflect.
+  engine.scene.add(engine.useEnvironmentFrom(sky));
   const water = createWater(terrain, sunDir, quality);
   engine.scene.add(water);
   console.log(`[tumble] water: ${water.userData.quads} quads over the river mask`);

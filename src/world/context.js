@@ -91,7 +91,7 @@ export function buildContext(terrain, quality) {
       const jx = bx + (rng() - 0.5) * 9;
       const jz = bz + (rng() - 0.5) * 9;
       const r = Math.hypot(jx, jz);
-      if (r < 118) continue;                       // the landmark's own plot
+      if (r < 96) continue;                        // the landmark's own plot
       if (terrain.isWater(jx, jz)) continue;
       const m = terrain.maskAt(jx, jz);
       if (m.park > 0.42) continue;                 // leave the parks open

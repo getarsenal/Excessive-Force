@@ -30,13 +30,21 @@ const MAX_TRACERS = 320;
 const MAX_FLASHES = 96;
 const MAX_SPARKS = 220;
 
-/** Per-weapon look. Speed is metres/second of visible travel. */
+/**
+ * Per-weapon look. Speed is metres/second of visible travel.
+ *
+ * The streaks are drawn far wider than a bullet is — a 7.62 mm round is 8 mm
+ * across, and at the distances this camera works at, a geometrically honest
+ * tracer is a fraction of a pixel and simply invisible. What a tracer actually
+ * looks like at night is a bright line, because the eye integrates it; these
+ * widths are what reproduce that impression in daylight at 150 m.
+ */
 const LOOK = {
-  rifleman: { color: 0xffc46a, core: 0xfff0d0, speed: 520, len: 5.5, width: 0.10, flash: 1.0 },
-  mg: { color: 0xff9b3c, core: 0xffe4b0, speed: 560, len: 7.5, width: 0.13, flash: 1.35 },
-  sniper: { color: 0x9fe8ff, core: 0xffffff, speed: 780, len: 11.0, width: 0.12, flash: 1.5 },
-  at: { color: 0xff5a2a, core: 0xffd8a0, speed: 210, len: 3.2, width: 0.34, flash: 2.6 },
-  mortar: { color: 0xff5a2a, core: 0xffd8a0, speed: 220, len: 3.0, width: 0.30, flash: 2.4 },
+  rifleman: { color: 0xffa832, core: 0xfff0d0, speed: 520, len: 9.0, width: 0.30, flash: 1.0 },
+  mg: { color: 0xff7a18, core: 0xffd090, speed: 560, len: 12.0, width: 0.36, flash: 1.35 },
+  sniper: { color: 0x62d8ff, core: 0xffffff, speed: 780, len: 16.0, width: 0.30, flash: 1.5 },
+  at: { color: 0xff3a12, core: 0xffc078, speed: 210, len: 5.0, width: 0.62, flash: 2.6 },
+  mortar: { color: 0xff3a12, core: 0xffc078, speed: 220, len: 4.5, width: 0.56, flash: 2.4 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 
@@ -211,10 +219,12 @@ export class TracerFX {
       this.tracerMesh.setMatrixAt(w, this._m4);
 
       // Bright at the tip, cooling along the streak: approximated by fading the
-      // whole instance as it ages, which at this size reads the same.
+      // whole instance as it ages, which at this size reads the same. The
+      // overall gain is well above 1 because this is additive over a daylit
+      // scene — at unit brightness a warm tracer washes out to a grey smear.
       const fade = t.bright * (1 - Math.min(1, (t.t * t.speed) / (t.end + t.len)) * 0.35);
       this._c2.setHex(t.color);
-      this._c.setHex(t.core).lerp(this._c2, 0.45).multiplyScalar(fade);
+      this._c.setHex(t.core).lerp(this._c2, 0.62).multiplyScalar(fade * 2.1);
       this.tracerMesh.instanceColor.setXYZ(w, this._c.r, this._c.g, this._c.b);
       w++;
     }

@@ -236,10 +236,14 @@ export class Terrain {
     // coloured from the same palette and the same noise, so the city reads as
     // continuing past the edge of the data rather than stopping at it. It is
     // still flat, and fog still takes it long before that becomes legible.
+    //
+    // It is a *frame*, not a plane. A single plane across the whole map sits at
+    // one height, and the river is carved five metres below the ground at the
+    // DEM's edge — so a full plane laid at the edge height covered the Thames
+    // completely, and the river rendered as a strip of dry land. Cutting the
+    // playfield out of it means the surround can never overlap anything inside.
     const edge = this.heightAt(this.span, 0);
-    const apronSpan = this.span * 14;
-    const apronGeo = new THREE.PlaneGeometry(apronSpan, apronSpan, 96, 96);
-    apronGeo.rotateX(-Math.PI / 2);
+    const apronGeo = frameGeometry(this.span, this.span * 7, 10);
     const ap = apronGeo.attributes.position;
     const apColors = new Float32Array(ap.count * 3);
     const at = new THREE.Color();
@@ -303,6 +307,47 @@ export async function loadTerrain(levelId, quality) {
     loadImageData(`${base}_mask.png`),
   ]);
   return new Terrain(meta, height, mask, quality);
+}
+
+/**
+ * A square annulus in the XZ plane: everything between `inner` and `outer`,
+ * with the middle left open. Built from eight subdivided rectangles so the
+ * vertex colouring has something to interpolate across.
+ */
+function frameGeometry(inner, outer, div) {
+  const pos = [];
+  const index = [];
+
+  const rect = (x0, z0, x1, z1) => {
+    const base = pos.length / 3;
+    const nx = div, nz = div;
+    for (let j = 0; j <= nz; j++) {
+      for (let i = 0; i <= nx; i++) {
+        pos.push(x0 + (x1 - x0) * (i / nx), 0, z0 + (z1 - z0) * (j / nz));
+      }
+    }
+    for (let j = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        const a = base + j * (nx + 1) + i;
+        const b = a + 1, c = a + nx + 1, d = c + 1;
+        index.push(a, c, b, b, c, d);
+      }
+    }
+  };
+
+  // Four sides plus four corners.
+  rect(-outer, -outer, outer, -inner);        // north strip
+  rect(-outer, inner, outer, outer);          // south strip
+  rect(-outer, -inner, -inner, inner);        // west strip
+  rect(inner, -inner, outer, inner);          // east strip
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setIndex(pos.length / 3 > 65535
+    ? new THREE.BufferAttribute(new Uint32Array(index), 1)
+    : new THREE.BufferAttribute(new Uint16Array(index), 1));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 /** Tileable multi-octave grain, generated once at boot. */

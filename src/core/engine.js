@@ -116,10 +116,15 @@ export class Engine {
     if (q.shadowMapSize > 0) {
       this.sun.castShadow = true;
       this.sun.shadow.mapSize.set(q.shadowMapSize, q.shadowMapSize);
-      const d = 260;
-      Object.assign(this.sun.shadow.camera, { left: -d, right: d, top: d, bottom: -d, near: 1, far: 1400 });
-      this.sun.shadow.bias = -0.0006;
-      this.sun.shadow.normalBias = 0.5;
+      // Wide enough to cover what the bird's-eye camera can actually see.
+      // At 260 m the map ended a couple of streets from the landmark and
+      // everything past it rendered as though it were in shadow — two bright
+      // wedges spreading out from the covered square, which is unmistakable
+      // once the surrounding city is dense enough to show it.
+      const d = 620;
+      Object.assign(this.sun.shadow.camera, { left: -d, right: d, top: d, bottom: -d, near: 1, far: 2200 });
+      this.sun.shadow.bias = -0.0012;
+      this.sun.shadow.normalBias = 1.1;
       this.sun.shadow.camera.updateProjectionMatrix();
     }
     this.scene.add(this.sun);
@@ -170,6 +175,33 @@ export class Engine {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
+  }
+
+  /**
+   * Build an environment map from the sky dome and light the scene with it.
+   *
+   * Without one, every metal in the game renders close to black: a metallic
+   * surface has no diffuse response at all, so with nothing to reflect there is
+   * nothing to see — which is why the cast-iron spire and the gilt finial read
+   * as silhouettes rather than as metal. Pre-filtering the actual sky means the
+   * spire reflects the sky it is standing against, and stone picks up a correct
+   * specular sheen at grazing angles for free.
+   *
+   * @param {THREE.Object3D} sky the sky dome, before it joins the main scene
+   */
+  useEnvironmentFrom(sky) {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    pmrem.compileEquirectangularShader();
+    const scratch = new THREE.Scene();
+    scratch.add(sky);
+    const rt = pmrem.fromScene(scratch, 0.04);
+    this.scene.environment = rt.texture;
+    this.scene.environmentIntensity = 0.55;
+    this.envMap = rt.texture;
+    pmrem.dispose();
+    // Hand the dome back; the caller adds it to the real scene.
+    scratch.remove(sky);
+    return sky;
   }
 
   /** Kick the camera. `amount` is roughly "metres of apparent displacement". */

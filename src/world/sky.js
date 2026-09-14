@@ -132,21 +132,33 @@ const WATER_FRAG = /* glsl */`
     // Depth tint: a river is green-brown where it is shallow and much darker
     // where it is deep. Driving it from the baked bed depth is what makes the
     // channel read as a channel rather than a painted strip.
-    float d = clamp(vDepth / 5.5, 0.0, 1.0);
-    vec3 col = mix(uShallow, uDeep, d * d);
+    //
+    // The carve is only about five metres, so normalising over that whole range
+    // and then squaring it left almost the entire surface at the shallow
+    // colour — a thin olive strip that read as grass, not as the Thames. Most
+    // of the channel should be the deep tone; only the margins are shallow.
+    float d = clamp(vDepth / 2.6, 0.0, 1.0);
+    vec3 col = mix(uShallow, uDeep, d);
 
     float fres = pow(1.0 - max(dot(viewDir, n), 0.0), 3.0);
-    col = mix(col, uSky, fres * 0.55);
+    col = mix(col, uSky, 0.09 + fres * 0.46);
 
-    // Sun glitter.
+    // Sun glitter. Kept below the bloom threshold: a specular lobe on a wave
+    // field this smooth lands as a handful of very bright pixels, and bloom
+    // then spreads each one into a soft white blob the size of a barge.
     vec3 h = normalize(normalize(uSunDir) + viewDir);
-    col += uSunColor * pow(max(dot(n, h), 0.0), 220.0) * 2.6;
-    col += uSunColor * pow(max(dot(n, h), 0.0), 24.0) * 0.10;
+    col += uSunColor * pow(max(dot(n, h), 0.0), 220.0) * 0.55;
+    col += uSunColor * pow(max(dot(n, h), 0.0), 24.0) * 0.05;
 
-    // Foam where the water meets the bank, and along the crests of the chop.
+    // Foam where the water meets the bank, and a hint of it on the crests.
+    //
+    // The crest term has to be tiny and tightly thresholded. The wave field is
+    // three sines with wavelengths of twenty to seventy metres, so a generous
+    // threshold paints white over patches the size of a city block — from the
+    // air that reads as ice floes, not chop.
     float shore = 1.0 - smoothstep(0.05, 0.9, vDepth);
-    float crest = smoothstep(0.14, 0.26, vWave) * smoothstep(0.4, 1.6, vDepth);
-    col += vec3(0.82, 0.87, 0.88) * (shore * 0.45 + crest * 0.20);
+    float crest = smoothstep(0.26, 0.35, vWave) * smoothstep(0.4, 1.6, vDepth);
+    col += vec3(0.82, 0.87, 0.88) * (shore * 0.22 + crest * 0.025);
 
     // Fade out over the last few centimetres of depth so the waterline is a
     // soft edge on the sand rather than a hard polygon boundary.
@@ -235,7 +247,11 @@ export function createWater(terrain, sunDirection, quality) {
       const b = vertexAt(gx + 1, gz);
       const c = vertexAt(gx + 1, gz + 1);
       const d = vertexAt(gx, gz + 1);
-      index.push(a, d, c, a, c, b);
+      // Wind anticlockwise seen from above. The grid runs +x with gx but −z
+      // with gz, which flips the handedness against the obvious ordering: the
+      // natural-looking (a, d, c) (a, c, b) faces *downward*, and the whole
+      // sheet is back-face culled and silently invisible.
+      index.push(a, c, d, a, b, c);
     }
   }
 
@@ -260,9 +276,15 @@ export function createWater(terrain, sunDirection, quality) {
       uTime: { value: 0 },
       // The Thames is a tidal estuary: green-brown in the shallows, and much
       // deeper and colder in the dredged channel.
-      uShallow: { value: new THREE.Color(0x6b8f52) },
-      uDeep: { value: new THREE.Color(0x0e3b4a) },
-      uSky: { value: new THREE.Color(0x86b4dc) },
+      // Pitched a little bright, because these go through ACES tone mapping on
+      // the way to the screen: a colour that looks right as a swatch comes out
+      // of the grade darker and flatter than it went in.
+      // Balanced across the channels on purpose. A river colour with almost no
+      // red in it survives the grade's saturation and contrast as electric
+      // cyan — the Thames is a grey-green estuary, not a swimming pool.
+      uShallow: { value: new THREE.Color(0x74804c) },
+      uDeep: { value: new THREE.Color(0x415f57) },
+      uSky: { value: new THREE.Color(0x93aec4) },
       uSunDir: { value: sunDirection.clone().normalize() },
       uSunColor: { value: new THREE.Color(0xffe0b0) },
     },
