@@ -10,9 +10,14 @@ import { buildTajMahal, buildTajMosque } from '../structure/landmarks/tajmahal.j
  * generic, so adding a landmark means writing one builder and one entry here,
  * plus its coordinates in `tools/bake_terrain.py`.
  *
- * `primary` marks the structure the win condition watches. The others are
- * secondary targets: softer, worth money, and useful for unlocking the next
- * tier before committing to the main event.
+ * `primary` marks the landmark the level is named after — the one the height
+ * and lean readouts track. `required` marks a structure that has to come down
+ * for the level to be won.
+ *
+ * Every structure holding a garrison is required. A wing full of defenders that
+ * could be ignored entirely was a strange thing to put in front of a player:
+ * it shot at them the whole match and then took no part in whether they had
+ * finished. If it is worth defending it is worth destroying.
  */
 
 export const LEVELS = {
@@ -25,8 +30,10 @@ export const LEVELS = {
     cityExcludeRadius: 70,
     camera: { yaw: -0.78, pitch: 0.40, distance: 235, height: 42 },
     structures: (quality) => [
-      { key: 'tower', blocks: buildElizabethTower(quality), primary: true },
-      { key: 'wing', blocks: buildPalaceWing(quality) },
+      { key: 'tower', blocks: buildElizabethTower(quality), primary: true,
+        required: true, label: 'ELIZABETH TOWER' },
+      { key: 'wing', blocks: buildPalaceWing(quality),
+        required: true, label: 'PALACE WING' },
     ],
     garrison: (g, origin, groundY) => {
       g.populateElizabethTower(origin, groundY);
@@ -34,6 +41,12 @@ export const LEVELS = {
     },
     // A tower is a cantilever: losing two thirds of its height is unambiguous.
     win: { integrity: 0.30, heightFrac: 0.34 },
+    // The wing is 170 m of three-storey masonry. It has no topple in it, so
+    // height is meaningless here and the only honest measure is how much of it
+    // is left — but it is also four times the tower's footprint and grinding
+    // all of it down would be a chore, so the bar sits where the building has
+    // plainly been gutted rather than where the last stone has gone.
+    winSecondary: { integrity: 0.42 },
     brief: 'Undercut one face and the whole tower goes over that way.',
   },
 
@@ -46,7 +59,10 @@ export const LEVELS = {
     cityExcludeRadius: 190,   // the complex is wide; keep OSM buildings clear
     camera: { yaw: 0.35, pitch: 0.34, distance: 290, height: 34 },
     structures: (quality) => [
-      { key: 'taj', blocks: buildTajMahal(quality), primary: true },
+      { key: 'taj', blocks: buildTajMahal(quality), primary: true,
+        required: true, label: 'TAJ MAHAL' },
+      // The mosque and the jawab hold no garrison, so they are worth money and
+      // nothing else — shoot them or leave them.
       { key: 'mosque', blocks: buildTajMosque(quality, -1) },
       { key: 'jawab', blocks: buildTajMosque(quality, 1) },
     ],

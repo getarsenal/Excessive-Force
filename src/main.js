@@ -111,6 +111,8 @@ async function boot() {
   for (const spec of specs) {
     const st = new Structure(physics, spec.blocks, { groundY, origin, onChunkDestroyed });
     st.key = spec.key;
+    st.required = !!spec.required;
+    st.label = spec.label || spec.key.toUpperCase();
     engine.scene.add(st.group);
     structures.push(st);
     if (spec.primary) primary = st;
@@ -358,7 +360,7 @@ async function boot() {
       physics.recycleSettled(quality.settleFrames);
       physics.cullRunaways(terrain.span * 1.6);
       for (const s of structures) {
-        s.solveStability(); s.maintainIslands(); s.tickLean(step); s.syncTransforms();
+        s.solveStability(); s.maintainIslands(step); s.tickLean(step); s.syncTransforms();
       }
       battle.update(step);
       fx.update(step);
@@ -403,7 +405,7 @@ async function boot() {
     physics.step(dt);
     physics.recycleSettled(quality.settleFrames);
     physics.cullRunaways(terrain.span * 1.6);
-    for (const s of structures) { s.solveStability(); s.maintainIslands(); s.tickLean(dt); }
+    for (const s of structures) { s.solveStability(); s.maintainIslands(dt); s.tickLean(dt); }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;
 
     for (const s of structures) s.syncTransforms();

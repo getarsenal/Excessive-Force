@@ -54,6 +54,10 @@ export class Battle {
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
     this.originGround = ctx.groundY;
+    // Resolved now rather than lazily: each objective records the height it
+    // started at, and that has to be measured before anything has been shot.
+    this._objectives = null;
+    void this.objectives;
 
     this._lastDestroyedMass = 0;
     // Aim candidates on the primary, refreshed on a timer rather than per shot:
@@ -799,15 +803,60 @@ export class Battle {
     }
   }
 
-  _checkEnd() {
-    const standing = this.primary.standingHeight() - this.originGround;
-    const start = this.startHeight - this.originGround;
-    const heightFrac = standing / start;
+  /**
+   * The objectives, and how far each has to go.
+   *
+   * The landmark the level is named after is judged on height as well as mass,
+   * because a tower that has lost two thirds of its height is unambiguously
+   * down however much rubble is piled at its foot. Anything else required —
+   * a garrisoned wing, say — is judged on mass alone: it never had a topple in
+   * it, so demanding one would be demanding something that cannot happen.
+   */
+  get objectives() {
+    if (this._objectives) return this._objectives;
+    const primaryWin = this.level?.win ?? { integrity: 0.30, heightFrac: 0.34 };
+    const otherWin = this.level?.winSecondary ?? { integrity: 0.42 };
+    this._objectives = this.structures
+      .filter((s) => s.required || s === this.primary)
+      .map((s) => ({
+        structure: s,
+        label: s.label || (s === this.primary ? this.level?.target : 'STRUCTURE'),
+        isPrimary: s === this.primary,
+        startHeight: s.standingHeight(),
+        win: s === this.primary ? primaryWin : otherWin,
+      }));
+    return this._objectives;
+  }
 
-    // Win when the tower is genuinely down: either most of its mass has left
-    // the standing structure, or it has lost two thirds of its height.
-    const win = this.level?.win ?? { integrity: 0.30, heightFrac: 0.34 };
-    if (this.primary.monumentIntegrity < win.integrity || heightFrac < win.heightFrac) {
+  /** Is one objective satisfied? */
+  objectiveDone(o) {
+    const s = o.structure;
+    if (s.monumentIntegrity < o.win.integrity) return true;
+    if (o.win.heightFrac === undefined) return false;
+    const start = o.startHeight - this.originGround;
+    if (start <= 0.5) return false;
+    return (s.standingHeight() - this.originGround) / start < o.win.heightFrac;
+  }
+
+  /** 0..1 across every objective, weighted by how much masonry each is. */
+  get objectiveProgress() {
+    let done = 0, total = 0;
+    for (const o of this.objectives) {
+      const w = o.structure.totalMass;
+      total += w;
+      // How far this one has come, as a fraction of what it takes to finish it.
+      const integ = o.structure.monumentIntegrity;
+      const need = 1 - o.win.integrity;
+      done += w * Math.max(0, Math.min(1, (1 - integ) / Math.max(0.01, need)));
+    }
+    return total > 0 ? done / total : 0;
+  }
+
+  _checkEnd() {
+    // Every required structure has to be down. A wing that shoots at the
+    // player for the whole match and then counts for nothing was the odd one
+    // out here: it is a target, so it is part of the job.
+    if (this.objectives.every((o) => this.objectiveDone(o))) {
       this.state = 'won';
       this.onEvent('win', this.summary());
       return;

@@ -39,6 +39,7 @@ export class HUD {
       defenders: document.getElementById('hud-defenders'),
       units: document.getElementById('hud-units'),
       target: document.getElementById('hud-target'),
+      objectives: document.getElementById('hud-objectives'),
       buildbar: document.getElementById('buildbar'),
       prompt: document.getElementById('prompt'),
       targetcard: document.getElementById('targetcard'),
@@ -179,11 +180,36 @@ export class HUD {
     this.el.money.textContent = `$${Math.floor(b.money).toLocaleString()}`;
     this.el.income.textContent = `$${b.income.toFixed(0)}/s`;
 
-    const integ = b.primary.monumentIntegrity;
-    const pct = Math.round(integ * 100);
+    // The bar is the whole job, not just the landmark. A level with a second
+    // garrisoned building in it is not four fifths finished because the tower
+    // has gone.
+    const objs = b.objectives;
+    const done = b.objectiveProgress;
+    const integ = 1 - done;
+    const pct = Math.round(done * 100);
     this.el.integrity.style.width = `${Math.max(0, integ * 100)}%`;
     this.el.integrityPct.textContent = `${pct}%`;
     this.el.integrity.className = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}`;
+
+    // Per-objective breakdown, so "what is left to do" is never a guess. Only
+    // drawn when there is more than one thing to bring down.
+    if (this.el.objectives) {
+      if (objs.length < 2) {
+        this.el.objectives.hidden = true;
+      } else {
+        this.el.objectives.hidden = false;
+        const sig = objs.map((o) => `${o.label}:${Math.round(o.structure.monumentIntegrity * 100)}`).join('|');
+        if (sig !== this._objSig) {
+          this._objSig = sig;
+          this.el.objectives.innerHTML = objs.map((o) => {
+            const ok = b.objectiveDone(o);
+            const p = Math.round(o.structure.monumentIntegrity * 100);
+            return `<span class="obj${ok ? ' done' : ''}">${o.label}
+              <b>${ok ? 'DOWN' : `${p}%`}</b></span>`;
+          }).join('');
+        }
+      }
+    }
 
     const h = b.primary.standingHeight() - b.originGround;
     // The lean is the clearest signal the shelling is working, and for a while

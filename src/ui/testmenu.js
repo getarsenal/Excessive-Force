@@ -1156,6 +1156,15 @@ export class TestMenu {
           }
           if (st.standingHeight() < h0 - 25) break;
         }
+        // Let it finish. A tower that is three seconds into going over is a
+        // tower that has been brought down, and measuring the instant the last
+        // shell lands reads the height it had on the way past — which is how
+        // this managed to fail on a collapse that was working perfectly.
+        for (let k = 0; k < 26; k++) {
+          c.fastForward(0.25);
+          leaned = Math.max(leaned, st.leanDegrees);
+          if (k > 6 && st.standingHeight() < h0 - 25 && !st.lean) break;
+        }
         const dropped = st.standingHeight() < h0 ? h0 - st.standingHeight() : 0;
         const integ = st.monumentIntegrity;
         if (slender > 2.5) {
@@ -1166,6 +1175,37 @@ export class TestMenu {
         assert(dropped > 20 || integ < 0.6,
           `it kept ${(integ * 100).toFixed(0)}% of itself and lost only `
           + `${dropped.toFixed(1)} m with its base shot out`);
+
+        // Nothing is left hanging in the air.
+        //
+        // The worst-looking bug this engine has had: a stone that had lost its
+        // support but could not be given a body — because the budget was spent,
+        // or because the release pass was filtering on the very support it no
+        // longer had — simply stayed where it was, with no collider and no
+        // flags, floating. A demolished tower would leave thousands of them
+        // hanging over the rubble. Every living stone must be a free body, part
+        // of a welded section, or standing on something.
+        const reach = st._reach;
+        let floating = 0, worstY = 0;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;   // dead, free or island
+          if (reach[i]) continue;
+          floating++;
+          worstY = Math.max(worstY, st.py[i] - gy);
+        }
+        assert(floating === 0,
+          `${floating} stones are hanging unsupported in mid-air, the highest `
+          + `${worstY.toFixed(0)} m up`);
+
+        // And the rubble is rubble, not a building lying on its side.
+        let biggest = 0;
+        for (const isl of st.islands.values()) {
+          if (isl.settling) continue;
+          biggest = Math.max(biggest, isl.members.length);
+        }
+        assert(biggest <= 420,
+          `a landed section is still welded into one ${biggest}-stone slab`);
+
         return slender > 2.5
           ? `leaned ${leaned.toFixed(1)}°, then lost ${dropped.toFixed(0)} m`
           : `${slender.toFixed(1)}:1 squat — no lean expected; down to `

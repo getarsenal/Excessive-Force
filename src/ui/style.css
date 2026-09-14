@@ -125,6 +125,19 @@ html, body {
 .tb-sub { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; margin-top: 3px; }
 .tb-sub.leaning { color: var(--warn); font-weight: 600; }
 
+/* Per-objective breakdown, shown when a level has more than one thing to
+   bring down. Kept to one compact row so it never competes with the bar. */
+.objectives {
+  display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 3px; font-size: 9px; letter-spacing: 0.09em; color: var(--dim);
+}
+.objectives .obj { display: inline-flex; gap: 4px; align-items: baseline; }
+.objectives .obj b {
+  color: #e6ebf2; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.objectives .obj.done { color: var(--money); opacity: 0.85; }
+.objectives .obj.done b { color: var(--money); }
+
 /* ── Build bar ───────────────────────────────────────────────────────── */
 #buildbar {
   position: absolute; left: 0; right: 0;
