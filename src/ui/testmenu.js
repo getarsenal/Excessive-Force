@@ -1448,11 +1448,23 @@ export class TestMenu {
         // flags, floating. A demolished tower would leave thousands of them
         // hanging over the rubble. Every living stone must be a free body, part
         // of a welded section, or standing on something.
+        // A leaning structure is not a floating one.
+        //
+        // While a lean is running, every stone above the hinge is deliberately
+        // *not* marked as reached — the support flood has condemned that slice
+        // and the lean is what is holding the section up until it decides. So
+        // the naive test counts the entire upper tower as hanging in mid-air:
+        // measured at 6,357 stones during a lean, resolving to zero the moment
+        // it finished. Which made this assertion fail at random depending on
+        // whether the tower happened to be mid-topple when it ran, and report
+        // a bug that was not there.
         const reach = st._reach;
+        const leanFrom = st.lean ? st.lean.band : Infinity;
         let floating = 0, worstY = 0;
         for (let i = 0; i < st.count; i++) {
           if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;   // dead, free or island
           if (reach[i]) continue;
+          if (st.bandOf[i] >= leanFrom) continue;                   // carried by the lean
           floating++;
           worstY = Math.max(worstY, st.py[i] - gy);
         }
