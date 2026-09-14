@@ -1318,6 +1318,33 @@ export class TestMenu {
         return `${removed} stones pulled, ${before - after} fell, none left floating`;
       })],
 
+      ['the city is detailed, and its roads keep out of the river', () => {
+        const city = this.ctx.cityGroup;
+        const d = city?.userData?.detail;
+        assert(d, 'the detail pass did not run');
+        const want = ['lamps', 'cars', 'cornices', 'porches', 'wall'];
+        const thin = want.filter((k) => !(d[k] > 20));
+        assert(thin.length === 0,
+          `too little of: ${thin.map((k) => `${k}=${d[k] ?? 0}`).join(', ')}`);
+
+        // No carriageway in the water. Roads used to run to the waterline and,
+        // where the river mask is coarse, a metre or two past it — half the
+        // streets on the map ended in the Thames.
+        const streets = city.getObjectByName('streets');
+        assert(streets, 'there is no street mesh');
+        const pos = streets.geometry.attributes.position;
+        let wet = 0, sampled = 0;
+        for (let i = 0; i < pos.count; i += 97) {
+          const x = pos.getX(i), z = pos.getZ(i);
+          sampled++;
+          if (this.ctx.terrain.isWater(x, z)) wet++;
+        }
+        assert(wet === 0,
+          `${wet} of ${sampled} sampled road vertices are over water`);
+        const total = Object.values(d).reduce((a, v) => a + v, 0);
+        return `${total.toLocaleString()} props, no road in the water`;
+      }],
+
       ['the city has streets, and they are in the gaps', () => {
         // Streets are the single thing that makes a plan view read as a city
         // rather than as boxes on a field, and they are drawn on a grid that

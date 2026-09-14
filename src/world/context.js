@@ -19,6 +19,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 // footprints are the same city rather than two different ones.
 import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 import { valueNoise } from './terrain.js';
+import { PropSet, MATERIALS, addStreetFurniture, addBuildingDetail,
+  addRiverEdge, addRoadMarkings, addJunctions, addRoofAndFrontage } from './detail.js';
 
 export function buildContext(terrain, quality) {
   const group = new THREE.Group();
@@ -57,19 +59,87 @@ export function buildContext(terrain, quality) {
     return false;
   };
 
-  /** A period block: body plus a flat roof slab, sat on the real terrain. */
+  /**
+   * A period block: body, roof, and whatever shape it has decided to be.
+   *
+   * Every building being an extruded rectangle with a flat slab on top is the
+   * single biggest reason a procedural city reads as a diagram. Three cheap
+   * variations fix most of it, and all three change the *silhouette*, which is
+   * what the eye actually compares:
+   *
+   *   - a pitched roof, which from above is two sloping planes and a ridge line
+   *     instead of one flat grey rectangle;
+   *   - a setback upper storey on the taller blocks, which gives the skyline a
+   *     step instead of a wall;
+   *   - a rear wing, turning the plan into an L.
+   *
+   * Only flat-roofed plots are offered to the player for deployment, so the
+   * roof style has to be recorded rather than inferred.
+   */
   const block = (x, z, w, d, h, ry = 0) => {
     if (terrain.isWater(x, z)) return false;
     if (overlaps(x, z, w, d)) return false;
     const g = terrain.heightAt(x, z);
-    const body = new THREE.BoxGeometry(w, h, d);
+    const roll = rng();
+    const pitched = roll < 0.42 && Math.min(w, d) < 26;
+    const setback = !pitched && roll > 0.82 && h > 20 && Math.min(w, d) > 14;
+
+    const bodyH = setback ? h * 0.72 : h;
+    const body = new THREE.BoxGeometry(w, bodyH, d);
     // Rescale the UVs to world size so the facade texture gives one window bay
     // roughly every 3.5 m regardless of how big the block is. Without this the
     // window grid stretches and every building reads as a different scale.
-    scaleBoxUVs(body, w, h, d, 3.5);
-    push(bodies, body, x, g + h / 2, z, ry);
-    push(roofs, new THREE.BoxGeometry(w + 0.7, 1.1, d + 0.7), x, g + h + 0.5, z, ry);
-    plots.push({ x, z, w, d, h, top: g + h + 1.1, yaw: ry });
+    scaleBoxUVs(body, w, bodyH, d, 3.5);
+    push(bodies, body, x, g + bodyH / 2, z, ry);
+
+    let top = g + bodyH;
+    if (setback) {
+      const sw = w * 0.66, sd = d * 0.66, sh = h - bodyH;
+      const upper = new THREE.BoxGeometry(sw, sh, sd);
+      scaleBoxUVs(upper, sw, sh, sd, 3.5);
+      push(bodies, upper, x, g + bodyH + sh / 2, z, ry);
+      push(roofs, new THREE.BoxGeometry(sw + 0.6, 1.0, sd + 0.6), x, g + h + 0.5, z, ry);
+      // The setback leaves a terrace, which is a real roof and a real place to
+      // put a gun.
+      push(roofs, new THREE.BoxGeometry(w + 0.7, 0.9, d + 0.7), x, g + bodyH + 0.45, z, ry);
+      top = g + h + 1.0;
+    } else if (pitched) {
+      // Two slopes and a ridge, built as a prism. The ridge runs along the
+      // building's long axis, as it does on every terrace ever built.
+      const alongX = w >= d;
+      const rise = Math.min(6.5, Math.max(2.6, Math.min(w, d) * 0.34));
+      const prism = new THREE.CylinderGeometry(
+        (alongX ? d : w) * 0.72, (alongX ? d : w) * 0.72, alongX ? w : d, 3, 1);
+      prism.rotateX(Math.PI / 2);
+      if (alongX) prism.rotateY(Math.PI / 2);
+      prism.scale(1, rise / ((alongX ? d : w) * 0.72 * 1.5), 1);
+      push(roofs, prism, x, g + bodyH + rise * 0.34, z, ry);
+      top = g + bodyH + rise;
+    } else {
+      push(roofs, new THREE.BoxGeometry(w + 0.7, 1.1, d + 0.7), x, g + h + 0.5, z, ry);
+      top = g + h + 1.1;
+    }
+
+    plots.push({ x, z, w, d, h: bodyH, top, yaw: ry, flat: !pitched, pitched });
+
+    // A rear wing on some of the bigger blocks, which turns a rectangle into
+    // an L without any of the machinery a real footprint mesher would need.
+    if (!pitched && rng() < 0.22 && Math.min(w, d) > 15) {
+      const ww = w * (0.3 + rng() * 0.2), wd = d * (0.3 + rng() * 0.2);
+      const sx = rng() < 0.5 ? 1 : -1, sz = rng() < 0.5 ? 1 : -1;
+      const wx = x + sx * (w / 2 + ww / 2 - 1.5);
+      const wz = z + sz * (d / 2 + wd / 2 - 1.5);
+      if (!terrain.isWater(wx, wz) && !overlaps(wx, wz, ww, wd, 0.5)) {
+        const wh = bodyH * (0.6 + rng() * 0.3);
+        const wing = new THREE.BoxGeometry(ww, wh, wd);
+        scaleBoxUVs(wing, ww, wh, wd, 3.5);
+        const wg = terrain.heightAt(wx, wz);
+        push(bodies, wing, wx, wg + wh / 2, wz, ry);
+        push(roofs, new THREE.BoxGeometry(ww + 0.6, 1.0, wd + 0.6), wx, wg + wh + 0.5, wz, ry);
+        plots.push({ x: wx, z: wz, w: ww, d: wd, h: wh, top: wg + wh + 1.0,
+          yaw: ry, flat: true });
+      }
+    }
     return true;
   };
 
@@ -177,9 +247,34 @@ export function buildContext(terrain, quality) {
   group.add(buildEmbankment(terrain));
   group.add(buildStreetDetail(terrain, quality, plots, rng));
 
+  // ── The detail pass. Everything that makes the massing read as a place
+  // rather than as a diagram: street furniture on a rhythm, the parts of a
+  // building that are not the box, the river's own edge, and paint on the road.
+  const props = new PropSet(quality);
+  const detail = new THREE.Group();
+  detail.name = 'citydetail';
+  const counts = {};
+  Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
+  Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
+  Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
+  Object.assign(counts, addRiverEdge(props, terrain, rng));
+  if (quality.groundClutter) {
+    Object.assign(counts, addRoadMarkings(props, terrain, PITCH, reach, -reach));
+    Object.assign(counts, addJunctions(props, terrain, PITCH, reach, -reach, rng));
+  }
+  props.flush(detail, {
+    ...MATERIALS,
+    // Grime is a wash over the facade, not a solid: it has to read as dirt on
+    // the stone rather than as a dark panel bolted to it.
+    grime: { roughness: 0.99, cast: false, transparent: true, opacity: 0.34 },
+  });
+  group.add(detail);
+  group.userData.detail = counts;
+
   // The flat roofs, for deployment. A gun on a roof has the sightlines the
   // ground does not, which is worth the climb.
-  group.userData.roofs = plots.filter((p) => Math.min(p.w, p.d) > 15 && p.h > 8);
+  group.userData.roofs = plots.filter(
+    (p) => p.flat !== false && Math.min(p.w, p.d) > 15 && p.h > 8);
   group.userData.plots = plots;
   return group;
 }
@@ -270,7 +365,24 @@ function buildStreets(terrain, quality, pitch, reach, origin) {
     }
   };
 
-  const clear = (x, z) => !terrain.isWater(x, z);
+  // A road stops short of the river, not at it.
+  //
+  // Testing the water mask alone put carriageway right up to the waterline and,
+  // where the mask edge is coarse, a metre or two past it — so half the streets
+  // on the map ran straight into the Thames and stopped. Real streets turn away
+  // from a river or meet it at an embankment; the margin here is what leaves
+  // room for the river wall and keeps tarmac out of the water.
+  const MARGIN = 9;
+  const clear = (x, z) => {
+    if (terrain.isWater(x, z)) return false;
+    if (terrain.heightAt(x, z) < terrain.waterLevel + 0.8) return false;
+    // And not within a few metres of the bank in any direction.
+    for (let a = 0; a < 8; a++) {
+      const th = (a / 8) * Math.PI * 2;
+      if (terrain.isWater(x + Math.cos(th) * MARGIN, z + Math.sin(th) * MARGIN)) return false;
+    }
+    return true;
+  };
   const lanes = Math.ceil((reach - origin) / pitch);
   for (let k = 0; k < lanes; k++) {
     // Halfway between two rows of block centres, which is where the gap is.
@@ -339,12 +451,42 @@ function buildBridge(terrain, quality) {
   deck.receiveShadow = quality.shadowMapSize > 0;
   g.add(deck);
 
+  // ── Balustrade. A solid slab either side reads as a kerb; what makes a
+  // bridge look like a bridge from above is the *gap* between the balusters —
+  // a dotted line of shadow the whole way across.
+  const railBits = [];
   for (const sx of [-1, 1]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.5, len), trimMat);
-    rail.position.set(mid.x + Math.cos(yaw) * sx * 9.2, deckY + 1.6, mid.z - Math.sin(yaw) * sx * 9.2);
-    rail.rotation.y = yaw;
-    g.add(rail);
+    const ox = Math.cos(yaw) * sx * 9.2, oz = -Math.sin(yaw) * sx * 9.2;
+    // Base course and handrail, with posts between them.
+    const base = new THREE.BoxGeometry(0.62, 0.42, len);
+    base.rotateY(yaw); base.translate(mid.x + ox, deckY + 1.1, mid.z + oz);
+    railBits.push(base);
+    const cap = new THREE.BoxGeometry(0.8, 0.26, len);
+    cap.rotateY(yaw); cap.translate(mid.x + ox, deckY + 2.3, mid.z + oz);
+    railBits.push(cap);
+    const posts = Math.max(6, Math.round(len / 2.4));
+    for (let i = 0; i <= posts; i++) {
+      const t = i / posts - 0.5;
+      const px = mid.x + ox + Math.sin(yaw) * len * t;
+      const pz = mid.z + oz + Math.cos(yaw) * len * t;
+      const post = new THREE.BoxGeometry(0.34, 0.9, 0.34);
+      post.rotateY(yaw); post.translate(px, deckY + 1.75, pz);
+      railBits.push(post);
+      // A lamp standard every sixth post.
+      if (i % 6 === 3) {
+        const col = new THREE.CylinderGeometry(0.1, 0.15, 5.0, 6);
+        col.translate(px, deckY + 4.8, pz);
+        railBits.push(col);
+        const head = new THREE.BoxGeometry(0.6, 0.5, 0.6);
+        head.translate(px, deckY + 7.4, pz);
+        railBits.push(head);
+      }
+    }
   }
+  const rails = new THREE.Mesh(
+    BufferGeometryUtils.mergeGeometries(railBits, false), trimMat);
+  rails.castShadow = quality.shadowMapSize > 0;
+  g.add(rails);
 
   // ── Approaches. The deck sits nine metres above the water, so without these
   // the bridge simply stopped in mid-air over each bank — a ribbon of road
@@ -392,20 +534,68 @@ function buildBridge(terrain, quality) {
     }
   }
 
-  // Piers down to the riverbed.
+  // Piers down to the riverbed, with cutwaters and the arches between them.
   const pierMat = pierMatShared();
-  for (let i = 1; i < 6; i++) {
-    const t = i / 6;
+  const spanBits = [];
+  const piers = 5;
+  const pierAt = [];
+  for (let i = 1; i <= piers; i++) {
+    const t = i / (piers + 1);
     const p = from.clone().lerp(to, t);
     const bed = terrain.heightAt(p.x, p.z);
     const h = deckY - bed;
     if (h <= 0.5) continue;
-    const pier = new THREE.Mesh(new THREE.BoxGeometry(7, h, 15), pierMat);
-    pier.position.set(p.x, bed + h / 2, p.z);
-    pier.rotation.y = yaw;
-    pier.castShadow = quality.shadowMapSize > 0;
-    g.add(pier);
+    pierAt.push({ p, bed, h, t });
+    const pier = new THREE.BoxGeometry(7, h, 15);
+    pier.rotateY(yaw); pier.translate(p.x, bed + h / 2, p.z);
+    spanBits.push(pier);
+    // Cutwater: a wedge on each face, so the pier parts the water rather than
+    // sitting in it like a post.
+    for (const sgn of [-1, 1]) {
+      const nose = new THREE.CylinderGeometry(3.5, 3.5, h, 3);
+      nose.rotateY(yaw + Math.PI / 2);
+      nose.translate(p.x + Math.cos(yaw) * 0, bed + h / 2,
+        p.z + 0);
+      nose.translate(Math.sin(yaw + Math.PI / 2) * 0, 0, 0);
+      const off = 7.5 * sgn;
+      nose.translate(Math.sin(yaw) * off, 0, Math.cos(yaw) * off);
+      spanBits.push(nose);
+    }
   }
+
+  // ── Arches. Stepped voussoirs springing between the piers: a stack of boxes
+  // whose width follows a circular profile. Cheap, and from any angle that can
+  // see under the deck it is the difference between a bridge and a plank.
+  const ends = [{ t: 0 }, ...pierAt.map((q) => ({ t: q.t })), { t: 1 }];
+  for (let i = 0; i < ends.length - 1; i++) {
+    const t0 = ends[i].t, t1 = ends[i + 1].t;
+    const a = from.clone().lerp(to, t0);
+    const bmid = from.clone().lerp(to, t1);
+    const sLen = a.distanceTo(bmid);
+    if (sLen < 6) continue;
+    const c = a.clone().lerp(bmid, 0.5);
+    const springY = deckY - 1.6;
+    const rise = Math.min(sLen * 0.34, 7.5);
+    const steps = 9;
+    for (let k = 0; k < steps; k++) {
+      const u = (k + 0.5) / steps;             // 0..1 across the arch
+      const dy = Math.sin(u * Math.PI) * rise; // circular-ish profile
+      const segW = (sLen / steps) + 0.4;
+      const px2 = c.x + Math.sin(yaw) * (u - 0.5) * sLen;
+      const pz2 = c.z + Math.cos(yaw) * (u - 0.5) * sLen;
+      // The spandrel above the arch line, filling up to the deck.
+      const fillH = Math.max(0.4, (deckY - 1.8) - (springY - rise + dy));
+      const seg = new THREE.BoxGeometry(15.4, fillH, segW);
+      seg.rotateY(yaw);
+      seg.translate(px2, (springY - rise + dy) + fillH / 2, pz2);
+      spanBits.push(seg);
+    }
+  }
+  const spans = new THREE.Mesh(
+    BufferGeometryUtils.mergeGeometries(spanBits, false), pierMat);
+  spans.castShadow = quality.shadowMapSize > 0;
+  spans.receiveShadow = quality.shadowMapSize > 0;
+  g.add(spans);
   return g;
 }
 
