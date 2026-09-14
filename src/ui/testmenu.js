@@ -768,6 +768,31 @@ export class TestMenu {
   tests() {
     const c = this.ctx, b = c.battle;
     return [
+      ['a structure stands as built, with nothing loose', () => {
+        // The build-time invariant. Grouting guarantees every stone is
+        // connected to the ground through the adjacency graph, but the solver
+        // walks *bearing* — held up only by something underneath — which is a
+        // strictly harder test, so a stone could be perfectly well grouted and
+        // still condemned on the first frame. Six hundred and twenty-seven
+        // stones of the Palace Wing were, one course of them at nine metres.
+        // Harmless while detaching a collider did not work; the moment that was
+        // fixed they became six hundred loose bodies starting the match
+        // interpenetrating their neighbours, and the solver resolves that by
+        // flinging them. Bricks spraying off the building on load.
+        const bad = [];
+        for (const st of c.structures) {
+          let loose = 0;
+          for (let i = 0; i < st.count; i++) {
+            if (!(st.flags[i] & 1)) continue;
+            if (st.flags[i] & 10) loose++;
+          }
+          if (loose > 0) bad.push(`${st.key}: ${loose} stones start detached`);
+        }
+        assert(bad.length === 0, bad.join('; '));
+        const grout = c.structures.map((st) => `${st.key} +${st.bearingGrout || 0}`);
+        return `nothing loose (bearing grout: ${grout.join(', ')})`;
+      }],
+
       // First, deliberately. This is a claim about a *pristine* structure —
       // that a building the solver has just assembled does not sag, slump or
       // shed anything when left alone. Run it after the tests that put real
@@ -1328,6 +1353,58 @@ export class TestMenu {
           + '— the street grid is out of phase with the block grid');
         return `${Math.round(tris)} triangles, ${(frac * 100).toFixed(1)}% under buildings`;
       }],
+
+
+      ['a severed section cannot hang in the air', () => this._calm(() => {
+        // Cut a building clean through and everything above the cut must come
+        // down. It used to stay up: the "is this section resting on anything"
+        // test counted reachable stone anywhere in the three bands below, so a
+        // tower cut through on one side reported itself as resting because the
+        // *other* side of the building was still standing at that height. The
+        // section then got the lean treatment rather than being released, and
+        // hung over the gap at seven degrees with nothing underneath it.
+        //
+        // Run against a secondary structure where there is one, so the primary
+        // survives for the collapse test below.
+        const st = c.structures.find((x) => x !== b.primary) || b.primary;
+        const gy = b.originGround;
+        let lo = Infinity, hi = -Infinity;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+          lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
+        }
+        assert(isFinite(lo) && hi - lo > 8,
+          `${st.key} is too short to sever meaningfully`);
+
+        // A narrow cut is enough: what is under test is whether the section
+        // above a clean break is left hanging, not how much masonry the engine
+        // can chew through in one tick.
+        const cut = lo + (hi - lo) * 0.55;
+        const band = Math.max(1.2, (hi - lo) * 0.045);
+        let removed = 0;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+          if (Math.abs(st.py[i] - cut) > band) continue;
+          st.destroyChunk(i); removed++;
+        }
+        st.stabilityDirty = true;
+        assert(removed > 20, `the cut only removed ${removed} stones`);
+        c.fastForward(3.0);
+
+        let stillFixed = 0, topFixed = -Infinity;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1)) continue;
+          if (st.py[i] < cut + 2.5) continue;         // below the cut is fine
+          if (st.flags[i] & 10) continue;             // free or islanded: falling
+          if (st.lean && st.bandOf[i] >= st.lean.band) continue;   // leaning
+          stillFixed++;
+          topFixed = Math.max(topFixed, st.py[i] - gy);
+        }
+        assert(stillFixed === 0,
+          `${stillFixed} stones are still standing above a clean cut through `
+          + `${st.key}, the highest ${topFixed.toFixed(0)} m up`);
+        return `cut ${st.key} through with ${removed} stones; nothing left hanging`;
+      })],
 
       // ── Destructive: leaves the level a pile of rubble, so it runs last.
       // Everything above needs a building to be standing in front of it.

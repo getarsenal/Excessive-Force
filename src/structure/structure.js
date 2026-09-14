@@ -212,6 +212,7 @@ export class Structure {
 
     this._buildAdjacency();
     this._groutOrphans();
+    this._groutBearing();
     this._buildStaticBody();
     this._buildMeshes();
 
@@ -883,6 +884,145 @@ export class Structure {
 
     this.groutedEdges = extra.size;
     this.culledStones = culled;
+  }
+
+  /**
+   * Make the building stand *by the rules the solver actually uses*.
+   *
+   * `_groutOrphans` guarantees every stone is connected to the ground through
+   * the adjacency graph. The support solver does not use the adjacency graph:
+   * it walks *bearing* — a stone is held up only by something underneath it —
+   * and then relaxes a limited amount of sideways spanning over the top. That
+   * is a strictly harder test, so a stone can be perfectly well grouted and
+   * still have nothing beneath it, and the solver condemns it on the first
+   * frame of the game.
+   *
+   * Which is exactly what was happening: six hundred and twenty-seven stones
+   * of the Palace Wing, one course of them at nine and a half metres, were
+   * declared unsupported before a shot was fired. They were harmless while
+   * detaching a collider did not work — they were freed, but the physics never
+   * noticed — and the moment that was fixed they became six hundred loose
+   * bodies starting the match interpenetrating their neighbours, which the
+   * solver resolves by flinging them. Bricks spraying off the building on
+   * load.
+   *
+   * So: run the solver's own reachability here, at build time, and give
+   * anything it cannot reach a bearing edge to the nearest masonry below it.
+   * Real buildings solve this with a corbel, a relieving arch or a bit of
+   * bedding mortar; the effect is the same. If a stone has nothing below it
+   * within reach at all, it was never part of the building and `_groutOrphans`
+   * has already removed it.
+   *
+   * The invariant this establishes — *a structure stands when it is built* —
+   * is worth having as a build step rather than as something each landmark
+   * author has to get right by hand.
+   */
+  _groutBearing() {
+    const n = this.count;
+    const byHeight = this.heightOrder;
+    const reach = new Uint8Array(n);
+
+    // The solver's bearing walk, lowest stone first.
+    const below = new Array(n);
+    for (let i = 0; i < n; i++) {
+      below[i] = [];
+      for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
+        below[i].push(this.belowList[a]);
+      }
+    }
+    const flood = () => {
+      reach.fill(0);
+      for (let k = n - 1; k >= 0; k--) {
+        const i = byHeight[k];
+        if (!(this.flags[i] & ALIVE)) continue;
+        if (this.flags[i] & GROUNDED) { reach[i] = 1; continue; }
+        for (const j of below[i]) if (reach[j]) { reach[i] = 1; break; }
+      }
+    };
+
+    let added = 0;
+    for (let pass = 0; pass < 6; pass++) {
+      flood();
+      const stranded = [];
+      for (let i = 0; i < n; i++) {
+        if ((this.flags[i] & ALIVE) && !reach[i]) stranded.push(i);
+      }
+      if (!stranded.length) break;
+
+      // The window widens with each pass. A finely modelled dome or a chattri
+      // has ornament sitting a long way clear of anything below it, and a
+      // window tight enough to be honest about a wall is too tight for those.
+      const maxDrop = 3.0 + pass * 1.2;
+      const maxSide = 2.2 + pass * 0.9;
+      let joined = 0;
+      for (const i of stranded) {
+        const bot = this.py[i] - this.hy[i];
+        let best = -1, bestD = Infinity;
+        for (let j = 0; j < n; j++) {
+          if (j === i || !(this.flags[j] & ALIVE)) continue;
+          const top = this.py[j] + this.hy[j];
+          const drop = bot - top;
+          if (drop < -0.6 || drop > maxDrop) continue;      // not underneath
+          const dx = Math.abs(this.px[j] - this.px[i]) - this._aabbX[i] - this._aabbX[j];
+          const dz = Math.abs(this.pz[j] - this.pz[i]) - this._aabbZ[i] - this._aabbZ[j];
+          if (dx > maxSide || dz > maxSide) continue;
+          // Prefer something already standing, then the closest.
+          const d = Math.max(0, dx) + Math.max(0, dz) + Math.max(0, drop)
+            + (reach[j] ? 0 : 6);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        if (best >= 0) { below[i].push(best); added++; joined++; }
+      }
+      if (!joined) break;
+    }
+
+    // Anything the widest search still cannot find a floor for has nothing
+    // under it at all, at any distance — it was never part of the building, in
+    // the same sense `_groutOrphans` means when it culls a stone nothing at all
+    // is touching. Removing it is better than shipping a building that sheds it
+    // on the first frame.
+    flood();
+    let culled = 0;
+    for (let i = 0; i < n; i++) {
+      if ((this.flags[i] & ALIVE) && !reach[i]) { this.flags[i] &= ~ALIVE; culled++; }
+    }
+    this.bearingCulled = culled;
+    if (!added) { this.bearingGrout = 0; return; }
+
+    // Fold the new bearing edges back into both graphs. They have to reach the
+    // adjacency list too, or spanning and island connectivity disagree with
+    // what the support pass now believes.
+    let belowEdges = 0;
+    for (let i = 0; i < n; i++) belowEdges += below[i].length;
+    this.belowStart = new Int32Array(n + 1);
+    this.belowList = new Int32Array(belowEdges);
+    let cursor = 0;
+    for (let i = 0; i < n; i++) {
+      this.belowStart[i] = cursor;
+      for (const j of below[i]) this.belowList[cursor++] = j;
+    }
+    this.belowStart[n] = cursor;
+
+    const adj = new Array(n);
+    let adjEdges = 0;
+    for (let i = 0; i < n; i++) {
+      const seen = new Set();
+      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) seen.add(this.adjList[a]);
+      for (const j of below[i]) seen.add(j);
+      seen.delete(i);
+      adj[i] = [...seen];
+      adjEdges += adj[i].length;
+    }
+    // Symmetric: a stone that bears on another is a neighbour of it.
+    this.adjStart = new Int32Array(n + 1);
+    this.adjList = new Int32Array(adjEdges);
+    cursor = 0;
+    for (let i = 0; i < n; i++) {
+      this.adjStart[i] = cursor;
+      for (const j of adj[i]) this.adjList[cursor++] = j;
+    }
+    this.adjStart[n] = cursor;
+    this.bearingGrout = added;
   }
 
   _buildStaticBody() {
@@ -2133,10 +2273,37 @@ export class Structure {
     // The ground itself counts: a section whose feet are at grade is resting on
     // the earth, not falling toward it.
     if (lowBand <= 1) return 8;
+
+    // Otherwise: is there masonry under *this section's own footprint*?
+    //
+    // This used to count every reachable stone in the three bands below,
+    // anywhere in the structure — so a tower cut clean through on one side
+    // reported itself as resting, because the *other* side of the building was
+    // still standing at that height. The section then got the lean treatment
+    // instead of being released, and hung in the air above the gap, held up by
+    // a hinge with nothing under it. Which is precisely the severed tower left
+    // floating at seven degrees.
+    //
+    // Support is a question about a place, not about a height.
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const i of group) {
+      if (this.bandOf[i] > lowBand + 1) continue;      // the section's feet
+      minX = Math.min(minX, this.px[i] - this._aabbX[i]);
+      maxX = Math.max(maxX, this.px[i] + this._aabbX[i]);
+      minZ = Math.min(minZ, this.pz[i] - this._aabbZ[i]);
+      maxZ = Math.max(maxZ, this.pz[i] + this._aabbZ[i]);
+    }
+    if (!isFinite(minX)) return 0;
+    // A little slack, because a stone half a metre proud of the footprint is
+    // still something the section would come down on.
+    const PAD = 1.2;
     for (let b = Math.max(0, lowBand - 3); b < lowBand; b++) {
       for (let k = this.bandStart[b]; k < this.bandStart[b + 1]; k++) {
         const j = this.bandList[k];
-        if (reach[j] && this.structural[j]) n++;
+        if (!reach[j] || !this.structural[j]) continue;
+        if (this.px[j] < minX - PAD || this.px[j] > maxX + PAD) continue;
+        if (this.pz[j] < minZ - PAD || this.pz[j] > maxZ + PAD) continue;
+        n++;
       }
     }
     return n >= 8 ? n : 0;
