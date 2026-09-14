@@ -1092,7 +1092,11 @@ export class Structure {
     for (let i = 0; i < this.count; i++) {
       if (!(this.flags[i] & FREE)) continue;
       const body = this.bodyOf[i];
-      if (!body || body.isSleeping()) continue;
+      // `alive` as well as null: a free stone's body can be removed out from
+      // under its flag (a runaway culled, a chunk destroyed mid-frame), and
+      // asking a removed body whether it is sleeping traps in wasm — which
+      // leaves the world borrowed and ends the simulation, not just the frame.
+      if (!PhysicsWorld.alive(body) || body.isSleeping()) continue;
       const t = body.translation();
       const r = body.rotation();
       this.px[i] = t.x; this.py[i] = t.y; this.pz[i] = t.z;
@@ -1339,8 +1343,17 @@ export class Structure {
   freeChunk(i, impulse) {
     if (!(this.flags[i] & ALIVE)) return false;
     if (this.flags[i] & FREE) {
-      if (impulse) this.bodyOf[i].applyImpulse(impulse, true);
-      return true;
+      const have = this.bodyOf[i];
+      if (!PhysicsWorld.alive(have)) {
+        // Flagged free with no body behind it: the body went and the flag did
+        // not. Clear it and fall through to build a fresh one rather than
+        // reaching into a corpse.
+        this.flags[i] &= ~FREE;
+        this.bodyOf[i] = null;
+      } else {
+        if (impulse) have.applyImpulse(impulse, true);
+        return true;
+      }
     }
     if (this.physics.dynamicSet.size >= this.physics.activeBudget) return false;
 
@@ -1555,6 +1568,9 @@ export class Structure {
     // solver condemns it and one that sags into its crater, leans, and then
     // makes up its mind.
     let leanBand = -1, leanRatio = 0;
+    // Groups handed to the lean instead of being released. If no lean actually
+    // arms, they have to be let go — see below.
+    const deferred = [];
     for (const group of this._connectedGroups(detached)) {
       let groupMass = 0;
       for (const i of group) groupMass += this.mass[i];
@@ -1573,6 +1589,7 @@ export class Structure {
         for (const i of group) lowest = Math.min(lowest, this.bandOf[i]);
         if (leanBand < 0 || lowest < leanBand) leanBand = lowest;
         leanRatio = Math.max(leanRatio, NO_EQUILIBRIUM * 0.9);
+        deferred.push(group);
       } else {
         this._releaseGroup(group);
       }
@@ -1643,6 +1660,21 @@ export class Structure {
     // through it. Falling is the right answer eventually — but only after it
     // has visibly gone over, and by then it is falling through air.
     if (leanBand > 0) this._armLean(leanBand, leanRatio, loadMask, reach);
+
+    // Nothing may be deferred to a lean that never comes.
+    //
+    // A group that has lost its bearing is handed to the lean rather than
+    // released, on the understanding that the lean will carry it. But
+    // `_armLean` refuses for perfectly good reasons — the slice has already
+    // let go once and cannot lean again, the mass above it is too small to be
+    // worth tilting, the bearing has no area left — and when it refuses,
+    // nobody released the group either. Those stones then sit exactly where
+    // they were: alive, unsupported, and still fixed bodies, which is masonry
+    // hanging motionless in the air over a demolished building. Measured at
+    // its worst: a thousand stones, the highest eighty-six metres up.
+    if (deferred.length && !this.lean) {
+      for (const group of deferred) this._releaseGroup(group);
+    }
 
     this.lastStressRatio = bearing2.ratio;
     this.lastStressBand = bearing2.band;
@@ -2030,7 +2062,10 @@ export class Structure {
       const h = this.colliderOf[i];
       if (h < 0) continue;
       const col = this.physics.world.getCollider(h);
-      if (!col) continue;
+      // Handles are reused, so a stale one can resolve to a live collider that
+      // belongs to something else entirely — and moving that is how one stone's
+      // lean teleports another stone across the map.
+      if (!col || col.handle !== h) continue;
       this._leanPosition(i, v);
       const half = this.ry[i] * 0.5;
       own.set(0, Math.sin(half), 0, Math.cos(half));
