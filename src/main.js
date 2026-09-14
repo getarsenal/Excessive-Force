@@ -364,6 +364,7 @@ async function boot() {
     for (let i = 0; i < steps; i++) {
       physics.step(step);
       physics.recycleSettled(quality.settleFrames);
+      physics.auditFrozen();
       physics.cullRunaways(terrain.span * 1.6);
       for (const s of structures) {
         s.solveStability(); s.maintainIslands(step); s.tickLean(step); s.syncTransforms();
@@ -410,6 +411,7 @@ async function boot() {
     physics.setBudget(governor.update(dtMs));
     physics.step(dt);
     physics.recycleSettled(quality.settleFrames);
+    physics.auditFrozen();
     physics.cullRunaways(terrain.span * 1.6);
     for (const s of structures) { s.solveStability(); s.maintainIslands(dt); s.tickLean(dt); }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;

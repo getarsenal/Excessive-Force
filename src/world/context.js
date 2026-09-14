@@ -20,7 +20,9 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, addStreetFurniture, addBuildingDetail,
-  addRiverEdge, addRoadMarkings, addJunctions, addRoofAndFrontage } from './detail.js';
+  addRiverEdge, addRoofAndFrontage } from './detail.js';
+import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
+  addNetworkFurniture, halfWidth } from './streets.js';
 
 export function buildContext(terrain, quality) {
   const group = new THREE.Group();
@@ -43,18 +45,128 @@ export function buildContext(terrain, quality) {
    */
   const plots = [];
 
+  const reach = terrain.span * 0.94;
+  const dense = quality.groundClutter ? 1.0 : 0.55;
+  const EXCLUDE = 80;                     // the landmark's own precinct
+
+  // ── The bridge comes first, because the street network has to know where it
+  // lands: a crossing with no road to it is the thing that made the old layout
+  // read as scenery rather than as a place.
+  const bridge = bridgeLine(terrain);
+
+  /**
+   * The civic set, placed by hand from the real map — Parliament Square, the
+   * abbey, the government blocks. These are reserved before the network is
+   * laid, so the streets grow *around* them the way they do in a real city.
+   */
+  const CIVIC = [
+    { x: -88, z: 6, w: 46, d: 34, h: 26 },
+    { x: -92, z: -52, w: 40, d: 40, h: 22 },
+    { x: -150, z: 30, w: 54, d: 44, h: 30 },
+    { x: -58, z: 96, w: 38, d: 52, h: 24 },
+    { x: -140, z: -70, w: 48, d: 36, h: 28 },
+    { x: -196, z: -20, w: 44, d: 58, h: 26 },
+    // Westminster Abbey stand-in: a long nave with towers at the west front.
+    { x: -128, z: 118, w: 30, d: 86, h: 26 },
+    { x: -128, z: 78, w: 42, d: 22, h: 34 },
+    { x: -143, z: 72, w: 12, d: 12, h: 52 },
+    { x: -113, z: 72, w: 12, d: 12, h: 52 },
+    // Portcullis House and the northern blocks.
+    { x: -14, z: -104, w: 62, d: 44, h: 30 },
+    { x: -96, z: -128, w: 52, d: 40, h: 26 },
+  ];
+
+  const net = buildStreetNetwork(terrain, rng, {
+    pitch: 104, reach, exclude: EXCLUDE, bridge, reserved: CIVIC,
+  });
+
+  // ── Where a building may and may not go.
+  //
+  // Three separate mistakes used to be visible from the opening camera: houses
+  // standing in the carriageway, houses hanging over the water on the outside
+  // of the river bank, and a row of houses sitting across the end of the
+  // bridge. All three are the same failure — placing a box and only asking
+  // about the single point at its centre — so all three are answered the same
+  // way, by testing the whole footprint.
+
+  /** The four corners and four edge midpoints of a rotated footprint. */
+  const footprintPoints = (x, z, w, d, ry) => {
+    const ca = Math.cos(ry), sa = Math.sin(ry);
+    const pts = [];
+    for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1],
+      [0, -1], [0, 1], [-1, 0], [1, 0], [0, 0]]) {
+      const lx = u * w / 2, lz = v * d / 2;
+      pts.push({ x: x + lx * ca + lz * sa, z: z - lx * sa + lz * ca });
+    }
+    return pts;
+  };
+
+  /** Dry, well clear of the waterline, all the way round. */
+  const onDryLand = (pts) => {
+    for (const p of pts) {
+      if (terrain.isWater(p.x, p.z)) return false;
+      if (terrain.heightAt(p.x, p.z) < terrain.waterLevel + 1.6) return false;
+      // And a margin outside the footprint, so nothing overhangs the bank.
+      for (let a = 0; a < 4; a++) {
+        const th = (a / 4) * Math.PI * 2;
+        if (terrain.isWater(p.x + Math.cos(th) * 4.5, p.z + Math.sin(th) * 4.5)) return false;
+      }
+    }
+    return true;
+  };
+
+  /** Clear of the carriageway, the pavement and the junction paving. */
+  const offStreet = (pts) => {
+    for (const p of pts) {
+      if (net.roadClearance(p.x, p.z) < 1.0) return false;
+      if (net.nodeClearance(p.x, p.z) < 1.0) return false;
+    }
+    return true;
+  };
+
+  /** Clear of the bridge and of the ramps at either end of it. */
+  const offBridge = (pts) => {
+    if (!bridge) return true;
+    for (const p of pts) {
+      if (distToSegment(p.x, p.z, bridge.far.a, bridge.far.b) < 17) return false;
+    }
+    return true;
+  };
+
   /**
    * Would this footprint land on one already placed?
    *
-   * Axis-aligned and generous, because the point is not to pack the city
-   * tightly — it is that two buildings sharing the same volume read as one
-   * malformed lump with facades running through each other, which is exactly
-   * what the skyline used to look like up close.
+   * A proper oriented-box test, not the bounding boxes. Buildings now face the
+   * street they were set back from, so a terrace of houses along a road at
+   * forty degrees is a row of forty-degree rectangles — and the axis-aligned
+   * box round one of those is nearly half again as large as the building,
+   * which made every second house in the row reject its neighbour. The
+   * separating-axis test is a dozen lines and lets a terrace sit nose to tail
+   * the way a terrace should.
    */
-  const overlaps = (x, z, w, d, gap = 2.0) => {
+  const overlaps = (x, z, w, d, ry, gap = 1.2) => {
+    const ca = Math.cos(ry), sa = Math.sin(ry);
+    // Local axes of the candidate, in world space.
+    const ux = { x: ca, z: -sa }, uz = { x: sa, z: ca };
+    const hw = w / 2 + gap / 2, hd = d / 2 + gap / 2;
     for (const p of plots) {
-      if (Math.abs(p.x - x) < (p.w + w) / 2 + gap
-          && Math.abs(p.z - z) < (p.d + d) / 2 + gap) return true;
+      // Cheap reject first: the circumscribed circles.
+      const dx = p.x - x, dz = p.z - z;
+      const rr = Math.hypot(hw, hd) + Math.hypot(p.w, p.d) / 2;
+      if (dx * dx + dz * dz > rr * rr) continue;
+      const pca = Math.cos(p.yaw || 0), psa = Math.sin(p.yaw || 0);
+      const pux = { x: pca, z: -psa }, puz = { x: psa, z: pca };
+      const phw = p.w / 2, phd = p.d / 2;
+      let separated = false;
+      for (const axis of [ux, uz, pux, puz]) {
+        const dist = Math.abs(dx * axis.x + dz * axis.z);
+        const ra = hw * Math.abs(ux.x * axis.x + ux.z * axis.z)
+          + hd * Math.abs(uz.x * axis.x + uz.z * axis.z);
+        const rb = phw * Math.abs(pux.x * axis.x + pux.z * axis.z)
+          + phd * Math.abs(puz.x * axis.x + puz.z * axis.z);
+        if (dist > ra + rb) { separated = true; break; }
+      }
+      if (!separated) return true;
     }
     return false;
   };
@@ -76,12 +188,17 @@ export function buildContext(terrain, quality) {
    * Only flat-roofed plots are offered to the player for deployment, so the
    * roof style has to be recorded rather than inferred.
    */
-  const block = (x, z, w, d, h, ry = 0) => {
-    if (terrain.isWater(x, z)) return false;
-    if (overlaps(x, z, w, d)) return false;
+  const rejects = { water: 0, street: 0, bridge: 0, overlap: 0, placed: 0 };
+  const block = (x, z, w, d, h, ry = 0, opts = {}) => {
+    const pts = footprintPoints(x, z, w, d, ry);
+    if (!onDryLand(pts)) { rejects.water++; return false; }
+    if (!offStreet(pts)) { rejects.street++; return false; }
+    if (!offBridge(pts)) { rejects.bridge++; return false; }
+    if (overlaps(x, z, w, d, ry)) { rejects.overlap++; return false; }
+    rejects.placed++;
     const g = terrain.heightAt(x, z);
     const roll = rng();
-    const pitched = roll < 0.42 && Math.min(w, d) < 26;
+    const pitched = roll < (opts.pitchChance ?? 0.42) && Math.min(w, d) < 26;
     const setback = !pitched && roll > 0.82 && h > 20 && Math.min(w, d) > 14;
 
     const bodyH = setback ? h * 0.72 : h;
@@ -120,100 +237,111 @@ export function buildContext(terrain, quality) {
       top = g + h + 1.1;
     }
 
-    plots.push({ x, z, w, d, h: bodyH, top, yaw: ry, flat: !pitched, pitched });
-
-    // A rear wing on some of the bigger blocks, which turns a rectangle into
-    // an L without any of the machinery a real footprint mesher would need.
-    if (!pitched && rng() < 0.22 && Math.min(w, d) > 15) {
-      const ww = w * (0.3 + rng() * 0.2), wd = d * (0.3 + rng() * 0.2);
-      const sx = rng() < 0.5 ? 1 : -1, sz = rng() < 0.5 ? 1 : -1;
-      const wx = x + sx * (w / 2 + ww / 2 - 1.5);
-      const wz = z + sz * (d / 2 + wd / 2 - 1.5);
-      if (!terrain.isWater(wx, wz) && !overlaps(wx, wz, ww, wd, 0.5)) {
-        const wh = bodyH * (0.6 + rng() * 0.3);
-        const wing = new THREE.BoxGeometry(ww, wh, wd);
-        scaleBoxUVs(wing, ww, wh, wd, 3.5);
-        const wg = terrain.heightAt(wx, wz);
-        push(bodies, wing, wx, wg + wh / 2, wz, ry);
-        push(roofs, new THREE.BoxGeometry(ww + 0.6, 1.0, wd + 0.6), wx, wg + wh + 0.5, wz, ry);
-        plots.push({ x: wx, z: wz, w: ww, d: wd, h: wh, top: wg + wh + 1.0,
-          yaw: ry, flat: true });
-      }
-    }
+    const ca = Math.abs(Math.cos(ry)), sa = Math.abs(Math.sin(ry));
+    plots.push({ x, z, w, d, h: bodyH, top, yaw: ry, flat: !pitched, pitched,
+      ax: w * ca + d * sa, az: w * sa + d * ca,
+      front: opts.front || null });
     return true;
   };
 
-  // ── Parliament Square and the government blocks west of the tower.
-  const west = [
-    [-88, 6, 46, 34, 26], [-92, -52, 40, 40, 22], [-150, 30, 54, 44, 30],
-    [-58, 96, 38, 52, 24], [-140, -70, 48, 36, 28], [-196, -20, 44, 58, 26],
-  ];
-  for (const [x, z, w, d, h] of west) block(x, z, w, d, h);
+  // ── The civic set, on its reserved ground.
+  // Subject to the same road test as everything else: the reserved footprints
+  // keep the ordinary streets off them, but the bridge approach outranks them,
+  // and a government office standing in the carriageway is still a government
+  // office standing in the carriageway.
+  for (const c of CIVIC) block(c.x, c.z, c.w, c.d, c.h, 0, { pitchChance: 0.1 });
 
-  // Westminster Abbey stand-in: a long nave with towers at the west front.
-  block(-128, 118, 30, 86, 26);
-  block(-128, 78, 42, 22, 34);
-  for (const sx of [-1, 1]) block(-128 + sx * 15, 72, 12, 12, 52);
-
-  // ── Portcullis House / the northern blocks.
-  block(-14, -104, 62, 44, 30);
-  block(-96, -128, 52, 40, 26);
-
-  // ── Across the river: the South Bank. Placed beyond the far bank so the
-  // river always has a built edge on both sides.
-  for (let i = 0; i < 14; i++) {
-    const t = i / 13;
-    const x = 340 + rng() * 120;
-    const z = -560 + t * 1180 + rng() * 40;
-    block(x, z, 34 + rng() * 34, 30 + rng() * 36, 20 + rng() * 34);
-  }
-
-  // ── The rest of the city, laid out as blocks and streets.
+  // ── The blocks the street network leaves behind.
   //
-  // The previous filler was ninety boxes scattered on a circle, which from the
-  // bird's-eye camera left the entire map outside the landmark's plot as bare
-  // ground — the single biggest reason the level read as a diorama on a lawn
-  // rather than as a place. A city seen from above is mostly *streets*: what
-  // the eye reads is the grid, not the individual buildings.
-  //
-  // So: a grid of blocks on a real Georgian pitch, each ringed with terraces
-  // around a courtyard, skipping water, parks and the landmark's own plot. It
-  // costs nothing at runtime — every box lands in the same merged mesh.
-  const PITCH = 86;          // block centre to block centre
-  const BLOCK = 68;          // built footprint within it; the rest is street
-  const reach = terrain.span * 0.94;
-  const dense = quality.groundClutter ? 1.0 : 0.55;
-  for (let bx = -reach; bx <= reach; bx += PITCH) {
-    for (let bz = -reach; bz <= reach; bz += PITCH) {
-      const jx = bx + (rng() - 0.5) * 9;
-      const jz = bz + (rng() - 0.5) * 9;
-      const r = Math.hypot(jx, jz);
-      if (r < 96) continue;                        // the landmark's own plot
-      if (terrain.isWater(jx, jz)) continue;
-      const m = terrain.maskAt(jx, jz);
-      if (m.park > 0.42) continue;                 // leave the parks open
-      // Thin with distance, so the near blocks are solid and the far ones
-      // break up before the fog takes them.
-      if (rng() > dense * (1 - Math.min(0.55, r / (terrain.span * 2.2)))) continue;
+  // This is the part that used to be guesswork. Buildings were laid on their
+  // own grid and streets on another, and where the two drifted out of phase a
+  // terrace ended up standing in the road. Now the block *is* the hole in the
+  // network: its sides are the streets that bound it, and every building is
+  // set back from one of those sides by a real distance, facing it.
+  let terraces = 0, squares = 0;
+  for (const b of net.blocks) {
+    const r = Math.hypot(b.x, b.z);
+    if (r < EXCLUDE) continue;
+    const m = terrain.maskAt(b.x, b.z);
+    // Parks stay open, and so does the odd block in town — a city needs
+    // squares, and a square is what the eye rests on between the terraces.
+    if (m.park > 0.40 || rng() < 0.055) { squares++; b.open = true; continue; }
+    // Thin with distance, so the near blocks are solid and the far ones break
+    // up before the fog takes them. Nothing thins inside the middle of town:
+    // that is the part the camera actually lives over.
+    const far = Math.max(0, (r - terrain.span * 0.45) / (terrain.span * 1.1));
+    if (rng() > dense * (1 - Math.min(0.45, far))) {
+      b.open = true; squares++; continue;
+    }
 
-      // Terraces around the block's edge, each side one run with a gap.
-      const h0 = 11 + rng() * 20;
-      const depth = 13 + rng() * 5;
-      const half = BLOCK / 2;
-      const yaw = (rng() - 0.5) * 0.12;
-      for (const [dx, dz, along] of [[0, 1, 'x'], [0, -1, 'x'], [1, 0, 'z'], [-1, 0, 'z']]) {
-        if (rng() < 0.16) continue;                // a gap onto the courtyard
-        const runs = 1 + (rng() < 0.45 ? 1 : 0);
-        for (let k = 0; k < runs; k++) {
-          const span = (BLOCK - 6) / runs;
-          const off = -half + 3 + span * (k + 0.5);
-          const cx = jx + dx * (half - depth / 2) + (along === 'x' ? off : 0);
-          const cz = jz + dz * (half - depth / 2) + (along === 'z' ? off : 0);
-          const w = along === 'x' ? span - 2 : depth;
-          const d = along === 'x' ? depth : span - 2;
-          block(cx, cz, w, d, h0 * (0.8 + rng() * 0.45), yaw);
+    // District character: taller in the middle of town, lower out at the edges,
+    // with a slow drift across the map so neighbourhoods differ.
+    const drift = valueNoise(b.x * 0.0026 + 5.1, b.z * 0.0026 - 2.3);
+    const baseH = (10 + 20 * (1 - Math.min(1, r / (terrain.span * 0.8)))) * (0.7 + drift * 0.9);
+    const depth = 13 + rng() * 7;
+
+    for (let s = 0; s < 4; s++) {
+      const p = b.poly[s], q = b.poly[(s + 1) % 4];
+      const dx = q.x - p.x, dz = q.z - p.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 24) continue;
+      const dir = { x: dx / len, z: dz / len };
+      // Inward normal: the one that points at the middle of the block.
+      let nx = -dir.z, nz = dir.x;
+      if ((b.x - p.x) * nx + (b.z - p.z) * nz < 0) { nx = -nx; nz = -nz; }
+      // Keep off the corners, where the next street's own frontage runs.
+      const t0 = halfWidth(b.sides[(s + 3) % 4]) + 4;
+      const t1 = len - halfWidth(b.sides[(s + 1) % 4]) - 4;
+      const yaw = Math.atan2(dir.x, dir.z);
+      const front = (c, off) => ({
+        x: p.x + dir.x * c + nx * off, z: p.z + dir.z * c + nz * off,
+      });
+
+      let t = t0;
+      while (t < t1 - 9) {
+        const run = Math.min(t1 - t, 9 + rng() * 15);
+        if (run < 8.5) break;
+        if (rng() < 0.12) { t += run + 2; continue; }   // a way through to the yard
+        const c = t + run / 2;
+
+        // Set back from the *road*, not from the block's nominal edge.
+        //
+        // The two are not the same: streets are bowed, and a street that bows
+        // into this block eats several metres of it. Measuring the setback off
+        // the straight line between the junctions is how a terrace ends up
+        // standing in the carriageway — so walk the frontage outward until the
+        // whole of it is genuinely clear of the paving, and give up on this
+        // run if the street has taken the ground.
+        let off = halfWidth(b.sides[s]) + 2.4 + rng() * 2.0;
+        let clear = -Infinity;
+        for (let k = 0; k < 5; k++) {
+          clear = Infinity;
+          for (const u of [-run / 2 + 1, 0, run / 2 - 1]) {
+            const f = front(c + u, off);
+            clear = Math.min(clear, net.roadClearance(f.x, f.z), net.nodeClearance(f.x, f.z));
+          }
+          if (clear >= 2.0) break;
+          off += (2.0 - clear) + 0.4;
         }
+        if (clear < 2.0 || off > 34) { t += run + 2; continue; }
+
+        const mid = front(c, off + depth / 2);
+        const corner = (t < t0 + 12 || t + run > t1 - 12) ? 1.22 : 1.0;
+        const h = baseH * corner * (0.78 + rng() * 0.5);
+        if (block(mid.x, mid.z, depth, run - 0.9, h, yaw,
+          { front: { x: -nx, z: -nz }, pitchChance: h < 18 ? 0.55 : 0.2 })) terraces++;
+        t += run + (rng() < 0.3 ? 1.4 + rng() * 2.6 : 0.5);
       }
+    }
+
+    // And something in the middle of the block: a mews, a works, a yard
+    // building. Blocks that are a ring of terraces round a void read as a
+    // stage set from above; real ones are built into.
+    if (rng() < 0.55) {
+      const mw = 10 + rng() * 16, md = 8 + rng() * 12;
+      const yaw = rng() * Math.PI;
+      const mx = b.x + (rng() - 0.5) * 22, mz = b.z + (rng() - 0.5) * 22;
+      block(mx, mz, mw, md, baseH * (0.5 + rng() * 0.4), yaw, { pitchChance: 0.6 });
     }
   }
 
@@ -238,14 +366,11 @@ export function buildContext(terrain, quality) {
   if (bodies.length) group.add(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
   if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
 
-  // Streets run down the middle of the gaps the block grid leaves, so they
-  // have to share its origin: the loop above starts at -reach, not at zero,
-  // and lines drawn on a grid of the right pitch but the wrong phase miss
-  // every gap and cut straight through the terraces instead.
-  group.add(buildStreets(terrain, quality, PITCH, reach, -reach));
-  group.add(buildBridge(terrain, quality));
+  group.add(buildForecourt(terrain, EXCLUDE, quality));
+  group.add(buildStreetSurface(net, terrain, quality));
+  group.add(buildBridge(terrain, quality, bridge));
   group.add(buildEmbankment(terrain));
-  group.add(buildStreetDetail(terrain, quality, plots, rng));
+  group.add(buildStreetDetail(terrain, quality, plots, net, rng));
 
   // ── The detail pass. Everything that makes the massing read as a place
   // rather than as a diagram: street furniture on a rhythm, the parts of a
@@ -253,15 +378,17 @@ export function buildContext(terrain, quality) {
   const props = new PropSet(quality);
   const detail = new THREE.Group();
   detail.name = 'citydetail';
-  const counts = {};
+  const counts = { terraces, squares, junctions: net.nodes.length,
+    streets: net.edges.length };
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
   Object.assign(counts, addRiverEdge(props, terrain, rng));
-  if (quality.groundClutter) {
-    Object.assign(counts, addRoadMarkings(props, terrain, PITCH, reach, -reach));
-    Object.assign(counts, addJunctions(props, terrain, PITCH, reach, -reach, rng));
-  }
+  Object.assign(counts, addNetworkFurniture(props, net, terrain, rng, dense));
+  // Paint stays on at every quality tier, thinned rather than dropped: a
+  // crossing and a centre line are two of the few things that read as a city
+  // from directly above, and they cost a handful of flat quads.
+  Object.assign(counts, addStreetMarkings(props, net, terrain, rng, dense));
   props.flush(detail, {
     ...MATERIALS,
     // Grime is a wash over the facade, not a solid: it has to read as dirt on
@@ -270,11 +397,14 @@ export function buildContext(terrain, quality) {
   });
   group.add(detail);
   group.userData.detail = counts;
+  group.userData.network = net;
+  group.userData.layout = rejects;
+  group.userData.bridge = bridge;
 
   // The flat roofs, for deployment. A gun on a roof has the sightlines the
   // ground does not, which is worth the climb.
   group.userData.roofs = plots.filter(
-    (p) => p.flat !== false && Math.min(p.w, p.d) > 15 && p.h > 8);
+    (p) => p.flat !== false && Math.min(p.w, p.d) > 12 && p.h > 8);
   group.userData.plots = plots;
   return group;
 }
@@ -300,132 +430,74 @@ function mergeTinted(geos, material, palette, rng, quality) {
 }
 
 /**
- * The street network.
+ * The landmark's forecourt.
  *
- * The single thing most responsible for the level reading as boxes on a field.
- * The city was already laid out on a grid — terraces ringing courtyards on an
- * 86 m pitch, with the space between them left as street — but nothing was ever
- * *drawn* on that space, so from the air it was the same undifferentiated warm
- * ground as everywhere else and the buildings appeared to be standing on a
- * beach. The blocks were there; the city was not.
+ * The middle of the map is held clear for the monument, and an empty circle in
+ * the centre of a city reads as a bomb site rather than as a setting. Paving it
+ * turns the hole into a square — the thing a landmark actually stands in — and
+ * gives the streets that stop at its edge something to stop at.
  *
- * What the eye actually reads in a plan view is the grid: dark carriageway,
- * pale pavement either side, and the hard straight edge between them. That edge
- * is worth more than any amount of noise on the ground, because it is the only
- * thing in the frame with a known width — it is what tells you how big
- * everything else is.
- *
- * Built as one merged strip mesh laid on the terrain: five lanes across each
- * street (kerb, pavement, road, pavement, kerb) carried in vertex colours, and
- * stepped along its length so it follows the ground instead of cutting through
- * it. Segments over water are skipped, which is what leaves the bridge as the
- * only way across.
+ * Built as rings of triangles that follow the ground, like the junction pads,
+ * because a flat disc laid on anything but a billiard table buries one side of
+ * itself and hangs in the air on the other.
  */
-function buildStreets(terrain, quality, pitch, reach, origin) {
-  const WIDTH = 17;              // kerb to kerb
-  const STEP = 11;               // length of one quad along the street
-  const LIFT = 0.22;             // clear of the terrain's own z-fighting range
-
-  // Lane boundaries across the street, as a fraction of WIDTH from the centre,
-  // with the colour of the band that starts there.
-  const asphalt = new THREE.Color(0x35383d);
-  const pavement = new THREE.Color(0xa8a294);
-  const kerb = new THREE.Color(0xc4bdab);
-  const LANES = [
-    [-0.50, kerb], [-0.42, pavement], [-0.26, asphalt],
-    [0.26, pavement], [0.42, kerb], [0.50, null],
-  ];
-
+function buildForecourt(terrain, radius, quality) {
+  const g = new THREE.Group();
+  g.name = 'forecourt';
+  const RINGS = [0, 0.38, 0.7, 0.88, 1.0];
+  const SEGS = 48;
   const pos = [];
   const col = [];
+  const paving = new THREE.Color(0xb6ae9b);
+  const edge = new THREE.Color(0x9a927f);
   const tmp = new THREE.Color();
-
-  // One quad of street: `along` is the axis it runs down, `t` the position
-  // along it, `c` the cross-street coordinate of the centre line.
-  const strip = (axis, t0, t1, c) => {
-    for (let li = 0; li < LANES.length - 1; li++) {
-      const [f0, colour] = LANES[li];
-      const f1 = LANES[li + 1][0];
-      if (!colour) continue;
-      const a0 = c + f0 * WIDTH, a1 = c + f1 * WIDTH;
-      // Corners, in world space, with the road's own axis chosen per call.
-      const P = (t, a) => (axis === 'x' ? [t, a] : [a, t]);
-      const quad = [
-        P(t0, a0), P(t1, a0), P(t1, a1),
-        P(t0, a0), P(t1, a1), P(t0, a1),
-      ];
-      for (const [x, z] of quad) {
-        pos.push(x, terrain.heightAt(x, z) + LIFT, z);
-        // A little value jitter keyed to position, so a long run of asphalt is
-        // not one perfectly flat tone for four hundred metres.
-        const j = 0.88 + 0.24 * valueNoise(x * 0.03, z * 0.03);
-        tmp.copy(colour).multiplyScalar(j);
-        col.push(tmp.r, tmp.g, tmp.b);
-      }
-    }
+  const at = (r, th) => {
+    const x = Math.cos(th) * r * radius, z = Math.sin(th) * r * radius;
+    return { x, z, y: terrain.heightAt(x, z) + 0.16 };
   };
-
-  // A road stops short of the river, not at it.
-  //
-  // Testing the water mask alone put carriageway right up to the waterline and,
-  // where the mask edge is coarse, a metre or two past it — so half the streets
-  // on the map ran straight into the Thames and stopped. Real streets turn away
-  // from a river or meet it at an embankment; the margin here is what leaves
-  // room for the river wall and keeps tarmac out of the water.
-  const MARGIN = 9;
-  const clear = (x, z) => {
-    if (terrain.isWater(x, z)) return false;
-    if (terrain.heightAt(x, z) < terrain.waterLevel + 0.8) return false;
-    // And not within a few metres of the bank in any direction.
-    for (let a = 0; a < 8; a++) {
-      const th = (a / 8) * Math.PI * 2;
-      if (terrain.isWater(x + Math.cos(th) * MARGIN, z + Math.sin(th) * MARGIN)) return false;
-    }
-    return true;
+  const put = (p, t) => {
+    pos.push(p.x, p.y, p.z);
+    const j = 0.9 + 0.2 * valueNoise(p.x * 0.05, p.z * 0.05);
+    tmp.copy(paving).lerp(edge, t).multiplyScalar(j);
+    col.push(tmp.r, tmp.g, tmp.b);
   };
-  const lanes = Math.ceil((reach - origin) / pitch);
-  for (let k = 0; k < lanes; k++) {
-    // Halfway between two rows of block centres, which is where the gap is.
-    const c = origin + (k + 0.5) * pitch;
-    if (Math.abs(c) > reach) continue;
-    for (let t = -reach; t < reach; t += STEP) {
-      // Both directions at once: a street running down x at cross-coordinate c,
-      // and its twin running down z. Skipped over water and over the landmark's
-      // own plot, which has its own forecourt.
-      if (clear(t, c) && clear(t + STEP, c) && Math.hypot(t, c) > 78) {
-        strip('x', t, t + STEP, c);
-      }
-      if (clear(c, t) && clear(c, t + STEP) && Math.hypot(c, t) > 78) {
-        strip('z', t, t + STEP, c);
-      }
+  for (let ri = 0; ri < RINGS.length - 1; ri++) {
+    const r0 = RINGS[ri], r1 = RINGS[ri + 1];
+    for (let s = 0; s < SEGS; s++) {
+      const th0 = (s / SEGS) * Math.PI * 2, th1 = ((s + 1) / SEGS) * Math.PI * 2;
+      // Nibble the outer edge so the forecourt is not a drawn-compass circle.
+      const wob = (t) => 1 - 0.06 * valueNoise(Math.cos(t) * 3.1, Math.sin(t) * 3.1);
+      const k0 = ri === RINGS.length - 2 ? wob(th0) : 1;
+      const k1 = ri === RINGS.length - 2 ? wob(th1) : 1;
+      const a = at(r0, th0), b = at(r1 * k0, th0), c = at(r1 * k1, th1), d = at(r0, th1);
+      put(a, r0); put(c, r1); put(b, r1);
+      put(a, r0); put(d, r0); put(c, r1);
     }
   }
-
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.96, metalness: 0.0,
-    // Asphalt is the darkest thing on the map and sits flat under a low sun, so
-    // without a floor it reads as a hole rather than a surface.
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    vertexColors: true, roughness: 0.95,
+    polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   }));
   mesh.receiveShadow = quality.shadowMapSize > 0;
   mesh.frustumCulled = false;
-  mesh.name = 'streets';
-  return mesh;
+  g.add(mesh);
+  return g;
 }
 
-/** Westminster Bridge, crossing where the real one does. */
-function buildBridge(terrain, quality) {
-  const g = new THREE.Group();
-  const deckMat = new THREE.MeshStandardMaterial({ color: 0x7d8676, roughness: 0.9 });
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x5f6a5b, roughness: 0.8 });
-
-  // Runs roughly east-north-east from the embankment by the tower. The line is
-  // fixed, but the deck is trimmed to where the water actually is (plus short
-  // approaches) — otherwise the bridge runs hundreds of metres over dry land.
+/**
+ * The line Westminster Bridge takes, worked out before anything else is built.
+ *
+ * The street network needs this: a crossing is only a crossing if roads reach
+ * it, and buildings have to be kept out of the corridor it lands in. The line
+ * itself is fixed from the real map, but the deck is trimmed to where the
+ * water actually is, plus a short approach either side — otherwise the bridge
+ * runs hundreds of metres over dry land.
+ */
+function bridgeLine(terrain) {
   const lineA = new THREE.Vector3(35, 0, -150);
   const lineB = new THREE.Vector3(430, 0, -255);
   let first = null, last = null;
@@ -436,14 +508,44 @@ function buildBridge(terrain, quality) {
       last = t;
     }
   }
-  if (first === null) return g; // no crossing on this line
+  if (first === null) return null;
   const pad = 0.055;
   const from = lineA.clone().lerp(lineB, Math.max(0, first - pad));
   const to = lineA.clone().lerp(lineB, Math.min(1, last + pad));
   const len = from.distanceTo(to);
-  const mid = from.clone().lerp(to, 0.5);
   const yaw = Math.atan2(to.x - from.x, to.z - from.z);
-  const deckY = terrain.waterLevel + 9.5;
+  const out = { x: (to.x - from.x) / len, z: (to.z - from.z) / len };
+  const RUN = 46;                       // metres of ramp at each end
+  return {
+    a: { x: from.x, z: from.z }, b: { x: to.x, z: to.z },
+    from, to, out, yaw, len, run: RUN,
+    deckY: terrain.waterLevel + 9.5,
+    // The whole corridor, ramps included: nothing may be built in it.
+    far: {
+      a: { x: from.x - out.x * RUN, z: from.z - out.z * RUN },
+      b: { x: to.x + out.x * RUN, z: to.z + out.z * RUN },
+    },
+  };
+}
+
+/** Distance from a point to a line segment, in the ground plane. */
+function distToSegment(x, z, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const l2 = dx * dx + dz * dz;
+  let t = l2 > 0 ? ((x - a.x) * dx + (z - a.z) * dz) / l2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t));
+}
+
+/** Westminster Bridge, built along the line worked out above. */
+function buildBridge(terrain, quality, line) {
+  const g = new THREE.Group();
+  if (!line) return g;                    // no crossing on this map
+  const deckMat = new THREE.MeshStandardMaterial({ color: 0x7d8676, roughness: 0.9 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x5f6a5b, roughness: 0.8 });
+
+  const { from, to, len, yaw, deckY } = line;
+  const mid = from.clone().lerp(to, 0.5);
 
   const deck = new THREE.Mesh(new THREE.BoxGeometry(19, 1.8, len), deckMat);
   deck.position.set(mid.x, deckY, mid.z);
@@ -497,7 +599,7 @@ function buildBridge(terrain, quality) {
       Math.sin(yaw) * sign, 0, Math.cos(yaw) * sign,
     );
     const steps = 9;
-    const run = 46;                       // metres of approach on each side
+    const run = line.run;                 // metres of approach on each side
     let prevY = deckY;
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
@@ -721,7 +823,7 @@ function mulberry32(a) {
  * here is merged into a handful of meshes, so the whole lot is a few draw calls
  * and none of it touches the physics world.
  */
-function buildStreetDetail(terrain, quality, plots, rng) {
+function buildStreetDetail(terrain, quality, plots, net, rng) {
   const g = new THREE.Group();
   g.name = 'detail';
   const shadows = quality.shadowMapSize > 0;
@@ -732,6 +834,7 @@ function buildStreetDetail(terrain, quality, plots, rng) {
   const trunks = [];
   const crowns = [];
   const treeAt = (x, z, scale) => {
+    if (terrain.isWater(x, z)) return;
     const y = terrain.heightAt(x, z);
     const h = (5 + rng() * 5) * scale;
     const t = new THREE.CylinderGeometry(0.18 * scale, 0.26 * scale, h * 0.42, 5);
@@ -746,12 +849,109 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     crowns.push(lower, upper);
   };
 
-  // In the courtyards: each block encloses one, and a garden is what is in it.
-  for (const p of plots) {
-    if (rng() > 0.5 * dense) continue;
-    for (let k = 0; k < 2; k++) {
-      treeAt(p.x + (rng() - 0.5) * p.w * 0.7, p.z + (rng() - 0.5) * p.d * 0.7, 1);
+  // ── Garden squares.
+  //
+  // Every block the layout left open gets one, and they are worth more to the
+  // plan than any building: a city read from above is a field of roofs with
+  // green holes punched in it, and the holes are what give the roofs a shape.
+  // Lawn, a gravel walk round the inside of the railings, and planting.
+  const lawns = [];
+  const gravel = [];
+  const railings = [];
+  let squares = 0;
+  for (const b of (net?.blocks || [])) {
+    if (!b.open) continue;
+    // The usable middle of the block, inside the pavements.
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of b.poly) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
     }
+    const INSET = 16;
+    const w = (maxX - minX) - INSET * 2, d = (maxZ - minZ) - INSET * 2;
+    if (w < 18 || d < 18) continue;
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    if (terrain.isWater(cx, cz)) continue;
+    if (net.roadClearance(cx, cz) < 6) continue;
+    const gy = terrain.heightAt(cx, cz);
+    const lawn = new THREE.BoxGeometry(w, 0.3, d);
+    lawn.translate(cx, gy + 0.1, cz);
+    tintOne(lawn, rng() < 0.22 ? 0xb9ae94 : 0x4f7336, 0.85 + rng() * 0.3);
+    lawns.push(lawn);
+    // A gravel walk just inside the edge, on two sides — enough to read as a
+    // path without pretending to be a plan of a real garden.
+    for (const [ox, oz, pw, pd] of [
+      [0, -d / 2 + 2.2, w - 4, 2.4], [0, d / 2 - 2.2, w - 4, 2.4],
+      [-w / 2 + 2.2, 0, 2.4, d - 4], [w / 2 - 2.2, 0, 2.4, d - 4]]) {
+      const path = new THREE.BoxGeometry(pw, 0.32, pd);
+      path.translate(cx + ox, gy + 0.16, cz + oz);
+      tintOne(path, 0xb3a98f, 0.9 + rng() * 0.2);
+      gravel.push(path);
+    }
+    const n = 3 + Math.floor(rng() * 6 * dense);
+    for (let k = 0; k < n; k++) {
+      treeAt(cx + (rng() - 0.5) * (w - 6), cz + (rng() - 0.5) * (d - 6), 1.1 + rng() * 0.4);
+    }
+
+    // Railings round the edge, and something in the middle to look at. A
+    // square with a centrepiece reads as a garden square; one without reads as
+    // a vacant lot, which is the opposite of what it is for.
+    for (const [ox, oz, pw, pd] of [
+      [0, -d / 2, w, 0.16], [0, d / 2, w, 0.16],
+      [-w / 2, 0, 0.16, d], [w / 2, 0, 0.16, d]]) {
+      for (let k = 0; k < (pw > pd ? w : d) / 2.2; k++) {
+        const t = (k + 0.5) / Math.ceil((pw > pd ? w : d) / 2.2) - 0.5;
+        const rx = cx + ox + (pw > pd ? t * w : 0);
+        const rz = cz + oz + (pw > pd ? 0 : t * d);
+        const rail = new THREE.BoxGeometry(pw > pd ? 1.9 : 0.1, 1.05, pw > pd ? 0.1 : 1.9);
+        rail.translate(rx, terrain.heightAt(rx, rz) + 0.55, rz);
+        tintOne(rail, 0x2f353b, 0.9 + rng() * 0.2);
+        railings.push(rail);
+      }
+    }
+    if (rng() < 0.45) {
+      // A fountain: basin, plinth, and a pale figure on top.
+      const basin = new THREE.CylinderGeometry(3.2, 3.4, 0.7, 12);
+      basin.translate(cx, gy + 0.35, cz);
+      tintOne(basin, 0xa9a290, 0.9 + rng() * 0.2);
+      railings.push(basin);
+      const plinth = new THREE.BoxGeometry(1.5, 2.2, 1.5);
+      plinth.translate(cx, gy + 1.8, cz);
+      tintOne(plinth, 0x9d9684, 1);
+      railings.push(plinth);
+      const figure = new THREE.CylinderGeometry(0.34, 0.5, 2.2, 6);
+      figure.translate(cx, gy + 4.0, cz);
+      tintOne(figure, 0xcfc9b6, 1);
+      railings.push(figure);
+    }
+    squares++;
+  }
+  for (const [arr, rough] of [[lawns, 0.98], [gravel, 0.95]]) {
+    if (!arr.length) continue;
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(arr, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough }),
+    );
+    mesh.receiveShadow = shadows;
+    g.add(mesh);
+  }
+  if (railings.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(railings, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }),
+    );
+    mesh.castShadow = shadows;
+    g.add(mesh);
+  }
+
+  // In the yards behind the terraces: a tree or two per plot, on the garden
+  // side, which is the side away from the street.
+  for (const p of plots) {
+    if (rng() > 0.4 * dense) continue;
+    const f = p.front || { x: 0, z: 1 };
+    const back = 3 + rng() * 7;
+    treeAt(p.x - f.x * (p.d / 2 + back) + (rng() - 0.5) * p.w * 0.6,
+      p.z - f.z * (p.d / 2 + back) + (rng() - 0.5) * p.w * 0.6, 0.9);
   }
   // And scattered across the mapped parks, which are otherwise bare green.
   const span = terrain.span;
@@ -761,7 +961,8 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     const z = (rng() * 2 - 1) * span * 0.95;
     if (terrain.isWater(x, z)) continue;
     const m = terrain.maskAt(x, z);
-    if (m.park < 0.35 || m.road > 0.3) continue;
+    if (m.park < 0.35) continue;
+    if (net && net.roadClearance(x, z) < 3) continue;
     treeAt(x, z, 0.9 + rng() * 0.5);
   }
 
@@ -795,6 +996,7 @@ function buildStreetDetail(terrain, quality, plots, rng) {
       const x = p.x + (rng() - 0.5) * (p.w - 3);
       const z = p.z + (rng() - 0.5) * (p.d - 3);
       const stack = new THREE.BoxGeometry(w, h, w * (0.8 + rng() * 1.6));
+      stack.rotateY(p.yaw || 0);
       stack.translate(x, p.top + h / 2, z);
       tintOne(stack, 0x8d5a4a, 0.8 + rng() * 0.4);
       roofBits.push(stack);
@@ -803,6 +1005,7 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     if (Math.min(p.w, p.d) > 18 && rng() < 0.55) {
       const w = 4 + rng() * 3, d = 3 + rng() * 3, h = 2.4 + rng() * 1.4;
       const hut = new THREE.BoxGeometry(w, h, d);
+      hut.rotateY(p.yaw || 0);
       hut.translate(p.x + (rng() - 0.5) * (p.w - w - 3), p.top + h / 2,
         p.z + (rng() - 0.5) * (p.d - d - 3));
       tintOne(hut, 0x9a958c, 0.85 + rng() * 0.3);
@@ -819,55 +1022,49 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     g.add(mesh);
   }
 
-  // ── Kerbs. A pale strip round each block turns "boxes on a field" into
-  // "buildings on streets", which is most of what the eye uses to read a plan
-  // from above. One flat quad per block, laid just proud of the terrain.
-  const kerbs = [];
+  // ── Back gardens. The inside of a block is not paving: it is the yards
+  // behind the terraces, and from above they are the green that stops a block
+  // reading as one solid slab of roof and forecourt.
+  const yards = [];
   for (const p of plots) {
-    const kerb = new THREE.BoxGeometry(p.w + 5.5, 0.24, p.d + 5.5);
-    kerb.translate(p.x, terrain.heightAt(p.x, p.z) + 0.12, p.z);
-    tintOne(kerb, 0xb9b3a4, 0.85 + rng() * 0.25);
-    kerbs.push(kerb);
+    if (!p.front) continue;
+    const back = 5 + rng() * 7;
+    const yw = p.d * (0.8 + rng() * 0.2);
+    const yard = new THREE.BoxGeometry(back, 0.2, yw);
+    yard.rotateY(p.yaw || 0);
+    const cx = p.x - p.front.x * (p.w / 2 + back / 2);
+    const cz = p.z - p.front.z * (p.w / 2 + back / 2);
+    if (terrain.isWater(cx, cz)) continue;
+    yard.translate(cx, terrain.heightAt(cx, cz) + 0.1, cz);
+    tintOne(yard, rng() < 0.3 ? 0x8f8368 : 0x4a6c33, 0.8 + rng() * 0.4);
+    yards.push(yard);
   }
-  if (kerbs.length) {
+  if (yards.length) {
     const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(kerbs, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }),
+      BufferGeometryUtils.mergeGeometries(yards, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
     );
     mesh.receiveShadow = shadows;
-    mesh.renderOrder = 1;
     g.add(mesh);
   }
 
-  // ── Street lamps. Barely a pixel each at playing distance, but a regular
-  // rhythm of verticals along a frontage is what makes a street read as a
-  // street rather than as a gap between two blocks.
-  const lamps = [];
+  // ── Forecourts. A pale apron between the building line and the pavement,
+  // which is what makes a terrace sit *on* a street rather than float beside
+  // one. Laid under the road surface, so where the two meet the road wins.
+  const aprons = [];
   for (const p of plots) {
-    if (rng() > 0.6 * dense) continue;
-    const n = 1 + Math.floor(rng() * 2);
-    for (let k = 0; k < n; k++) {
-      const alongX = rng() < 0.5;
-      const off = (rng() - 0.5) * (alongX ? p.w : p.d) * 0.8;
-      const side = rng() < 0.5 ? 1 : -1;
-      const x = p.x + (alongX ? off : side * (p.w / 2 + 2.6));
-      const z = p.z + (alongX ? side * (p.d / 2 + 2.6) : off);
-      if (terrain.isWater(x, z)) continue;
-      const y = terrain.heightAt(x, z);
-      const post = new THREE.CylinderGeometry(0.1, 0.14, 6.2, 5);
-      post.translate(x, y + 3.1, z);
-      lamps.push(post);
-      const head = new THREE.BoxGeometry(0.8, 0.3, 0.4);
-      head.translate(x, y + 6.2, z);
-      lamps.push(head);
-    }
+    const apron = new THREE.BoxGeometry(p.w + 3.4, 0.22, p.d + 3.4);
+    apron.rotateY(p.yaw || 0);
+    apron.translate(p.x, terrain.heightAt(p.x, p.z) + 0.11, p.z);
+    tintOne(apron, 0xb9b3a4, 0.85 + rng() * 0.25);
+    aprons.push(apron);
   }
-  if (lamps.length) {
+  if (aprons.length) {
     const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(lamps, false),
-      new THREE.MeshStandardMaterial({ color: 0x2b3138, roughness: 0.6, metalness: 0.35 }),
+      BufferGeometryUtils.mergeGeometries(aprons, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }),
     );
-    mesh.castShadow = shadows;
+    mesh.receiveShadow = shadows;
     g.add(mesh);
   }
 
@@ -900,36 +1097,7 @@ function buildStreetDetail(terrain, quality, plots, rng) {
     g.add(mesh);
   }
 
-  // ── Parked vehicles along the street frontages. Tiny, but they are the thing
-  // that fixes the scale of everything else in the frame.
-  const cars = [];
-  const CAR_COLOURS = [0x9aa3ad, 0x2f3a45, 0x8c3a32, 0x3d5a46, 0xb8b2a4, 0x24303a];
-  for (const p of plots) {
-    if (rng() > 0.75 * dense) continue;
-    const n = 1 + Math.floor(rng() * 3);
-    for (let k = 0; k < n; k++) {
-      const alongX = rng() < 0.5;
-      const off = (rng() - 0.5) * (alongX ? p.w : p.d) * 0.8;
-      const side = rng() < 0.5 ? 1 : -1;
-      const x = p.x + (alongX ? off : side * (p.w / 2 + 3.4));
-      const z = p.z + (alongX ? side * (p.d / 2 + 3.4) : off);
-      if (terrain.isWater(x, z)) continue;
-      const y = terrain.heightAt(x, z);
-      const body = new THREE.BoxGeometry(alongX ? 4.3 : 1.9, 1.5, alongX ? 1.9 : 4.3);
-      body.translate(x, y + 0.75, z);
-      tintOne(body, CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)], 0.85 + rng() * 0.3);
-      cars.push(body);
-    }
-  }
-  if (cars.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(cars, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.35 }),
-    );
-    mesh.castShadow = shadows;
-    g.add(mesh);
-  }
-
+  g.userData.squares = squares;
   return g;
 }
 

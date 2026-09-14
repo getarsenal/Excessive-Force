@@ -1322,7 +1322,7 @@ export class TestMenu {
         const city = this.ctx.cityGroup;
         const d = city?.userData?.detail;
         assert(d, 'the detail pass did not run');
-        const want = ['lamps', 'cars', 'cornices', 'porches', 'wall'];
+        const want = ['lamps', 'parked', 'cornices', 'porches', 'wall', 'streetTrees'];
         const thin = want.filter((k) => !(d[k] > 20));
         assert(thin.length === 0,
           `too little of: ${thin.map((k) => `${k}=${d[k] ?? 0}`).join(', ')}`);
@@ -1345,42 +1345,103 @@ export class TestMenu {
         return `${total.toLocaleString()} props, no road in the water`;
       }],
 
-      ['the city has streets, and they are in the gaps', () => {
-        // Streets are the single thing that makes a plan view read as a city
-        // rather than as boxes on a field, and they are drawn on a grid that
-        // has to share its phase with the one the blocks were laid on. Getting
-        // that wrong is invisible in the code and unmistakable on screen: the
-        // roads march straight through the terraces. So check both — that the
-        // mesh exists at all, and that it is where the buildings are not.
+      ['the city is a street network, not a grid of stripes', () => {
+        // What this is really checking is the complaint that produced it: the
+        // roads were dead straight and went nowhere, houses stood in the
+        // carriageway at the end of the bridge, and houses hung over the edge
+        // of the river. All three came from laying streets and buildings on
+        // two independent grids and hoping. The layout is now one graph, and
+        // these are the properties that graph has to have.
         const city = this.ctx.cityGroup;
-        const streets = city?.getObjectByName('streets');
-        assert(streets, 'there is no street mesh in the city');
-        const tris = streets.geometry.attributes.position.count / 3;
-        assert(tris > 2000, `only ${Math.round(tris)} triangles of street`);
+        const net = city?.userData?.network;
+        const terrain = this.ctx.terrain;
+        assert(net, 'the city was built without a street network');
+        assert(net.edges.length > 150,
+          `only ${net.edges.length} streets in the whole city`);
 
-        // Sample the road surface against the footprints it is meant to miss.
+        // Connected: junctions joined into one town, not a scatter of stubs.
+        // Two components are expected — one per bank, joined by the bridge.
+        const seen = new Set();
+        const sizes = [];
+        for (let i = 0; i < net.nodes.length; i++) {
+          if (seen.has(i) || !net.nodes[i].links.length) continue;
+          const q = [i]; seen.add(i); let n = 0;
+          while (q.length) {
+            const k = q.pop(); n++;
+            for (const l of net.nodes[k].links) {
+              if (!seen.has(l.other)) { seen.add(l.other); q.push(l.other); }
+            }
+          }
+          sizes.push(n);
+        }
+        sizes.sort((a, b) => b - a);
+        const linked = net.nodes.filter((n) => n.links.length).length;
+        const inTwo = (sizes[0] || 0) + (sizes[1] || 0);
+        assert(inTwo / Math.max(1, linked) > 0.9,
+          `the street network is in ${sizes.length} pieces; the two largest hold `
+          + `${inTwo} of ${linked} junctions`);
+
+        // Curved: a network of ruled lines is the thing being replaced.
+        let bent = 0;
+        for (const e of net.edges) {
+          const a = e.pts[0], b = e.pts[e.pts.length - 1];
+          const straight = Math.hypot(b.x - a.x, b.z - a.z);
+          let along = 0;
+          for (let i = 0; i < e.pts.length - 1; i++) {
+            along += Math.hypot(e.pts[i + 1].x - e.pts[i].x, e.pts[i + 1].z - e.pts[i].z);
+          }
+          if (along > straight * 1.002) bent++;
+        }
+        assert(bent > net.edges.length * 0.5,
+          `only ${bent} of ${net.edges.length} streets have any bend in them`);
+
+        // Nothing standing in the road, on any part of its footprint.
         const plots = city.userData.plots || [];
-        assert(plots.length > 40, `only ${plots.length} plots to check against`);
-        const pos = streets.geometry.attributes.position;
-        let inside = 0, sampled = 0;
-        for (let i = 0; i < pos.count; i += 211) {
-          const x = pos.getX(i), z = pos.getZ(i);
-          sampled++;
-          for (const p of plots) {
-            // Allow the pavement to run up to the wall; only count road that
-            // is properly buried inside a building.
-            if (Math.abs(p.x - x) < p.w / 2 - 2 && Math.abs(p.z - z) < p.d / 2 - 2) {
-              inside++; break;
+        assert(plots.length > 300, `only ${plots.length} buildings in the city`);
+        let inRoad = 0, worstRoad = 0, wet2 = 0, onBridge = 0;
+        const bridge = city.userData.bridge;
+        for (const p of plots) {
+          const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+          for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0]]) {
+            const x = p.x + (u * p.w / 2) * ca + (v * p.d / 2) * sa;
+            const z = p.z - (u * p.w / 2) * sa + (v * p.d / 2) * ca;
+            const clear = Math.min(net.roadClearance(x, z), net.nodeClearance(x, z));
+            if (clear < 0) { inRoad++; worstRoad = Math.max(worstRoad, -clear); break; }
+            if (terrain.isWater(x, z)
+              || terrain.heightAt(x, z) < terrain.waterLevel + 0.6) { wet2++; break; }
+            if (bridge) {
+              const a = bridge.far.a, b = bridge.far.b;
+              const dx = b.x - a.x, dz = b.z - a.z;
+              const l2 = dx * dx + dz * dz;
+              let t = l2 > 0 ? ((x - a.x) * dx + (z - a.z) * dz) / l2 : 0;
+              t = Math.max(0, Math.min(1, t));
+              const dist = Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t));
+              if (dist < 11) { onBridge++; break; }
             }
           }
         }
-        const frac = sampled ? inside / sampled : 0;
-        assert(frac < 0.06,
-          `${(frac * 100).toFixed(0)}% of the road surface is inside a building `
-          + '— the street grid is out of phase with the block grid');
-        return `${Math.round(tris)} triangles, ${(frac * 100).toFixed(1)}% under buildings`;
-      }],
+        assert(inRoad === 0,
+          `${inRoad} buildings stand in the carriageway, the worst `
+          + `${worstRoad.toFixed(1)} m into it`);
+        assert(wet2 === 0, `${wet2} buildings are in the river or over its edge`);
+        assert(onBridge === 0, `${onBridge} buildings are in the bridge's corridor`);
 
+        // And the bridge is reachable: a junction at the foot of each ramp.
+        if (bridge) {
+          for (const [end, sign] of [[bridge.a, -1], [bridge.b, 1]]) {
+            const fx = end.x + bridge.out.x * sign * bridge.run;
+            const fz = end.z + bridge.out.z * sign * bridge.run;
+            const near = net.nodes.some(
+              (n) => Math.hypot(n.x - fx, n.z - fz) < 30 && n.links.length);
+            assert(near, 'the bridge has no road running to it');
+          }
+        }
+        const counts = city.userData.detail || {};
+        assert((counts.crossings || 0) > 15,
+          `only ${counts.crossings || 0} pedestrian crossings in the whole city`);
+        return `${net.edges.length} streets, ${net.nodes.length} junctions, `
+          + `${plots.length} buildings, none of them in the road`;
+      }],
 
       ['a severed section cannot hang in the air', () => this._calm(() => {
         // Cut a building clean through and everything above the cut must come
@@ -1431,6 +1492,69 @@ export class TestMenu {
           `${stillFixed} stones are still standing above a clean cut through `
           + `${st.key}, the highest ${topFixed.toFixed(0)} m up`);
         return `cut ${st.key} through with ${removed} stones; nothing left hanging`;
+      })],
+
+      ['debris never freezes in mid-air', () => this._calm(() => {
+        // The bug this guards against: rubble is recycled back into scenery
+        // once it stops moving, and "stopped" used to mean nothing more than
+        // slow. A stone at the top of its arc is momentarily slower than one
+        // lying on the ground, so under budget pressure a bombardment left
+        // blooms of masonry hanging in the sky — motionless, never falling,
+        // and still solid enough to shoot at. Rubble that freezes onto a wall
+        // and then has the wall shot out from under it is the same picture.
+        const st = c.structures.find((x) => x !== b.primary) || b.primary;
+        const gy = b.originGround;
+        const P = c.physics;
+        const RT = P.rapier.RigidBodyType;
+
+        // Squeeze the budget: recycling only runs hard when it has to, and
+        // that pressure is exactly what used to freeze stone in the air.
+        const wasBudget = P.activeBudget;
+        P.setBudget(200);
+        try {
+          for (let r = 0; r < 6; r++) {
+            let best = -1, bestd = Infinity;
+            let lo = Infinity, hi = -Infinity;
+            for (let i = 0; i < st.count; i++) {
+              if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+              lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
+            }
+            if (!isFinite(lo)) break;
+            const wantY = lo + (hi - lo) * (0.3 + r * 0.09);
+            for (let i = 0; i < st.count; i++) {
+              if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+              const d = Math.abs(st.py[i] - wantY);
+              if (d < bestd) { bestd = d; best = i; }
+            }
+            if (best < 0) break;
+            st.explode(
+              { x: st.px[best], y: st.py[best], z: st.pz[best] }, 2.6, 8, 8000,
+              { dir: { x: 0, y: 0.05, z: 1 }, kinetic: 0.85 },
+            );
+            st.stabilityDirty = true;
+            c.fastForward(1.4);
+          }
+          c.fastForward(6.0);
+
+          let frozen = 0;
+          const hanging = [];
+          for (let i = 0; i < st.count; i++) {
+            if (!(st.flags[i] & 1) || !(st.flags[i] & 2)) continue;
+            const body = st.bodyOf[i];
+            if (!body || body.__removed || body.bodyType() !== RT.Fixed) continue;
+            frozen++;
+            if (st.py[i] - st.hy[i] < gy + 3) continue;
+            if (P._standsOnSomething(body)) continue;
+            hanging.push((st.py[i] - gy).toFixed(0));
+          }
+          assert(frozen > 20, `only ${frozen} stones were recycled — no pressure`);
+          assert(hanging.length === 0,
+            `${hanging.length} stones are frozen in mid-air with nothing under `
+            + `them, at ${hanging.slice(0, 6).join(', ')} m up`);
+          return `${frozen} stones recycled, none of them hanging`;
+        } finally {
+          P.setBudget(wasBudget);
+        }
       })],
 
       // ── Destructive: leaves the level a pile of rubble, so it runs last.

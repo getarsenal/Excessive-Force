@@ -56,6 +56,9 @@ export class PhysicsWorld {
     this.owners = new Map();
     /** bodies currently dynamic, tracked so we can recycle them */
     this.dynamicSet = new Set();
+    /** bodies frozen back into scenery, swept for lost footing */
+    this.frozen = [];
+    this._auditCursor = 0;
 
     this.eventQueue = new rapier.EventQueue(true);
     this.contactListeners = [];
@@ -110,13 +113,119 @@ export class PhysicsWorld {
     return true;
   }
 
-  /** Freeze settled debris back into scenery, reclaiming simulation budget. */
+  /**
+   * Freeze settled debris back into scenery, reclaiming simulation budget.
+   *
+   * Refuses to freeze anything that is not touching the world. A stone at the
+   * top of its arc is momentarily as slow as a stone on the ground, and Rapier
+   * will occasionally sleep one that is wedged in clear air, so without this
+   * test a bombardment leaves blooms of masonry hanging over the site —
+   * motionless, un-fallable, and still solid enough to shoot at.
+   *
+   * Returns whether the body was actually frozen.
+   */
   demote(body) {
-    if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return;
+    if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
+    if (!this._standsOnSomething(body)) return false;
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = false; owner.settled = true; }
+    // Remember it so the audit below can catch it if the ground it froze onto
+    // is later blown out from under it.
+    this.frozen.push(body);
+    return true;
+  }
+
+  /**
+   * Is this body — frozen or not — in contact with anything?
+   *
+   * A geometric query rather than a contact lookup, because the narrow phase
+   * has no opinion about a fixed body: once debris is recycled into scenery
+   * Rapier stops computing its contacts entirely, so `touching` always says no.
+   * A ball a little larger than each piece, centred on that piece and ignoring
+   * the body's own colliders, gives the same answer without the solver's help.
+   *
+   * A downward ray was the obvious thing to try and it is wrong: a stone lying
+   * on the edge of a rubble pile has its centre out over thin air, and the ray
+   * reports it hanging when it is doing nothing of the sort.
+   */
+  _standsOnSomething(body) {
+    const n = body.numColliders();
+    if (n === 0) return true;
+    // A welded section can carry hundreds of colliders; sampling a spread of
+    // them is enough to tell a section resting on rubble from one in the sky.
+    const step = Math.max(1, Math.floor(n / 8));
+    const ZERO_ROT = this._zeroRot
+      || (this._zeroRot = { x: 0, y: 0, z: 0, w: 1 });
+    for (let c = 0; c < n; c += step) {
+      const col = body.collider(c);
+      if (!col) continue;
+      const t = col.translation();
+      if (!isFinite(t.y)) return true;
+      const he = col.halfExtents?.();
+      const r = (he ? Math.hypot(he.x, he.y, he.z) : 0.6) * 1.08;
+      const shape = new this.rapier.Ball(r);
+      let found = false;
+      this.world.intersectionsWithShape(
+        t, ZERO_ROT, shape,
+        () => { found = true; return false; },
+        undefined, undefined, undefined, body, undefined,
+      );
+      if (found) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Walk the frozen debris a slice at a time, and let go of anything whose
+   * footing has gone.
+   *
+   * Rubble that settles on a wall is frozen quite correctly — and then the wall
+   * is shelled, and it is left standing on nothing. Nothing wakes it: it is a
+   * fixed body now, so the solver has no opinion about it at all. This is the
+   * sweep that notices, and it is spread over frames because it costs a shape
+   * query per body and there can be thousands of them.
+   */
+  auditFrozen(slice = 18) {
+    const list = this.frozen;
+    if (!list.length) return 0;
+    let checked = 0, woke = 0;
+    while (checked < slice && list.length) {
+      if (this._auditCursor >= list.length) this._auditCursor = 0;
+      const idx = this._auditCursor;
+      const body = list[idx];
+      checked++;
+      // Drop anything that is gone or has been promoted by some other route.
+      if (!PhysicsWorld.alive(body)
+          || body.bodyType() !== this.rapier.RigidBodyType.Fixed) {
+        list[idx] = list[list.length - 1];
+        list.pop();
+        continue;
+      }
+      if (this._standsOnSomething(body)) {
+        this._auditCursor++;
+        continue;
+      }
+      // Make room if the budget is full: something hanging in the sky is a
+      // better use of a slot than a stone that has already come to rest.
+      if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
+      if (!this.promote(body)) {
+        // Still no room. Leave it on the list and come back to it rather than
+        // losing track of a stone that is hanging.
+        this._auditCursor++;
+        break;
+      }
+      list[idx] = list[list.length - 1];
+      list.pop();
+      woke++;
+      // A nudge, so a stone that froze perfectly balanced actually topples
+      // rather than dropping in a dead straight line.
+      body.applyTorqueImpulse(
+        { x: (Math.random() - 0.5) * 8, y: 0, z: (Math.random() - 0.5) * 8 }, true,
+      );
+    }
+    return woke;
   }
 
   remove(body) {
@@ -146,7 +255,7 @@ export class PhysicsWorld {
     const need = this.dynamicSet.size + wanted - this.activeBudget;
     for (const body of this.dynamicSet) {
       if (freed >= need) break;
-      if (body.isSleeping()) { this.demote(body); freed++; }
+      if (body.isSleeping() && this.demote(body)) freed++;
     }
 
     // Second pass: bodies that have stopped without being asleep.
@@ -169,8 +278,9 @@ export class PhysicsWorld {
         const v = body.linvel(), w = body.angvel();
         if (Math.hypot(v.x, v.y, v.z) > 0.34) continue;
         if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
-        this.demote(body);
-        freed++;
+        // `demote` refuses anything airborne, which matters most here: at the
+        // top of its arc a thrown stone is briefly slower than a settled one.
+        if (this.demote(body)) freed++;
       }
     }
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
@@ -286,8 +396,16 @@ export class PhysicsWorld {
         owner.settleTimer = 0;
       }
     }
-    for (const b of toDemote) this.demote(b);
-    return toDemote.length;
+    let n = 0;
+    for (const b of toDemote) {
+      if (this.demote(b)) { n++; continue; }
+      // Refused: asleep in clear air, which is not settled but stuck. Wake it
+      // and let gravity have another go, then re-test after another spell.
+      const owner = this.owners.get(b.handle);
+      if (owner) owner.settleTimer = 0;
+      b.wakeUp();
+    }
+    return n;
   }
 
   castRay(origin, dir, maxToi, filter) {

@@ -106,108 +106,64 @@ export const MATERIALS = {
 /**
  * Street furniture along a frontage.
  *
- * Placed by walking the edges of each block at a fixed pitch rather than
- * scattering randomly, because the thing that makes a street read as a street
- * is the *rhythm* — evenly spaced verticals down both sides. Random placement
- * gives the same object count and none of the effect.
+ * Placed along the building's *front*, which the layout now knows: every plot
+ * records which way it faces, because it was set back from a particular street
+ * rather than dropped on a grid. That is the difference between a bench on the
+ * pavement and a bench in somebody's back garden — and it is why the lamps and
+ * the parked cars have moved out of here and into the street network, where
+ * they can follow the kerb instead of guessing at it.
  */
 export function addStreetFurniture(props, terrain, plots, rng, dense) {
-  const CAR_COLOURS = [0x9aa3ad, 0x2f3a45, 0x8c3a32, 0x3d5a46, 0xb8b2a4,
-    0x24303a, 0x6e7a86, 0x43352c, 0xa8a094];
-  let lamps = 0, cars = 0, bollards = 0, benches = 0, bins = 0, boxes = 0;
+  let bollards = 0, benches = 0, bins = 0, boxes = 0, planters = 0, shelters = 0;
 
   for (const p of plots) {
     if (Math.min(p.w, p.d) < 8) continue;
-    // Walk all four frontages.
-    for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const along = ax !== 0 ? 'z' : 'x';
-      const halfAlong = (along === 'x' ? p.w : p.d) / 2;
-      const off = (along === 'x' ? p.d : p.w) / 2 + 3.2;
-      const yaw = ax !== 0 ? Math.PI / 2 : 0;
+    // Which way the building faces, and the line of its frontage.
+    const f = p.front || { x: 0, z: 1 };
+    const ax = f.z, az = -f.x;                        // along the frontage
+    const halfAlong = (p.front ? p.d : p.w) / 2;
+    const depth = (p.front ? p.w : p.d) / 2;
+    const yaw = Math.atan2(f.x, f.z);
+    const at = (s, off) => ({
+      x: p.x + ax * s + f.x * (depth + off),
+      z: p.z + az * s + f.z * (depth + off),
+    });
 
-      // Lamp standards every ~22 m.
-      const pitch = 22;
-      for (let s = -halfAlong + 6; s < halfAlong - 4; s += pitch) {
-        if (rng() > dense) continue;
-        const x = p.x + (along === 'x' ? s : ax * off);
-        const z = p.z + (along === 'x' ? az * off : s);
-        if (terrain.isWater(x, z)) continue;
-        const gy = terrain.heightAt(x, z);
-        const h = 7.2;
-        props.add('dark', cyl(0.11, 0.17, h, 6, x, gy + h / 2, z), 0x2c3138, 0.9 + rng() * 0.2);
-        // The arm and the head, which is what gives it a silhouette.
-        props.add('dark', box(1.7, 0.16, 0.16, x + (ax ? -ax * 0.85 : 0), gy + h - 0.2,
-          z + (az ? -az * 0.85 : 0)), 0x2c3138, 1);
-        props.add('paint', box(0.7, 0.26, 0.34,
-          x + (ax ? -ax * 1.6 : 0), gy + h - 0.36, z + (az ? -az * 1.6 : 0)),
-          0xf2e2b8, 1);
-        lamps++;
-      }
-
-      // Cars parked nose to tail against the kerb.
-      for (let s = -halfAlong + 4; s < halfAlong - 5; s += 6.4) {
-        if (rng() > 0.42 * dense) continue;
-        const x = p.x + (along === 'x' ? s + rng() * 0.8 : ax * (off - 1.4));
-        const z = p.z + (along === 'x' ? az * (off - 1.4) : s + rng() * 0.8);
-        if (terrain.isWater(x, z)) continue;
-        const gy = terrain.heightAt(x, z);
-        const col = CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)];
-        const len = 4.1 + rng() * 0.9;
-        props.add('paint', box(1.82, 0.78, len, x, gy + 0.62, z, yaw), col, 1);
-        // Cabin, set back, so from above it reads as a car and not a crate.
-        props.add('glass', box(1.66, 0.6, len * 0.48, x, gy + 1.28,
-          z - (along === 'x' ? 0 : 0.2), yaw), 0x2a3440, 1);
-        cars++;
-      }
-
-      // Bollards along the pavement edge on some frontages.
-      if (rng() < 0.3) {
-        for (let s = -halfAlong + 5; s < halfAlong - 4; s += 3.6) {
-          const x = p.x + (along === 'x' ? s : ax * (off + 0.9));
-          const z = p.z + (along === 'x' ? az * (off + 0.9) : s);
-          if (terrain.isWater(x, z)) continue;
-          props.add('dark', cyl(0.14, 0.17, 1.0, 6, x, terrain.heightAt(x, z) + 0.5, z),
-            0x36302a, 0.9 + rng() * 0.25);
-          bollards++;
-        }
+    // Bollards along the edge of the forecourt on some frontages.
+    if (rng() < 0.3) {
+      for (let s = -halfAlong + 2; s < halfAlong - 1.5; s += 3.6) {
+        const q = at(s, 2.0);
+        if (terrain.isWater(q.x, q.z)) continue;
+        props.add('dark', cyl(0.14, 0.17, 1.0, 6, q.x, terrain.heightAt(q.x, q.z) + 0.5, q.z),
+          0x36302a, 0.9 + rng() * 0.25);
+        bollards++;
       }
     }
 
-    // One or two pieces of larger furniture per block, on a random frontage.
-    const pick = () => {
-      const alongX = rng() < 0.5;
-      const sgn = rng() < 0.5 ? 1 : -1;
-      const s = (rng() - 0.5) * (alongX ? p.w : p.d) * 0.7;
-      const off = (alongX ? p.d : p.w) / 2 + 4.0;
-      return {
-        x: p.x + (alongX ? s : sgn * off),
-        z: p.z + (alongX ? sgn * off : s),
-        yaw: alongX ? 0 : Math.PI / 2,
-      };
-    };
+    // One or two pieces of larger furniture, out on the pavement.
     for (let k = 0; k < 2; k++) {
       if (rng() > 0.5 * dense) continue;
-      const q = pick();
+      const q = at((rng() - 0.5) * halfAlong * 1.6, 2.4 + rng() * 1.2);
       if (terrain.isWater(q.x, q.z)) continue;
       const gy = terrain.heightAt(q.x, q.z);
       const r = rng();
-      if (r < 0.26) {
+      if (r < 0.2) {
         // Bus shelter: posts, roof, back panel.
         for (const sx of [-1.7, 1.7]) {
-          props.add('dark', box(0.13, 2.4, 0.13, q.x + Math.cos(q.yaw) * sx,
-            gy + 1.2, q.z - Math.sin(q.yaw) * sx, q.yaw), 0x353b42, 1);
+          props.add('dark', box(0.13, 2.4, 0.13, q.x + ax * sx, gy + 1.2, q.z + az * sx, yaw),
+            0x353b42, 1);
         }
-        props.add('dark', box(4.0, 0.14, 1.5, q.x, gy + 2.45, q.z, q.yaw), 0x3c434b, 1);
-        props.add('glass', box(3.8, 1.9, 0.08, q.x + Math.sin(q.yaw + Math.PI) * 0.7,
-          gy + 1.3, q.z + Math.cos(q.yaw + Math.PI) * 0.7, q.yaw), 0x51606e, 1);
-      } else if (r < 0.44) {
-        // Bench.
-        props.add('stone', box(2.2, 0.16, 0.55, q.x, gy + 0.46, q.z, q.yaw), 0x6b563c, 1);
-        props.add('stone', box(2.2, 0.5, 0.1, q.x + Math.sin(q.yaw) * 0.25,
-          gy + 0.7, q.z + Math.cos(q.yaw) * 0.25, q.yaw), 0x6b563c, 1);
+        props.add('dark', box(4.0, 0.14, 1.5, q.x, gy + 2.45, q.z, yaw), 0x3c434b, 1);
+        props.add('glass', box(3.8, 1.9, 0.08, q.x - f.x * 0.7, gy + 1.3, q.z - f.z * 0.7, yaw),
+          0x51606e, 1);
+        shelters++;
+      } else if (r < 0.42) {
+        // Bench, facing the street.
+        props.add('stone', box(2.2, 0.16, 0.55, q.x, gy + 0.46, q.z, yaw), 0x6b563c, 1);
+        props.add('stone', box(2.2, 0.5, 0.1, q.x - f.x * 0.25, gy + 0.7, q.z - f.z * 0.25, yaw),
+          0x6b563c, 1);
         benches++;
-      } else if (r < 0.6) {
-        // Litter bin.
+      } else if (r < 0.58) {
         props.add('dark', cyl(0.36, 0.3, 1.0, 8, q.x, gy + 0.5, q.z), 0x3a4038, 1);
         bins++;
       } else if (r < 0.74) {
@@ -218,16 +174,18 @@ export function addStreetFurniture(props, terrain, plots, rng, dense) {
         boxes++;
       } else if (r < 0.86) {
         // Telephone box.
-        props.add('paint', box(0.95, 2.5, 0.95, q.x, gy + 1.25, q.z, q.yaw), 0x8e2b22, 1);
-        props.add('paint', box(1.06, 0.18, 1.06, q.x, gy + 2.55, q.z, q.yaw), 0x7a251d, 1);
+        props.add('paint', box(0.95, 2.5, 0.95, q.x, gy + 1.25, q.z, yaw), 0x8e2b22, 1);
+        props.add('paint', box(1.06, 0.18, 1.06, q.x, gy + 2.55, q.z, yaw), 0x7a251d, 1);
+        boxes++;
       } else {
-        // Planter.
-        props.add('stone', box(1.6, 0.6, 1.6, q.x, gy + 0.3, q.z, q.yaw), 0x8d8779, 1);
-        props.add('foliage', cyl(0.7, 0.55, 0.9, 7, q.x, gy + 1.0, q.z), 0x416a2e, 0.8 + rng() * 0.4);
+        props.add('stone', box(1.6, 0.6, 1.6, q.x, gy + 0.3, q.z, yaw), 0x8d8779, 1);
+        props.add('foliage', cyl(0.7, 0.55, 0.9, 7, q.x, gy + 1.0, q.z), 0x416a2e,
+          0.8 + rng() * 0.4);
+        planters++;
       }
     }
   }
-  return { lamps, cars, bollards, benches, bins, boxes };
+  return { bollards, benches, bins, boxes, planters, shelters };
 }
 
 /**
@@ -336,62 +294,6 @@ export function addBuildingDetail(props, terrain, plots, rng, dense) {
     }
   }
   return { porches, cornices };
-}
-
-/**
- * Junctions, and the things that only exist where two streets meet.
- *
- * A crossroads with nothing at it is the clearest tell that a city was
- * generated rather than built. Signals and signs are small, but they sit at
- * exactly the points the eye goes to when it is reading a street plan.
- */
-export function addJunctions(props, terrain, pitch, reach, origin, rng) {
-  const centres = [];
-  const lanes = Math.ceil((reach - origin) / pitch);
-  for (let k = 0; k < lanes; k++) {
-    const c = origin + (k + 0.5) * pitch;
-    if (Math.abs(c) <= reach) centres.push(c);
-  }
-  let signals = 0, signs = 0;
-  for (const cx of centres) {
-    for (const cz of centres) {
-      if (terrain.isWater(cx, cz) || Math.hypot(cx, cz) < 78) continue;
-      const gy = terrain.heightAt(cx, cz);
-      if (rng() < 0.55) {
-        // Traffic signals on two opposite corners.
-        for (const [sx, sz] of [[1, 1], [-1, -1]]) {
-          const x = cx + sx * 10.5, z = cz + sz * 10.5;
-          if (terrain.isWater(x, z)) continue;
-          const g2 = terrain.heightAt(x, z);
-          props.add('dark', cyl(0.09, 0.12, 3.6, 6, x, g2 + 1.8, z), 0x2a2e33, 1);
-          props.add('dark', box(0.34, 0.95, 0.3, x, g2 + 4.0, z), 0x24282c, 1);
-          // The three lenses, which is the only bit anyone will actually see.
-          props.add('paint', box(0.2, 0.2, 0.06, x, g2 + 4.3, z + 0.17), 0xc4452f, 1);
-          props.add('paint', box(0.2, 0.2, 0.06, x, g2 + 4.0, z + 0.17), 0xd0a63a, 1);
-          props.add('paint', box(0.2, 0.2, 0.06, x, g2 + 3.7, z + 0.17), 0x4e9e58, 1);
-          signals++;
-        }
-      }
-      if (rng() < 0.5) {
-        // A sign on a post at one corner.
-        const x = cx - 10.5, z = cz + 10.5;
-        if (!terrain.isWater(x, z)) {
-          const g2 = terrain.heightAt(x, z);
-          props.add('dark', cyl(0.06, 0.07, 2.6, 5, x, g2 + 1.3, z), 0x50565c, 1);
-          props.add('paint', box(1.0, 0.62, 0.06, x, g2 + 2.5, z), 0xdfe3e6, 1);
-          signs++;
-        }
-      }
-      // A patch of resurfaced road: a slightly different asphalt rectangle,
-      // which is the cheapest possible cure for a perfectly uniform surface.
-      if (rng() < 0.5) {
-        props.add('markings', box(5 + rng() * 7, 0.05, 4 + rng() * 6,
-          cx + (rng() - 0.5) * 20, gy + 0.26, cz + (rng() - 0.5) * 20),
-          0x44474c, 0.85 + rng() * 0.3);
-      }
-    }
-  }
-  return { signals, signs };
 }
 
 /**
@@ -527,53 +429,4 @@ export function addRiverEdge(props, terrain, rng) {
     }
   }
   return { wall, stairs };
-}
-
-/**
- * Road markings.
- *
- * Painted onto the carriageway the streets already lay down: a dashed centre
- * line, and a zebra where two streets cross. Cheap, flat, and they do more for
- * "this is a road" than any amount of asphalt texture.
- */
-export function addRoadMarkings(props, terrain, pitch, reach, origin) {
-  const LIFT = 0.3;
-  let dashes = 0, crossings = 0;
-  const lanes = Math.ceil((reach - origin) / pitch);
-  const centres = [];
-  for (let k = 0; k < lanes; k++) {
-    const c = origin + (k + 0.5) * pitch;
-    if (Math.abs(c) > reach) continue;
-    centres.push(c);
-  }
-
-  for (const c of centres) {
-    for (let t = -reach; t < reach; t += 9) {
-      for (const axis of ['x', 'z']) {
-        const x = axis === 'x' ? t : c;
-        const z = axis === 'x' ? c : t;
-        if (terrain.isWater(x, z)) continue;
-        if (Math.hypot(x, z) < 78) continue;
-        // Skip the dash where a cross street runs through, and paint a
-        // crossing instead.
-        const onJunction = centres.some((cc) => Math.abs((axis === 'x' ? x : z) - cc) < 11);
-        const y = terrain.heightAt(x, z) + LIFT;
-        if (onJunction) continue;
-        const g = axis === 'x' ? box(4.0, 0.06, 0.34, x, y, z) : box(0.34, 0.06, 4.0, x, y, z);
-        props.add('markings', g, 0xe8e2cc, 0.92);
-        dashes++;
-      }
-    }
-    // Zebra crossings on the approaches to each junction.
-    for (const cc of centres) {
-      if (terrain.isWater(c, cc) || Math.hypot(c, cc) < 78) continue;
-      const y = terrain.heightAt(c, cc) + LIFT;
-      for (let b = -3; b <= 3; b++) {
-        props.add('markings', box(0.62, 0.06, 5.2, c + b * 1.15, y, cc + 13), 0xe8e2cc, 0.95);
-        props.add('markings', box(5.2, 0.06, 0.62, c + 13, y, cc + b * 1.15), 0xe8e2cc, 0.95);
-      }
-      crossings += 2;
-    }
-  }
-  return { dashes, crossings };
 }
