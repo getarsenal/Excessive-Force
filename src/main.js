@@ -14,6 +14,8 @@ import { ExplosionFX } from './fx/explosion.js';
 import { Garrison } from './game/defenders.js';
 import { Battle } from './game/battle.js';
 import { HUD } from './ui/hud.js';
+import { Picker } from './core/picking.js';
+import { TestMenu } from './ui/testmenu.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -55,8 +57,9 @@ async function boot() {
 
   const sunDir = engine.sun.position.clone().normalize();
   engine.scene.add(createSky(sunDir));
-  const water = createWater(terrain.span, terrain.waterLevel, sunDir);
+  const water = createWater(terrain, sunDir, quality);
   engine.scene.add(water);
+  console.log(`[tumble] water: ${water.userData.quads} quads over the river mask`);
 
   const groundY = terrain.heightAt(0, 0);
   const origin = new THREE.Vector3(0, groundY, 0);
@@ -197,61 +200,15 @@ async function boot() {
 
   // ── Input: tap the structure to designate a target, tap the ground to
   // deploy the selected unit.
-  const raycaster = new THREE.Raycaster();
-  const ndc = new THREE.Vector2();
-  let structureMeshes = structures.flatMap((s) => s.meshes.map((m) => m.mesh));
+  const picker = new Picker(canvas, engine.camera, terrain);
+  const pick = (x, y) => picker.pick(x, y, structures);
 
-  function pick(clientX, clientY) {
-    ndc.x = (clientX / window.innerWidth) * 2 - 1;
-    ndc.y = -(clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(ndc, engine.camera);
-
-    const onStructure = raycaster.intersectObjects(structureMeshes, false);
-    if (onStructure.length) {
-      const hit = onStructure[0];
-      const entry = structures.find((s) => s.meshes.some((m) => m.mesh === hit.object));
-      let label = null;
-      if (entry) {
-        const meshEntry = entry.meshes.find((m) => m.mesh === hit.object);
-        const chunk = meshEntry?.list[hit.instanceId];
-        if (chunk !== undefined) label = entry.tagOf[chunk];
-      }
-      return { kind: 'structure', point: hit.point, label };
-    }
-
-    const groundHit = raycastTerrain(raycaster.ray);
-    if (groundHit) return { kind: 'ground', point: groundHit };
-    return null;
-  }
-
-  /** March the ray against the heightfield; cheaper and more robust than
-   *  intersecting the terrain mesh, which has 260k triangles. */
-  function raycastTerrain(ray) {
-    const o = ray.origin, d = ray.direction;
-    let t = 0;
-    let prevDiff = o.y - terrain.heightAt(o.x, o.z);
-    const maxT = 4000;
-    const step = 2.5;
-    while (t < maxT) {
-      t += step + t * 0.012; // coarser strides further out
-      const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
-      const diff = y - terrain.heightAt(x, z);
-      if (diff <= 0 && prevDiff > 0) {
-        // Bisect once for a clean surface point.
-        let lo = t - step, hi = t;
-        for (let i = 0; i < 12; i++) {
-          const mid = (lo + hi) / 2;
-          const mx = o.x + d.x * mid, my = o.y + d.y * mid, mz = o.z + d.z * mid;
-          if (my - terrain.heightAt(mx, mz) > 0) lo = mid; else hi = mid;
-        }
-        const ft = (lo + hi) / 2;
-        return new THREE.Vector3(o.x + d.x * ft, 0, o.z + d.z * ft)
-          .setY(terrain.heightAt(o.x + d.x * ft, o.z + d.z * ft));
-      }
-      prevDiff = diff;
-    }
-    return null;
-  }
+  // Every touch gets an immediate screen-space acknowledgement, before any of
+  // the work below decides what the touch meant. Feedback that waits on a
+  // decision is feedback that arrives too late to be reassuring.
+  canvas.addEventListener('pointerdown', (e) => {
+    hud.ripple(e.clientX, e.clientY, battle.selectedUnitId ? 'deploy' : 'aim');
+  });
 
   canvas.addEventListener('pointerup', (e) => {
     if (rig.wasDrag) return;
@@ -261,8 +218,11 @@ async function boot() {
 
     if (battle.selectedUnitId) {
       if (hit.kind === 'ground') {
+        const ok = battle.validPlacement(hit.point);
+        battle.pulse(hit.point, ok.ok ? 0x6fd08c : 0xe8604c, 14);
         battle.deploy(battle.selectedUnitId, hit.point);
       } else {
+        battle.pulse(hit.point, 0xe8604c, 9, true);
         hud.showPrompt('deploy on open ground', 'warn');
       }
       return;
@@ -270,6 +230,10 @@ async function boot() {
     if (hit.kind === 'structure') {
       battle.setTarget(hit.point, hit.label);
       hud.feed(`TARGET: ${(hit.label || 'structure').toUpperCase()}`, '');
+    } else {
+      // Tapping bare ground with nothing selected still confirms the tap, so
+      // it is obvious the game registered it and where.
+      battle.pulse(hit.point, 0x7e8b9b, 9);
     }
   });
 
@@ -307,11 +271,57 @@ async function boot() {
   let last = performance.now();
   let frames = 0, fpsAcc = 0, fps = 0, physMs = 0;
 
+  /**
+   * Step the simulation without rendering.
+   *
+   * Automated tests and the test menu both need to cover a two-minute
+   * engagement in a fraction of a second — under a software rasteriser the
+   * page runs at a couple of frames a second, so wall-clock waiting advances
+   * almost no game time and nothing with a setup timer ever fires. This runs
+   * the same update path the frame loop does, minus the draw.
+   */
+  const fastForward = (seconds, step = 1 / 60) => {
+    const steps = Math.round(seconds / step);
+    for (let i = 0; i < steps; i++) {
+      physics.step(step);
+      physics.recycleSettled(quality.settleFrames);
+      for (const s of structures) { s.solveStability(); s.maintainIslands(); s.syncTransforms(); }
+      battle.update(step);
+      fx.update(step);
+    }
+    return steps;
+  };
+
+  // Collect anything the WebGL context complains about, so the self-test suite
+  // can assert the render path is clean rather than relying on someone
+  // noticing a warning in the console.
+  const shaderLog = [];
+  {
+    const warn = console.warn.bind(console);
+    const err = console.error.bind(console);
+    const watch = (fn) => (...args) => {
+      const s = args.map((a) => (typeof a === 'string' ? a : '')).join(' ');
+      if (/shader|program|glsl|webgl/i.test(s)) shaderLog.push(s.slice(0, 160));
+      fn(...args);
+    };
+    console.warn = watch(warn);
+    console.error = watch(err);
+  }
+
+  const testMenu = new TestMenu({
+    battle, engine, physics, terrain, rig, quality, level, structures, water,
+    cityGroup, hud, picker, fx, garrison, governor,
+    fastForward,
+    stats: () => ({ fps, physMs: +physMs.toFixed(2) }),
+    shaderErrors: () => shaderLog,
+  });
+
   function frame() {
     requestAnimationFrame(frame);
     const now = performance.now();
     const dtMs = now - last;
-    const dt = Math.min(dtMs / 1000, 0.05);
+    const rawDt = Math.min(dtMs / 1000, 0.05);
+    const dt = testMenu.paused ? 0 : rawDt * testMenu.timeScale;
     last = now;
 
     const pStart = performance.now();
@@ -324,14 +334,16 @@ async function boot() {
     for (const s of structures) s.syncTransforms();
 
     audio.setListener(engine.camera);
+    battle.tracerFX.setCamera(engine.camera);
     battle.update(dt);
     fx.update(dt);
-    hud.update(dt);
+    hud.update(rawDt);
+    testMenu.update(rawDt);
 
     water.material.uniforms.uTime.value = now * 0.001;
 
-    const shake = engine.updateShake(dt);
-    rig.update(dt, shake);
+    const shake = engine.updateShake(rawDt);
+    rig.update(rawDt, shake);
     engine.sun.target.position.set(rig.target.x, rig.target.y, rig.target.z);
     engine.sun.position.set(rig.target.x - 320, rig.target.y + 260, rig.target.z + 190);
     engine.render();
@@ -350,29 +362,12 @@ async function boot() {
 
   Object.assign(window, {
     engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level,
-    structures, tower: primary, primary,
+    structures, tower: primary, primary, picker, hud, water, testMenu,
   });
-
-  /**
-   * Step the simulation without rendering.
-   *
-   * Automated tests run under a software rasteriser at a couple of frames a
-   * second, so wall-clock waiting advances almost no game time and nothing with
-   * a setup timer ever fires. This runs the same update path the frame loop
-   * does, minus the draw, so a test can cover a two-minute engagement in a
-   * second. It is a test hook, not a game speed control.
-   */
-  window.__fastForward = (seconds, step = 1 / 60) => {
-    const steps = Math.round(seconds / step);
-    for (let i = 0; i < steps; i++) {
-      physics.step(step);
-      physics.recycleSettled(quality.settleFrames);
-      for (const s of structures) { s.solveStability(); s.maintainIslands(); s.syncTransforms(); }
-      battle.update(step);
-      fx.update(step);
-    }
-    return steps;
-  };
+  window.__fastForward = fastForward;
+  // The headless harness drives the same suite the panel does, so a regression
+  // fails CI and the in-game panel identically.
+  window.__runTests = () => testMenu.runTestsSync();
 }
 
 boot().catch((err) => {

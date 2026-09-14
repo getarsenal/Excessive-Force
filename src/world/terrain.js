@@ -71,14 +71,27 @@ export class Terrain {
     return (a * (1 - fx) + b * fx) * (1 - fz) + (c * (1 - fx) + d * fx) * fz;
   }
 
-  /** Bilinear mask lookup: water / road / park coverage at world (x, z). */
+  /**
+   * Mask lookup: water / road / park coverage at world (x, z).
+   *
+   * Bilinear, not nearest. The mask is one sample every 3.5 m, and taking the
+   * nearest one draws every park and road as a staircase of hard-edged
+   * rectangles — which is exactly what the ground used to look like from the
+   * opening camera position.
+   */
   maskAt(x, z) {
     const n = this.size;
     const u = THREE.MathUtils.clamp((x + this.span) / (this.span * 2) * (n - 1), 0, n - 1);
     const v = THREE.MathUtils.clamp((this.span - z) / (this.span * 2) * (n - 1), 0, n - 1);
-    const xi = Math.round(u), zi = Math.round(v);
-    const o = (zi * n + xi) * 3;
-    return { water: this.mask[o], road: this.mask[o + 1], park: this.mask[o + 2] };
+    const x0 = Math.floor(u), z0 = Math.floor(v);
+    const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
+    const fx = u - x0, fz = v - z0;
+    const m = this.mask;
+    const at = (xi, zi, ch) => m[(zi * n + xi) * 3 + ch];
+    const lerp2 = (ch) =>
+      (at(x0, z0, ch) * (1 - fx) + at(x1, z0, ch) * fx) * (1 - fz)
+      + (at(x0, z1, ch) * (1 - fx) + at(x1, z1, ch) * fx) * fz;
+    return { water: lerp2(0), road: lerp2(1), park: lerp2(2) };
   }
 
   isWater(x, z) {
@@ -102,12 +115,37 @@ export class Terrain {
     const pos = geo.attributes.position;
     const colors = new Float32Array(pos.count * 3);
 
-    // Urban ground, parkland, riverbed and wet mud, blended by the bake mask.
-    const cUrban = new THREE.Color(0x5c5b54);
-    const cPark = new THREE.Color(0x546b3c);
-    const cBed = new THREE.Color(0x3f4136);
-    const cBank = new THREE.Color(0x64604f);
+    /**
+     * The palette.
+     *
+     * The ground used to be four shades of the same grey, which is why the
+     * whole level read as a photocopy: with only 28 m of relief over 1.8 km
+     * there is almost no shading variation to carry the image, so every bit of
+     * the depth in this picture has to come out of colour.
+     *
+     * So the mask channels are now used for what they are: parkland is really
+     * green, roads are really asphalt, the ground between them is warm London
+     * brick-dust rather than neutral, and the riverbed runs from silt to a deep
+     * cold green. The two noise octaves then break each of those into patches
+     * so no region is a single flat field.
+     */
+    //
+     // Value separation matters as much as hue here. Colours of similar
+     // brightness average into one field at this scale however different their
+     // hue is, so the palette is deliberately spread from near-white paving to
+     // near-black asphalt.
+    const P = this.palette || (this.palette = {
+      urban: new THREE.Color(0xb3ab99),   // pale paving and forecourt
+      urbanAlt: new THREE.Color(0x9d927c),
+      park: new THREE.Color(0x40682a),    // real grass, deep
+      parkAlt: new THREE.Color(0x5f8a37),
+      road: new THREE.Color(0x2e3035),    // asphalt, genuinely dark
+      bank: new THREE.Color(0xb0a173),    // exposed silt at the waterline
+      bed: new THREE.Color(0x2b4239),     // wet riverbed, cold green
+      dry: new THREE.Color(0xc2b184),     // sun-bleached ground on high spots
+    });
     const tmp = new THREE.Color();
+    const tmp2 = new THREE.Color();
 
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
@@ -116,21 +154,43 @@ export class Terrain {
       pos.setY(i, h);
 
       const m = this.maskAt(x, z);
-      tmp.copy(cUrban).lerp(cPark, m.park);
-      // Below the waterline the ground is riverbed; just above it, wet bank.
-      const wet = THREE.MathUtils.clamp((this.waterLevel + 1.5 - h) / 4.0, 0, 1);
-      tmp.lerp(cBank, wet * 0.7);
-      tmp.lerp(cBed, THREE.MathUtils.clamp((this.waterLevel - h) / 3.0, 0, 1) * 0.85);
 
-      // Fine mottling so the large flat expanse isn't a flat colour field.
-      // Two scales of variation: broad patches that break the plain into
-      // districts, and fine mottling on top.
-      const broad = valueNoise(x * 0.0055, z * 0.0055);
-      tmp.lerp(cPark, THREE.MathUtils.clamp(broad * 1.6 + 0.22, 0, 1) * 0.30 * (1 - m.water));
-      const n = valueNoise(x * 0.035, z * 0.035) * 0.13
-              + valueNoise(x * 0.31, z * 0.31) * 0.06
+      // Broad districts: which part of town this is.
+      const broad = valueNoise(x * 0.0048, z * 0.0048);
+      const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
+
+      tmp.copy(P.urban).lerp(P.urbanAlt, THREE.MathUtils.clamp(broad * 2.2 + 0.5, 0, 1));
+      // Squares, gardens and verges outside the mapped parks — but *patches*,
+      // not a wash. Thresholded rather than ramped, so green appears as
+      // discrete pockets of ground with edges, which is what a city looks like
+      // from above. Ramping it instead turns the entire map into one lawn.
+      const green = THREE.MathUtils.smoothstep(patch, 0.10, 0.30) * 0.62;
+      tmp2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
+      tmp.lerp(tmp2, Math.max(green * (1 - m.water), m.park * 0.92));
+
+      // Higher, drier ground bleaches out.
+      const rel = THREE.MathUtils.clamp(
+        (h - this.meta.minElevation) / Math.max(1, this.meta.maxElevation - this.meta.minElevation),
+        0, 1,
+      );
+      tmp.lerp(P.dry, rel * 0.22);
+
+      // Roads, straight from the bake mask — hard edges are exactly what a
+      // noise-only ground lacks, and they give the eye something to measure
+      // distance against.
+      tmp.lerp(P.road, THREE.MathUtils.clamp(m.road * 1.35, 0, 1) * 0.82);
+
+      // Then the water margin, which overrides everything: silt at the line,
+      // cold green below it.
+      const wet = THREE.MathUtils.clamp((this.waterLevel + 1.2 - h) / 3.2, 0, 1);
+      tmp.lerp(P.bank, wet * 0.8);
+      tmp.lerp(P.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
+
+      // Fine mottling on top of all of it.
+      const n = valueNoise(x * 0.055, z * 0.055) * 0.22
+              + valueNoise(x * 0.34, z * 0.34) * 0.10
               + broad * 0.16;
-      tmp.multiplyScalar(0.88 + n);
+      tmp.multiplyScalar(0.80 + n);
 
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
@@ -149,26 +209,59 @@ export class Terrain {
       t.repeat.set(170, 170);
       t.anisotropy = this.quality.anisotropy;
     }
+    // The normal map is doing most of the work that relief would do on a hillier
+    // map, so it is pushed hard: at this scale the sun rakes across it and the
+    // ground picks up texture instead of reading as painted card.
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       map: grain,
       normalMap: grainN,
-      normalScale: new THREE.Vector2(0.3, 0.3),
-      roughness: 0.97,
+      normalScale: new THREE.Vector2(0.85, 0.85),
+      roughness: 0.94,
       metalness: 0.0,
     });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = this.quality.shadowMapSize > 0;
     this.mesh.frustumCulled = false;
 
-    // Flat apron continuing the border height to the horizon so the playfield
-    // doesn't end in mid-air. It sits fractionally lower to avoid z-fighting
-    // along the seam, and fog swallows the step long before it's legible.
+    // The surround.
+    //
+    // Everything outside the DEM's 1.8 km square still has to be *something*,
+    // and for a long time it was one flat plane of one flat colour, sixteen
+    // times the size of the playfield. From the opening camera that plane was
+    // most of the screen: whatever the level itself looked like, the picture
+    // was a huge featureless field with a small diorama in the middle of it.
+    //
+    // So it gets the same treatment the playfield does — a subdivided grid,
+    // coloured from the same palette and the same noise, so the city reads as
+    // continuing past the edge of the data rather than stopping at it. It is
+    // still flat, and fog still takes it long before that becomes legible.
     const edge = this.heightAt(this.span, 0);
-    const apronGeo = new THREE.PlaneGeometry(this.span * 16, this.span * 16, 1, 1);
+    const apronSpan = this.span * 14;
+    const apronGeo = new THREE.PlaneGeometry(apronSpan, apronSpan, 96, 96);
     apronGeo.rotateX(-Math.PI / 2);
+    const ap = apronGeo.attributes.position;
+    const apColors = new Float32Array(ap.count * 3);
+    const at = new THREE.Color();
+    const at2 = new THREE.Color();
+    for (let i = 0; i < ap.count; i++) {
+      const x = ap.getX(i), z = ap.getZ(i);
+      const broad = valueNoise(x * 0.0048, z * 0.0048);
+      const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
+      at.copy(P.urban).lerp(P.urbanAlt, THREE.MathUtils.clamp(broad * 2.2 + 0.5, 0, 1));
+      at2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
+      // More green further out: the suburbs and then open country.
+      const rural = THREE.MathUtils.clamp(
+        (Math.max(Math.abs(x), Math.abs(z)) - this.span) / (this.span * 3), 0, 1,
+      );
+      at.lerp(at2, THREE.MathUtils.smoothstep(patch, 0.08, 0.28) * 0.62 + rural * 0.38);
+      const n2 = valueNoise(x * 0.055, z * 0.055) * 0.22 + broad * 0.16;
+      at.multiplyScalar(0.80 + n2);
+      apColors[i * 3] = at.r; apColors[i * 3 + 1] = at.g; apColors[i * 3 + 2] = at.b;
+    }
+    apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
     const apron = new THREE.Mesh(apronGeo, new THREE.MeshStandardMaterial({
-      color: 0x60594c, roughness: 1.0, metalness: 0,
+      vertexColors: true, roughness: 1.0, metalness: 0,
     }));
     apron.position.y = edge - 0.4;
     apron.frustumCulled = false;

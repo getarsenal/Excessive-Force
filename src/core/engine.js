@@ -6,12 +6,22 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
-/** Slight warm grade + vignette, applied after bloom. */
+/**
+ * Grade: saturation, contrast, warmth, vignette, and a chromatic punch driven
+ * by the camera shake.
+ *
+ * ACES tone mapping is doing the right thing to highlights but it desaturates
+ * midtones noticeably, which on a scene this flat is most of the picture. The
+ * saturation and lift/gain here are what bring the colour back after it — they
+ * are the last thing in the chain, so what the player sees is what this says.
+ */
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null },
     uVignette: { value: 0.85 },
     uWarm: { value: 0.03 },
+    uSaturation: { value: 1.12 },
+    uContrast: { value: 1.11 },
     uShake: { value: new THREE.Vector2(0, 0) },
   },
   vertexShader: /* glsl */`
@@ -22,6 +32,8 @@ const GradeShader = {
     uniform sampler2D tDiffuse;
     uniform float uVignette;
     uniform float uWarm;
+    uniform float uSaturation;
+    uniform float uContrast;
     uniform vec2 uShake;
     varying vec2 vUv;
     void main(){
@@ -36,9 +48,22 @@ const GradeShader = {
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - d * ca).b;
 
-      col *= mix(vec3(1.0), vec3(1.06, 1.0, 0.93), uWarm * 6.0);
+      // Saturation around perceptual luma, so pushing colour does not also
+      // push brightness and blow the stonework out.
+      float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(luma), col, uSaturation);
+
+      // Gentle S-curve about mid grey.
+      col = (col - 0.5) * uContrast + 0.5;
+
+      // Split tone: warm the highlights, cool the shadows. A single global warm
+      // tint flattens the image; opposing the ends separates them.
+      float shadow = 1.0 - smoothstep(0.0, 0.55, luma);
+      col *= mix(vec3(1.0), vec3(1.07, 1.01, 0.92), uWarm * 6.0);
+      col *= mix(vec3(1.0), vec3(0.94, 0.98, 1.09), shadow * 0.5);
+
       col *= smoothstep(0.95, uVignette * 0.35, r2 * 1.6);
-      gl_FragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(max(col, 0.0), 1.0);
     }
   `,
 };
@@ -57,7 +82,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatioCap));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.98;
+    this.renderer.toneMappingExposure = 1.12;
 
     if (quality.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
@@ -82,9 +107,11 @@ export class Engine {
   _setupLights() {
     const q = this.quality;
 
-    // Late-afternoon London: low warm sun, strong cool sky fill. The contrast
-    // is what gives the stonework its relief.
-    this.sun = new THREE.DirectionalLight(0xfff0d8, 3.0);
+    // Mid-afternoon: a strong, distinctly warm sun against a cool sky fill.
+    // The colour *difference* between key and fill is what gives masonry its
+    // relief — a neutral sun and a neutral ambient produce the flat grey
+    // stonework this used to have, no matter how bright either one is.
+    this.sun = new THREE.DirectionalLight(0xfff3dd, 4.0);
     this.sun.position.set(-320, 260, 190);
     if (q.shadowMapSize > 0) {
       this.sun.castShadow = true;
@@ -101,17 +128,18 @@ export class Engine {
     // Kept well below the sun: a strong blue hemisphere washes every upward
     // face (roofs especially) with sky colour and the whole city goes flat and
     // cold. Ambient should fill shadow, not compete with the key light.
-    this.hemi = new THREE.HemisphereLight(0x9fb4cc, 0x5a4c3c, 0.78);
+    this.hemi = new THREE.HemisphereLight(0x8cb2e0, 0x6a5a38, 0.5);
     this.scene.add(this.hemi);
 
-    // A dim rim from behind separates the tower from the sky haze.
-    this.rim = new THREE.DirectionalLight(0x93b4dc, 0.38);
+    // A rim from behind separates the tower from the sky haze.
+    this.rim = new THREE.DirectionalLight(0x8fc0f0, 0.5);
     this.rim.position.set(280, 120, -260);
     this.scene.add(this.rim);
 
     // Light enough that the far bank and the skyline still read, heavy enough
-    // to hide where the terrain data runs out.
-    this.scene.fog = new THREE.FogExp2(0xb6c6d6, 0.00042);
+    // to hide where the terrain data runs out. Tinted toward the sky rather
+    // than grey, so distance reads as air and not as dust.
+    this.scene.fog = new THREE.FogExp2(0xa9c4de, 0.00036);
   }
 
   _setupComposer() {

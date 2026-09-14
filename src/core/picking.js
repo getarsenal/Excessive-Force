@@ -1,0 +1,183 @@
+import * as THREE from 'three';
+
+/**
+ * Turning a tap into a world point.
+ *
+ * This lives on its own because two separate bugs in it made the game close to
+ * unplayable, and both were invisible from the code that called it:
+ *
+ * 1. Normalised device coordinates were derived from `window.innerWidth` and
+ *    `window.innerHeight`. That is only the canvas's size if the canvas exactly
+ *    fills the layout viewport, which it does not once a mobile browser shows
+ *    its URL bar — the canvas is laid out against one viewport and the pointer
+ *    is reported in another, so every tap lands a fixed distance off. Asking
+ *    the canvas for its own rectangle is correct in every case, and costs one
+ *    cached call per resize.
+ *
+ * 2. The heightfield marcher advanced with a growing stride but bisected
+ *    against a fixed one, so the bracket did not contain the crossing and the
+ *    returned point sat past the real surface.
+ *
+ * The result now round-trips: project the returned point back through the
+ * camera and you land within a pixel of the tap. `selfTest()` asserts exactly
+ * that, and the test menu runs it.
+ */
+export class Picker {
+  constructor(canvas, camera, terrain) {
+    this.canvas = canvas;
+    this.camera = camera;
+    this.terrain = terrain;
+    this.raycaster = new THREE.Raycaster();
+    this._ndc = new THREE.Vector2();
+    this._v = new THREE.Vector3();
+  }
+
+  /** Pointer coordinates -> NDC, using the canvas's own box. */
+  toNDC(clientX, clientY, out = this._ndc) {
+    const r = this.canvas.getBoundingClientRect();
+    out.x = ((clientX - r.left) / Math.max(r.width, 1)) * 2 - 1;
+    out.y = -(((clientY - r.top) / Math.max(r.height, 1)) * 2 - 1);
+    return out;
+  }
+
+  ray(clientX, clientY) {
+    this.raycaster.setFromCamera(this.toNDC(clientX, clientY), this.camera);
+    return this.raycaster.ray;
+  }
+
+  /**
+   * March the ray against the heightfield.
+   *
+   * Cheaper and far more robust than intersecting the terrain mesh, which has
+   * a quarter of a million triangles. The stride grows with distance because
+   * near the camera a metre of ray is a lot of screen, and far away it is not —
+   * but the previous sample distance is now carried forward explicitly so the
+   * bisection brackets the crossing it actually found.
+   */
+  terrainPoint(ray, maxT = 5000) {
+    const t3 = this.terrain;
+    const o = ray.origin, d = ray.direction;
+    const h = (t, out) => {
+      out.set(o.x + d.x * t, o.y + d.y * t, o.z + d.z * t);
+      return out.y - t3.heightAt(out.x, out.z);
+    };
+    const p = this._v;
+
+    let t = 0;
+    let prevT = 0;
+    let prevDiff = h(0, p);
+    // Starting underground (camera clipped into a hill) has no sensible answer
+    // above the surface; take the point straight below instead.
+    if (prevDiff <= 0) return this._surface(o.x, o.z);
+
+    const base = 2.0;
+    while (t < maxT) {
+      prevT = t;
+      t += base + t * 0.012;
+      const diff = h(t, p);
+      if (diff <= 0) {
+        // The crossing is in (prevT, t]; bisect that exact interval.
+        let lo = prevT, hi = t;
+        for (let i = 0; i < 24; i++) {
+          const mid = (lo + hi) * 0.5;
+          if (h(mid, p) > 0) lo = mid; else hi = mid;
+        }
+        const ft = (lo + hi) * 0.5;
+        return this._surface(o.x + d.x * ft, o.z + d.z * ft);
+      }
+      prevDiff = diff;
+    }
+    return null;
+  }
+
+  _surface(x, z) {
+    return new THREE.Vector3(x, this.terrain.heightAt(x, z), z);
+  }
+
+  /**
+   * Full pick: structures first, then the ground.
+   * @returns {{kind:'structure'|'ground', point:THREE.Vector3, label:?string,
+   *            structure:?object, chunk:number}|null}
+   */
+  pick(clientX, clientY, structures) {
+    const ray = this.ray(clientX, clientY);
+
+    let best = null;
+    if (structures) {
+      const meshes = [];
+      for (const s of structures) for (const m of s.meshes) meshes.push(m.mesh);
+      const hits = this.raycaster.intersectObjects(meshes, false);
+      for (const hit of hits) {
+        const entry = this._entryFor(structures, hit.object);
+        if (!entry) continue;
+        const chunk = entry.meshEntry.list[hit.instanceId];
+        // Destroyed instances are scaled to zero rather than removed, so they
+        // still carry a (degenerate) bounding volume. Skip them explicitly.
+        if (chunk === undefined || !(entry.structure.flags[chunk] & 1)) continue;
+        best = {
+          kind: 'structure',
+          point: hit.point.clone(),
+          label: entry.structure.tagOf[chunk],
+          structure: entry.structure,
+          chunk,
+          distance: hit.distance,
+        };
+        break;
+      }
+    }
+
+    const ground = this.terrainPoint(ray);
+    if (best && (!ground || best.distance <= ray.origin.distanceTo(ground) + 0.5)) return best;
+    if (ground) return { kind: 'ground', point: ground, label: null, structure: null, chunk: -1 };
+    return best;
+  }
+
+  _entryFor(structures, object) {
+    for (const s of structures) {
+      for (const m of s.meshes) if (m.mesh === object) return { structure: s, meshEntry: m };
+    }
+    return null;
+  }
+
+  /**
+   * Project a world point back to client coordinates. Used by the HUD and by
+   * the round-trip assertion below.
+   */
+  toScreen(point) {
+    const r = this.canvas.getBoundingClientRect();
+    const v = this._v.copy(point).project(this.camera);
+    return {
+      x: r.left + (v.x * 0.5 + 0.5) * r.width,
+      y: r.top + (-v.y * 0.5 + 0.5) * r.height,
+      behind: v.z > 1,
+    };
+  }
+
+  /**
+   * Assert that picking round-trips: tap at (x, y), project the ground point
+   * found there back to the screen, and it must come back to (x, y).
+   *
+   * @returns {{samples:number, worst:number, failures:Array}}
+   */
+  selfTest(samples = 25, tolerancePx = 2.5) {
+    const r = this.canvas.getBoundingClientRect();
+    const failures = [];
+    let worst = 0;
+    let n = 0;
+    for (let i = 0; i < samples; i++) {
+      // Sample the lower two thirds of the screen, where the ground is.
+      const gx = (i % 5 + 0.5) / 5;
+      const gy = 0.34 + (Math.floor(i / 5) % 5 + 0.5) / 5 * 0.62;
+      const cx = r.left + gx * r.width;
+      const cy = r.top + gy * r.height;
+      const p = this.terrainPoint(this.ray(cx, cy));
+      if (!p) continue;
+      n++;
+      const back = this.toScreen(p);
+      const err = Math.hypot(back.x - cx, back.y - cy);
+      worst = Math.max(worst, err);
+      if (err > tolerancePx) failures.push({ cx, cy, err: +err.toFixed(2) });
+    }
+    return { samples: n, worst: +worst.toFixed(2), failures };
+  }
+}

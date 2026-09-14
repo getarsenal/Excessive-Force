@@ -18,6 +18,35 @@ import { BlockList, MATERIALS as M } from '../builder.js';
  * through from one side and topple, rather than simply eroding.
  */
 
+/**
+ * Where the tower's windows are.
+ *
+ * Exported because the garrison stands in them: a defender's position and the
+ * hole he is shooting through have to come from the same numbers, or he ends up
+ * embedded in a wall or floating a metre outside it. Six bays on each of the
+ * four faces, plus the belfry arcade above.
+ */
+export const TOWER_WINDOWS = {
+  heights: [12.5, 20.5, 28.5, 36.5, 44.5, 52.0],
+  halfWidth: 0.85,      // opening is 1.7 m across
+  halfHeight: 1.15,     // and 2.3 m tall
+  faceInset: 3.0,       // how far out from the axis a wall stone has to be
+};
+
+function towerWindowCutter() {
+  const { heights, halfWidth, halfHeight, faceInset } = TOWER_WINDOWS;
+  return (x, y, z) => {
+    for (const wy of heights) {
+      if (y < wy - halfHeight || y > wy + halfHeight) continue;
+      // A window is cut where a stone sits on a face (far out on one axis,
+      // near the centre line on the other).
+      if (Math.abs(x) < halfWidth && Math.abs(z) > faceInset) return true;
+      if (Math.abs(z) < halfWidth && Math.abs(x) > faceInset) return true;
+    }
+    return false;
+  };
+}
+
 export function buildElizabethTower(quality) {
   const B = new BlockList();
   const s = quality.blockScale;
@@ -56,25 +85,48 @@ export function buildElizabethTower(quality) {
   // that a hit can strip facing without opening the core — and so the core,
   // being weaker brick, is what actually fails under redistributed load.
   B.section('shaft', () => {
-    let y = 6.0;
-    let c = 0;
-    while (y < SHAFT_TOP) {
-      const h = Math.min(course, SHAFT_TOP - y);
-      const t = (y - 6.0) / (SHAFT_TOP - 6.0);
-      // Walls thin as they rise, like the real tower.
+    // Window openings are cut by simply not laying the stone, which means the
+    // support graph is correct from the start: the wall genuinely spans each
+    // opening through the lintel course, and shooting that lintel out genuinely
+    // drops the masonry above it.
+    B.openings(towerWindowCutter(), () => {
+      let y = 6.0;
+      let c = 0;
+      while (y < SHAFT_TOP) {
+        const h = Math.min(course, SHAFT_TOP - y);
+        const t = (y - 6.0) / (SHAFT_TOP - 6.0);
+        // Walls thin as they rise, like the real tower.
+        const wall = 2.3 - t * 1.4;
+        const w = W - t * 0.5;
+
+        // Structural brick ring.
+        B.ring(0, 0, w - 1.0, w - 1.0, wall, y, h, stone, M.BRICK, c % 2);
+        // Limestone facing, half a course out of phase with the core.
+        B.ring(0, 0, w, w, 0.55, y, h, stone * 0.9, M.LIMESTONE, (c + 1) % 2);
+
+        y += h;
+        c++;
+      }
+    });
+
+    // Lintel and sill for every opening. The lintel is one stone spanning the
+    // whole bay, so the courses above it bear on masonry rather than relying on
+    // the solver's lateral spanning — and it is a single point of failure the
+    // player can aim at, which is the point of having one.
+    const { heights, halfWidth, halfHeight } = TOWER_WINDOWS;
+    for (const wy of heights) {
+      const t = (wy - 6.0) / (SHAFT_TOP - 6.0);
       const wall = 2.3 - t * 1.4;
       const w = W - t * 0.5;
-
-      // Structural brick ring.
-      B.ring(0, 0, w - 1.0, w - 1.0, wall, y, h, stone, M.BRICK, c % 2);
-      // Limestone facing, half a course out of phase with the core.
-      B.ring(0, 0, w, w, 0.55, y, h, stone * 0.9, M.LIMESTONE, (c + 1) % 2);
-
-      // Window openings every few courses on each face, cut by simply not
-      // placing the facing stones there. Openings weaken the wall exactly
-      // where you would expect.
-      y += h;
-      c++;
+      const span = halfWidth * 2 + 1.5;
+      for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const off = (w - wall) / 2;
+        const cx = ax * off, cz = az * off;
+        const hxL = ax !== 0 ? wall / 2 : span / 2;
+        const hzL = ax !== 0 ? span / 2 : wall / 2;
+        B.add(cx, wy + halfHeight + 0.32, cz, hxL, 0.30, hzL, M.LIMESTONE);
+        B.add(cx, wy - halfHeight - 0.28, cz, hxL, 0.26, hzL, M.LIMESTONE);
+      }
     }
 
     // Corner buttresses run the full height and carry a real share of load.
@@ -195,6 +247,30 @@ export function buildElizabethTower(quality) {
   return B;
 }
 
+export const WING_WINDOWS = {
+  heights: [5.0, 12.0, 19.0],
+  first: 6,          // z offset of the first bay from the wing's near end
+  spacing: 6,        // bay spacing along the wing
+  halfWidth: 1.1,
+  halfHeight: 1.5,
+  roof: 27,          // parapet height, where the mortar pits go
+};
+
+function wingWindowCutter(z0, len, depth) {
+  const { heights, first, spacing, halfWidth, halfHeight } = WING_WINDOWS;
+  const faceX = depth / 2 - 1.6;
+  return (x, y, z) => {
+    if (Math.abs(x) < faceX) return false;      // only the long elevations
+    for (const wy of heights) {
+      if (y < wy - halfHeight || y > wy + halfHeight) continue;
+      for (let bz = z0 + first; bz < z0 + len - 3; bz += spacing) {
+        if (Math.abs(z - bz) < halfWidth) return true;
+      }
+    }
+    return false;
+  };
+}
+
 /**
  * A short wing of the Palace of Westminster butting onto the tower's south
  * face, so the tower doesn't read as a lone obelisk in an empty field. It is
@@ -214,12 +290,28 @@ export function buildPalaceWing(quality) {
 
     B.slab(0, -1.0, z0 + len / 2, depth + 4, 2.0, len + 4, stone * 2.0, M.CONCRETE);
 
-    let y = 0;
-    let c = 0;
-    while (y < height) {
-      const h = Math.min(course, height - y);
-      B.ring(0, z0 + len / 2, depth, len, 1.5, y, h, stone, M.LIMESTONE, c % 2);
-      y += h; c++;
+    // Three storeys of windows down both long elevations, on the real bay
+    // spacing of the Palace. The garrison stands in them.
+    const cut = wingWindowCutter(z0, len, depth);
+    B.openings(cut, () => {
+      let y = 0;
+      let c = 0;
+      while (y < height) {
+        const h = Math.min(course, height - y);
+        B.ring(0, z0 + len / 2, depth, len, 1.5, y, h, stone, M.LIMESTONE, c % 2);
+        y += h; c++;
+      }
+    });
+    // Lintels over the bays.
+    for (const wy of WING_WINDOWS.heights) {
+      for (let z = z0 + WING_WINDOWS.first; z < z0 + len - 3; z += WING_WINDOWS.spacing) {
+        for (const sx of [1, -1]) {
+          B.add(sx * (depth / 2 - 0.75), wy + WING_WINDOWS.halfHeight + 0.3, z,
+            0.75, 0.28, WING_WINDOWS.halfWidth + 0.7, M.LIMESTONE);
+          B.add(sx * (depth / 2 - 0.75), wy - WING_WINDOWS.halfHeight - 0.26, z,
+            0.75, 0.24, WING_WINDOWS.halfWidth + 0.7, M.LIMESTONE);
+        }
+      }
     }
     // Cross walls every 8 m give the wing real internal structure, and give
     // the roof bearing often enough that it does not rely on spanning.

@@ -15,11 +15,9 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
  * to the west, and blocks of period terraces filling the rest.
  */
 
-const PALETTE = [
-  0xa79781, 0xb3a48c, 0x94836f, 0x8a8073, 0xa08f77, 0x8b7f6d, 0xb0a087,
-  0x9c8a72, 0x857a6a,
-];
-const ROOF = [0x53483e, 0x463d35, 0x5d5145, 0x3f3831, 0x4e463c];
+// Shared with the OSM city builder, so the fallback layout and the real
+// footprints are the same city rather than two different ones.
+import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 
 export function buildContext(terrain, quality) {
   const group = new THREE.Group();
@@ -73,15 +71,53 @@ export function buildContext(terrain, quality) {
     block(x, z, 34 + rng() * 34, 30 + rng() * 36, 20 + rng() * 34);
   }
 
-  // ── Filler terraces to the west and south, thinning with distance.
-  const count = quality.groundClutter ? 90 : 44;
-  for (let i = 0; i < count; i++) {
-    const a = rng() * Math.PI * 2;
-    const r = 210 + Math.pow(rng(), 0.62) * 560;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    if (x > 150 && Math.abs(z) < 700) continue; // leave the river clear
-    block(x, z, 20 + rng() * 30, 18 + rng() * 28, 14 + rng() * 26, rng() * 0.6);
+  // ── The rest of the city, laid out as blocks and streets.
+  //
+  // The previous filler was ninety boxes scattered on a circle, which from the
+  // bird's-eye camera left the entire map outside the landmark's plot as bare
+  // ground — the single biggest reason the level read as a diorama on a lawn
+  // rather than as a place. A city seen from above is mostly *streets*: what
+  // the eye reads is the grid, not the individual buildings.
+  //
+  // So: a grid of blocks on a real Georgian pitch, each ringed with terraces
+  // around a courtyard, skipping water, parks and the landmark's own plot. It
+  // costs nothing at runtime — every box lands in the same merged mesh.
+  const PITCH = 86;          // block centre to block centre
+  const BLOCK = 68;          // built footprint within it; the rest is street
+  const reach = terrain.span * 0.94;
+  const dense = quality.groundClutter ? 1.0 : 0.55;
+  for (let bx = -reach; bx <= reach; bx += PITCH) {
+    for (let bz = -reach; bz <= reach; bz += PITCH) {
+      const jx = bx + (rng() - 0.5) * 9;
+      const jz = bz + (rng() - 0.5) * 9;
+      const r = Math.hypot(jx, jz);
+      if (r < 118) continue;                       // the landmark's own plot
+      if (terrain.isWater(jx, jz)) continue;
+      const m = terrain.maskAt(jx, jz);
+      if (m.park > 0.42) continue;                 // leave the parks open
+      // Thin with distance, so the near blocks are solid and the far ones
+      // break up before the fog takes them.
+      if (rng() > dense * (1 - Math.min(0.55, r / (terrain.span * 2.2)))) continue;
+
+      // Terraces around the block's edge, each side one run with a gap.
+      const h0 = 11 + rng() * 20;
+      const depth = 13 + rng() * 5;
+      const half = BLOCK / 2;
+      const yaw = (rng() - 0.5) * 0.12;
+      for (const [dx, dz, along] of [[0, 1, 'x'], [0, -1, 'x'], [1, 0, 'z'], [-1, 0, 'z']]) {
+        if (rng() < 0.16) continue;                // a gap onto the courtyard
+        const runs = 1 + (rng() < 0.45 ? 1 : 0);
+        for (let k = 0; k < runs; k++) {
+          const span = (BLOCK - 6) / runs;
+          const off = -half + 3 + span * (k + 0.5);
+          const cx = jx + dx * (half - depth / 2) + (along === 'x' ? off : 0);
+          const cz = jz + dz * (half - depth / 2) + (along === 'z' ? off : 0);
+          const w = along === 'x' ? span - 2 : depth;
+          const d = along === 'x' ? depth : span - 2;
+          block(cx, cz, w, d, h0 * (0.8 + rng() * 0.45), yaw);
+        }
+      }
+    }
   }
 
   const facade = makeFacadeTexture(64);

@@ -32,11 +32,33 @@ export async function loadCity(levelId) {
   }
 }
 
-const PALETTE = [
-  0xa79781, 0xb3a48c, 0x94836f, 0x8a8073, 0xa08f77, 0x8b7f6d, 0xb0a087,
-  0x9c8a72, 0x857a6a,
+/**
+ * Facade and roof colours.
+ *
+ * Westminster is not beige. It is Portland stone next to London stock brick
+ * next to red Victorian terracotta next to post-war concrete, under slate and
+ * oxidised copper. The old palette was nine samples of the same warm grey,
+ * which made a thousand buildings read as one undifferentiated mass — you
+ * could not tell where one ended and the next began, which is most of why the
+ * city looked flat.
+ */
+export const FACADE_PALETTE = [
+  0xd9cdb4, 0xe4d9c2, 0xc9bca0,   // Portland stone
+  0xb0704c, 0xa15f42, 0xc07a52,   // London stock / terracotta
+  0x8d5a4a, 0x9c6350,             // darker brick
+  0xa9a79c, 0x96958c,             // concrete
+  0xc4b58e, 0xb8a67e,             // render
 ];
-const ROOF = [0x53483e, 0x463d35, 0x5d5145, 0x3f3831, 0x4e463c];
+// Muted at source: the grade adds saturation globally, so a palette that
+// already reads correctly on its own comes out as poster paint on screen.
+export const ROOF_PALETTE = [
+  0x5e6773, 0x525a66, 0x6b7381,   // slate
+  0x4d6c63, 0x56776c,             // oxidised copper
+  0x7d5648, 0x8a5f4f,             // clay tile
+  0x474c53,                       // bitumen
+];
+const PALETTE = FACADE_PALETTE;
+const ROOF = ROOF_PALETTE;
 
 /** Buildings kept, by quality tier. The baker sorts largest-first. */
 const BUDGET = { low: 320, medium: 700, high: 1200, ultra: 2000 };

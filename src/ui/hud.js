@@ -74,6 +74,44 @@ export class HUD {
 
     this._promptTimer = 0;
     this._lastUnlocked = new Set();
+    this._setupRipples();
+  }
+
+  /**
+   * Touch confirmation.
+   *
+   * A pool of pre-made elements rather than one created per tap: on a phone,
+   * creating and destroying a DOM node inside a pointer handler is enough to
+   * cost a frame, and a ripple that stutters is worse than no ripple.
+   */
+  _setupRipples() {
+    this._ripplePool = [];
+    this._rippleNext = 0;
+    const layer = document.createElement('div');
+    layer.id = 'ripples';
+    for (let i = 0; i < 8; i++) {
+      const r = document.createElement('span');
+      r.className = 'ripple';
+      layer.appendChild(r);
+      this._ripplePool.push(r);
+    }
+    document.body.appendChild(layer);
+  }
+
+  /**
+   * Show a ripple at a screen position.
+   * @param {'aim'|'deploy'|'ui'} kind changes the colour, so the feedback also
+   *   says what the tap was going to mean.
+   */
+  ripple(x, y, kind = 'ui') {
+    const el = this._ripplePool[this._rippleNext];
+    this._rippleNext = (this._rippleNext + 1) % this._ripplePool.length;
+    el.className = 'ripple';
+    // Force a reflow so restarting the animation actually restarts it.
+    void el.offsetWidth;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.className = `ripple go ${kind}`;
   }
 
   _buildBar() {
@@ -172,12 +210,19 @@ export class HUD {
       }
     }
 
-    // Target card.
-    if (b.target) {
+    // Target card. Shown whenever anything is engaging, since guns now pick
+    // their own aim point when nothing has been designated — a silent card
+    // would read as "nothing is shooting", which is the opposite of the truth.
+    const guns = b.gunsOnTarget;
+    if (b.target || guns > 0) {
       this.el.targetcard.hidden = false;
-      this.el.tcSection.textContent = (b.targetLabel || 'structure').toUpperCase();
-      this.el.tcHeight.textContent = `${(b.target.y - b.originGround).toFixed(1)} m`;
-      this.el.tcGuns.textContent = String(b.gunsOnTarget);
+      this.el.tcSection.textContent = b.target
+        ? (b.targetLabel || 'structure').toUpperCase()
+        : 'FREE FIRE';
+      this.el.tcHeight.textContent = b.target
+        ? `${(b.target.y - b.originGround).toFixed(1)} m`
+        : '—';
+      this.el.tcGuns.textContent = String(guns);
     } else {
       this.el.targetcard.hidden = true;
     }

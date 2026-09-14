@@ -109,6 +109,7 @@ export class Projectile {
     this.kind = opts.kind ?? 'arc';
     this.warhead = opts.warhead;
     this.owner = opts.owner ?? null;
+    this.hostile = !!opts.hostile;
     this.target = opts.target ? opts.target.clone() : null;
     this.trailRate = opts.trail ?? 0.6;
     this.age = 0;
@@ -196,10 +197,12 @@ export class ProjectileManager {
     this.list = [];
 
     const geo = new THREE.SphereGeometry(0.42, 8, 6);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
     this.mesh = new THREE.InstancedMesh(geo, mat, 256);
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(256 * 3), 3);
+    this.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     this.mesh.count = 0;
     scene.add(this.mesh);
     this._m4 = new THREE.Matrix4();
@@ -265,15 +268,20 @@ export class ProjectileManager {
 
       if (p.pos.y < -200) { p.alive = false; continue; }
 
-      if (write < this.mesh.count + 256) {
+      if (write < 256) {
         this._m4.compose(p.pos, this._q, this._scale);
         this.mesh.setMatrixAt(write, this._m4);
+        // Incoming rounds burn red so the player can tell at a glance which
+        // way a shell is going.
+        if (p.hostile) this.mesh.instanceColor.setXYZ(write, 1.0, 0.34, 0.18);
+        else this.mesh.instanceColor.setXYZ(write, 1.0, 0.85, 0.63);
         write++;
       }
     }
 
     this.mesh.count = Math.min(write, 256);
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.instanceColor.needsUpdate = true;
     this.list = this.list.filter((p) => p.alive);
   }
 

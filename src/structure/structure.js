@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MATERIALS, MATERIAL_PROPS } from './builder.js';
+import { Occupancy } from './occupancy.js';
 
 /**
  * A destructible masonry structure.
@@ -112,6 +113,14 @@ export class Structure {
     this._groutOrphans();
     this._buildStaticBody();
     this._buildMeshes();
+
+    // Solidity grid for line-of-sight. Built after the grout pass so stones
+    // that were never part of the building don't block anyone's shot, and
+    // maintained from `_detachCollider`, which is the single point every stone
+    // passes through on its way out of the standing structure.
+    this._inGrid = new Uint8Array(n);
+    for (let i = 0; i < n; i++) if (this.flags[i] & ALIVE) this._inGrid[i] = 1;
+    this.occupancy = new Occupancy(this);
 
     this.islands = new Map();
     this._nextIslandId = 1;
@@ -598,6 +607,12 @@ export class Structure {
     return { x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) };
   }
 
+  _topY() {
+    let y = -Infinity;
+    for (let i = 0; i < this.count; i++) if (this.flags[i] & ALIVE) y = Math.max(y, this.py[i]);
+    return isFinite(y) ? y : this.groundY + 1;
+  }
+
   _buildMeshes() {
     // One InstancedMesh per material; a unit cube scaled per instance.
     const byMat = new Map();
@@ -645,13 +660,40 @@ export class Structure {
 
       const colors = new Float32Array(list.length * 3);
       const meshIdx = this.meshes.length;
+      const c = new THREE.Color();
+      const hsl = { h: 0, s: 0, l: 0 };
+      const yLo = this.groundY;
+      const yHi = this._topY();
       for (let k = 0; k < list.length; k++) {
         const i = list[k];
         this.meshIndexOf[i] = meshIdx;
         this.instanceIndexOf[i] = k;
-        // Per-stone tonal variation; without it the tower reads as plastic.
-        const v = 0.82 + hash01(i) * 0.36;
-        const c = new THREE.Color(props.color).multiplyScalar(v);
+
+        c.setHex(props.color);
+        c.getHSL(hsl);
+
+        // Per-stone tonal *and* hue variation. Value alone reads as plastic
+        // lit badly; a few degrees of hue scatter reads as quarried stone.
+        const r1 = hash01(i), r2 = hash01(i * 2654435761 + 7);
+        hsl.h = (hsl.h + (r1 - 0.5) * 0.035 + 1) % 1;
+        hsl.s = THREE.MathUtils.clamp(hsl.s * (0.78 + r2 * 0.62), 0, 1);
+        hsl.l = THREE.MathUtils.clamp(hsl.l * (0.86 + r1 * 0.30), 0, 1);
+
+        // Ambient occlusion, free: a stone's neighbour count already says how
+        // enclosed it is. Deep-set stones in a reveal or an arcade darken,
+        // exposed corners and parapets stay bright. This is most of what gives
+        // the masonry depth, and it costs one subtraction per stone at build
+        // time rather than a baking pass.
+        const nb = this.adjStart[i + 1] - this.adjStart[i];
+        const ao = 1 - THREE.MathUtils.clamp((nb - 7) / 16, 0, 1) * 0.34;
+
+        // Weathering: soot and rain streaking gathers low and on the underside
+        // of cornices, which is how a real Victorian tower is coloured.
+        const t = THREE.MathUtils.clamp((this.py[i] - yLo) / Math.max(1, yHi - yLo), 0, 1);
+        const weather = 1 - (1 - t) * 0.16;
+
+        c.setHSL(hsl.h, hsl.s, hsl.l);
+        c.multiplyScalar(ao * weather);
         colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
       mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
@@ -865,6 +907,12 @@ export class Structure {
   }
 
   _detachCollider(i) {
+    // Leaving the static body means this stone no longer blocks anyone's line
+    // of sight, whether it was destroyed, freed or welded into an island.
+    if (this._inGrid && this._inGrid[i]) {
+      this._inGrid[i] = 0;
+      this.occupancy.addChunk(this, i, -1);
+    }
     const h = this.colliderOf[i];
     if (h < 0) return;
     const col = this.physics.world.getCollider(h);

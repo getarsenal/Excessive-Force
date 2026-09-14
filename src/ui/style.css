@@ -32,6 +32,26 @@ html, body {
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 #ui > * { pointer-events: auto; }
 
+/* ── Touch ripples ───────────────────────────────────────────────────────
+   Confirmation that a tap registered, and where. Pointer-events off and
+   composited on transform/opacity only, so it never costs a frame or eats an
+   input the game wanted. */
+#ripples { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.ripple {
+  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border-radius: 50%; opacity: 0;
+  border: 2px solid rgba(220, 235, 250, 0.9);
+  box-shadow: 0 0 12px rgba(160, 200, 245, 0.55);
+}
+.ripple.go { animation: rippleOut 0.5s cubic-bezier(0.15, 0.7, 0.3, 1) forwards; }
+.ripple.aim { border-color: rgba(255, 128, 96, 0.95); box-shadow: 0 0 14px rgba(255, 110, 80, 0.6); }
+.ripple.deploy { border-color: rgba(120, 220, 150, 0.95); box-shadow: 0 0 14px rgba(110, 215, 145, 0.6); }
+@keyframes rippleOut {
+  0% { transform: scale(0.35); opacity: 0.95; border-width: 3px; }
+  70% { opacity: 0.5; }
+  100% { transform: scale(4.6); opacity: 0; border-width: 1px; }
+}
+
 /* ── Loading ─────────────────────────────────────────────────────────── */
 #loading {
   position: fixed; inset: 0; z-index: 100;
@@ -203,6 +223,113 @@ html, body {
 /* The target card takes this corner when it appears, so step the button down. */
 #targetcard:not([hidden]) ~ #sound-toggle { top: 232px; }
 
+/* ── Test menu ───────────────────────────────────────────────────────── */
+#test-btn {
+  position: absolute; left: var(--ui-pad); top: 92px;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
+  font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
+  padding: 6px 10px; cursor: pointer;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#test-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+#test-btn.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
+
+#testmenu {
+  position: absolute; left: var(--ui-pad); top: 122px;
+  width: min(330px, calc(100vw - var(--ui-pad) * 2));
+  max-height: calc(100vh - 240px);
+  display: flex; flex-direction: column;
+  background: var(--panel-solid); border: 1px solid var(--edge-bright);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px; z-index: 40;
+}
+.tm-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-bottom: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.03);
+}
+.tm-title {
+  font-family: 'Oswald', sans-serif; font-size: 11px;
+  letter-spacing: 0.2em; color: var(--text); flex: 1;
+}
+.tm-hint {
+  font-size: 9px; color: var(--dim); border: 1px solid var(--edge);
+  padding: 1px 5px; border-radius: 2px;
+}
+.tm-close {
+  background: none; border: none; color: var(--dim);
+  font-size: 17px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.tm-close:hover { color: var(--danger); }
+.tm-body { overflow-y: auto; overscroll-behavior: contain; }
+
+.tm-sec-head {
+  padding: 7px 10px; cursor: pointer; color: var(--dim);
+  letter-spacing: 0.16em; border-top: 1px solid rgba(150, 168, 190, 0.09);
+  display: flex; align-items: center; gap: 6px;
+}
+.tm-sec-head::before { content: '▸'; font-size: 8px; }
+.tm-sec.open > .tm-sec-head { color: var(--text); }
+.tm-sec.open > .tm-sec-head::before { content: '▾'; }
+.tm-sec-body { display: none; padding: 2px 10px 9px; }
+.tm-sec.open > .tm-sec-body { display: block; }
+
+.tm-row {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 20px; padding: 2px 0; color: var(--dim);
+}
+.tm-row > span { flex: 1; min-width: 0; }
+.tm-row > b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tm-stat > b { color: #9fd2ff; }
+
+.tm-slider input[type=range] {
+  flex: 1.1; min-width: 70px; height: 16px; accent-color: #58a6ff;
+  background: transparent; cursor: pointer;
+}
+.tm-slider > b { min-width: 46px; text-align: right; }
+
+.tm-toggle button, .tm-btns button {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge);
+  color: var(--dim); font-family: inherit; font-size: 9px;
+  letter-spacing: 0.1em; padding: 3px 7px; cursor: pointer;
+}
+.tm-toggle button.on { color: #6fd08c; border-color: rgba(111, 208, 140, 0.5); }
+.tm-btns { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.tm-btns button:hover { color: var(--text); border-color: var(--edge-bright); }
+.tm-select select {
+  flex: 1.2; background: #0e1116; color: var(--text);
+  border: 1px solid var(--edge); font-family: inherit; font-size: 10px; padding: 2px;
+}
+.tm-note {
+  color: rgba(140, 156, 176, 0.75); font-size: 9px; line-height: 1.5;
+  padding: 5px 0 2px; border-top: 1px dashed rgba(150, 168, 190, 0.14); margin-top: 5px;
+}
+
+.tm-tests { margin-top: 6px; }
+.tm-test {
+  display: grid; grid-template-columns: 34px 1fr auto;
+  gap: 5px; padding: 3px 0; align-items: baseline;
+  border-top: 1px solid rgba(150, 168, 190, 0.07);
+}
+.tm-test b { font-size: 9px; }
+.tm-test.pass b { color: #6fd08c; }
+.tm-test.fail b { color: var(--danger); }
+.tm-test span { color: var(--text); }
+.tm-test i {
+  grid-column: 2 / 4; font-style: normal; font-size: 9px;
+  color: rgba(140, 156, 176, 0.8);
+}
+.tm-test.fail i { color: #f0b8ae; }
+.tm-test u { text-decoration: none; color: rgba(140, 156, 176, 0.5); font-size: 9px; }
+.tm-test.summary {
+  grid-template-columns: 1fr; font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.14em; font-size: 11px; padding: 4px 0 6px;
+}
+.tm-test.summary.pass { color: #6fd08c; }
+.tm-test.summary.fail { color: var(--danger); }
+.tm-test.running { color: var(--warn); grid-template-columns: 1fr; }
+
 /* ── Kill feed ───────────────────────────────────────────────────────── */
 #feed {
   position: absolute; right: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
@@ -258,7 +385,10 @@ html, body {
   #perf { font-size: 9px; }
   #feed { display: none; }
   .tb-block { min-width: 0; }
+  #test-btn { top: 84px; }
+  #testmenu { top: 112px; max-height: calc(100vh - 210px); }
 }
 @media (max-height: 480px) {
   #targetcard { display: none; }
+  #testmenu { max-height: calc(100vh - 130px); }
 }

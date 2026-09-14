@@ -32,15 +32,15 @@ export const MATERIALS = {
  * is exactly what a real stone surround exists to prevent.
  */
 export const MATERIAL_PROPS = {
-  [MATERIALS.LIMESTONE]: { density: 2.45, strength: 1.00, toughness: 100, color: 0xc9bfa4, structural: true },
-  [MATERIALS.BRICK]:     { density: 1.90, strength: 0.78, toughness: 78,  color: 0x8a5341, structural: true },
-  [MATERIALS.IRON]:      { density: 7.20, strength: 2.60, toughness: 210, color: 0x4d5751, structural: true },
-  [MATERIALS.GLASS]:     { density: 2.50, strength: 0.16, toughness: 16,  color: 0xdfeaf2, structural: false },
-  [MATERIALS.SLATE]:     { density: 2.70, strength: 0.55, toughness: 55,  color: 0x4a4e56, structural: true },
-  [MATERIALS.GILT]:      { density: 2.60, strength: 0.70, toughness: 70,  color: 0xc8a250, structural: false },
-  [MATERIALS.CONCRETE]:  { density: 2.35, strength: 1.45, toughness: 150, color: 0x9a958c, structural: true },
-  [MATERIALS.MARBLE]:    { density: 2.70, strength: 1.08, toughness: 112, color: 0xeae4d8, structural: true },
-  [MATERIALS.SANDSTONE]: { density: 2.30, strength: 0.82, toughness: 84,  color: 0x9c5a44, structural: true },
+  [MATERIALS.LIMESTONE]: { density: 2.45, strength: 1.00, toughness: 100, color: 0xdcc99e, structural: true },
+  [MATERIALS.BRICK]:     { density: 1.90, strength: 0.78, toughness: 78,  color: 0xa4573c, structural: true },
+  [MATERIALS.IRON]:      { density: 7.20, strength: 2.60, toughness: 210, color: 0x50605e, structural: true },
+  [MATERIALS.GLASS]:     { density: 2.50, strength: 0.16, toughness: 16,  color: 0xe6f2f7, structural: false },
+  [MATERIALS.SLATE]:     { density: 2.70, strength: 0.55, toughness: 55,  color: 0x4c5666, structural: true },
+  [MATERIALS.GILT]:      { density: 2.60, strength: 0.70, toughness: 70,  color: 0xe2b446, structural: false },
+  [MATERIALS.CONCRETE]:  { density: 2.35, strength: 1.45, toughness: 150, color: 0xa39c8e, structural: true },
+  [MATERIALS.MARBLE]:    { density: 2.70, strength: 1.08, toughness: 112, color: 0xf4ece0, structural: true },
+  [MATERIALS.SANDSTONE]: { density: 2.30, strength: 0.82, toughness: 84,  color: 0xb85f3e, structural: true },
 };
 
 
