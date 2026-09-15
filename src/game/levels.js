@@ -204,7 +204,12 @@ export const LEVELS = {
     // A pyramid cannot topple, so height is meaningless and the whole measure
     // is how much of it is left. The bar is low because grinding two and a
     // half million cubic metres of limestone to nothing is not a game.
-    win: { integrity: 0.55, heightFrac: 0.62 },
+    // The bar is low, and it is low for a reason. Khufu is two and a third
+    // million cubic metres; asking for half of it is asking for ten thousand
+    // shells. What wins here is opening one face and bringing the chambers
+    // down, which takes a tenth of it off and is a afternoon's work rather
+    // than a siege.
+    win: { integrity: 0.86, heightFrac: 0.90 },
     brief: 'Nothing here can topple. Open the casing and break what the chambers hang on.',
   },
 };

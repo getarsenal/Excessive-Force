@@ -23,6 +23,7 @@ export const MATERIALS = {
   MARBLE: 7,     // Makrana marble, the Taj's facing
   SANDSTONE: 8,  // Agra red sandstone
   REDSTONE: 9,   // the Palace of Westminster's own warm red-brown stone
+  RUBBLE: 10,    // the packed rubble-and-mortar fill inside a pyramid
 };
 
 /**
@@ -51,6 +52,16 @@ export const MATERIAL_PROPS = {
   // comes out of the pipeline as a traffic cone — which is exactly what the
   // first attempt at this did to the whole Palace of Westminster.
   [MATERIALS.REDSTONE]:  { density: 2.45, strength: 1.00, toughness: 100, color: 0xa87b6c, structural: true },
+  // What a pyramid is actually full of: roughly dressed local limestone packed
+  // with rubble and gypsum mortar, not dressed ashlar.
+  //
+  // Soft on purpose, and it has to be. A stone's health goes as its volume, so
+  // a six-metre pyramid block has fifteen times the health of a stone in the
+  // Elizabeth Tower — eighty rounds into one face of Khufu quarried nine
+  // blocks out of twenty thousand, which is a level that cannot be won. The
+  // core is a quarter the toughness of dressed stone, so a shell that lands on
+  // it takes a piece out of the pyramid rather than scuffing it.
+  [MATERIALS.RUBBLE]:    { density: 2.10, strength: 0.70, toughness: 26,  color: 0xbaa478, structural: true },
 };
 
 

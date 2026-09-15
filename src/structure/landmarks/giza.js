@@ -58,7 +58,7 @@ function halfAt(y, base = KHUFU.base, height = KHUFU.height) {
  */
 function pyramid(B, cx, cz, base, height, stone, opts = {}) {
   const casingMat = opts.casing ?? M.LIMESTONE;
-  const coreMat = opts.core ?? M.SANDSTONE;
+  const coreMat = opts.core ?? M.RUBBLE;
   const capMat = opts.cap ?? casingMat;
   // Courses thin as they rise, from about 1.4 m at the base to 0.6 m at the
   // apex, which is roughly what Khufu does.
@@ -176,7 +176,7 @@ export function buildGreatPyramid(quality) {
   B.section('pyramid', () => {
     B.openings(voids, () => {
       pyramid(B, 0, 0, K.base, K.height, stone,
-        { casing: M.LIMESTONE, core: M.SANDSTONE, cap: M.GILT });
+        { casing: M.LIMESTONE, core: M.RUBBLE, cap: M.GILT });
     });
   });
 
@@ -217,7 +217,7 @@ export function buildKhafre(quality) {
   });
   B.section('khafre', () => {
     pyramid(B, 0, 0, 215.5, 136.4, stone,
-      { casing: M.SANDSTONE, core: M.SANDSTONE, cap: M.LIMESTONE });
+      { casing: M.SANDSTONE, core: M.RUBBLE, cap: M.LIMESTONE });
   });
   return B;
 }
@@ -232,7 +232,7 @@ export function buildMenkaure(quality) {
   });
   B.section('menkaure', () => {
     pyramid(B, 0, 0, 102.2, 65.5, stone,
-      { casing: M.LIMESTONE, core: M.SANDSTONE, cap: M.LIMESTONE });
+      { casing: M.LIMESTONE, core: M.RUBBLE, cap: M.LIMESTONE });
   });
   return B;
 }
