@@ -1937,8 +1937,12 @@ export class Structure {
     for (let b = from; b < L.band; b++) {
       for (let k = this.bandStart[b]; k < this.bandStart[b + 1]; k++) {
         const j = this.bandList[k];
-        if (!(this.flags[j] & ALIVE) || (this.flags[j] & (FREE | ISLAND))) continue;
-        if (!this.structural[j]) continue;
+        if (!(this.flags[j] & ALIVE)) continue;
+        // Rubble counts. A section coming over does not care whether what
+        // catches it is masonry that is still standing or the heap of its own
+        // building that fell an hour ago — and the heap is usually wider than
+        // the stump, because that is what a heap is. Leaving it out is how
+        // this still handed over sections that then sat on the pile.
         const proj = (this.px[j] - L.pivotX) * dx + (this.pz[j] - L.pivotZ) * dz
           + Math.abs(this.hx[j] * dx) + Math.abs(this.hz[j] * dz);
         if (proj > widest) widest = proj;
@@ -2242,7 +2246,22 @@ export class Structure {
       // on it any more. Without this the solver re-armed the same slice on the
       // next tick, tipped it on the one after, and sat in that loop for the
       // rest of the level, baking a fraction of a degree each time.
-      if (moved) this._fallenBand = Math.min(this._fallenBand ?? Infinity, band);
+      if (moved) {
+        this._fallenBand = Math.min(this._fallenBand ?? Infinity, band);
+        // ...provisionally. A slice that has let go cannot lean again, which
+        // is true of a slice that *went* — and a disaster for one that was
+        // handed over and then sat down on the rubble, because the lockout
+        // applies to every band above it too and the building can never lean
+        // again at all. That is how a tower finished a test sixty-eight per
+        // cent intact with seventy rounds still to come and no mechanism left
+        // that could bring it down. So the lockout is watched, and lifted if
+        // the section is still standing where it was a few seconds later.
+        this._fallenWatch = {
+          band,
+          top: this.standingHeight(),
+          t: 0,
+        };
+      }
       return 1;
     }
     // Keep the colliders roughly with the geometry so shells still hit the
@@ -2891,6 +2910,24 @@ export class Structure {
    * island per call so a big collapse spreads the cost over several frames.
    */
   maintainIslands(dt = 1 / 60) {
+    // Lift the lockout if the section that was handed over never went.
+    //
+    // Cheap, and it runs whether or not there are islands left, because the
+    // case it exists for is a section that sat down and stayed sitting.
+    const w = this._fallenWatch;
+    if (w) {
+      w.t += dt;
+      if (w.t > 3.0) {
+        this._fallenWatch = null;
+        if (this.standingHeight() > w.top - 3) {
+          // It is still as tall as it was: whatever was released is resting on
+          // the rubble rather than falling, and the building has to be allowed
+          // to lean again or nothing can ever bring it down.
+          if (this._fallenBand === w.band) this._fallenBand = undefined;
+          this.stabilityDirty = true;
+        }
+      }
+    }
     if (this.islands.size === 0) return 0;
 
     // A settling section is still part of the building until it has visibly
