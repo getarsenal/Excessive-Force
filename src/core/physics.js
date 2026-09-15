@@ -126,9 +126,21 @@ export class PhysicsWorld {
    *
    * Returns whether the body was actually frozen.
    */
-  demote(body) {
+  demote(body, force = false) {
     if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
-    if (!this._standsOnSomething(body)) return false;
+    if (!this._standsOnSomething(body)) {
+      // The relief valve. Refusing to freeze anything unsupported is right in
+      // the sky and wrong in a rubble field: a stone balanced on the lip of a
+      // pile fails the test, stays dynamic, and holds a simulation slot that a
+      // collapsing tower needs — which is how a building ends up standing
+      // there with its base shot out, because there was no room left to let it
+      // go. Down among the rubble, freeze it anyway: it is already on the
+      // ground, and nothing about it will read as floating.
+      if (!force || !this.groundAt) return false;
+      const t = body.translation();
+      const g = this.groundAt(t.x, t.z);
+      if (!isFinite(g) || t.y - this._reachOf(body) > g + 3.0) return false;
+    }
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
@@ -136,6 +148,7 @@ export class PhysicsWorld {
     // Remember it so the sweeps above can catch it if the ground it froze onto
     // is later blown out from under it.
     body.__frozen = true;
+    body.__frozenAt = this.stepCount;
     this.frozen.push(body);
     return true;
   }
@@ -228,7 +241,7 @@ export class PhysicsWorld {
    * can create that situation, so a blast is where to look for it — one query
    * per explosion rather than a sweep every frame.
    */
-  wakeNear(center, radius, limit = 24) {
+  wakeNear(center, radius, limit = 48) {
     if (this.dead || !this.frozen.length) return 0;
     // Capped, hard. A blast in a rubble field can have several hundred frozen
     // stones inside it, and testing every one of them costs three rays each —
@@ -266,10 +279,18 @@ export class PhysicsWorld {
    * that leaned away, a pile that shifted — kept deliberately slow, because
    * every query into the physics world is a query that can go wrong.
    */
-  auditFrozen(slice = 6) {
+  auditFrozen(slice = 0) {
     if (this.dead) return 0;
     const list = this.frozen;
     if (!list.length) return 0;
+    // Scaled to the size of the field. Most of these answers are arithmetic
+    // now, so a big rubble field can afford to be walked in a couple of
+    // seconds rather than a couple of minutes — which is the difference
+    // between a stone that hangs for a moment and one that hangs all game.
+    if (!slice) slice = Math.max(8, Math.min(48, list.length >> 5));
+    // Make room once, up front. Without this the sweep spends its whole budget
+    // failing to promote the first thing it finds.
+    if (this.dynamicSet.size >= this.activeBudget) this.reclaim(8);
     let checked = 0, woke = 0;
     while (checked < slice && list.length) {
       if (this._auditCursor >= list.length) this._auditCursor = 0;
@@ -288,14 +309,17 @@ export class PhysicsWorld {
         this._auditCursor++;
         continue;
       }
-      // Make room if the budget is full: something hanging in the sky is a
-      // better use of a slot than a stone that has already come to rest.
+      // Something hanging in the sky is a better use of a slot than a stone
+      // that has already come to rest.
       if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
       if (!this.promote(body)) {
-        // Still no room. Leave it on the list and come back to it rather than
-        // losing track of a stone that is hanging.
+        // No room for this one. Keep going rather than stopping the sweep
+        // here: stopping is how the cursor ends up advancing one place a
+        // frame, taking a minute to cross a list of two thousand — which is
+        // long enough for the player to see a stone hanging and wonder why
+        // nothing is happening about it.
         this._auditCursor++;
-        break;
+        continue;
       }
       list[idx] = list[list.length - 1];
       list.pop();
@@ -337,7 +361,7 @@ export class PhysicsWorld {
     const need = this.dynamicSet.size + wanted - this.activeBudget;
     for (const body of this.dynamicSet) {
       if (freed >= need) break;
-      if (body.isSleeping() && this.demote(body)) freed++;
+      if (body.isSleeping() && this.demote(body, true)) freed++;
     }
 
     // Second pass: bodies that have stopped without being asleep.
@@ -366,8 +390,10 @@ export class PhysicsWorld {
         if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
         tried++;
         // `demote` refuses anything airborne, which matters most here: at the
-        // top of its arc a thrown stone is briefly slower than a settled one.
-        if (this.demote(body)) freed++;
+        // top of its arc a thrown stone is briefly slower than a settled one —
+        // but down in the rubble it takes what it can get, or a collapse can
+        // run out of room to happen in.
+        if (this.demote(body, true)) freed++;
       }
     }
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);

@@ -1335,7 +1335,7 @@ export class Structure {
     // Rubble that settled on this wall is about to have the wall taken out
     // from under it. It is fixed scenery by now, so nothing in the solver will
     // ever notice — this is where to notice, once per blast.
-    this.physics.wakeNear(center, radius * 1.8);
+    this.physics.wakeNear(center, radius * 2.4);
 
     // Only stones near the blast can be involved; walk the spatial extent
     // cheaply by testing all chunks against a squared distance. For 7k chunks
