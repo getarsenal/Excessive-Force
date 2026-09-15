@@ -375,12 +375,17 @@ export class PhysicsWorld {
     if (this.dynamicSet.size + wanted <= this.activeBudget) return wanted;
     let freed = 0;
     const need = this.dynamicSet.size + wanted - this.activeBudget;
+
+    // Three passes, in order of how happy we are about the outcome.
+    //
+    // First, bodies Rapier has put to sleep, standing on something: freezing
+    // one of those is free of consequence.
     for (const body of this.dynamicSet) {
       if (freed >= need) break;
-      if (body.isSleeping() && this.demote(body, true)) freed++;
+      if (body.isSleeping() && this.demote(body)) freed++;
     }
 
-    // Second pass: bodies that have stopped without being asleep.
+    // Second, bodies that have stopped without being asleep.
     //
     // Rapier only sleeps a body that has been still for a while, and the debris
     // from a collapse is a heap of several hundred pieces jostling each other —
@@ -394,10 +399,8 @@ export class PhysicsWorld {
     // A third of a metre a second is slow enough that freezing it there is
     // invisible, and nothing in free fall stays under it for more than a frame
     // or two.
+    const slow = [];
     if (freed < need) {
-      // Bounded, because each attempt costs a few rays and this runs on the
-      // frame a shell lands. Freeing fewer slots than asked for is a slightly
-      // smaller collapse; testing two thousand bodies is a dropped frame.
       let tried = 0;
       for (const body of this.dynamicSet) {
         if (freed >= need || tried >= 240) break;
@@ -405,12 +408,20 @@ export class PhysicsWorld {
         if (Math.hypot(v.x, v.y, v.z) > 0.34) continue;
         if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
         tried++;
-        // `demote` refuses anything airborne, which matters most here: at the
-        // top of its arc a thrown stone is briefly slower than a settled one —
-        // but down in the rubble it takes what it can get, or a collapse can
-        // run out of room to happen in.
-        if (this.demote(body, true)) freed++;
+        if (this.demote(body)) freed++;
+        else slow.push(body);
       }
+    }
+
+    // Third, and only if the first two could not find enough: freeze the slow
+    // ones that are *not* standing on anything. This is the pass nobody wants
+    // — it is how a stone ends up frozen where it should not be — but the
+    // alternative is worse. A collapsing tower needs somewhere to put four
+    // hundred stones at once, and a building that cannot be given bodies
+    // stands there with its base shot out. Anything frozen here is on the
+    // sweep's list immediately, and gets released as soon as there is room.
+    for (let i = 0; i < slow.length && freed < need; i++) {
+      if (this.demote(slow[i], true)) freed++;
     }
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
   }
