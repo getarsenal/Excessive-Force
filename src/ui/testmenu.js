@@ -1557,6 +1557,7 @@ export class TestMenu {
 
           let frozen = 0;
           const hanging = [];
+          const tracked = new Set(P.frozen);
           for (let i = 0; i < st.count; i++) {
             if (!(st.flags[i] & 1) || !(st.flags[i] & 2)) continue;
             const body = st.bodyOf[i];
@@ -1564,12 +1565,15 @@ export class TestMenu {
             frozen++;
             if (st.py[i] - st.hy[i] < gy + 3) continue;
             if (P._standsOnSomething(body)) continue;
-            hanging.push((st.py[i] - gy).toFixed(0));
+            hanging.push(`${(st.py[i] - gy).toFixed(0)}m`
+              + `${tracked.has(body) ? '' : '/untracked'}`
+              + `${body.__frozen ? '' : '/unflagged'}`);
           }
           assert(frozen > 20, `only ${frozen} stones were recycled — no pressure`);
           assert(hanging.length === 0,
             `${hanging.length} stones are frozen in mid-air with nothing under `
-            + `them, at ${hanging.slice(0, 6).join(', ')} m up`);
+            + `them: ${hanging.slice(0, 8).join(', ')} `
+            + `(list ${P.frozen.length}, dynamic ${P.dynamicSet.size}/${P.activeBudget})`);
           return `${frozen} stones recycled, none of them hanging`;
         } finally {
           P.setBudget(wasBudget);
