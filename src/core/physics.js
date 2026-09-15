@@ -242,6 +242,12 @@ export class PhysicsWorld {
    */
   wakeNear(center, radius, limit = 48) {
     if (this.dead || !this.frozen.length) return 0;
+    // Not while the world is busy. Waking rubble costs slots, and the slots
+    // are what a collapsing building needs to come down with: a blast that
+    // spends them on bricks near the crater is a blast that leaves the tower
+    // standing. The sweep will pick up anything genuinely hanging as soon as
+    // there is room again, which is a second or two later.
+    if (this.dynamicSet.size > this.activeBudget * 0.6) return 0;
     // Capped, hard. A blast in a rubble field can have several hundred frozen
     // stones inside it, and testing every one of them costs three rays each —
     // which turned a blast into thousands of queries and slowed the game to a
