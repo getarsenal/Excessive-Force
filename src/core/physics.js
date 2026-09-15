@@ -247,16 +247,53 @@ export class PhysicsWorld {
     // heap at the bottom of that, and reports a piece of building hanging in
     // clear air at seventy metres as resting on the ground. Five hundred
     // stones of the Elizabeth Tower froze in the sky that way.
-    if (body.numColliders() > 1) return this._sectionStands(body);
+    const n = body.numColliders();
+    if (n > 1) return this._sectionStands(body);
+    if (n === 1) {
+      const col = body.collider(0);
+      const f = col && this._footOf(col);
+      if (f) return this._probeStands(f, body);
+    }
     const reach = this._reachOf(body);
-    return this._probeStands(t.x, t.y, t.z, reach, body);
+    return this._probeStands(
+      { x: t.x, y: t.y, z: t.z, hy: reach, hr: reach }, body);
+  }
+
+  /**
+   * A collider's own size, as the box that encloses it in world axes.
+   *
+   * The support rays used to be given the collider's *diagonal* as their length
+   * in every direction, which is a fine bound for a cube and a terrible one for
+   * a piece of masonry four metres long and half a metre thick: the diagonal is
+   * two metres, so a sideways ray reached a metre and a half past the surface of
+   * the stone and reported anything within it as something to lean on. A stone
+   * can then be held up by a wall it is not touching, and once one is, the next
+   * leans on that, and the chain climbs into the air. Measured properly, the
+   * horizontal half-extent of that stone is what it actually is, and a ray a
+   * quarter of a metre longer only finds things it is really against.
+   */
+  _footOf(col) {
+    const he = col.halfExtents?.();
+    const t = col.translation();
+    if (!he || !t || !isFinite(t.y)) return null;
+    const q = col.rotation?.() || { x: 0, y: 0, z: 0, w: 1 };
+    const xx = q.x * q.x, yy = q.y * q.y, zz = q.z * q.z;
+    const xy = q.x * q.y, xz = q.x * q.z, yz = q.y * q.z;
+    const wx = q.w * q.x, wy = q.w * q.y, wz = q.w * q.z;
+    const row = (a, b, c) => Math.abs(a) * he.x + Math.abs(b) * he.y + Math.abs(c) * he.z;
+    const ex = row(1 - 2 * (yy + zz), 2 * (xy - wz), 2 * (xz + wy));
+    const ey = row(2 * (xy + wz), 1 - 2 * (xx + zz), 2 * (yz - wx));
+    const ez = row(2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy));
+    return { x: t.x, y: t.y, z: t.z, hy: ey, hr: Math.max(ex, ez), hx: ex, hz: ez };
   }
 
   /**
    * The support test for one compact piece: three rays down from its origin
    * and four sideways, all of them ignoring anything that is itself falling.
    */
-  _probeStands(x, y, z, reach, body) {
+  _probeStands(f, body) {
+    const { x, y, z } = f;
+    const hy = f.hy, hr = f.hr;
     const FIXED_ONLY = this.fixedOnly;
     // The cheap answer first, and it is the answer nearly every time: almost
     // all settled rubble is lying on the ground, and the ground's height is
@@ -265,17 +302,17 @@ export class PhysicsWorld {
     // Rapier's opinion, and there is far less of that.
     if (this.groundAt) {
       const g = this.groundAt(x, z);
-      if (isFinite(g) && y - reach <= g + 0.8) return GROUNDED;
+      if (isFinite(g) && y - hy <= g + 0.6) return GROUNDED;
     }
     const ray = this._ray || (this._ray = new this.rapier.Ray(
       { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
     ));
-    const r = Math.min(1.2, reach * 0.55);
+    const r = Math.min(1.2, hr * 0.6);
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
     for (const [ox, oz] of [[0, 0], [r, r], [-r, -r]]) {
       ray.origin.x = x + ox; ray.origin.y = y; ray.origin.z = z + oz;
       const hit = this.world.castRay(
-        ray, reach + 0.6, true, FIXED_ONLY, undefined, undefined, body, undefined,
+        ray, hy + 0.55, true, FIXED_ONLY, undefined, undefined, body, undefined,
       );
       const sup = this._resolveSupport(hit);
       if (sup) return sup;
@@ -283,12 +320,14 @@ export class PhysicsWorld {
     // Nothing underneath — but a stone wedged against a wall is not hanging in
     // the air either, and if we call it hanging we free it, it falls half a
     // metre back into the wall, and we refuse to freeze it again: it burns a
-    // simulation slot forever. So look sideways too before giving up.
+    // simulation slot forever. So look sideways too before giving up. Barely
+    // past its own surface, though: this is a test for contact, not for
+    // proximity, and the two used to be a metre and a half apart.
     ray.origin.x = x; ray.origin.y = y; ray.origin.z = z;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       ray.dir.x = dx; ray.dir.y = 0; ray.dir.z = dz;
       const hit = this.world.castRay(
-        ray, reach + 0.35, true, FIXED_ONLY, undefined, undefined, body, undefined,
+        ray, hr + 0.3, true, FIXED_ONLY, undefined, undefined, body, undefined,
       );
       const sup = this._resolveSupport(hit);
       if (sup) { ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0; return sup; }
@@ -324,20 +363,18 @@ export class PhysicsWorld {
     const feet = [];
     for (let c = 0; c < n; c += step) {
       const col = body.collider(c);
-      if (!col) continue;
-      const ct = col.translation();
-      if (!isFinite(ct.y)) continue;
-      const he = col.halfExtents?.();
-      const r = he ? Math.hypot(he.x, he.y, he.z) : 0.6;
-      feet.push({ x: ct.x, y: ct.y, z: ct.z, r });
+      const f = col && this._footOf(col);
+      if (f) feet.push(f);
     }
-    if (!feet.length) return this._probeStands(
-      body.translation().x, body.translation().y, body.translation().z,
-      this._reachOf(body), body);
-    feet.sort((a, b) => (a.y - a.r) - (b.y - b.r));
+    if (!feet.length) {
+      const t = body.translation();
+      const reach = this._reachOf(body);
+      return this._probeStands(
+        { x: t.x, y: t.y, z: t.z, hy: reach, hr: reach }, body);
+    }
+    feet.sort((a, b) => (a.y - a.hy) - (b.y - b.hy));
     for (let i = 0; i < feet.length && i < 4; i++) {
-      const f = feet[i];
-      const sup = this._probeStands(f.x, f.y, f.z, f.r, body);
+      const sup = this._probeStands(feet[i], body);
       if (sup) return sup;
     }
     return null;

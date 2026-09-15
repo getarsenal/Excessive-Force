@@ -1850,6 +1850,11 @@ export class TestMenu {
         // hanging. So this one measures instead. Every piece of loose masonry
         // is joined to the ones it is touching, and every group that results
         // has to reach the ground.
+        // Let it stop moving first. The claim is that nothing comes to *rest*
+        // in mid-air, which is not the same as the claim that no stone is ever
+        // off the ground: a section in free fall is exactly what should be
+        // happening, and sampling in the middle of one reports it as a fault.
+        for (let k = 0; k < 60 && c.physics.awakeCount > 20; k++) c.fastForward(0.25);
         const gy = b.originGround;
         const CELL = 5;
         const nodes = [];
@@ -1862,6 +1867,7 @@ export class TestMenu {
             nodes.push({
               x: st.px[i], y: st.py[i], z: st.pz[i], r,
               kind: (st.flags[i] & 8) ? 'island' : ((st.flags[i] & 2) ? 'free' : 'built'),
+              islandId: (st.flags[i] & 8) ? `${st.key}:${st.islandOf[i]}` : undefined,
               fixed: !!body && !body.__removed
                 && body.bodyType() === c.physics.rapier.RigidBodyType.Fixed,
               dead: (st.flags[i] & 8) ? !(body && !body.__removed) : false,
@@ -1887,6 +1893,17 @@ export class TestMenu {
           let cell = grid.get(k);
           if (!cell) grid.set(k, cell = []);
           cell.push(i);
+        });
+        // Stones welded into one section are connected whether or not they
+        // happen to touch. A section is a single rigid body: if any part of it
+        // is on the ground then none of it is hanging, and joining its members
+        // only by proximity reported the top of an L-shaped piece as a separate
+        // clump floating over the bottom of the same piece.
+        const byIsland = new Map();
+        nodes.forEach((n, i) => {
+          if (n.islandId === undefined) return;
+          const first = byIsland.get(n.islandId);
+          if (first === undefined) byIsland.set(n.islandId, i); else union(first, i);
         });
         nodes.forEach((n, i) => {
           const cx = Math.floor(n.x / CELL), cy = Math.floor(n.y / CELL), cz = Math.floor(n.z / CELL);
@@ -1914,6 +1931,7 @@ export class TestMenu {
           if (n.fixed) rec.fixed++;
           if (n.settling) rec.settling++;
           if (n.dead) rec.dead++;
+          if (!rec.lowNode || n.y < rec.lowNode.y) rec.lowNode = n;
           if (!rec.why && n.body && !n.body.__removed) {
             const P = c.physics;
             rec.why = {
@@ -1933,22 +1951,33 @@ export class TestMenu {
         });
         // A single stone caught at the top of its arc is not a cloud, and a
         // stone genuinely in free fall is the thing we want to see happen. So
-        // the complaint is groups: several pieces, well clear of the ground,
-        // with nothing joining them to it.
+        // the complaint is groups that have *stopped*: several pieces, all of
+        // them frozen back into scenery, well clear of the ground, with nothing
+        // joining them to it.
         const floating = [...groups.values()]
-          .filter((r) => !r.ground && r.n >= 4 && r.low > 6)
+          .filter((r) => !r.ground && r.n >= 4 && r.low > 6 && r.fixed === r.n)
           .sort((a, d) => d.n - a.n);
         const total = floating.reduce((a, r) => a + r.n, 0);
         const worst = floating[0];
         if (floating.length) {
+          for (const r of floating.slice(0, 6)) {
+            const L = r.lowNode;
+            if (!L) continue;
+            const hit = c.physics.castRay(
+              { x: L.x, y: L.y - L.r - 0.05, z: L.z }, { x: 0, y: -1, z: 0 }, 60);
+            r.dropTo = hit ? +hit.toi.toFixed(2) : null;
+            r.terrainBelow = +(L.y - L.r - c.terrain.heightAt(L.x, L.z)).toFixed(2);
+            delete r.lowNode;
+          }
           console.log('[tumble] hanging rubble:', JSON.stringify(floating.slice(0, 6)));
         }
+        for (const r of floating) delete r.lowNode;
         assert(floating.length === 0,
           `${floating.length} clumps of masonry (${total} stones) are hanging `
           + `clear of the ground — the biggest ${worst?.n} stones at `
-          + `${worst?.low.toFixed(0)}–${worst?.top.toFixed(0)} m up `
-          + `(${worst?.island} welded, ${worst?.free} loose, ${worst?.built} built, `
-          + `${worst?.fixed} of them frozen)`);
+          + `${worst?.low.toFixed(0)}–${worst?.top.toFixed(0)} m up, with `
+          + `${worst?.dropTo ?? '∞'} m of clear air under it `
+          + `(${worst?.island} welded, ${worst?.free} loose, ${worst?.built} built)`);
         return `${groups.size} groups of rubble, every one of them on the ground`;
       })],
     ];
