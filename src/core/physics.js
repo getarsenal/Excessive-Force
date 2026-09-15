@@ -60,6 +60,7 @@ export class PhysicsWorld {
     this.frozen = [];
     this._auditCursor = 0;
 
+    this.dead = false;
     this.eventQueue = new rapier.EventQueue(true);
     this.contactListeners = [];
     this.stepCount = 0;
@@ -108,6 +109,7 @@ export class PhysicsWorld {
     body.setSoftCcdPrediction?.(1.0);
     if (impulse) body.applyImpulse(impulse, true);
     this.dynamicSet.add(body);
+    body.__frozen = false;
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = true; owner.settleTimer = 0; }
     return true;
@@ -131,63 +133,104 @@ export class PhysicsWorld {
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = false; owner.settled = true; }
-    // Remember it so the audit below can catch it if the ground it froze onto
+    // Remember it so the sweeps above can catch it if the ground it froze onto
     // is later blown out from under it.
+    body.__frozen = true;
     this.frozen.push(body);
     return true;
   }
 
   /**
-   * Is this body — frozen or not — in contact with anything?
+   * Is this body standing on anything?
    *
-   * A geometric query rather than a contact lookup, because the narrow phase
-   * has no opinion about a fixed body: once debris is recycled into scenery
-   * Rapier stops computing its contacts entirely, so `touching` always says no.
-   * A ball a little larger than each piece, centred on that piece and ignoring
-   * the body's own colliders, gives the same answer without the solver's help.
+   * Rays, deliberately, and as few of them as possible. The first version of
+   * this asked Rapier for shape intersections around every collider of every
+   * frozen body, several thousand times a second — and somewhere in that
+   * traffic the wasm side eventually tripped, which poisons the world: every
+   * later `step` throws, the bodies stop being simulated, and the transforms
+   * that come back are garbage. Garbage quaternions are not merely wrong, they
+   * are *huge*, and a box drawn with one fills the screen. That is what the
+   * enormous floating slabs were.
    *
-   * A downward ray was the obvious thing to try and it is wrong: a stone lying
-   * on the edge of a rubble pile has its centre out over thin air, and the ray
-   * reports it hanging when it is doing nothing of the sort.
+   * So: at most three rays, cast down from the body's own origin, ignoring the
+   * body's own colliders. The offsets matter — a stone lying on the edge of a
+   * rubble pile has its centre out over thin air, and a single central ray
+   * calls it hanging when it is not.
    */
   _standsOnSomething(body) {
-    const n = body.numColliders();
-    if (n === 0) return true;
-    // A welded section can carry hundreds of colliders; sampling a spread of
-    // them is enough to tell a section resting on rubble from one in the sky.
-    const step = Math.max(1, Math.floor(n / 8));
-    const ZERO_ROT = this._zeroRot
-      || (this._zeroRot = { x: 0, y: 0, z: 0, w: 1 });
-    for (let c = 0; c < n; c += step) {
-      const col = body.collider(c);
-      if (!col) continue;
-      const t = col.translation();
-      if (!isFinite(t.y)) return true;
-      const he = col.halfExtents?.();
-      const r = (he ? Math.hypot(he.x, he.y, he.z) : 0.6) * 1.08;
-      const shape = new this.rapier.Ball(r);
-      let found = false;
-      this.world.intersectionsWithShape(
-        t, ZERO_ROT, shape,
-        () => { found = true; return false; },
-        undefined, undefined, undefined, body, undefined,
+    const t = body.translation();
+    if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return true;
+    const reach = this._reachOf(body);
+    const ray = this._ray || (this._ray = new this.rapier.Ray(
+      { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
+    ));
+    const r = Math.min(1.2, reach * 0.55);
+    for (const [ox, oz] of [[0, 0], [r, r], [-r, -r]]) {
+      ray.origin.x = t.x + ox; ray.origin.y = t.y; ray.origin.z = t.z + oz;
+      const hit = this.world.castRay(
+        ray, reach + 0.6, true, undefined, undefined, undefined, body, undefined,
       );
-      if (found) return true;
+      if (hit) return true;
     }
     return false;
   }
 
+  /** How far the body reaches below its own origin. Cached: it never changes. */
+  _reachOf(body) {
+    if (body.__reach !== undefined) return body.__reach;
+    let r = 0.6;
+    const n = body.numColliders();
+    if (n > 0) {
+      const bt = body.translation();
+      const step = Math.max(1, Math.floor(n / 4));
+      for (let c = 0; c < n; c += step) {
+        const col = body.collider(c);
+        if (!col) continue;
+        const he = col.halfExtents?.();
+        const ct = col.translation();
+        const span = he ? Math.hypot(he.x, he.y, he.z) : 0.6;
+        r = Math.max(r, Math.hypot(ct.x - bt.x, ct.y - bt.y, ct.z - bt.z) + span);
+      }
+    }
+    body.__reach = Math.min(r, 40);
+    return body.__reach;
+  }
+
   /**
-   * Walk the frozen debris a slice at a time, and let go of anything whose
-   * footing has gone.
+   * Let go of frozen rubble near a blast.
    *
-   * Rubble that settles on a wall is frozen quite correctly — and then the wall
-   * is shelled, and it is left standing on nothing. Nothing wakes it: it is a
-   * fixed body now, so the solver has no opinion about it at all. This is the
-   * sweep that notices, and it is spread over frames because it costs a shape
-   * query per body and there can be thousands of them.
+   * The event-driven half of the same problem: rubble that settled honestly on
+   * a wall, and then had the wall shot out from under it, is a fixed body with
+   * nothing holding it up and nothing to notice. A blast is the only thing that
+   * can create that situation, so a blast is where to look for it — one query
+   * per explosion rather than a sweep every frame.
    */
-  auditFrozen(slice = 18) {
+  wakeNear(center, radius) {
+    if (this.dead || !this.frozen.length) return 0;
+    const hits = [];
+    this.queryBall(center, radius, (owner, parent) => {
+      if (parent.bodyType() === this.rapier.RigidBodyType.Fixed
+        && parent.__frozen) hits.push(parent);
+    });
+    let woke = 0;
+    for (const body of hits) {
+      if (!PhysicsWorld.alive(body)) continue;
+      if (this._standsOnSomething(body)) continue;
+      if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
+      if (!this.promote(body)) break;
+      woke++;
+    }
+    return woke;
+  }
+
+  /**
+   * Walk the frozen debris a slice at a time and let go of anything whose
+   * footing has gone. The backstop for whatever `wakeNear` misses — a section
+   * that leaned away, a pile that shifted — kept deliberately slow, because
+   * every query into the physics world is a query that can go wrong.
+   */
+  auditFrozen(slice = 6) {
+    if (this.dead) return 0;
     const list = this.frozen;
     if (!list.length) return 0;
     let checked = 0, woke = 0;
@@ -199,6 +242,7 @@ export class PhysicsWorld {
       // Drop anything that is gone or has been promoted by some other route.
       if (!PhysicsWorld.alive(body)
           || body.bodyType() !== this.rapier.RigidBodyType.Fixed) {
+        if (body) body.__frozen = false;
         list[idx] = list[list.length - 1];
         list.pop();
         continue;
@@ -231,6 +275,7 @@ export class PhysicsWorld {
   remove(body) {
     this.dynamicSet.delete(body);
     this.owners.delete(body.handle);
+    body.__frozen = false;
     // Marked before the removal, and checked by anything that keeps its own
     // reference to a body. Rapier hands out wrappers around raw indices, so
     // calling any method on one after its body is gone traps in wasm — and a
@@ -293,13 +338,30 @@ export class PhysicsWorld {
    * we deliberately drop the extra sub-steps rather than spiral.
    */
   step(dt) {
+    // A world that has trapped stays trapped.
+    //
+    // Once the wasm side throws, the Rust borrow is never released: every
+    // later call throws "recursive use of an object", the bodies stop being
+    // integrated, and — worse — the transforms that come back are whatever is
+    // in that memory. Rendering those is how a trap turns into slabs of
+    // masonry the size of a city block hanging over the map. So the moment it
+    // happens, stop touching the world at all and leave the scene standing.
+    if (this.dead) return 0;
     this.accumulator += Math.min(dt, 0.1);
     let steps = 0;
-    while (this.accumulator >= this.fixedStep && steps < 3) {
-      this.world.step(this.eventQueue);
-      this.accumulator -= this.fixedStep;
-      steps++;
-      this.stepCount++;
+    try {
+      while (this.accumulator >= this.fixedStep && steps < 3) {
+        this.world.step(this.eventQueue);
+        this.accumulator -= this.fixedStep;
+        steps++;
+        this.stepCount++;
+      }
+    } catch (err) {
+      this.dead = true;
+      this.deadReason = String(err && err.message ? err.message : err);
+      console.error('[tumble] physics world trapped, simulation halted:',
+        this.deadReason);
+      return 0;
     }
     if (steps === 0) return 0;
 
@@ -351,6 +413,7 @@ export class PhysicsWorld {
    * that does is clamped, and anything that has left the map is removed.
    */
   cullRunaways(bounds) {
+    if (this.dead) return 0;
     const dead = [];
     let clamped = 0;
     for (const body of this.dynamicSet) {
@@ -385,6 +448,7 @@ export class PhysicsWorld {
   }
 
   recycleSettled(settleFrames) {
+    if (this.dead) return 0;
     const toDemote = [];
     for (const body of this.dynamicSet) {
       const owner = this.owners.get(body.handle);

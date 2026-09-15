@@ -26,6 +26,26 @@ import { PhysicsWorld } from '../core/physics.js';
  *    fragments into fewer pieces on the way down.
  */
 
+/**
+ * Is this transform something we can draw?
+ *
+ * The last line of defence against a physics world that has gone wrong. If the
+ * wasm side traps — and over a long enough session something eventually does —
+ * every later read comes back as whatever was in that memory, and the numbers
+ * are not merely wrong but wild. A quaternion is used as a rotation *and* a
+ * scale: `|q|²` multiplies the box it is applied to, so a rotation that reads
+ * back as (3, -7, 2, 5) draws a stone the size of a district, hanging in the
+ * sky across half the screen. Refusing to copy a transform that cannot be real
+ * leaves the stone where it last was, which is wrong quietly instead of wrong
+ * catastrophically.
+ */
+function sane(t, r) {
+  if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return false;
+  if (Math.abs(t.x) > 1e5 || Math.abs(t.y) > 1e5 || Math.abs(t.z) > 1e5) return false;
+  const q = r.x * r.x + r.y * r.y + r.z * r.z + r.w * r.w;
+  return q > 0.9 && q < 1.1;
+}
+
 const ALIVE = 1;
 const FREE = 2;       // has its own dynamic rigid body
 const GROUNDED = 4;   // foundation stone, an anchor for the support search
@@ -1185,6 +1205,16 @@ export class Structure {
       this._q.premultiply(lq);
     }
     this._s.set(this.hx[i] * 2, this.hy[i] * 2, this.hz[i] * 2);
+    // `compose` treats the quaternion as a rotation *and* a scale: it applies
+    // |q|² to the box. A stone whose rotation is not unit length therefore
+    // draws at the wrong size — and a stone whose rotation is garbage draws the
+    // size of a district. Normalising here is four multiplies and makes that
+    // impossible however the numbers got in.
+    const qn = this._q.lengthSq();
+    if (!(qn > 0.999 && qn < 1.001)) {
+      if (qn > 1e-6 && isFinite(qn)) this._q.multiplyScalar(1 / Math.sqrt(qn));
+      else this._q.set(0, 0, 0, 1);
+    }
     this._m4.compose(this._v, this._q, this._s);
     entry.mesh.setMatrixAt(k, this._m4);
   }
@@ -1239,6 +1269,7 @@ export class Structure {
       if (!PhysicsWorld.alive(body) || body.isSleeping()) continue;
       const t = body.translation();
       const r = body.rotation();
+      if (!sane(t, r)) continue;
       this.px[i] = t.x; this.py[i] = t.y; this.pz[i] = t.z;
       this.qx[i] = r.x; this.qy[i] = r.y; this.qz[i] = r.z; this.qw[i] = r.w;
       this._writeMatrix(i);
@@ -1251,6 +1282,7 @@ export class Structure {
       if (!PhysicsWorld.alive(body) || body.isSleeping()) continue;
       const t = body.translation();
       const r = body.rotation();
+      if (!sane(t, r)) continue;
       this._q.set(r.x, r.y, r.z, r.w);
       for (let m = 0; m < island.members.length; m++) {
         const i = island.members[m];
@@ -1299,6 +1331,11 @@ export class Structure {
     const destroyed = [];
     const thrown = [];
     const r2 = radius * radius;
+
+    // Rubble that settled on this wall is about to have the wall taken out
+    // from under it. It is fixed scenery by now, so nothing in the solver will
+    // ever notice — this is where to notice, once per blast.
+    this.physics.wakeNear(center, radius * 1.8);
 
     // Only stones near the blast can be involved; walk the spatial extent
     // cheaply by testing all chunks against a squared distance. For 7k chunks

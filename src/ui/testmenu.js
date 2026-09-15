@@ -1576,6 +1576,49 @@ export class TestMenu {
         }
       })],
 
+      ['no stone is ever drawn the size of a district', () => this._calm(() => {
+        // The worst thing this engine has done on screen, and it was a
+        // rendering fault rather than a physics one. `Matrix4.compose` treats
+        // the quaternion as a rotation *and* a scale — it applies |q|² — so a
+        // stone whose rotation reads back as anything but unit length draws at
+        // the wrong size. When the wasm world traps, every transform that
+        // comes back is whatever was in that memory, and a few of those draw
+        // as slabs of masonry hundreds of metres across, hanging over the map
+        // and blocking most of the view.
+        //
+        // Nothing may reach an instance matrix unchecked, so this walks the
+        // matrices themselves: every stone is drawn at a stone's size, and
+        // stands somewhere on the map.
+        const m = new THREE.Matrix4();
+        const v = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+        const span = c.terrain.span;
+        let biggest = 0, farthest = 0, drawn = 0;
+        for (const st of c.structures) {
+          let stone = 0;
+          for (let i = 0; i < st.count; i++) {
+            stone = Math.max(stone, st.hx[i] * 2, st.hy[i] * 2, st.hz[i] * 2);
+          }
+          for (const e of st.meshes) {
+            const mesh = e.mesh;
+            for (let k = 0; k < mesh.count; k++) {
+              mesh.getMatrixAt(k, m);
+              m.decompose(v, q, sc);
+              if (sc.x < 1e-4 && sc.y < 1e-4) continue;      // a destroyed stone
+              drawn++;
+              biggest = Math.max(biggest, sc.x, sc.y, sc.z);
+              farthest = Math.max(farthest, Math.hypot(v.x, v.y, v.z));
+            }
+          }
+          assert(biggest <= stone * 1.35 + 0.2,
+            `${st.key} is drawing a stone ${biggest.toFixed(1)} m across, `
+            + `against a largest real stone of ${stone.toFixed(1)} m`);
+        }
+        assert(isFinite(farthest) && farthest < span * 4,
+          `a stone is being drawn ${farthest.toFixed(0)} m from the middle of `
+          + `a map ${span.toFixed(0)} m across`);
+        return `${drawn} stones drawn, the biggest ${biggest.toFixed(1)} m across`;
+      })],
+
       // ── Destructive: leaves the level a pile of rubble, so it runs last.
       // Everything above needs a building to be standing in front of it.
       ['undercutting the base brings it down', () => this._calm(() => {
