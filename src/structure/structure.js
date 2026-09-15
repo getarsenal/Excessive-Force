@@ -1211,8 +1211,8 @@ export class Structure {
     // size of a district. Normalising here is four multiplies and makes that
     // impossible however the numbers got in.
     const qn = this._q.lengthSq();
-    if (!(qn > 0.999 && qn < 1.001)) {
-      if (qn > 1e-6 && isFinite(qn)) this._q.multiplyScalar(1 / Math.sqrt(qn));
+    if (!(qn > 0.99 && qn < 1.01)) {
+      if (qn > 1e-6 && isFinite(qn)) this._q.normalize();
       else this._q.set(0, 0, 0, 1);
     }
     this._m4.compose(this._v, this._q, this._s);

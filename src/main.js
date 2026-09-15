@@ -237,6 +237,12 @@ async function boot() {
   }
 
   // Welded sections fragment when they land hard enough.
+  // The physics side needs to know where the ground is: it is the difference
+  // between answering "is this stone supported?" with arithmetic and
+  // answering it with a ray, and it asks that question thousands of times
+  // during a collapse.
+  physics.groundAt = (x, z) => terrain.heightAt(x, z);
+
   physics.onImpact((a, b, force) => {
     for (const o of [a, b]) {
       if (!o || o.island === undefined) continue;

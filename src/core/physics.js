@@ -161,10 +161,20 @@ export class PhysicsWorld {
     const t = body.translation();
     if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return true;
     const reach = this._reachOf(body);
+    // The cheap answer first, and it is the answer nearly every time: almost
+    // all settled rubble is lying on the ground, and the ground's height is
+    // arithmetic rather than a query. Only stone that has come to rest *above*
+    // the ground — on a pile, on a ledge, on what is left of a wall — needs
+    // Rapier's opinion, and there is far less of that.
+    if (this.groundAt) {
+      const g = this.groundAt(t.x, t.z);
+      if (isFinite(g) && t.y - reach <= g + 0.8) return true;
+    }
     const ray = this._ray || (this._ray = new this.rapier.Ray(
       { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
     ));
     const r = Math.min(1.2, reach * 0.55);
+    ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
     for (const [ox, oz] of [[0, 0], [r, r], [-r, -r]]) {
       ray.origin.x = t.x + ox; ray.origin.y = t.y; ray.origin.z = t.z + oz;
       const hit = this.world.castRay(
@@ -172,6 +182,19 @@ export class PhysicsWorld {
       );
       if (hit) return true;
     }
+    // Nothing underneath — but a stone wedged against a wall is not hanging in
+    // the air either, and if we call it hanging we free it, it falls half a
+    // metre back into the wall, and we refuse to freeze it again: it burns a
+    // simulation slot forever. So look sideways too before giving up.
+    ray.origin.x = t.x; ray.origin.y = t.y; ray.origin.z = t.z;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      ray.dir.x = dx; ray.dir.y = 0; ray.dir.z = dz;
+      const hit = this.world.castRay(
+        ray, reach + 0.35, true, undefined, undefined, undefined, body, undefined,
+      );
+      if (hit) return true;
+    }
+    ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
     return false;
   }
 
@@ -205,16 +228,30 @@ export class PhysicsWorld {
    * can create that situation, so a blast is where to look for it — one query
    * per explosion rather than a sweep every frame.
    */
-  wakeNear(center, radius) {
+  wakeNear(center, radius, limit = 24) {
     if (this.dead || !this.frozen.length) return 0;
+    // Capped, hard. A blast in a rubble field can have several hundred frozen
+    // stones inside it, and testing every one of them costs three rays each —
+    // which turned a blast into thousands of queries and slowed the game to a
+    // crawl during exactly the moment it should be at its most exciting. The
+    // nearest two dozen are the ones that were holding anything up; the sweep
+    // picks up whatever is left, a few frames later.
     const hits = [];
     this.queryBall(center, radius, (owner, parent) => {
+      if (hits.length >= limit * 3) return;
       if (parent.bodyType() === this.rapier.RigidBodyType.Fixed
         && parent.__frozen) hits.push(parent);
     });
-    let woke = 0;
+    hits.sort((a, b) => {
+      const ta = a.translation(), tb = b.translation();
+      return (Math.hypot(ta.x - center.x, ta.y - center.y, ta.z - center.z)
+        - Math.hypot(tb.x - center.x, tb.y - center.y, tb.z - center.z));
+    });
+    let woke = 0, tested = 0;
     for (const body of hits) {
+      if (tested >= limit) break;
       if (!PhysicsWorld.alive(body)) continue;
+      tested++;
       if (this._standsOnSomething(body)) continue;
       if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
       if (!this.promote(body)) break;
@@ -318,11 +355,16 @@ export class PhysicsWorld {
     // invisible, and nothing in free fall stays under it for more than a frame
     // or two.
     if (freed < need) {
+      // Bounded, because each attempt costs a few rays and this runs on the
+      // frame a shell lands. Freeing fewer slots than asked for is a slightly
+      // smaller collapse; testing two thousand bodies is a dropped frame.
+      let tried = 0;
       for (const body of this.dynamicSet) {
-        if (freed >= need) break;
+        if (freed >= need || tried >= 240) break;
         const v = body.linvel(), w = body.angvel();
         if (Math.hypot(v.x, v.y, v.z) > 0.34) continue;
         if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
+        tried++;
         // `demote` refuses anything airborne, which matters most here: at the
         // top of its arc a thrown stone is briefly slower than a settled one.
         if (this.demote(body)) freed++;
@@ -461,6 +503,9 @@ export class PhysicsWorld {
       }
     }
     let n = 0;
+    // Also bounded: a collapse settles in waves, and the rest of a wave can
+    // just as well be frozen on the next frame.
+    if (toDemote.length > 160) toDemote.length = 160;
     for (const b of toDemote) {
       if (this.demote(b)) { n++; continue; }
       // Refused: asleep in clear air, which is not settled but stuck. Wake it
