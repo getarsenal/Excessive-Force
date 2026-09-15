@@ -128,19 +128,18 @@ export class PhysicsWorld {
    */
   demote(body, force = false) {
     if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
-    if (!this._standsOnSomething(body)) {
-      // The relief valve. Refusing to freeze anything unsupported is right in
-      // the sky and wrong in a rubble field: a stone balanced on the lip of a
-      // pile fails the test, stays dynamic, and holds a simulation slot that a
-      // collapsing tower needs — which is how a building ends up standing
-      // there with its base shot out, because there was no room left to let it
-      // go. Down among the rubble, freeze it anyway: it is already on the
-      // ground, and nothing about it will read as floating.
-      if (!force || !this.groundAt) return false;
-      const t = body.translation();
-      const g = this.groundAt(t.x, t.z);
-      if (!isFinite(g) || t.y - this._reachOf(body) > g + 3.0) return false;
-    }
+    // Two callers, two rules.
+    //
+    // Ordinary settling refuses to freeze anything that is not touching the
+    // world: that is the whole point, and it is what stops blooms of masonry
+    // hanging over the site. But when the *budget* is the caller — when a
+    // collapsing tower needs somewhere to put four hundred stones and every
+    // slot is taken — refusing costs more than it saves. A building that
+    // cannot be given bodies stands there with its base shot out, which is the
+    // worst bug in the game, and a stone frozen where it should not be is on
+    // the sweep's list a moment later: it gets released when there is room, or
+    // deleted when there is not. So the budget takes what it needs.
+    if (!force && !this._standsOnSomething(body)) return false;
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
