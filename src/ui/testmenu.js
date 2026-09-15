@@ -1455,11 +1455,72 @@ export class TestMenu {
             assert(near, 'the bridge has no road running to it');
           }
         }
+        // No street that goes nowhere.
+        //
+        // Every street that fails to build — the line runs into the water, or
+        // across the abbey, or off the edge — leaves the one behind it ending
+        // at nothing, and a map dotted with hundred-metre stubs is most of what
+        // "too many disjointed streets" was. The exceptions are the two roads
+        // that are supposed to end where they end: the bridge approach, at the
+        // abutment, and the embankment, at the edge of the map.
+        const stubs = net.edges.filter((e) => !e.approach && !e.bank
+          && (net.nodes[e.a].links.length < 2 || net.nodes[e.b].links.length < 2));
+        assert(stubs.length === 0,
+          `${stubs.length} streets are dead-end stubs that lead nowhere`);
+
+        // Everything stands square to the plan.
+        //
+        // A building is either aligned with the block it is in or it is one of
+        // the things that made the city read as boxes dropped from a height.
+        // Measured modulo a quarter turn, because a building along the short
+        // side of its block is just as square to the grid as one along the long
+        // side.
+        const quarter = Math.PI / 2;
+        const wrap = (a) => {
+          let o = ((a % quarter) + quarter) % quarter;
+          if (o > quarter / 2) o -= quarter;
+          return o;
+        };
+        // The grid's own bearing, taken from the buildings themselves rather
+        // than from a constant, so this holds on any level.
+        const bearings = plots.map((p) => wrap(p.yaw || 0)).sort((a, b) => a - b);
+        const ref = bearings[bearings.length >> 1] || 0;
+        let skew = 0, worstSkew = 0;
+        for (const p of plots) {
+          const off = Math.abs(wrap((p.yaw || 0) - ref));
+          if (off > 0.035) { skew++; worstSkew = Math.max(worstSkew, off); }
+        }
+        assert(skew / Math.max(1, plots.length) < 0.06,
+          `${skew} of ${plots.length} buildings are out of line with the street `
+          + `grid, the worst by ${(worstSkew * 180 / Math.PI).toFixed(0)}°`);
+
+        // And none of them is off the ground. A box stood on the height of its
+        // own centre hangs off the downhill end of any slope.
+        let hovering = 0, worstGap = 0;
+        for (const p of plots) {
+          const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+          const base = p.base ?? (p.top - p.h);
+          for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+            const x = p.x + (u * p.w / 2) * ca + (v * p.d / 2) * sa;
+            const z = p.z - (u * p.w / 2) * sa + (v * p.d / 2) * ca;
+            const gap = terrain.heightAt(x, z) - base;
+            if (gap < -0.35) {
+              hovering++;
+              worstGap = Math.max(worstGap, -gap);
+              break;
+            }
+          }
+        }
+        assert(hovering === 0,
+          `${hovering} buildings hang above the ground, the worst by `
+          + `${worstGap.toFixed(1)} m`);
+
         const counts = city.userData.detail || {};
         assert((counts.crossings || 0) > 15,
           `only ${counts.crossings || 0} pedestrian crossings in the whole city`);
         return `${net.edges.length} streets, ${net.nodes.length} junctions, `
-          + `${plots.length} buildings, none of them in the road`;
+          + `${net.blocks.length} blocks, ${plots.length} buildings — square to `
+          + 'the grid, on the ground, and none of them in the road';
       }],
 
       ['a severed section cannot hang in the air', () => this._calm(() => {

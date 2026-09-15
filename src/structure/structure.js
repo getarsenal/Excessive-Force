@@ -1296,10 +1296,25 @@ export class Structure {
     // Island members ride their parent body.
     for (const island of this.islands.values()) {
       const body = island.body;
-      if (!PhysicsWorld.alive(body) || body.isSleeping()) continue;
+      if (!PhysicsWorld.alive(body)) continue;
       const t = body.translation();
       const r = body.rotation();
       if (!sane(t, r)) continue;
+      // Skipped on sleep, not on stillness. The two are not the same: Rapier
+      // reports a fixed body as sleeping, and a section that is frozen back
+      // into scenery is fixed — so `isSleeping()` alone stopped its stones
+      // being redrawn from the frame it was frozen, and they stayed wherever
+      // they had last been written while the section itself had moved on.
+      // Measured at nearly four metres of drift between a stone and its own
+      // collider. Comparing the transform instead costs one read per section,
+      // and there are tens of those.
+      const last = island.lastSync;
+      if (last && last.x === t.x && last.y === t.y && last.z === t.z
+        && last.qx === r.x && last.qy === r.y && last.qz === r.z && last.qw === r.w) {
+        continue;
+      }
+      island.lastSync = { x: t.x, y: t.y, z: t.z,
+        qx: r.x, qy: r.y, qz: r.z, qw: r.w };
       this._q.set(r.x, r.y, r.z, r.w);
       for (let m = 0; m < island.members.length; m++) {
         const i = island.members[m];

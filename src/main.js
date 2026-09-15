@@ -72,6 +72,28 @@ async function boot() {
   const origin = new THREE.Vector3(0, groundY, 0);
 
   await progress(30, 'building london');
+  // The landmarks' own ground, worked out before the city is laid.
+  //
+  // The city used to be kept off them by a single radius around the origin,
+  // which is a fair description of a clock tower and a poor one of a palace
+  // wing seventy-five metres long: the radius had to be big enough to clear the
+  // wing's far end, so it also cleared a hundred and sixty metres of open
+  // ground in every other direction and left the monument standing in a
+  // paddock. Measuring the real footprints lets the streets come right up to
+  // the precinct on the sides where there is nothing in the way.
+  const specs = level.structures(quality);
+  const landmarks = specs.map((sp) => {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const b of sp.blocks.blocks || sp.blocks) {
+      const r = Math.max(b.hx, b.hz);
+      if (b.x - r < x0) x0 = b.x - r;
+      if (b.x + r > x1) x1 = b.x + r;
+      if (b.z - r < z0) z0 = b.z - r;
+      if (b.z + r > z1) z1 = b.z + r;
+    }
+    return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0 };
+  });
+
   // Real OpenStreetMap footprints when they've been baked; otherwise the
   // hand-placed approximation, so the level still reads as a city either way.
   let contextGroup = null;
@@ -86,7 +108,7 @@ async function boot() {
     console.log(`[tumble] city: ${cityGroup.userData.built} of `
       + `${cityGroup.userData.available} buildings — ${city.source}`);
   } else {
-    contextGroup = buildContext(terrain, quality);
+    contextGroup = buildContext(terrain, quality, { landmarks });
     engine.scene.add(contextGroup);
     console.log(`[tumble] city: hand-placed approximation, `
       + `${contextGroup.userData.plots.length} buildings, `
@@ -95,7 +117,6 @@ async function boot() {
   }
 
   await progress(44, 'quarrying stone');
-  const specs = level.structures(quality);
   const totalBlocks = specs.reduce((a, sp) => a + sp.blocks.length, 0);
 
   await progress(56, `setting ${totalBlocks.toLocaleString()} stones`);

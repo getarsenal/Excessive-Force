@@ -149,6 +149,7 @@ export class PhysicsWorld {
     // that is how the ball of masonry over the site gets built.
     const sup = this._findSupport(body);
     if (!sup) return false;
+    if (!this._overSomething(body)) return false;
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
@@ -177,6 +178,49 @@ export class PhysicsWorld {
   }
 
   /**
+   * The last word before anything is frozen: is there anything under it at all?
+   *
+   * The support test asks what a body is touching, which is the right question
+   * and answers it in seven directions — and a piece of masonry wedged sideways
+   * against something fixed passes it while hanging over a void. That is
+   * physically defensible (a beam leaning on a wall really is held up) and it
+   * looks like a mistake, which is what matters here: the last clump to survive
+   * every other rule was a thirty-five metre splinter of tower, propped
+   * somewhere up its own length, with eleven metres of clear air under its foot.
+   *
+   * So: one ray, straight down from the lowest point, through anything at all,
+   * and nothing is frozen with a drop under it.
+   */
+  _overSomething(body) {
+    const t = body.translation();
+    let lowY = t.y, lx = t.x, lz = t.z, lowHy = this._reachOf(body);
+    const n = body.numColliders();
+    if (n > 0) {
+      const step = Math.max(1, Math.floor(n / 14));
+      let best = Infinity;
+      for (let c = 0; c < n; c += step) {
+        const col = body.collider(c);
+        const f = col && this._footOf(col);
+        if (!f || f.y - f.hy >= best) continue;
+        best = f.y - f.hy;
+        lowY = f.y; lx = f.x; lz = f.z; lowHy = f.hy;
+      }
+    }
+    const foot = lowY - lowHy;
+    if (this.groundAt) {
+      const g = this.groundAt(lx, lz);
+      if (isFinite(g) && foot <= g + 2.5) return true;
+    }
+    const ray = this._ray2 || (this._ray2 = new this.rapier.Ray(
+      { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
+    ));
+    ray.origin.x = lx; ray.origin.y = foot - 0.05; ray.origin.z = lz;
+    ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
+    return !!this.world.castRay(
+      ray, 2.5, true, undefined, undefined, undefined, body, undefined);
+  }
+
+  /**
    * Is the footing this body was frozen on still there?
    *
    * Cheap on purpose — a handle lookup, not a ray — because the sweep asks it
@@ -194,7 +238,15 @@ export class PhysicsWorld {
     if (!p || p.bodyType() !== this.rapier.RigidBodyType.Fixed) return false;
     const sb = body.__supBody;
     if (sb && (sb.__removed === true || sb.handle !== p.handle)) return false;
-    return true;
+    // And one ray to check the world rather than the bookkeeping.
+    //
+    // The record above says what this was frozen against and notices when that
+    // goes; what it cannot notice is the collider still being there and no
+    // longer being *underneath* — a stone that was propped against a wall while
+    // the pile it stood on was cleared out from under it, say. Cheap enough to
+    // ask outright, and only ever asked of the small minority of frozen debris
+    // that is not simply lying on the terrain.
+    return this._overSomething(body);
   }
 
   /**

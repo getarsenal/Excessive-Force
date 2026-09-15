@@ -609,6 +609,9 @@ function linkDir(node, link) {
 
 // ─────────────────────────────────────────────────────────────── surface ──
 
+/** How far every road surface sits above the ground it follows. */
+export const SURFACE_LIFT = 0.22;
+
 const ASPHALT = new THREE.Color(0x35383d);
 const PAVE = new THREE.Color(0xa8a294);
 const KERB = new THREE.Color(0xc4bdab);
@@ -625,7 +628,7 @@ const KERB = new THREE.Color(0xc4bdab);
  * and the kerb lines turn the corner.
  */
 export function buildStreetSurface(net, terrain, quality) {
-  const LIFT = 0.22;
+  const LIFT = SURFACE_LIFT;
   const pos = [];
   const col = [];
   const tmp = new THREE.Color();
@@ -906,10 +909,18 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
   const counts = { dashes: 0, crossings: 0, stopLines: 0, bays: 0 };
   const white = 0xd9d5c8;
 
-  const paint = (x, z, w, d, ry, colour = white) => {
+  // Paint sits on the road, and the road is not the terrain.
+  //
+  // Every marking used to be laid at `heightAt(x, z) + 0.30`, which is right in
+  // the middle of a street and wrong at every junction: a junction pad is a flat
+  // slab at its own node's height, so on any slope the paint either sank into it
+  // or floated over it. Box junctions came out as a scatter of yellow strips at
+  // assorted heights, which is what "whatever the hell happened with the
+  // intersections" was looking at.
+  const paint = (x, z, w, d, ry, colour = white, y = null) => {
     const g = new THREE.BoxGeometry(w, 0.06, d);
     g.rotateY(ry);
-    g.translate(x, terrain.heightAt(x, z) + 0.30, z);
+    g.translate(x, (y ?? terrain.heightAt(x, z) + SURFACE_LIFT) + 0.08, z);
     props.add('markings', g, colour, 1);
   };
 
@@ -942,47 +953,85 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
   // Crossings and stop lines on the approach to every real junction.
   for (const n of net.nodes) {
     if (n.links.length < 3) continue;
+    const y = n.y + SURFACE_LIFT;
+    // One crossing per direction, not one per street.
+    //
+    // A junction where two arms leave on nearly the same bearing — a bend with a
+    // side road, which this grid produces constantly — used to get a zebra on
+    // each, overlapping at a few degrees to one another. Two ladders of stripes
+    // crossing at a narrow angle is the fan of white marks in the screenshot.
+    const done = [];
     for (const l of n.links) {
       const c = ROAD_CLASS[l.edge.cls];
       if (c.road < 7) continue;
       const dir = linkDir(n, l);
-      const r = padRadius(n) + 2.2;
+      let clash = false;
+      for (const d of done) {
+        if (d.x * dir.x + d.z * dir.z > 0.82) { clash = true; break; }   // within ~35°
+      }
+      if (clash) continue;
+      done.push(dir);
+      const r = padRadius(n) + 2.6;
       const ry = Math.atan2(dir.x, dir.z);
-      // Zebra: stripes across the carriageway, running with the road.
-      const stripes = Math.max(3, Math.round(c.road / (dense > 0.8 ? 1.5 : 2.4)));
+      // Zebra: stripes across the carriageway, running with the road, and
+      // strictly inside it — the last version spread them over the full road
+      // width measured centre to centre, so the outer two overhung the kerb.
+      const usable = c.road - 1.8;
+      const stripes = Math.max(3, Math.round(usable / (dense > 0.8 ? 1.5 : 2.4)));
       for (let s = 0; s < stripes; s++) {
-        const f = (s / (stripes - 1) - 0.5) * (c.road - 1.0);
-        const px = -dir.z * f, pz = dir.x * f;
-        paint(n.x + dir.x * r + px, n.z + dir.z * r + pz, 0.62, 3.6, ry);
+        const f = (s / (stripes - 1) - 0.5) * usable;
+        paint(n.x + dir.x * r - dir.z * f, n.z + dir.z * r + dir.x * f,
+          0.55, 3.2, ry, white, y);
       }
       counts.crossings++;
-      // Stop line beyond it.
-      const sr = r + 2.8;
-      paint(n.x + dir.x * sr, n.z + dir.z * sr, c.road - 0.6, 0.4, ry);
+      // Stop line, on the far side of the crossing from the junction.
+      const sr = r + 2.9;
+      paint(n.x + dir.x * sr, n.z + dir.z * sr, c.road - 1.0, 0.4, ry, white, y);
       counts.stopLines++;
     }
 
-    // Yellow box junction on the busiest crossings — kept inside the junction.
+    // Yellow box junction on the busiest crossings.
     //
-    // The first version drew long diagonals from the centre and they ran out
-    // across the pavements and off down the street, which looked like someone
-    // had scribbled on the map. The box is now a square of the junction's own
-    // size, turned to line up with the roads that meet it, and every line is
-    // cut to the square.
+    // Drawn as a box, which it was not before: five diagonals each way, spaced
+    // by a fixed fraction of the junction and given a length by eye, with no
+    // border and nothing holding them to a shape. From above that is a loose
+    // yellow lattice lying across the crossroads — a scribble.
+    //
+    // A real one is a rectangle with a hatch inside it. Both are exact here: the
+    // border is four strips round the square, and each diagonal is cut to the
+    // chord it actually makes across that square, which for a 45° line at
+    // perpendicular offset `o` from the centre of a square of half-size h is
+    // 2(h√2 − |o|) long, centred at the point o along the other diagonal. So the
+    // hatch ends at the border rather than running off down the street.
     const avenues = n.links.filter((l) => l.edge.cls === 'avenue').length;
     if (avenues >= 2 && n.links.length >= 3) {
       const narrow = Math.min(...n.links.map((l) => ROAD_CLASS[l.edge.cls].road));
-      const size = Math.min(padRadius(n) * 0.95, narrow * 0.92);
+      const h = Math.min(padRadius(n) * 0.9, narrow * 0.92) / 2;
       const main = n.links.find((l) => l.edge.cls === 'avenue');
       const dir = linkDir(n, main);
       const base = Math.atan2(dir.x, dir.z);
-      for (let k = -2; k <= 2; k++) {
-        const off = (k / 2) * size * 0.42;
-        const len = size * Math.sqrt(2) * (1 - Math.abs(k) / 3.2);
-        for (const sign of [1, -1]) {
-          const a2 = base + sign * Math.PI / 4;
-          paint(n.x - Math.cos(a2) * off, n.z + Math.sin(a2) * off,
-            0.24, len, a2, 0xc8a13a);
+      const YEL = 0xc8a13a;
+      // Local axes: `u` along the main avenue, `v` across it.
+      const ux = dir.x, uz = dir.z;
+      const vx = -dir.z, vz = dir.x;
+      const at = (u, v) => [n.x + ux * u + vx * v, n.z + uz * u + vz * v];
+      // Border.
+      for (const s of [-1, 1]) {
+        let [bx, bz] = at(s * h, 0);
+        paint(bx, bz, h * 2, 0.26, base, YEL, y);
+        [bx, bz] = at(0, s * h);
+        paint(bx, bz, 0.26, h * 2, base, YEL, y);
+      }
+      // Hatch, both diagonals, each clipped to the square.
+      const diag = h * Math.SQRT2;
+      const step = Math.max(2.0, diag / 3.2);
+      for (let o = -diag + step * 0.5; o < diag; o += step) {
+        const len = 2 * (diag - Math.abs(o));
+        if (len < 1.2) continue;
+        for (const s of [1, -1]) {
+          // Offset point along the opposite diagonal.
+          const [px, pz] = at(o / Math.SQRT2, -s * o / Math.SQRT2);
+          paint(px, pz, 0.22, len, base + s * Math.PI / 4, YEL, y);
         }
       }
       counts.hatching = (counts.hatching || 0) + 1;
