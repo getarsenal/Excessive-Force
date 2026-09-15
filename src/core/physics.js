@@ -35,6 +35,9 @@ export function R() {
   return RAPIER;
 }
 
+/** Support that can never go away: the map itself. */
+const GROUNDED = Object.freeze({ grounded: true });
+
 export class PhysicsWorld {
   constructor(quality) {
     const rapier = R();
@@ -59,6 +62,15 @@ export class PhysicsWorld {
     /** bodies frozen back into scenery, swept for lost footing */
     this.frozen = [];
     this._auditCursor = 0;
+
+    // Ray filter for the support test: look past anything still falling, and
+    // count only ground, standing masonry and debris already frozen. Resolved
+    // once, and loudly, because silently falling back to "hit anything" is the
+    // difference between rubble that settles and rubble that hangs in the sky.
+    this.fixedOnly = rapier.QueryFilterFlags?.EXCLUDE_DYNAMIC;
+    if (this.fixedOnly === undefined) {
+      throw new Error('rapier is missing QueryFilterFlags.EXCLUDE_DYNAMIC');
+    }
 
     this.dead = false;
     this.eventQueue = new rapier.EventQueue(true);
@@ -110,6 +122,9 @@ export class PhysicsWorld {
     if (impulse) body.applyImpulse(impulse, true);
     this.dynamicSet.add(body);
     body.__frozen = false;
+    body.__supGround = false;
+    body.__supCol = undefined;
+    body.__supBody = null;
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = true; owner.settleTimer = 0; }
     return true;
@@ -126,26 +141,35 @@ export class PhysicsWorld {
    *
    * Returns whether the body was actually frozen.
    */
-  demote(body, force = false) {
+  demote(body) {
     if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
-    // Two callers, two rules.
-    //
-    // Ordinary settling refuses to freeze anything that is not touching the
-    // world: that is the whole point, and it is what stops blooms of masonry
-    // hanging over the site. But when the *budget* is the caller — when a
-    // collapsing tower needs somewhere to put four hundred stones and every
-    // slot is taken — refusing costs more than it saves. A building that
-    // cannot be given bodies stands there with its base shot out, which is the
-    // worst bug in the game, and a stone frozen where it should not be is on
-    // the sweep's list a moment later: it gets released when there is room, or
-    // deleted when there is not. So the budget takes what it needs.
-    if (!force && !this._standsOnSomething(body)) return false;
+    // One rule, no exceptions, and the lack of an exception is the point.
+    // Nothing is ever frozen unless it is resting on something fixed, because
+    // a single stone frozen in clear air is an anchor for the next one, and
+    // that is how the ball of masonry over the site gets built.
+    const sup = this._findSupport(body);
+    if (!sup) return false;
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = false; owner.settled = true; }
-    // Remember it so the sweeps above can catch it if the ground it froze onto
-    // is later blown out from under it.
+    // What it is standing on, remembered.
+    //
+    // Re-asking the question later does not work, and this is the subtle half
+    // of the whole problem. Frozen debris is fixed, so it is valid support for
+    // the next stone down the chain — which is right, and which means a clump
+    // that froze honestly against a wall goes on satisfying the test after the
+    // wall has been shot away, because by then its members are holding each
+    // other up. Fifteen stones stayed seventy metres in the air that way, every
+    // one of them able to point at a neighbour.
+    //
+    // So support is recorded once, at the moment of freezing, and never
+    // re-derived: if the collider it was resting on is removed, or goes dynamic,
+    // this stone falls. Chains unwind from the bottom, a layer per sweep, and
+    // can never close into a loop.
+    body.__supGround = !!sup.grounded;
+    body.__supCol = sup.col;
+    body.__supBody = sup.parent || null;
     body.__frozen = true;
     body.__frozenAt = this.stepCount;
     this.frozen.push(body);
@@ -153,7 +177,43 @@ export class PhysicsWorld {
   }
 
   /**
-   * Is this body standing on anything?
+   * Is the footing this body was frozen on still there?
+   *
+   * Cheap on purpose — a handle lookup, not a ray — because the sweep asks it
+   * of every frozen body in the world, over and over, for the whole match.
+   */
+  _footingIntact(body) {
+    if (body.__supGround) return true;
+    const h = body.__supCol;
+    if (h === undefined || h === null) return false;
+    const col = this.world.getCollider(h);
+    // Handles are reused, so a live collider at this handle is not necessarily
+    // the one we froze against; the parent has to match as well.
+    if (!col || col.handle !== h) return false;
+    const p = col.parent();
+    if (!p || p.bodyType() !== this.rapier.RigidBodyType.Fixed) return false;
+    const sb = body.__supBody;
+    if (sb && (sb.__removed === true || sb.handle !== p.handle)) return false;
+    return true;
+  }
+
+  /**
+   * Is this body standing on anything that is itself standing on the world?
+   *
+   * The second half of that sentence is the whole thing, and leaving it out is
+   * what produced the ball of masonry hanging over the site. Support was any
+   * contact at all, so a clump of debris in mid-air — where by definition every
+   * stone is touching its neighbours — satisfied the test for every one of its
+   * members, and the entire cloud froze together in the sky, several hundred
+   * pieces of it, exactly at the height the tower used to be.
+   *
+   * Support therefore means *fixed* support: the ground, masonry that is still
+   * standing, or debris already frozen — and debris is only ever frozen by this
+   * same test, so the chain always ends at the ground. `EXCLUDE_DYNAMIC` says
+   * that in one flag: the ray passes straight through anything that is still
+   * falling, which is right, because something still falling is holding nothing
+   * up. A pile freezes from the bottom course upward, one layer per sweep, the
+   * way a real one comes to rest.
    *
    * Rays, deliberately, and as few of them as possible. The first version of
    * this asked Rapier for shape intersections around every collider of every
@@ -169,18 +229,43 @@ export class PhysicsWorld {
    * rubble pile has its centre out over thin air, and a single central ray
    * calls it hanging when it is not.
    */
-  _standsOnSomething(body) {
+  _standsOnSomething(body) { return !!this._findSupport(body); }
+
+  /**
+   * What this body is resting on: `{ grounded: true }` for the terrain itself,
+   * `{ col, parent }` for a collider, or null for nothing at all.
+   */
+  _findSupport(body) {
     const t = body.translation();
-    if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return true;
+    if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)) return { grounded: true };
+    // A welded section is asked about its own feet, not about its middle.
+    //
+    // Everything below measures from the body's origin and allows the ray the
+    // body's own radius, which is exactly right for a single stone and badly
+    // wrong for a section of tower forty metres tall: the ray then reaches
+    // forty metres down from a point in the middle of it, finds the rubble
+    // heap at the bottom of that, and reports a piece of building hanging in
+    // clear air at seventy metres as resting on the ground. Five hundred
+    // stones of the Elizabeth Tower froze in the sky that way.
+    if (body.numColliders() > 1) return this._sectionStands(body);
     const reach = this._reachOf(body);
+    return this._probeStands(t.x, t.y, t.z, reach, body);
+  }
+
+  /**
+   * The support test for one compact piece: three rays down from its origin
+   * and four sideways, all of them ignoring anything that is itself falling.
+   */
+  _probeStands(x, y, z, reach, body) {
+    const FIXED_ONLY = this.fixedOnly;
     // The cheap answer first, and it is the answer nearly every time: almost
     // all settled rubble is lying on the ground, and the ground's height is
     // arithmetic rather than a query. Only stone that has come to rest *above*
     // the ground — on a pile, on a ledge, on what is left of a wall — needs
     // Rapier's opinion, and there is far less of that.
     if (this.groundAt) {
-      const g = this.groundAt(t.x, t.z);
-      if (isFinite(g) && t.y - reach <= g + 0.8) return true;
+      const g = this.groundAt(x, z);
+      if (isFinite(g) && y - reach <= g + 0.8) return GROUNDED;
     }
     const ray = this._ray || (this._ray = new this.rapier.Ray(
       { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
@@ -188,26 +273,74 @@ export class PhysicsWorld {
     const r = Math.min(1.2, reach * 0.55);
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
     for (const [ox, oz] of [[0, 0], [r, r], [-r, -r]]) {
-      ray.origin.x = t.x + ox; ray.origin.y = t.y; ray.origin.z = t.z + oz;
+      ray.origin.x = x + ox; ray.origin.y = y; ray.origin.z = z + oz;
       const hit = this.world.castRay(
-        ray, reach + 0.6, true, undefined, undefined, undefined, body, undefined,
+        ray, reach + 0.6, true, FIXED_ONLY, undefined, undefined, body, undefined,
       );
-      if (hit) return true;
+      const sup = this._resolveSupport(hit);
+      if (sup) return sup;
     }
     // Nothing underneath — but a stone wedged against a wall is not hanging in
     // the air either, and if we call it hanging we free it, it falls half a
     // metre back into the wall, and we refuse to freeze it again: it burns a
     // simulation slot forever. So look sideways too before giving up.
-    ray.origin.x = t.x; ray.origin.y = t.y; ray.origin.z = t.z;
+    ray.origin.x = x; ray.origin.y = y; ray.origin.z = z;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       ray.dir.x = dx; ray.dir.y = 0; ray.dir.z = dz;
       const hit = this.world.castRay(
-        ray, reach + 0.35, true, undefined, undefined, undefined, body, undefined,
+        ray, reach + 0.35, true, FIXED_ONLY, undefined, undefined, body, undefined,
       );
-      if (hit) return true;
+      const sup = this._resolveSupport(hit);
+      if (sup) { ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0; return sup; }
     }
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
-    return false;
+    return null;
+  }
+
+  /** Turn a ray hit into a support record, or null if it hit nothing. */
+  _resolveSupport(hit) {
+    if (!hit) return null;
+    let col = hit.collider;
+    if (typeof col === 'number') col = this.world.getCollider(col);
+    if (!col && hit.colliderHandle !== undefined) col = this.world.getCollider(hit.colliderHandle);
+    if (!col) return GROUNDED;         // something was hit; take it on trust
+    const parent = col.parent();
+    // The terrain is not going anywhere, so anything resting on it is settled
+    // for good and needs no bookkeeping at all.
+    if (this.groundBody && parent && parent.handle === this.groundBody.handle) return GROUNDED;
+    return { grounded: false, col: col.handle, parent };
+  }
+
+  /**
+   * Is this welded section resting on anything?
+   *
+   * Asked of its lowest stones, each with only its own size of reach. Sections
+   * are rare — tens of them against thousands of loose stones — so this can
+   * afford to look at a dozen colliders and pick the bottom few.
+   */
+  _sectionStands(body) {
+    const n = body.numColliders();
+    const step = Math.max(1, Math.floor(n / 14));
+    const feet = [];
+    for (let c = 0; c < n; c += step) {
+      const col = body.collider(c);
+      if (!col) continue;
+      const ct = col.translation();
+      if (!isFinite(ct.y)) continue;
+      const he = col.halfExtents?.();
+      const r = he ? Math.hypot(he.x, he.y, he.z) : 0.6;
+      feet.push({ x: ct.x, y: ct.y, z: ct.z, r });
+    }
+    if (!feet.length) return this._probeStands(
+      body.translation().x, body.translation().y, body.translation().z,
+      this._reachOf(body), body);
+    feet.sort((a, b) => (a.y - a.r) - (b.y - b.r));
+    for (let i = 0; i < feet.length && i < 4; i++) {
+      const f = feet[i];
+      const sup = this._probeStands(f.x, f.y, f.z, f.r, body);
+      if (sup) return sup;
+    }
+    return null;
   }
 
   /** How far the body reaches below its own origin. Cached: it never changes. */
@@ -270,7 +403,7 @@ export class PhysicsWorld {
       if (tested >= limit) break;
       if (!PhysicsWorld.alive(body)) continue;
       tested++;
-      if (this._standsOnSomething(body)) continue;
+      if (this._footingIntact(body)) continue;
       if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
       if (!this.promote(body)) break;
       woke++;
@@ -315,7 +448,7 @@ export class PhysicsWorld {
         list.pop();
         continue;
       }
-      if (this._standsOnSomething(body)) {
+      if (this._footingIntact(body)) {
         st.standing++;
         body.__hangStrikes = 0;
         this._auditCursor++;
@@ -335,19 +468,27 @@ export class PhysicsWorld {
         // be released at all: it hangs there for the rest of the match. One
         // brick vanishing out of a rubble field is not something anyone will
         // notice; one brick hanging in the sky is the thing people photograph.
-        body.__hangStrikes = (body.__hangStrikes || 0) + 1;
+        //
+        // One strike per sweep, not per visit. The cursor wraps when the list
+        // is shorter than the slice, so the same stone can be looked at four
+        // times in a single call — which spent its strikes and deleted it in the
+        // same breath as noticing it, before the budget had a chance to free
+        // anything.
+        if (body.__strikeAt !== this.stepCount) {
+          body.__strikeAt = this.stepCount;
+          body.__hangStrikes = (body.__hangStrikes || 0) + 1;
+        }
         st.noRoom++;
-        if (body.__hangStrikes < 2) { this._auditCursor++; continue; }
-        const owner = this.owners.get(body.handle);
+        if (body.__hangStrikes < 3) { this._auditCursor++; continue; }
+        // Give up and delete it. On a phone the budget can be genuinely full for
+        // long stretches, and then a stone that has lost its footing can never
+        // be released at all: it hangs there for the rest of the match. One
+        // brick vanishing out of a rubble field is not something anyone will
+        // notice; one brick hanging in the sky is the thing people photograph.
+        if (!this._discard(body)) { this._auditCursor++; continue; }
         list[idx] = list[list.length - 1];
         list.pop();
-        if (owner && owner.structure && owner.chunk !== undefined) {
-          owner.structure.destroyChunk(owner.chunk);
-        } else {
-          this.remove(body);
-        }
         st.culled++;
-        this.hangingCulled = (this.hangingCulled || 0) + 1;
         continue;
       }
       body.__hangStrikes = 0;
@@ -427,17 +568,102 @@ export class PhysicsWorld {
       }
     }
 
-    // Third, and only if the first two could not find enough: freeze the slow
-    // ones that are *not* standing on anything. This is the pass nobody wants
-    // — it is how a stone ends up frozen where it should not be — but the
-    // alternative is worse. A collapsing tower needs somewhere to put four
-    // hundred stones at once, and a building that cannot be given bodies
-    // stands there with its base shot out. Anything frozen here is on the
-    // sweep's list immediately, and gets released as soon as there is room.
-    for (let i = 0; i < slow.length && freed < need; i++) {
-      if (this.demote(slow[i], true)) freed++;
+    // Third, and only if the first two could not find enough: get rid of the
+    // slow ones that are standing on nothing.
+    //
+    // This pass used to *freeze* them instead, on the reasoning that a stone
+    // wrongly frozen is on the sweep's list a moment later and the alternative
+    // — a collapsing tower with nowhere to put four hundred stones — is worse.
+    // It is not worse. Freezing a stone in clear air is how the sky-ball is
+    // seeded: one anchor hanging at ninety metres is enough for the next stone
+    // to land against it and freeze legitimately, and the next against that,
+    // and a moment later there are three hundred of them in a clot over the
+    // site that the sweep will not touch because every one of them really is
+    // resting on its neighbour.
+    //
+    // So they go instead. Smallest and lowest first, because the cost of this
+    // pass is a piece of masonry disappearing and the question is only which
+    // piece nobody will see go: the cull runs through `destroyChunk`, which
+    // throws the same dust and fragments as a stone shattered by a shell, so
+    // what it looks like is rubble breaking up rather than rubble vanishing.
+    // They are marked for deletion rather than deleted here, and that matters:
+    // `reclaim` is called from inside the structure code, which is holding
+    // references to islands and chunks across the call. Freeing a slot used to
+    // mean nothing worse than changing a body's type, so that was safe; deleting
+    // one is not, and doing it inline panicked Rapier the first time a
+    // fragmenting island had a stone taken out from under it mid-call. The queue
+    // is drained at the top of `step`, where nothing is mid-way through
+    // anything.
+    if (freed < need && slow.length) {
+      slow.sort((a, b) => this._expendability(a) - this._expendability(b));
+      for (let i = 0, want = need - freed; i < slow.length && i < want; i++) {
+        this._condemn(slow[i]);
+      }
     }
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
+  }
+
+  /** Mark a body for deletion at the next safe point. */
+  _condemn(body) {
+    if (!PhysicsWorld.alive(body) || body.__doomed) return false;
+    const owner = this.owners.get(body.handle);
+    // Single stones only. An island is a welded section the structure is still
+    // steering — deleting one out from under it is not a dropped brick, it is a
+    // piece of building that vanishes.
+    if (!owner || owner.chunk === undefined || !owner.structure) return false;
+    body.__doomed = true;
+    (this._doomed || (this._doomed = [])).push(body);
+    return true;
+  }
+
+  /** Delete what `reclaim` condemned, now that nothing is holding a reference. */
+  _drainDoomed(limit = 64) {
+    const q = this._doomed;
+    if (!q || !q.length) return 0;
+    let n = 0;
+    while (q.length && n < limit) {
+      const body = q.pop();
+      if (!PhysicsWorld.alive(body)) continue;
+      body.__doomed = false;
+      // Reprieved: it found something to stand on, or was frozen honestly, in
+      // the frame between being condemned and being deleted.
+      if (body.bodyType() === this.rapier.RigidBodyType.Fixed) continue;
+      if (this._standsOnSomething(body)) continue;
+      this._discard(body);
+      n++;
+    }
+    return n;
+  }
+
+  /**
+   * How much it would cost, visually, to delete this body. Small and low is
+   * cheap; a large piece high in the air is what people are watching.
+   */
+  _expendability(body) {
+    const t = body.translation();
+    if (!isFinite(t.y)) return -1;
+    const g = this.groundAt ? this.groundAt(t.x, t.z) : 0;
+    return this._reachOf(body) * 3 + Math.max(0, t.y - (isFinite(g) ? g : 0));
+  }
+
+  /**
+   * Delete one stone, letting its structure throw the usual dust.
+   *
+   * Single stones only, and the refusal matters more than the deletion. This
+   * used to fall through to `removeRigidBody` for anything it did not
+   * recognise, which included every welded section — and a section's body is
+   * the only thing that moves it. Deleting one left three hundred and fifty
+   * stones drawn exactly where they were when it went, permanently, in the
+   * air: the ball of masonry the player photographed. A section that cannot be
+   * given a slot waits for one instead.
+   */
+  _discard(body) {
+    if (!PhysicsWorld.alive(body)) return false;
+    const owner = this.owners.get(body.handle);
+    if (!owner || !owner.structure || owner.chunk === undefined) return false;
+    owner.structure.destroyChunk(owner.chunk);
+    this.hangingCulled = (this.hangingCulled || 0) + 1;
+    return true;
   }
 
   setBudget(n) { this.activeBudget = n; }
@@ -456,6 +682,10 @@ export class PhysicsWorld {
     // masonry the size of a city block hanging over the map. So the moment it
     // happens, stop touching the world at all and leave the scene standing.
     if (this.dead) return 0;
+    // Deletions the budget asked for last frame happen here, before anything
+    // else has begun: nothing is holding a body reference at this point, which
+    // is the whole reason they were queued rather than done where they arose.
+    this._drainDoomed();
     this.accumulator += Math.min(dt, 0.1);
     let steps = 0;
     try {

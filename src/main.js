@@ -55,7 +55,9 @@ async function boot() {
   await progress(18, `surveying ${level.name.split(',')[1]?.trim() || level.name}`);
   const terrain = await loadTerrain(level.terrain, quality);
   engine.scene.add(terrain.buildMesh());
-  terrain.addToPhysics(physics);
+  // The ground, kept by handle: anything resting on the terrain is settled for
+  // good, and the freezing bookkeeping can stop worrying about it.
+  physics.groundBody = terrain.addToPhysics(physics);
 
   const sunDir = engine.sun.position.clone().normalize();
   const sky = createSky(sunDir);

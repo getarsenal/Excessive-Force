@@ -280,12 +280,27 @@ export class Terrain {
   addToPhysics(physics) {
     const rapier = physics.rapier;
     const n = this.size;
-    // Rapier's heightfield indexes rows along z and columns along x, with the
-    // sample grid normalised to the collider's scale.
+    // Rapier's heightfield is a column-major matrix: element (row i, column j)
+    // lives at `heights[j * n + i]`, column j sits at x = (j/(n-1) - ½)·scale.x
+    // and row i at z = (i/(n-1) - ½)·scale.z. So the row index climbs with +z.
+    //
+    // The DEM's does not. `heightAt` looks up row `(span - z)`, because the
+    // bake writes north at the top of the image the way a map does, so its row
+    // index climbs with *-z*. Copying the rows across without reversing them
+    // therefore built a physics ground mirrored north-south against the one
+    // being drawn — 3.6 m out on average over this map, and far more than that
+    // on the river bank.
+    //
+    // Everything that asks the world where the ground is was wrong by that
+    // much: shells detonated against invisible slopes a few metres from the
+    // muzzle, rubble came to rest on ground that was not there, and the
+    // freezing test — which compares a stone's height against the *visual*
+    // terrain — called those stones supported and froze them in mid-air.
     const heights = new Float32Array(n * n);
     for (let zi = 0; zi < n; zi++) {
+      const row = (n - 1 - zi) * n;
       for (let xi = 0; xi < n; xi++) {
-        heights[xi * n + zi] = this.heights[zi * n + xi];
+        heights[xi * n + zi] = this.heights[row + xi];
       }
     }
     const body = physics.world.createRigidBody(rapier.RigidBodyDesc.fixed());

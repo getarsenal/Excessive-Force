@@ -305,10 +305,20 @@ export class Battle {
     if (Math.abs(point.x) > span * 0.92 || Math.abs(point.z) > span * 0.92) {
       return { ok: false, reason: 'off map' };
     }
-    // Keep clear of the structures themselves.
+    // Keep clear of the structures themselves — measured against the ground
+    // each one covers, not a circle around a point. A radius around the origin
+    // let a gun stand inside the palace wing, whose origin is at the foot of
+    // the tower seventy metres away; its first round then detonated against the
+    // wall in front of the muzzle, which is what "the rounds explode instantly"
+    // was.
     for (const s of this.structures) {
-      const dx = point.x - s.origin.x, dz = point.z - s.origin.z;
-      if (Math.hypot(dx, dz) < 26) return { ok: false, reason: 'too close' };
+      const f = s.footprint;
+      if (!f) continue;
+      const PAD = 9;
+      if (point.x > f.x0 - PAD && point.x < f.x1 + PAD
+          && point.z > f.z0 - PAD && point.z < f.z1 + PAD) {
+        return { ok: false, reason: 'too close' };
+      }
     }
     for (const u of this.units) {
       if (!u.alive) continue;
@@ -560,6 +570,22 @@ export class Battle {
       vel = new THREE.Vector3(0, p.speed, 0);
     } else {
       vel = solveDirect(from, aim, p.speed, p.gravity);
+    }
+
+    // Never fire into something a metre away. Placement keeps guns out of the
+    // landmarks, but rubble piles up and the ground moves, and a crew that has
+    // been buried should hold its fire rather than detonate its own round in
+    // its own lap.
+    if (vel && p.kind !== 'topattack') {
+      const len = Math.hypot(vel.x, vel.y, vel.z);
+      if (len > 1e-3) {
+        const blocked = this.physics.castRay(
+          { x: from.x, y: from.y, z: from.z },
+          { x: vel.x / len, y: vel.y / len, z: vel.z / len },
+          2.6,
+        );
+        if (blocked) return false;
+      }
     }
 
     this.projectiles.fire({

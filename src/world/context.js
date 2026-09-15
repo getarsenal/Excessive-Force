@@ -22,7 +22,8 @@ import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, addStreetFurniture, addBuildingDetail,
   addRiverEdge, addRoofAndFrontage } from './detail.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
-  addNetworkFurniture, halfWidth } from './streets.js';
+  addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
+  GRID_YAW } from './streets.js';
 
 export function buildContext(terrain, quality) {
   const group = new THREE.Group();
@@ -445,7 +446,7 @@ export function buildContext(terrain, quality) {
   if (bodies.length) group.add(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
   if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
 
-  group.add(buildGroundCover(terrain, net, rng, quality, terrain.span * 0.8));
+  group.add(buildBlockGround(terrain, net, quality));
   group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
@@ -509,67 +510,87 @@ function mergeTinted(geos, material, palette, rng, quality) {
   return mesh;
 }
 
+/** The colour of each kind of block's own ground. */
+const BLOCK_SURFACE = {
+  park: 0x4f7336,
+  carpark: 0x3a3d42,
+  works: 0x8d8471,
+  civic: 0xa39b89,
+  terrace: 0x8a8170,
+  precinct: null,          // the forecourt covers this
+};
+
 /**
- * Ground cover.
+ * Ground cover, by the block.
  *
- * The last of the bare map. Between the blocks and around the landmark's
- * precinct there is always ground that belongs to no block and no street —
- * verges, forecourts, the gaps between civic buildings — and left as the map's
- * own sand-coloured terrain it reads as a building site. This lays a tile of
- * grass, gravel or paving over anything that is not carriageway and not water,
- * in patches keyed to a noise field so it comes out as areas with edges rather
- * than as confetti.
+ * The version this replaces laid seventeen-metre squares of grass, gravel and
+ * paving across the whole map on a jittered lattice, each one flat and at the
+ * height of its own centre. On anything but level ground every tile cut into
+ * the slope on one side and hung off it on the other, neighbours overlapped at
+ * different heights, and none of them lined up with anything — which is what
+ * "weird grass blocks" was. It was a way of covering bare terrain without
+ * having to know what the terrain was *for*.
  *
- * One merged mesh, a few thousand quads, no per-frame cost.
+ * Now the ground belongs to the plan. Every block has a use, and the use says
+ * what its floor is: lawn in a garden square, tarmac in a car park, gravel in a
+ * works yard, paving in a civic block, a worn yard behind a terrace. Each floor
+ * is the block's own shape, pulled in behind the kerbs, and subdivided so it
+ * follows the ground rather than sitting on top of it. Between the blocks there
+ * is nothing left to cover: streets have surfaces, the landmark has a
+ * forecourt, the river has an embankment, and past the edge of town the map's
+ * own colouring is the right answer.
  */
-function buildGroundCover(terrain, net, rng, quality, radius) {
-  const STEP = 17;
-  const tiles = [];
-  const lawn = new THREE.Color(0x52683d);
-  const gravel = new THREE.Color(0x8d8471);
-  const paving = new THREE.Color(0xa59d8b);
+function buildBlockGround(terrain, net, quality) {
+  const g = new THREE.Group();
+  g.name = 'blockground';
+  const pos = [];
+  const col = [];
   const tmp = new THREE.Color();
-  for (let x = -radius; x <= radius; x += STEP) {
-    for (let z = -radius; z <= radius; z += STEP) {
-      const jx = x + (rng() - 0.5) * STEP * 0.3;
-      const jz = z + (rng() - 0.5) * STEP * 0.3;
-      if (terrain.isWater(jx, jz)) continue;
-      if (terrain.heightAt(jx, jz) < terrain.waterLevel + 0.9) continue;
-      // Keep off the roads: the carriageway is the one surface that is already
-      // drawn, and covering it is worse than covering nothing.
-      if (net.roadClearance(jx, jz) < STEP * 0.45) continue;
-      if (net.nodeClearance(jx, jz) < STEP * 0.45) continue;
-      const patch = valueNoise(jx * 0.006 + 13.7, jz * 0.006 - 5.2);
-      const fine = valueNoise(jx * 0.03, jz * 0.03);
-      // Green where the map says parkland or where a patch of it wants to be,
-      // and less of it the closer to the middle of town: a city centre is
-      // paved. Covering everything in lawn turns the place into a campus.
-      const m = terrain.maskAt(jx, jz);
-      const urban = 1 - Math.min(1, Math.hypot(jx, jz) / (terrain.span * 0.7));
-      const green = m.park > 0.32 || patch < 0.30 - urban * 0.18;
-      tmp.copy(green ? lawn : (patch < 0.70 ? gravel : paving));
-      tmp.multiplyScalar(0.84 + fine * 0.34);
-      // A flat quad, not a box: two triangles instead of twelve, and there are
-      // thousands of these.
-      const tile = new THREE.PlaneGeometry(STEP * 1.06, STEP * 1.06);
-      tile.rotateX(-Math.PI / 2);
-      tile.translate(jx, terrain.heightAt(jx, jz) + 0.07, jz);
-      const n = tile.attributes.position.count;
-      const arr = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) {
-        arr[i * 3] = tmp.r; arr[i * 3 + 1] = tmp.g; arr[i * 3 + 2] = tmp.b;
+  const base = new THREE.Color();
+  const CELL = 8;
+
+  const vert = (p, y) => {
+    pos.push(p.x, y, p.z);
+    col.push(tmp.r, tmp.g, tmp.b);
+  };
+
+  for (const b of net.blocks) {
+    const hue = BLOCK_SURFACE[b.use];
+    if (!hue) continue;
+    const quad = blockInterior(b, 0.4);
+    const f = quadFrame(quad);
+    if (f.w < 6 || f.d < 6) continue;
+    base.setHex(hue);
+    const nu = Math.max(1, Math.round(f.w / CELL));
+    const nv = Math.max(1, Math.round(f.d / CELL));
+    for (let iv = 0; iv < nv; iv++) {
+      for (let iu = 0; iu < nu; iu++) {
+        const p00 = quadPoint(quad, iu / nu, iv / nv);
+        const p10 = quadPoint(quad, (iu + 1) / nu, iv / nv);
+        const p11 = quadPoint(quad, (iu + 1) / nu, (iv + 1) / nv);
+        const p01 = quadPoint(quad, iu / nu, (iv + 1) / nv);
+        // Never over the water, and never over a road: a block corner can
+        // overhang the bank where the grid meets the river, and one quad of
+        // lawn floating over the Thames is more noticeable than a missing one.
+        if (terrain.isWater(p00.x, p00.z) || terrain.isWater(p10.x, p10.z)
+          || terrain.isWater(p11.x, p11.z) || terrain.isWater(p01.x, p01.z)) continue;
+        const mx = (p00.x + p11.x) / 2, mz = (p00.z + p11.z) / 2;
+        if (net.roadClearance(mx, mz) < 0.5 || net.nodeClearance(mx, mz) < 0.5) continue;
+        tmp.copy(base).multiplyScalar(
+          0.86 + 0.26 * valueNoise(mx * 0.035 + 7.1, mz * 0.035 - 3.4));
+        const y = (p) => terrain.heightAt(p.x, p.z) + 0.10;
+        vert(p00, y(p00)); vert(p10, y(p10)); vert(p11, y(p11));
+        vert(p00, y(p00)); vert(p11, y(p11)); vert(p01, y(p01));
       }
-      tile.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-      tiles.push(tile);
     }
   }
-  const g = new THREE.Group();
-  g.name = 'groundcover';
-  if (!tiles.length) return g;
-  const mesh = new THREE.Mesh(
-    BufferGeometryUtils.mergeGeometries(tiles, false),
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
-  );
+  if (!pos.length) return g;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }));
   mesh.receiveShadow = quality.shadowMapSize > 0;
   mesh.frustumCulled = false;
   g.add(mesh);
@@ -1010,38 +1031,11 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
   const yardBeds = [];
   let carparks = 0;
 
-  // ── The ground inside a block.
-  //
-  // Whatever a block is for, the part of it that is not roof is a surface: a
-  // yard, a garden, a service road, a bit of gravel. Leaving it as the map's
-  // own ground is what made the city read as buildings standing on a desert,
-  // so every block gets its own floor, under everything else.
-  for (const b of (net?.blocks || [])) {
-    if (b.use === 'park' || b.use === 'carpark' || b.use === 'precinct') continue;
-    let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
-    for (const p of b.poly) {
-      bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x);
-      bz0 = Math.min(bz0, p.z); bz1 = Math.max(bz1, p.z);
-    }
-    const bw = (bx1 - bx0) - 26, bd = (bz1 - bz0) - 26;
-    if (bw < 12 || bd < 12) continue;
-    const cx2 = (bx0 + bx1) / 2, cz2 = (bz0 + bz1) / 2;
-    if (terrain.isWater(cx2, cz2)) continue;
-    const bed = new THREE.BoxGeometry(bw, 0.18, bd);
-    bed.translate(cx2, terrain.heightAt(cx2, cz2) + 0.09, cz2);
-    const roll = rng();
-    tintOne(bed, roll < 0.34 ? 0x4e6b38 : (roll < 0.7 ? 0x8a8170 : 0x6f6a5e),
-      0.85 + rng() * 0.3);
-    yardBeds.push(bed);
-  }
-  if (yardBeds.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(yardBeds, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
-    );
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
+  // The ground inside a block used to be laid here, as one flat box the size of
+  // the block's axis-aligned bounding box. `buildBlockGround` does it properly
+  // now — the block's own shape, at the block's own angle, following the
+  // terrain — so all that is left for this pass is what stands *on* it.
+  void yardBeds;
 
   for (const b of (net?.blocks || [])) {
     if (!b.open) continue;

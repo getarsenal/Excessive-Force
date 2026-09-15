@@ -1837,6 +1837,120 @@ export class TestMenu {
             + `peak lean ${(st.peakLean || 0).toFixed(1)}°; `
             + `down to ${(integ * 100).toFixed(0)}%`;
       })],
+
+      ['no cloud of rubble hangs over the site', () => this._calm(() => {
+        // The same complaint as the assertion above, asked a way that does not
+        // trust the engine's own answer.
+        //
+        // That one calls `_standsOnSomething`, which is the function on trial:
+        // when support meant "touching anything at all", a clump of debris in
+        // mid-air satisfied it for every one of its members — each stone really
+        // was resting on its neighbour — and the whole clot froze in the sky,
+        // three hundred pieces of it, while the assertion reported nothing
+        // hanging. So this one measures instead. Every piece of loose masonry
+        // is joined to the ones it is touching, and every group that results
+        // has to reach the ground.
+        const gy = b.originGround;
+        const CELL = 5;
+        const nodes = [];
+        for (const st of c.structures) {
+          for (let i = 0; i < st.count; i++) {
+            if (!(st.flags[i] & 1)) continue;
+            const r = Math.hypot(st.hx[i], st.hy[i], st.hz[i]);
+            const body = (st.flags[i] & 8) ? st.islands.get(st.islandOf[i])?.body
+              : st.bodyOf[i];
+            nodes.push({
+              x: st.px[i], y: st.py[i], z: st.pz[i], r,
+              kind: (st.flags[i] & 8) ? 'island' : ((st.flags[i] & 2) ? 'free' : 'built'),
+              fixed: !!body && !body.__removed
+                && body.bodyType() === c.physics.rapier.RigidBodyType.Fixed,
+              dead: (st.flags[i] & 8) ? !(body && !body.__removed) : false,
+              settling: (st.flags[i] & 8)
+                && !!st.islands.get(st.islandOf[i])?.settling,
+              body,
+              // Masonry still attached to the building is ground by definition;
+              // so is anything lying on the terrain.
+              ground: !(st.flags[i] & 10)
+                || st.py[i] - st.hy[i] <= c.terrain.heightAt(st.px[i], st.pz[i]) + 1.4,
+            });
+          }
+        }
+        // Union-find over a hash grid: touching stones share a group.
+        const parent = new Int32Array(nodes.length);
+        for (let i = 0; i < parent.length; i++) parent[i] = i;
+        const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+        const union = (a, d) => { a = find(a); d = find(d); if (a !== d) parent[d] = a; };
+        const grid = new Map();
+        const key = (x, y, z) => `${x},${y},${z}`;
+        nodes.forEach((n, i) => {
+          const k = key(Math.floor(n.x / CELL), Math.floor(n.y / CELL), Math.floor(n.z / CELL));
+          let cell = grid.get(k);
+          if (!cell) grid.set(k, cell = []);
+          cell.push(i);
+        });
+        nodes.forEach((n, i) => {
+          const cx = Math.floor(n.x / CELL), cy = Math.floor(n.y / CELL), cz = Math.floor(n.z / CELL);
+          for (let a = -1; a <= 1; a++) for (let d = -1; d <= 1; d++) for (let e = -1; e <= 1; e++) {
+            const cell = grid.get(key(cx + a, cy + d, cz + e));
+            if (!cell) continue;
+            for (const j of cell) {
+              if (j <= i) continue;
+              const m = nodes[j];
+              const gap = Math.hypot(n.x - m.x, n.y - m.y, n.z - m.z) - n.r - m.r;
+              if (gap < 0.8) union(i, j);
+            }
+          }
+        });
+        const groups = new Map();
+        nodes.forEach((n, i) => {
+          const g = find(i);
+          let rec = groups.get(g);
+          if (!rec) {
+            groups.set(g, rec = { n: 0, ground: false, top: -Infinity, low: Infinity,
+              island: 0, free: 0, built: 0, fixed: 0, settling: 0, dead: 0 });
+          }
+          rec.n++;
+          rec[n.kind]++;
+          if (n.fixed) rec.fixed++;
+          if (n.settling) rec.settling++;
+          if (n.dead) rec.dead++;
+          if (!rec.why && n.body && !n.body.__removed) {
+            const P = c.physics;
+            rec.why = {
+              onGround: !!n.body.__supGround,
+              supCol: n.body.__supCol,
+              intact: P._footingIntact(n.body),
+              findsNow: !!P._findSupport(n.body),
+              cols: n.body.numColliders(),
+              strikes: n.body.__hangStrikes || 0,
+              inList: P.frozen.indexOf(n.body) >= 0,
+            };
+          }
+          if (n.ground) rec.ground = true;
+          const h = n.y - c.terrain.heightAt(n.x, n.z);
+          if (h > rec.top) rec.top = h;
+          if (h < rec.low) rec.low = h;
+        });
+        // A single stone caught at the top of its arc is not a cloud, and a
+        // stone genuinely in free fall is the thing we want to see happen. So
+        // the complaint is groups: several pieces, well clear of the ground,
+        // with nothing joining them to it.
+        const floating = [...groups.values()]
+          .filter((r) => !r.ground && r.n >= 4 && r.low > 6)
+          .sort((a, d) => d.n - a.n);
+        const total = floating.reduce((a, r) => a + r.n, 0);
+        const worst = floating[0];
+        if (floating.length) {
+          console.log('[tumble] hanging rubble:', JSON.stringify(floating.slice(0, 6)));
+        }
+        assert(floating.length === 0,
+          `${floating.length} clumps of masonry (${total} stones) are hanging `
+          + `clear of the ground — the biggest ${worst?.n} stones at `
+          + `${worst?.low.toFixed(0)}–${worst?.top.toFixed(0)} m up `
+          + `(${worst?.island} welded, ${worst?.free} loose, ${worst?.built} built, `
+          + `${worst?.fixed} of them frozen)`);
+        return `${groups.size} groups of rubble, every one of them on the ground`;
+      })],
     ];
   }
 

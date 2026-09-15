@@ -44,6 +44,17 @@ export function halfWidth(cls) {
 }
 
 /**
+ * The angle the whole plan is turned through.
+ *
+ * Exported because everything that stands in this city has to agree with it.
+ * The hand-placed civic set did not — it was laid out on the map's own axes
+ * while the streets ran thirteen degrees off them, so a government block sat at
+ * thirteen degrees to the road in front of it and the quarter read as a pile of
+ * boxes dropped from a height.
+ */
+export const GRID_YAW = 0.23;
+
+/**
  * Lay out the graph.
  *
  * `opts`: { pitch, reach, exclude (radius kept clear for the landmark),
@@ -102,7 +113,6 @@ export function buildStreetNetwork(terrain, rng, opts) {
   //
   // The curves that are left are the ones with a reason: the road along the
   // river follows the bank, and the bridge approaches point at the bridge.
-  const GRID_YAW = 0.23;
   const gca = Math.cos(GRID_YAW), gsa = Math.sin(GRID_YAW);
   const span = reach * 1.45;                 // laid out past the corners
   const lineSet = () => {
@@ -298,19 +308,89 @@ export function buildStreetNetwork(terrain, rng, opts) {
     }
   }
 
-  // ── 6. Blocks: the holes in the network, which is where buildings go.
+  // ── 6. Tidy the graph before anything is drawn from it.
+  //
+  // Every street above can fail to be built — the line runs into the water, or
+  // across the abbey, or off the edge — and what that leaves behind is the
+  // thing the plan reads worst as: stubs that go a hundred metres and stop at
+  // nothing, and the occasional pocket of road with no connection to the rest
+  // of the city at all. A road exists to get somewhere. So:
+  //
+  //   - repeatedly drop any street with a dead end, until none is left;
+  //   - then keep only the largest connected piece of what remains.
+  //
+  // Both are just graph work, and between them they are the difference between
+  // a plan and a scattering of tarmac.
+  pruneNetwork(nodes, edges);
+
+  // ── 7. Blocks: the holes in the network, which is where buildings go.
+  //
+  // Not one per grid cell. A cell whose four sides are not all there is not a
+  // block — and the version before this one simply skipped it, which is why the
+  // map had bald patches: every street that failed to build, and every street
+  // deliberately dropped to break up the lattice, punched a hole in the city
+  // that nothing ever filled.
+  //
+  // What belongs there is a *bigger* block. Where the street between two cells
+  // is missing, the two cells are one plot of land, and that is what a long
+  // block is. So the cells are swept into maximal rectangles: grow right while
+  // the divider to the right is missing, then grow down while every divider
+  // along the bottom is missing, and take the result as one block bounded by
+  // the streets that really do run around it.
   const blocks = [];
   const linked = (a, b) => (a >= 0 && b >= 0
     && nodes[a].links.some((l) => l.other === b));
+  const at = (i, j) => (i >= 0 && j >= 0 && i < cols && j < rows ? idx[j * cols + i] : -1);
+  // Is the cell at (i, j) real ground — four corners, and not the precinct?
+  const corners = (i, j) => {
+    const c00 = at(i, j), c10 = at(i + 1, j), c01 = at(i, j + 1), c11 = at(i + 1, j + 1);
+    return (c00 < 0 || c10 < 0 || c01 < 0 || c11 < 0) ? null : { c00, c10, c01, c11 };
+  };
+  // Does a street run along the given side of cell (i, j)?
+  const topOf = (i, j) => { const c = corners(i, j); return !!c && linked(c.c00, c.c10); };
+  const botOf = (i, j) => { const c = corners(i, j); return !!c && linked(c.c01, c.c11); };
+  const leftOf = (i, j) => { const c = corners(i, j); return !!c && linked(c.c00, c.c01); };
+  const rightOf = (i, j) => { const c = corners(i, j); return !!c && linked(c.c10, c.c11); };
+
+  const taken = new Uint8Array(cols * rows);
   for (let j = 0; j < rows - 1; j++) {
     for (let i = 0; i < cols - 1; i++) {
-      const c00 = idx[j * cols + i], c10 = idx[j * cols + i + 1];
-      const c01 = idx[(j + 1) * cols + i], c11 = idx[(j + 1) * cols + i + 1];
+      if (taken[j * cols + i]) continue;
+      if (!corners(i, j)) continue;
+      // The block must be walled on the two sides it starts against.
+      if (!topOf(i, j) || !leftOf(i, j)) continue;
+      // Grow right while the divider between this column and the next is gone
+      // and the next column is real ground with a street along its top.
+      let i1 = i;
+      while (i1 + 1 < cols - 1 && !taken[j * cols + i1 + 1]
+        && !rightOf(i1, j) && corners(i1 + 1, j) && topOf(i1 + 1, j)) i1++;
+      // Then down, but only in whole rows: every column of the next row has to
+      // be free of a divider, or the rectangle would swallow a street.
+      let j1 = j;
+      for (;;) {
+        if (j1 + 1 >= rows - 1) break;
+        let ok = true;
+        for (let k = i; k <= i1; k++) {
+          if (taken[(j1 + 1) * cols + k] || botOf(k, j1) || !corners(k, j1 + 1)
+            || !leftOf(i, j1 + 1) || !rightOf(i1, j1 + 1)) { ok = false; break; }
+        }
+        if (!ok) break;
+        j1++;
+      }
+      // Closed on the far sides, or this is not an enclosed block at all.
+      if (!rightOf(i1, j) || !botOf(i, j1)) {
+        // A rectangle open on one side is still land, provided its outline is
+        // made of real junctions — it is a corner plot rather than a block, and
+        // leaving it bare is the hole this whole pass exists to remove. Accept
+        // it if at least three of its four sides are streets.
+        const sidesPresent = (topOf(i, j) ? 1 : 0) + (leftOf(i, j) ? 1 : 0)
+          + (rightOf(i1, j) ? 1 : 0) + (botOf(i, j1) ? 1 : 0);
+        if (sidesPresent < 3) continue;
+      }
+      for (let b = j; b <= j1; b++) for (let a = i; a <= i1; a++) taken[b * cols + a] = 1;
+      const c00 = at(i, j), c10 = at(i1 + 1, j);
+      const c01 = at(i, j1 + 1), c11 = at(i1 + 1, j1 + 1);
       if (c00 < 0 || c10 < 0 || c01 < 0 || c11 < 0) continue;
-      // All four sides have to exist, or this is not an enclosed block and
-      // something else (a square, a bigger block) belongs here.
-      if (!linked(c00, c10) || !linked(c01, c11)
-        || !linked(c00, c01) || !linked(c10, c11)) continue;
       const poly = [nodes[c00], nodes[c10], nodes[c11], nodes[c01]]
         .map((n) => ({ x: n.x, z: n.z }));
       const sides = [
@@ -319,13 +399,81 @@ export function buildStreetNetwork(terrain, rng, opts) {
       ];
       let cx = 0, cz = 0;
       for (const p of poly) { cx += p.x / 4; cz += p.z / 4; }
-      blocks.push({ poly, sides, x: cx, z: cz });
+      blocks.push({ poly, sides, x: cx, z: cz, cells: (i1 - i + 1) * (j1 - j + 1) });
     }
   }
 
   const net = { nodes, edges, blocks, pitch, reach, debug };
   buildEdgeIndex(net);
   return net;
+}
+
+/**
+ * Take the stubs and the orphans out of a finished graph.
+ *
+ * Nodes are never removed or reordered — the block sweep indexes into the same
+ * array — so a junction left with nothing attached simply has no links, and
+ * every consumer already skips those.
+ *
+ * Two rules:
+ *
+ *   - a street with a dead end at either end is not a street, it is a stub, and
+ *     it goes. Repeatedly, because removing one makes its neighbour a stub too:
+ *     a failed line can leave a chain of three or four of them trailing off
+ *     across the map.
+ *   - a handful of streets joined only to each other, a long way from anything,
+ *     is a fragment. It goes as well. Not by "keep the largest": the far bank of
+ *     the river is a legitimate second component joined only by the bridge, and
+ *     keeping the largest deletes half the city.
+ *
+ * Bridge approaches and the embankment are exempt from the first rule. Both are
+ * meant to end where they end — one at the abutment, the other at the edge of
+ * the map — and pruning them is how the bridge loses its road again.
+ */
+function pruneNetwork(nodes, edges) {
+  const keep = (e) => e.approach || e.bank;
+  for (;;) {
+    let cut = 0;
+    for (let k = edges.length - 1; k >= 0; k--) {
+      const e = edges[k];
+      if (keep(e)) continue;
+      const a = nodes[e.a], b = nodes[e.b];
+      if (a.links.length > 1 && b.links.length > 1) continue;
+      a.links = a.links.filter((l) => l.edge !== e);
+      b.links = b.links.filter((l) => l.edge !== e);
+      edges.splice(k, 1);
+      cut++;
+    }
+    if (!cut) break;
+  }
+
+  // Components, by flood fill over what is left.
+  const comp = new Int32Array(nodes.length).fill(-1);
+  let nc = 0;
+  const sizes = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (comp[i] >= 0 || !nodes[i].links.length) continue;
+    const id = nc++;
+    let n = 0;
+    const stack = [i];
+    comp[i] = id;
+    while (stack.length) {
+      const k = stack.pop();
+      n++;
+      for (const l of nodes[k].links) {
+        if (comp[l.other] < 0) { comp[l.other] = id; stack.push(l.other); }
+      }
+    }
+    sizes.push(n);
+  }
+  for (let k = edges.length - 1; k >= 0; k--) {
+    const e = edges[k];
+    const id = comp[e.a];
+    if (id < 0 || sizes[id] >= 5 || keep(e)) continue;
+    nodes[e.a].links = nodes[e.a].links.filter((l) => l.edge !== e);
+    nodes[e.b].links = nodes[e.b].links.filter((l) => l.edge !== e);
+    edges.splice(k, 1);
+  }
 }
 
 /** Which road class runs along this side of a block. */
@@ -650,6 +798,70 @@ function intersect(p1, d1, p2, d2) {
   if (Math.abs(den) < 1e-4) return null;
   const t = ((p2.x - p1.x) * d2.z - (p2.z - p1.z) * d2.x) / den;
   return { x: p1.x + d1.x * t, z: p1.z + d1.z * t };
+}
+
+/**
+ * A block's usable ground: its own four corners, pulled in behind the kerbs.
+ *
+ * The single most visible fault in the old city came from not having this.
+ * Every surface inside a block — the garden square's lawn, the car park's
+ * tarmac, the yard behind a terrace — was built from the block's *axis-aligned
+ * bounding box*: a rectangle square to the map, laid flat at one height, on a
+ * plan turned thirteen degrees off the map's axes. So each one sat at an angle
+ * to the block it belonged to, overhung the pavement at two corners, and either
+ * buried itself in the hill or hung off it. From above that is a field of
+ * mismatched green and grey rectangles, which is exactly what it looked like.
+ *
+ * The corners here are the intersections of the four kerb lines, so the surface
+ * is the shape of the block, at the angle of the block, ending where the
+ * pavement begins.
+ */
+export function blockInterior(b, extra = 0) {
+  const lines = [];
+  for (let s = 0; s < 4; s++) {
+    const p = b.poly[s], q = b.poly[(s + 1) % 4];
+    const dx = q.x - p.x, dz = q.z - p.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const dir = { x: dx / len, z: dz / len };
+    let nx = -dir.z, nz = dir.x;
+    if ((b.x - p.x) * nx + (b.z - p.z) * nz < 0) { nx = -nx; nz = -nz; }
+    const off = halfWidth(b.sides[s]) + extra;
+    lines.push({ p: { x: p.x + nx * off, z: p.z + nz * off }, d: dir });
+  }
+  const out = [];
+  for (let k = 0; k < 4; k++) {
+    const a = lines[(k + 3) % 4], c = lines[k];
+    out.push(intersect(a.p, a.d, c.p, c.d) || { x: b.poly[k].x, z: b.poly[k].z });
+  }
+  return out;
+}
+
+/**
+ * A local frame for a quad: where its middle is, which way it runs, and how big
+ * it is. Everything placed inside a block — bays, paths, railings, beds — is
+ * laid out in this frame instead of in world axes, which is what stops a car
+ * park's white lines running diagonally across the car park.
+ */
+export function quadFrame(quad) {
+  const cx = (quad[0].x + quad[1].x + quad[2].x + quad[3].x) / 4;
+  const cz = (quad[0].z + quad[1].z + quad[2].z + quad[3].z) / 4;
+  const ex = (quad[1].x - quad[0].x + quad[2].x - quad[3].x) / 2;
+  const ez = (quad[1].z - quad[0].z + quad[2].z - quad[3].z) / 2;
+  const fx = (quad[3].x - quad[0].x + quad[2].x - quad[1].x) / 2;
+  const fz = (quad[3].z - quad[0].z + quad[2].z - quad[1].z) / 2;
+  const w = Math.hypot(ex, ez), d = Math.hypot(fx, fz);
+  // `yaw` turns +Z onto the block's first edge, matching how the buildings in
+  // the block are oriented, so a slab and the terrace in front of it agree.
+  return { cx, cz, w, d, yaw: Math.atan2(ex, ez) };
+}
+
+/** Bilinear point inside a quad, u along edge 0→1, v along edge 0→3. */
+export function quadPoint(quad, u, v) {
+  const ax = quad[0].x + (quad[1].x - quad[0].x) * u;
+  const az = quad[0].z + (quad[1].z - quad[0].z) * u;
+  const bx = quad[3].x + (quad[2].x - quad[3].x) * u;
+  const bz = quad[3].z + (quad[2].z - quad[3].z) * u;
+  return { x: ax + (bx - ax) * v, z: az + (bz - az) * v };
 }
 
 /** Cut `from` metres off the start of a polyline and `to` off the end. */

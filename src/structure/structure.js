@@ -230,6 +230,23 @@ export class Structure {
     this._v = new THREE.Vector3();
     this._s = new THREE.Vector3();
 
+    // The ground this building actually stands on, as an axis-aligned box.
+    //
+    // Everything used to ask "is this within 26 m of the structure's origin?",
+    // which is a fine question for a tower and a meaningless one for a wing
+    // seventy-five metres long — both of these share an origin at the foot of
+    // the clock tower, so the whole palace read as open ground and a gun could
+    // be deployed inside it, firing into a wall a metre from its own muzzle.
+    let fx0 = Infinity, fx1 = -Infinity, fz0 = Infinity, fz1 = -Infinity;
+    for (let i = 0; i < n; i++) {
+      const r = Math.max(this.hx[i], this.hz[i]);
+      if (this.px[i] - r < fx0) fx0 = this.px[i] - r;
+      if (this.px[i] + r > fx1) fx1 = this.px[i] + r;
+      if (this.pz[i] - r < fz0) fz0 = this.pz[i] - r;
+      if (this.pz[i] + r > fz1) fz1 = this.pz[i] + r;
+    }
+    this.footprint = { x0: fx0, x1: fx1, z0: fz0, z1: fz1 };
+
     this._buildAdjacency();
     this._groutOrphans();
     this._groutBearing();
