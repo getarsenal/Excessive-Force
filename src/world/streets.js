@@ -403,9 +403,95 @@ export function buildStreetNetwork(terrain, rng, opts) {
     }
   }
 
+  // ── 8. Now that the blocks are cut, join up the streets the grid split.
+  //
+  // It has to be this way round: a block is found by asking whether its four
+  // corners are directly linked, and dissolving a node replaces two of those
+  // links with one long street that no corner can see.
+  debug.dissolved = dissolveThroughNodes(nodes, edges);
+
   const net = { nodes, edges, blocks, pitch, reach, debug };
   buildEdgeIndex(net);
   return net;
+}
+
+/**
+ * Join up streets that only stop because the grid said so.
+ *
+ * This is the jank. A junction pad is built from the kerb lines of the streets
+ * that meet it — for each neighbouring pair of arms, the point where their kerbs
+ * cross — and that construction is right for three arms or more and degenerate
+ * for two that run straight on: the kerb lines are then *parallel*, there is no
+ * crossing point, and the fallback pinches the pad to a point at the node. What
+ * that draws is a road narrowing to a wedge and opening out again, which is what
+ * a lane looks like when it appears to merge into nothing, and the riverside had
+ * ten of them in a row because the embankment is a chain of such nodes.
+ *
+ * The real answer is not a better fallback. A node with two arms running through
+ * it is not a junction at all — it is a point in the middle of a street — so the
+ * two streets are joined into one and the node is dropped. Bends keep their
+ * node, because a bend really is a corner and the kerb lines really do cross.
+ *
+ * Runs after the blocks are cut, which need the grid's own links to find their
+ * four sides, and before anything is drawn from the graph.
+ */
+function dissolveThroughNodes(nodes, edges) {
+  const indexOf = new Map();
+  const reindex = () => {
+    indexOf.clear();
+    for (let i = 0; i < nodes.length; i++) indexOf.set(nodes[i], i);
+  };
+  reindex();
+  let merged = 0;
+  for (let pass = 0; pass < 6; pass++) {
+    let did = 0;
+    for (let ni = 0; ni < nodes.length; ni++) {
+      const n = nodes[ni];
+      if (n.links.length !== 2) continue;
+      const la = n.links[0], lb = n.links[1];
+      const ea = la.edge, eb = lb.edge;
+      if (ea === eb) continue;                       // a loop back to itself
+      if (ea.cls !== eb.cls) continue;               // a road changing class stops here
+      if (ea.approach || eb.approach) continue;      // the bridge's own geometry
+      if (!!ea.bank !== !!eb.bank) continue;
+      const da = linkDir(n, la), db = linkDir(n, lb);
+      // +1 when the second arm carries straight on from the first.
+      const straight = -(da.x * db.x + da.z * db.z);
+      // The embankment is allowed to be a curve; a street is not, and a street
+      // merged across a real kink would fail the straightness test it exists to
+      // satisfy.
+      if (straight < (ea.bank ? 0.86 : 0.998)) continue;
+
+      // Orient both so `ea` ends at n and `eb` leaves it.
+      const aPts = la.at === 0 ? ea.pts.slice().reverse() : ea.pts.slice();
+      const bPts = lb.at === 0 ? eb.pts.slice() : eb.pts.slice().reverse();
+      const farA = la.at === 0 ? ea.b : ea.a;
+      const farB = lb.at === 0 ? eb.b : eb.a;
+      if (farA === farB) continue;                   // would close a two-edge loop
+      const pts = aPts.concat(bPts.slice(1));
+      let len = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+      }
+      const e = { a: farA, b: farB, cls: ea.cls, pts, len };
+      if (ea.bank || eb.bank) e.bank = true;
+
+      // Swap the two old edges out of the graph.
+      for (const k of [farA, farB]) {
+        nodes[k].links = nodes[k].links.filter((l) => l.edge !== ea && l.edge !== eb);
+      }
+      nodes[farA].links.push({ edge: e, other: farB, at: 0 });
+      nodes[farB].links.push({ edge: e, other: farA, at: 1 });
+      n.links = [];
+      for (let k = edges.length - 1; k >= 0; k--) {
+        if (edges[k] === ea || edges[k] === eb) edges.splice(k, 1);
+      }
+      edges.push(e);
+      merged++; did++;
+    }
+    if (!did) break;
+  }
+  return merged;
 }
 
 /**
@@ -591,8 +677,17 @@ function pointSeg(x, z, a, b) {
   return Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t));
 }
 
-/** How far the junction's paving reaches from its centre. */
+/**
+ * How far the junction's paving reaches from its centre.
+ *
+ * Zero where there is no junction. A node with one street is the end of a road
+ * and a node with none is a node the dissolve pass retired, and giving either of
+ * them a six-metre pad meant the street was trimmed six metres short of its own
+ * end and the gap filled with a triangle — a road stopping in a spike, with a
+ * hole behind it that buildings and ground cover were also told to keep out of.
+ */
 export function padRadius(node) {
+  if (node.links.length < 2) return 0;
   let r = 6;
   for (const l of node.links) r = Math.max(r, halfWidth(l.edge.cls));
   return r;
@@ -706,7 +801,9 @@ export function buildStreetSurface(net, terrain, quality) {
   // lines cross. That gives the concave corners a real junction has, and the
   // pad is never wider than the roads that meet it.
   for (const n of net.nodes) {
-    if (!n.links.length) continue;
+    // Two arms or more, or there is nothing here to pave: the ribbon runs to
+    // the node's own position and stops square.
+    if (n.links.length < 2) continue;
     const y = n.y + LIFT;
     const R = padRadius(n);
     const arms = n.links.map((l) => {
@@ -734,8 +831,17 @@ export function buildStreetSurface(net, terrain, quality) {
         const lim = R * 1.6;
         if (c && Math.hypot(c.x - n.x, c.z - n.z) < lim) out.push(c);
         else {
-          out.push({ x: (p1.x + p2.x) / 2 + (a.dir.x + b.dir.x) * R * 0.35,
-            z: (p1.z + p2.z) / 2 + (a.dir.z + b.dir.z) * R * 0.35 });
+          // Nearly parallel kerbs, so no corner. Put the point out on the
+          // bisector of the two outward normals instead of splitting the
+          // difference between them — the old fallback averaged two points on
+          // the *same* side of a straight-through node and pinched the pad to a
+          // wedge. Through nodes are dissolved before this runs, so what is
+          // left here is a rounding case rather than a shape.
+          let bx = na.x - nb.x, bz = na.z - nb.z;
+          const bl = Math.hypot(bx, bz);
+          if (bl < 1e-3) { bx = na.x; bz = na.z; } else { bx /= bl; bz /= bl; }
+          const w = Math.max(wa, wb);
+          out.push({ x: n.x + bx * w, z: n.z + bz * w });
         }
       }
       return out;
@@ -1003,8 +1109,24 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
     // perpendicular offset `o` from the centre of a square of half-size h is
     // 2(h√2 − |o|) long, centred at the point o along the other diagonal. So the
     // hatch ends at the border rather than running off down the street.
-    const avenues = n.links.filter((l) => l.edge.cls === 'avenue').length;
-    if (avenues >= 2 && n.links.length >= 3) {
+    // Only where two through routes genuinely cross.
+    //
+    // "Two avenue arms and three streets" described ninety-five of two hundred
+    // and thirty-three junctions, which is not a box junction, it is a paint
+    // scheme. A real one is at a crossroads where two main roads meet — so both
+    // avenue arms have to run *opposite* each other, making one road that
+    // carries on through, and there have to be four arms for it to be crossed
+    // by. That leaves a handful, at the crossings that deserve them.
+    const avArms = n.links.filter((l) => l.edge.cls === 'avenue');
+    let crosses = false;
+    for (let i = 0; i < avArms.length && !crosses; i++) {
+      for (let j = i + 1; j < avArms.length; j++) {
+        const p = linkDir(n, avArms[i]), q = linkDir(n, avArms[j]);
+        if (p.x * q.x + p.z * q.z < -0.9) { crosses = true; break; }
+      }
+    }
+    const avenues = crosses ? avArms.length : 0;
+    if (avenues >= 2 && n.links.length >= 4) {
       const narrow = Math.min(...n.links.map((l) => ROAD_CLASS[l.edge.cls].road));
       const h = Math.min(padRadius(n) * 0.9, narrow * 0.92) / 2;
       const main = n.links.find((l) => l.edge.cls === 'avenue');

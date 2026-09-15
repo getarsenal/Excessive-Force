@@ -1468,6 +1468,35 @@ export class TestMenu {
         assert(stubs.length === 0,
           `${stubs.length} streets are dead-end stubs that lead nowhere`);
 
+        // No junction in the middle of a street.
+        //
+        // A junction's paving is built from the kerb lines of the streets that
+        // meet it, and for two streets running straight on there is no crossing
+        // point to build it from — so the pad pinched to a wedge at the node and
+        // the road appeared to narrow to nothing and open out again. Ten of them
+        // in a row along the embankment, which is a chain of exactly such nodes.
+        // Two arms running through is not a junction; it is a street, and the
+        // graph now says so.
+        const dirAt = (n, l) => {
+          const pts = l.edge.pts;
+          const p = l.at === 0 ? pts[1] : pts[pts.length - 2];
+          const dx = p.x - n.x, dz = p.z - n.z;
+          const d = Math.hypot(dx, dz) || 1;
+          return { x: dx / d, z: dz / d };
+        };
+        let through = 0;
+        for (const n of net.nodes) {
+          if (n.links.length !== 2) continue;
+          const a = dirAt(n, n.links[0]), b2 = dirAt(n, n.links[1]);
+          // Same class, and the second arm carries straight on from the first.
+          if (n.links[0].edge.cls !== n.links[1].edge.cls) continue;
+          if (n.links[0].edge.approach || n.links[1].edge.approach) continue;
+          if (-(a.x * b2.x + a.z * b2.z) > 0.998) through++;
+        }
+        assert(through === 0,
+          `${through} junctions sit in the middle of a straight street, which is `
+          + 'where the paving pinches the road to a wedge');
+
         // Everything stands square to the plan.
         //
         // A building is either aligned with the block it is in or it is one of
