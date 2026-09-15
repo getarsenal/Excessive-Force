@@ -2085,6 +2085,22 @@ export class Structure {
       const crush = Math.min(0.32, 0.06 * over);
       L.target += crush * (reachOut / comH) * dt;
 
+      // Crushing eats the bearing, and the bearing does not grow back.
+      //
+      // This is the ratchet that makes a collapse a collapse. The edge the
+      // load is standing on is being crushed — that is what `over` means — and
+      // every millimetre of it that goes is a millimetre the resultant is
+      // closer to the edge for good. Without it the arithmetic is reversible:
+      // shell the base, watch the tower lean, and then watch it stand back up
+      // because the analysis stopped condemning it, which is the one thing
+      // masonry never does. Measured on the self-test, that recovery was the
+      // whole of the remaining "it kept two thirds of itself and lost no
+      // height at all" failures.
+      if (L.reachOut0 === undefined) L.reachOut0 = reachOut;
+      if (over > 0.001) {
+        L.reachOut = Math.max(0.25, reachOut - crush * reachOut * 0.5 * dt);
+      }
+
       // Nothing is allowed to stand still out of plumb.
       //
       // A lean used to hold whatever angle it happened to reach: the creep rate
@@ -2093,7 +2109,12 @@ export class Structure {
       // rest of the level. That is the one outcome masonry never produces.
       // Either the damage is winning, in which case it keeps going, or it is
       // not, in which case the structure straightens back onto its bearing.
-      if (over <= 0.001) {
+      // Straightening is only for a building that has not yet been hurt. Once
+      // it is properly out of plumb, or once a real part of its bearing has
+      // been crushed away, there is no way back onto it.
+      const recoverable = L.angle < 0.026                 // about a degree and a half
+        && L.reachOut > (L.reachOut0 ?? reachOut) * 0.92;
+      if (over <= 0.001 && recoverable) {
         L.target = Math.max(0, L.target - 0.09 * dt);
         if (L.target <= 0 && L.angle < 0.0035 && Math.abs(L.vel) < 0.004) {
           // Put the colliders back on the geometry before forgetting the lean,
