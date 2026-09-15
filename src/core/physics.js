@@ -286,7 +286,7 @@ export class PhysicsWorld {
     // now, so a big rubble field can afford to be walked in a couple of
     // seconds rather than a couple of minutes — which is the difference
     // between a stone that hangs for a moment and one that hangs all game.
-    if (!slice) slice = Math.max(8, Math.min(48, list.length >> 5));
+    if (!slice) slice = Math.max(12, Math.min(160, list.length >> 4));
     // Make room once, up front. Without this the sweep spends its whole budget
     // failing to promote the first thing it finds.
     if (this.dynamicSet.size >= this.activeBudget) this.reclaim(8);
@@ -317,14 +317,14 @@ export class PhysicsWorld {
         // is how the cursor ends up advancing one place a frame, taking half a
         // minute to cross a list of two thousand.
         //
-        // And if there is *still* no room after several passes, give up and
-        // delete the stone. On a phone the budget can be genuinely full for
+        // And if there is *still* no room after a couple of passes, give up
+        // and delete the stone. On a phone the budget can be genuinely full for
         // long stretches, and then a stone that has lost its footing can never
         // be released at all: it hangs there for the rest of the match. One
         // brick vanishing out of a rubble field is not something anyone will
         // notice; one brick hanging in the sky is the thing people photograph.
         body.__hangStrikes = (body.__hangStrikes || 0) + 1;
-        if (body.__hangStrikes < 3) { this._auditCursor++; continue; }
+        if (body.__hangStrikes < 2) { this._auditCursor++; continue; }
         const owner = this.owners.get(body.handle);
         list[idx] = list[list.length - 1];
         list.pop();
