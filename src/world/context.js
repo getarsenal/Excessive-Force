@@ -56,7 +56,10 @@ export function buildContext(terrain, quality, opts = {}) {
   // building in the middle of it, which from above reads as a car park with a
   // monument parked on it. Sixty-six brings the city up to the edge of the
   // square, which is where a city stands in relation to a landmark.
-  const EXCLUDE = 66;
+  // A level whose landmark is a quarter of a kilometre across says so: Giza
+  // keeps the whole plateau clear, because a pyramid with a terrace of houses
+  // against its casing is not Giza.
+  const EXCLUDE = opts.exclude || 66;
 
   // ── The bridge comes first, because the street network has to know where it
   // lands: a crossing with no road to it is the thing that made the old layout

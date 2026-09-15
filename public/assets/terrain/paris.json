@@ -1,0 +1,13 @@
+{
+  "id": "paris",
+  "name": "Eiffel Tower, Paris",
+  "lat": 48.85826,
+  "lon": 2.2945,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 20.451,
+  "maxElevation": 84.462,
+  "metersPerDemPixel": 6.2862,
+  "seaLevel": 28.5,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

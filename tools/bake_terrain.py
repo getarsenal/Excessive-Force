@@ -69,6 +69,56 @@ LEVELS = {
         # The charbagh garden south of the mausoleum, and the forecourt.
         "parks": [[0, -340, 300], [-260, -300, 170], [260, -300, 170]],
     },
+    "paris": {
+        "name": "Eiffel Tower, Paris",
+        "lat": 48.85826,
+        "lon": 2.29450,
+        "span": 900.0,
+        "zoom": 14,
+        # The Seine runs past the tower's north-east foot, curving away to the
+        # south-west. Held ~200 m out so the carved channel clears the piers:
+        # the real Pont d'Iena is right at the foot of the tower, which would
+        # put the river through the north leg's foundations.
+        "river": {
+            "width": 190.0,
+            "points": [
+                [-900, 470], [-560, 360], [-300, 290], [-40, 235],
+                [230, 215], [500, 250], [760, 350], [900, 430],
+            ],
+        },
+        # The Champ de Mars running south-east from the tower, and the
+        # Trocadero gardens across the water to the north.
+        "parks": [
+            [40, -300, 330], [20, -560, 260], [-90, 400, 170],
+        ],
+    },
+    "giza": {
+        "name": "Great Pyramids, Giza",
+        "lat": 29.97918,
+        "lon": 31.13417,
+        "span": 900.0,
+        "zoom": 14,
+        # No river: the Nile is nine kilometres east of the plateau, well off
+        # the map. Giza is desert, and a level with no water is a level whose
+        # water sheet is simply never built.
+        "parks": [],
+        # The elevation data already contains the pyramids.
+        #
+        # At this zoom Khufu arrives as a fifty-four metre bump in the ground,
+        # because a terrain tile does not distinguish a mountain from four
+        # million tonnes of limestone stacked on a plateau. Building the game's
+        # own pyramid on top of that would stand it on a pyramid-shaped hill.
+        # Each pad is levelled to the median height of the ring just outside
+        # it, so the monuments sit on flat ground and the plateau still falls
+        # away to the Nile the way it really does.
+        # [east, north, pad radius, feather]
+        "flatten": [
+            [0, 0, 150, 90],          # Khufu
+            [-350, -350, 140, 90],    # Khafre
+            [-540, -600, 95, 70],     # Menkaure
+            [350, -350, 80, 60],      # the Sphinx enclosure
+        ],
+    },
 }
 
 
@@ -191,6 +241,32 @@ def carve_river(height: np.ndarray, mask: np.ndarray, river: dict, span: float, 
     return height
 
 
+def flatten_pads(height: np.ndarray, pads: list, span: float) -> np.ndarray:
+    """Level a disc of ground to the median height of the ring around it.
+
+    Used where the DEM already contains the thing the game is about to build.
+    Levelling to the surrounding median rather than to a hand-picked number
+    means the pad matches whatever the real ground does there, and the feather
+    blends it back out so the result is a terrace rather than a plug.
+    """
+    size = height.shape[0]
+    gx = np.linspace(-span, span, size)[None, :]
+    gy = np.linspace(span, -span, size)[:, None]
+    px = np.broadcast_to(gx, (size, size))
+    py = np.broadcast_to(gy, (size, size))
+    for ox, oy, r, feather in pads:
+        d = np.hypot(px - ox, py - oy)
+        ring = (d > r) & (d < r + feather * 1.4)
+        if not ring.any():
+            continue
+        target = float(np.median(height[ring]))
+        t = np.clip((r + feather - d) / max(feather, 1e-3), 0.0, 1.0)
+        k = t * t * (3.0 - 2.0 * t)
+        height = height * (1.0 - k) + target * k
+        print(f"  levelled a {r:.0f} m pad at ({ox}, {oy}) to {target:.1f} m")
+    return height
+
+
 def bake(level_id: str):
     cfg = LEVELS[level_id]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -205,6 +281,9 @@ def bake(level_id: str):
 
     sea = float(np.percentile(height, 5))
     mask = np.zeros((size, size, 3))
+
+    if cfg.get("flatten"):
+        height = flatten_pads(height, cfg["flatten"], cfg["span"])
 
     if "river" in cfg:
         height = carve_river(height, mask, cfg["river"], cfg["span"], sea)

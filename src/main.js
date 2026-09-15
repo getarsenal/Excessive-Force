@@ -55,6 +55,10 @@ async function boot() {
 
   await progress(18, `surveying ${level.name.split(',')[1]?.trim() || level.name}`);
   const terrain = await loadTerrain(level.terrain, quality);
+  // A level may dictate its own ground palette. Giza is desert: the default
+  // London greens and brick dust make the plateau read as the Home Counties
+  // with a pyramid on it.
+  if (level.palette) terrain.palette = level.palette;
   engine.scene.add(terrain.buildMesh());
   // The ground, kept by handle: anything resting on the terrain is settled for
   // good, and the freezing bookkeeping can stop worrying about it.
@@ -84,6 +88,7 @@ async function boot() {
   // the precinct on the sides where there is nothing in the way.
   const specs = level.structures(quality);
   const landmarks = specs.map((sp) => {
+    const off = sp.offset || { x: 0, z: 0 };
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const b of sp.blocks.blocks || sp.blocks) {
       const r = Math.max(b.hx, b.hz);
@@ -92,7 +97,8 @@ async function boot() {
       if (b.z - r < z0) z0 = b.z - r;
       if (b.z + r > z1) z1 = b.z + r;
     }
-    return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0 };
+    return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
+      w: x1 - x0, d: z1 - z0 };
   });
 
   // Real OpenStreetMap footprints when they've been baked; otherwise the
@@ -109,7 +115,9 @@ async function boot() {
     console.log(`[tumble] city: ${cityGroup.userData.built} of `
       + `${cityGroup.userData.available} buildings — ${city.source}`);
   } else {
-    contextGroup = buildContext(terrain, quality, { landmarks, precinct: level.precinct });
+    contextGroup = buildContext(terrain, quality, {
+      landmarks, precinct: level.precinct, exclude: level.cityExcludeRadius,
+    });
     engine.scene.add(contextGroup);
     console.log(`[tumble] city: hand-placed approximation, `
       + `${contextGroup.userData.plots.length} buildings, `
@@ -149,12 +157,26 @@ async function boot() {
   const structures = [];
   let primary = null;
   for (const spec of specs) {
-    const st = new Structure(physics, spec.blocks, { groundY, origin, onChunkDestroyed });
+    // A structure may stand somewhere other than the level's origin, and when
+    // it does it is founded on its own ground rather than on the primary's.
+    // Giza needs both: Khafre is 500 m away across a plateau that falls eleven
+    // metres over that distance, and giving it the origin's ground height
+    // would bury one corner and leave the other in the air.
+    const off = spec.offset;
+    const sOrigin = off
+      ? new THREE.Vector3(origin.x + off.x, 0, origin.z + off.z)
+      : origin;
+    const sGround = off ? terrain.heightAt(sOrigin.x, sOrigin.z) : groundY;
+    if (off) sOrigin.y = sGround;
+    const st = new Structure(physics, spec.blocks,
+      { groundY: sGround, origin: sOrigin, onChunkDestroyed });
     st.key = spec.key;
     st.required = !!spec.required;
     st.label = spec.label || spec.key.toUpperCase();
     engine.scene.add(st.group);
     structures.push(st);
+    st.origin = sOrigin;
+    st.groundY = sGround;
     if (spec.primary) primary = st;
     if (spec.primary && level.scoreTags) st.setScoreTags(level.scoreTags);
   }
@@ -164,7 +186,12 @@ async function boot() {
 
   await progress(74, 'posting the garrison');
   const garrison = new Garrison(engine.scene, structures, quality);
-  level.garrison(garrison, origin, groundY);
+  // Each structure's own origin and ground are handed over too, so a level
+  // whose landmarks are spread across the map can post men on the ones that
+  // are not at the centre of it.
+  const sites = {};
+  for (const st of structures) sites[st.key] = { origin: st.origin, groundY: st.groundY };
+  level.garrison(garrison, origin, groundY, sites);
 
   const rig = new CameraRig(engine.camera, canvas, {
     tx: 0, ty: groundY + level.camera.height, tz: 0,

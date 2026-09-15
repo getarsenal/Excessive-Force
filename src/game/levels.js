@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { buildElizabethTower, buildPalaceWing } from '../structure/landmarks/bigben.js';
 import { buildTajMahal, buildTajMosque } from '../structure/landmarks/tajmahal.js';
+import { buildEiffelTower, buildChaillotWing } from '../structure/landmarks/eiffel.js';
+import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
+  from '../structure/landmarks/giza.js';
 
 /**
  * Level registry.
@@ -97,6 +100,101 @@ export const LEVELS = {
     },
     win: { integrity: 0.42, heightFrac: 0.30 },
     brief: 'The dome stands on four piers. Shelling the shell only makes holes.',
+  },
+
+  paris: {
+    id: 'paris',
+    terrain: 'paris',
+    name: 'Eiffel Tower, Paris',
+    target: 'EIFFEL TOWER',
+    subtitle: 'Tour Eiffel · Champ de Mars',
+    // The tower's own piers are 125 m apart and the Champ de Mars is open
+    // ground for three hundred metres beyond that; the city starts where the
+    // park ends.
+    cityExcludeRadius: 210,
+    camera: { yaw: 0.62, pitch: 0.30, distance: 560, height: 120 },
+    structures: (quality) => [
+      { key: 'eiffel', blocks: buildEiffelTower(quality), primary: true,
+        required: true, label: 'EIFFEL TOWER' },
+      { key: 'chaillot', blocks: buildChaillotWing(quality),
+        required: true, label: 'PALAIS DE CHAILLOT' },
+    ],
+    garrison: (g, origin, groundY) => {
+      g.populateEiffelTower(origin, groundY);
+      g.populateChaillot(origin, groundY);
+    },
+    // A lattice is all cantilever and no shell: it has less than a tenth of
+    // the Elizabeth Tower's mass holding up twice the height, so once it goes
+    // it goes completely. The bar is set on height alone, and set high.
+    scoreTags: ['legs', 'arches', 'first', 'second', 'shaft', 'summit'],
+    precinct: {
+      boundary: 'railings',       // the perimeter fence round the piers
+      ground: 'lawn',             // the Champ de Mars, gravel walks and grass
+      ornament: 'statues',
+      river: 'embankment',        // the Seine's quais, walled the same way
+      pier: true,                 // a bateau-mouche landing on the quai
+    },
+    winSecondary: { integrity: 0.45 },
+    brief: 'It stands on four legs and nothing else. Cut one and it falls that way.',
+  },
+
+  giza: {
+    id: 'giza',
+    terrain: 'giza',
+    name: 'Great Pyramids, Giza',
+    target: 'GREAT PYRAMID',
+    subtitle: 'Pyramid of Khufu · Giza Plateau',
+    // Khufu's base is 230 m square and Khafre stands 350 m away; the whole
+    // plateau is kept clear and the town is pushed back to where Nazlet
+    // el-Samman actually starts.
+    //
+    // Desert, not the Home Counties. The default ground palette is London —
+    // brick dust, parkland, wet silt — and on the Giza plateau it drew a green
+    // field with a pyramid standing in it. Sand, gravel, and the dark basalt
+    // of the causeways instead.
+    palette: {
+      urban: new THREE.Color(0xc9b48a),
+      urbanAlt: new THREE.Color(0xb49b72),
+      park: new THREE.Color(0x8a7f52),
+      parkAlt: new THREE.Color(0xa1904f),
+      road: new THREE.Color(0x4a443c),
+      bank: new THREE.Color(0xd2bd92),
+      bed: new THREE.Color(0x6a6b4a),
+      dry: new THREE.Color(0xe0cda0),
+    },
+    cityExcludeRadius: 460,
+    camera: { yaw: -0.55, pitch: 0.33, distance: 640, height: 130 },
+    structures: (quality) => [
+      { key: 'khufu', blocks: buildGreatPyramid(quality), primary: true,
+        required: true, label: 'GREAT PYRAMID' },
+      { key: 'khafre', blocks: buildKhafre(quality), required: true,
+        label: 'KHAFRE', offset: { x: -350, z: 350 } },
+      // Menkaure and the Sphinx hold no garrison: worth money, nothing else.
+      { key: 'menkaure', blocks: buildMenkaure(quality),
+        label: 'MENKAURE', offset: { x: -540, z: 600 } },
+      { key: 'sphinx', blocks: buildSphinx(quality),
+        label: 'SPHINX', offset: { x: 350, z: 350 } },
+    ],
+    garrison: (g, origin, groundY, sites) => {
+      g.populateGreatPyramid(origin, groundY);
+      // Khafre stands five hundred metres away across the plateau, on its own
+      // ground, so its picket is posted from its own site rather than from the
+      // level's origin.
+      const k = sites && sites.khafre;
+      if (k) g.populateKhafre(k.origin, k.groundY);
+    },
+    // Scored on the pyramid itself, not on the bedrock raft it stands on.
+    scoreTags: ['pyramid', 'relieving', 'entrance'],
+    precinct: {
+      boundary: 'none',           // there is no wall on the plateau, only sand
+      ground: 'sand',
+      ornament: 'none',
+    },
+    // A pyramid cannot topple, so height is meaningless and the whole measure
+    // is how much of it is left. The bar is low because grinding two and a
+    // half million cubic metres of limestone to nothing is not a game.
+    win: { integrity: 0.55, heightFrac: 0.62 },
+    brief: 'Nothing here can topple. Open the casing and break what the chambers hang on.',
   },
 };
 

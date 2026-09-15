@@ -3,6 +3,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
 import { TOWER, WING } from '../structure/landmarks/bigben.js';
+import { EIFFEL } from '../structure/landmarks/eiffel.js';
+import { KHUFU } from '../structure/landmarks/giza.js';
 
 /**
  * The garrison.
@@ -580,6 +582,200 @@ export class Garrison {
       this.place('mortar',
         new THREE.Vector3(origin.x + 13.0, groundY + roof + 2.8, origin.z + z0 + off),
         0, 7, { cover: 'roof' });
+    }
+  }
+
+  /**
+   * The Eiffel Tower.
+   *
+   * There is no masonry to stand in, so the garrison is where the tower
+   * actually has floors: the three galleries, the ironwork of the legs, and
+   * gun pits in the Champ de Mars at the foot of each pier. The legs are the
+   * point — every man above the second floor is riding on four of them, and
+   * cutting one out drops the lot.
+   */
+  populateEiffelTower(origin, groundY, counts = {}) {
+    const deckRing = (y, half, n, type, cover, inset = 1.6) => {
+      for (let i = 0; i < n; i++) {
+        const t = (i / n) * 4;
+        const side = Math.floor(t);
+        const f = (t - side) * 2 - 1;          // -1..1 along this side
+        const r = half - inset;
+        const p = new THREE.Vector3(origin.x, groundY + y + 0.6, origin.z);
+        if (side === 0) { p.x += f * r; p.z += r; }
+        else if (side === 1) { p.x += r; p.z -= f * r; }
+        else if (side === 2) { p.x -= f * r; p.z -= r; }
+        else { p.x -= r; p.z += f * r; }
+        const yaw = Math.atan2(p.x - origin.x, p.z - origin.z);
+        this.place(type, p, yaw, 6, { cover });
+      }
+    };
+
+    // Gun pits between the piers, on the gravel of the Champ de Mars.
+    const ground = counts.ground ?? 20;
+    for (let i = 0; i < ground; i++) {
+      const a = (i / ground) * Math.PI * 2;
+      const r = EIFFEL.baseHalf * 1.02;
+      const p = new THREE.Vector3(
+        origin.x + Math.cos(a) * r, groundY + 0.9, origin.z + Math.sin(a) * r,
+      );
+      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p,
+        Math.atan2(Math.cos(a), Math.sin(a)), 10, { cover: 'ground', sandbags: true });
+    }
+
+    // In the ironwork of each leg, on the bracing.
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      for (const y of [18, 36]) {
+        const t = y / EIFFEL.secondFloor;
+        const r = 51 + (13.5 - 51) * t;
+        const p = new THREE.Vector3(origin.x + sx * r, groundY + y + 0.8, origin.z + sz * r);
+        this.place(y > 26 ? 'mg' : 'rifleman', p, Math.atan2(sx, sz), 7,
+          { cover: 'arcade' });
+      }
+    }
+
+    // First gallery: the widest deck and the best arcs over the city.
+    deckRing(EIFFEL.firstFloor, EIFFEL.firstDeckHalf, 20, 'mg', 'roof', 2.2);
+    // Second gallery.
+    deckRing(EIFFEL.secondFloor, EIFFEL.secondDeckHalf, 12, 'sniper', 'roof', 1.8);
+    // AT teams on the first gallery corners, which can reach anything on the
+    // Champ de Mars.
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      this.place('at', new THREE.Vector3(
+        origin.x + sx * (EIFFEL.firstDeckHalf - 3.0), groundY + EIFFEL.firstFloor + 0.6,
+        origin.z + sz * (EIFFEL.firstDeckHalf - 3.0)), Math.atan2(sx, sz), 7,
+      { cover: 'roof' });
+      this.place('at', new THREE.Vector3(
+        origin.x + sx * (EIFFEL.secondDeckHalf - 2.4), groundY + EIFFEL.secondFloor + 0.6,
+        origin.z + sz * (EIFFEL.secondDeckHalf - 2.4)), Math.atan2(sx, sz), 7,
+      { cover: 'roof' });
+    }
+    // The summit: snipers at 276 m, which is every metre of the map.
+    deckRing(EIFFEL.thirdFloor, EIFFEL.thirdDeckHalf, 6, 'sniper', 'roof', 1.2);
+    // Mortars on the first gallery, lobbing over the whole Champ de Mars.
+    for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x + sx * (EIFFEL.firstDeckHalf - 8), groundY + EIFFEL.firstFloor + 0.6,
+        origin.z + sz * (EIFFEL.firstDeckHalf - 8)), 0, 7, { cover: 'roof' });
+    }
+  }
+
+  /** The Palais de Chaillot wing, across the Seine. */
+  populateChaillot(origin, groundY) {
+    const z0 = -210, len = 96, depth = 20, height = 22;
+    for (let i = 0; i < 14; i++) {
+      const z = origin.z + z0 - len / 2 + 6 + i * (len - 12) / 13;
+      for (const sx of [1, -1]) {
+        this.place(i % 3 === 0 ? 'mg' : 'rifleman', new THREE.Vector3(
+          origin.x + sx * (depth / 2 - 1.2), groundY + height * 0.55, z),
+        sx > 0 ? Math.PI / 2 : -Math.PI / 2, 4, { cover: 'window' });
+      }
+    }
+    for (let i = 0; i < 4; i++) {
+      this.place('at', new THREE.Vector3(origin.x, groundY + height + 2.0,
+        origin.z + z0 - len / 2 + 14 + i * 22), 0, 8, { cover: 'roof' });
+    }
+    for (const off of [-30, 10, 34]) {
+      this.place('mortar', new THREE.Vector3(origin.x + 5.0, groundY + height + 2.0,
+        origin.z + z0 + off), 0, 7, { cover: 'roof' });
+    }
+  }
+
+  /**
+   * The Great Pyramid.
+   *
+   * A pyramid has no windows and no parapet, so the defence is on the faces
+   * and at the corners: the casing is a staircase two hundred metres long on
+   * every side, and men on it can see the whole plateau. The chambers inside
+   * hold the reserve, which is the only part of this garrison that a shell
+   * cannot reach until the masonry over it is gone.
+   */
+  populateGreatPyramid(origin, groundY, counts = {}) {
+    const half = (y) => (KHUFU.base / 2) * Math.max(0, 1 - y / KHUFU.height);
+
+    // Sandbagged batteries round the base, on the sand.
+    const ground = counts.ground ?? 22;
+    for (let i = 0; i < ground; i++) {
+      const a = (i / ground) * Math.PI * 2;
+      const r = KHUFU.base * 0.60;
+      const p = new THREE.Vector3(
+        origin.x + Math.cos(a) * r, groundY + 0.9, origin.z + Math.sin(a) * r,
+      );
+      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p,
+        Math.atan2(Math.cos(a), Math.sin(a)), 12, { cover: 'ground', sandbags: true });
+    }
+
+    // On the faces. Stepped positions up all four sides — the higher the man,
+    // the longer his weapon reaches.
+    for (const y of [16, 34, 54, 76, 100]) {
+      const h = half(y);
+      const perSide = y < 60 ? 4 : 2;
+      for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        for (let i = 0; i < perSide; i++) {
+          const f = perSide === 1 ? 0 : (i / (perSide - 1)) * 2 - 1;
+          const along = f * h * 0.66;
+          const p = new THREE.Vector3(
+            origin.x + nx * h + (nx ? 0 : along) - nx * 1.5,
+            groundY + y + 1.0,
+            origin.z + nz * h + (nz ? 0 : along) - nz * 1.5,
+          );
+          const t = y > 70 ? 'sniper' : y > 40 ? 'mg' : 'rifleman';
+          this.place(t, p, Math.atan2(nx, nz), 8, { cover: 'roof' });
+        }
+      }
+    }
+
+    // AT teams at the four corners of the base, covering the causeways.
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const h = half(8);
+      this.place('at', new THREE.Vector3(
+        origin.x + sx * (h - 4), groundY + 9.0, origin.z + sz * (h - 4)),
+      Math.atan2(sx, sz), 9, { cover: 'arcade' });
+    }
+
+    // In the King's Chamber and the Grand Gallery, where nothing can reach
+    // them until the masonry above has gone.
+    for (const [dx, dz] of [[-3, 0], [3, 0]]) {
+      this.place('at', new THREE.Vector3(origin.x + dx, groundY + KHUFU.chamberY + 1.0,
+        origin.z + 2 + dz), 0, 7, { cover: 'arcade' });
+    }
+    for (let i = 0; i < 4; i++) {
+      const y = KHUFU.galleryY + 3 + i * 4.5;
+      const along = (y - KHUFU.galleryY) / Math.tan(26 * Math.PI / 180);
+      this.place('rifleman', new THREE.Vector3(origin.x, groundY + y + 0.9,
+        origin.z + 2 - 40 + along), 0, 6, { cover: 'arcade' });
+    }
+
+    // Mortar pits on the apex platform — the highest ground for eight hundred
+    // metres in any direction.
+    for (const [sx, sz] of [[1, 1], [-1, -1], [1, -1]]) {
+      const h = half(KHUFU.height - 8);
+      this.place('mortar', new THREE.Vector3(
+        origin.x + sx * h * 0.5, groundY + KHUFU.height - 7, origin.z + sz * h * 0.5),
+      0, 9, { cover: 'roof' });
+    }
+  }
+
+  /** Khafre, the second pyramid: a lighter picket on the faces. */
+  populateKhafre(origin, groundY) {
+    const half = (y) => (215.5 / 2) * Math.max(0, 1 - y / 136.4);
+    for (const y of [20, 48, 80]) {
+      const h = half(y);
+      for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        for (const f of [-0.5, 0.5]) {
+          const along = f * h * 0.7;
+          this.place(y > 60 ? 'sniper' : 'mg', new THREE.Vector3(
+            origin.x + nx * h + (nx ? 0 : along) - nx * 1.5,
+            groundY + y + 1.0,
+            origin.z + nz * h + (nz ? 0 : along) - nz * 1.5,
+          ), Math.atan2(nx, nz), 8, { cover: 'roof' });
+        }
+      }
+    }
+    for (const [sx, sz] of [[1, 1], [-1, -1]]) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x + sx * half(120) * 0.5, groundY + 122, origin.z + sz * half(120) * 0.5),
+      0, 9, { cover: 'roof' });
     }
   }
 

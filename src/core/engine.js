@@ -97,12 +97,16 @@ export class Engine {
 
     if (quality.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
-      // Soft PCF rather than hard. The shadow map covers 1.36 km with a low
-      // sun, so one texel is a metre or more on the ground and a hard lookup
-      // draws every shadow edge as a staircase — most visible along the long
-      // diagonal edges the city's own buildings cast across the streets. The
-      // soft filter costs three extra taps and turns those into an edge.
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      // Variance shadow maps, blurred, rather than a hard PCF lookup. The
+      // shadow map covers 1.36 km with a low sun, so one texel is a metre or
+      // more on the ground and a hard lookup draws every shadow edge as a
+      // staircase — most visible along the long diagonal edges the city's own
+      // buildings cast across the streets.
+      //
+      // Not PCFSoftShadowMap: three.js removed it, and asking for it now logs
+      // a warning and silently gives back the hard filter, which is a quality
+      // setting that looks like it is working and is not.
+      this.renderer.shadowMap.type = THREE.VSMShadowMap;
     }
 
     this.scene = new THREE.Scene();
@@ -154,6 +158,12 @@ export class Engine {
       Object.assign(this.sun.shadow.camera, { left: -d, right: d, top: d, bottom: -d, near: 1, far: 3200 });
       this.sun.shadow.bias = -0.0009;
       this.sun.shadow.normalBias = 0.9;
+      // VSM filters the depth *distribution* rather than sampling it, so the
+      // softness is a blur radius on the map itself. Kept small: this light
+      // covers 1.36 km, and a wide blur at that scale starts leaking shadow
+      // through thin geometry — a lattice tower being the worst possible case.
+      this.sun.shadow.radius = 2.2;
+      this.sun.shadow.blurSamples = 8;
       this.sun.shadow.camera.updateProjectionMatrix();
     }
     this.scene.add(this.sun);
