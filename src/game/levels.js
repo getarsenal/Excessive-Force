@@ -28,6 +28,7 @@ export const LEVELS = {
     id: 'westminster',
     terrain: 'westminster',
     name: 'Westminster, London',
+    place: 'Westminster, London',
     target: 'ELIZABETH TOWER',
     subtitle: 'Elizabeth Tower · Westminster',
     // The tower is twice life size, so everything framed around it moves out
@@ -70,6 +71,7 @@ export const LEVELS = {
     id: 'agra',
     terrain: 'agra',
     name: 'Taj Mahal, Agra',
+    place: 'Agra, Uttar Pradesh',
     target: 'TAJ MAHAL',
     subtitle: 'Taj Mahal · Agra',
     cityExcludeRadius: 190,   // the complex is wide; keep OSM buildings clear
@@ -106,6 +108,7 @@ export const LEVELS = {
     id: 'paris',
     terrain: 'paris',
     name: 'Eiffel Tower, Paris',
+    place: 'Champ de Mars, Paris',
     target: 'EIFFEL TOWER',
     subtitle: 'Tour Eiffel · Champ de Mars',
     // The tower's own piers are 125 m apart and the Champ de Mars is open
@@ -143,6 +146,7 @@ export const LEVELS = {
     id: 'giza',
     terrain: 'giza',
     name: 'Great Pyramids, Giza',
+    place: 'Giza Plateau, Egypt',
     target: 'GREAT PYRAMID',
     subtitle: 'Pyramid of Khufu · Giza Plateau',
     // Khufu's base is 230 m square and Khafre stands 350 m away; the whole
@@ -216,14 +220,27 @@ export const LEVELS = {
 
 export const DEFAULT_LEVEL = 'westminster';
 
-/** Pick a level from `?level=`, falling back to the default. */
-export function resolveLevel() {
-  let id = DEFAULT_LEVEL;
-  try {
-    const q = new URLSearchParams(window.location.search).get('level');
-    if (q && LEVELS[q]) id = q;
-  } catch { /* no location in some embeds */ }
-  return LEVELS[id];
+/**
+ * The order the target-select screen lists them in, easiest first.
+ *
+ * Nothing is locked. Gating the new maps behind finishing the old ones would
+ * hide most of the game from anybody opening it for the first time, and the
+ * levels are not a difficulty curve so much as four different problems — a
+ * cantilever, a dome, a lattice, and a mountain.
+ */
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza'];
+
+/** One line on the target-select card, saying what kind of problem this is. */
+export const LEVEL_BLURB = {
+  westminster: 'A hollow tower on four walls. Undercut one face and it goes over that way.',
+  paris: 'Three hundred metres of iron on four legs. Cut one and it falls towards it.',
+  agra: 'A dome on four piers over a marble terrace. It will not topple; it has to be broken.',
+  giza: 'Two and a third million cubic metres of limestone. Nothing here falls over.',
+};
+
+/** Ordered level records, for menus. */
+export function levelList() {
+  return LEVEL_ORDER.filter((id) => LEVELS[id]).map((id) => LEVELS[id]);
 }
 
 export function levelOrigin(terrain) {

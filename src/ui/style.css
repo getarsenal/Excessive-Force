@@ -414,3 +414,96 @@ html, body {
   #targetcard { display: none; }
   #testmenu { max-height: calc(100vh - 130px); }
 }
+
+/* ── Target select ───────────────────────────────────────────────────────
+   The front door, and the only way a player can reach any level but the
+   first. Deliberately the same furniture as the loading screen and the end
+   card: same ground, same type, same thin rules. */
+#levelselect {
+  position: fixed; inset: 0; z-index: 140;
+  background: radial-gradient(ellipse at 50% 38%, #1a212b 0%, #07090c 74%);
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto; animation: fadeIn 0.4s ease;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px
+           calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+.ls-inner { width: min(96vw, 940px); margin: auto; }
+.ls-head { text-align: center; margin-bottom: 26px; }
+.ls-title {
+  font-size: clamp(30px, 6vw, 52px); font-weight: 700; letter-spacing: 0.16em;
+  background: linear-gradient(180deg, #f0f4f8 0%, #8fa3b8 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.ls-sub {
+  margin-top: 6px; font-size: 11px; letter-spacing: 0.38em;
+  color: var(--dim); text-transform: uppercase;
+}
+.ls-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.ls-card {
+  position: relative; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--edge); border-left-width: 2px;
+  padding: 16px 16px 18px; transition: all 0.15s;
+}
+.ls-card:hover {
+  background: rgba(88, 166, 255, 0.10);
+  border-color: var(--accent); transform: translateY(-2px);
+}
+.ls-card.done { border-left-color: #6fbf73; }
+.ls-card.tried { border-left-color: #c8a24a; }
+.ls-card.new { border-left-color: var(--edge-bright); }
+.ls-card.here { background: rgba(88, 166, 255, 0.07); }
+.ls-badge {
+  font-size: 9px; letter-spacing: 0.24em; color: var(--dim);
+  text-transform: uppercase;
+}
+.ls-card.done .ls-badge { color: #6fbf73; }
+.ls-target {
+  margin-top: 8px; font-size: 19px; font-weight: 600; letter-spacing: 0.06em;
+}
+.ls-place {
+  font-size: 11px; letter-spacing: 0.16em; color: var(--dim);
+  text-transform: uppercase; margin-top: 2px;
+}
+.ls-blurb {
+  margin-top: 11px; font-size: 12px; line-height: 1.45; color: #9fb0c2;
+}
+.ls-stats {
+  margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--edge);
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
+}
+.ls-here {
+  position: absolute; top: 14px; right: 14px;
+  font-size: 9px; letter-spacing: 0.2em; color: var(--accent);
+}
+.ls-foot { margin-top: 22px; text-align: center; }
+.ls-back, #ec-next, #ec-targets, #targets-btn {
+  background: transparent; border: 1px solid var(--edge-bright); color: var(--text);
+  font-family: inherit; font-size: 11px; letter-spacing: 0.2em;
+  padding: 10px 24px; cursor: pointer; transition: all 0.15s;
+}
+.ls-back:hover, #ec-next:hover, #ec-targets:hover, #targets-btn:hover {
+  background: rgba(88, 166, 255, 0.14); border-color: var(--accent);
+}
+#ec-next { border-color: var(--accent); background: rgba(88, 166, 255, 0.12); }
+.ec-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+#targets-btn {
+  /* Under the TEST button, clear of the top bar — at the top it sat straight
+     on top of the FUNDS readout. */
+  position: absolute; left: var(--ui-pad); top: 124px; z-index: 20;
+  padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#targets-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+@media (max-width: 620px) {
+  .ls-grid { grid-template-columns: 1fr; }
+  .ls-card { padding: 13px 13px 15px; }
+  .ls-blurb { font-size: 11px; }
+  #targets-btn { top: 116px; padding: 5px 8px; font-size: 8px; }
+}

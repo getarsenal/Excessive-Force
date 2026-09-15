@@ -16,6 +16,9 @@ export class HUD {
     this.onClearTarget = opts.onClearTarget || (() => {});
     this.onRestart = opts.onRestart || (() => {});
     this.onToggleSound = opts.onToggleSound || (() => {});
+    this.onNextTarget = opts.onNextTarget || (() => {});
+    this.onPickTarget = opts.onPickTarget || (() => {});
+    this.nextTargetLabel = null;
 
     this.el = {
       money: document.getElementById('hud-money'),
@@ -40,6 +43,9 @@ export class HUD {
       ecSub: document.getElementById('ec-sub'),
       ecStats: document.getElementById('ec-stats'),
       ecAgain: document.getElementById('ec-again'),
+      ecNext: document.getElementById('ec-next'),
+      ecTargets: document.getElementById('ec-targets'),
+      targetsBtn: document.getElementById('targets-btn'),
     };
 
     if (this.el.target && battle.level) this.el.target.textContent = battle.level.target;
@@ -59,6 +65,11 @@ export class HUD {
       });
     }
     this.el.ecAgain.addEventListener('click', () => this.onRestart());
+    if (this.el.ecNext) this.el.ecNext.addEventListener('click', () => this.onNextTarget());
+    if (this.el.ecTargets) this.el.ecTargets.addEventListener('click', () => this.onPickTarget());
+    if (this.el.targetsBtn) {
+      this.el.targetsBtn.addEventListener('click', () => this.onPickTarget());
+    }
 
     this._promptTimer = 0;
     this._lastUnlocked = new Set();
@@ -271,5 +282,12 @@ export class HUD {
     this.el.ecStats.innerHTML = rows
       .map(([k, v]) => `<div class="ec-stat"><span>${k}</span><b>${v}</b></div>`)
       .join('');
+    // Only offer the next target when this one is actually down. After a
+    // stalled assault the thing to do is run it again, not walk away.
+    if (this.el.ecNext) {
+      this.el.ecNext.hidden = !won;
+      this.el.ecNext.textContent = this.nextTargetLabel
+        ? `NEXT: ${this.nextTargetLabel}` : 'NEXT TARGET';
+    }
   }
 }

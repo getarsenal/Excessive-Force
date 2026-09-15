@@ -22,7 +22,13 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // Force a quality tier so tests can check what a desktop actually gets; the
 // software rasteriser here would otherwise always be detected as "low".
 await page.addInitScript((tier) => {
-  try { localStorage.setItem('tt.quality', tier); } catch { /* private mode */ }
+  try {
+    localStorage.setItem('tt.quality', tier);
+    // Skip the target-select screen. A fresh browser profile has never chosen
+    // a level, so without this every run would sit on the front door waiting
+    // for a click that is never coming.
+    localStorage.setItem('tt.autostart', '1');
+  } catch { /* private mode */ }
 }, process.env.TT_TIER || 'high');
 
 const logs = [];

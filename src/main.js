@@ -9,7 +9,9 @@ import { buildContext } from './world/context.js';
 import { Life } from './world/life.js';
 import { loadCity, buildCity } from './world/city.js';
 import { Structure } from './structure/structure.js';
-import { resolveLevel } from './game/levels.js';
+import {
+  resolveStartLevel, showLevelSelect, recordResult, nextTarget, goToLevel,
+} from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
 import { MATERIAL_PROPS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
@@ -35,7 +37,10 @@ async function boot() {
   console.log('[tumble] quality', quality.id, '· wasm simd', quality.simd,
     '· body budget', quality.activeBodies);
 
-  const level = resolveLevel();
+  // Ask which target, unless the player has already said or a link says for
+  // them. This is the front door: without it the only level a player can
+  // reach is Westminster.
+  const level = await resolveStartLevel();
   console.log('[tumble] level', level.id, '·', level.name);
   const sub = document.querySelector('.load-sub');
   if (sub) sub.textContent = level.name.toUpperCase();
@@ -246,6 +251,12 @@ async function boot() {
     },
     onClearTarget: () => battle.clearTarget(),
     onRestart: () => window.location.reload(),
+    onNextTarget: () => goToLevel(nextTarget(level.id).id),
+    onPickTarget: async () => {
+      const id = await showLevelSelect({ current: level.id, canResume: true });
+      if (id && id !== level.id) goToLevel(id);
+      // Picking the level already in play, or backing out, just closes it.
+    },
     onToggleSound: (on) => audio.setEnabled(on),
   });
 
@@ -274,10 +285,18 @@ async function boot() {
         hud.feed('STRUCTURE FAILING', 'big');
         rig.focus(new THREE.Vector3(0, groundY + level.camera.height * 0.7, 0),
           level.camera.distance * 1.3);
-        setTimeout(() => hud.showEnd('win', battle.summary()), 7000);
+        setTimeout(() => {
+          const sum = battle.summary();
+          recordResult(level.id, true, sum);
+          hud.nextTargetLabel = nextTarget(level.id).target;
+          hud.showEnd('win', sum);
+        }, 7000);
         break;
       case 'lose':
-        setTimeout(() => hud.showEnd('lose', data), 1500);
+        setTimeout(() => {
+          recordResult(level.id, false, data);
+          hud.showEnd('lose', data);
+        }, 1500);
         break;
       default: break;
     }
@@ -539,6 +558,12 @@ async function boot() {
     THREE,
   });
   window.__fastForward = fastForward;
+  // Exercised by the UI probe: the end-of-level path without having to win.
+  window.__recordAndEnd = (sum) => {
+    recordResult(level.id, true, sum);
+    hud.nextTargetLabel = nextTarget(level.id).target;
+    hud.showEnd('win', sum);
+  };
   // The headless harness drives the same suite the panel does, so a regression
   // fails CI and the in-game panel identically.
   window.__runTests = () => testMenu.runTestsSync();
