@@ -262,9 +262,17 @@ export class Life {
       const { mesh, boats, wet, total } = this.boats;
       let w = 0;
       for (const b of boats) {
+        // Turn at the ends rather than wrapping round to the other one.
+        //
+        // Wrapping teleported a boat from the last sample of the reach to the
+        // first, which is a jump of the whole length of the river in one frame
+        // — on Westminster that is far enough away to go unnoticed, and on the
+        // Yamuna, where the reach is shorter, it read as a barge doing thirty-
+        // six knots. A river is not a loop; a working boat goes up it and then
+        // comes back down.
         b.s += b.speed * dt;
-        if (b.s < 0) b.s += total;
-        if (b.s >= total) b.s -= total;
+        if (b.s < 0) { b.s = -b.s; b.speed = -b.speed; }
+        else if (b.s > total) { b.s = 2 * total - b.s; b.speed = -b.speed; }
         // Find the pair of samples this distance falls between.
         let i0 = 0;
         while (i0 < wet.length - 2 && wet[i0 + 1].s <= b.s) i0++;
