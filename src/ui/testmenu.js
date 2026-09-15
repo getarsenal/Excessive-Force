@@ -903,8 +903,18 @@ export class TestMenu {
 
       ['there are windows to shoot from', () => {
         const g = b.garrison;
+        const traits = c.level.traits || {};
         const inWindows = g.defenders.filter((d) => d.cover === 'window').length;
         const onRoofs = g.defenders.filter((d) => d.cover === 'roof').length;
+        // A pyramid has no windows, and saying so is not the same as failing.
+        if (traits.windows === false) {
+          const covered = g.defenders.filter((d) => d.cover === 'arcade').length;
+          assert(covered > 0, 'nobody is under cover anywhere on this landmark');
+          assert(onRoofs > 0, 'nobody is posted on the faces');
+          const m = g.defenders.filter((d) => d.def.indirect).length;
+          assert(m > 0, 'no mortars');
+          return `no windows here: ${covered} in the chambers, ${onRoofs} on the faces, ${m} mortars`;
+        }
         assert(inWindows > 0, 'nobody is posted in a window');
         assert(onRoofs > 0, 'nobody is posted on a roof');
         const mortars = g.defenders.filter((d) => d.def.indirect).length;
@@ -1373,7 +1383,10 @@ export class TestMenu {
         const city = this.ctx.cityGroup;
         const d = city?.userData?.detail;
         assert(d, 'the detail pass did not run');
-        const want = ['lamps', 'parked', 'cornices', 'porches', 'wall', 'streetTrees'];
+        // `wall` is the river wall, and a level with no river has none.
+        const traits = c.level.traits || {};
+        const want = ['lamps', 'parked', 'cornices', 'porches', 'streetTrees'];
+        if (traits.river !== false) want.push('wall');
         const thin = want.filter((k) => !(d[k] > 20));
         assert(thin.length === 0,
           `too little of: ${thin.map((k) => `${k}=${d[k] ?? 0}`).join(', ')}`);
@@ -1411,6 +1424,7 @@ export class TestMenu {
         // same failure — ground with nothing on it and no reason to be empty.
         const city = this.ctx.cityGroup;
         const d = city?.userData?.detail || {};
+        const traits = c.level.traits || {};
         const want = {
           railing: 40,        // something stands round the monument
           statues: 3,         // and something to look at inside it
@@ -1420,15 +1434,20 @@ export class TestMenu {
           track: 20,          // a railway crosses it
           programmes: 4,      // open blocks are for something
         };
+        // A level with no river has no river wall, and no railed precinct or
+        // statuary either where the monument stands in open desert.
+        if (traits.river === false) { delete want.wall; delete want.railing; delete want.statues; }
         const thin = Object.entries(want).filter(([k, n]) => !(d[k] >= n));
         assert(thin.length === 0,
           `the map is missing: ${thin.map(([k, n]) => `${k} ${d[k] ?? 0}/${n}`).join(', ')}`);
         // And that edge is the one this river actually has: a parapet with a
         // balustrade along the Thames, steps down to the water at Agra. Both
         // are river walls; only one of them has balusters on it.
-        assert((d.balusters || 0) >= 200 || (d.stairs || 0) >= 30,
-          `the river wall has neither a balustrade (${d.balusters || 0}) nor `
-          + `steps down to the water (${d.stairs || 0})`);
+        if (traits.river !== false) {
+          assert((d.balusters || 0) >= 200 || (d.stairs || 0) >= 30,
+            `the river wall has neither a balustrade (${d.balusters || 0}) nor `
+            + `steps down to the water (${d.stairs || 0})`);
+        }
 
         // And the things that move are moving.
         const life = this.ctx.life;
@@ -2097,6 +2116,27 @@ export class TestMenu {
         // plumb at *some* point on its way here — that is the high-water mark,
         // and it is the only honest way to assert the mechanism from the last
         // test in a suite that has already half demolished the thing.
+        // A landmark that cannot topple is measured on whether it can be
+        // quarried instead.
+        //
+        // This is Giza. A pyramid has no cantilever in it — every stone is
+        // already sitting on a wider stone — so demanding a lean, or twenty
+        // metres off the top from cutting one face, is demanding the one thing
+        // the level is built around not happening. What matters there is that
+        // shelling the base actually takes stone out of it, which is the whole
+        // of how that level is won.
+        if ((c.level.traits || {}).topples === false) {
+          const removedFrac = 1 - integ / Math.max(0.001, intactAtStart);
+          assert(removedFrac > 0.01,
+            `eighty rounds into one face quarried only `
+            + `${(removedFrac * 100).toFixed(2)}% of it`);
+          assert(st.destroyedCount > 200,
+            `only ${st.destroyedCount} stones came out of it`);
+          return `cannot topple, and should not: quarried `
+            + `${(removedFrac * 100).toFixed(1)}% out of one face, `
+            + `${st.destroyedCount} stones gone`;
+        }
+
         if (slender > 2.5 || intactAtStart > 0.55) {
           assert((st.peakLean || 0) > 0.4 || slender < 2.0,
             `this structure has never been out of plumb by more than `

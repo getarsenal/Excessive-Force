@@ -192,6 +192,15 @@ export const LEVELS = {
       ground: 'sand',
       ornament: 'none',
     },
+    // What this level is not.
+    //
+    // Most of the regression suite was written against a European river city
+    // with a tower in it, and asserts things that are simply not true here: a
+    // pyramid has no windows to post men in, the plateau has no river to wall,
+    // and — the whole premise of the level — nothing on it can be made to fall
+    // over. Those assertions read this rather than being quietly weakened for
+    // everybody.
+    traits: { windows: false, river: false, topples: false },
     // A pyramid cannot topple, so height is meaningless and the whole measure
     // is how much of it is left. The bar is low because grinding two and a
     // half million cubic metres of limestone to nothing is not a game.
