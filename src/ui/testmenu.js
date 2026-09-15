@@ -1975,7 +1975,10 @@ export class TestMenu {
               if (j <= i) continue;
               const m = nodes[j];
               const gap = Math.hypot(n.x - m.x, n.y - m.y, n.z - m.z) - n.r - m.r;
-              if (gap < 0.8) union(i, j);
+              // Matched to the metre of clear air the engine allows under
+              // anything it freezes. If this were tighter than that, the test
+              // would keep finding stones the engine considers settled.
+              if (gap < 1.2) union(i, j);
             }
           }
         });

@@ -38,6 +38,17 @@ export function R() {
 /** Support that can never go away: the map itself. */
 const GROUNDED = Object.freeze({ grounded: true });
 
+/**
+ * The most clear air allowed under anything that has been frozen, in metres.
+ *
+ * It has a partner: the self-test joins rubble into groups by contact and then
+ * insists every group reaches the ground, and its idea of contact has to be at
+ * least this generous or it will always find stragglers that the engine
+ * considers settled. One metre is close enough to touching that a stone perched
+ * that far above the heap reads as resting on it.
+ */
+const AIR_UNDER = 1.0;
+
 export class PhysicsWorld {
   constructor(quality) {
     const rapier = R();
@@ -209,7 +220,7 @@ export class PhysicsWorld {
     const foot = lowY - lowHy;
     if (this.groundAt) {
       const g = this.groundAt(lx, lz);
-      if (isFinite(g) && foot <= g + 2.5) return true;
+      if (isFinite(g) && foot <= g + AIR_UNDER) return true;
     }
     const ray = this._ray2 || (this._ray2 = new this.rapier.Ray(
       { x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 },
@@ -217,7 +228,7 @@ export class PhysicsWorld {
     ray.origin.x = lx; ray.origin.y = foot - 0.05; ray.origin.z = lz;
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
     return !!this.world.castRay(
-      ray, 2.5, true, undefined, undefined, undefined, body, undefined);
+      ray, AIR_UNDER, true, undefined, undefined, undefined, body, undefined);
   }
 
   /**
@@ -227,7 +238,16 @@ export class PhysicsWorld {
    * of every frozen body in the world, over and over, for the whole match.
    */
   _footingIntact(body) {
-    if (body.__supGround) return true;
+    // Frozen onto the terrain, which does not move — but check the arithmetic
+    // again anyway, because a section can be judged grounded on one of its feet
+    // and the reading that produced that judgement is not re-examined anywhere
+    // else. Two subtractions; no query.
+    if (body.__supGround) {
+      if (!this.groundAt) return true;
+      const t = body.translation();
+      const g = this.groundAt(t.x, t.z);
+      return !isFinite(g) || t.y - this._reachOf(body) <= g + AIR_UNDER + 0.5;
+    }
     const h = body.__supCol;
     if (h === undefined || h === null) return false;
     const col = this.world.getCollider(h);
