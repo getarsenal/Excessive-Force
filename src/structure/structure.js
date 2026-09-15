@@ -1911,6 +1911,44 @@ export class Structure {
    * and stays under control right up to the point where the structure really
    * is going over — and *then* Rapier gets it, and does the part it is good at.
    */
+  /**
+   * Is the load actually past the base it would land on?
+   *
+   * `reachOut` measures the bearing in the hinge band, which is the right
+   * quantity for the creep: that band is what is being crushed. It is the
+   * wrong quantity for deciding to hand the section to Rapier, because Rapier
+   * will not rest it on that band — the band is going with it. What catches it
+   * is the stump underneath, which on a tower shelled from one side is wider
+   * than the slice that failed, and a section whose centre of mass is still
+   * over that stump is a stable stack. Hand one of those over and it sits
+   * exactly where it was, and — because the slice is then marked as fallen and
+   * can never lean again — the tower stands there for the rest of the match
+   * with its base shot out. Measured: eighty-five per cent intact, peak lean
+   * 7.58°, no height lost at all.
+   *
+   * So the handover asks about the stump: three bands of it, which is as far
+   * down as a toppling section can reasonably come to rest.
+   */
+  _overPhysicalBase(L) {
+    const dx = L.axisZ, dz = -L.axisX;
+    const offset = (L.off0 ?? 0) * Math.cos(L.angle) + (L.comH ?? 20) * Math.sin(L.angle);
+    let widest = 0;
+    const from = Math.max(0, L.band - 3);
+    for (let b = from; b < L.band; b++) {
+      for (let k = this.bandStart[b]; k < this.bandStart[b + 1]; k++) {
+        const j = this.bandList[k];
+        if (!(this.flags[j] & ALIVE) || (this.flags[j] & (FREE | ISLAND))) continue;
+        if (!this.structural[j]) continue;
+        const proj = (this.px[j] - L.pivotX) * dx + (this.pz[j] - L.pivotZ) * dz
+          + Math.abs(this.hx[j] * dx) + Math.abs(this.hz[j] * dz);
+        if (proj > widest) widest = proj;
+      }
+    }
+    // Nothing underneath at all: whatever is up there is going over.
+    if (widest <= 0.05) return true;
+    return offset > widest;
+  }
+
   _armLean(band, ratio, loadMask, reach) {
     const b = band;
     if (b <= 0) return;
@@ -2187,7 +2225,8 @@ export class Structure {
     // So: it goes when it is leaning far enough *and* something has actually
     // committed it — the resultant has walked outside the bearing at some
     // point — or when it is so far out of plumb that the question is academic.
-    if (L.angle > LEAN_CRITICAL && (L.committed || L.angle > 0.21)) {
+    if (L.angle > LEAN_CRITICAL
+      && (this._overPhysicalBase(L) || L.angle > 0.21)) {
       // Going over. Hand it to Rapier from exactly where it is standing now,
       // moving exactly the way it is already moving.
       const band = L.band;

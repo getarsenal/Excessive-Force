@@ -1555,6 +1555,21 @@ export class TestMenu {
           }
           c.fastForward(6.0);
 
+          // Let the sweep converge before counting.
+          //
+          // The invariant worth asserting is that nothing *stays* hanging, not
+          // that no stone is ever unsupported for an instant — and the instant
+          // is real: a stone resting on rubble becomes unsupported the moment
+          // that rubble is culled, and the sweep gets to it on its next pass a
+          // fraction of a second later. Sampling between those two is how this
+          // reported thirteen stones hanging while the sweep's own tally said
+          // it had checked a hundred and fifty thousand and found all but
+          // three hundred of them standing.
+          for (let k = 0; k < 3; k++) {
+            P.auditFrozen(P.frozen.length);
+            c.fastForward(0.4);
+          }
+
           let frozen = 0;
           const hanging = [];
           const tracked = new Set(P.frozen);
