@@ -74,10 +74,27 @@ export function buildContext(terrain, quality) {
     // Portcullis House and the northern blocks.
     { x: -14, z: -104, w: 62, d: 44, h: 30 },
     { x: -96, z: -128, w: 52, d: 40, h: 26 },
+    // And enough of a quarter around them that the landmark stands in a city
+    // rather than in a field. Anything that clashes with a street or with its
+    // neighbours is dropped when it is placed.
+    { x: -210, z: 92, w: 46, d: 40, h: 24 },
+    { x: -186, z: 152, w: 52, d: 36, h: 22 },
+    { x: -74, z: -158, w: 46, d: 40, h: 26 },
+    { x: -172, z: -132, w: 44, d: 44, h: 24 },
+    { x: -36, z: 158, w: 42, d: 46, h: 22 },
+    { x: -244, z: -62, w: 42, d: 50, h: 26 },
+    { x: -252, z: 24, w: 40, d: 42, h: 20 },
+    { x: -118, z: -18, w: 34, d: 40, h: 28 },
+    { x: -60, z: 40, w: 30, d: 36, h: 24 },
+    { x: -66, z: -70, w: 34, d: 32, h: 22 },
   ];
 
+  // Only the abbey gets a precinct of its own. Reserving the whole civic set
+  // kept the streets out of a quarter of the map and left the landmark
+  // standing in a field — so the rest take their chances with the grid, and
+  // any of them that a street runs through simply is not built.
   const net = buildStreetNetwork(terrain, rng, {
-    pitch: 104, reach, exclude: EXCLUDE, bridge, reserved: CIVIC,
+    pitch: 104, reach, exclude: EXCLUDE, bridge, reserved: CIVIC.slice(6, 10),
   });
 
   // ── Where a building may and may not go.
@@ -258,28 +275,88 @@ export function buildContext(terrain, quality) {
   // terrace ended up standing in the road. Now the block *is* the hole in the
   // network: its sides are the streets that bound it, and every building is
   // set back from one of those sides by a real distance, facing it.
-  let terraces = 0, squares = 0;
+  let terraces = 0, squares = 0, civics = 0, yards = 0, works = 0;
+
+  /**
+   * The block as a rectangle: centre, the angle its long side runs at, and how
+   * much of it is left once the pavements are taken off each edge.
+   */
+  const blockFrame = (b) => {
+    const e0 = { x: b.poly[1].x - b.poly[0].x, z: b.poly[1].z - b.poly[0].z };
+    const e1 = { x: b.poly[2].x - b.poly[1].x, z: b.poly[2].z - b.poly[1].z };
+    const L0 = Math.hypot(e0.x, e0.z), L1 = Math.hypot(e1.x, e1.z);
+    const in0 = halfWidth(b.sides[0]) + halfWidth(b.sides[2]) + 8;
+    const in1 = halfWidth(b.sides[1]) + halfWidth(b.sides[3]) + 8;
+    return { yaw: Math.atan2(e0.x, e0.z), L0, L1, in0, in1,
+      free0: L0 - in0, free1: L1 - in1 };
+  };
+
   for (const b of net.blocks) {
     const r = Math.hypot(b.x, b.z);
-    if (r < EXCLUDE) continue;
+    if (r < EXCLUDE) { b.use = 'precinct'; continue; }
     const m = terrain.maskAt(b.x, b.z);
-    // Parks stay open, and so does the odd block in town — a city needs
-    // squares, and a square is what the eye rests on between the terraces.
-    if (m.park > 0.40 || rng() < 0.055) { squares++; b.open = true; continue; }
-    // Thin with distance, so the near blocks are solid and the far ones break
-    // up before the fog takes them. Nothing thins inside the middle of town:
-    // that is the part the camera actually lives over.
-    const far = Math.max(0, (r - terrain.span * 0.45) / (terrain.span * 1.1));
-    if (rng() > dense * (1 - Math.min(0.45, far))) {
-      b.open = true; squares++; continue;
-    }
+    const f = blockFrame(b);
+
+    // What is this block *for*?
+    //
+    // Every block is for something. The version before this one left about
+    // half of them as bare ground on the grounds that a city needs open space,
+    // which is true of squares and false of everything else: from above, an
+    // unbuilt block with no reason to be unbuilt reads as a hole in the map.
+    // So the choice here is between uses, never between building and not.
+    const roll = rng();
+    let use = 'terrace';
+    if (m.park > 0.40) use = 'park';
+    else if (roll < 0.09) use = 'park';
+    else if (roll < 0.15) use = 'carpark';
+    else if (roll < 0.25 && r > terrain.span * 0.42) use = 'works';
+    else if (roll < 0.34 && r < terrain.span * 0.6) use = 'civic';
+    if (f.free0 < 26 || f.free1 < 26) use = use === 'park' ? 'park' : 'carpark';
+    b.use = use;
+    b.open = use === 'park' || use === 'carpark';
+    if (b.open) { squares++; continue; }        // the detail pass builds these
 
     // District character: taller in the middle of town, lower out at the edges,
     // with a slow drift across the map so neighbourhoods differ.
     const drift = valueNoise(b.x * 0.0026 + 5.1, b.z * 0.0026 - 2.3);
     const baseH = (10 + 20 * (1 - Math.min(1, r / (terrain.span * 0.8)))) * (0.7 + drift * 0.9);
-    const depth = 13 + rng() * 7;
 
+    // ── One building, filling the block. Offices, a department store, a
+    // ministry: the thing a terrace of houses is not.
+    if (use === 'civic') {
+      const w = Math.min(f.free1, 16 + rng() * 26);
+      const d = Math.min(f.free0, 24 + rng() * 40);
+      if (block(b.x, b.z, w, d, baseH * (1.25 + rng() * 0.75), f.yaw,
+        { pitchChance: 0.08, front: null })) civics++;
+      // Whatever is left of the block goes to a yard building or two.
+      for (let k = 0; k < 2; k++) {
+        const ox = (rng() - 0.5) * f.free1, oz = (rng() - 0.5) * f.free0;
+        const px = b.x + ox * Math.cos(f.yaw) + oz * Math.sin(f.yaw);
+        const pz = b.z - ox * Math.sin(f.yaw) + oz * Math.cos(f.yaw);
+        if (block(px, pz, 8 + rng() * 8, 8 + rng() * 12, baseH * (0.4 + rng() * 0.3),
+          f.yaw, { pitchChance: 0.5 })) yards++;
+      }
+      continue;
+    }
+
+    // ── A works: long sheds in a row, with a yard between them. Reads as
+    // industry from above because of the roof pitch and the repetition.
+    if (use === 'works') {
+      const bays = 2 + Math.floor(rng() * 3);
+      const shedW = Math.min(f.free1 / bays - 3, 16);
+      for (let k = 0; k < bays; k++) {
+        const ox = (k - (bays - 1) / 2) * (shedW + 3.5);
+        const px = b.x + ox * Math.cos(f.yaw);
+        const pz = b.z - ox * Math.sin(f.yaw);
+        if (shedW < 7) break;
+        if (block(px, pz, shedW, Math.min(f.free0, 26 + rng() * 34),
+          7 + rng() * 6, f.yaw, { pitchChance: 0.85 })) works++;
+      }
+      continue;
+    }
+
+    // ── Terraces round the edge, facing the street they were set back from.
+    const depth = 13 + rng() * 7;
     for (let s = 0; s < 4; s++) {
       const p = b.poly[s], q = b.poly[(s + 1) % 4];
       const dx = q.x - p.x, dz = q.z - p.z;
@@ -301,24 +378,22 @@ export function buildContext(terrain, quality) {
       while (t < t1 - 9) {
         const run = Math.min(t1 - t, 9 + rng() * 15);
         if (run < 8.5) break;
-        if (rng() < 0.12) { t += run + 2; continue; }   // a way through to the yard
+        if (rng() < 0.08) { t += run + 2; continue; }   // a way through to the yard
         const c = t + run / 2;
 
-        // Set back from the *road*, not from the block's nominal edge.
-        //
-        // The two are not the same: streets are bowed, and a street that bows
-        // into this block eats several metres of it. Measuring the setback off
-        // the straight line between the junctions is how a terrace ends up
-        // standing in the carriageway — so walk the frontage outward until the
-        // whole of it is genuinely clear of the paving, and give up on this
-        // run if the street has taken the ground.
+        // Set back from the *road*, not from the block's nominal edge. The two
+        // are not always the same — a junction's paving is wider than the
+        // street that leads to it — so walk the frontage outward until the
+        // whole of it is genuinely clear, and give up on this run if the
+        // street has taken the ground.
         let off = halfWidth(b.sides[s]) + 2.4 + rng() * 2.0;
         let clear = -Infinity;
         for (let k = 0; k < 5; k++) {
           clear = Infinity;
           for (const u of [-run / 2 + 1, 0, run / 2 - 1]) {
-            const f = front(c + u, off);
-            clear = Math.min(clear, net.roadClearance(f.x, f.z), net.nodeClearance(f.x, f.z));
+            const g2 = front(c + u, off);
+            clear = Math.min(clear, net.roadClearance(g2.x, g2.z),
+              net.nodeClearance(g2.x, g2.z));
           }
           if (clear >= 2.0) break;
           off += (2.0 - clear) + 0.4;
@@ -334,14 +409,18 @@ export function buildContext(terrain, quality) {
       }
     }
 
-    // And something in the middle of the block: a mews, a works, a yard
-    // building. Blocks that are a ring of terraces round a void read as a
-    // stage set from above; real ones are built into.
-    if (rng() < 0.55) {
-      const mw = 10 + rng() * 16, md = 8 + rng() * 12;
-      const yaw = rng() * Math.PI;
-      const mx = b.x + (rng() - 0.5) * 22, mz = b.z + (rng() - 0.5) * 22;
-      block(mx, mz, mw, md, baseH * (0.5 + rng() * 0.4), yaw, { pitchChance: 0.6 });
+    // And the middle of the block: mews, workshops, the back of a pub. Blocks
+    // that are a ring of terraces round a void read as a stage set from above;
+    // real ones are built into.
+    const fills = 1 + Math.floor(rng() * 3);
+    for (let k = 0; k < fills; k++) {
+      const mw = 9 + rng() * 14, md = 8 + rng() * 14;
+      const ox = (rng() - 0.5) * Math.max(0, f.free1 - depth * 2 - mw);
+      const oz = (rng() - 0.5) * Math.max(0, f.free0 - depth * 2 - md);
+      const px = b.x + ox * Math.cos(f.yaw) + oz * Math.sin(f.yaw);
+      const pz = b.z - ox * Math.sin(f.yaw) + oz * Math.cos(f.yaw);
+      if (block(px, pz, mw, md, baseH * (0.45 + rng() * 0.45), f.yaw + (rng() - 0.5) * 0.1,
+        { pitchChance: 0.7 })) yards++;
     }
   }
 
@@ -366,6 +445,7 @@ export function buildContext(terrain, quality) {
   if (bodies.length) group.add(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
   if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
 
+  group.add(buildGroundCover(terrain, net, rng, quality, terrain.span * 0.8));
   group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
@@ -378,8 +458,8 @@ export function buildContext(terrain, quality) {
   const props = new PropSet(quality);
   const detail = new THREE.Group();
   detail.name = 'citydetail';
-  const counts = { terraces, squares, junctions: net.nodes.length,
-    streets: net.edges.length };
+  const counts = { terraces, squares, civics, works, yards,
+    junctions: net.nodes.length, streets: net.edges.length };
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
@@ -427,6 +507,73 @@ function mergeTinted(geos, material, palette, rng, quality) {
   mesh.castShadow = quality.shadowMapSize > 0;
   mesh.receiveShadow = quality.shadowMapSize > 0;
   return mesh;
+}
+
+/**
+ * Ground cover.
+ *
+ * The last of the bare map. Between the blocks and around the landmark's
+ * precinct there is always ground that belongs to no block and no street —
+ * verges, forecourts, the gaps between civic buildings — and left as the map's
+ * own sand-coloured terrain it reads as a building site. This lays a tile of
+ * grass, gravel or paving over anything that is not carriageway and not water,
+ * in patches keyed to a noise field so it comes out as areas with edges rather
+ * than as confetti.
+ *
+ * One merged mesh, a few thousand quads, no per-frame cost.
+ */
+function buildGroundCover(terrain, net, rng, quality, radius) {
+  const STEP = 17;
+  const tiles = [];
+  const lawn = new THREE.Color(0x52683d);
+  const gravel = new THREE.Color(0x8d8471);
+  const paving = new THREE.Color(0xa59d8b);
+  const tmp = new THREE.Color();
+  for (let x = -radius; x <= radius; x += STEP) {
+    for (let z = -radius; z <= radius; z += STEP) {
+      const jx = x + (rng() - 0.5) * STEP * 0.3;
+      const jz = z + (rng() - 0.5) * STEP * 0.3;
+      if (terrain.isWater(jx, jz)) continue;
+      if (terrain.heightAt(jx, jz) < terrain.waterLevel + 0.9) continue;
+      // Keep off the roads: the carriageway is the one surface that is already
+      // drawn, and covering it is worse than covering nothing.
+      if (net.roadClearance(jx, jz) < STEP * 0.45) continue;
+      if (net.nodeClearance(jx, jz) < STEP * 0.45) continue;
+      const patch = valueNoise(jx * 0.006 + 13.7, jz * 0.006 - 5.2);
+      const fine = valueNoise(jx * 0.03, jz * 0.03);
+      // Green where the map says parkland or where a patch of it wants to be,
+      // and less of it the closer to the middle of town: a city centre is
+      // paved. Covering everything in lawn turns the place into a campus.
+      const m = terrain.maskAt(jx, jz);
+      const urban = 1 - Math.min(1, Math.hypot(jx, jz) / (terrain.span * 0.7));
+      const green = m.park > 0.32 || patch < 0.30 - urban * 0.18;
+      tmp.copy(green ? lawn : (patch < 0.70 ? gravel : paving));
+      tmp.multiplyScalar(0.84 + fine * 0.34);
+      // A flat quad, not a box: two triangles instead of twelve, and there are
+      // thousands of these.
+      const tile = new THREE.PlaneGeometry(STEP * 1.06, STEP * 1.06);
+      tile.rotateX(-Math.PI / 2);
+      tile.translate(jx, terrain.heightAt(jx, jz) + 0.07, jz);
+      const n = tile.attributes.position.count;
+      const arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        arr[i * 3] = tmp.r; arr[i * 3 + 1] = tmp.g; arr[i * 3 + 2] = tmp.b;
+      }
+      tile.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+      tiles.push(tile);
+    }
+  }
+  const g = new THREE.Group();
+  g.name = 'groundcover';
+  if (!tiles.length) return g;
+  const mesh = new THREE.Mesh(
+    BufferGeometryUtils.mergeGeometries(tiles, false),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
+  );
+  mesh.receiveShadow = quality.shadowMapSize > 0;
+  mesh.frustumCulled = false;
+  g.add(mesh);
+  return g;
 }
 
 /**
@@ -859,8 +1006,87 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
   const gravel = [];
   const railings = [];
   let squares = 0;
+  const asphalt = [];
+  const yardBeds = [];
+  let carparks = 0;
+
+  // ── The ground inside a block.
+  //
+  // Whatever a block is for, the part of it that is not roof is a surface: a
+  // yard, a garden, a service road, a bit of gravel. Leaving it as the map's
+  // own ground is what made the city read as buildings standing on a desert,
+  // so every block gets its own floor, under everything else.
+  for (const b of (net?.blocks || [])) {
+    if (b.use === 'park' || b.use === 'carpark' || b.use === 'precinct') continue;
+    let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+    for (const p of b.poly) {
+      bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x);
+      bz0 = Math.min(bz0, p.z); bz1 = Math.max(bz1, p.z);
+    }
+    const bw = (bx1 - bx0) - 26, bd = (bz1 - bz0) - 26;
+    if (bw < 12 || bd < 12) continue;
+    const cx2 = (bx0 + bx1) / 2, cz2 = (bz0 + bz1) / 2;
+    if (terrain.isWater(cx2, cz2)) continue;
+    const bed = new THREE.BoxGeometry(bw, 0.18, bd);
+    bed.translate(cx2, terrain.heightAt(cx2, cz2) + 0.09, cz2);
+    const roll = rng();
+    tintOne(bed, roll < 0.34 ? 0x4e6b38 : (roll < 0.7 ? 0x8a8170 : 0x6f6a5e),
+      0.85 + rng() * 0.3);
+    yardBeds.push(bed);
+  }
+  if (yardBeds.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(yardBeds, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
+    );
+    mesh.receiveShadow = shadows;
+    g.add(mesh);
+  }
+
   for (const b of (net?.blocks || [])) {
     if (!b.open) continue;
+    if (b.use === 'carpark') {
+      // A yard of tarmac with bays painted on it and a few cars left in them.
+      // Every city has them, and from above they are the one thing that is
+      // neither roof nor garden — which is exactly why they are worth having.
+      let minX2 = Infinity, maxX2 = -Infinity, minZ2 = Infinity, maxZ2 = -Infinity;
+      for (const p of b.poly) {
+        minX2 = Math.min(minX2, p.x); maxX2 = Math.max(maxX2, p.x);
+        minZ2 = Math.min(minZ2, p.z); maxZ2 = Math.max(maxZ2, p.z);
+      }
+      const cw = (maxX2 - minX2) - 30, cd = (maxZ2 - minZ2) - 30;
+      const ccx = (minX2 + maxX2) / 2, ccz = (minZ2 + maxZ2) / 2;
+      if (cw < 16 || cd < 16 || terrain.isWater(ccx, ccz)) continue;
+      if (net.roadClearance(ccx, ccz) < 6) continue;
+      const cy = terrain.heightAt(ccx, ccz);
+      const slab = new THREE.BoxGeometry(cw, 0.26, cd);
+      slab.translate(ccx, cy + 0.13, ccz);
+      tintOne(slab, 0x3a3d42, 0.9 + rng() * 0.2);
+      asphalt.push(slab);
+      // Bays, in two ranks with an aisle between them.
+      for (let k = 0; k * 2.6 < cw - 3; k++) {
+        const bx = ccx - cw / 2 + 1.5 + k * 2.6;
+        for (const side of [-1, 1]) {
+          const bz = ccz + side * (cd / 4);
+          const line = new THREE.BoxGeometry(0.16, 0.06, 4.8);
+          line.translate(bx, cy + 0.29, bz);
+          tintOne(line, 0xd7d2c2, 1);
+          asphalt.push(line);
+          if (rng() < 0.45) {
+            const car = new THREE.BoxGeometry(1.8, 0.95, 4.2);
+            car.translate(bx + 1.3, cy + 0.72, bz);
+            tintOne(car, [0x9aa3ad, 0x2f3a45, 0x8c3a32, 0x3d5a46, 0xb8b2a4][
+              Math.floor(rng() * 5)], 0.85 + rng() * 0.3);
+            asphalt.push(car);
+          }
+        }
+      }
+      for (let k = 0; k < 4; k++) {
+        treeAt(ccx + (rng() - 0.5) * cw, ccz + (rng() - 0.5) * cd * 1.05, 0.9);
+      }
+      carparks++;
+      continue;
+    }
     // The usable middle of the block, inside the pavements.
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const p of b.poly) {
@@ -925,6 +1151,14 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
       railings.push(figure);
     }
     squares++;
+  }
+  if (asphalt.length) {
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(asphalt, false),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93 }),
+    );
+    mesh.receiveShadow = shadows;
+    g.add(mesh);
   }
   for (const [arr, rough] of [[lawns, 0.98], [gravel, 0.95]]) {
     if (!arr.length) continue;
@@ -1098,6 +1332,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
   }
 
   g.userData.squares = squares;
+  g.userData.carparks = carparks;
   return g;
 }
 

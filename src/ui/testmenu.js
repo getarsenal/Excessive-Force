@@ -1381,19 +1381,38 @@ export class TestMenu {
           `the street network is in ${sizes.length} pieces; the two largest hold `
           + `${inTwo} of ${linked} junctions`);
 
-        // Curved: a network of ruled lines is the thing being replaced.
+        // Straight: streets are ruled lines, and the variety comes from where
+        // they are rather than from bending them. A map of gently wandering
+        // roads reads as noise — nothing lines up and nothing points anywhere.
         let bent = 0;
         for (const e of net.edges) {
+          if (e.bank || e.approach) continue;      // these curve for a reason
           const a = e.pts[0], b = e.pts[e.pts.length - 1];
           const straight = Math.hypot(b.x - a.x, b.z - a.z);
           let along = 0;
           for (let i = 0; i < e.pts.length - 1; i++) {
             along += Math.hypot(e.pts[i + 1].x - e.pts[i].x, e.pts[i + 1].z - e.pts[i].z);
           }
-          if (along > straight * 1.002) bent++;
+          if (along > straight * 1.003) bent++;
         }
-        assert(bent > net.edges.length * 0.5,
-          `only ${bent} of ${net.edges.length} streets have any bend in them`);
+        assert(bent === 0, `${bent} streets wander instead of running straight`);
+
+        // But the blocks they enclose are all different sizes: a grid at one
+        // fixed pitch is the other way to make a city look machine-made.
+        const spans = net.blocks.map((b) => Math.hypot(
+          b.poly[1].x - b.poly[0].x, b.poly[1].z - b.poly[0].z));
+        spans.sort((a, b) => a - b);
+        const lo = spans[Math.floor(spans.length * 0.1)];
+        const hi = spans[Math.floor(spans.length * 0.9)];
+        assert(hi > lo * 1.3,
+          `every block is the same size: ${lo.toFixed(0)}–${hi.toFixed(0)} m across`);
+
+        // And every block is *for* something. Bare ground in the middle of a
+        // city reads as a hole in the map.
+        const used = net.blocks.filter((b) => b.use).length;
+        assert(used === net.blocks.length,
+          `${net.blocks.length - used} of ${net.blocks.length} blocks were left `
+          + 'with nothing in them');
 
         // Nothing standing in the road, on any part of its footprint.
         const plots = city.userData.plots || [];

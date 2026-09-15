@@ -65,7 +65,7 @@ export function buildStreetNetwork(terrain, rng, opts) {
   const reserved = opts.reserved || [];
   const inReserved = (x, z) => {
     for (const r of reserved) {
-      if (Math.abs(x - r.x) < r.w / 2 + 15 && Math.abs(z - r.z) < r.d / 2 + 15) return true;
+      if (Math.abs(x - r.x) < r.w / 2 + 11 && Math.abs(z - r.z) < r.d / 2 + 11) return true;
     }
     return false;
   };
@@ -84,28 +84,41 @@ export function buildStreetNetwork(terrain, rng, opts) {
     return true;
   };
 
-  // ── 1. Junctions on a pushed-around grid.
+  // ── 1. Junctions on a straight, irregular grid.
   //
-  // Two noise fields, sampled at the node's *nominal* position, displace it.
-  // The frequency matters more than the amplitude: sampled coarsely, whole
-  // runs of nodes drift together and the street bends as one long sweep, which
-  // is what a city laid out on old field boundaries looks like. Sampled
-  // finely, each node jumps independently and the streets zig-zag like a bad
-  // maze. The amplitude stays under half a pitch so the grid cannot fold over
-  // itself and turn blocks inside out.
-  const cols = Math.floor((reach * 2) / pitch) + 1;
-  const origin = -reach;
-  const idx = new Int32Array(cols * cols).fill(-1);
-  const AMP = pitch * 0.30;
-  for (let j = 0; j < cols; j++) {
+  // Streets are straight. An earlier version pushed every junction around with
+  // a noise field, which bent the streets — and a whole map of gently wandering
+  // roads reads as *noise*, not as a city: nothing lines up, nothing points at
+  // anything, and the eye has nothing to measure against. Real cities are
+  // straight lines with reasons for the exceptions.
+  //
+  // So the variety comes from the spacing rather than the shape. The column and
+  // row lines are laid at irregular intervals — a short block here, a long one
+  // there — and every junction sits exactly on the intersection of two of them,
+  // so an entire street runs dead straight from one side of the map to the
+  // other while no two blocks are the same size. The whole grid is then turned
+  // a few degrees off the map axes, which is what stops it reading as graph
+  // paper and lets the river cut across it at an angle.
+  //
+  // The curves that are left are the ones with a reason: the road along the
+  // river follows the bank, and the bridge approaches point at the bridge.
+  const GRID_YAW = 0.23;
+  const gca = Math.cos(GRID_YAW), gsa = Math.sin(GRID_YAW);
+  const span = reach * 1.45;                 // laid out past the corners
+  const lineSet = () => {
+    const out = [];
+    for (let u = -span; u <= span; u += pitch * (0.68 + rng() * 0.7)) out.push(u);
+    return out;
+  };
+  const colU = lineSet();
+  const rowV = lineSet();
+  const cols = colU.length, rows = rowV.length;
+  const idx = new Int32Array(cols * rows).fill(-1);
+  for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
-      const bx = origin + i * pitch;
-      const bz = origin + j * pitch;
-      const dx = (valueNoise(bx * 0.0017 + 11.3, bz * 0.0017 - 4.1) - 0.5) * 2 * AMP
-        + (rng() - 0.5) * pitch * 0.10;
-      const dz = (valueNoise(bx * 0.0017 - 67.9, bz * 0.0017 + 23.5) - 0.5) * 2 * AMP
-        + (rng() - 0.5) * pitch * 0.10;
-      const x = bx + dx, z = bz + dz;
+      const x = colU[i] * gca - rowV[j] * gsa;
+      const z = colU[i] * gsa + rowV[j] * gca;
+      if (Math.abs(x) > reach || Math.abs(z) > reach) continue;
       if (Math.hypot(x, z) < exclude) continue;
       if (!onLand(x, z, 7)) continue;
       // Avenues every third line, in both directions: the through routes.
@@ -129,11 +142,11 @@ export function buildStreetNetwork(terrain, rng, opts) {
   };
 
   /**
-   * One street, as a polyline.
+   * One street, as a straight run cut into a few pieces.
    *
-   * Streets are drawn bowed rather than straight: a single lateral offset in
-   * the middle, a few metres either way, is enough to stop the eye reading the
-   * whole map as ruled lines, and it costs three extra quads.
+   * The pieces are there to follow the ground, not to bend the road: every
+   * point lies exactly on the line between the two junctions, so the street is
+   * straight in plan and stepped in section.
    */
   const addEdge = (na, nb, cls, margin, minLen, ignoreReserved) => {
     const a = nodes[na], b = nodes[nb];
@@ -141,19 +154,11 @@ export function buildStreetNetwork(terrain, rng, opts) {
     const dx = b.x - a.x, dz = b.z - a.z;
     const len = Math.hypot(dx, dz);
     if (len < (minLen ?? pitch * 0.35)) return null;
-    const nx = -dz / len, nz = dx / len;
-    const bow = (valueNoise(a.x * 0.004 + 3.7, a.z * 0.004 - 9.1) - 0.5)
-      * Math.min(6.5, len * 0.07) * 2;
-    const SEGS = 5;
+    const SEGS = Math.max(2, Math.min(6, Math.round(len / 26)));
     const pts = [];
     for (let s = 0; s <= SEGS; s++) {
       const t = s / SEGS;
-      const k = Math.sin(t * Math.PI);           // zero at both junctions
-      const x = a.x + dx * t + nx * bow * k;
-      const z = a.z + dz * t + nz * bow * k;
-      // The bowed line is checked the same way the straight one was: with the
-      // caller's own margin and its own view of the reserved ground, or a
-      // forced road would pass `lineClear` and then fail here.
+      const x = a.x + dx * t, z = a.z + dz * t;
       if (!onLand(x, z, Math.min(5, margin ?? 5), ignoreReserved)) return null;
       pts.push({ x, z, y: terrain.heightAt(x, z) });
     }
@@ -166,13 +171,13 @@ export function buildStreetNetwork(terrain, rng, opts) {
 
   // ── 2. Streets between neighbouring junctions.
   const pending = [];
-  for (let j = 0; j < cols; j++) {
+  for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const here = idx[j * cols + i];
       if (here < 0) continue;
       for (const [di, dj] of [[1, 0], [0, 1]]) {
         const ni = i + di, nj = j + dj;
-        if (ni >= cols || nj >= cols) continue;
+        if (ni >= cols || nj >= rows) continue;
         const there = idx[nj * cols + ni];
         if (there < 0) continue;
         const bothAvenue = nodes[here].avenue && nodes[there].avenue;
@@ -194,7 +199,7 @@ export function buildStreetNetwork(terrain, rng, opts) {
   for (let k = edges.length - 1; k >= 0; k--) {
     const e = edges[k];
     if (e.cls !== 'street') continue;
-    if (rng() > 0.10) continue;
+    if (rng() > 0.07) continue;
     const a = nodes[e.a], b = nodes[e.b];
     if (a.links.length < 3 || b.links.length < 3) continue;
     a.links = a.links.filter((l) => l.edge !== e);
@@ -219,7 +224,10 @@ export function buildStreetNetwork(terrain, rng, opts) {
   }
   for (let i = 0; i < bankNodes.length - 1; i++) {
     if (bankNodes[i] < 0 || bankNodes[i + 1] < 0) continue;
-    addEdge(bankNodes[i], bankNodes[i + 1], 'avenue');
+    // The one road that is allowed to wander: it follows the water, which is
+    // a reason. Flagged so the straightness check knows the difference.
+    const e = addEdge(bankNodes[i], bankNodes[i + 1], 'avenue');
+    if (e) e.bank = true;
   }
   // Tie the embankment back into the grid, or it is a road to nowhere.
   for (let i = 0; i < bankNodes.length; i += 2) {
@@ -274,7 +282,8 @@ export function buildStreetNetwork(terrain, rng, opts) {
       const tip = nodes.length;
       nodes.push({ x: foot.x, z: foot.z, y: terrain.heightAt(foot.x, foot.z),
         avenue: true, links: [], approach: true });
-      if (!addEdge(n, tip, 'avenue', 0, 8, true)) nodes.pop();
+      const stub = addEdge(n, tip, 'avenue', 0, 8, true);
+      if (!stub) nodes.pop(); else stub.approach = true;
       // Join the junction into the network in more than one direction.
       let joined = 0;
       const tried = new Set();
@@ -283,7 +292,8 @@ export function buildStreetNetwork(terrain, rng, opts) {
           (m, mi) => !tried.has(mi) && mi !== n && !m.approach);
         if (near < 0) break;
         tried.add(near);
-        if (addEdge(n, near, 'avenue', 5, undefined, true)) joined++;
+        const join = addEdge(n, near, 'avenue', 5, undefined, true);
+        if (join) { join.approach = true; joined++; }
       }
     }
   }
@@ -292,7 +302,7 @@ export function buildStreetNetwork(terrain, rng, opts) {
   const blocks = [];
   const linked = (a, b) => (a >= 0 && b >= 0
     && nodes[a].links.some((l) => l.other === b));
-  for (let j = 0; j < cols - 1; j++) {
+  for (let j = 0; j < rows - 1; j++) {
     for (let i = 0; i < cols - 1; i++) {
       const c00 = idx[j * cols + i], c10 = idx[j * cols + i + 1];
       const c01 = idx[(j + 1) * cols + i], c11 = idx[(j + 1) * cols + i + 1];
@@ -531,26 +541,58 @@ export function buildStreetSurface(net, terrain, quality) {
     }
   }
 
-  // ── Junction pads. Pavement first, asphalt a few centimetres over it: the
-  // two are coplanar otherwise and the crossing flickers.
+  // ── Junction pads.
+  //
+  // Not a convex hull. The first version took the hull of every road's corners
+  // and filled it, which on a five-way junction is a big black polygon with
+  // wedges of tarmac sticking out between the streets — the junction reads as a
+  // blot rather than as a crossroads.
+  //
+  // What a junction actually is: each street runs into it to a stop line, and
+  // the *corners* between neighbouring streets are where the kerb turns. So the
+  // outline is built from the streets themselves — two points per street at the
+  // stop line, and between each neighbouring pair the point where their kerb
+  // lines cross. That gives the concave corners a real junction has, and the
+  // pad is never wider than the roads that meet it.
   for (const n of net.nodes) {
     if (!n.links.length) continue;
     const y = n.y + LIFT;
-    const outer = [];
-    const inner = [];
-    for (const l of n.links) {
+    const R = padRadius(n);
+    const arms = n.links.map((l) => {
       const dir = linkDir(n, l);
       const c = ROAD_CLASS[l.edge.cls];
-      const r = padRadius(n);
-      const px = -dir.z, pz = dir.x;
-      const full = c.road / 2 + c.pave + c.kerb;
-      outer.push({ x: n.x + dir.x * r + px * full, z: n.z + dir.z * r + pz * full });
-      outer.push({ x: n.x + dir.x * r - px * full, z: n.z + dir.z * r - pz * full });
-      inner.push({ x: n.x + dir.x * r + px * c.road / 2, z: n.z + dir.z * r + pz * c.road / 2 });
-      inner.push({ x: n.x + dir.x * r - px * c.road / 2, z: n.z + dir.z * r - pz * c.road / 2 });
-    }
-    fan(hull(outer), n, y, PAVE, vert, dry);
-    fan(hull(inner), n, y + 0.03, ASPHALT, vert, dry);
+      return { dir, ang: Math.atan2(dir.z, dir.x),
+        full: c.road / 2 + c.pave + c.kerb, road: c.road / 2 };
+    }).sort((a, b) => a.ang - b.ang);
+
+    const ring = (widthOf) => {
+      const out = [];
+      for (let i = 0; i < arms.length; i++) {
+        const a = arms[i], b = arms[(i + 1) % arms.length];
+        const wa = widthOf(a), wb = widthOf(b);
+        const na = { x: -a.dir.z, z: a.dir.x };     // left of a
+        const nb = { x: -b.dir.z, z: b.dir.x };
+        // The two ends of this street's stop line.
+        out.push({ x: n.x + a.dir.x * R - na.x * wa, z: n.z + a.dir.z * R - na.z * wa });
+        out.push({ x: n.x + a.dir.x * R + na.x * wa, z: n.z + a.dir.z * R + na.z * wa });
+        // And the kerb corner between this street and the next one round.
+        if (arms.length < 2) continue;
+        const p1 = { x: n.x + na.x * wa, z: n.z + na.z * wa };
+        const p2 = { x: n.x - nb.x * wb, z: n.z - nb.z * wb };
+        const c = intersect(p1, a.dir, p2, b.dir);
+        const lim = R * 1.6;
+        if (c && Math.hypot(c.x - n.x, c.z - n.z) < lim) out.push(c);
+        else {
+          out.push({ x: (p1.x + p2.x) / 2 + (a.dir.x + b.dir.x) * R * 0.35,
+            z: (p1.z + p2.z) / 2 + (a.dir.z + b.dir.z) * R * 0.35 });
+        }
+      }
+      return out;
+    };
+
+    // Star-shaped around the node, so a fan from the centre triangulates it.
+    fan(ring((a) => a.full), n, y, PAVE, vert, dry);
+    fan(ring((a) => a.road), n, y + 0.03, ASPHALT, vert, dry);
   }
 
   // Face every triangle upward.
@@ -602,24 +644,12 @@ function fan(ring, n, y, colour, vert, dry) {
   }
 }
 
-/** Convex hull, monotone chain. Small inputs: at most a dozen points. */
-function hull(pts) {
-  if (pts.length < 3) return pts;
-  const p = pts.slice().sort((a, b) => (a.x - b.x) || (a.z - b.z));
-  const cross = (o, a, b) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
-  const lower = [];
-  for (const q of p) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop();
-    lower.push(q);
-  }
-  const upper = [];
-  for (let i = p.length - 1; i >= 0; i--) {
-    const q = p[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop();
-    upper.push(q);
-  }
-  lower.pop(); upper.pop();
-  return lower.concat(upper);
+/** Where two lines (point + direction) cross, or null if they are parallel. */
+function intersect(p1, d1, p2, d2) {
+  const den = d1.x * d2.z - d1.z * d2.x;
+  if (Math.abs(den) < 1e-4) return null;
+  const t = ((p2.x - p1.x) * d2.z - (p2.z - p1.z) * d2.x) / den;
+  return { x: p1.x + d1.x * t, z: p1.z + d1.z * t };
 }
 
 /** Cut `from` metres off the start of a polyline and `to` off the end. */
@@ -668,7 +698,7 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
     const g = new THREE.BoxGeometry(w, 0.06, d);
     g.rotateY(ry);
     g.translate(x, terrain.heightAt(x, z) + 0.30, z);
-    props.add('markings', g, colour, 0);
+    props.add('markings', g, colour, 1);
   };
 
   for (const e of net.edges) {
@@ -720,16 +750,28 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
       counts.stopLines++;
     }
 
-    // Yellow box junction on the busiest crossings: a hatched square that
-    // reads, from directly above, as the one thing in the frame that is
-    // unmistakably a road junction.
+    // Yellow box junction on the busiest crossings — kept inside the junction.
+    //
+    // The first version drew long diagonals from the centre and they ran out
+    // across the pavements and off down the street, which looked like someone
+    // had scribbled on the map. The box is now a square of the junction's own
+    // size, turned to line up with the roads that meet it, and every line is
+    // cut to the square.
     const avenues = n.links.filter((l) => l.edge.cls === 'avenue').length;
     if (avenues >= 2 && n.links.length >= 3) {
-      const size = padRadius(n) * 1.25;
-      for (let k = -3; k <= 3; k++) {
-        const off = (k / 3) * size * 0.8;
-        paint(n.x + off, n.z, 0.22, size * 1.5, Math.PI / 4, 0xc8b45e);
-        paint(n.x + off, n.z, 0.22, size * 1.5, -Math.PI / 4, 0xc8b45e);
+      const narrow = Math.min(...n.links.map((l) => ROAD_CLASS[l.edge.cls].road));
+      const size = Math.min(padRadius(n) * 0.95, narrow * 0.92);
+      const main = n.links.find((l) => l.edge.cls === 'avenue');
+      const dir = linkDir(n, main);
+      const base = Math.atan2(dir.x, dir.z);
+      for (let k = -2; k <= 2; k++) {
+        const off = (k / 2) * size * 0.42;
+        const len = size * Math.sqrt(2) * (1 - Math.abs(k) / 3.2);
+        for (const sign of [1, -1]) {
+          const a2 = base + sign * Math.PI / 4;
+          paint(n.x - Math.cos(a2) * off, n.z + Math.sin(a2) * off,
+            0.24, len, a2, 0xc8a13a);
+        }
       }
       counts.hatching = (counts.hatching || 0) + 1;
     }
@@ -804,14 +846,14 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
       const y = terrain.heightAt(px, pz);
       const post = new THREE.CylinderGeometry(0.09, 0.13, 6.4, 5);
       post.translate(px, y + 3.2, pz);
-      props.add('dark', post, 0x2b3138, 0);
+      props.add('dark', post, 0x2b3138, 1);
       const arm = new THREE.BoxGeometry(0.9, 0.16, 0.24);
       arm.rotateY(Math.atan2(dir.x, dir.z));
       arm.translate(px - dir.z * off * 0.12, y + 6.4, pz + dir.x * off * 0.12);
-      props.add('dark', arm, 0x2b3138, 0);
+      props.add('dark', arm, 0x2b3138, 1);
       const head = new THREE.BoxGeometry(0.7, 0.22, 0.34);
       head.translate(px, y + 6.5, pz);
-      props.add('paint', head, 0xd9d2bd, 0);
+      props.add('paint', head, 0xd9d2bd, 1);
       counts.lamps++;
     });
 
@@ -826,22 +868,24 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         const h = 6 + rng() * 3.4;
         const trunk = new THREE.CylinderGeometry(0.16, 0.24, h * 0.46, 5);
         trunk.translate(px, y + h * 0.23, pz);
-        props.add('dark', trunk, 0x5a4432, 0);
+        props.add('dark', trunk, 0x5a4432, 0.9 + rng() * 0.25);
         const crown = new THREE.SphereGeometry(h * 0.31, 6, 5);
         crown.scale(1, 0.82, 1);
         crown.translate(px, y + h * 0.72, pz);
-        props.add('foliage', crown, 0x4a7a32, 0.18);
+        props.add('foliage', crown, 0x4a7a32, 0.78 + rng() * 0.44);
         // A tree pit in the pavement: a square of dark earth with a grate.
         const pit = new THREE.BoxGeometry(1.5, 0.08, 1.5);
         pit.translate(px, y + 0.27, pz);
-        props.add('dark', pit, 0x3a332a, 0);
+        props.add('dark', pit, 0x3a332a, 1);
         counts.streetTrees++;
       });
     }
 
-    // Parked cars, nose to tail along the kerb, aligned with the street.
+    // Parked cars, nose to tail along the kerb, aligned with the street. Kept
+    // well back from the junction: nobody parks on a crossing.
     if (e.cls !== 'mews') {
-      walkPolyline(line, 7.5 / dense, (x, z, dir) => {
+      const parking = trimPolyline(e.pts, padRadius(a) + 10, padRadius(b) + 10);
+      if (parking.length >= 2) walkPolyline(parking, 7.5 / dense, (x, z, dir) => {
         if (rng() > 0.5 * dense + 0.2) return;
         const side = rng() < 0.5 ? 1 : -1;
         const off = (c.road / 2 - 1.15) * side;
@@ -851,10 +895,10 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         const ry = Math.atan2(dir.x, dir.z);
         const body = new THREE.BoxGeometry(1.86, 0.92, 4.3);
         body.rotateY(ry); body.translate(px, y + 0.62, pz);
-        props.add('paint', body, CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)], 0.1);
+        props.add('paint', body, CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)], 0.85 + rng() * 0.3);
         const cabin = new THREE.BoxGeometry(1.7, 0.66, 2.2);
         cabin.rotateY(ry); cabin.translate(px, y + 1.34, pz);
-        props.add('glass', cabin, 0x59626b, 0.06);
+        props.add('glass', cabin, 0x59626b, 1);
         counts.parked++;
       });
     }
@@ -879,21 +923,21 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         if (major && ways >= 3 && s > 0) {
           const post = new THREE.CylinderGeometry(0.1, 0.12, 3.6, 5);
           post.translate(px, gy + 1.8, pz);
-          props.add('dark', post, 0x2b3138, 0);
+          props.add('dark', post, 0x2b3138, 1);
           const box = new THREE.BoxGeometry(0.34, 0.9, 0.3);
           box.rotateY(Math.atan2(dir.x, dir.z));
           box.translate(px, gy + 4.0, pz);
-          props.add('dark', box, 0x23282d, 0);
+          props.add('dark', box, 0x23282d, 1);
           for (let k = 0; k < 3; k++) {
             const lens = new THREE.SphereGeometry(0.1, 5, 4);
             lens.translate(px, gy + 4.3 - k * 0.28, pz - 0.17);
-            props.add('paint', lens, [0xd14b3a, 0xd7b23c, 0x4fa85a][k], 0);
+            props.add('paint', lens, [0xd14b3a, 0xd7b23c, 0x4fa85a][k], 1);
           }
           counts.signals++;
         } else if (rng() < 0.5) {
           const b = new THREE.CylinderGeometry(0.13, 0.15, 0.95, 6);
           b.translate(px, gy + 0.48, pz);
-          props.add('dark', b, 0x3b4148, 0);
+          props.add('dark', b, 0x3b4148, 1);
           counts.bollards++;
         }
       }
@@ -910,10 +954,10 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         const ry = Math.atan2(dir.x, dir.z);
         const roof = new THREE.BoxGeometry(4.2, 0.16, 1.7);
         roof.rotateY(ry); roof.translate(px, gy + 2.6, pz);
-        props.add('metal', roof, 0x8e949a, 0);
+        props.add('metal', roof, 0x8e949a, 1);
         const back = new THREE.BoxGeometry(4.2, 2.4, 0.1);
         back.rotateY(ry); back.translate(px - Math.cos(ry) * 0.8, gy + 1.3, pz + Math.sin(ry) * 0.8);
-        props.add('glass', back, 0x76838c, 0);
+        props.add('glass', back, 0x76838c, 1);
         counts.busStops++;
       }
     }
@@ -922,7 +966,7 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
       const gy = terrain.heightAt(px, pz);
       const bin = new THREE.CylinderGeometry(0.33, 0.28, 1.0, 7);
       bin.translate(px + padRadius(n) * 0.9, gy + 0.5, pz);
-      props.add('dark', bin, 0x3f4640, 0);
+      props.add('dark', bin, 0x3f4640, 1);
       counts.bins++;
     }
 
@@ -939,10 +983,10 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         const ry = Math.atan2(dir.x, dir.z);
         const post = new THREE.CylinderGeometry(0.05, 0.06, 2.4, 5);
         post.translate(px, gy + 1.2, pz);
-        props.add('dark', post, 0x50565c, 0);
+        props.add('dark', post, 0x50565c, 1);
         const plate = new THREE.BoxGeometry(1.15, 0.3, 0.05);
         plate.rotateY(ry); plate.translate(px, gy + 2.3, pz);
-        props.add('paint', plate, 0xe6e2d6, 0);
+        props.add('paint', plate, 0xe6e2d6, 1);
         counts.signs = (counts.signs || 0) + 1;
       }
     }
@@ -962,7 +1006,7 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
             const rail = new THREE.BoxGeometry(0.08, 1.05, 1.25);
             rail.rotateY(Math.atan2(dir.x, dir.z));
             rail.translate(px, gy + 0.55, pz);
-            props.add('metal', rail, 0x9aa0a6, 0);
+            props.add('metal', rail, 0x9aa0a6, 1);
             counts.guardRails = (counts.guardRails || 0) + 1;
           }
         }
@@ -988,14 +1032,14 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
       const gully = new THREE.BoxGeometry(0.5, 0.06, 0.8);
       gully.rotateY(Math.atan2(dir.x, dir.z));
       gully.translate(px, gy + 0.3, pz);
-      props.add('markings', gully, 0x25282c, 0);
+      props.add('markings', gully, 0x25282c, 1);
       counts.drains++;
       if (rng() < 0.45) {
         const mx = x + (rng() - 0.5) * c.road * 0.5;
         const mz = z + (rng() - 0.5) * c.road * 0.5;
         const cover = new THREE.CylinderGeometry(0.34, 0.34, 0.05, 8);
         cover.translate(mx, terrain.heightAt(mx, mz) + 0.3, mz);
-        props.add('markings', cover, 0x33373c, 0);
+        props.add('markings', cover, 0x33373c, 1);
         counts.drains++;
       }
     });
