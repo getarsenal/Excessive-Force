@@ -4,6 +4,7 @@ import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS } from '../game/levels.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveArc } from '../game/projectiles.js';
+import { junctionRing, padRadius } from '../world/streets.js';
 
 /**
  * The test menu.
@@ -1330,17 +1331,25 @@ export class TestMenu {
         // No carriageway in the water. Roads used to run to the waterline and,
         // where the river mask is coarse, a metre or two past it — half the
         // streets on the map ended in the Thames.
+        //
+        // One road is allowed over the river, and it is the bridge. It is an
+        // edge of the street network now rather than a separate thing built
+        // alongside it, so its deck is part of this mesh and is found here as
+        // road over water — which it is, at nine metres up. Anything at ground
+        // level is still the fault this exists to catch.
         const streets = city.getObjectByName('streets');
         assert(streets, 'there is no street mesh');
         const pos = streets.geometry.attributes.position;
+        const deckY = (city.userData.bridge?.deckTop ?? Infinity) - 1.5;
         let wet = 0, sampled = 0;
         for (let i = 0; i < pos.count; i += 97) {
           const x = pos.getX(i), z = pos.getZ(i);
           sampled++;
+          if (pos.getY(i) > deckY) continue;            // up on the bridge
           if (this.ctx.terrain.isWater(x, z)) wet++;
         }
         assert(wet === 0,
-          `${wet} of ${sampled} sampled road vertices are over water`);
+          `${wet} of ${sampled} sampled road vertices are in the river`);
         const total = Object.values(d).reduce((a, v) => a + v, 0);
         return `${total.toLocaleString()} props, no road in the water`;
       }],
@@ -1445,16 +1454,6 @@ export class TestMenu {
         assert(wet2 === 0, `${wet2} buildings are in the river or over its edge`);
         assert(onBridge === 0, `${onBridge} buildings are in the bridge's corridor`);
 
-        // And the bridge is reachable: a junction at the foot of each ramp.
-        if (bridge) {
-          for (const [end, sign] of [[bridge.a, -1], [bridge.b, 1]]) {
-            const fx = end.x + bridge.out.x * sign * bridge.run;
-            const fz = end.z + bridge.out.z * sign * bridge.run;
-            const near = net.nodes.some(
-              (n) => Math.hypot(n.x - fx, n.z - fz) < 30 && n.links.length);
-            assert(near, 'the bridge has no road running to it');
-          }
-        }
         // No street that goes nowhere.
         //
         // Every street that fails to build — the line runs into the water, or
@@ -1496,6 +1495,94 @@ export class TestMenu {
         assert(through === 0,
           `${through} junctions sit in the middle of a straight street, which is `
           + 'where the paving pinches the road to a wedge');
+
+        // Every junction's paving is a simple shape.
+        //
+        // The outline is built by walking neighbouring arms and inserting the
+        // point where their kerbs cross, and it is filled by a fan from the
+        // node — which needs the outline to go round the node once, in one
+        // direction. When two arms are close together their kerb lines are
+        // nearly parallel, so that point runs away, or lands behind the node,
+        // and the outline stops being star-shaped: the fan then either folds
+        // over itself and draws a spike, or fails to close and leaves bare
+        // ground showing through the middle of a junction. Eighteen of two
+        // hundred and fourteen pads were doing one or the other, sweeping
+        // anywhere from 242° to 383° instead of 360°.
+        //
+        // This asks the real builder, not a copy of it.
+        let folded = 0, sprawled = 0, worstSweep = 360;
+        for (const n of net.nodes) {
+          if (n.links.length < 2) continue;
+          const R = padRadius(n);
+          for (const widthOf of [(a) => a.full, (a) => a.road]) {
+            const ring = junctionRing(n, widthOf);
+            if (ring.length < 3) { folded++; continue; }
+            let sweep = 0, back = 0, prev = null;
+            for (let k = 0; k <= ring.length; k++) {
+              const p = ring[k % ring.length];
+              const ang = Math.atan2(p.z - n.z, p.x - n.x);
+              if (prev !== null) {
+                let d = ang - prev;
+                while (d > Math.PI) d -= Math.PI * 2;
+                while (d < -Math.PI) d += Math.PI * 2;
+                sweep += d;
+                if (d < -1e-6) back++;
+              }
+              prev = ang;
+              if (Math.hypot(p.x - n.x, p.z - n.z) > R * 1.45) sprawled++;
+            }
+            const turn = Math.abs(sweep * 180 / Math.PI);
+            if (back > 0 || turn < 350 || turn > 370) {
+              folded++;
+              if (Math.abs(turn - 360) > Math.abs(worstSweep - 360)) worstSweep = turn;
+            }
+          }
+        }
+        assert(folded === 0,
+          `${folded} junction outlines fold back on themselves or fail to close `
+          + `— the worst sweeps ${worstSweep.toFixed(0)}° instead of 360°`);
+        assert(sprawled === 0,
+          `${sprawled} junction outline points sit outside their own paving`);
+
+        // And no junction has two streets leaving on almost the same bearing.
+        // That is not a fork, it is one road drawn twice, and it is the input
+        // the geometry above cannot be given a sensible answer for.
+        let folds = 0, tightest = 0;
+        for (const n of net.nodes) {
+          for (let i = 0; i < n.links.length; i++) {
+            for (let j = i + 1; j < n.links.length; j++) {
+              // The crossing is exempt: it arrives where the river lets it and
+              // cannot be moved to suit the street it meets. The rule is about
+              // two *streets* drawn as one, which is a thing the layout chose.
+              if (n.links[i].edge.bridge || n.links[j].edge.bridge) continue;
+              const a = dirAt(n, n.links[i]), b2 = dirAt(n, n.links[j]);
+              const dot = a.x * b2.x + a.z * b2.z;
+              if (dot > 0.82) { folds++; tightest = Math.max(tightest, dot); }
+            }
+          }
+        }
+        assert(folds === 0,
+          `${folds} junctions have two streets leaving on the same bearing, the `
+          + `worst ${(Math.acos(Math.min(1, tightest)) * 180 / Math.PI).toFixed(0)}° apart`);
+
+        // The crossing is part of the street network, not a second one.
+        //
+        // It used to be built entirely outside it, which is two road generators
+        // and so two answers about where the road is: the deck met the street
+        // four metres narrower, in its own colour, with no markings and its
+        // surface two metres higher, and the join was a seam.
+        if (bridge) {
+          const deck = net.edges.find((e) => e.bridge);
+          assert(deck, 'the bridge is not an edge of the street network');
+          for (const k of [deck.a, deck.b]) {
+            assert(net.nodes[k].links.length >= 2,
+              'a bridge lands at a junction with nothing else joining it');
+          }
+          const rise = deck.pts.filter((q) => q.y !== undefined).length;
+          assert(rise === deck.pts.length,
+            `${deck.pts.length - rise} points of the bridge carry no height, so `
+            + 'that stretch of it is drawn on the riverbed');
+        }
 
         // Everything stands square to the plan.
         //

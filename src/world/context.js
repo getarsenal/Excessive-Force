@@ -741,10 +741,40 @@ function bridgeLine(terrain) {
   const yaw = Math.atan2(to.x - from.x, to.z - from.z);
   const out = { x: (to.x - from.x) / len, z: (to.z - from.z) / len };
   const RUN = 46;                       // metres of ramp at each end
+  const deckY = terrain.waterLevel + 9.5;
+  const DECK_T = 1.8;
+  const deckTop = deckY + DECK_T / 2;
+
+  // The running surface, end to end: down one ramp, across the deck, up the
+  // other. One profile, shared by the street network — which draws the road on
+  // it — and by the structure below it, so the two cannot disagree about where
+  // the bridge is. That disagreement is the whole reason the bridge used to
+  // meet the road in a seam: the deck was built by code that had never heard of
+  // the street network, and a second road generator is a second answer.
+  const RAMP_STEPS = 7;
+  const profile = [];
+  const rampPoint = (end, sign, t) => {
+    const x = end.x + out.x * sign * RUN * t;
+    const z = end.z + out.z * sign * RUN * t;
+    const ground = terrain.heightAt(x, z);
+    // Eased as t², so the ramp leaves the deck level and lands flat.
+    const y = deckTop + (ground + 0.22 - deckTop) * (t * t);
+    return { x, z, y };
+  };
+  for (let i = RAMP_STEPS; i >= 1; i--) profile.push(rampPoint(from, -1, i / RAMP_STEPS));
+  profile.push({ x: from.x, z: from.z, y: deckTop });
+  const spans = Math.max(4, Math.round(len / 26));
+  for (let i = 1; i < spans; i++) {
+    profile.push({ x: from.x + (to.x - from.x) * (i / spans),
+      z: from.z + (to.z - from.z) * (i / spans), y: deckTop });
+  }
+  profile.push({ x: to.x, z: to.z, y: deckTop });
+  for (let i = 1; i <= RAMP_STEPS; i++) profile.push(rampPoint(to, 1, i / RAMP_STEPS));
+
   return {
     a: { x: from.x, z: from.z }, b: { x: to.x, z: to.z },
     from, to, out, yaw, len, run: RUN,
-    deckY: terrain.waterLevel + 9.5,
+    deckY, deckT: DECK_T, deckTop, profile,
     // The whole corridor, ramps included: nothing may be built in it.
     far: {
       a: { x: from.x - out.x * RUN, z: from.z - out.z * RUN },
@@ -769,65 +799,24 @@ function buildBridge(terrain, quality, line) {
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x7d8676, roughness: 0.9 });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0x5f6a5b, roughness: 0.8 });
 
-  const { from, to, len, yaw, deckY } = line;
+  const { from, to, len, yaw, deckY, deckTop, profile } = line;
   const mid = from.clone().lerp(to, 0.5);
 
-  // A bridge is a road, and it was not being drawn as one.
-  //
-  // The deck was a nineteen-metre slab of its own colour with nothing painted
-  // on it, and an avenue is twenty-three and a half metres of carriageway,
-  // pavement and kerb — so the road arrived at the bridge four metres wider
-  // than the bridge, changed colour, lost its pavements and its centre line,
-  // and carried on. The deck is an avenue's width now, and the same surface is
-  // laid along it and down both ramps, which is most of what "the bridges
-  // connecting to the roads is janky" was looking at.
-  const AV = ROAD_CLASS.avenue;
+  // The structure only. The running surface across this bridge is drawn by the
+  // street network, from the same profile these boxes are built under, because
+  // the bridge is an edge of that network like any other street. It was not,
+  // and a second road generator is a second answer: the deck arrived four
+  // metres narrower than the road that met it, in its own colour, with no
+  // markings, its surface two metres above the tarmac — and where the two met
+  // there was a seam, because neither knew the other was there.
   const DECK_W = halfWidth('avenue') * 2;
-  const DECK_T = 1.8;
-  const deckTop = deckY + DECK_T / 2;
-  const surface = [];
-  /** Lay carriageway, pavements and kerbs along one straight run of deck. */
-  const laneStrip = (cx, cy, cz, runLen, pitch) => {
-    const lanes = [
-      [-AV.road / 2 - AV.pave - AV.kerb, -AV.road / 2 - AV.pave, 0xc4bdab, 0.30],
-      [-AV.road / 2 - AV.pave, -AV.road / 2, 0xa8a294, 0.22],
-      [-AV.road / 2, AV.road / 2, 0x35383d, 0.06],
-      [AV.road / 2, AV.road / 2 + AV.pave, 0xa8a294, 0.22],
-      [AV.road / 2 + AV.pave, AV.road / 2 + AV.pave + AV.kerb, 0xc4bdab, 0.30],
-    ];
-    for (const [f0, f1, colour, lift] of lanes) {
-      const w = f1 - f0;
-      const box = new THREE.BoxGeometry(w, 0.16, runLen);
-      box.translate((f0 + f1) / 2, lift, 0);
-      if (pitch) box.rotateX(pitch);
-      box.rotateY(yaw);
-      box.translate(cx, cy, cz);
-      tintOne(box, colour, 1);
-      surface.push(box);
-    }
-  };
-  /** Dashed centre line along the same run. */
-  const centreDashes = (ax, ay, az, bx, by, bz) => {
-    const d = Math.hypot(bx - ax, bz - az);
-    const n = Math.max(1, Math.round(d / 9));
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-      const dash = new THREE.BoxGeometry(0.32, 0.08, 3.4);
-      dash.rotateY(yaw);
-      dash.translate(ax + (bx - ax) * t, ay + (by - ay) * t + 0.10,
-        az + (bz - az) * t);
-      tintOne(dash, 0xd9d5c8, 1);
-      surface.push(dash);
-    }
-  };
+  const DECK_T = line.deckT ?? 1.8;
 
   const deck = new THREE.Mesh(new THREE.BoxGeometry(DECK_W, DECK_T, len), deckMat);
-  deck.position.set(mid.x, deckY, mid.z);
+  deck.position.set(mid.x, deckTop - DECK_T / 2, mid.z);
   deck.rotation.y = yaw;
   deck.receiveShadow = quality.shadowMapSize > 0;
   g.add(deck);
-  laneStrip(mid.x, deckTop, mid.z, len, 0);
-  centreDashes(from.x, deckTop, from.z, to.x, deckTop, to.z);
 
   // ── Balustrade. A solid slab either side reads as a kerb; what makes a
   // bridge look like a bridge from above is the *gap* between the balusters —
@@ -838,10 +827,10 @@ function buildBridge(terrain, quality, line) {
     const oz = -Math.sin(yaw) * sx * (DECK_W / 2 - 0.4);
     // Base course and handrail, with posts between them.
     const base = new THREE.BoxGeometry(0.62, 0.42, len);
-    base.rotateY(yaw); base.translate(mid.x + ox, deckY + 1.1, mid.z + oz);
+    base.rotateY(yaw); base.translate(mid.x + ox, deckTop + 0.2, mid.z + oz);
     railBits.push(base);
     const cap = new THREE.BoxGeometry(0.8, 0.26, len);
-    cap.rotateY(yaw); cap.translate(mid.x + ox, deckY + 2.3, mid.z + oz);
+    cap.rotateY(yaw); cap.translate(mid.x + ox, deckTop + 1.4, mid.z + oz);
     railBits.push(cap);
     const posts = Math.max(6, Math.round(len / 2.4));
     for (let i = 0; i <= posts; i++) {
@@ -849,15 +838,15 @@ function buildBridge(terrain, quality, line) {
       const px = mid.x + ox + Math.sin(yaw) * len * t;
       const pz = mid.z + oz + Math.cos(yaw) * len * t;
       const post = new THREE.BoxGeometry(0.34, 0.9, 0.34);
-      post.rotateY(yaw); post.translate(px, deckY + 1.75, pz);
+      post.rotateY(yaw); post.translate(px, deckTop + 0.85, pz);
       railBits.push(post);
       // A lamp standard every sixth post.
       if (i % 6 === 3) {
         const col = new THREE.CylinderGeometry(0.1, 0.15, 5.0, 6);
-        col.translate(px, deckY + 4.8, pz);
+        col.translate(px, deckTop + 3.9, pz);
         railBits.push(col);
         const head = new THREE.BoxGeometry(0.6, 0.5, 0.6);
-        head.translate(px, deckY + 7.4, pz);
+        head.translate(px, deckTop + 6.5, pz);
         railBits.push(head);
       }
     }
@@ -867,70 +856,36 @@ function buildBridge(terrain, quality, line) {
   rails.castShadow = quality.shadowMapSize > 0;
   g.add(rails);
 
-  // ── Approaches. The deck sits nine metres above the water, so without these
-  // the bridge simply stopped in mid-air over each bank — a ribbon of road
-  // floating clear of the ground it is supposed to connect. Each end now ramps
-  // down to meet the terrain, on an abutment.
-  for (const [end, sign] of [[from, -1], [to, 1]]) {
-    const dir = new THREE.Vector3(
-      Math.sin(yaw) * sign, 0, Math.cos(yaw) * sign,
-    );
-    const steps = 9;
-    const run = line.run;                 // metres of approach on each side
-    let prevY = deckY;
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps;
-      const p2 = end.clone().addScaledVector(dir, run * t);
-      const ground = terrain.heightAt(p2.x, p2.z);
-      // Ease down until the deck's *top* is the height of the road surface.
-      //
-      // It used to ease to `ground + 1.2` measured at the slab's middle, which
-      // with a slab 1.8 m thick puts its surface two metres above the tarmac it
-      // is supposed to join: the ramp ended in a step you could park under, and
-      // the street ran into the side of it. Landing the running surface on the
-      // running surface is the whole trick.
-      const landY = ground + SURFACE_LIFT - DECK_T / 2;
-      const y = deckY + (landY - deckY) * (t * t);
-      const segLen = run / steps + 0.6;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(DECK_W, DECK_T, segLen), deckMat);
-      const cx = p2.x - dir.x * segLen * 0.5;
-      const cz = p2.z - dir.z * segLen * 0.5;
-      const cy = (y + prevY) / 2;
-      seg.position.set(cx, cy, cz);
-      seg.rotation.y = yaw;
-      // Pitch the segment so it meets the next one cleanly instead of stepping.
-      const pitch = Math.atan2(prevY - y, segLen) * sign;
-      seg.rotation.x = pitch;
-      seg.receiveShadow = quality.shadowMapSize > 0;
-      g.add(seg);
-      laneStrip(cx, cy + DECK_T / 2, cz, segLen, pitch);
-      centreDashes(cx - dir.x * segLen * 0.4, cy + DECK_T / 2, cz - dir.z * segLen * 0.4,
-        cx + dir.x * segLen * 0.4, cy + DECK_T / 2, cz + dir.z * segLen * 0.4);
+  // ── The ramps, built straight from the profile the road is drawn on. Each
+  // pair of profile points becomes one box under that stretch of surface, with
+  // the wedge between it and the ground filled in as an abutment.
+  for (let i = 0; i < profile.length - 1; i++) {
+    const p0 = profile[i], p1 = profile[i + 1];
+    if (p0.y >= deckTop - 0.01 && p1.y >= deckTop - 0.01) continue;   // the deck
+    const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    if (segLen < 0.5) continue;
+    const cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2;
+    const top = (p0.y + p1.y) / 2;
+    const seg = new THREE.Mesh(
+      new THREE.BoxGeometry(DECK_W, DECK_T, segLen + 0.6), deckMat);
+    seg.position.set(cx, top - DECK_T / 2, cz);
+    seg.rotation.y = yaw;
+    seg.rotation.x = Math.atan2(p0.y - p1.y, segLen)
+      * (Math.sign((p1.x - p0.x) * Math.sin(yaw) + (p1.z - p0.z) * Math.cos(yaw)) || 1);
+    seg.receiveShadow = quality.shadowMapSize > 0;
+    g.add(seg);
 
-      // Abutment: fill the wedge between the ramp and the ground under it.
-      const fillH = Math.max(0, (y + prevY) / 2 - ground);
-      if (fillH > 0.4) {
-        const fill = new THREE.Mesh(
-          new THREE.BoxGeometry(DECK_W - 3, fillH, segLen * 0.98), pierMatShared(),
-        );
-        fill.position.set(
-          p2.x - dir.x * segLen * 0.5, ground + fillH / 2, p2.z - dir.z * segLen * 0.5,
-        );
-        fill.rotation.y = yaw;
-        fill.receiveShadow = quality.shadowMapSize > 0;
-        g.add(fill);
-      }
-      prevY = y;
-      if (y <= landY + 0.2) break;
+    const ground = terrain.heightAt(cx, cz);
+    const fillH = (top - DECK_T) - ground;
+    if (fillH > 0.4) {
+      const fill = new THREE.Mesh(
+        new THREE.BoxGeometry(DECK_W - 3, fillH, segLen * 0.98), pierMatShared(),
+      );
+      fill.position.set(cx, ground + fillH / 2, cz);
+      fill.rotation.y = yaw;
+      fill.receiveShadow = quality.shadowMapSize > 0;
+      g.add(fill);
     }
-  }
-  if (surface.length) {
-    const road = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(surface, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
-    );
-    road.receiveShadow = quality.shadowMapSize > 0;
-    g.add(road);
   }
 
   // Piers down to the riverbed, with cutwaters and the arches between them.

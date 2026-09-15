@@ -258,43 +258,82 @@ export function buildStreetNetwork(terrain, rng, opts) {
   const approaches = [];
   const debug = { bridge: [] };
   if (bridge) {
+    // One street, all the way across.
+    //
+    // The bridge used to be built entirely outside the network: its own deck,
+    // its own ramps, its own surface, meeting the street plan at a node that
+    // knew nothing about it. Two road generators means two answers about where
+    // the road is, how wide it is and how high it is, and where they meet you
+    // get a seam — which is what the join at the abutment was.
+    //
+    // So the crossing is an edge like any other. Its polyline is the running
+    // surface the bridge builder will put its structure under, carrying a height
+    // per point, and it runs from a junction inland on one bank to a junction
+    // inland on the other. The ramps are part of it, so there is no node at the
+    // foot of a ramp for the two to disagree at, and both ends are ordinary
+    // junctions that the grid joins into in the ordinary way.
+    const heads = [];
     for (const [end, sign] of [[bridge.a, -1], [bridge.b, 1]]) {
-      // The ramp end, then a little further, until the ground can take a
-      // junction. Starting at the abutment itself only ever finds ground that
-      // is too close to the bank for a road to be allowed on it.
-      // `sign` points from the abutment back inland, and the ramp occupies the
-      // first `run` metres of that — so the road has to start where the ramp
-      // ends, not at the abutment, which is out over the bank.
-      const foot = {
-        x: end.x + bridge.out.x * sign * bridge.run,
-        z: end.z + bridge.out.z * sign * bridge.run,
-      };
       let head = null;
       // The reserved precincts are ignored here, deliberately. The ground
       // behind an abutment belongs to the abbey, to Portcullis House, to
       // whatever else the map has put there — and the bridge still has to be
       // reachable, so the approach takes precedence and anything reserved that
       // it happens to cross simply does not get built.
-      for (let t = bridge.run + 46; t <= 260; t += 6) {
+      for (let t = bridge.run + 30; t <= 260; t += 6) {
         const x = end.x + bridge.out.x * sign * t;
         const z = end.z + bridge.out.z * sign * t;
         if (onLand(x, z, 9, true)) { head = { x, z }; break; }
       }
-      debug.bridge.push({ sign, foot: [Math.round(foot.x), Math.round(foot.z)],
-        head: head ? [Math.round(head.x), Math.round(head.z)] : null });
-      if (!head) continue;
+      debug.bridge.push({ sign, head: head ? [Math.round(head.x), Math.round(head.z)] : null });
+      if (!head) { heads.push(-1); continue; }
+      // Land on a street if there is one to land on.
+      //
+      // A junction of its own, dropped on the bank a fixed distance inland, has
+      // to be tied into the grid afterwards by roads invented for the purpose —
+      // and those are the roads that kept coming out as folds, two of them
+      // leaving the head a few degrees apart because the only junctions in
+      // reach were in the same direction. A bridge that arrives at a junction
+      // that already exists needs no such roads: the crossing is simply another
+      // arm of a junction the grid already built and already got right.
+      let existing = -1, bestD = Infinity;
+      for (let mi = 0; mi < nodes.length; mi++) {
+        const m = nodes[mi];
+        if (!m.links.length || m.approach) continue;
+        const d = Math.hypot(m.x - head.x, m.z - head.z);
+        if (d > pitch * 1.15 || d >= bestD) continue;
+        // And the run from it to the ramp has to be buildable.
+        const foot = { x: end.x + bridge.out.x * sign * bridge.run,
+          z: end.z + bridge.out.z * sign * bridge.run };
+        if (!lineClear(m, foot, 6, true)) continue;
+        bestD = d; existing = mi;
+      }
+      if (existing >= 0) { heads.push(existing); continue; }
       const n = nodes.length;
       nodes.push({ x: head.x, z: head.z, y: terrain.heightAt(head.x, head.z),
         avenue: true, links: [], approach: true });
       approaches.push(n);
-      // The approach itself: carriageway from that junction to the foot of the
-      // ramp, so the bridge is met by road rather than by grass.
-      const tip = nodes.length;
-      nodes.push({ x: foot.x, z: foot.z, y: terrain.heightAt(foot.x, foot.z),
-        avenue: true, links: [], approach: true });
-      const stub = addEdge(n, tip, 'avenue', 0, 8, true);
-      if (!stub) nodes.pop(); else stub.approach = true;
-      // Join the junction into the network in more than one direction.
+      heads.push(n);
+    }
+
+    if (heads[0] >= 0 && heads[1] >= 0) {
+      const A = nodes[heads[0]], B = nodes[heads[1]];
+      const pts = [{ x: A.x, z: A.z, y: A.y + SURFACE_LIFT }];
+      for (const q of bridge.profile) pts.push({ x: q.x, z: q.z, y: q.y });
+      pts.push({ x: B.x, z: B.z, y: B.y + SURFACE_LIFT });
+      let len = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+      }
+      const e = { a: heads[0], b: heads[1], cls: 'avenue', pts, len,
+        approach: true, bridge: true };
+      edges.push(e);
+      A.links.push({ edge: e, other: heads[1], at: 0 });
+      B.links.push({ edge: e, other: heads[0], at: 1 });
+    }
+
+    // Join each bank's junction into the grid, in more than one direction.
+    for (const n of approaches) {
       let joined = 0;
       const tried = new Set();
       for (let k = 0; k < 8 && joined < 2; k++) {
@@ -322,6 +361,47 @@ export function buildStreetNetwork(terrain, rng, opts) {
   // Both are just graph work, and between them they are the difference between
   // a plan and a scattering of tarmac.
   pruneNetwork(nodes, edges);
+
+  // A bridge has to land somewhere.
+  //
+  // The tidy-up above can take the last street off a bridge head — two roads
+  // tying it into the grid on similar bearings are a fold like any other, and
+  // dropping one of them can leave the other prunable. What that produces is a
+  // crossing that arrives on the far bank and stops, which is the one thing a
+  // bridge must never do. So after the graph is tidy, any head still holding
+  // nothing but the crossing goes looking again, further out and less fussily.
+  for (const n of approaches) {
+    if (nodes[n].links.length >= 2) continue;
+    const tried = new Set();
+    for (let k = 0; k < 14 && nodes[n].links.length < 2; k++) {
+      const near = nearestNode(nodes, nodes[n], 4.5 * pitch,
+        (m, mi) => !tried.has(mi) && mi !== n && m.links.length > 0);
+      if (near < 0) break;
+      tried.add(near);
+      const join = addEdge(n, near, 'avenue', 4, 8, true);
+      if (!join) continue;
+      join.approach = true;
+      // This runs after the tidy-up, so nothing downstream will notice if the
+      // road it just added leaves on the same bearing as one already there —
+      // at *either* end of it. Check both before keeping it.
+      let fold = false;
+      for (const k2 of [n, near]) {
+        const here = nodes[k2];
+        const added = here.links[here.links.length - 1];
+        const da = linkDir(here, added);
+        for (const l of here.links) {
+          if (l === added) continue;
+          const db = linkDir(here, l);
+          if (da.x * db.x + da.z * db.z > 0.78) { fold = true; break; }
+        }
+        if (fold) break;
+      }
+      if (!fold) continue;
+      nodes[n].links = nodes[n].links.filter((l) => l.edge !== join);
+      nodes[near].links = nodes[near].links.filter((l) => l.edge !== join);
+      edges.splice(edges.indexOf(join), 1);
+    }
+  }
 
   // ── 7. Blocks: the holes in the network, which is where buildings go.
   //
@@ -518,6 +598,54 @@ function dissolveThroughNodes(nodes, edges) {
  */
 function pruneNetwork(nodes, edges) {
   const keep = (e) => e.approach || e.bank;
+
+  // Folds first: two streets leaving a junction on nearly the same bearing.
+  //
+  // That is not a fork, it is one road drawn twice — and it is the worst input
+  // the junction geometry can be given, because the corner between two arms
+  // twenty degrees apart has nowhere sensible to go. Measured on this map: a
+  // pair at two degrees on a five-way node, another at eleven, and a two-armed
+  // node at twenty-eight, which is a road doubling back on itself and is the
+  // spike by the tower. The shorter of the two goes; there is nowhere it went
+  // that its twin does not.
+  for (const n of nodes) {
+    for (let guard = 0; guard < 4 && n.links.length > 1; guard++) {
+      let drop = null;
+      for (let i = 0; i < n.links.length && !drop; i++) {
+        for (let j = i + 1; j < n.links.length; j++) {
+          const a = linkDir(n, n.links[i]), b = linkDir(n, n.links[j]);
+          if (a.x * b.x + a.z * b.z < 0.78) continue;        // over ~39° apart
+          const ea = n.links[i].edge, eb = n.links[j].edge;
+          // Only the crossing itself is sacred here. The two roads that tie a
+          // bridge head into the grid are ordinary streets and are perfectly
+          // capable of leaving it eight degrees apart, which is a fork onto the
+          // same destination and the sharpest corner on the map.
+          const fixed = (e) => !!e.bridge;
+          if (fixed(ea) && fixed(eb)) continue;
+          const cand = fixed(ea) ? eb : (fixed(eb) ? ea : (ea.len <= eb.len ? ea : eb));
+          // Removing a fold must not strand a bridge.
+          //
+          // Everywhere else it is fine and usually right: dropping one arm of a
+          // two-armed fold leaves a dead-end stub, and the dead-end pass below
+          // removes that too, which is exactly what should happen to a road
+          // that doubles back on itself. A bridge head is the exception — its
+          // crossing cannot be moved or removed, so a head cut down to nothing
+          // but the crossing is a bridge that arrives and stops.
+          const carriesBridge = (k) => nodes[k].links.some((l) => l.edge.bridge);
+          const strands = (k) => carriesBridge(k) && nodes[k].links.length < 3;
+          if (strands(cand.a) || strands(cand.b)) continue;
+          drop = cand;
+          break;
+        }
+      }
+      if (!drop) break;
+      nodes[drop.a].links = nodes[drop.a].links.filter((l) => l.edge !== drop);
+      nodes[drop.b].links = nodes[drop.b].links.filter((l) => l.edge !== drop);
+      const k = edges.indexOf(drop);
+      if (k >= 0) edges.splice(k, 1);
+    }
+  }
+
   for (;;) {
     let cut = 0;
     for (let k = edges.length - 1; k >= 0; k--) {
@@ -712,6 +840,111 @@ const PAVE = new THREE.Color(0xa8a294);
 const KERB = new THREE.Color(0xc4bdab);
 
 /**
+ * The outline of one junction's paving, as a ring of points about the node.
+ *
+ * Exported because the self-test checks the real thing rather than a copy of
+ * it: the property that matters — that the ring goes round the node once,
+ * without doubling back and without running away from it — is a property of
+ * this function, and a test that reimplements it tests nothing.
+ *
+ * `widthOf` picks which edge of each street the ring follows: the outside of
+ * its pavement, or the edge of its carriageway.
+ */
+export function junctionRing(n, widthOf) {
+  const R = padRadius(n);
+  const arms = n.links.map((l) => {
+    const dir = linkDir(n, l);
+    const c = ROAD_CLASS[l.edge.cls];
+    return { dir, ang: Math.atan2(dir.z, dir.x),
+      full: c.road / 2 + c.pave + c.kerb, road: c.road / 2 };
+  }).sort((a, b) => a.ang - b.ang);
+  if (arms.length < 2) return [];
+  const build = (widthOf) => {
+    const out = [];
+    const arc = (from, to, radius, steps) => {
+      let a0 = Math.atan2(from.z - n.z, from.x - n.x);
+      let a1 = Math.atan2(to.z - n.z, to.x - n.x);
+      let d = a1 - a0;
+      while (d <= 0) d += Math.PI * 2;
+      while (d > Math.PI * 2) d -= Math.PI * 2;
+      for (let k = 1; k < steps; k++) {
+        const a2 = a0 + (d * k) / steps;
+        out.push({ x: n.x + Math.cos(a2) * radius, z: n.z + Math.sin(a2) * radius });
+      }
+    };
+    for (let i = 0; i < arms.length; i++) {
+      const a = arms[i], b = arms[(i + 1) % arms.length];
+      const wa = widthOf(a), wb = widthOf(b);
+      const na = { x: -a.dir.z, z: a.dir.x };     // left of a
+      const nb = { x: -b.dir.z, z: b.dir.x };
+      // The two ends of this street's stop line.
+      const right = { x: n.x + a.dir.x * R - na.x * wa, z: n.z + a.dir.z * R - na.z * wa };
+      const left = { x: n.x + a.dir.x * R + na.x * wa, z: n.z + a.dir.z * R + na.z * wa };
+      out.push(right);
+      out.push(left);
+      if (arms.length < 2) continue;
+      const nextRight = { x: n.x + b.dir.x * R - nb.x * wb,
+        z: n.z + b.dir.z * R - nb.z * wb };
+      // How far apart are these two arms?
+      let sep = b.ang - a.ang;
+      while (sep < 0) sep += Math.PI * 2;
+      if (sep < 0.87) {                       // under ~50°: no usable corner
+        arc(left, nextRight, Math.max(wa, wb, R * 0.9), 4);
+        continue;
+      }
+      const p1 = { x: n.x + na.x * wa, z: n.z + na.z * wa };
+      const p2 = { x: n.x - nb.x * wb, z: n.z - nb.z * wb };
+      const c = intersect(p1, a.dir, p2, b.dir);
+      const lim = R * 1.4;
+      if (!c || Math.hypot(c.x - n.x, c.z - n.z) > lim) {
+        arc(left, nextRight, Math.max(wa, wb), 4);
+        continue;
+      }
+      // A kerb return: round the corner off rather than mitring it to a
+      // point, with a radius the smaller of the two roads can carry.
+      const rad = Math.min(Math.min(wa, wb) * 0.7, 7,
+        Math.hypot(c.x - left.x, c.z - left.z) * 0.8,
+        Math.hypot(c.x - nextRight.x, c.z - nextRight.z) * 0.8);
+      if (rad < 0.8) { out.push(c); continue; }
+      const t1 = Math.hypot(c.x - left.x, c.z - left.z) || 1;
+      const t2 = Math.hypot(c.x - nextRight.x, c.z - nextRight.z) || 1;
+      const s1 = { x: c.x + (left.x - c.x) * (rad / t1),
+        z: c.z + (left.z - c.z) * (rad / t1) };
+      const s2 = { x: c.x + (nextRight.x - c.x) * (rad / t2),
+        z: c.z + (nextRight.z - c.z) * (rad / t2) };
+      out.push(s1);
+      for (let k = 1; k < 4; k++) {
+        const u = k / 4;
+        // Quadratic Bézier through the mitre point: a clean fillet for two
+        // straight kerbs, and three points is plenty at this scale.
+        const iv = 1 - u;
+        out.push({
+          x: iv * iv * s1.x + 2 * iv * u * c.x + u * u * s2.x,
+          z: iv * iv * s1.z + 2 * iv * u * c.z + u * u * s2.z,
+        });
+      }
+      out.push(s2);
+    }
+    // Star-shaped, or the fan below cannot draw it.
+    //
+    // Sorted by bearing about the node and clamped in radius, so no vertex can
+    // sit behind the node or beyond the pad, and no pair can cross. This is
+    // the guard that makes the two cases above unable to produce a spike
+    // however strangely the streets happen to meet.
+    const lim2 = R * 1.4;
+    for (const q of out) {
+      const dx = q.x - n.x, dz = q.z - n.z;
+      const r2 = Math.hypot(dx, dz);
+      if (r2 > lim2) { q.x = n.x + (dx / r2) * lim2; q.z = n.z + (dz / r2) * lim2; }
+      q.ang = Math.atan2(dz, dx);
+    }
+    out.sort((p2, q2) => p2.ang - q2.ang);
+    return out;
+  };
+  return build(widthOf);
+}
+
+/**
  * The road surface: every street a ribbon, every junction a paved pad.
  *
  * The pads are the part that was missing before. Two straight ribbons crossing
@@ -739,8 +972,9 @@ export function buildStreetSurface(net, terrain, quality) {
   // centre line — so the surface checks each corner, and simply does not lay
   // the piece that would end up in the river.
   const dry = (p) => !terrain.isWater(p.x, p.z);
+  let overWater = false;          // true while laying a bridge deck
   const quad = (p0, p1, p2, p3, colour) => {
-    if (!dry(p0) || !dry(p1) || !dry(p2) || !dry(p3)) return;
+    if (!overWater && (!dry(p0) || !dry(p1) || !dry(p2) || !dry(p3))) return;
     vert(p0.x, p0.z, p0.y, colour); vert(p1.x, p1.z, p1.y, colour);
     vert(p2.x, p2.z, p2.y, colour);
     vert(p0.x, p0.z, p0.y, colour); vert(p2.x, p2.z, p2.y, colour);
@@ -761,6 +995,10 @@ export function buildStreetSurface(net, terrain, quality) {
     const trimA = padRadius(a) * 0.98, trimB = padRadius(b) * 0.98;
     const line = trimPolyline(e.pts, trimA, trimB);
     if (line.length < 2) continue;
+    // A bridge carries its own height and is allowed over the water. Its
+    // polyline is the running surface itself, worked out once and shared with
+    // the structure built under it.
+    overWater = !!e.bridge;
     for (let i = 0; i < line.length - 1; i++) {
       const p = line[i], q = line[i + 1];
       const dx = q.x - p.x, dz = q.z - p.z;
@@ -768,6 +1006,7 @@ export function buildStreetSurface(net, terrain, quality) {
       const nx = -dz / d, nz = dx / d;
       // Ease the ends up to the junction's own level so pad and ribbon meet.
       const yAt = (pt, w) => {
+        if (e.bridge && pt.y !== undefined) return pt.y;
         const g = terrain.heightAt(pt.x, pt.z) + LIFT;
         if (w <= 0) return g;
         return g * (1 - w) + w * (pt.nearA ? a.y + LIFT : b.y + LIFT);
@@ -789,67 +1028,41 @@ export function buildStreetSurface(net, terrain, quality) {
 
   // ── Junction pads.
   //
-  // Not a convex hull. The first version took the hull of every road's corners
-  // and filled it, which on a five-way junction is a big black polygon with
-  // wedges of tarmac sticking out between the streets — the junction reads as a
-  // blot rather than as a crossroads.
+  // What a junction is: each street runs into it to a stop line, and the kerb
+  // turns the corner between one street and the next. So the outline is built
+  // from the streets themselves — two points per street at its stop line, and
+  // between each neighbouring pair the corner where their kerbs meet.
   //
-  // What a junction actually is: each street runs into it to a stop line, and
-  // the *corners* between neighbouring streets are where the kerb turns. So the
-  // outline is built from the streets themselves — two points per street at the
-  // stop line, and between each neighbouring pair the point where their kerb
-  // lines cross. That gives the concave corners a real junction has, and the
-  // pad is never wider than the roads that meet it.
+  // The corner is the part that has to be handled carefully, because the naive
+  // answer breaks in two directions at once. Intersecting the two kerb lines is
+  // right for arms that are well apart and wrong for arms that are close: the
+  // crossing point runs away to infinity as they become parallel, and lands
+  // *behind* the node once they are closer than a right angle or so. Either way
+  // the vertex list stops going round the node in one direction — and a fan from
+  // the centre needs exactly that. When it fails the pad either folds over
+  // itself, which draws a spike, or fails to close, which leaves a wedge of bare
+  // ground showing through the middle of a junction. Eighteen of two hundred and
+  // fourteen were doing one or the other, with outlines sweeping anywhere from
+  // 242° to 383° instead of 360°.
+  //
+  // Three things fix it, and the third makes the first two unable to fail:
+  //
+  //   - the corner is a *kerb radius*, an arc tangent to both kerb lines, not a
+  //     mitred point. That is what a junction looks like from above and it is
+  //     what stops an acute corner drawing a thin spit of pavement;
+  //   - arms closer than about fifty degrees get no crossing point at all, just
+  //     an arc swept round the node between their two stop lines;
+  //   - and whatever comes out of that is then forced to be star-shaped: sorted
+  //     by bearing from the node, clamped in radius, and stripped of anything
+  //     that doubles back. A fan of it is then always a simple polygon.
   for (const n of net.nodes) {
     // Two arms or more, or there is nothing here to pave: the ribbon runs to
     // the node's own position and stops square.
     if (n.links.length < 2) continue;
     const y = n.y + LIFT;
-    const R = padRadius(n);
-    const arms = n.links.map((l) => {
-      const dir = linkDir(n, l);
-      const c = ROAD_CLASS[l.edge.cls];
-      return { dir, ang: Math.atan2(dir.z, dir.x),
-        full: c.road / 2 + c.pave + c.kerb, road: c.road / 2 };
-    }).sort((a, b) => a.ang - b.ang);
-
-    const ring = (widthOf) => {
-      const out = [];
-      for (let i = 0; i < arms.length; i++) {
-        const a = arms[i], b = arms[(i + 1) % arms.length];
-        const wa = widthOf(a), wb = widthOf(b);
-        const na = { x: -a.dir.z, z: a.dir.x };     // left of a
-        const nb = { x: -b.dir.z, z: b.dir.x };
-        // The two ends of this street's stop line.
-        out.push({ x: n.x + a.dir.x * R - na.x * wa, z: n.z + a.dir.z * R - na.z * wa });
-        out.push({ x: n.x + a.dir.x * R + na.x * wa, z: n.z + a.dir.z * R + na.z * wa });
-        // And the kerb corner between this street and the next one round.
-        if (arms.length < 2) continue;
-        const p1 = { x: n.x + na.x * wa, z: n.z + na.z * wa };
-        const p2 = { x: n.x - nb.x * wb, z: n.z - nb.z * wb };
-        const c = intersect(p1, a.dir, p2, b.dir);
-        const lim = R * 1.6;
-        if (c && Math.hypot(c.x - n.x, c.z - n.z) < lim) out.push(c);
-        else {
-          // Nearly parallel kerbs, so no corner. Put the point out on the
-          // bisector of the two outward normals instead of splitting the
-          // difference between them — the old fallback averaged two points on
-          // the *same* side of a straight-through node and pinched the pad to a
-          // wedge. Through nodes are dissolved before this runs, so what is
-          // left here is a rounding case rather than a shape.
-          let bx = na.x - nb.x, bz = na.z - nb.z;
-          const bl = Math.hypot(bx, bz);
-          if (bl < 1e-3) { bx = na.x; bz = na.z; } else { bx /= bl; bz /= bl; }
-          const w = Math.max(wa, wb);
-          out.push({ x: n.x + bx * w, z: n.z + bz * w });
-        }
-      }
-      return out;
-    };
-
     // Star-shaped around the node, so a fan from the centre triangulates it.
-    fan(ring((a) => a.full), n, y, PAVE, vert, dry);
-    fan(ring((a) => a.road), n, y + 0.03, ASPHALT, vert, dry);
+    fan(junctionRing(n, (a) => a.full), n, y, PAVE, vert, dry);
+    fan(junctionRing(n, (a) => a.road), n, y + 0.03, ASPHALT, vert, dry);
   }
 
   // Face every triangle upward.
@@ -987,7 +1200,13 @@ function trimPolyline(pts, from, to) {
     const lo = Math.max(from, s0), hi = Math.min(total - to, s1);
     if (hi <= lo) continue;
     const t0 = (lo - s0) / seg, t1 = (hi - s0) / seg;
-    const at = (t) => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+    // Carry the height across the cut. A bridge's polyline *is* its running
+    // surface, so a trim that drops `y` puts the deck back on the riverbed.
+    const at = (t) => {
+      const q = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+      if (a.y !== undefined && b.y !== undefined) q.y = a.y + (b.y - a.y) * t;
+      return q;
+    };
     if (!out.length) out.push(at(t0));
     out.push(at(t1));
   }
