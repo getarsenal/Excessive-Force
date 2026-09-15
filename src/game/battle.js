@@ -28,6 +28,9 @@ export class Battle {
     this.structures = ctx.structures;
     this.primary = ctx.primary;          // the structure that must come down
     this.garrison = ctx.garrison;
+    // Scratch for the free-fire aim point, so picking a target does not
+    // allocate a vector per gun per second.
+    this._aimPoint = new THREE.Vector3();
     this.fx = ctx.fx;
     this.quality = ctx.quality;
     this.engine = ctx.engine;
@@ -481,7 +484,13 @@ export class Battle {
         const b = Math.min(bands - 1, Math.floor(((st.py[i] - lo) / span) * bands));
         if (found[b] >= perBand) continue;
         found[b]++;
-        out.push(new THREE.Vector3(st.px[i], st.py[i], st.pz[i]));
+        const v = new THREE.Vector3(st.px[i], st.py[i], st.pz[i]);
+        // Stones within a few metres of the ground are marked rather than
+        // dropped: aiming at one means half the sheaf lands on the pavement in
+        // front of the building, so free fire skips them — but they are still
+        // the only thing left once a tower is down to its stump.
+        v.lowly = st.py[i] - st.hy[i] < this.originGround + 4.5;
+        out.push(v);
       }
     }
     this._aimCandidates = out;
@@ -491,16 +500,54 @@ export class Battle {
   /**
    * What this gun should shoot at right now.
    *
-   * The designated target wins whenever it is in range. Otherwise the gun picks
-   * the nearest standing masonry it can reach, which is what stops a freshly
-   * deployed battery sitting silent because the player has not tapped the
-   * tower yet — the original reason no friendly unit ever fired.
+   * The designated target wins whenever it is in range. With none set, free
+   * fire goes for the garrison first and the building second — which is both
+   * what a gun crew with no orders would do and what the player expects,
+   * because the defenders are the thing shooting back.
+   *
+   * The building half of it used to pick the nearest of a stratified sample of
+   * stones, and the nearest stone to a gun standing outside the precinct is
+   * almost always one at the very bottom of the near face. With dispersion on
+   * top, most of the sheaf then landed on the ground *around* the tower rather
+   * than on it: a shell aimed at a stone fifty centimetres above the pavement
+   * misses low as often as it hits. So free fire now skips the bottom few
+   * metres entirely and takes the nearest stone above it — falling back to the
+   * skirting only once that is all a stump has left.
    */
   aimFor(unit) {
     const r = unit.def.range;
     if (this.target && unit.pos.distanceTo(this.target) <= r) return this.target;
     if (!this.autoEngage) return null;
+
+    // ── Defenders first.
+    const g = this.garrison;
+    if (g && g.defenders && g.defenders.length) {
+      let best = null, bestD = r * r;
+      for (const d of g.defenders) {
+        if (!d.alive) continue;
+        const p = d.muzzle || d.pos;
+        if (!p) continue;
+        const dx = p.x - unit.pos.x, dy = p.y - unit.pos.y, dz = p.z - unit.pos.z;
+        const dd = dx * dx + dy * dy + dz * dz;
+        if (dd < bestD) { bestD = dd; best = p; }
+      }
+      // Every tier, not just the infantry. The garrison fires from the
+      // building's own windows and parapets, so a shell sent at a defender is
+      // a shell sent at the wall he is standing behind: laying on the men
+      // costs the heavy guns nothing and it is what the player is watching.
+      if (best) return this._aimPoint.copy(best);
+    }
+
+    // ── Otherwise the nearest part of the building that is worth hitting.
     let best = null, bestD = r * r;
+    for (const c of this._aimCandidates) {
+      if (c.lowly) continue;
+      const dx = c.x - unit.pos.x, dy = c.y - unit.pos.y, dz = c.z - unit.pos.z;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < bestD) { bestD = d; best = c; }
+    }
+    if (best) return best;
+    // Nothing above the skirting left: take whatever is standing.
     for (const c of this._aimCandidates) {
       const dx = c.x - unit.pos.x, dy = c.y - unit.pos.y, dz = c.z - unit.pos.z;
       const d = dx * dx + dy * dy + dz * dz;

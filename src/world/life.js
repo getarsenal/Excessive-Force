@@ -140,12 +140,29 @@ export class Life {
       }
       if (lo !== null && hi - lo > 40) wet.push({ z, x: (lo + hi) / 2, w: hi - lo });
     }
+    // Measured along the channel, not counted in samples.
+    //
+    // Position used to be an index into this list advanced at a fixed rate, and
+    // the samples are a fixed step in *z* — so wherever the river runs across
+    // the map rather than down it, consecutive samples are much further apart
+    // and the same rate is a much higher speed. Some of them were doing forty
+    // knots. A cumulative length table makes the parameter metres, and a boat
+    // given six metres a second travels six metres a second wherever it is.
+    let total = 0;
+    for (let i = 0; i < wet.length; i++) {
+      wet[i].s = total;
+      if (i < wet.length - 1) {
+        total += Math.hypot(wet[i + 1].x - wet[i].x, wet[i + 1].z - wet[i].z);
+      }
+    }
     const boats = [];
     const c = new THREE.Color();
     for (let i = 0; i < n && wet.length > 2; i++) {
       boats.push({
-        t: this.rng() * wet.length,
-        speed: (0.12 + this.rng() * 0.16) * (this.rng() < 0.5 ? 1 : -1),
+        s: this.rng() * total,
+        // A working river: barges plod, launches move. Nothing on it does more
+        // than about twelve knots.
+        speed: (2.4 + this.rng() * 3.6) * (this.rng() < 0.5 ? 1 : -1),
         off: (this.rng() - 0.5) * 0.5,
       });
       c.setHex([0x3b4249, 0x6b3f36, 0x2f4a55, 0xb0aa9a][Math.floor(this.rng() * 4)])
@@ -154,7 +171,7 @@ export class Life {
     }
     mesh.instanceColor.needsUpdate = true;
     mesh.count = boats.length;
-    return { mesh, boats, wet };
+    return { mesh, boats, wet, total };
   }
 
   // ───────────────────────────────────────────────────────────────── birds ──
@@ -241,16 +258,19 @@ export class Life {
       mesh.instanceMatrix.needsUpdate = true;
     }
 
-    if (this.boats && this.boats.wet.length > 2) {
-      const { mesh, boats, wet } = this.boats;
+    if (this.boats && this.boats.wet.length > 2 && this.boats.total > 1) {
+      const { mesh, boats, wet, total } = this.boats;
       let w = 0;
       for (const b of boats) {
-        b.t += b.speed * dt;
-        if (b.t < 0) b.t += wet.length;
-        if (b.t >= wet.length) b.t -= wet.length;
-        const i0 = Math.floor(b.t) % wet.length;
-        const i1 = (i0 + 1) % wet.length;
-        const f = b.t - Math.floor(b.t);
+        b.s += b.speed * dt;
+        if (b.s < 0) b.s += total;
+        if (b.s >= total) b.s -= total;
+        // Find the pair of samples this distance falls between.
+        let i0 = 0;
+        while (i0 < wet.length - 2 && wet[i0 + 1].s <= b.s) i0++;
+        const i1 = Math.min(wet.length - 1, i0 + 1);
+        const seg = Math.max(0.001, wet[i1].s - wet[i0].s);
+        const f = Math.min(1, Math.max(0, (b.s - wet[i0].s) / seg));
         const a = wet[i0], c = wet[i1];
         const x = a.x + (c.x - a.x) * f + b.off * a.w * 0.5;
         const z = a.z + (c.z - a.z) * f;

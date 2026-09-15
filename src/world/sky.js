@@ -125,7 +125,16 @@ const WATER_VERT = /* glsl */`
     w += wave(world.xz, normalize(vec2(1.0, 0.3)), 0.085, 1.4, uTime) * 0.22;
     w += wave(world.xz, normalize(vec2(-0.4, 1.0)), 0.13, 1.9, uTime) * 0.13;
     w += wave(world.xz, normalize(vec2(0.7, -0.8)), 0.27, 2.6, uTime) * 0.06;
-    w *= calm;
+    // Flattened with distance from the eye.
+    //
+    // The swell has a wavelength of twenty to seventy metres, and out past the
+    // playfield the sheet is a coarse strip with vertices further apart than
+    // that: displacing those samples does not make waves, it folds the ribbon
+    // into a chevron the shortest of which is several hundred metres across.
+    // Nobody is ever within a kilometre of that water, so it costs nothing to
+    // let the surface go flat out there and keep the swell where it reads.
+    float near = 1.0 - smoothstep(320.0, 900.0, distance(cameraPosition, world));
+    w *= calm * near;
     vWave = w;
 
     vec3 p = position;
@@ -144,6 +153,8 @@ const WATER_FRAG = /* glsl */`
   uniform vec3 uSunDir;
   uniform vec3 uSunColor;
   uniform float uTime;
+  uniform vec3 uFogColor;
+  uniform float uFogDensity;
   varying vec3 vWorld;
   varying float vWave;
   varying float vDepth;
@@ -238,6 +249,19 @@ const WATER_FRAG = /* glsl */`
     // Fade out over the last few centimetres of depth so the waterline is a
     // soft edge on the sand rather than a hard polygon boundary.
     float alpha = smoothstep(0.0, 0.55, vDepth) * 0.94 + 0.06;
+
+    // Haze, the same exponential-squared falloff the scene fog uses.
+    //
+    // This is a hand-written shader, so it never got the fog three.js injects
+    // into a standard material — which did not matter while the river ended at
+    // the edge of the data. Now that it runs to the horizon, the far reach was
+    // the one thing in the frame at six kilometres that was not fading into the
+    // haze: a bright cyan ribbon laid over a landscape that had long since gone
+    // to flat grey. Fogging it puts the river back in the same air as
+    // everything else.
+    float fogDist = length(cameraPosition - vWorld) * uFogDensity;
+    float fog = 1.0 - exp(-fogDist * fogDist);
+    col = mix(col, uFogColor, clamp(fog, 0.0, 1.0));
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -330,6 +354,65 @@ export function createWater(terrain, sunDirection, quality) {
     }
   }
 
+  // The river does not stop where the elevation data does.
+  //
+  // Everything above is built from the DEM's wet mask, so the sheet ends in two
+  // square ends at the boundary of a 1.8 km box, and from any height the Thames
+  // read as a lake. A river comes from somewhere and goes somewhere: the ground
+  // outside the playfield already has the channel cut into it (`riverTails`
+  // drives both), so all that is left is to run the water down it.
+  //
+  // Each tail is a quad strip five columns wide, laid flat at the waterline,
+  // with the depth attribute falling off towards the banks — so the shader's
+  // own shoreline treatment draws the edge and the strip fades into the bank
+  // instead of ending on a hard line.
+  {
+    const COLS = [-1, -0.55, 0, 0.55, 1];
+    for (const tail of terrain.riverTails()) {
+      if (tail.length < 2) continue;
+      // Start a little inside the boundary so the strip overlaps the
+      // playfield's sheet rather than leaving a hairline of bare bed between
+      // the two.
+      const line = tail.slice();
+      const bx = line[1].x - line[0].x, bz = line[1].z - line[0].z;
+      const bl = Math.hypot(bx, bz) || 1;
+      line.unshift({
+        x: line[0].x - (bx / bl) * 16, z: line[0].z - (bz / bl) * 16,
+        half: line[0].half,
+      });
+
+      let prev = null;
+      for (let i = 0; i < line.length; i++) {
+        const p = line[i];
+        const ahead = line[Math.min(line.length - 1, i + 1)];
+        const back = line[Math.max(0, i - 1)];
+        let tx = ahead.x - back.x, tz = ahead.z - back.z;
+        const tl = Math.hypot(tx, tz) || 1;
+        tx /= tl; tz /= tl;
+        const nx = -tz, nz = tx;
+        const row = [];
+        for (const u of COLS) {
+          // A touch wider than the flat bed, so the waterline sits on the bank
+          // rather than leaving a ring of bed below the surface and dry.
+          const w = p.half * 1.05 * u;
+          row.push(pos.length / 3);
+          pos.push(p.x + nx * w, level, p.z + nz * w);
+          // Dredged down the middle, shallowing to the bank. The channel bed
+          // out here is flat, so this is a painted gradient rather than a
+          // measured one — but it is the gradient a river actually has.
+          depth.push(3.4 * (1 - u * u * 0.92));
+        }
+        if (prev) {
+          for (let k = 0; k < COLS.length - 1; k++) {
+            index.push(prev[k], row[k + 1], row[k]);
+            index.push(prev[k], prev[k + 1], row[k + 1]);
+          }
+        }
+        prev = row;
+      }
+    }
+  }
+
   const geo = new THREE.BufferGeometry();
   if (pos.length === 0) {
     // Landlocked level: hand back an empty object so callers need no branch.
@@ -366,6 +449,10 @@ export function createWater(terrain, sunDirection, quality) {
       uSkyZenith: { value: new THREE.Color(0x2f68bd) },
       uSunDir: { value: sunDirection.clone().normalize() },
       uSunColor: { value: new THREE.Color(0xffe0b0) },
+      // Matched to the scene fog in `engine.js`: this shader has to apply it
+      // itself, so the two have to be kept in step by hand.
+      uFogColor: { value: new THREE.Color(0xd8d3c4) },
+      uFogDensity: { value: 0.00026 },
     },
     vertexShader: WATER_VERT,
     fragmentShader: WATER_FRAG,

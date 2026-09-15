@@ -94,12 +94,41 @@ export class Terrain {
     return { water: lerp2(0), road: lerp2(1), park: lerp2(2) };
   }
 
-  isWater(x, z) {
+  /** The wet mask, and nothing else: false everywhere off the DEM. */
+  _maskWet(x, z) {
     const n = this.size;
     const u = Math.round((x + this.span) / (this.span * 2) * (n - 1));
     const v = Math.round((this.span - z) / (this.span * 2) * (n - 1));
     if (u < 0 || v < 0 || u > n - 1 || v > n - 1) return false;
     return this.mask[(v * n + u) * 3] > 0.5;
+  }
+
+  isWater(x, z) {
+    // Past the DEM there is no mask, but there is still a river: the channel
+    // carved out to the horizon is water as far as anything that asks is
+    // concerned, or the farms and the airfield get built in it.
+    if (Math.abs(x) > this.span || Math.abs(z) > this.span) {
+      return this.inRiverTail(x, z, 30);
+    }
+    return this._maskWet(x, z);
+  }
+
+  /** Is this point in (or within `pad` of) the channel beyond the playfield? */
+  inRiverTail(x, z, pad = 0) {
+    for (const pts of this.riverTails()) {
+      for (let k = 0; k < pts.length - 1; k++) {
+        const a = pts[k], b = pts[k + 1];
+        const vx = b.x - a.x, vz = b.z - a.z;
+        const l2 = vx * vx + vz * vz;
+        let t = l2 > 0 ? ((x - a.x) * vx + (z - a.z) * vz) / l2 : 0;
+        t = Math.max(0, Math.min(1, t));
+        const half = a.half + (b.half - a.half) * t;
+        if (Math.hypot(x - (a.x + vx * t), z - (a.z + vz * t)) <= half + pad) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   buildMesh() {
@@ -243,8 +272,67 @@ export class Terrain {
     // completely, and the river rendered as a strip of dry land. Cutting the
     // playfield out of it means the surround can never overlap anything inside.
     const edge = this.heightAt(this.span, 0);
-    const apronGeo = frameGeometry(this.span, this.span * 7, 10);
+    // Subdivided far more finely than it needs to be as a flat sheet, because
+    // it is no longer flat: the river's channel is cut through it, and a cut
+    // with ten divisions across seven kilometres is a staircase.
+    const apronGeo = frameGeometry(this.span, this.span * 7, 150);
     const ap = apronGeo.attributes.position;
+    // Carve the channel. The apron sits at the DEM's edge height, which is
+    // above the waterline — so without this the river simply ran into a wall of
+    // ground the moment it left the map.
+    //
+    // `chan` records how far into the channel each vertex is: 1 on the bed, 0
+    // well clear of the bank. The colour pass below needs it to lay silt and
+    // riverbed down there, instead of painting the cut with the same fields as
+    // everything else — which drew the reach as a bright sandy gash through
+    // farmland.
+    const chan = new Float32Array(ap.count);
+    {
+      const tails = this.riverTails();
+      const sunk = (this.waterLevel - edge) - 2.6;
+      // The apron is ninety thousand vertices and the channel is a few hundred
+      // segments; testing every pair is twenty-odd million distance tests at
+      // boot. A padded bounding box per tail throws out the ninety per cent of
+      // the countryside that is nowhere near the water for the cost of four
+      // comparisons.
+      const bounds = tails.map((pts) => {
+        const b = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+        let pad = 0;
+        for (const p of pts) {
+          b.x0 = Math.min(b.x0, p.x); b.x1 = Math.max(b.x1, p.x);
+          b.z0 = Math.min(b.z0, p.z); b.z1 = Math.max(b.z1, p.z);
+          pad = Math.max(pad, p.half);
+        }
+        pad += 80;
+        b.x0 -= pad; b.x1 += pad; b.z0 -= pad; b.z1 += pad;
+        return b;
+      });
+      for (let i = 0; i < ap.count; i++) {
+        const x = ap.getX(i), z = ap.getZ(i);
+        let best = Infinity, half = 0;
+        for (let ti = 0; ti < tails.length; ti++) {
+          const b0 = bounds[ti];
+          if (x < b0.x0 || x > b0.x1 || z < b0.z0 || z > b0.z1) continue;
+          const pts = tails[ti];
+          for (let k = 0; k < pts.length - 1; k++) {
+            const a = pts[k], b = pts[k + 1];
+            const vx = b.x - a.x, vz = b.z - a.z;
+            const l2 = vx * vx + vz * vz;
+            let t = l2 > 0 ? ((x - a.x) * vx + (z - a.z) * vz) / l2 : 0;
+            t = Math.max(0, Math.min(1, t));
+            const d = Math.hypot(x - (a.x + vx * t), z - (a.z + vz * t));
+            if (d < best) { best = d; half = a.half + (b.half - a.half) * t; }
+          }
+        }
+        if (best > half + 70) continue;
+        // Flat channel bed, then a bank that climbs over seventy metres.
+        const k2 = best <= half ? 1
+          : 1 - THREE.MathUtils.smoothstep((best - half) / 70, 0, 1);
+        ap.setY(i, sunk * k2);
+        chan[i] = k2;
+      }
+      ap.needsUpdate = true;
+    }
     const apColors = new Float32Array(ap.count * 3);
     const at = new THREE.Color();
     const at2 = new THREE.Color();
@@ -261,6 +349,13 @@ export class Terrain {
       at.lerp(at2, THREE.MathUtils.smoothstep(patch, 0.08, 0.28) * 0.62 + rural * 0.38);
       const n2 = valueNoise(x * 0.055, z * 0.055) * 0.22 + broad * 0.16;
       at.multiplyScalar(0.80 + n2);
+      // Down the channel: silt on the shore, riverbed under the water. The
+      // sheet only covers the flat bed, so the bank between the waterline and
+      // the fields has to read as a bank.
+      if (chan[i] > 0) {
+        at2.copy(P.bank).lerp(P.bed, THREE.MathUtils.smoothstep(chan[i], 0.55, 0.95));
+        at.lerp(at2, THREE.MathUtils.smoothstep(chan[i], 0.04, 0.4));
+      }
       apColors[i * 3] = at.r; apColors[i * 3 + 1] = at.g; apColors[i * 3 + 2] = at.b;
     }
     apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
@@ -275,6 +370,152 @@ export class Terrain {
     this.group.add(apron);
     this.group.add(this.mesh);
     return this.group;
+  }
+
+  /**
+   * Where the river leaves the map, and which way it is going when it does.
+   *
+   * The playfield is a square cut out of a DEM, so the water stops dead at its
+   * edge: from any height the Thames read as a lake with two square ends. A
+   * river runs to both horizons, and to draw that both the water sheet and the
+   * ground around it need the same description of where the channel goes — so
+   * it is worked out once, here.
+   *
+   * Each exit is the midpoint and half-width of a wet run along one edge of the
+   * square, plus the direction the channel is actually travelling, taken from
+   * how the centreline moves over the last hundred metres inside the boundary
+   * rather than assumed to be square to the edge.
+   */
+  riverExits() {
+    if (this._exits) return this._exits;
+    const s = this.span * 0.995;
+    const out = [];
+    const N = 360;
+    const sides = [
+      { n: { x: 0, z: -1 }, at: (t) => ({ x: -s + t * 2 * s, z: -s }) },
+      { n: { x: 0, z: 1 }, at: (t) => ({ x: -s + t * 2 * s, z: s }) },
+      { n: { x: -1, z: 0 }, at: (t) => ({ x: -s, z: -s + t * 2 * s }) },
+      { n: { x: 1, z: 0 }, at: (t) => ({ x: s, z: -s + t * 2 * s }) },
+    ];
+    /** The wet centre of the channel `d` metres inside the edge, near `mid`. */
+    const centreInside = (side, mid, d) => {
+      const bx = mid.x - side.n.x * d, bz = mid.z - side.n.z * d;
+      const tx = -side.n.z, tz = side.n.x;       // along the edge
+      let lo = null, hi = null;
+      for (let k = -60; k <= 60; k++) {
+        const x = bx + tx * k * 12, z = bz + tz * k * 12;
+        if (!this._maskWet(x, z)) continue;
+        if (lo === null) lo = k;
+        hi = k;
+      }
+      if (lo === null) return null;
+      const m = (lo + hi) / 2;
+      return { x: bx + tx * m * 12, z: bz + tz * m * 12, half: (hi - lo) * 6 };
+    };
+    for (const side of sides) {
+      let run = null;
+      const close = (r) => {
+        const a = side.at(r.i0 / N), b = side.at(r.i1 / N);
+        const w = Math.hypot(b.x - a.x, b.z - a.z);
+        if (w < 40) return;
+        const mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        const near = centreInside(side, mid, 30);
+        const far = centreInside(side, mid, 150);
+        let dir = { x: side.n.x, z: side.n.z };
+        if (near && far) {
+          const dx = near.x - far.x, dz = near.z - far.z;
+          const d = Math.hypot(dx, dz);
+          // Only trust it if it is actually pointing outward.
+          if (d > 1 && (dx * side.n.x + dz * side.n.z) / d > 0.35) {
+            dir = { x: dx / d, z: dz / d };
+          }
+        }
+        out.push({ mid, half: w / 2, dir });
+      };
+      for (let i = 0; i <= N; i++) {
+        const p = side.at(i / N);
+        const wet = this._maskWet(p.x - side.n.x * 8, p.z - side.n.z * 8);
+        if (wet) { if (!run) run = { i0: i, i1: i }; else run.i1 = i; }
+        else if (run) { close(run); run = null; }
+      }
+      if (run) close(run);
+    }
+    this._exits = out;
+    return out;
+  }
+
+  /**
+   * The channel each exit carves through the country beyond the playfield, as a
+   * centreline with a half-width at every point. Shared by the water sheet and
+   * by the ground it has to be sunk into.
+   */
+  riverTails() {
+    if (this._tails) return this._tails;
+    // Far enough to put the end of the channel at the outer edge of the apron,
+    // which is where the world stops.
+    const reach = this.span * 6;
+    // Marched coarsely and then smoothed, rather than marched finely. A river
+    // a quarter of a kilometre across that changes heading every ninety metres
+    // is a crinkled ribbon however small each kink is; control points a long
+    // way apart, run through a spline, give the long lazy bends the thing
+    // actually has.
+    const CTRL = 420;
+    const OUT = 70;
+    const tails = [];
+    for (const e of this.riverExits()) {
+      const ctrl = [];
+      // Start one span back inside the map, so the first control point the
+      // spline actually draws from is the exit itself rather than a step past
+      // it — otherwise the channel begins four hundred metres offshore.
+      let x = e.mid.x - e.dir.x * CTRL, z = e.mid.z - e.dir.z * CTRL;
+      // The heading is kept as an offset from the exit bearing and pulled back
+      // towards it every step. Integrating the noise straight into the heading
+      // instead is a random walk: over a dozen steps it accumulates whole
+      // turns, and the river leaves the map, curls round and comes back as a
+      // lagoon. Damped, the same noise reads as a meander.
+      const a0 = Math.atan2(e.dir.x, e.dir.z);
+      let drift = 0;
+      let half = e.half;
+      for (let t = -CTRL; t <= reach + CTRL; t += CTRL) {
+        ctrl.push({ x, z, half });
+        const bend = valueNoise(x * 0.0009 + 31.7, z * 0.0009 - 12.3) - 0.5;
+        drift = drift * 0.72 + bend * 0.34;
+        const a = a0 + drift;
+        x += Math.sin(a) * CTRL;
+        z += Math.cos(a) * CTRL;
+        // Broadening towards the sea, but a river, not an ocean: about half as
+        // wide again by the horizon.
+        if (t >= 0) half *= 1.028;
+      }
+      // Catmull-Rom through the control points, sampled every seventy metres.
+      // The first and last control points are outside the run on purpose, so
+      // every real span has the two neighbours the spline needs.
+      const pts = [];
+      const cr = (p0, p1, p2, p3, u) => {
+        const u2 = u * u, u3 = u2 * u;
+        return 0.5 * ((2 * p1) + (-p0 + p2) * u
+          + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2
+          + (-p0 + 3 * p1 - 3 * p2 + p3) * u3);
+      };
+      for (let k = 1; k < ctrl.length - 2; k++) {
+        const p0 = ctrl[k - 1], p1 = ctrl[k], p2 = ctrl[k + 1], p3 = ctrl[k + 2];
+        const n = Math.max(1, Math.round(
+          Math.hypot(p2.x - p1.x, p2.z - p1.z) / OUT));
+        for (let s = 0; s < n; s++) {
+          const u = s / n;
+          pts.push({
+            x: cr(p0.x, p1.x, p2.x, p3.x, u),
+            z: cr(p0.z, p1.z, p2.z, p3.z, u),
+            half: p1.half + (p2.half - p1.half) * u,
+          });
+        }
+      }
+      pts.push({ x: ctrl[ctrl.length - 2].x, z: ctrl[ctrl.length - 2].z,
+        half: ctrl[ctrl.length - 2].half });
+      tails.push(pts);
+    }
+    this._tails = tails;
+    return tails;
   }
 
   addToPhysics(physics) {

@@ -936,6 +936,40 @@ export class TestMenu {
         return `${fired} rounds`;
       })],
 
+      // Free fire used to take the nearest sampled stone, which from outside
+      // the precinct is always one at the foot of the near wall — so with
+      // dispersion on top, half the sheaf landed on the pavement around the
+      // tower and never touched it. The order is now the garrison first, then
+      // the nearest part of the building that is not skirting.
+      ['free fire lays on the enemy, not the pavement', () => this._calm(() => {
+        const hadTarget = b.target ? b.target.clone() : null;
+        const label = b.targetLabel;
+        b.clearTarget();
+        if (b.units.filter((u) => u.alive).length < 3) this.spawnRing(5);
+        b._refreshAimCandidates();
+        const alive = b.units.filter((u) => u.alive);
+        const men = (b.garrison?.defenders || []).filter((d) => d.alive);
+        let onMen = 0, low = 0, blank = 0, off = 0;
+        for (const u of alive) {
+          const a = b.aimFor(u);
+          if (!a) { blank++; continue; }
+          if (men.some((d) => (d.muzzle || d.pos)
+            && (d.muzzle || d.pos).distanceTo(a) < 0.5)) { onMen++; continue; }
+          if (a.y < b.originGround + 4.0) low++;
+          const on = c.structures.some((s) => s.footprint
+            && a.x > s.footprint.x0 - 3 && a.x < s.footprint.x1 + 3
+            && a.z > s.footprint.z0 - 3 && a.z < s.footprint.z1 + 3);
+          if (!on) off++;
+        }
+        if (hadTarget) b.setTarget(hadTarget, label);
+        assert(alive.length > 0, 'no guns were deployed to test with');
+        assert(blank === 0, `${blank} of ${alive.length} guns had nothing to aim at`);
+        assert(low === 0, `${low} guns are laid on stones at pavement level`);
+        assert(off === 0, `${off} guns are laid at nothing in particular`);
+        return `${alive.length} guns: ${onMen} on the garrison, `
+          + `${alive.length - onMen} on the structure`;
+      })],
+
       ['shells actually reach the building', () => this._calm(() => {
         // A howitzer, not an AT4: the whole point of the light tiers is that
         // they barely scratch stone, so asserting damage with one would assert
@@ -1402,6 +1436,76 @@ export class TestMenu {
         assert(moved > 4, `${moved} of 8 sampled vehicles moved in a second`);
         return `${d.railing} of railing, ${d.fields} fields, ${d.towers} towers on `
           + `the skyline, ${d.programmes} blocks with a use, ${cars} vehicles moving`;
+      }],
+
+      // A river that stops at the edge of the elevation data is a lake with two
+      // square ends, and from any height that is exactly what it read as. The
+      // channel is carried out through the surrounding country to the limit of
+      // vision — and the boats on it move at the speed they were given, which
+      // they did not while their position was an index into a list of samples
+      // taken at a fixed step in z.
+      ['the river runs to both horizons', () => {
+        const t = c.terrain;
+        const exits = t.riverExits();
+        if (!exits.length) return 'landlocked: no river leaves this map';
+        const tails = t.riverTails();
+        assert(tails.length === exits.length,
+          `${exits.length} river mouths but ${tails.length} channels`);
+
+        let reach = 0, worst = 0;
+        for (const pts of tails) {
+          const end = pts[pts.length - 1];
+          reach = Math.max(reach, Math.hypot(end.x, end.z));
+          // A quarter-kilometre-wide river that changes heading sharply every
+          // few hundred metres is a crinkled ribbon, not a reach.
+          for (let k = 1; k < pts.length - 1; k++) {
+            const a = Math.atan2(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
+            const b2 = Math.atan2(pts[k + 1].x - pts[k].x, pts[k + 1].z - pts[k].z);
+            let dd = Math.abs(b2 - a);
+            if (dd > Math.PI) dd = Math.PI * 2 - dd;
+            worst = Math.max(worst, dd);
+          }
+        }
+        assert(reach > t.span * 4,
+          `the channel reaches ${Math.round(reach)} m, barely past the `
+          + `${Math.round(t.span)} m playfield`);
+        assert(worst < 0.16,
+          `the channel kinks ${(worst * 180 / Math.PI).toFixed(0)}° between samples`);
+
+        // And the water is actually drawn out there, not just carved.
+        const p = c.water?.geometry?.attributes?.position;
+        assert(p, 'there is a river mask but no water surface');
+        let far = 0;
+        for (let i = 0; i < p.count; i++) {
+          if (Math.hypot(p.getX(i), p.getZ(i)) > t.span * 2) far++;
+        }
+        assert(far > 60, `only ${far} water vertices lie beyond the playfield`);
+
+        // Boat speeds, measured over the ground rather than trusted.
+        const life = c.life;
+        const bm = life?.boats?.mesh;
+        assert(bm && bm.count > 3, 'there is a river but nothing is on it');
+        const mat2 = new THREE.Matrix4();
+        const was = [];
+        life.update(0.001);
+        for (let i = 0; i < bm.count; i++) {
+          bm.getMatrixAt(i, mat2);
+          was.push(mat2.elements[12], mat2.elements[14]);
+        }
+        for (let k = 0; k < 10; k++) life.update(0.1);
+        let fastest = 0, slowest = Infinity;
+        for (let i = 0; i < bm.count; i++) {
+          bm.getMatrixAt(i, mat2);
+          const v = Math.hypot(mat2.elements[12] - was[i * 2],
+            mat2.elements[14] - was[i * 2 + 1]);
+          fastest = Math.max(fastest, v);
+          slowest = Math.min(slowest, v);
+        }
+        assert(fastest < 9,
+          `a boat is doing ${fastest.toFixed(1)} m/s — about ${Math.round(fastest * 1.94)} knots`);
+        assert(slowest > 1.2, `a boat is doing ${slowest.toFixed(1)} m/s, adrift`);
+        return `${tails.length} reaches out to ${Math.round(reach)} m, `
+          + `${bm.count} boats at ${slowest.toFixed(1)}–${fastest.toFixed(1)} m/s`;
       }],
 
       ['the city is a street network, not a grid of stripes', () => {
