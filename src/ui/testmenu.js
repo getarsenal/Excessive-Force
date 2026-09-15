@@ -1718,10 +1718,24 @@ export class TestMenu {
         // tower that has been brought down, and measuring the instant the last
         // shell lands reads the height it had on the way past — which is how
         // this managed to fail on a collapse that was working perfectly.
-        for (let k = 0; k < 26; k++) {
+        // Let it finish what it has started.
+        //
+        // Six seconds was the whole allowance, which is enough for one
+        // collapse and not for two — and two is now a normal way for this to
+        // go: the first section is handed over, comes to rest on the rubble
+        // instead of falling, the lockout that would have frozen the building
+        // in that state is lifted, and a *second* lean arms and takes it the
+        // rest of the way. Caught mid-second-collapse this read as a failure,
+        // with the evidence sitting right there in the message: peak lean
+        // 12.28°, and a fresh lean running at 1.52° with the resultant already
+        // a quarter of the way past the edge of its bearing.
+        //
+        // So it waits while something is still moving, up to twenty seconds,
+        // and stops the moment nothing is leaning any more.
+        for (let k = 0; k < 80; k++) {
           c.fastForward(0.25);
           leaned = Math.max(leaned, st.leanDegrees);
-          if (k > 6 && st.standingHeight() < h0 - 25 && !st.lean) break;
+          if (!st.lean && (k > 26 || (k > 6 && st.standingHeight() < h0 - 25))) break;
         }
         const dropped = st.standingHeight() < h0 ? h0 - st.standingHeight() : 0;
         const integ = st.monumentIntegrity;
