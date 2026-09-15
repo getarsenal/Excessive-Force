@@ -1730,9 +1730,18 @@ export class TestMenu {
             + `${(intactAtStart * 100).toFixed(0)}% intact never went out of `
             + `plumb (worst ${leaned.toFixed(2)}°)`);
         }
+        const L = st.lean;
         assert(dropped > 20 || integ < 0.6,
           `it kept ${(integ * 100).toFixed(0)}% of itself and lost only `
-          + `${dropped.toFixed(1)} m with its base shot out`);
+          + `${dropped.toFixed(1)} m with its base shot out `
+          + `(started ${(intactAtStart * 100).toFixed(0)}% intact, `
+          + `${slender.toFixed(1)}:1 slender, peak lean `
+          + `${(st.peakLean || 0).toFixed(2)}°, `
+          + `lean now ${L ? `${(L.angle * 180 / Math.PI).toFixed(2)}° tip `
+            + `${(L.tip || 0).toFixed(2)} bearing ${(L.reachOut || 0).toFixed(2)}`
+            + `/${(L.reachOut0 || 0).toFixed(2)}` : 'none'}, `
+          + `${st.islands.size} sections, `
+          + `${c.physics.dynamicSet.size}/${c.physics.activeBudget} bodies)`);
 
         // Nothing is left hanging in the air.
         //
