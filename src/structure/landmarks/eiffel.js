@@ -67,11 +67,21 @@ function legAt(y) {
   return { r: P[P.length - 1][1], h: P[P.length - 1][2] };
 }
 
-/** Half-width of the upper shaft, which tapers from the second floor to the top. */
+/**
+ * Half-width of the upper shaft, which tapers from the second floor to the top.
+ *
+ * Concave, like the legs below it — but not a bare power curve. `t^0.78` has
+ * infinite slope at t = 0, so the first courses off the platform narrowed
+ * faster than a course can bear on the one beneath it, and the bottom of the
+ * caisson was the one part of the tower still starting the level detached.
+ * Mixing in a linear term gives the same silhouette with a finite slope where
+ * it leaves the deck.
+ */
 function shaftHalf(y) {
-  const t = (y - EIFFEL.secondFloor) / (EIFFEL.thirdFloor - EIFFEL.secondFloor);
-  // Concave, like the legs below it.
-  return 13.5 + (4.6 - 13.5) * Math.pow(Math.max(0, Math.min(1, t)), 0.78);
+  const t = Math.max(0, Math.min(1,
+    (y - EIFFEL.secondFloor) / (EIFFEL.thirdFloor - EIFFEL.secondFloor)));
+  const shape = 0.30 * t + 0.70 * Math.pow(t, 1.35);
+  return 13.5 + (4.6 - 13.5) * shape;
 }
 
 export function buildEiffelTower(quality) {
