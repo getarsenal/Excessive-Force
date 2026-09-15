@@ -1599,7 +1599,10 @@ export class TestMenu {
         const span = c.terrain.span;
         let biggest = 0, farthest = 0, drawn = 0;
         for (const st of c.structures) {
-          let stone = 0;
+          // Per structure, both of them: the Taj's stones are bigger than the
+          // mosque's, and judging the mosque by the Taj's yardstick is how this
+          // assertion managed to fail on a level where nothing was wrong.
+          let stone = 0, worst = 0;
           for (let i = 0; i < st.count; i++) {
             stone = Math.max(stone, st.hx[i] * 2, st.hy[i] * 2, st.hz[i] * 2);
           }
@@ -1610,12 +1613,13 @@ export class TestMenu {
               m.decompose(v, q, sc);
               if (sc.x < 1e-4 && sc.y < 1e-4) continue;      // a destroyed stone
               drawn++;
-              biggest = Math.max(biggest, sc.x, sc.y, sc.z);
+              worst = Math.max(worst, sc.x, sc.y, sc.z);
+              biggest = Math.max(biggest, worst);
               farthest = Math.max(farthest, Math.hypot(v.x, v.y, v.z));
             }
           }
-          assert(biggest <= stone * 1.35 + 0.2,
-            `${st.key} is drawing a stone ${biggest.toFixed(1)} m across, `
+          assert(worst <= stone * 1.35 + 0.2,
+            `${st.key} is drawing a stone ${worst.toFixed(1)} m across, `
             + `against a largest real stone of ${stone.toFixed(1)} m`);
         }
         assert(isFinite(farthest) && farthest < span * 4,
