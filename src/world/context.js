@@ -21,6 +21,8 @@ import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, addStreetFurniture, addBuildingDetail,
   addRiverEdge, addRoofAndFrontage } from './detail.js';
+import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
+  buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
   GRID_YAW, ROAD_CLASS, SURFACE_LIFT } from './streets.js';
@@ -367,6 +369,14 @@ export function buildContext(terrain, quality, opts = {}) {
     if (f.free0 < 26 || f.free1 < 26) use = use === 'park' ? 'park' : 'carpark';
     b.use = use;
     b.open = use === 'park' || use === 'carpark';
+    // An open block still needs a reason to be open. A city of nothing but
+    // garden squares and car parks is a diagram with the interesting parts left
+    // out, so each one is given a programme — a market, a pitch, a graveyard, a
+    // school, allotments, a builder's yard — and the detail pass lays out what
+    // that actually looks like from the air.
+    if (b.open && use === 'park' && f.free0 > 34 && f.free1 > 34 && rng() < 0.72) {
+      b.programme = BLOCK_PROGRAMMES[Math.floor(rng() * BLOCK_PROGRAMMES.length)];
+    }
     if (b.open) { squares++; continue; }        // the detail pass builds these
 
     // District character: taller in the middle of town, lower out at the edges,
@@ -520,14 +530,37 @@ export function buildContext(terrain, quality, opts = {}) {
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
-  Object.assign(counts, addRiverEdge(props, terrain, rng));
+  Object.assign(counts, addRiverEdge(props, terrain, rng, opts.precinct || {}));
   Object.assign(counts, addNetworkFurniture(props, net, terrain, rng, dense));
   // Paint stays on at every quality tier, thinned rather than dropped: a
   // crossing and a centre line are two of the few things that read as a city
   // from directly above, and they cost a handful of flat quads.
   Object.assign(counts, addStreetMarkings(props, net, terrain, rng, dense));
+  Object.assign(counts, buildPrecinct(props, terrain, rng, {
+    precinct: opts.precinct, radius: EXCLUDE - 4, net,
+    landmarks: opts.landmarks || [], yaw: GRID_YAW,
+  }));
+  Object.assign(counts, buildOutskirts(props, terrain, rng, { inner: reach * 1.02 }));
+  Object.assign(counts, buildHorizon(props, terrain, rng));
+  Object.assign(counts, buildRailway(props, terrain, rng, { yaw: GRID_YAW, net }));
+  // Whatever each open block is for, laid out in the block's own frame.
+  counts.programmes = 0;
+  for (const b of net.blocks) {
+    if (!b.programme) continue;
+    const quad = blockInterior(b, 2.0);
+    const fr = quadFrame(quad);
+    if (fr.w < 26 || fr.d < 26) continue;
+    if (terrain.isWater(fr.cx, fr.cz)) continue;
+    Object.assign(counts, fillOpenBlock(props, terrain, rng, b.programme,
+      { cx: fr.cx, cz: fr.cz, w: fr.w - 4, d: fr.d - 4, yaw: fr.yaw }));
+    counts.programmes++;
+  }
   props.flush(detail, {
     ...MATERIALS,
+    // Lamps, lit windows, signals: emissive, so they carry at distance and
+    // pick up the bloom. A street with lamps that are merely pale grey reads
+    // as a street at noon whatever the sun is doing.
+    glow: { roughness: 0.4, cast: false, emissive: 0xffd9a0, emissiveIntensity: 1.5 },
     // Grime is a wash over the facade, not a solid: it has to read as dirt on
     // the stone rather than as a dark panel bolted to it.
     grime: { roughness: 0.99, cast: false, transparent: true, opacity: 0.34 },
@@ -1167,6 +1200,20 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
         treeAt(p.x, p.z, 0.9);
       }
       carparks++;
+      continue;
+    }
+
+    // A block with a programme — a market, a pitch, a graveyard, a school —
+    // gets its content from the detail pass instead, where the prop buckets
+    // are. Trees round the edge of it still belong here.
+    if (b.programme) {
+      for (let k = 0; k < 4; k++) {
+        const p = put((rng() - 0.5) * w, (rng() - 0.5) * d);
+        if (Math.hypot(p.x - fr.cx, p.z - fr.cz) > Math.min(w, d) * 0.38) {
+          treeAt(p.x, p.z, 1.0 + rng() * 0.4);
+        }
+      }
+      squares++;
       continue;
     }
 

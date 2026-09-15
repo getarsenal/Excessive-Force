@@ -6,6 +6,7 @@ import { Audio } from './core/audio.js';
 import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
+import { Life } from './world/life.js';
 import { loadCity, buildCity } from './world/city.js';
 import { Structure } from './structure/structure.js';
 import { resolveLevel } from './game/levels.js';
@@ -108,13 +109,29 @@ async function boot() {
     console.log(`[tumble] city: ${cityGroup.userData.built} of `
       + `${cityGroup.userData.available} buildings — ${city.source}`);
   } else {
-    contextGroup = buildContext(terrain, quality, { landmarks });
+    contextGroup = buildContext(terrain, quality, { landmarks, precinct: level.precinct });
     engine.scene.add(contextGroup);
     console.log(`[tumble] city: hand-placed approximation, `
       + `${contextGroup.userData.plots.length} buildings, `
       + `${contextGroup.userData.roofs.length} deployable roofs`
       + ' (run tools/bake_buildings.py for real footprints)');
   }
+
+  // The things that move. A still city is uncanny however detailed it is: the
+  // eye reads motion as life long before it reads a bollard.
+  const lifeRng = () => {
+    let a = 0x5eed1e5;
+    return () => {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+  const life = (cityGroup || contextGroup)?.userData?.network
+    ? new Life(engine.scene, terrain,
+      (cityGroup || contextGroup).userData.network, quality, lifeRng())
+    : null;
 
   await progress(44, 'quarrying stone');
   const totalBlocks = specs.reduce((a, sp) => a + sp.blocks.length, 0);
@@ -163,6 +180,8 @@ async function boot() {
     structures, primary, garrison, fx, quality, groundY, audio, level,
     onEvent: (kind, data) => handleEvent(kind, data),
   });
+  // So a shell landing can scatter whatever was sitting on the roofs.
+  battle.life = life;
 
   // The real soldier from FIREBASE, flattened into one instanceable geometry.
   // Loaded after the garrison is posted rather than before it, so a slow or
@@ -277,6 +296,13 @@ async function boot() {
         const t = isl.body.translation();
         fx.impactDust(t.x, terrain.heightAt(t.x, t.z), t.z,
           Math.min(3.5, isl.members.length / 90));
+        // A big section landing throws a column that stands for half a minute,
+        // and everything with wings within a hundred metres leaves.
+        if (isl.members.length > 90) {
+          fx.dustColumn(t.x, terrain.heightAt(t.x, t.z), t.z,
+            Math.min(3.2, isl.members.length / 220));
+        }
+        if (life) life.startle(t.x, t.z, 90 + isl.members.length * 0.5);
         engine.addShake(Math.min(0.55, isl.members.length / 900));
         const where = new THREE.Vector3(t.x, t.y, t.z);
         audio.rumble(Math.min(1, isl.members.length / 260), where);
@@ -423,7 +449,7 @@ async function boot() {
   const testMenu = new TestMenu({
     battle, engine, physics, terrain, rig, quality, level, structures, water,
     cityGroup: cityGroup || contextGroup, hud, picker, fx, garrison, governor,
-    fastForward,
+    life, fastForward,
     stats: () => ({ fps, physMs: +physMs.toFixed(2) }),
     shaderErrors: () => shaderLog,
   });
@@ -447,6 +473,7 @@ async function boot() {
 
     for (const s of structures) s.syncTransforms();
 
+    if (life) life.update(rawDt);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     battle.update(dt);
@@ -477,7 +504,7 @@ async function boot() {
   frame();
 
   Object.assign(window, {
-    engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level,
+    engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level, life,
     structures, tower: primary, primary, picker, hud, water, testMenu,
     cityGroup: cityGroup || contextGroup,
     // Exposed so a console session or the headless harness can build the same

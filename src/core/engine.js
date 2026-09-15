@@ -180,7 +180,15 @@ export class Engine {
     // the afternoon, which is most of what makes a wide shot read as *deep*
     // rather than as a flat map. It has to stay close to the sky's horizon
     // colour or the skyline shows up as a seam.
-    this.scene.fog = new THREE.FogExp2(0xd8d3c4, 0.00052);
+    //
+    // Half the density it was. At the old figure the air was 46% opaque at a
+    // kilometre and 81% at two and a half, which is not depth, it is a wall:
+    // everything past the last street washed to flat grey, so the country
+    // beyond the town could not be seen at all whatever was built out there.
+    // Thinner air keeps the lift and the desaturation that make a wide shot
+    // read as deep, and lets the fields, the airfield and the far skyline
+    // actually arrive.
+    this.scene.fog = new THREE.FogExp2(0xd8d3c4, 0.00026);
   }
 
   _setupComposer() {

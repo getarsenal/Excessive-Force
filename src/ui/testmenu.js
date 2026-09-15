@@ -1354,6 +1354,56 @@ export class TestMenu {
         return `${total.toLocaleString()} props, no road in the water`;
       }],
 
+      ['the map is a place, not a plan', () => {
+        // The complaint this answers: the landmark stood in an apron of bare
+        // paving, every open block was flat and blank, and past the last street
+        // the map was a wash of colour running to the fog. All three are the
+        // same failure — ground with nothing on it and no reason to be empty.
+        const city = this.ctx.cityGroup;
+        const d = city?.userData?.detail || {};
+        const want = {
+          railing: 40,        // something stands round the monument
+          statues: 3,         // and something to look at inside it
+          wall: 60,           // the river's edge is built, not a beach
+          fields: 150,        // there is country beyond the town
+          towers: 40,         // and a skyline at the limit of vision
+          track: 20,          // a railway crosses it
+          programmes: 4,      // open blocks are for something
+        };
+        const thin = Object.entries(want).filter(([k, n]) => !(d[k] >= n));
+        assert(thin.length === 0,
+          `the map is missing: ${thin.map(([k, n]) => `${k} ${d[k] ?? 0}/${n}`).join(', ')}`);
+        // And that edge is the one this river actually has: a parapet with a
+        // balustrade along the Thames, steps down to the water at Agra. Both
+        // are river walls; only one of them has balusters on it.
+        assert((d.balusters || 0) >= 200 || (d.stairs || 0) >= 30,
+          `the river wall has neither a balustrade (${d.balusters || 0}) nor `
+          + `steps down to the water (${d.stairs || 0})`);
+
+        // And the things that move are moving.
+        const life = this.ctx.life;
+        assert(life, 'nothing in this city moves');
+        const cars = life.cars?.cars?.length || 0;
+        assert(cars > 20, `only ${cars} vehicles on a network of ${d.streets} streets`);
+        const before = [];
+        const m = life.cars.mesh;
+        const mat = new THREE.Matrix4();
+        for (let i = 0; i < Math.min(8, m.count); i++) {
+          m.getMatrixAt(i, mat);
+          before.push(mat.elements[12], mat.elements[14]);
+        }
+        life.update(1.0);
+        let moved = 0;
+        for (let i = 0; i < Math.min(8, m.count); i++) {
+          m.getMatrixAt(i, mat);
+          if (Math.abs(mat.elements[12] - before[i * 2]) > 0.5
+            || Math.abs(mat.elements[14] - before[i * 2 + 1]) > 0.5) moved++;
+        }
+        assert(moved > 4, `${moved} of 8 sampled vehicles moved in a second`);
+        return `${d.railing} of railing, ${d.fields} fields, ${d.towers} towers on `
+          + `the skyline, ${d.programmes} blocks with a use, ${cars} vehicles moving`;
+      }],
+
       ['the city is a street network, not a grid of stripes', () => {
         // What this is really checking is the complaint that produced it: the
         // roads were dead straight and went nowhere, houses stood in the

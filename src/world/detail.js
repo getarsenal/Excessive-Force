@@ -51,6 +51,8 @@ export class PropSet {
         vertexColors: true,
         roughness: spec.roughness ?? 0.92,
         metalness: spec.metalness ?? 0.0,
+        emissive: spec.emissive !== undefined ? new THREE.Color(spec.emissive) : 0x000000,
+        emissiveIntensity: spec.emissiveIntensity ?? 1,
         transparent: !!spec.transparent,
         opacity: spec.opacity ?? 1,
         depthWrite: spec.depthWrite !== false,
@@ -69,7 +71,7 @@ export class PropSet {
   }
 }
 
-function tint(geo, hex, jitter) {
+export function tint(geo, hex, jitter) {
   const n = geo.attributes.position.count;
   const c = new THREE.Color(hex).multiplyScalar(jitter);
   const arr = new Float32Array(n * 3);
@@ -78,14 +80,14 @@ function tint(geo, hex, jitter) {
 }
 
 /** A box, placed and yawed in one call. */
-function box(w, h, d, x, y, z, ry = 0) {
+export function box(w, h, d, x, y, z, ry = 0) {
   const g = new THREE.BoxGeometry(w, h, d);
   if (ry) g.rotateY(ry);
   g.translate(x, y, z);
   return g;
 }
 
-function cyl(rt, rb, h, seg, x, y, z) {
+export function cyl(rt, rb, h, seg, x, y, z) {
   const g = new THREE.CylinderGeometry(rt, rb, h, seg);
   g.translate(x, y, z);
   return g;
@@ -392,11 +394,12 @@ export function addRoofAndFrontage(props, terrain, plots, rng, dense) {
  * gives the waterline a hard shadow and a known height, and it is what stops
  * the streets appearing to run straight into the Thames.
  */
-export function addRiverEdge(props, terrain, rng) {
+export function addRiverEdge(props, terrain, rng, opts = {}) {
   const span = terrain.span;
   const step = 7;
-  let wall = 0, stairs = 0;
+  const counts = { wall: 0, stairs: 0, balusters: 0, lamps: 0, rings: 0, moorings: 0 };
   const level = terrain.waterLevel;
+  const ghats = opts.river === 'ghats';
 
   for (let z = -span * 0.96; z < span * 0.96; z += step) {
     // Walk east until the shoreline, from both sides of the map.
@@ -411,22 +414,78 @@ export function addRiverEdge(props, terrain, rng) {
       const gy = terrain.heightAt(x, z);
       if (gy < level - 0.5) continue;
       const h = Math.max(1.0, gy - level + 1.6);
+      const top = level - 1.6 + h;
       props.add('stone', box(2.6, h, step + 0.6, x, level - 1.6 + h / 2, z),
         0x8f8778, 0.86 + rng() * 0.2);
       // Coping: a paler cap along the top of the wall.
-      props.add('stone', box(3.0, 0.32, step + 0.6, x, level - 1.6 + h + 0.16, z),
+      props.add('stone', box(3.0, 0.32, step + 0.6, x, top + 0.16, z),
         0xc3bba8, 0.9 + rng() * 0.16);
-      wall++;
-      // Occasional stair down to the water.
-      if (rng() < 0.05) {
-        for (let k = 0; k < 5; k++) {
+      counts.wall++;
+
+      if (ghats) {
+        // The Yamuna side is steps down to the water, not a parapet: broad
+        // shallow ghats running the length of the bank.
+        for (let k = 0; k < 6; k++) {
+          props.add('stone', box(1.6, 0.34, step + 0.4,
+            x + dir * (1.6 + k * 1.5), top - k * 0.36, z),
+            0xb2a68d, 0.88 + rng() * 0.2);
+        }
+        counts.stairs++;
+        continue;
+      }
+
+      // ── A parapet, and above it a stone balustrade: the thing that makes an
+      // embankment read as an embankment from any distance is the *dotted*
+      // line of light and shadow along its top, which a solid wall does not
+      // give you.
+      props.add('stone', box(0.55, 0.36, step + 0.6, x - dir * 0.9, top + 0.5, z),
+        0xbdb5a2, 0.94);
+      props.add('stone', box(0.55, 0.3, step + 0.6, x - dir * 0.9, top + 1.42, z),
+        0xc7bfab, 0.94);
+      const bal = Math.max(3, Math.round(step / 1.1));
+      for (let k = 0; k < bal; k++) {
+        const bz = z - step / 2 + (k + 0.5) * (step / bal);
+        props.add('stone', cyl(0.13, 0.19, 0.9, 6, x - dir * 0.9, top + 1.0, bz),
+          0xc1b9a6, 0.9 + rng() * 0.14);
+        counts.balusters++;
+      }
+
+      // Sturgeon lamps along the parapet, and mooring rings below them.
+      if (Math.abs(z % (step * 5)) < step * 0.5) {
+        const lx = x - dir * 0.9;
+        props.add('metal', cyl(0.3, 0.42, 1.1, 8, lx, top + 2.1, z), 0x2c3a3a, 1);
+        props.add('metal', cyl(0.1, 0.16, 4.6, 6, lx, top + 4.7, z), 0x30403f, 1);
+        props.add('metal', box(0.72, 0.9, 0.72, lx, top + 7.3, z), 0x283634, 1);
+        // The lamp itself, bright enough to read at dusk.
+        props.add('glow', box(0.5, 0.62, 0.5, lx, top + 7.3, z), 0xffe6b4, 1);
+        counts.lamps++;
+      }
+      if (rng() < 0.12) {
+        props.add('metal', cyl(0.28, 0.28, 0.12, 8, x + dir * 1.2, level + 0.9, z),
+          0x3b3f42, 1);
+        counts.rings++;
+      }
+      // Occasional stair down to the water, with a landing at the bottom.
+      if (rng() < 0.045) {
+        for (let k = 0; k < 6; k++) {
           props.add('stone', box(2.0, 0.3, 1.0 + k * 0.2,
-            x + dir * (1.4 + k * 0.5), level - 1.4 + h - k * 0.42, z),
+            x + dir * (1.4 + k * 0.5), top - 0.2 - k * 0.42, z),
             0xa39a88, 0.9);
         }
-        stairs++;
+        props.add('stone', box(3.0, 0.3, 4.0, x + dir * 4.4, level + 0.35, z),
+          0x9d9483, 0.92);
+        counts.stairs++;
+      }
+      // A moored barge or launch, tied against the wall.
+      if (rng() < 0.05) {
+        const bx = x + dir * 5.5;
+        props.add('dark', box(4.4, 1.5, 15, bx, level + 0.4, z), 0x3b4249,
+          0.86 + rng() * 0.24);
+        props.add('paint', box(3.4, 1.3, 5.5, bx, level + 1.6, z - 3), 0xb8b2a2, 1);
+        props.add('paint', box(0.2, 2.6, 0.2, bx, level + 2.6, z + 4), 0xd8d2c2, 1);
+        counts.moorings++;
       }
     }
   }
-  return { wall, stairs };
+  return counts;
 }

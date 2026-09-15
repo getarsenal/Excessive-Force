@@ -40,7 +40,17 @@ export const LEVELS = {
       g.populatePalaceWing(origin, groundY);
     },
     // A tower is a cantilever: losing two thirds of its height is unambiguous.
-    win: { integrity: 0.30, heightFrac: 0.34 },
+    // What actually stands round the Palace of Westminster, so the precinct
+    // reads as that place rather than as an apron of paving. Level data, not a
+    // special case in the builder: the next map describes its own.
+    precinct: {
+      boundary: 'railings',       // ironwork on a stone plinth, and gate piers
+      ground: 'lawn',             // green with paved walks, not bare stone
+      ornament: 'statues',        // figures on plinths, the way a square has
+      river: 'embankment',        // granite parapet, balustrade, sturgeon lamps
+      obelisk: true,              // Cleopatra's Needle, on the bank
+      pier: true,                 // Westminster Pier, moored on the river
+    },
     // The wing is 170 m of three-storey masonry. It has no topple in it, so
     // height is meaningless here and the only honest measure is how much of it
     // is left — but it is also four times the tower's footprint and grinding
@@ -76,6 +86,12 @@ export const LEVELS = {
     // outweighs everything standing on it, and counting it would mean the dome
     // could fall with the readout barely moving.
     scoreTags: ['tomb', 'chamber', 'iwans', 'drum', 'dome', 'finial', 'chattris', 'minarets'],
+    precinct: {
+      boundary: 'sandstone',      // the red wall with its crenellated coping
+      ground: 'charbagh',         // the quartered garden and its water channel
+      ornament: 'pavilions',      // chattris on the terrace corners
+      river: 'ghats',             // steps down to the Yamuna
+    },
     win: { integrity: 0.42, heightFrac: 0.30 },
     brief: 'The dome stands on four piers. Shelling the shell only makes holes.',
   },

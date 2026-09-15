@@ -420,6 +420,43 @@ export class ExplosionFX {
     }
   }
 
+  /**
+   * The column that stands over a collapse.
+   *
+   * A building coming down throws a plume that keeps rising for half a minute
+   * after the noise stops and then leans over and drifts — and it is the single
+   * most recognisable thing about the event. The impact dust above is the right
+   * shape for a section hitting the ground and much too short-lived for this: it
+   * is gone in three seconds, so the aftermath of a ninety-metre tower looked
+   * like the aftermath of a dropped brick.
+   *
+   * Slow, large, long-lived particles with almost no gravity and a steady drift,
+   * seeded up a vertical line so the column has height from the moment it
+   * appears rather than growing out of a puddle.
+   */
+  dustColumn(x, y, z, strength = 1) {
+    const s = THREE.MathUtils.clamp(strength, 0.5, 4);
+    const n = Math.round(26 * s);
+    const wind = 0.6 + Math.random() * 0.5;
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const a = Math.random() * Math.PI * 2;
+      const r = (2 + Math.random() * 9) * s * (0.4 + t);
+      this.dust.spawn({
+        x: x + Math.cos(a) * r,
+        y: y + t * 26 * s + Math.random() * 6,
+        z: z + Math.sin(a) * r,
+        vx: Math.cos(a) * (1.2 + Math.random() * 2.4) + wind * 3.4,
+        vy: 3.4 + Math.random() * 5.5 * s,
+        vz: Math.sin(a) * (1.2 + Math.random() * 2.4) + wind * 1.1,
+        life: 11 + Math.random() * 13,
+        size0: 6 * s, size1: (26 + Math.random() * 26) * s,
+        color0: this._c.dust, color1: this._c.dustFade,
+        drag: 0.32, grav: -0.05, turb: 0.5, alpha: 0.34,
+      });
+    }
+  }
+
   /** Muzzle flash for a firing gun. */
   muzzleFlash(pos, dir, power) {
     const scale = Math.pow(power, 0.5);

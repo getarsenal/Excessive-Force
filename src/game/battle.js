@@ -756,6 +756,7 @@ export class Battle {
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 4.0;
     this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
+    if (this.life) this.life.startle(point.x, point.z, 60 + w.fx * 40);
     // A round that falls short leaves a mark. Cheap, and it turns a miss into
     // information: you can see where the sheaf is actually landing.
     if (nearGround && this.craters) this.craters.add(point.x, groundY, point.z, w.radius);
