@@ -112,6 +112,7 @@ export const LEVELS = {
     // ground for three hundred metres beyond that; the city starts where the
     // park ends.
     cityExcludeRadius: 210,
+    contextExclude: 180,
     camera: { yaw: 0.62, pitch: 0.30, distance: 560, height: 120 },
     structures: (quality) => [
       { key: 'eiffel', blocks: buildEiffelTower(quality), primary: true,
@@ -163,6 +164,7 @@ export const LEVELS = {
       dry: new THREE.Color(0xe0cda0),
     },
     cityExcludeRadius: 460,
+    contextExclude: 460,
     camera: { yaw: -0.55, pitch: 0.33, distance: 640, height: 130 },
     structures: (quality) => [
       { key: 'khufu', blocks: buildGreatPyramid(quality), primary: true,

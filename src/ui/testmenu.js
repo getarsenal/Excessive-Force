@@ -843,17 +843,33 @@ export class TestMenu {
 
       ['the building blocks line of sight', () => {
         const st = b.primary;
-        const y = b.originGround + Math.max(6, (st.standingHeight() - b.originGround) * 0.3);
-        const reach = 140;
-        const a = new THREE.Vector3(st.origin.x - reach, y, st.origin.z);
-        const d = new THREE.Vector3(st.origin.x + reach, y, st.origin.z);
-        assert(!lineOfSight(c.structures, a, d, 0, 0),
-          'a line straight through the building came back clear');
-        const high = b.originGround + 400;
+        // Sampled at several heights, not one.
+        //
+        // A single probe at 30 % of the height used to be safe, and stopped
+        // being safe the moment the tower got twelve storeys of windows
+        // instead of six: 30 % landed exactly on a bay, and a horizontal ray
+        // through two aligned 3.4 m openings genuinely is not blocked. That is
+        // the building behaving correctly — defenders shoot out of those
+        // windows — so what the assertion should say is that the building is
+        // mostly opaque, not that every line through it is.
+        const top = st.standingHeight();
+        const reach = Math.max(140, (st.footprint ? st.footprint.x1 - st.footprint.x0 : 0) * 1.6);
+        const hs = [0.18, 0.3, 0.42, 0.54, 0.66];
+        let blocked = 0;
+        for (const f of hs) {
+          const y = b.originGround + Math.max(6, (top - b.originGround) * f);
+          const a2 = new THREE.Vector3(st.origin.x - reach, y, st.origin.z);
+          const d2 = new THREE.Vector3(st.origin.x + reach, y, st.origin.z);
+          if (!lineOfSight(c.structures, a2, d2, 0, 0)) blocked++;
+        }
+        assert(blocked >= hs.length - 1,
+          `only ${blocked} of ${hs.length} lines through the building were blocked`);
+        const high = b.originGround + top + 200;
         assert(lineOfSight(c.structures,
-          new THREE.Vector3(a.x, high, a.z), new THREE.Vector3(d.x, high, d.z), 0, 0),
-        'a line 400 m over the building came back blocked');
-        return 'through blocked, over clear';
+          new THREE.Vector3(st.origin.x - reach, high, st.origin.z),
+          new THREE.Vector3(st.origin.x + reach, high, st.origin.z), 0, 0),
+        'a line 200 m over the building came back blocked');
+        return `${blocked}/${hs.length} through blocked, over clear`;
       }],
 
       ['defenders stand on real masonry', () => {

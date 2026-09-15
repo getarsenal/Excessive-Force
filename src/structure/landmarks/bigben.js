@@ -267,10 +267,21 @@ export function buildElizabethTower(quality) {
       }
     }
     // Arches spanning between the piers, then the lintel course they carry.
-    const archY = BELFRY_TOP - 4.4;
+    //
+    // Set low enough that the crown clears the cornice above. A 6.4 m arch
+    // springing 4.4 m below the belfry top crests 1 m *inside* the cornice,
+    // and two stones sharing a cubic metre is how ten blocks of it ended up
+    // starting the level detached.
+    // Wide enough to land on the corner piers. A 6.4 m arch between piers
+    // 10.4 m apart puts both feet in the middle of an opening, and the
+    // voussoirs near the crown then have nothing holding them up at all.
+    const pier = bw / 2 - 1.1;
+    const archY = BELFRY_TOP - CORNICE - pier - 0.2;
     for (const side of [1, -1]) {
-      B.arch(0, archY, side * (bw / 2 - 0.9), 6.4, 1.6, 0.9, Math.max(5, Math.round(9 / s)), M.REDSTONE, 'x');
-      B.arch(side * (bw / 2 - 0.9), archY, 0, 6.4, 1.6, 0.9, Math.max(5, Math.round(9 / s)), M.REDSTONE, 'z');
+      B.arch(0, archY, side * (bw / 2 - 0.9), pier * 2, 1.6, 0.9,
+        Math.max(5, Math.round(9 / s)), M.REDSTONE, 'x');
+      B.arch(side * (bw / 2 - 0.9), archY, 0, pier * 2, 1.6, 0.9,
+        Math.max(5, Math.round(9 / s)), M.REDSTONE, 'z');
     }
     // The cornice: a continuous ring closing the arcade, bearing on every pier
     // and on the crowns of the arches. This is what the roof slab — and

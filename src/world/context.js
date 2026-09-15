@@ -56,9 +56,15 @@ export function buildContext(terrain, quality, opts = {}) {
   // building in the middle of it, which from above reads as a car park with a
   // monument parked on it. Sixty-six brings the city up to the edge of the
   // square, which is where a city stands in relation to a landmark.
-  // A level whose landmark is a quarter of a kilometre across says so: Giza
-  // keeps the whole plateau clear, because a pyramid with a terrace of houses
-  // against its casing is not Giza.
+  // A level whose landmark is a quarter of a kilometre across says so through
+  // `contextExclude`: Giza keeps the whole plateau clear, because a pyramid
+  // with a terrace of houses against its casing is not Giza.
+  //
+  // Deliberately *not* `cityExcludeRadius`, which belongs to the baked-OSM
+  // path. Wiring that one through here instead moved Westminster's exclusion
+  // from 66 m to 150 m, which reshapes the entire street network — and took
+  // four assertions down with it, none of which looked like they had anything
+  // to do with the city.
   const EXCLUDE = opts.exclude || 66;
 
   // ── The bridge comes first, because the street network has to know where it

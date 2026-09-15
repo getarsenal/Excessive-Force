@@ -116,7 +116,7 @@ async function boot() {
       + `${cityGroup.userData.available} buildings — ${city.source}`);
   } else {
     contextGroup = buildContext(terrain, quality, {
-      landmarks, precinct: level.precinct, exclude: level.cityExcludeRadius,
+      landmarks, precinct: level.precinct, exclude: level.contextExclude,
     });
     engine.scene.add(contextGroup);
     console.log(`[tumble] city: hand-placed approximation, `
