@@ -2129,6 +2129,23 @@ export class Structure {
         }
       }
 
+      // Nothing waits out of plumb for a commitment that is not coming.
+      //
+      // With the bearing ratchet in place a lean can no longer straighten once
+      // it is properly over, so a slice that stops being condemned by the
+      // analysis would otherwise hold its angle for the rest of the level.
+      // After a couple of seconds of that, the decision is made for it: a
+      // tower that has stood at five degrees for two seconds is going over.
+      if (over <= 0.001 && L.angle > 0.026) {
+        L.idle = (L.idle || 0) + dt;
+        if (L.idle > 2.5) {
+          L.committed = true;
+          L.vel = Math.max(L.vel, 0.05);
+        }
+      } else {
+        L.idle = 0;
+      }
+
       // Lightly damped second-order chase, so it sways rather than sliding.
       const k = 26, c = 1.6;
       L.vel += (k * (L.target - L.angle) - c * L.vel) * dt;
@@ -2154,11 +2171,23 @@ export class Structure {
     L.poll = (L.poll || 0) + dt;
     if (L.poll > 0.4) { L.poll = 0; this.stabilityDirty = true; }
 
-    // Hand over on the angle, never on the tipping test. Passing the tipping
-    // point is what *starts* the fall, not what finishes it — a section handed
-    // to the physics engine while it is still essentially upright simply sits
-    // back down on its own stumps, which is what it did.
-    if (L.angle > LEAN_CRITICAL) {
+    // Hand over on the angle *and* on commitment, which are two different
+    // questions and both have to be yes.
+    //
+    // The angle alone was the rule, on the grounds that passing the tipping
+    // point is what starts a fall rather than what finishes it — a section
+    // handed over while essentially upright sits back down on its own stumps.
+    // True, and the mirror of it is just as true: a section handed over at
+    // seven and a half degrees that has *never* had its resultant outside its
+    // bearing is still a stable stack, and Rapier quite correctly leaves it
+    // standing. Measured on a failing run: peak lean 7.58°, handed over at
+    // 7.45°, and the tower finished the test sixty-eight per cent intact and
+    // exactly as tall as it started.
+    //
+    // So: it goes when it is leaning far enough *and* something has actually
+    // committed it — the resultant has walked outside the bearing at some
+    // point — or when it is so far out of plumb that the question is academic.
+    if (L.angle > LEAN_CRITICAL && (L.committed || L.angle > 0.21)) {
       // Going over. Hand it to Rapier from exactly where it is standing now,
       // moving exactly the way it is already moving.
       const band = L.band;
