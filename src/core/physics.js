@@ -306,6 +306,7 @@ export class PhysicsWorld {
         continue;
       }
       if (this._standsOnSomething(body)) {
+        body.__hangStrikes = 0;
         this._auditCursor++;
         continue;
       }
@@ -313,14 +314,30 @@ export class PhysicsWorld {
       // that has already come to rest.
       if (this.dynamicSet.size >= this.activeBudget) this.reclaim(1);
       if (!this.promote(body)) {
-        // No room for this one. Keep going rather than stopping the sweep
-        // here: stopping is how the cursor ends up advancing one place a
-        // frame, taking a minute to cross a list of two thousand — which is
-        // long enough for the player to see a stone hanging and wonder why
-        // nothing is happening about it.
-        this._auditCursor++;
+        // No room. Keep going rather than stopping the sweep here — stopping
+        // is how the cursor ends up advancing one place a frame, taking half a
+        // minute to cross a list of two thousand.
+        //
+        // And if there is *still* no room after several passes, give up and
+        // delete the stone. On a phone the budget can be genuinely full for
+        // long stretches, and then a stone that has lost its footing can never
+        // be released at all: it hangs there for the rest of the match. One
+        // brick vanishing out of a rubble field is not something anyone will
+        // notice; one brick hanging in the sky is the thing people photograph.
+        body.__hangStrikes = (body.__hangStrikes || 0) + 1;
+        if (body.__hangStrikes < 3) { this._auditCursor++; continue; }
+        const owner = this.owners.get(body.handle);
+        list[idx] = list[list.length - 1];
+        list.pop();
+        if (owner && owner.structure && owner.chunk !== undefined) {
+          owner.structure.destroyChunk(owner.chunk);
+        } else {
+          this.remove(body);
+        }
+        this.hangingCulled = (this.hangingCulled || 0) + 1;
         continue;
       }
+      body.__hangStrikes = 0;
       list[idx] = list[list.length - 1];
       list.pop();
       woke++;
