@@ -22,6 +22,7 @@ export const MATERIALS = {
   CONCRETE: 6,   // foundations, modern context
   MARBLE: 7,     // Makrana marble, the Taj's facing
   SANDSTONE: 8,  // Agra red sandstone
+  REDSTONE: 9,   // the Palace of Westminster's own warm red-brown stone
 };
 
 /**
@@ -41,6 +42,15 @@ export const MATERIAL_PROPS = {
   [MATERIALS.CONCRETE]:  { density: 2.35, strength: 1.45, toughness: 150, color: 0xa39c8e, structural: true },
   [MATERIALS.MARBLE]:    { density: 2.70, strength: 1.08, toughness: 112, color: 0xf4ece0, structural: true },
   [MATERIALS.SANDSTONE]: { density: 2.30, strength: 0.82, toughness: 84,  color: 0xb85f3e, structural: true },
+  // Anston limestone weathered to the warm red-brown the tower reads as
+  // against a low sun. Physically it is limestone; only the colour differs.
+  //
+  // Deliberately undersaturated. Every stone's saturation is then multiplied
+  // by up to 1.4 by the per-stone jitter and pushed again by the ACES grade on
+  // the way to the screen, so a swatch that looks like the right red here
+  // comes out of the pipeline as a traffic cone — which is exactly what the
+  // first attempt at this did to the whole Palace of Westminster.
+  [MATERIALS.REDSTONE]:  { density: 2.45, strength: 1.00, toughness: 100, color: 0xa87b6c, structural: true },
 };
 
 
@@ -68,6 +78,29 @@ export class BlockList {
   }
 
   get length() { return this.blocks.length; }
+
+  /**
+   * Scale the whole structure about its own origin.
+   *
+   * A landmark is written at its real dimensions, which is what makes the
+   * builder readable and checkable against survey figures — so making one
+   * bigger is a transform applied afterwards rather than a hundred edited
+   * constants that then have to be kept in step with the garrison.
+   *
+   * The joint shrink each stone was laid with scales too, so a doubled tower
+   * has 3 cm joints rather than 1.5 cm. That is still well inside the 7.5 cm
+   * the support solver treats as touching, which is the number that matters:
+   * open the joints past it and the building silently stops being connected
+   * to itself.
+   */
+  scaleAll(k) {
+    if (k === 1) return this;
+    for (const b of this.blocks) {
+      b.x *= k; b.y *= k; b.z *= k;
+      b.hx *= k; b.hy *= k; b.hz *= k;
+    }
+    return this;
+  }
 
   /** Group the blocks emitted by `fn` under a name, for gameplay queries. */
   section(tag, fn) {

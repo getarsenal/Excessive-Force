@@ -27,8 +27,11 @@ export const LEVELS = {
     name: 'Westminster, London',
     target: 'ELIZABETH TOWER',
     subtitle: 'Elizabeth Tower · Westminster',
-    cityExcludeRadius: 70,
-    camera: { yaw: -0.78, pitch: 0.40, distance: 235, height: 42 },
+    // The tower is twice life size, so everything framed around it moves out
+    // with it: the camera sits back far enough to hold 192 m of masonry, and
+    // the city keeps clear of a palace with twice the footprint.
+    cityExcludeRadius: 150,
+    camera: { yaw: -0.78, pitch: 0.40, distance: 430, height: 84 },
     structures: (quality) => [
       { key: 'tower', blocks: buildElizabethTower(quality), primary: true,
         required: true, label: 'ELIZABETH TOWER' },

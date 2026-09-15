@@ -97,7 +97,12 @@ export class Engine {
 
     if (quality.shadowMapSize > 0) {
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFShadowMap;
+      // Soft PCF rather than hard. The shadow map covers 1.36 km with a low
+      // sun, so one texel is a metre or more on the ground and a hard lookup
+      // draws every shadow edge as a staircase — most visible along the long
+      // diagonal edges the city's own buildings cast across the streets. The
+      // soft filter costs three extra taps and turns those into an edge.
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
 
     this.scene = new THREE.Scene();

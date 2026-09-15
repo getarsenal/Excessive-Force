@@ -36,9 +36,56 @@ export class Terrain {
     }
 
     this.cellSize = (this.span * 2) / (n - 1);
+    this._relax();
     this.waterLevel = this._computeWaterLevel();
     this.mesh = null;
     this.collider = null;
+  }
+
+  /**
+   * Take the stair-steps out of the elevation data.
+   *
+   * The source DEM quantises to a metre and its tiles are about ten metres to
+   * the pixel, upsampled here to three and a half. What arrives is therefore
+   * not a smooth landscape but a flight of one-metre terraces, and on ground
+   * with twenty-eight metres of relief across the whole map those terraces are
+   * most of the shading: the ground read as a contour model rather than as
+   * land.
+   *
+   * Two passes of a 3x3 binomial blur, weighted so it cannot drift the overall
+   * elevation. Wet cells are held back from the blur — the river channel was
+   * deliberately carved with a sharp shoulder, and smoothing across it fills
+   * the channel in and lifts the bed towards the bank.
+   */
+  _relax() {
+    const n = this.size;
+    const h = this.heights;
+    const m = this.mask;
+    const tmp = new Float32Array(n * n);
+    for (let pass = 0; pass < 2; pass++) {
+      for (let z = 0; z < n; z++) {
+        for (let x = 0; x < n; x++) {
+          const i = z * n + x;
+          if (m[i * 3] > 0.5) { tmp[i] = h[i]; continue; }
+          let sum = 0, wsum = 0;
+          for (let dz = -1; dz <= 1; dz++) {
+            const zz = z + dz;
+            if (zz < 0 || zz >= n) continue;
+            for (let dx = -1; dx <= 1; dx++) {
+              const xx = x + dx;
+              if (xx < 0 || xx >= n) continue;
+              const j = zz * n + xx;
+              // Never pull the bed of the river up into the bank.
+              if (m[j * 3] > 0.5) continue;
+              const w = (dx === 0 ? 2 : 1) * (dz === 0 ? 2 : 1);
+              sum += h[j] * w; wsum += w;
+            }
+          }
+          tmp[i] = wsum > 0 ? sum / wsum : h[i];
+        }
+      }
+      h.set(tmp);
+    }
   }
 
   _computeWaterLevel() {
@@ -53,7 +100,18 @@ export class Terrain {
     return minWet + 5.4;
   }
 
-  /** Bilinear ground height at world (x, z). Metres, world units. */
+  /**
+   * Ground height at world (x, z). Metres, world units.
+   *
+   * Smooth-bilinear rather than plain bilinear: the cell fractions are put
+   * through a smoothstep first. Straight bilinear is continuous but its
+   * *slope* is not — it changes abruptly at every cell boundary — so the
+   * ground picks up a crease along each of the 512 grid lines, and the
+   * terrain mesh reads as a sheet of folded paper wherever the sun rakes
+   * across it. Easing the fractions costs two multiplies and a subtract per
+   * axis and makes the surface smooth in the derivative, which is what the
+   * eye is actually judging.
+   */
   heightAt(x, z) {
     const n = this.size;
     // Clamped, so sampling past the DEM extends the border height outward
@@ -64,7 +122,9 @@ export class Terrain {
     const v = THREE.MathUtils.clamp((this.span - z) / (this.span * 2) * (n - 1), 0, n - 1);
     const x0 = Math.floor(u), z0 = Math.floor(v);
     const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
-    const fx = u - x0, fz = v - z0;
+    const ux = u - x0, uz = v - z0;
+    const fx = ux * ux * (3 - 2 * ux);
+    const fz = uz * uz * (3 - 2 * uz);
     const h = this.heights;
     const a = h[z0 * n + x0], b = h[z0 * n + x1];
     const c = h[z1 * n + x0], d = h[z1 * n + x1];
@@ -209,10 +269,34 @@ export class Terrain {
       // distance against.
       tmp.lerp(P.road, THREE.MathUtils.clamp(m.road * 1.35, 0, 1) * 0.82);
 
-      // Then the water margin, which overrides everything: silt at the line,
-      // cold green below it.
-      const wet = THREE.MathUtils.clamp((this.waterLevel + 1.2 - h) / 3.2, 0, 1);
-      tmp.lerp(P.bank, wet * 0.8);
+      // Then the water margin, which overrides everything.
+      //
+      // The foreshore is the part of this that was wrong. Driving it from
+      // height alone put the silt in a band of exactly constant width all the
+      // way along both banks, so the river met the land on a drawn line — the
+      // one edge in the whole frame with no texture in it, and the first thing
+      // the eye goes to. A real foreshore is ragged: it is wide where the bank
+      // shelves and pinches to nothing where it is steep, and it is strewn
+      // with the stuff the tide leaves.
+      //
+      // So the waterline is perturbed by two octaves of noise along the bank,
+      // and the silt band is widened where the ground is shallow. `shelf` is
+      // the local gradient, measured by sampling eight metres out: flat ground
+      // gets a beach, a steep bank gets a lip.
+      const ripple = (valueNoise(x * 0.018 + 5.1, z * 0.018 - 2.3) - 0.5) * 2.4
+                   + (valueNoise(x * 0.071 - 8.8, z * 0.071 + 4.4) - 0.5) * 0.9;
+      const slope = Math.abs(this.heightAt(x + 8, z) - this.heightAt(x - 8, z))
+                  + Math.abs(this.heightAt(x, z + 8) - this.heightAt(x, z - 8));
+      const shelf = THREE.MathUtils.clamp(1 - slope / 2.4, 0, 1);
+      // Measured in *height* above the waterline, so it has to shrink on flat
+      // ground, not grow: a six-metre band on a shelving bank is a hundred
+      // metres of beach in plan, and the first cut of this turned both banks
+      // of the Thames into the Wash. A steep bank can take a taller band
+      // because a tall band there is still only a few metres wide.
+      const margin = 1.1 + (1 - shelf) * 2.2;
+      const wet = THREE.MathUtils.clamp(
+        (this.waterLevel + margin + ripple * 0.5 - h) / (1.4 + (1 - shelf) * 2.0), 0, 1);
+      tmp.lerp(P.bank, Math.pow(wet, 1.3) * 0.86);
       tmp.lerp(P.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
 
       // Fine mottling on top of all of it.

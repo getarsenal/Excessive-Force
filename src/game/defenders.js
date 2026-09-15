@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
-import { TOWER_WINDOWS, WING_WINDOWS } from '../structure/landmarks/bigben.js';
+import { TOWER, WING } from '../structure/landmarks/bigben.js';
 
 /**
  * The garrison.
@@ -463,7 +463,10 @@ export class Garrison {
    * the belfry arcade, and a mortar section on the palace roof.
    */
   populateElizabethTower(origin, groundY, counts = {}) {
-    const W = 12.2;
+    // Every figure comes from `TOWER`, which is the builder's own. These used
+    // to be copied out by hand, and scaling the tower then moved the masonry
+    // and left the garrison standing in mid-air where the old walls had been.
+    const W = TOWER.width;
     const faces = [
       { nx: 0, nz: 1, yaw: 0 },
       { nx: 0, nz: -1, yaw: Math.PI },
@@ -471,13 +474,16 @@ export class Garrison {
       { nx: -1, nz: 0, yaw: -Math.PI / 2 },
     ];
 
-    // Sandbagged positions at the foot of the tower, on the plinth.
-    const ground = counts.ground ?? 10;
+    // Sandbagged positions at the foot of the tower — on the ground, ringing
+    // the plinth. They used to be put half way up it, which is neither on the
+    // plinth (that is where the shaft's own wall stands) nor on the ground, so
+    // the first sweep for men standing on nothing culled every one of them.
+    const ground = counts.ground ?? 20;
     for (let i = 0; i < ground; i++) {
       const a = (i / ground) * Math.PI * 2;
-      const r = 11.5;
+      const r = W * 0.80;
       const p = new THREE.Vector3(
-        origin.x + Math.cos(a) * r, groundY + 5.4, origin.z + Math.sin(a) * r,
+        origin.x + Math.cos(a) * r, groundY + 0.9, origin.z + Math.sin(a) * r,
       );
       this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(Math.cos(a), Math.sin(a)), 8,
         { cover: 'ground', sandbags: true });
@@ -485,79 +491,94 @@ export class Garrison {
 
     // In the window bays. The embrasure's sill is the floor they stand on, and
     // they sit *inside* the wall plane so the reveal covers them from the side.
-    const { heights, halfHeight } = TOWER_WINDOWS;
+    const { heights, halfHeight } = TOWER.windows;
     for (let li = 0; li < heights.length; li++) {
       const wy = heights[li];
-      const t = (wy - 6.0) / (61.0 - 6.0);
-      const wall = 2.3 - t * 1.4;
-      const w = W - t * 0.5;
-      const inset = w / 2 - wall * 0.35;
+      const inset = TOWER.widthAt(wy) / 2 - TOWER.wallAt(wy) * 0.35;
+      const band = li / Math.max(1, heights.length - 1);
       for (const f of faces) {
-        const p = new THREE.Vector3(
-          origin.x + f.nx * inset,
-          groundY + wy - halfHeight + 0.28,
-          origin.z + f.nz * inset,
-        );
-        const t2 = li >= 4 ? 'sniper' : li >= 2 ? 'mg' : 'rifleman';
-        this.place(t2, p, f.yaw, 4.0, { cover: 'window' });
+        // Two to an embrasure. The openings are 3.4 m across at this scale,
+        // which is a fire position for a section rather than for one man.
+        for (const along of [-1, 1]) {
+          const p = new THREE.Vector3(
+            origin.x + f.nx * inset + along * f.nz * 0.85,
+            groundY + wy - halfHeight + 0.56,
+            origin.z + f.nz * inset + along * f.nx * 0.85,
+          );
+          const t2 = band >= 0.66 ? 'sniper' : band >= 0.33 ? 'mg' : 'rifleman';
+          this.place(t2, p, f.yaw, 4.0 * TOWER.scale, { cover: 'window' });
+        }
       }
     }
 
-    // Clock stage corners — long sightlines over the whole of Westminster.
-    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    // Clock stage — long sightlines over the whole of Westminster. Eight men
+    // spaced round the stage rather than two flung out past each corner: the
+    // surround is 26 m across and anything beyond that is standing in the air.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const r = W / 2 - 0.6;
       const p = new THREE.Vector3(
-        origin.x + sx * (W / 2 + 0.4), groundY + 59.0, origin.z + sz * (W / 2 + 0.4),
+        origin.x + Math.cos(a) * r, groundY + TOWER.clockY + 8.0,
+        origin.z + Math.sin(a) * r,
       );
-      this.place('sniper', p, Math.atan2(sx, sz), 6, { cover: 'roof' });
+      this.place('sniper', p, Math.atan2(Math.cos(a), Math.sin(a)), 6, { cover: 'roof' });
     }
 
     // Belfry arcade: AT teams with the best field of fire in the level. Drop
-    // the belfry and the whole upper garrison goes with it.
+    // the belfry and the whole upper garrison goes with it. Two per face.
     for (const f of faces) {
-      const p = new THREE.Vector3(
-        origin.x + f.nx * 6.0, groundY + 64.5, origin.z + f.nz * 6.0,
-      );
-      this.place('at', p, f.yaw, 7, { cover: 'arcade' });
+      for (const along of [-1, 1]) {
+        const p = new THREE.Vector3(
+          origin.x + f.nx * (W * 0.49) + along * f.nz * 3.6,
+          groundY + TOWER.belfryTop - 8.0,
+          origin.z + f.nz * (W * 0.49) + along * f.nx * 3.6,
+        );
+        this.place('at', p, f.yaw, 7, { cover: 'arcade' });
+      }
     }
 
-    // Two mortars on the belfry roof slab, which can range the entire map.
+    // Mortars on the belfry roof slab, which can range the entire map.
     for (const sx of [-1, 1]) {
-      this.place('mortar',
-        new THREE.Vector3(origin.x + sx * 3.4, groundY + 70.4, origin.z),
-        0, 6, { cover: 'roof' });
+      for (const sz of [-1, 1]) {
+        this.place('mortar',
+          new THREE.Vector3(origin.x + sx * 5.6, groundY + TOWER.belfryTop + 3.4,
+            origin.z + sz * 5.6),
+          0, 6, { cover: 'roof' });
+      }
     }
   }
 
   populatePalaceWing(origin, groundY) {
-    const z0 = 14, len = 74, depth = 22;
-    const { heights, first, spacing, halfHeight, roof } = WING_WINDOWS;
+    const { z0, len, depth } = WING;
+    const { heights, first, spacing, halfHeight, roof } = WING.windows;
 
     // One man per window bay on both elevations, weighted so the upper floors
     // hold the longer-ranged weapons.
     for (let li = 0; li < heights.length; li++) {
       const wy = heights[li];
-      for (let bz = z0 + first; bz < z0 + len - 3; bz += spacing) {
+      for (let bz = z0 + first; bz < z0 + len - 6; bz += spacing) {
         for (const sx of [1, -1]) {
           const p = new THREE.Vector3(
-            origin.x + sx * (depth / 2 - 1.15),
-            groundY + wy - halfHeight + 0.3,
+            origin.x + sx * (depth / 2 - 2.3),
+            groundY + wy - halfHeight + 0.6,
             origin.z + bz,
           );
           const t = li === 2 ? 'sniper' : li === 1 ? 'mg' : 'rifleman';
-          this.place(t, p, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 3.4, { cover: 'window' });
+          this.place(t, p, sx > 0 ? Math.PI / 2 : -Math.PI / 2, 3.4 * WING.scale,
+            { cover: 'window' });
         }
       }
     }
 
-    // Roof: AT teams behind the parapet, and a mortar pit amidships.
-    for (let i = 0; i < 3; i++) {
-      const z = origin.z + z0 + 16 + i * 20;
-      this.place('at', new THREE.Vector3(origin.x, groundY + roof + 7.2, z), 0, 8,
+    // Roof: AT teams behind the parapet, and mortar pits amidships.
+    for (let i = 0; i < 6; i++) {
+      const z = origin.z + z0 + 32 + i * 20;
+      this.place('at', new THREE.Vector3(origin.x, groundY + roof + 14.4, z), 0, 8,
         { cover: 'roof' });
     }
-    for (const off of [10, 44, 62]) {
+    for (const off of [20, 60, 88, 124]) {
       this.place('mortar',
-        new THREE.Vector3(origin.x + 6.5, groundY + roof + 1.4, origin.z + z0 + off),
+        new THREE.Vector3(origin.x + 13.0, groundY + roof + 2.8, origin.z + z0 + off),
         0, 7, { cover: 'roof' });
     }
   }

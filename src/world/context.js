@@ -269,6 +269,24 @@ export function buildContext(terrain, quality, opts = {}) {
     scaleBoxUVs(body, w, bodyH, d, 3.5);
     push(bodies, body, x, g + bodyH / 2, z, ry);
 
+    // A plinth at the pavement and a string course under the eaves.
+    //
+    // Two boxes, forty centimetres proud of the wall. Without them a building
+    // is a rectangle of facade texture that meets the ground on a line and the
+    // sky on a line, which is why the city read as a tray of blocks however
+    // much the roofs were varied: a real elevation is banded, and the bands
+    // are what catch the light and tell you which way is up. The plinth also
+    // does the work a contact shadow would — the wall no longer appears to
+    // float a few centimetres over its own pavement.
+    if (Math.min(w, d) > 5) {
+      push(roofs, new THREE.BoxGeometry(w + 0.5, Math.min(1.5, 0.9 + fall), d + 0.5),
+        x, g + Math.min(1.5, 0.9 + fall) / 2, z, ry);
+      if (bodyH > 9) {
+        push(roofs, new THREE.BoxGeometry(w + 0.45, 0.7, d + 0.45),
+          x, g + bodyH - 1.4, z, ry);
+      }
+    }
+
     let top = g + bodyH;
     if (setback) {
       const sw = w * 0.66, sd = d * 0.66, sh = Math.max(3, h - (bodyH - fall - 0.3));
@@ -1114,24 +1132,59 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
   const shadows = quality.shadowMapSize > 0;
   const dense = quality.groundClutter ? 1 : 0.45;
 
-  // ── Trees. Two cheap cones on a trunk, varied in height and hue, standing in
-  // the courtyards the terraces enclose and along the park edges.
+  // ── Trees.
+  //
+  // These were two stacked cones, and two stacked cones is a fir. London's
+  // street trees are planes and limes: a bare trunk to head height and then a
+  // broad, lumpy, roughly round crown. From the bird's-eye camera the crown is
+  // the whole of what you see, and a field of little green spikes was one of
+  // the most obviously wrong things in the frame.
+  //
+  // A crown is now three overlapping low-poly spheres, offset and squashed so
+  // no two trees are the same shape and none of them is a perfect ball. Firs
+  // still exist — a fifth of them, out in the woods and along the railway,
+  // where a conifer belongs.
   const trunks = [];
   const crowns = [];
   const treeAt = (x, z, scale) => {
     if (terrain.isWater(x, z)) return;
     const y = terrain.heightAt(x, z);
     const h = (5 + rng() * 5) * scale;
-    const t = new THREE.CylinderGeometry(0.18 * scale, 0.26 * scale, h * 0.42, 5);
-    t.translate(x, y + h * 0.21, z);
+    const conifer = rng() < 0.2;
+    const t = new THREE.CylinderGeometry(0.16 * scale, 0.28 * scale,
+      h * (conifer ? 0.34 : 0.56), 5);
+    t.translate(x, y + h * (conifer ? 0.17 : 0.28), z);
     trunks.push(t);
-    const lower = new THREE.ConeGeometry(h * 0.32, h * 0.55, 7);
-    lower.translate(x, y + h * 0.55, z);
-    const upper = new THREE.ConeGeometry(h * 0.23, h * 0.45, 7);
-    upper.translate(x, y + h * 0.82, z);
-    tintOne(lower, 0x3f6b2c, 0.7 + rng() * 0.55);
-    tintOne(upper, 0x4c7d33, 0.7 + rng() * 0.55);
-    crowns.push(lower, upper);
+
+    if (conifer) {
+      // Non-indexed, to match the icosahedra the broadleaf crowns are built
+      // from: `mergeGeometries` refuses a list where some geometries carry an
+      // index buffer and others do not, and the failure is a null return that
+      // only surfaces as a crash inside the Mesh constructor.
+      const lower = new THREE.ConeGeometry(h * 0.30, h * 0.58, 7).toNonIndexed();
+      lower.translate(x, y + h * 0.50, z);
+      const upper = new THREE.ConeGeometry(h * 0.21, h * 0.46, 7).toNonIndexed();
+      upper.translate(x, y + h * 0.80, z);
+      tintOne(lower, 0x355c28, 0.7 + rng() * 0.5);
+      tintOne(upper, 0x406e2d, 0.7 + rng() * 0.5);
+      crowns.push(lower, upper);
+      return;
+    }
+
+    // Broadleaf: a clump of squashed spheres centred a little above the fork.
+    const r = h * 0.34;
+    const cy = y + h * 0.70;
+    for (let k = 0; k < 3; k++) {
+      const rr = r * (k === 0 ? 1 : 0.62 + rng() * 0.3);
+      const lobe = new THREE.IcosahedronGeometry(rr, 0);
+      lobe.scale(1, 0.82, 1);
+      const a = rng() * Math.PI * 2;
+      const off = k === 0 ? 0 : r * (0.4 + rng() * 0.4);
+      lobe.translate(x + Math.cos(a) * off, cy + (k === 0 ? 0 : (rng() - 0.35) * r * 0.7),
+        z + Math.sin(a) * off);
+      tintOne(lobe, 0x4a7534, 0.72 + rng() * 0.5);
+      crowns.push(lobe);
+    }
   };
 
   // ── Garden squares.
