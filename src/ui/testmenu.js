@@ -1899,6 +1899,73 @@ export class TestMenu {
             + `down to ${(integ * 100).toFixed(0)}%`;
       })],
 
+      ['a welded section is drawn where its colliders are', () => this._calm(() => {
+        // The ball of masonry, and the assertion that would have caught it on
+        // the first run rather than the fifth report.
+        //
+        // A section is one rigid body: its stones cannot move relative to each
+        // other, so the box round where they are *drawn* has to match the box
+        // round where their colliders are. It did not. Scratch aliasing in the
+        // transform sync rotated every stone after the first by its
+        // predecessor's rotation instead of by the body's, and a seventeen by
+        // eighteen by fifty-seven metre piece of tower came out drawn as a
+        // sixty-metre ball — moving as one lump, because it is one body, and
+        // sinking slowly, because that body is falling.
+        //
+        // Nothing in the physics could have fixed it and nothing in the physics
+        // was wrong. So this compares the two directly.
+        const P = c.physics;
+        const box = (pts) => {
+          let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+          let z0 = Infinity, z1 = -Infinity, n = 0;
+          for (const p of pts) {
+            if (!p) continue;
+            n++;
+            if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+            if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y;
+            if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
+          }
+          return n ? { n, w: x1 - x0, h: y1 - y0, d: z1 - z0 } : null;
+        };
+        const bad = [];
+        let checked = 0;
+        for (const st of c.structures) {
+          for (const isl of st.islands.values()) {
+            const body = isl.body;
+            if (!body || body.__removed || isl.members.length < 8) continue;
+            const drawn = [];
+            for (const i of isl.members) {
+              if (!(st.flags[i] & 1)) continue;
+              drawn.push({ x: st.px[i], y: st.py[i], z: st.pz[i] });
+            }
+            const nc = body.numColliders();
+            const cols = [];
+            const step = Math.max(1, Math.floor(nc / 60));
+            for (let k = 0; k < nc; k += step) {
+              const col = body.collider(k);
+              if (col) cols.push(col.translation());
+            }
+            const a = box(drawn), b2 = box(cols);
+            if (!a || !b2 || a.n < 8) continue;
+            checked++;
+            // Generous: the collider set is sampled and a stone's centre is not
+            // its collider's centre. An order-of-magnitude disagreement is what
+            // this is for.
+            const off = Math.max(a.w - b2.w, a.h - b2.h, a.d - b2.d);
+            if (off > 8 + Math.max(b2.w, b2.h, b2.d) * 0.35) {
+              bad.push(`${isl.members.length} stones drawn `
+                + `${a.w.toFixed(0)}×${a.h.toFixed(0)}×${a.d.toFixed(0)} m `
+                + `against colliders ${b2.w.toFixed(0)}×${b2.h.toFixed(0)}×`
+                + `${b2.d.toFixed(0)} m`);
+            }
+          }
+        }
+        assert(bad.length === 0,
+          `${bad.length} of ${checked} welded sections are drawn as a cloud `
+          + `rather than as themselves: ${bad.slice(0, 3).join('; ')}`);
+        return `${checked} welded sections, every one drawn where it is`;
+      })],
+
       ['no cloud of rubble hangs over the site', () => this._calm(() => {
         // The same complaint as the assertion above, asked a way that does not
         // trust the engine's own answer.

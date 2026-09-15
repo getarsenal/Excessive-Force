@@ -1315,19 +1315,43 @@ export class Structure {
       }
       island.lastSync = { x: t.x, y: t.y, z: t.z,
         qx: r.x, qy: r.y, qz: r.z, qw: r.w };
-      this._q.set(r.x, r.y, r.z, r.w);
+      // The section's own rotation, in scratch nothing else touches.
+      //
+      // This is the ball of masonry, and it was never physics at all. The body
+      // rotation used to be held in `this._q` and the offset in `this._v` —
+      // which are the same two scratch objects `_writeMatrix` uses, and
+      // `_writeMatrix` is called at the bottom of this very loop. So the first
+      // stone of a section was placed correctly and then had `this._q`
+      // overwritten with its own world rotation; the second stone's local
+      // offset was rotated by *that* instead of by the body's, the third by the
+      // second's, and so on down the section.
+      //
+      // What that draws is a section's stones sprayed around the body's origin
+      // at assorted angles: a long thin piece of tower, seventeen metres by
+      // eighteen by fifty-seven, drawn as a sixty-metre ball. It moves as one
+      // lump because it really is one rigid body, and it sinks slowly because
+      // that body is falling — which is exactly what it looks like. The
+      // colliders were always in the right place; only the drawing was wrong,
+      // which is why every physics fix made no difference to it.
+      const bq = this._islandQ || (this._islandQ = new THREE.Quaternion());
+      const bv = this._islandV || (this._islandV = new THREE.Vector3());
+      const lq = this._islandLQ || (this._islandLQ = new THREE.Quaternion());
+      bq.set(r.x, r.y, r.z, r.w);
+      const bn = bq.lengthSq();
+      if (!(bn > 0.99 && bn < 1.01)) {
+        if (bn > 1e-6 && isFinite(bn)) bq.normalize(); else bq.set(0, 0, 0, 1);
+      }
       for (let m = 0; m < island.members.length; m++) {
         const i = island.members[m];
         if (!(this.flags[i] & ALIVE)) continue;
-        this._v.set(island.localPos[m * 3], island.localPos[m * 3 + 1], island.localPos[m * 3 + 2]);
-        this._v.applyQuaternion(this._q);
-        this.px[i] = t.x + this._v.x;
-        this.py[i] = t.y + this._v.y;
-        this.pz[i] = t.z + this._v.z;
-        const lq = this._tmpQ || (this._tmpQ = new THREE.Quaternion());
+        bv.set(island.localPos[m * 3], island.localPos[m * 3 + 1], island.localPos[m * 3 + 2]);
+        bv.applyQuaternion(bq);
+        this.px[i] = t.x + bv.x;
+        this.py[i] = t.y + bv.y;
+        this.pz[i] = t.z + bv.z;
         lq.set(island.localQuat[m * 4], island.localQuat[m * 4 + 1],
           island.localQuat[m * 4 + 2], island.localQuat[m * 4 + 3]);
-        lq.premultiply(this._q);
+        lq.premultiply(bq);
         this.qx[i] = lq.x; this.qy[i] = lq.y; this.qz[i] = lq.z; this.qw[i] = lq.w;
         this._writeMatrix(i);
         moved++;
