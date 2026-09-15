@@ -281,6 +281,9 @@ export class PhysicsWorld {
   auditFrozen(slice = 0) {
     if (this.dead) return 0;
     const list = this.frozen;
+    const st = this.sweepStats || (this.sweepStats = {
+      passes: 0, checked: 0, standing: 0, woke: 0, culled: 0, noRoom: 0, stale: 0,
+    });
     if (!list.length) return 0;
     // Scaled to the size of the field. Most of these answers are arithmetic
     // now, so a big rubble field can afford to be walked in a couple of
@@ -297,14 +300,17 @@ export class PhysicsWorld {
       const body = list[idx];
       checked++;
       // Drop anything that is gone or has been promoted by some other route.
+      st.checked++;
       if (!PhysicsWorld.alive(body)
           || body.bodyType() !== this.rapier.RigidBodyType.Fixed) {
+        st.stale++;
         if (body) body.__frozen = false;
         list[idx] = list[list.length - 1];
         list.pop();
         continue;
       }
       if (this._standsOnSomething(body)) {
+        st.standing++;
         body.__hangStrikes = 0;
         this._auditCursor++;
         continue;
@@ -324,6 +330,7 @@ export class PhysicsWorld {
         // brick vanishing out of a rubble field is not something anyone will
         // notice; one brick hanging in the sky is the thing people photograph.
         body.__hangStrikes = (body.__hangStrikes || 0) + 1;
+        st.noRoom++;
         if (body.__hangStrikes < 2) { this._auditCursor++; continue; }
         const owner = this.owners.get(body.handle);
         list[idx] = list[list.length - 1];
@@ -333,13 +340,14 @@ export class PhysicsWorld {
         } else {
           this.remove(body);
         }
+        st.culled++;
         this.hangingCulled = (this.hangingCulled || 0) + 1;
         continue;
       }
       body.__hangStrikes = 0;
       list[idx] = list[list.length - 1];
       list.pop();
-      woke++;
+      woke++; st.woke++;
       // A nudge, so a stone that froze perfectly balanced actually topples
       // rather than dropping in a dead straight line.
       body.applyTorqueImpulse(

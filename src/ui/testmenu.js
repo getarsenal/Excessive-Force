@@ -1573,7 +1573,8 @@ export class TestMenu {
           assert(hanging.length === 0,
             `${hanging.length} stones are frozen in mid-air with nothing under `
             + `them: ${hanging.slice(0, 8).join(', ')} `
-            + `(list ${P.frozen.length}, dynamic ${P.dynamicSet.size}/${P.activeBudget})`);
+            + `(list ${P.frozen.length}, dynamic ${P.dynamicSet.size}/${P.activeBudget}, `
+            + `sweep ${JSON.stringify(P.sweepStats || {})})`);
           return `${frozen} stones recycled, none of them hanging`;
         } finally {
           P.setBudget(wasBudget);
