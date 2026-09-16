@@ -77,7 +77,9 @@ export const LEVELS = {
     // it. Everything framed around it moves out with it.
     cityExcludeRadius: 420,   // keep OSM buildings off the charbagh
     contextExclude: 300,
-    camera: { yaw: 0.35, pitch: 0.34, distance: 640, height: 78 },
+    // From the garden, the way everyone has seen it: the charbagh in the
+    // foreground and the Yamuna behind the dome.
+    camera: { yaw: 3.30, pitch: 0.30, distance: 640, height: 78 },
     structures: (quality) => [
       { key: 'taj', blocks: buildTajMahal(quality), primary: true,
         required: true, label: 'TAJ MAHAL' },
@@ -117,6 +119,8 @@ export const LEVELS = {
     // park ends.
     cityExcludeRadius: 210,
     contextExclude: 180,
+    // The Trocadéro view: across the Seine, the tower framed by the river
+    // in the foreground rather than hidden behind the camera.
     camera: { yaw: 0.62, pitch: 0.30, distance: 560, height: 120 },
     structures: (quality) => [
       { key: 'eiffel', blocks: buildEiffelTower(quality), primary: true,

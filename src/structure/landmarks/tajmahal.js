@@ -35,10 +35,15 @@ import { BlockList, MATERIALS as M } from '../builder.js';
 // squarely on the drum it rises from. Starting below 1.0 leaves the dome
 // perched on the inner lip of the drum with almost no bearing, and the whole
 // shell then reads as unsupported and drops on the first frame.
+// Bulbous, which the first profile was not: it swelled ten per cent and read
+// as a beehive. The Taj's dome is pinched where it leaves the drum and widest
+// about a third of the way up, and that overhang is the whole of its
+// silhouette. The base sits inside the drum's wall, so the shell still lands
+// on masonry.
 const ONION = [
-  [0.00, 1.000], [0.10, 1.068], [0.22, 1.100], [0.34, 1.088],
-  [0.46, 1.030], [0.58, 0.918], [0.70, 0.742], [0.80, 0.545],
-  [0.89, 0.352], [0.95, 0.205], [1.00, 0.062],
+  [0.00, 0.880], [0.08, 1.020], [0.18, 1.140], [0.30, 1.190],
+  [0.42, 1.160], [0.54, 1.060], [0.66, 0.880], [0.77, 0.650],
+  [0.87, 0.410], [0.94, 0.220], [1.00, 0.060],
 ];
 
 function onion(t) {
@@ -146,11 +151,22 @@ export function buildTajMahal(quality) {
   // through the arch above — and losing that arch really does drop the wall.
   const IWAN_HALF = 8.6;
   const IWAN_TOP = PLINTH_H + 21.0;
+  // Pointed, not square-topped. The opening was a rectangle up to the arch
+  // ring, so what you saw from the garden was a letterbox with an arch drawn
+  // above it. The width now closes over the top two fifths of the height, on
+  // a curve, so the void itself is the pointed arch and the ring sits on it.
+  const SPRING = PLINTH_H + 12.0;
+  const iwanHalfAt = (y) => {
+    if (y <= SPRING) return IWAN_HALF;
+    const t = (y - SPRING) / (IWAN_TOP - SPRING);
+    return IWAN_HALF * Math.sqrt(Math.max(0, 1 - t * t));
+  };
   const iwanOpening = (x, y, z) => {
     if (y < PLINTH_H + 0.8 || y > IWAN_TOP) return false;
+    const w = iwanHalfAt(y);
     // North/south faces, then east/west.
-    if (Math.abs(z) > HALF - 5.0 && Math.abs(x) < IWAN_HALF) return true;
-    if (Math.abs(x) > HALF - 5.0 && Math.abs(z) < IWAN_HALF) return true;
+    if (Math.abs(z) > HALF - 5.0 && Math.abs(x) < w) return true;
+    if (Math.abs(x) > HALF - 5.0 && Math.abs(z) < w) return true;
     return false;
   };
 
@@ -293,11 +309,19 @@ export function buildTajMahal(quality) {
       while (y < PLINTH_H + H) {
         const h = Math.min(course, PLINTH_H + H - y);
         const t = (y - PLINTH_H) / H;
-        const r = 4.1 - t * 0.75;
+        let r = 4.1 - t * 0.75;
+        let wall = 1.5;
+        // Three balconies up each shaft, corbelled: the course is laid wider,
+        // and because the wall is thicker by the same amount it still lands
+        // on the course below. A ring hung off the outside would have
+        // nothing under it at all.
+        for (const bt of [0.33, 0.62, 0.90]) {
+          if (Math.abs(t - bt) < course / H) { r += 1.3; wall += 1.3; }
+        }
         const lean = LEAN * t;
         const sides = Math.max(10, Math.round((2 * Math.PI * r) / stone));
         B.polyRing(bx + sx * lean, bz + sz * lean,
-          BlockList.circle(r, sides, (c % 2) * (Math.PI / sides)), 1.5, y, h, stone, M.MARBLE);
+          BlockList.circle(r, sides, (c % 2) * (Math.PI / sides)), wall, y, h, stone, M.MARBLE);
         y += h; c++;
       }
       // Chattri cap.

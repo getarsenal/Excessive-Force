@@ -87,8 +87,28 @@ async function boot() {
     return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
       w: x1 - x0, d: z1 - z0 };
   });
-  for (const L of landmarks) {
-    terrain.levelPad(L.x, L.z, Math.max(L.w, L.d) * 0.5 + 8, 40);
+  // One pad per group of structures founded at the same point, not one per
+  // structure. The Taj, its mosque and its jawab are all founded at the level
+  // origin, and levelling each to the median of its own surrounding ring gave
+  // three pads at three heights with a step between them — a terrace the
+  // mosque sat two metres below. Structures with their own offset (Khafre,
+  // five hundred metres across the plateau) keep their own ground.
+  const pads = new Map();
+  specs.forEach((sp, i) => {
+    const off = sp.offset || { x: 0, z: 0 };
+    const key = `${Math.round(off.x)},${Math.round(off.z)}`;
+    const L = landmarks[i];
+    const g = pads.get(key) || { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+    g.x0 = Math.min(g.x0, L.x - L.w / 2); g.x1 = Math.max(g.x1, L.x + L.w / 2);
+    g.z0 = Math.min(g.z0, L.z - L.d / 2); g.z1 = Math.max(g.z1, L.z + L.d / 2);
+    pads.set(key, g);
+  });
+  // The pad is the precinct's ground, not a bald disc of dirt: painted as
+  // parkland where the level's precinct is lawn or garden.
+  const green = ['lawn', 'charbagh'].includes(level.precinct?.ground);
+  for (const g of pads.values()) {
+    const r = Math.max(g.x1 - g.x0, g.z1 - g.z0) * 0.5 + 8;
+    terrain.levelPad((g.x0 + g.x1) / 2, (g.z0 + g.z1) / 2, r, 40, { park: green });
   }
 
   engine.scene.add(terrain.buildMesh());

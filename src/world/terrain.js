@@ -117,7 +117,7 @@ export class Terrain {
    * out so the result reads as a terrace rather than as a plug. Wet cells are
    * left alone, or a landmark on a bank would dam its own river.
    */
-  levelPad(cx, cz, radius, feather = 30) {
+  levelPad(cx, cz, radius, feather = 30, opts = {}) {
     const n = this.size, h = this.heights, span = this.span, c = this.cellSize;
     const uOf = (x) => (x + span) / (span * 2) * (n - 1);
     const vOf = (z) => (span - z) / (span * 2) * (n - 1);
@@ -145,7 +145,11 @@ export class Terrain {
         const d = Math.hypot(-span + i * c - cx, span - j * c - cz);
         if (d >= rOut) continue;
         const t = d <= radius ? 1 : 1 - (d - radius) / feather;
-        h[idx] += (level - h[idx]) * (t * t * (3 - 2 * t));
+        const k = t * t * (3 - 2 * t);
+        h[idx] += (level - h[idx]) * k;
+        // Grass over the pad. Without it the levelled disc drew in the bare
+        // paving colour and read as a plate the monument had been set on.
+        if (opts.park) this.mask[idx * 3 + 2] = Math.max(this.mask[idx * 3 + 2], k);
       }
     }
     return level;

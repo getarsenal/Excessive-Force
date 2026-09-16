@@ -174,7 +174,8 @@ html, body {
 }
 .unit-card:hover:not(.locked) { border-color: var(--edge-bright); transform: translateY(-2px); }
 .unit-card.selected { border-color: var(--accent); background: rgba(35, 62, 96, 0.78); }
-.unit-card.locked { opacity: 0.36; cursor: not-allowed; }
+.unit-card.locked { opacity: 0.62; cursor: not-allowed; }
+.unit-card.locked .uc-icon { filter: grayscale(1) brightness(0.7); }
 .unit-card.unaffordable .uc-cost { color: var(--danger); }
 
 .uc-icon {
@@ -200,10 +201,15 @@ html, body {
   color: var(--dim); letter-spacing: 0.1em;
 }
 .uc-lock {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  /* A band over the price, not a curtain over the card: the icon and the
+     name stay readable, so the bar reads as a roster with some of it still
+     to earn rather than as a row of blanks. */
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
   font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase;
-  background: rgba(6, 8, 11, 0.72); color: var(--warn); text-align: center; padding: 4px;
+  background: rgba(6, 8, 11, 0.86); color: var(--warn); text-align: center; padding: 4px 2px;
 }
+.uc-lock::before { content: '\1F512'; font-size: 8px; filter: grayscale(1); }
 .unit-card:not(.locked) .uc-lock { display: none; }
 
 /* ── Prompt ──────────────────────────────────────────────────────────── */
@@ -421,6 +427,10 @@ html, body {
 
 /* ── Phone ───────────────────────────────────────────────────────────── */
 @media (max-width: 620px) {
+  /* Five columns on a phone leave the centre about a third of the width; the
+     target name's wide tracking is what pushed it into an ellipsis. */
+  .tb-target-name { letter-spacing: 0.12em; }
+  .tb-label { letter-spacing: 0.14em; }
   :root { --ui-pad: 8px; }
   #targetcard { width: 142px; top: 84px; padding: 7px 9px; }
   #perf { font-size: 9px; }

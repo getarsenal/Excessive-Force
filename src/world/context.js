@@ -70,7 +70,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // ── The bridge comes first, because the street network has to know where it
   // lands: a crossing with no road to it is the thing that made the old layout
   // read as scenery rather than as a place.
-  const bridge = bridgeLine(terrain);
+  const bridge = bridgeLine(terrain, EXCLUDE);
 
   /**
    * The civic set, placed by hand from the real map — Parliament Square, the
@@ -782,7 +782,7 @@ function buildForecourt(terrain, radius, quality) {
  * water actually is, plus a short approach either side — otherwise the bridge
  * runs hundreds of metres over dry land.
  */
-function bridgeLine(terrain) {
+function bridgeLine(terrain, exclude = 66) {
   // Found from the river, not written down.
   //
   // This used to be two hard-coded points — Westminster Bridge's own line,
@@ -796,12 +796,14 @@ function bridgeLine(terrain) {
   for (let z = -span * 0.75; z <= span * 0.75; z += 10) {
     for (let x = -span * 0.75; x <= span * 0.75; x += 10) {
       if (!terrain.isWater(x, z)) continue;
-      // The closest crossing to the monument, because that is where the city
-      // is and a bridge wants streets at both ends. Picked further out, it
-      // lands on farmland and the road network leaves its abutment as a
-      // junction with nothing else joining it.
+      // The closest crossing to the monument that is clear of its precinct.
+      // Closest, because that is where the city is and a bridge wants streets
+      // at both ends; clear of the precinct, because inside it there are no
+      // streets at all — the Champ de Mars is kept empty for the tower — and
+      // an abutment there is a junction with nothing else joining it.
       const d = Math.hypot(x, z);
-      if (d < nearD) { nearD = d; near = { x, z }; }
+      if (d < exclude + 70 || d >= nearD) continue;
+      nearD = d; near = { x, z };
     }
   }
   if (!near) return null;

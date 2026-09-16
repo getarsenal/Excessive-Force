@@ -246,7 +246,7 @@ export class HUD {
         // number on the card is not the number being tested.
         const scale = b.level?.unlockScale ?? 1;
         const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
-        card.querySelector('.uc-lock').textContent = `${need}% DAMAGE`;
+        card.querySelector('.uc-lock').textContent = `UNLOCK ${need}%`;
       } else if (!this._lastUnlocked.has(u.id)) {
         this._lastUnlocked.add(u.id);
         this.feed(`${u.full} AVAILABLE`, 'big');

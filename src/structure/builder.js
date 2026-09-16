@@ -78,7 +78,9 @@ export const MATERIAL_PROPS = {
   // A crate of explosive walled into the masonry. Structural, because it is
   // packed in and the stone above rests on it, and soft, because the reward
   // for quarrying down to one should be that the next round sets it off.
-  [MATERIALS.CHARGE]:    { density: 1.10, strength: 0.40, toughness: 9,   color: 0xb8442c, structural: true },
+  // Painted like a find: dull red read as one more brick of the core, and a
+  // reward nobody notices is not a reward.
+  [MATERIALS.CHARGE]:    { density: 1.10, strength: 0.40, toughness: 9,   color: 0xe0a21c, structural: true },
 };
 
 

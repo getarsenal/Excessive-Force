@@ -288,7 +288,7 @@ export function buildEiffelTower(quality) {
       // the ends.
       cage(at, 0, EIFFEL.secondFloor, LEG_N, (y) => {
         const t = Math.max(0, Math.min(1, y / EIFFEL.secondFloor));
-        return BAR * (1.05 + 0.55 * Math.pow(1 - t, 1.5) + 1.25 * Math.pow(t, 2.2));
+        return BAR * (1.18 + 0.55 * Math.pow(1 - t, 1.5) + 1.25 * Math.pow(t, 2.2));
       }, COURSE);
       // A belt every fourth course, which is what gives the leg its horizontal
       // banding at a distance.
