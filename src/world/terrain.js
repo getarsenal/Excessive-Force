@@ -416,7 +416,10 @@ export class Terrain {
           const along = Math.abs(ox * -e.n.z + oz * e.n.x);
           if (out < -80 || along > reach) continue;
           const idx = j * n + i;
-          if (mask[idx * 3] < 0.5) continue;
+          // Within the run's own width everything is river, whatever the mask
+          // says — the notch that split Agra's run in two is dry in the mask
+          // and was left standing as a sandbar in the middle of the mouth.
+          if (along > e.half && mask[idx * 3] < 0.5) continue;
           const k = 1 - THREE.MathUtils.smoothstep(-out, 0, 80);
           if (h[idx] > DEPTH) h[idx] += (DEPTH - h[idx]) * k;
         }
@@ -989,10 +992,17 @@ export class Terrain {
       // never sunk and a bar of raised bank stood across one side of the
       // mouth — from a phone's low angle, a land bridge over the Thames. Run
       // the centreline back inside by that much and the whole mouth is cut.
-      const sinT = Math.abs(e.dir.x * e.n.z - e.dir.z * e.n.x);
+      //
+      // Back along the spline's own first tangent, not the exit bearing: the
+      // spline leaves the mouth a few degrees off the bearing, and a straight
+      // stub on the bearing put a kink in the channel right at the boundary.
+      let tx0 = pts[1].x - pts[0].x, tz0 = pts[1].z - pts[0].z;
+      const tl0 = Math.hypot(tx0, tz0) || 1;
+      tx0 /= tl0; tz0 /= tl0;
+      const sinT = Math.abs(tx0 * e.n.z - tz0 * e.n.x);
       const back = e.half * sinT + 30;
       pts.unshift({
-        x: e.mid.x - e.dir.x * back, z: e.mid.z - e.dir.z * back,
+        x: e.mid.x - tx0 * back, z: e.mid.z - tz0 * back,
         half: e.half, inside: true,
       });
       tails.push(pts);
