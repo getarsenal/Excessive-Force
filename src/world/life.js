@@ -140,6 +140,22 @@ export class Life {
       }
       if (lo !== null && hi - lo > 40) wet.push({ z, x: (lo + hi) / 2, w: hi - lo });
     }
+    // Throw away the rows that ran *along* the river instead of across it.
+    //
+    // The scan measures the wet span of a line of constant z, which is the
+    // channel's width only where the channel runs north-south. Where it runs
+    // east-west — most of the Seine, once the river was put where the ground
+    // says it is — one row can be fifteen hundred metres of water, its
+    // midpoint is nowhere near the centreline, and the width it reports is the
+    // length of a reach. A boat offset by a quarter of *that* jumps two
+    // hundred metres sideways at the sample boundary and reads as doing
+    // twenty-three knots.
+    if (wet.length > 4) {
+      const med = wet.map((p) => p.w).sort((a, b) => a - b)[wet.length >> 1];
+      for (let i = wet.length - 1; i >= 0; i--) {
+        if (wet[i].w > med * 2.5) wet.splice(i, 1);
+      }
+    }
     // Measured along the channel, not counted in samples.
     //
     // Position used to be an index into this list advanced at a fixed rate, and
@@ -280,7 +296,11 @@ export class Life {
         const seg = Math.max(0.001, wet[i1].s - wet[i0].s);
         const f = Math.min(1, Math.max(0, (b.s - wet[i0].s) / seg));
         const a = wet[i0], c = wet[i1];
-        const x = a.x + (c.x - a.x) * f + b.off * a.w * 0.5;
+        // Width interpolated with everything else. Taken from `a` alone it
+        // steps at every sample boundary, and a boat holding a fixed fraction
+        // of the width slides sideways by half that step in one frame.
+        const wid = Math.min(a.w + (c.w - a.w) * f, 120);
+        const x = a.x + (c.x - a.x) * f + b.off * wid * 0.5;
         const z = a.z + (c.z - a.z) * f;
         this._p.set(x, t.waterLevel + 0.15, z);
         this._q.setFromAxisAngle(UP,

@@ -410,9 +410,20 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
         if (terrain.isWater(x, z)) { found = x; break; }
       }
       if (found === null) continue;
-      const x = found - dir * 1.6;
-      const gy = terrain.heightAt(x, z);
-      if (gy < level - 0.5) continue;
+      // Step back from the waterline until the ground is above the water,
+      // rather than by a fixed metre and a half.
+      //
+      // The channel is cut with a feathered shoulder, so the first few metres
+      // outside the wet mask are still below the surface. A fixed offset put
+      // the wall's footing underwater along most of the Yamuna and skipped it
+      // there: twenty-two bays of river wall where the map wants sixty.
+      let x = null, gy = 0;
+      for (let back = 1.6; back <= 26; back += 2.0) {
+        const cx = found - dir * back;
+        const g = terrain.heightAt(cx, z);
+        if (g >= level - 0.2) { x = cx; gy = g; break; }
+      }
+      if (x === null) continue;
       const h = Math.max(1.0, gy - level + 1.6);
       const top = level - 1.6 + h;
       props.add('stone', box(2.6, h, step + 0.6, x, level - 1.6 + h / 2, z),
