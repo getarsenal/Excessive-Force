@@ -835,7 +835,11 @@ export class Garrison {
     const perimeter = counts.plinth ?? 16;
     for (let i = 0; i < perimeter; i++) {
       const a = (i / perimeter) * Math.PI * 2;
-      const half = PLINTH / 2 - 2.5 * K;
+      // On the paved top, which is eight metres narrower than the terrace.
+      // Posted at the parapet they stood over the hollow of the shell, and
+      // the floor check under their feet found nothing: twelve of sixteen
+      // died on the first frame at 2.2x, where the gap is six metres wide.
+      const half = PLINTH / 2 - 5.0 * K;
       const c = Math.cos(a), sn = Math.sin(a);
       const m = Math.max(Math.abs(c), Math.abs(sn));
       const p = new THREE.Vector3(
@@ -866,8 +870,10 @@ export class Garrison {
 
     // Tomb roof: AT teams at the corners, mortars beside the drum.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      // Off the diagonal: the corner chattris stand there, and a team posted
+      // at 21 m on both axes was inside one, looking at its columns.
       const p = new THREE.Vector3(
-        origin.x + sx * 21 * K, groundY + ROOF + 2.0, origin.z + sz * 21 * K,
+        origin.x + sx * 24 * K, groundY + ROOF + 2.0, origin.z + sz * 9 * K,
       );
       this.place('at', p, Math.atan2(sx, sz), 9 * K, { cover: 'roof' });
     }
@@ -880,21 +886,25 @@ export class Garrison {
     // Minaret tops: snipers, seeing everything.
     const base = PLINTH / 2 - 6.0 * K;
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      // On the ring of the cap and on the shaft's wall, not at the centre of
+      // a hollow. A minaret is a tube; at 2.2x its bore is ten metres across
+      // and a man at the axis has nothing under him.
       const p = new THREE.Vector3(
-        origin.x + sx * (base + 0.9 * K), groundY + PLINTH_H + 43.0 * K,
-        origin.z + sz * (base + 0.9 * K),
+        origin.x + sx * (base + 2.3 * K), groundY + PLINTH_H + 43.0 * K,
+        origin.z + sz * (base + 2.3 * K),
       );
       this.place('sniper', p, Math.atan2(sx, sz), 9 * K, { cover: 'roof' });
       const q = new THREE.Vector3(
-        origin.x + sx * (base + 0.4 * K), groundY + PLINTH_H + 24.0 * K,
-        origin.z + sz * (base + 0.4 * K),
+        origin.x + sx * (base + 2.05 * K), groundY + PLINTH_H + 24.0 * K,
+        origin.z + sz * (base + 2.05 * K),
       );
       this.place('mg', q, Math.atan2(sx, sz), 8 * K, { cover: 'window' });
     }
 
     // Mosque and jawab roofs.
     for (const side of [-1, 1]) {
-      for (const off of [-16 * K, 0, 16 * K]) {
+      // Between the domes, not inside them: the outer domes sit at 17 m.
+      for (const off of [-9 * K, 0, 9 * K]) {
         const p = new THREE.Vector3(
           origin.x + side * TAJ.mosqueX, groundY + TAJ.mosqueRoof, origin.z + off);
         this.place(off === 0 ? 'mortar' : 'rifleman', p, side > 0 ? Math.PI / 2 : -Math.PI / 2,

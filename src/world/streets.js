@@ -373,8 +373,14 @@ export function buildStreetNetwork(terrain, rng, opts) {
   for (const n of approaches) {
     if (nodes[n].links.length >= 2) continue;
     const tried = new Set();
+    // Further out than the first pass, and then further still. On a map
+    // where the river runs along the edge — Agra's Yamuna, the Seine past the
+    // Champ de Mars — one bank has no grid within four pitches, and a bridge
+    // that reaches it and stops is the one thing a bridge must never be. A
+    // long approach road across open ground is what the real one would have.
     for (let k = 0; k < 14 && nodes[n].links.length < 2; k++) {
-      const near = nearestNode(nodes, nodes[n], 4.5 * pitch,
+      const reach = k < 6 ? 4.5 * pitch : 11 * pitch;
+      const near = nearestNode(nodes, nodes[n], reach,
         (m, mi) => !tried.has(mi) && mi !== n && m.links.length > 0);
       if (near < 0) break;
       tried.add(near);

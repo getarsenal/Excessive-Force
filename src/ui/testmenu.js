@@ -2074,7 +2074,14 @@ export class TestMenu {
         // pristine tower; this test runs last, so it now starts against one
         // that is already well chewed, and a cut that stops half way through
         // leaves the thing standing for no better reason than the loop ran out.
-        for (let round = 0; round < 80; round++) {
+        // Scaled to the monument. Eighty rounds was sized against a building
+        // sixty metres across; a Taj at 2.2x is a hundred and twenty-five, and
+        // asking the same eighty rounds to gut it is asking a different
+        // question of a bigger building. The count grows with the footprint,
+        // so the test keeps asking "does undercutting work here" rather than
+        // "is this building small".
+        const rounds = Math.round(80 * Math.min(3, Math.max(1, width / 60)));
+        for (let round = 0; round < rounds; round++) {
           const i = foot();
           if (i < 0) break;
           st.explode(
