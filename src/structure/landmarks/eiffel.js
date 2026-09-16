@@ -194,9 +194,27 @@ export function buildEiffelTower(quality) {
   // shorter course is a smaller step, and a smaller step is a thinner bar that
   // still overlaps the one beneath it.
   const BAR = Math.max(0.5, COURSE * 0.36);
+  /** Member half-thickness, tapering from `a` at `y0` to `b` at `y1`. */
+  const taper = (y0, y1, a, b) => (y) => {
+    const t = Math.max(0, Math.min(1, (y - y0) / (y1 - y0)));
+    return a + (b - a) * t;
+  };
 
-  /** One tapering box built as a cage: `at(y)` gives its centre and half-width. */
-  const cage = (at, y0, y1, n, bar, courseH) => {
+  /**
+   * One tapering box built as a cage: `at(y)` gives its centre and half-width,
+   * `barAt(y)` the half-thickness of a member there.
+   *
+   * The members taper, and that is structural rather than decorative. A stone
+   * is crushed when the load on it passes its plan area times its material
+   * strength, and the bars at the foot of the upper shaft carry every one of
+   * the hundred and sixty metres above them: at a constant 0.84 m square they
+   * went straight through their twenty-six meganewtons and a hundred and
+   * seventy-four of them were condemned on the first frame — which is what
+   * took the whole tower over, since a loss that size arms the collapse. Stout
+   * where the load is and slender where it is not is also what the real tower
+   * does.
+   */
+  const cage = (at, y0, y1, n, barAt, courseH) => {
     const fr = [];
     for (let i = 0; i < n; i++) fr.push(-1 + (2 * i) / (n - 1));
     let y = y0;
@@ -204,6 +222,7 @@ export function buildEiffelTower(quality) {
       const h = Math.min(courseH, y1 - y);
       const yc = y + h / 2;
       const g = at(yc);
+      const bar = barAt(yc);
       const hy = h / 2 - 0.02;
       // The four corner posts, square in plan.
       for (const ex of [-1, 1]) {
@@ -249,7 +268,8 @@ export function buildEiffelTower(quality) {
         const g = legAt(y);
         return { cx: sx * g.r, cz: sz * g.r, h: g.h };
       };
-      cage(at, 0, EIFFEL.secondFloor, LEG_N, BAR, COURSE);
+      cage(at, 0, EIFFEL.secondFloor, LEG_N,
+        taper(0, EIFFEL.secondFloor, BAR * 1.5, BAR), COURSE);
       // A belt every fourth course, which is what gives the leg its horizontal
       // banding at a distance.
       for (let y = COURSE * 4; y < EIFFEL.secondFloor - COURSE; y += COURSE * 4) {
@@ -359,7 +379,8 @@ export function buildEiffelTower(quality) {
     // almost anything overlaps itself.
     const SN = 5;
     const SBAR = Math.max(0.42, COURSE * 0.30);
-    cage((y) => ({ cx: 0, cz: 0, h: shaftHalf(y) }), y0, y1, SN, SBAR, COURSE);
+    cage((y) => ({ cx: 0, cz: 0, h: shaftHalf(y) }), y0, y1, SN,
+      taper(y0, y1, SBAR * 2.6, SBAR * 0.92), COURSE);
     for (let y = y0 + COURSE * 5; y < y1 - COURSE; y += COURSE * 5) {
       belt((yy) => ({ cx: 0, cz: 0, h: shaftHalf(yy) }), y, SBAR * 0.8);
     }
