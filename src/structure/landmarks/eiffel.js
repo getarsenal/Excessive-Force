@@ -225,12 +225,22 @@ export function buildEiffelTower(quality) {
       // Never wider than the gap between members, or a stout course becomes a
       // row of boxes sharing each other's volume — which the physics answers
       // by throwing one of them off the building.
-      const bar = Math.min(barAt(yc), (2 * g.h / (n - 1)) * 0.46);
+      //
+      // The corners get more of that gap than the face members do. Where the
+      // legs meet the second platform the plate funnels the upper tower into
+      // the leg's inner corner post — the shaft's own corner stands on the
+      // plate stone over it, and that stone has one thing under it — so the
+      // corner carries several times what a face member does. Sharing the
+      // gap evenly left the corners at 0.46 of the spacing and crushed nine
+      // of them on a phone before the map had loaded.
+      const spacing = 2 * g.h / (n - 1);
+      const bar = Math.min(barAt(yc), spacing * 0.40);
+      const corner = Math.min(barAt(yc) * 1.3, spacing * 0.58);
       const hy = h / 2 - 0.02;
       // The four corner posts, square in plan.
       for (const ex of [-1, 1]) {
         for (const ez of [-1, 1]) {
-          B.add(g.cx + ex * g.h, yc, g.cz + ez * g.h, bar, hy, bar, M.IRONWORK);
+          B.add(g.cx + ex * g.h, yc, g.cz + ez * g.h, corner, hy, corner, M.IRONWORK);
         }
       }
       // And the members along each face, between the corners.
@@ -455,7 +465,12 @@ function deck(B, y, oh, ih, member, s) {
     // tower stands on. Kept thin: thickening it to a girder deck pushed its
     // underside down into the tops of the legs, and sixty-one stones of deck
     // then spent the first frame shoving at the ironwork holding them up.
-    B.slab(0, y - 0.45, 0, oh * 2, 0.9, oh * 2, step, M.IRONWORK);
+    //
+    // And coarse. Each plate stone hands its load to whatever members stand
+    // under it, so a plate stone wide enough to cover two or three members
+    // spreads the upper tower across the leg head instead of dropping the
+    // whole of it down one post.
+    B.slab(0, y - 0.45, 0, oh * 2, 0.9, oh * 2, Math.max(step, 5.0), M.IRONWORK);
     return;
   }
   for (let i = 0; i < n; i++) {
@@ -480,8 +495,8 @@ function deck(B, y, oh, ih, member, s) {
 function balustrade(B, y, half, member) {
   const step = Math.max(2.2, member * 2.0);
   for (const side of [1, -1]) {
-    B.slab(0, y + 0.85, side * (half - 0.3), half * 2, 1.7, 0.36, step, M.IRONWORK);
-    B.slab(side * (half - 0.3), y + 0.85, 0, 0.36, 1.7, half * 2 - 1.2, step, M.IRONWORK);
+    B.slab(0, y + 0.85, side * (half - 0.3), half * 2, 1.7, 0.36, step, M.RAILING);
+    B.slab(side * (half - 0.3), y + 0.85, 0, 0.36, 1.7, half * 2 - 1.2, step, M.RAILING);
   }
 }
 

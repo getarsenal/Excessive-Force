@@ -26,6 +26,7 @@ export const MATERIALS = {
   RUBBLE: 10,    // the packed rubble-and-mortar fill inside a pyramid
   IRONWORK: 11,  // painted structural ironwork — the Eiffel Tower's own bronze
   CHARGE: 12,    // a buried demolition charge; destroying one sets it off
+  RAILING: 13,   // ironwork nothing may rest on: balustrades and screens
 };
 
 /**
@@ -81,6 +82,12 @@ export const MATERIAL_PROPS = {
   // Painted like a find: dull red read as one more brick of the core, and a
   // reward nobody notices is not a reward.
   [MATERIALS.CHARGE]:    { density: 1.10, strength: 0.40, toughness: 9,   color: 0xe0a21c, structural: true },
+  // The Eiffel's railings: painted ironwork like the frame, but a screen a
+  // hand's width thick is not something a tower stands on. Structural, it
+  // was: the solver's grout joined the shaft's corner posts to the railing
+  // two metres beside them, split the posts' hundred meganewtons across
+  // both, and the railing went first.
+  [MATERIALS.RAILING]:   { density: 7.20, strength: 2.60, toughness: 210, color: 0x7b5f45, structural: false },
 };
 
 

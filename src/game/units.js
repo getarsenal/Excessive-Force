@@ -145,6 +145,13 @@ export const UNITS = [
     id: 'm142', name: 'HIMARS', full: 'M142 HIMARS', tier: 'MRL',
     cost: 5200, unlockFrac: 0.37,
     tint: ARTILLERY_GREEN, model: 'M142', modelLength: 7.0,
+    // The model is posed with its pod elevated over the rear, so laid nose
+    // forward it reads from the bird's-eye camera as a truck driving away
+    // from the target. Turned to put the cab toward the target, which is what
+    // the player asked for; and it has no barrel for the facing test to find,
+    // so that test is told not to look.
+    modelYaw: Math.PI,
+    noBarrel: true,
     range: 2600, reload: 18.0, setup: 3.5,
     crew: 0, health: 420,
     projectile: { kind: 'rocket', speed: 360, gravity: 9.81, trail: 1.6 },

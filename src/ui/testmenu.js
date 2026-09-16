@@ -1156,6 +1156,9 @@ export class TestMenu {
         const v = new THREE.Vector3();
         for (const u of UNITS) {
           if (u.model === 'infantry') continue;
+          // A launcher truck has no barrel; its facing is a judgement, not a
+          // measurement.
+          if (u.noBarrel) { found.push(`${u.name} n/a`); continue; }
           const w = b.models.cache.get(`${u.model}:${u.modelLength}:${u.tint ?? ''}`);
           if (!w) continue;
           w.updateMatrixWorld(true);
