@@ -25,6 +25,7 @@ export const MATERIALS = {
   REDSTONE: 9,   // the Palace of Westminster's own warm red-brown stone
   RUBBLE: 10,    // the packed rubble-and-mortar fill inside a pyramid
   IRONWORK: 11,  // painted structural ironwork — the Eiffel Tower's own bronze
+  CHARGE: 12,    // a buried demolition charge; destroying one sets it off
 };
 
 /**
@@ -74,6 +75,10 @@ export const MATERIAL_PROPS = {
   // tower. At 0x9d8468 under the per-stone jitter and the tonemap it came out
   // as pale tan and the whole building read as sandstone.
   [MATERIALS.IRONWORK]:  { density: 7.20, strength: 2.60, toughness: 210, color: 0x7b5f45, structural: true },
+  // A crate of explosive walled into the masonry. Structural, because it is
+  // packed in and the stone above rests on it, and soft, because the reward
+  // for quarrying down to one should be that the next round sets it off.
+  [MATERIALS.CHARGE]:    { density: 1.10, strength: 0.40, toughness: 9,   color: 0xb8442c, structural: true },
 };
 
 

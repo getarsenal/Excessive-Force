@@ -845,6 +845,37 @@ export class Battle {
     if (destroyed > 6) this.onEvent('bigimpact', { point, destroyed });
   }
 
+  /**
+   * A demolition charge going off, having been uncovered by shellfire.
+   *
+   * Far bigger than any round in the game and entirely local: the point is
+   * that a pyramid, which has to be quarried rather than felled, occasionally
+   * pays out a large piece of itself for having been dug into. Sized to take a
+   * few per cent of the monument — a thirty-two metre radius is about ninety
+   * thousand cubic metres, against Khufu's two and a third million.
+   */
+  demolitionCharge(point) {
+    let destroyed = 0;
+    for (const s of this.structures) {
+      destroyed += s.explode(point, 20, 32, 52000, { kinetic: 0.12 });
+    }
+    const killed = this.garrison.splash(point, 38, 52000);
+    if (killed) {
+      this.defendersKilled += killed;
+      this.money += killed * MONEY_PER_DEFENDER;
+    }
+    const groundY = this.terrain.heightAt(point.x, point.z);
+    this.fx.detonate(point, 3.4, { ground: point.y - groundY < 4.0, groundY });
+    if (this.life) this.life.startle(point.x, point.z, 160);
+    const camDist = this.camera.position.distanceTo(point);
+    this.engine.addShake(THREE.MathUtils.clamp(110 / Math.max(camDist, 30), 0.05, 0.95));
+    if (this.audio) {
+      this.audio.play('explosion', point, { rate: 0.5, gain: 0.95, rolloff: 900 });
+      this.audio.rumble(1, point);
+    }
+    this.onEvent('charge', { point, destroyed });
+  }
+
   // ────────────────────────────────────────────────────────────────── loop ──
 
   update(dt) {

@@ -124,6 +124,7 @@ export class Projectile {
       this.phase = 'climb';
       this.vel.set(0, opts.speed ?? 145, 0);
       this.speed = opts.speed ?? 145;
+      this._lastRange = Infinity;
     }
     if (this.kind === 'rocket') {
       this.boostTime = 0.85;
@@ -173,8 +174,25 @@ export class Projectile {
       }
       return;
     }
-    // Dive: steer hard toward the aim point.
+    // Unguided once it is there, which is the whole of the fix for a round
+    // that used to stop in mid-air.
+    //
+    // A designated point whose masonry has since been shot away is empty sky.
+    // A seeker that keeps steering at it arrives, finds nothing to hit, and
+    // then has its own guidance drive its velocity to zero against a target it
+    // is already standing on — so the shell hangs there, on the targeting
+    // marker, in the open. Past the aim point it is a falling object like any
+    // other: it carries on and goes off against whatever is underneath.
     const toTarget = new THREE.Vector3().subVectors(t, this.pos);
+    const range = toTarget.length();
+    if (this.phase === 'free' || range < 2.5 || range > this._lastRange + 0.01) {
+      this.phase = 'free';
+      if (this.vel.lengthSq() < 4) this.vel.set(0, -this.speed, 0);
+      this.vel.y -= this.gravity * dt;
+      this.pos.addScaledVector(this.vel, dt);
+      return;
+    }
+    this._lastRange = range;
     const desired = toTarget.normalize().multiplyScalar(this.speed * 1.35);
     this.vel.lerp(desired, Math.min(1, dt * 7));
     this.pos.addScaledVector(this.vel, dt);

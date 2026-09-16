@@ -85,8 +85,16 @@ html, body {
   position: absolute; top: 0; left: 0; right: 0;
   padding: max(8px, env(safe-area-inset-top)) var(--ui-pad) 10px;
   display: grid;
-  grid-template-columns: auto auto 1fr auto auto;
-  gap: clamp(10px, 3vw, 30px);
+  /* Fractional, not `auto`.
+     With `auto` every column is as wide as whatever is in it, so the centre
+     block slid sideways each time the money gained a digit or the defender
+     count lost one — which is exactly when a shell lands, so the whole bar
+     looked like it was being shaken by the explosions. Fractions hold their
+     width whatever the numbers do. */
+  grid-template-columns:
+    minmax(72px, 0.9fr) minmax(66px, 0.9fr) minmax(0, 3.2fr)
+    minmax(66px, 0.9fr) minmax(54px, 0.7fr);
+  gap: clamp(8px, 2vw, 22px);
   align-items: center;
   background: linear-gradient(180deg, rgba(6, 8, 11, 0.92) 0%, rgba(6, 8, 11, 0) 100%);
 }
@@ -122,14 +130,21 @@ html, body {
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
   min-width: 38px; text-align: right;
 }
-.tb-sub { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; margin-top: 3px; }
+/* Height and per-structure breakdown share a line. Four stacked rows under a
+   fifteen-character building name is a lot of furniture for the top of a phone
+   screen; three is enough. */
+.tb-meta {
+  display: flex; justify-content: center; align-items: baseline;
+  gap: 4px 14px; flex-wrap: wrap; margin-top: 3px;
+}
+.tb-sub { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; }
 .tb-sub.leaning { color: var(--warn); font-weight: 600; }
 
 /* Per-objective breakdown, shown when a level has more than one thing to
    bring down. Kept to one compact row so it never competes with the bar. */
 .objectives {
   display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
-  margin-top: 3px; font-size: 9px; letter-spacing: 0.09em; color: var(--dim);
+  font-size: 9px; letter-spacing: 0.09em; color: var(--dim);
 }
 .objectives .obj { display: inline-flex; gap: 4px; align-items: baseline; }
 .objectives .obj b {
@@ -226,7 +241,11 @@ html, body {
 #tc-clear:hover { border-color: var(--danger); color: var(--danger); }
 
 /* ── Perf ────────────────────────────────────────────────────────────── */
-#perf {
+/* Off for the player, still written every frame so the headless harness and
+   `?perf=1` can read it. */
+#perf { display: none; }
+#perf.on {
+  display: block;
   position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 10px; color: rgba(160, 176, 194, 0.62);

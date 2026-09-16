@@ -140,6 +140,29 @@ export function buildGreatPyramid(quality) {
   }
 
   /**
+   * Where the demolition charges are walled in.
+   *
+   * Worked out before the masonry, because each one needs a slot cut for it in
+   * exactly the same way the granite beams do: a block added inside a solid
+   * course shares its volume with the stone around it, and Rapier answers an
+   * overlap by shoving — which is how the pyramid once arrived awake and
+   * settled a metre before the player had touched it.
+   */
+  const CHARGE_E = Math.max(2.0, stone * 0.62);
+  const charges = [];
+  for (let i = 0; i < 7; i++) {
+    const t = (i + 0.6) / 7.9;
+    const y = K.height * t * 0.72 + 12;
+    const half = halfAt(y, K.base, K.height);
+    if (half < 14) continue;
+    const a = i * 2.399963;                       // golden angle, so they spread
+    const r = Math.max(6, half - (9 + (i % 3) * 5));
+    const cs = Math.cos(a), sn = Math.sin(a);
+    const m = Math.max(Math.abs(cs), Math.abs(sn));
+    charges.push({ x: (cs / m) * r, y, z: (sn / m) * r });
+  }
+
+  /**
    * The passages and chambers.
    *
    * Cut by omission, so the masonry over them genuinely spans and genuinely
@@ -171,6 +194,12 @@ export function buildGreatPyramid(quality) {
     }
     // Queen's Chamber.
     if (y > 19 && y < 25 && Math.abs(x) < 2.8 && Math.abs(z - 2) < 2.6) return true;
+    // The slots the charges sit in.
+    for (const c of charges) {
+      if (Math.abs(x - c.x) < CHARGE_E + 0.45
+        && Math.abs(y - c.y) < CHARGE_E + 0.45
+        && Math.abs(z - c.z) < CHARGE_E + 0.45) return true;
+    }
     // The slots the granite beams lie in.
     for (const ry of beamYs) {
       if (Math.abs(y - ry) < BEAM_H + 0.1
@@ -204,6 +233,23 @@ export function buildGreatPyramid(quality) {
           K.chamberD / 2 + 2.7, M.IRON);
       }
     }
+  });
+
+  // ── Demolition charges ───────────────────────────────────────────────────
+  //
+  // Something to find. Quarrying a pyramid down is a grind by construction —
+  // there is no cantilever in it to exploit, so the only way through is
+  // material — and a grind wants a reason to keep cutting into the same face.
+  // These are crates of explosive walled into the fill, soft enough that the
+  // round which exposes one sets it off, and worth a few per cent of the
+  // monument each when they go.
+  //
+  // Placed on a spiral so they are spread over all four faces and most of the
+  // height, and set back from the surface far enough that the player has to
+  // have got somewhere before finding one. Nothing marks them: the reward is
+  // for digging, and a marked charge is a button.
+  B.section('charges', () => {
+    for (const c of charges) B.add(c.x, c.y, c.z, CHARGE_E, CHARGE_E, CHARGE_E, M.CHARGE);
   });
 
   // Entrance: the robbers' tunnel, open on the north face. A hole in the

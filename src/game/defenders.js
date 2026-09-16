@@ -4,6 +4,7 @@ import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
 import { TOWER, WING } from '../structure/landmarks/bigben.js';
 import { EIFFEL } from '../structure/landmarks/eiffel.js';
+import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
 
 /**
@@ -820,75 +821,84 @@ export class Garrison {
    * lobbing over the dome at anything working round the back.
    */
   populateTajMahal(origin, groundY, counts = {}) {
-    const PLINTH = 95.5;
-    const PLINTH_H = 7.0;
-    const HALF = 28.5;
-    const ROOF = PLINTH_H + 33.0;
+    // Every figure comes from `TAJ`, which is the builder's own, and the loose
+    // offsets are multiplied by its scale. These used to be written out here
+    // by hand at the survey dimensions, so scaling the monument moved the
+    // marble and left the garrison standing where the old walls had been.
+    const K = TAJ.scale;
+    const PLINTH = TAJ.plinth;
+    const PLINTH_H = TAJ.plinthH;
+    const HALF = TAJ.half;
+    const ROOF = TAJ.roof;
 
     // Sandbagged positions along the plinth parapet.
     const perimeter = counts.plinth ?? 16;
     for (let i = 0; i < perimeter; i++) {
       const a = (i / perimeter) * Math.PI * 2;
-      const half = PLINTH / 2 - 2.5;
+      const half = PLINTH / 2 - 2.5 * K;
       const c = Math.cos(a), sn = Math.sin(a);
       const m = Math.max(Math.abs(c), Math.abs(sn));
       const p = new THREE.Vector3(
         origin.x + (c / m) * half, groundY + PLINTH_H + 1.0, origin.z + (sn / m) * half,
       );
-      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(c, sn), 7,
+      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(c, sn), 7 * K,
         { cover: 'ground', sandbags: true });
     }
 
     // The four great iwans — deep covered recesses looking straight down each
     // approach. Set back inside the arch so the reveal is real cover.
     for (const [nx, nz, yaw] of [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]]) {
-      for (const off of [-5, 0, 5]) {
+      for (const off of [-5 * K, 0, 5 * K]) {
         const p = new THREE.Vector3(
-          origin.x + nx * (HALF - 3.2) - nz * off,
+          origin.x + nx * (HALF - 3.2 * K) - nz * off,
           groundY + PLINTH_H + 1.6,
-          origin.z + nz * (HALF - 3.2) + nx * off,
+          origin.z + nz * (HALF - 3.2 * K) + nx * off,
         );
-        this.place(off === 0 ? 'mg' : 'rifleman', p, yaw, 7, { cover: 'window' });
+        this.place(off === 0 ? 'mg' : 'rifleman', p, yaw, 7 * K, { cover: 'window' });
       }
       // A second storey of pierced screens above each iwan.
       const q = new THREE.Vector3(
-        origin.x + nx * (HALF - 1.2), groundY + PLINTH_H + 21.0, origin.z + nz * (HALF - 1.2),
+        origin.x + nx * (HALF - 1.2 * K), groundY + PLINTH_H + 21.0 * K,
+        origin.z + nz * (HALF - 1.2 * K),
       );
-      this.place('sniper', q, yaw, 6, { cover: 'window' });
+      this.place('sniper', q, yaw, 6 * K, { cover: 'window' });
     }
 
     // Tomb roof: AT teams at the corners, mortars beside the drum.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const p = new THREE.Vector3(
-        origin.x + sx * 21, groundY + ROOF + 2.0, origin.z + sz * 21,
+        origin.x + sx * 21 * K, groundY + ROOF + 2.0, origin.z + sz * 21 * K,
       );
-      this.place('at', p, Math.atan2(sx, sz), 9, { cover: 'roof' });
+      this.place('at', p, Math.atan2(sx, sz), 9 * K, { cover: 'roof' });
     }
     for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       this.place('mortar',
-        new THREE.Vector3(origin.x + sx * 15, groundY + ROOF + 2.0, origin.z + sz * 15),
-        Math.atan2(sx, sz), 9, { cover: 'roof' });
+        new THREE.Vector3(origin.x + sx * 15 * K, groundY + ROOF + 2.0, origin.z + sz * 15 * K),
+        Math.atan2(sx, sz), 9 * K, { cover: 'roof' });
     }
 
-    // Minaret tops: snipers, 41 m up, seeing everything.
-    const base = PLINTH / 2 - 6.0;
+    // Minaret tops: snipers, seeing everything.
+    const base = PLINTH / 2 - 6.0 * K;
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const p = new THREE.Vector3(
-        origin.x + sx * (base + 0.9), groundY + PLINTH_H + 43.0, origin.z + sz * (base + 0.9),
+        origin.x + sx * (base + 0.9 * K), groundY + PLINTH_H + 43.0 * K,
+        origin.z + sz * (base + 0.9 * K),
       );
-      this.place('sniper', p, Math.atan2(sx, sz), 9, { cover: 'roof' });
+      this.place('sniper', p, Math.atan2(sx, sz), 9 * K, { cover: 'roof' });
       const q = new THREE.Vector3(
-        origin.x + sx * (base + 0.4), groundY + PLINTH_H + 24.0, origin.z + sz * (base + 0.4),
+        origin.x + sx * (base + 0.4 * K), groundY + PLINTH_H + 24.0 * K,
+        origin.z + sz * (base + 0.4 * K),
       );
-      this.place('mg', q, Math.atan2(sx, sz), 8, { cover: 'window' });
+      this.place('mg', q, Math.atan2(sx, sz), 8 * K, { cover: 'window' });
     }
 
     // Mosque and jawab roofs.
     for (const side of [-1, 1]) {
-      for (const off of [-16, 0, 16]) {
-        const p = new THREE.Vector3(origin.x + side * 88, groundY + 19.5, origin.z + off);
-        this.place(off === 0 ? 'mortar' : 'rifleman', p, side > 0 ? Math.PI / 2 : -Math.PI / 2, 9,
-          { cover: 'roof' });
+      for (const off of [-16 * K, 0, 16 * K]) {
+        const p = new THREE.Vector3(
+          origin.x + side * TAJ.mosqueX, groundY + TAJ.mosqueRoof, origin.z + off);
+        this.place(off === 0 ? 'mortar' : 'rifleman', p, side > 0 ? Math.PI / 2 : -Math.PI / 2,
+          9 * K, { cover: 'roof' });
       }
     }
   }

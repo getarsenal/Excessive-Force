@@ -13,7 +13,7 @@ import {
   resolveStartLevel, showLevelSelect, recordResult, nextTarget, goToLevel,
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
-import { MATERIAL_PROPS } from './structure/builder.js';
+import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
 import { Garrison, loadSoldierGeometry } from './game/defenders.js';
@@ -64,6 +64,33 @@ async function boot() {
   // London greens and brick dust make the plateau read as the Home Counties
   // with a pyramid on it.
   if (level.palette) terrain.palette = level.palette;
+  // The landmarks' footprints, measured before the ground is committed to.
+  //
+  // This has to happen before the mesh and the heightfield collider are built,
+  // because the ground each one stands on gets levelled first. A structure is
+  // founded at a single sampled height and then built as though the world were
+  // flat under all of it, which is fine for a clock tower and wrong for a
+  // ninety-five metre terrace — the Taj's plinth was founded on the height at
+  // its centre with the ground rising across it, and a third of the terrace
+  // ended up underground.
+  const specs = level.structures(quality);
+  const landmarks = specs.map((sp) => {
+    const off = sp.offset || { x: 0, z: 0 };
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const b of sp.blocks.blocks || sp.blocks) {
+      const r = Math.max(b.hx, b.hz);
+      if (b.x - r < x0) x0 = b.x - r;
+      if (b.x + r > x1) x1 = b.x + r;
+      if (b.z - r < z0) z0 = b.z - r;
+      if (b.z + r > z1) z1 = b.z + r;
+    }
+    return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
+      w: x1 - x0, d: z1 - z0 };
+  });
+  for (const L of landmarks) {
+    terrain.levelPad(L.x, L.z, Math.max(L.w, L.d) * 0.5 + 8, 40);
+  }
+
   engine.scene.add(terrain.buildMesh());
   // The ground, kept by handle: anything resting on the terrain is settled for
   // good, and the freezing bookkeeping can stop worrying about it.
@@ -91,21 +118,6 @@ async function boot() {
   // ground in every other direction and left the monument standing in a
   // paddock. Measuring the real footprints lets the streets come right up to
   // the precinct on the sides where there is nothing in the way.
-  const specs = level.structures(quality);
-  const landmarks = specs.map((sp) => {
-    const off = sp.offset || { x: 0, z: 0 };
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (const b of sp.blocks.blocks || sp.blocks) {
-      const r = Math.max(b.hx, b.hz);
-      if (b.x - r < x0) x0 = b.x - r;
-      if (b.x + r > x1) x1 = b.x + r;
-      if (b.z - r < z0) z0 = b.z - r;
-      if (b.z + r > z1) z1 = b.z + r;
-    }
-    return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
-      w: x1 - x0, d: z1 - z0 };
-  });
-
   // Real OpenStreetMap footprints when they've been baked; otherwise the
   // hand-placed approximation, so the level still reads as a city either way.
   let contextGroup = null;
@@ -153,9 +165,17 @@ async function boot() {
 
   const fx = new ExplosionFX(engine.scene, quality);
   const dustColour = new THREE.Color();
+  // Charges that have been uncovered and are about to go off. Queued rather
+  // than fired here: this runs from inside the explosion that destroyed the
+  // crate, and detonating from within that pass would re-enter the solver
+  // while it is halfway through rebuilding its own graphs.
+  const pendingCharges = [];
   const onChunkDestroyed = (x, y, z, size, mat) => {
     dustColour.setHex(MATERIAL_PROPS[mat].color);
     fx.stoneBurst(x, y, z, size, dustColour);
+    if (mat === MATERIALS.CHARGE) {
+      pendingCharges.push(new THREE.Vector3(x, y, z));
+    }
   };
 
   const t0 = performance.now();
@@ -283,6 +303,9 @@ async function boot() {
         break;
       case 'crushed':
         if (data > 2) hud.feed(`${data} DEFENDERS CRUSHED`, 'big');
+        break;
+      case 'charge':
+        hud.feed(`DEMOLITION CHARGE — ${data.destroyed} STONES`, 'big');
         break;
       case 'win':
         // Let the collapse actually finish before covering it with a panel —
@@ -453,6 +476,11 @@ async function boot() {
 
   const governor = new AdaptiveGovernor(quality);
   const perfEl = document.getElementById('perf');
+  // Kept up to date either way — the harness reads its text — but only shown
+  // when asked for.
+  if (perfEl && new URLSearchParams(location.search).has('perf')) {
+    perfEl.classList.add('on');
+  }
   let last = performance.now();
   let frames = 0, fpsAcc = 0, fps = 0, physMs = 0;
 
@@ -476,6 +504,7 @@ async function boot() {
         s.solveStability(); s.maintainIslands(step); s.tickLean(step); s.syncTransforms();
       }
       battle.update(step);
+      while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
       fx.update(step);
     }
     return steps;
@@ -528,6 +557,9 @@ async function boot() {
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     battle.update(dt);
+    // Anything the last frame uncovered goes off now, one frame late and
+    // safely outside the pass that exposed it.
+    while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     hud.update(rawDt);
     testMenu.update(rawDt);

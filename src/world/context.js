@@ -783,21 +783,53 @@ function buildForecourt(terrain, radius, quality) {
  * runs hundreds of metres over dry land.
  */
 function bridgeLine(terrain) {
-  const lineA = new THREE.Vector3(35, 0, -150);
-  const lineB = new THREE.Vector3(430, 0, -255);
-  let first = null, last = null;
-  for (let t = 0; t <= 1.0001; t += 0.01) {
-    const p = lineA.clone().lerp(lineB, t);
-    if (terrain.isWater(p.x, p.z)) {
-      if (first === null) first = t;
-      last = t;
+  // Found from the river, not written down.
+  //
+  // This used to be two hard-coded points — Westminster Bridge's own line,
+  // which is exactly right on the one map it was measured from and arbitrary
+  // on every other. On Agra it crossed the Yamuna at whatever angle that line
+  // happened to make with it, a long way from anything, so the bridge read as
+  // an aqueduct abandoned in a field: no road came near it and nothing
+  // explained why it was there.
+  const span = terrain.span;
+  let near = null, nearD = Infinity;
+  for (let z = -span * 0.75; z <= span * 0.75; z += 10) {
+    for (let x = -span * 0.75; x <= span * 0.75; x += 10) {
+      if (!terrain.isWater(x, z)) continue;
+      // Near the monument, but not on top of it.
+      const d = Math.abs(Math.hypot(x, z) - 260);
+      if (d < nearD) { nearD = d; near = { x, z }; }
     }
   }
-  if (first === null) return null;
-  const pad = 0.055;
-  const from = lineA.clone().lerp(lineB, Math.max(0, first - pad));
-  const to = lineA.clone().lerp(lineB, Math.min(1, last + pad));
+  if (!near) return null;
+
+  // Which way the channel runs here: the heading along which the water goes
+  // furthest. Crossing square to that is what a bridge does.
+  let dir = { x: 1, z: 0 }, longest = -1;
+  for (let a = 0; a < Math.PI - 1e-6; a += Math.PI / 24) {
+    const dx = Math.sin(a), dz = Math.cos(a);
+    let run = 0;
+    for (let t = -420; t <= 420; t += 7) {
+      if (terrain.isWater(near.x + dx * t, near.z + dz * t)) run++;
+    }
+    if (run > longest) { longest = run; dir = { x: dx, z: dz }; }
+  }
+  const nx = -dir.z, nz = dir.x;
+
+  // Out to dry land on both sides, and a little beyond.
+  const bank = (sign) => {
+    let last = 0;
+    for (let t = 0; t < 900; t += 4) {
+      if (terrain.isWater(near.x + nx * sign * t, near.z + nz * sign * t)) last = t;
+      else if (t > last + 26) break;
+    }
+    const d = last + 16;
+    return new THREE.Vector3(near.x + nx * sign * d, 0, near.z + nz * sign * d);
+  };
+  const from = bank(-1);
+  const to = bank(1);
   const len = from.distanceTo(to);
+  if (len < 40 || len > span * 1.6) return null;
   const yaw = Math.atan2(to.x - from.x, to.z - from.z);
   const out = { x: (to.x - from.x) / len, z: (to.z - from.z) / len };
   const RUN = 46;                       // metres of ramp at each end
@@ -951,7 +983,17 @@ function buildBridge(terrain, quality, line) {
   // Piers down to the riverbed, with cutwaters and the arches between them.
   const pierMat = pierMatShared();
   const spanBits = [];
-  const piers = 5;
+  // Sized off the deck rather than in absolute metres, and slimmer than it was.
+  //
+  // The old numbers — piers seven metres thick and fifteen deep under a
+  // spandrel fifteen and a half wide — were a pier of the Thames embankment
+  // and made the whole thing read as a rigid block of masonry with holes in
+  // it. A river crossing is mostly air: what you should see under the deck is
+  // a run of arches on slender piers, with the water behind them.
+  const PIER_W = DECK_W * 0.30;          // across the current
+  const PIER_D = DECK_W * 0.62;          // along the deck
+  const SOFFIT = DECK_W * 0.66;          // width of the arch barrel
+  const piers = Math.max(3, Math.min(9, Math.round(len / 34)));
   const pierAt = [];
   for (let i = 1; i <= piers; i++) {
     const t = i / (piers + 1);
@@ -960,20 +1002,30 @@ function buildBridge(terrain, quality, line) {
     const h = deckY - bed;
     if (h <= 0.5) continue;
     pierAt.push({ p, bed, h, t });
-    const pier = new THREE.BoxGeometry(7, h, 15);
+    const pier = new THREE.BoxGeometry(PIER_W, h, PIER_D);
     pier.rotateY(yaw); pier.translate(p.x, bed + h / 2, p.z);
     spanBits.push(pier);
     // Cutwater: a wedge on each face, so the pier parts the water rather than
-    // sitting in it like a post.
+    // sitting in it like a post. Carried up as a pilaster to just under the
+    // deck, the way a real one is, which is what gives the elevation its
+    // vertical rhythm instead of leaving it a band of holes.
     for (const sgn of [-1, 1]) {
-      const nose = new THREE.CylinderGeometry(3.5, 3.5, h, 3);
+      const nose = new THREE.CylinderGeometry(PIER_W * 0.62, PIER_W * 0.62, h, 3);
       nose.rotateY(yaw + Math.PI / 2);
-      nose.translate(p.x + Math.cos(yaw) * 0, bed + h / 2,
-        p.z + 0);
-      nose.translate(Math.sin(yaw + Math.PI / 2) * 0, 0, 0);
-      const off = 7.5 * sgn;
+      nose.translate(p.x, bed + h / 2, p.z);
+      const off = (PIER_D / 2 + PIER_W * 0.18) * sgn;
       nose.translate(Math.sin(yaw) * off, 0, Math.cos(yaw) * off);
       spanBits.push(nose);
+
+      // The pilaster above it, and the corbelled cap it dies into.
+      const col = new THREE.BoxGeometry(PIER_W * 0.86, Math.min(h, 4.2), PIER_W * 0.9);
+      col.rotateY(yaw);
+      col.translate(p.x + Math.sin(yaw) * off, deckY - 2.4, p.z + Math.cos(yaw) * off);
+      spanBits.push(col);
+      const cap = new THREE.BoxGeometry(PIER_W * 1.05, 0.5, PIER_W * 1.1);
+      cap.rotateY(yaw);
+      cap.translate(p.x + Math.sin(yaw) * off, deckY - 0.2, p.z + Math.cos(yaw) * off);
+      spanBits.push(cap);
     }
   }
 
@@ -989,21 +1041,61 @@ function buildBridge(terrain, quality, line) {
     if (sLen < 6) continue;
     const c = a.clone().lerp(bmid, 0.5);
     const springY = deckY - 1.6;
-    const rise = Math.min(sLen * 0.34, 7.5);
-    const steps = 9;
+    const rise = Math.min(sLen * 0.40, 9.0);
+    // Finer than it was: nine boxes across a thirty-metre arch is a staircase,
+    // and the eye reads a staircase as a mistake rather than as masonry.
+    const steps = 18;
     for (let k = 0; k < steps; k++) {
       const u = (k + 0.5) / steps;             // 0..1 across the arch
       const dy = Math.sin(u * Math.PI) * rise; // circular-ish profile
-      const segW = (sLen / steps) + 0.4;
+      const segW = (sLen / steps) + 0.25;
       const px2 = c.x + Math.sin(yaw) * (u - 0.5) * sLen;
       const pz2 = c.z + Math.cos(yaw) * (u - 0.5) * sLen;
+      const soffit = springY - rise + dy;
       // The spandrel above the arch line, filling up to the deck.
-      const fillH = Math.max(0.4, (deckY - 1.8) - (springY - rise + dy));
-      const seg = new THREE.BoxGeometry(15.4, fillH, segW);
+      const fillH = Math.max(0.4, (deckY - 1.8) - soffit);
+      const seg = new THREE.BoxGeometry(SOFFIT, fillH, segW);
       seg.rotateY(yaw);
-      seg.translate(px2, (springY - rise + dy) + fillH / 2, pz2);
+      seg.translate(px2, soffit + fillH / 2, pz2);
       spanBits.push(seg);
+
+      // The arch ring: a band of voussoirs standing slightly proud of the
+      // spandrel on both elevations. This is the single detail that stops a
+      // masonry arch reading as a hole punched in a wall — from any angle that
+      // can see the side of the bridge, it is the arch.
+      for (const sgn of [-1, 1]) {
+        const ring = new THREE.BoxGeometry(PIER_W * 0.30, 1.5, segW);
+        ring.rotateY(yaw);
+        ring.translate(
+          px2 + Math.cos(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.12),
+          soffit + 0.55,
+          pz2 - Math.sin(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.12));
+        spanBits.push(ring);
+      }
     }
+
+    // A keystone over the crown of each arch, dropped below the string course.
+    for (const sgn of [-1, 1]) {
+      const key = new THREE.BoxGeometry(PIER_W * 0.34, 2.6, 1.5);
+      key.rotateY(yaw);
+      key.translate(
+        c.x + Math.cos(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.14),
+        springY - rise + rise - 0.5,
+        c.z - Math.sin(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.14));
+      spanBits.push(key);
+    }
+  }
+
+  // A string course the whole length, just under the parapet, tying the
+  // elevation together.
+  for (const sgn of [-1, 1]) {
+    const band = new THREE.BoxGeometry(PIER_W * 0.34, 0.7, len);
+    band.rotateY(yaw);
+    band.translate(
+      mid.x + Math.cos(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.13),
+      deckY - 0.9,
+      mid.z - Math.sin(yaw) * sgn * (SOFFIT / 2 + PIER_W * 0.13));
+    spanBits.push(band);
   }
   const spans = new THREE.Mesh(
     BufferGeometryUtils.mergeGeometries(spanBits, false), pierMat);

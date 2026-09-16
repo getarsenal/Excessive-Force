@@ -169,41 +169,92 @@ export function buildEiffelTower(quality) {
   });
 
   // ── The four legs ────────────────────────────────────────────────────────
-  B.section('legs', () => {
-    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      // Laced on all four faces, course by course.
-      //
-      // Four free-standing posts is what the real leg looks like from a
-      // distance and it is not what the real leg is: it is a closed caisson,
-      // four posts laced together the whole way up. Built as bare posts the
-      // bearing chain broke a few courses off the ground and the outer
-      // corners of every leg came away — on a phone that took the whole tower
-      // down before the player had touched it. The lacing is a continuous load
-      // path; at 0.7 m on a box twenty-five metres across it still reads as a
-      // frame with sky behind it.
-      {
-        let y = 0;
-        let c = 0;
-        while (y < EIFFEL.secondFloor - 0.001) {
-          const h = Math.min(member * 1.6, EIFFEL.secondFloor - y);
-          const g = legAt(y + h / 2);
-          // The wall has to be wider than the batter moves the leg in one
-          // course, or each ring lands inboard of the one below it and bears
-          // on nothing — which is exactly what a 0.7 m wall did.
-          B.ring(sx * g.r, sz * g.r, g.h * 2, g.h * 2, LACE, y, h,
-            member * 2.0, M.IRONWORK, c % 2);
-          y += h;
-          c++;
+  //
+  // A cage of continuous vertical members, not a wall with holes in it.
+  //
+  // This has been three things and only the third one is both true and stable.
+  // Four bare corner posts look right and fall down: a post that steps inward
+  // faster than it is wide bears on nothing, and on a phone that took the whole
+  // tower down before the player had touched it. A closed laced ring stands
+  // perfectly and reads from the camera as a solid brown chimney — which is
+  // not what anybody means by the Eiffel Tower. Cutting panels out of that ring
+  // gives back the openness and sheds nine hundred stones on load, because the
+  // one rule the support solver actually enforces is that a stone must stand on
+  // something *underneath* it, and a hole in a wall is precisely a place where
+  // the stone above has nothing under it.
+  //
+  // So: build the wall out of members that are continuous all the way up. Every
+  // bar is a column standing on the bar below it, so the bearing chain is
+  // unbroken at every point on every face — and the gaps between the bars,
+  // which are three quarters of each face, are sky. That is also how the real
+  // tower is built, which is usually a sign of being on the right track.
+  const LEG_N = 6;                          // members across each face
+  const COURSE = member * 0.9;              // finer than the ring's, on purpose:
+  // the batter moves a member sideways by 0.4 m for every metre of height, so a
+  // shorter course is a smaller step, and a smaller step is a thinner bar that
+  // still overlaps the one beneath it.
+  const BAR = Math.max(0.5, COURSE * 0.36);
+
+  /** One tapering box built as a cage: `at(y)` gives its centre and half-width. */
+  const cage = (at, y0, y1, n, bar, courseH) => {
+    const fr = [];
+    for (let i = 0; i < n; i++) fr.push(-1 + (2 * i) / (n - 1));
+    let y = y0;
+    while (y < y1 - 0.001) {
+      const h = Math.min(courseH, y1 - y);
+      const yc = y + h / 2;
+      const g = at(yc);
+      const hy = h / 2 - 0.02;
+      // The four corner posts, square in plan.
+      for (const ex of [-1, 1]) {
+        for (const ez of [-1, 1]) {
+          B.add(g.cx + ex * g.h, yc, g.cz + ez * g.h, bar, hy, bar, M.IRONWORK);
         }
       }
+      // And the members along each face, between the corners.
+      for (let k = 1; k < n - 1; k++) {
+        const f = fr[k];
+        for (const ex of [-1, 1]) {
+          B.add(g.cx + ex * g.h, yc, g.cz + f * g.h, bar, hy, bar, M.IRONWORK);
+        }
+        for (const ez of [-1, 1]) {
+          B.add(g.cx + f * g.h, yc, g.cz + ez * g.h, bar, hy, bar, M.IRONWORK);
+        }
+      }
+      y += h;
+    }
+  };
 
-      // No separate ties or braces on the legs.
-      //
-      // They were laid on the corner-post lines, which is exactly where the
-      // lacing now is, so every one of them shared a volume with a ring block
-      // and spent the first frame shoving at it. The lacing already does their
-      // structural job; what they were adding was texture, and texture is not
-      // worth seventy stones of leg coming apart.
+  /**
+   * A belt of horizontals round a cage at one height, and the diagonals under
+   * it.
+   *
+   * Laid exactly on a course boundary so each belt sits on the tops of the
+   * members it crosses and has a real bearing edge to every one of them. A
+   * horizontal floating between two courses has nothing under it at all and
+   * lives or dies on the grout pass, which is the other way nine hundred stones
+   * came off this tower.
+   */
+  const belt = (at, y, bar) => {
+    const g = at(y);
+    for (const ex of [-1, 1]) {
+      B.add(g.cx + ex * g.h, y, g.cz, bar, bar * 0.85, g.h + bar, M.IRONWORK);
+      B.add(g.cx, y, g.cz + ex * g.h, g.h + bar, bar * 0.85, bar, M.IRONWORK);
+    }
+  };
+
+  B.section('legs', () => {
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const at = (y) => {
+        const g = legAt(y);
+        return { cx: sx * g.r, cz: sz * g.r, h: g.h };
+      };
+      cage(at, 0, EIFFEL.secondFloor, LEG_N, BAR, COURSE);
+      // A belt every fourth course, which is what gives the leg its horizontal
+      // banding at a distance.
+      for (let y = COURSE * 4; y < EIFFEL.secondFloor - COURSE; y += COURSE * 4) {
+        belt(at, y, BAR * 0.8);
+      }
     }
   });
 
@@ -293,27 +344,25 @@ export function buildEiffelTower(quality) {
   // than losing anything above.
   B.section('shaft', () => {
     const y0 = EIFFEL.secondFloor, y1 = EIFFEL.thirdFloor;
-    // A closed caisson, not four free-standing posts.
+    // Built as the legs are: a cage of continuous members.
     //
-    // Above the second platform the real tower is a single braced box, and it
-    // has to be one here too. Built as four bare corner posts it would not
-    // stand: the bearing chain up a column of 2.3 m blocks stepping inward a
-    // couple of centimetres a course kept breaking three courses above the
-    // deck, and a thousand and twenty-eight stones — everything above 124 m —
-    // started the level detached. A thin ring gives every course a continuous
-    // seat on the one below it, which is what a caisson is for.
+    // This was a closed ring for the same reason the legs were, and it cost the
+    // same thing. Above the second platform the real tower is a single braced
+    // box a hundred and sixty metres tall, and that is most of what you see of
+    // the building from anywhere on the map — solid, it turns the whole upper
+    // tower into a tapering chimney. Members that run the full height bear on
+    // themselves the whole way up, so the box is open and still stands.
     //
-    // The lattice is still lattice: the ring is under a metre thick against a
-    // box twenty-seven metres across at the bottom, so it reads as a frame,
-    // and the ties and braces below still carry the eye.
-    // A constant wall. Thickening it where it meets the platform sounds right
-    // and measures worse: the extra mass lands on deck plate that was already
-    // at its limit, and sixty-eight stones of the platform give way instead of
-    // eleven of the caisson.
-    B.tower(0, 0, y0, y1,
-      (t, y) => shaftHalf(y) * 2,
-      () => 0.85,
-      member * 1.6, member, () => M.IRONWORK);
+    // Fewer members than a leg has, and thinner, because the shaft barely
+    // batters: it loses nine metres of half-width over a hundred and sixty of
+    // height, so a course moves a member about five centimetres sideways and
+    // almost anything overlaps itself.
+    const SN = 5;
+    const SBAR = Math.max(0.42, COURSE * 0.30);
+    cage((y) => ({ cx: 0, cz: 0, h: shaftHalf(y) }), y0, y1, SN, SBAR, COURSE);
+    for (let y = y0 + COURSE * 5; y < y1 - COURSE; y += COURSE * 5) {
+      belt((yy) => ({ cx: 0, cz: 0, h: shaftHalf(yy) }), y, SBAR * 0.8);
+    }
 
     // Bracing across each face, for the look of the thing.
     const BAY = 10.0;

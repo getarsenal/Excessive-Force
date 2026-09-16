@@ -122,6 +122,15 @@ export class Picker {
           structure: null, chunk: -1, defender: d, distance: h.distance };
         break;
       }
+      // Failing an exact hit, the nearest man to the tap on screen.
+      //
+      // A soldier is about sixty centimetres across. At the four hundred
+      // metres the camera sits back for a doubled tower that is two or three
+      // pixels, and a finger is nearer forty — so a gun crew dug in on open
+      // ground was, in practice, impossible to point at. The men in windows
+      // were fine only because the ray that misses the man still hits the
+      // building he is standing in, which is what the caller wanted anyway.
+      if (!man) man = this._defenderNearTap(clientX, clientY, garrison);
     }
 
     // Flat roofs are legitimate ground. A gun on one has sightlines the street
@@ -187,6 +196,40 @@ export class Picker {
       return { kind: 'roof', point: roof, label: 'rooftop', structure: null, chunk: -1 };
     }
     if (ground) return { kind: 'ground', point: ground, label: null, structure: null, chunk: -1 };
+    return best;
+  }
+
+  /**
+   * The living defender whose head is nearest the tap on screen, in pixels.
+   *
+   * Deliberately generous and deliberately last: this only runs when the ray
+   * missed every figure outright, so it costs a projection per defender on a
+   * tap that was going to land on ground or masonry anyway. The result still
+   * goes through the same forward-bias test as an exact hit, so a man behind a
+   * wall does not win the tap just for being near the finger.
+   */
+  _defenderNearTap(clientX, clientY, garrison) {
+    const r = this.canvas.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    // Scaled to the screen: about a finger's width on a phone, and no more
+    // than that on a desktop monitor.
+    const tol = Math.max(22, Math.min(r.width, r.height) * 0.055);
+    let best = null, bestPx = tol;
+    const v = this._v;
+    for (const d of garrison.defenders) {
+      if (!d.alive) continue;
+      v.set(d.pos.x, d.pos.y + 0.9, d.pos.z);       // chest height
+      const dist = this.camera.position.distanceTo(v);
+      v.project(this.camera);
+      if (v.z < -1 || v.z > 1) continue;            // behind, or past the far plane
+      const px = r.left + (v.x * 0.5 + 0.5) * r.width;
+      const py = r.top + (-v.y * 0.5 + 0.5) * r.height;
+      const off = Math.hypot(px - clientX, py - clientY);
+      if (off >= bestPx) continue;
+      bestPx = off;
+      best = { kind: 'defender', point: new THREE.Vector3(d.pos.x, d.pos.y + 0.9, d.pos.z),
+        label: d.def.name, structure: null, chunk: -1, defender: d, distance: dist };
+    }
     return best;
   }
 

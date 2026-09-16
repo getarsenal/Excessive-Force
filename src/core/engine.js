@@ -563,8 +563,18 @@ export class CameraRig {
     this.camera.lookAt(this.target);
 
     if (shakeVec && (shakeVec.x || shakeVec.y)) {
-      this.camera.position.x += shakeVec.x * this.distance * 0.004;
-      this.camera.position.y += shakeVec.y * this.distance * 0.004;
+      // The shake belongs to the building, not to the lens.
+      //
+      // Amplitude used to be a flat multiple of the camera distance, which is
+      // the one law that keeps it *constant on screen*: a shell landing eight
+      // hundred metres off shook the view exactly as hard as one landing under
+      // the camera, and from right out — where the whole city is in frame and
+      // nothing in it is moving much — the picture still jolted. Pulling back
+      // should calm it down, and from far enough out it should stop.
+      const fall = clamp((620 - this.distance) / 420, 0, 1);
+      const amp = Math.min(this.distance, 260) * 0.004 * fall * fall;
+      this.camera.position.x += shakeVec.x * amp;
+      this.camera.position.y += shakeVec.y * amp;
     }
   }
 }

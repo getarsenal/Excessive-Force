@@ -63,9 +63,39 @@ function chamferedSquare(half, cut) {
   ];
 }
 
+/**
+ * How much bigger than life the complex is built.
+ *
+ * Everything below is written at the real survey dimensions — that is what
+ * makes it checkable — and the whole block list is scaled once at the end, the
+ * way the Elizabeth Tower is. At 2.2 the terrace is 210 m square and the dome
+ * stands 141 m over it, which is the size the Taj has in memory rather than
+ * the size it has on a drawing.
+ *
+ * The stone size is *not* scaled with it. Building at 0.72 of the tier's
+ * nominal stone and then scaling puts the stones at about 1.6x their old size
+ * in a building ten times the volume — finer relative to the monument than
+ * they were before, for about two and a half times as many of them.
+ */
+export const TAJ_SCALE = 2.2;
+const STONE_FINENESS = 0.72;
+
+/** The finished complex's dimensions, in world metres. One source for the
+ *  builder and the garrison both. */
+export const TAJ = {
+  scale: TAJ_SCALE,
+  plinth: 95.5 * TAJ_SCALE,
+  plinthH: 7.0 * TAJ_SCALE,
+  half: 28.5 * TAJ_SCALE,
+  wallTop: 33.0 * TAJ_SCALE,
+  roof: 40.0 * TAJ_SCALE,
+  mosqueX: 88 * TAJ_SCALE,
+  mosqueRoof: 19.5 * TAJ_SCALE,
+};
+
 export function buildTajMahal(quality) {
   const B = new BlockList();
-  const s = quality.blockScale;
+  const s = quality.blockScale * STONE_FINENESS;
 
   const stone = 1.5 * s;
   const course = 1.15 * s;
@@ -289,7 +319,7 @@ export function buildTajMahal(quality) {
     }
   });
 
-  return B;
+  return B.scaleAll(TAJ_SCALE);
 }
 
 /**
@@ -299,7 +329,7 @@ export function buildTajMahal(quality) {
  */
 export function buildTajMosque(quality, sideSign = -1) {
   const B = new BlockList();
-  const s = quality.blockScale;
+  const s = quality.blockScale * STONE_FINENESS;
   const stone = 1.5 * s;
   const course = 1.15 * s;
 
@@ -337,5 +367,5 @@ export function buildTajMosque(quality, sideSign = -1) {
     }
   });
 
-  return B;
+  return B.scaleAll(TAJ_SCALE);
 }

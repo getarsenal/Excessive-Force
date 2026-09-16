@@ -101,6 +101,56 @@ export class Terrain {
     return minWet + 5.4;
   }
 
+  /**
+   * Level the ground a landmark stands on, to the height of the ring just
+   * outside its footprint.
+   *
+   * A structure is founded at one sampled height — `terrain.heightAt` at its
+   * origin — and then built as though the world were flat under all of it.
+   * That is fine for a clock tower and wrong for a plinth ninety-five metres
+   * square: the Taj's terrace was founded on the height at its centre and the
+   * ground rose two metres across it, so a third of the plinth was underground
+   * and the mausoleum looked half sunk.
+   *
+   * Levelling to the surrounding median rather than to the centre sample means
+   * the terrace matches the ground it is cut into, and the feather blends it
+   * out so the result reads as a terrace rather than as a plug. Wet cells are
+   * left alone, or a landmark on a bank would dam its own river.
+   */
+  levelPad(cx, cz, radius, feather = 30) {
+    const n = this.size, h = this.heights, span = this.span, c = this.cellSize;
+    const uOf = (x) => (x + span) / (span * 2) * (n - 1);
+    const vOf = (z) => (span - z) / (span * 2) * (n - 1);
+    const rOut = radius + feather;
+    const i0 = Math.max(0, Math.floor(uOf(cx - rOut)));
+    const i1 = Math.min(n - 1, Math.ceil(uOf(cx + rOut)));
+    const j0 = Math.max(0, Math.floor(vOf(cz + rOut)));
+    const j1 = Math.min(n - 1, Math.ceil(vOf(cz - rOut)));
+
+    const ring = [];
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const d = Math.hypot(-span + i * c - cx, span - j * c - cz);
+        if (d > radius && d < rOut) ring.push(h[j * n + i]);
+      }
+    }
+    if (!ring.length) return null;
+    ring.sort((a, b) => a - b);
+    const level = ring[ring.length >> 1];
+
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const idx = j * n + i;
+        if (this.mask[idx * 3] > 0.5) continue;
+        const d = Math.hypot(-span + i * c - cx, span - j * c - cz);
+        if (d >= rOut) continue;
+        const t = d <= radius ? 1 : 1 - (d - radius) / feather;
+        h[idx] += (level - h[idx]) * (t * t * (3 - 2 * t));
+      }
+    }
+    return level;
+  }
+
   /** Separable box blur over the DEM grid, by prefix sums. */
   _blur(src, r) {
     const n = this.size;

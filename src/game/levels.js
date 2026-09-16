@@ -73,8 +73,11 @@ export const LEVELS = {
     place: 'Agra, Uttar Pradesh',
     target: 'TAJ MAHAL',
     subtitle: 'Taj Mahal · Agra',
-    cityExcludeRadius: 190,   // the complex is wide; keep OSM buildings clear
-    camera: { yaw: 0.35, pitch: 0.34, distance: 290, height: 34 },
+    // The complex is 2.2x life size: a 210 m terrace with a dome 141 m over
+    // it. Everything framed around it moves out with it.
+    cityExcludeRadius: 420,   // keep OSM buildings off the charbagh
+    contextExclude: 300,
+    camera: { yaw: 0.35, pitch: 0.34, distance: 640, height: 78 },
     structures: (quality) => [
       { key: 'taj', blocks: buildTajMahal(quality), primary: true,
         required: true, label: 'TAJ MAHAL' },
