@@ -408,10 +408,13 @@ export class Terrain {
             if (d < best) { best = d; half = a.half + (b.half - a.half) * t; }
           }
         }
-        if (best > half + 70) continue;
-        // Flat channel bed, then a bank that climbs over seventy metres.
+        // Banks that climb over thirty metres, not seventy. A seventy-metre
+        // shoulder either side of a 240 m channel is a third of a kilometre of
+        // pale shelving ground, and from the air that band — not the water —
+        // was most of what the eye read as "the river out there".
+        if (best > half + 32) continue;
         const k2 = best <= half ? 1
-          : 1 - THREE.MathUtils.smoothstep((best - half) / 70, 0, 1);
+          : 1 - THREE.MathUtils.smoothstep((best - half) / 32, 0, 1);
         ap.setY(i, sunk * k2);
         chan[i] = k2;
       }
@@ -547,11 +550,21 @@ export class Terrain {
     const OUT = 70;
     const tails = [];
     for (const e of this.riverExits()) {
-      const ctrl = [];
-      // Start one span back inside the map, so the first control point the
-      // spline actually draws from is the exit itself rather than a step past
-      // it — otherwise the channel begins four hundred metres offshore.
-      let x = e.mid.x - e.dir.x * CTRL, z = e.mid.z - e.dir.z * CTRL;
+      // The first drawn control point has to be the river mouth exactly.
+      //
+      // Marching from a point behind the mouth does not achieve that: the
+      // drift is applied before the first step, so the second control point —
+      // the first one the spline actually draws from — lands wherever that
+      // step happened to go. On the Thames that was ninety-six metres to one
+      // side of where the river leaves the map, which is most of the width of
+      // the river, and the join was unmissable.
+      //
+      // So the march starts at the mouth, and the control point behind it is
+      // placed by hand, straight back along the exit bearing.
+      const ctrl = [{
+        x: e.mid.x - e.dir.x * CTRL, z: e.mid.z - e.dir.z * CTRL, half: e.half,
+      }];
+      let x = e.mid.x, z = e.mid.z;
       // The heading is kept as an offset from the exit bearing and pulled back
       // towards it every step. Integrating the noise straight into the heading
       // instead is a random walk: over a dozen steps it accumulates whole
@@ -560,16 +573,18 @@ export class Terrain {
       const a0 = Math.atan2(e.dir.x, e.dir.z);
       let drift = 0;
       let half = e.half;
-      for (let t = -CTRL; t <= reach + CTRL; t += CTRL) {
+      for (let t = 0; t <= reach + CTRL; t += CTRL) {
         ctrl.push({ x, z, half });
         const bend = valueNoise(x * 0.0009 + 31.7, z * 0.0009 - 12.3) - 0.5;
         drift = drift * 0.72 + bend * 0.34;
         const a = a0 + drift;
         x += Math.sin(a) * CTRL;
         z += Math.cos(a) * CTRL;
-        // Broadening towards the sea, but a river, not an ocean: about half as
-        // wide again by the horizon.
-        if (t >= 0) half *= 1.028;
+        // Barely broadening. It is the same river a few kilometres further on,
+        // not an estuary: at 1.028 a step it arrived at the horizon half as
+        // wide again as the channel it continues, which read as the map's
+        // river running into a lake.
+        half *= 1.006;
       }
       // Catmull-Rom through the control points, sampled every seventy metres.
       // The first and last control points are outside the run on purpose, so

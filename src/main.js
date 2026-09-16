@@ -252,6 +252,11 @@ async function boot() {
     onClearTarget: () => battle.clearTarget(),
     onRestart: () => window.location.reload(),
     onNextTarget: () => goToLevel(nextTarget(level.id).id),
+    // The win is already banked; this just lets play carry on against
+    // whatever is still standing.
+    onKeepGoing: () => {
+      if (battle.resumeAfterWin()) hud.feed('ASSAULT CONTINUES', 'big');
+    },
     onPickTarget: async () => {
       const id = await showLevelSelect({ current: level.id, canResume: true });
       if (id && id !== level.id) goToLevel(id);

@@ -107,12 +107,14 @@ function pyramid(B, cx, cz, base, height, stone, opts = {}) {
 export function buildGreatPyramid(quality) {
   const B = new BlockList();
   const s = quality.blockScale;
-  // Deliberately coarse. Khufu is 2.6 million blocks and 2.3 million cubic
-  // metres; at the stone size the Elizabeth Tower uses this one object would
-  // be three hundred thousand bodies on its own. Six-metre blocks put it in
-  // the same budget as everything else and are, as it happens, about the size
-  // of the largest stones actually in it.
-  const stone = 6.2 * s;
+  // Coarse, but not as coarse as it was. Khufu is 2.3 million cubic metres;
+  // at the Elizabeth Tower's stone size this one object would be three hundred
+  // thousand bodies. Six-metre blocks kept it cheap and made it unshootable —
+  // a shell's blast radius is about two metres, so it could only ever touch
+  // one block at a time. Four and a half metres is the compromise: two and a
+  // half times the bodies, and a charge that takes out a cluster rather than a
+  // single stone.
+  const stone = 4.6 * s;
 
   const K = KHUFU;
 
@@ -211,7 +213,9 @@ export function buildGreatPyramid(quality) {
 export function buildKhafre(quality) {
   const B = new BlockList();
   const s = quality.blockScale;
-  const stone = 6.2 * s;
+  // Khafre stays coarse: it is a secondary objective, and doubling its body
+  // count to make it shootable would cost more than the level gains.
+  const stone = 7.0 * s;
   B.section('bedrock', () => {
     B.slab(0, -2.0, 0, 224, 4.0, 224, stone * 2.0, M.CONCRETE);
   });

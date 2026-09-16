@@ -17,6 +17,7 @@ export class HUD {
     this.onRestart = opts.onRestart || (() => {});
     this.onToggleSound = opts.onToggleSound || (() => {});
     this.onNextTarget = opts.onNextTarget || (() => {});
+    this.onKeepGoing = opts.onKeepGoing || (() => {});
     this.onPickTarget = opts.onPickTarget || (() => {});
     this.nextTargetLabel = null;
 
@@ -44,6 +45,7 @@ export class HUD {
       ecStats: document.getElementById('ec-stats'),
       ecAgain: document.getElementById('ec-again'),
       ecNext: document.getElementById('ec-next'),
+      ecKeep: document.getElementById('ec-keep'),
       ecTargets: document.getElementById('ec-targets'),
       targetsBtn: document.getElementById('targets-btn'),
     };
@@ -66,6 +68,12 @@ export class HUD {
     }
     this.el.ecAgain.addEventListener('click', () => this.onRestart());
     if (this.el.ecNext) this.el.ecNext.addEventListener('click', () => this.onNextTarget());
+    if (this.el.ecKeep) {
+      this.el.ecKeep.addEventListener('click', () => {
+        this.el.endcard.hidden = true;
+        this.onKeepGoing();
+      });
+    }
     if (this.el.ecTargets) this.el.ecTargets.addEventListener('click', () => this.onPickTarget());
     if (this.el.targetsBtn) {
       this.el.targetsBtn.addEventListener('click', () => this.onPickTarget());
@@ -234,7 +242,10 @@ export class HUD {
       card.classList.toggle('selected', b.selectedUnitId === u.id);
 
       if (!unlocked) {
-        const need = Math.round((u.unlockFrac ?? 0) * 100);
+        // Shown against the same scaled progress the gate uses, or the
+        // number on the card is not the number being tested.
+        const scale = b.level?.unlockScale ?? 1;
+        const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
         card.querySelector('.uc-lock').textContent = `${need}% DAMAGE`;
       } else if (!this._lastUnlocked.has(u.id)) {
         this._lastUnlocked.add(u.id);
@@ -284,6 +295,9 @@ export class HUD {
       .join('');
     // Only offer the next target when this one is actually down. After a
     // stalled assault the thing to do is run it again, not walk away.
+    // Carrying on only makes sense when there is something still standing to
+    // carry on against.
+    if (this.el.ecKeep) this.el.ecKeep.hidden = !won || summary.heightStanding <= 0.5;
     if (this.el.ecNext) {
       this.el.ecNext.hidden = !won;
       this.el.ecNext.textContent = this.nextTargetLabel

@@ -63,7 +63,6 @@ export const LEVELS = {
     // is left — but it is also four times the tower's footprint and grinding
     // all of it down would be a chore, so the bar sits where the building has
     // plainly been gutted rather than where the last stone has gone.
-    winSecondary: { integrity: 0.42 },
     brief: 'Undercut one face and the whole tower goes over that way.',
   },
 
@@ -100,7 +99,6 @@ export const LEVELS = {
       ornament: 'pavilions',      // chattris on the terrace corners
       river: 'ghats',             // steps down to the Yamuna
     },
-    win: { integrity: 0.42, heightFrac: 0.30 },
     brief: 'The dome stands on four piers. Shelling the shell only makes holes.',
   },
 
@@ -138,7 +136,6 @@ export const LEVELS = {
       river: 'embankment',        // the Seine's quais, walled the same way
       pier: true,                 // a bateau-mouche landing on the quai
     },
-    winSecondary: { integrity: 0.45 },
     brief: 'It stands on four legs and nothing else. Cut one and it falls that way.',
   },
 
@@ -205,15 +202,19 @@ export const LEVELS = {
     // over. Those assertions read this rather than being quietly weakened for
     // everybody.
     traits: { windows: false, river: false, topples: false },
+    // Unlocks are fractions of the mass on the map, and the mass here is two
+    // and a third million cubic metres of limestone with two more pyramids
+    // beside it. Unscaled, earning the RPG meant demolishing 0.6 % of that
+    // with an AT4, so nothing past the two weakest weapons ever unlocked and
+    // the level was, for the player, indestructible.
+    unlockScale: 16,
     // A pyramid cannot topple, so height is meaningless and the whole measure
     // is how much of it is left. The bar is low because grinding two and a
     // half million cubic metres of limestone to nothing is not a game.
-    // The bar is low, and it is low for a reason. Khufu is two and a third
-    // million cubic metres; asking for half of it is asking for ten thousand
-    // shells. What wins here is opening one face and bringing the chambers
-    // down, which takes a tenth of it off and is a afternoon's work rather
-    // than a siege.
-    win: { integrity: 0.86, heightFrac: 0.90 },
+    // Ninety per cent, like everywhere else. Worth saying plainly: that is a
+    // very long grind on two and a third million cubic metres of limestone,
+    // and this is the level most likely to need its own number once it has
+    // been played rather than measured.
     brief: 'Nothing here can topple. Open the casing and break what the chambers hang on.',
   },
 };

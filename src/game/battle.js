@@ -276,7 +276,26 @@ export class Battle {
     return Math.min(1, demolished / this.totalMass);
   }
 
-  isUnlocked(u) { return this.unlockAll || this.progress >= (u.unlockFrac ?? 0); }
+  /**
+   * How far through this level the player counts as being, for unlocks.
+   *
+   * Not the same number as `progress`, and it cannot be. Unlock thresholds are
+   * fractions of the whole mass on the map, and that mass varies by three
+   * orders of magnitude between levels: the Elizabeth Tower is thirty-two
+   * thousand stones, the Giza plateau is two and a third million cubic metres
+   * of limestone with two more pyramids beside it. At Giza a player would have
+   * had to demolish 0.6 % of that — with an AT4, the only thing unlocked at
+   * the start — to earn the RPG. It is not reachable, so nothing beyond the
+   * two weakest weapons ever unlocked, and the level read as indestructible
+   * because for that player it was.
+   *
+   * `unlockScale` lets a level say how much of it counts as getting going.
+   */
+  get unlockProgress() {
+    return Math.min(1, this.progress * (this.level?.unlockScale ?? 1));
+  }
+
+  isUnlocked(u) { return this.unlockAll || this.unlockProgress >= (u.unlockFrac ?? 0); }
   canAfford(u) { return this.freeBuild || this.money >= u.cost; }
 
   get income() {
@@ -904,8 +923,15 @@ export class Battle {
    */
   get objectives() {
     if (this._objectives) return this._objectives;
-    const primaryWin = this.level?.win ?? { integrity: 0.30, heightFrac: 0.34 };
-    const otherWin = this.level?.winSecondary ?? { integrity: 0.42 };
+    // Ninety per cent of the monument, or it has gone over.
+    //
+    // One number, in one place, for every level. Both halves matter: a tower
+    // lying on the ground is finished whatever fraction of its mass is still
+    // in the rubble pile, which is what the height test is for; and a dome or
+    // a pyramid, which never topples, is finished when there is almost nothing
+    // of it left.
+    const primaryWin = this.level?.win ?? { integrity: 0.10, heightFrac: 0.30 };
+    const otherWin = this.level?.winSecondary ?? { integrity: 0.15 };
     this._objectives = this.structures
       .filter((s) => s.required || s === this.primary)
       .map((s) => ({
@@ -942,7 +968,22 @@ export class Battle {
     return total > 0 ? done / total : 0;
   }
 
+  /**
+   * Carry on after the level is already won.
+   *
+   * The objectives stay met — the win is banked and recorded — but play
+   * resumes, so a player who wants the other ten per cent can have it. The
+   * flag is what stops `_checkEnd` firing the win again on the next frame.
+   */
+  resumeAfterWin() {
+    if (this.state !== 'won') return false;
+    this.state = 'playing';
+    this._winAcknowledged = true;
+    return true;
+  }
+
   _checkEnd() {
+    if (this._winAcknowledged) return;
     // Every required structure has to be down. A wing that shoots at the
     // player for the whole match and then counts for nothing was the odd one
     // out here: it is a target, so it is part of the job.

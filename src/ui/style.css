@@ -482,12 +482,12 @@ html, body {
   font-size: 9px; letter-spacing: 0.2em; color: var(--accent);
 }
 .ls-foot { margin-top: 22px; text-align: center; }
-.ls-back, #ec-next, #ec-targets, #targets-btn {
+.ls-back, #ec-next, #ec-targets, #ec-keep, #targets-btn {
   background: transparent; border: 1px solid var(--edge-bright); color: var(--text);
   font-family: inherit; font-size: 11px; letter-spacing: 0.2em;
   padding: 10px 24px; cursor: pointer; transition: all 0.15s;
 }
-.ls-back:hover, #ec-next:hover, #ec-targets:hover, #targets-btn:hover {
+.ls-back:hover, #ec-next:hover, #ec-targets:hover, #ec-keep:hover, #targets-btn:hover {
   background: rgba(88, 166, 255, 0.14); border-color: var(--accent);
 }
 #ec-next { border-color: var(--accent); background: rgba(88, 166, 255, 0.12); }
