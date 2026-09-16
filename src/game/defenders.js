@@ -595,11 +595,17 @@ export class Garrison {
    * cutting one out drops the lot.
    */
   populateEiffelTower(origin, groundY, counts = {}) {
-    const deckRing = (y, half, n, type, cover, inset = 1.6) => {
+    // `spread` is how far along each side of the deck a man may stand, as a
+    // fraction of the half-width. It is not decoration either: the four legs
+    // pass through the corners of every gallery, and since they were laced
+    // course by course they are closed boxes rather than open bracing. A ring
+    // that runs into the corners posts a fifth of the garrison inside the
+    // ironwork, looking at the inside of a girder.
+    const deckRing = (y, half, n, type, cover, inset = 1.6, spread = 1) => {
       for (let i = 0; i < n; i++) {
         const t = (i / n) * 4;
         const side = Math.floor(t);
-        const f = (t - side) * 2 - 1;          // -1..1 along this side
+        const f = ((t - side) * 2 - 1) * spread;   // -1..1 along this side
         const r = half - inset;
         const p = new THREE.Vector3(origin.x, groundY + y + 0.6, origin.z);
         if (side === 0) { p.x += f * r; p.z += r; }
@@ -612,15 +618,26 @@ export class Garrison {
     };
 
     // Gun pits between the piers, on the gravel of the Champ de Mars.
+    //
+    // On four straight runs rather than a ring. The piers stand on the corners
+    // of a 125 m square and their feet are 25 m thick, so a circle drawn
+    // through them puts a man inside the ironwork at every diagonal — eight of
+    // twenty, each with a girder a metre from his face.
     const ground = counts.ground ?? 20;
-    for (let i = 0; i < ground; i++) {
-      const a = (i / ground) * Math.PI * 2;
-      const r = EIFFEL.baseHalf * 1.02;
-      const p = new THREE.Vector3(
-        origin.x + Math.cos(a) * r, groundY + 0.9, origin.z + Math.sin(a) * r,
-      );
-      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p,
-        Math.atan2(Math.cos(a), Math.sin(a)), 10, { cover: 'ground', sandbags: true });
+    const perSide = Math.max(1, Math.round(ground / 4));
+    const OUT = EIFFEL.baseHalf + 4;     // just beyond the piers' outer face
+    const SPAN = 32;                     // and well inside their inner face
+    for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      for (let i = 0; i < perSide; i++) {
+        const f = perSide === 1 ? 0 : (i / (perSide - 1)) * 2 - 1;
+        const p = new THREE.Vector3(
+          origin.x + nx * OUT + (nx ? 0 : f * SPAN),
+          groundY + 0.9,
+          origin.z + nz * OUT + (nz ? 0 : f * SPAN),
+        );
+        this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(nx, nz), 10,
+          { cover: 'ground', sandbags: true });
+      }
     }
 
     // In the ironwork of each leg, on the bracing.
@@ -634,20 +651,24 @@ export class Garrison {
       }
     }
 
-    // First gallery: the widest deck and the best arcs over the city.
-    deckRing(EIFFEL.firstFloor, EIFFEL.firstDeckHalf, 20, 'mg', 'roof', 2.2);
-    // Second gallery.
-    deckRing(EIFFEL.secondFloor, EIFFEL.secondDeckHalf, 12, 'sniper', 'roof', 1.8);
-    // AT teams on the first gallery corners, which can reach anything on the
-    // Champ de Mars.
-    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+    // First gallery: the widest deck and the best arcs over the city. The legs
+    // pass through its corners, so the ring stops short of them.
+    deckRing(EIFFEL.firstFloor, EIFFEL.firstDeckHalf, 20, 'mg', 'roof', 2.2, 0.68);
+    // Second gallery, where the legs have all but merged and the clear run of
+    // deck either side of them is shorter still.
+    deckRing(EIFFEL.secondFloor, EIFFEL.secondDeckHalf, 12, 'sniper', 'roof', 1.8, 0.42);
+    // AT teams on the galleries, at the middle of each side rather than at the
+    // corners: a corner of this building is a girder, not a parapet.
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       this.place('at', new THREE.Vector3(
-        origin.x + sx * (EIFFEL.firstDeckHalf - 3.0), groundY + EIFFEL.firstFloor + 0.6,
-        origin.z + sz * (EIFFEL.firstDeckHalf - 3.0)), Math.atan2(sx, sz), 7,
+        origin.x + nx * (EIFFEL.firstDeckHalf - 3.0) + nz * 10,
+        groundY + EIFFEL.firstFloor + 0.6,
+        origin.z + nz * (EIFFEL.firstDeckHalf - 3.0) + nx * 10), Math.atan2(nx, nz), 7,
       { cover: 'roof' });
       this.place('at', new THREE.Vector3(
-        origin.x + sx * (EIFFEL.secondDeckHalf - 2.4), groundY + EIFFEL.secondFloor + 0.6,
-        origin.z + sz * (EIFFEL.secondDeckHalf - 2.4)), Math.atan2(sx, sz), 7,
+        origin.x + nx * (EIFFEL.secondDeckHalf - 2.4) + nz * 5,
+        groundY + EIFFEL.secondFloor + 0.6,
+        origin.z + nz * (EIFFEL.secondDeckHalf - 2.4) + nx * 5), Math.atan2(nx, nz), 7,
       { cover: 'roof' });
     }
     // The summit: snipers at 276 m, which is every metre of the map.
@@ -693,16 +714,29 @@ export class Garrison {
   populateGreatPyramid(origin, groundY, counts = {}) {
     const half = (y) => (KHUFU.base / 2) * Math.max(0, 1 - y / KHUFU.height);
 
-    // Sandbagged batteries round the base, on the sand.
+    // Sandbagged batteries along the four faces, on the bedrock terrace.
+    //
+    // A circle is the wrong shape for a square building. Drawn wide enough to
+    // clear the base along the axes it runs off the terrace on the diagonals,
+    // and drawn tight enough to stay on the terrace it puts men inside the
+    // bottom course. Four straight runs sit where gun pits would actually be
+    // dug: hard against each face, on the rock, with the whole plateau in
+    // front of them.
     const ground = counts.ground ?? 22;
-    for (let i = 0; i < ground; i++) {
-      const a = (i / ground) * Math.PI * 2;
-      const r = KHUFU.base * 0.60;
-      const p = new THREE.Vector3(
-        origin.x + Math.cos(a) * r, groundY + 0.9, origin.z + Math.sin(a) * r,
-      );
-      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p,
-        Math.atan2(Math.cos(a), Math.sin(a)), 12, { cover: 'ground', sandbags: true });
+    const perSide = Math.max(1, Math.round(ground / 4));
+    const OUT = KHUFU.base / 2 + 5;          // clear of the casing, on the rock
+    const SPAN = KHUFU.base / 2 - 8;         // and short of the terrace corners
+    for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      for (let i = 0; i < perSide; i++) {
+        const f = perSide === 1 ? 0 : (i / (perSide - 1)) * 2 - 1;
+        const p = new THREE.Vector3(
+          origin.x + nx * OUT + (nx ? 0 : f * SPAN),
+          groundY + 0.9,
+          origin.z + nz * OUT + (nz ? 0 : f * SPAN),
+        );
+        this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(nx, nz), 12,
+          { cover: 'ground', sandbags: true });
+      }
     }
 
     // On the faces. Stepped positions up all four sides — the higher the man,

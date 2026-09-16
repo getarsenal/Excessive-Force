@@ -38,6 +38,7 @@ export class Terrain {
     this.cellSize = (this.span * 2) / (n - 1);
     this._relax();
     this.waterLevel = this._computeWaterLevel();
+    this._cutChannel();
     this.mesh = null;
     this.collider = null;
   }
@@ -98,6 +99,54 @@ export class Terrain {
     }
     if (!isFinite(minWet)) return this.meta.minElevation;
     return minWet + 5.4;
+  }
+
+  /**
+   * Cut the channel the water mask says is there.
+   *
+   * `tools/bake_terrain.py` subtracts a fixed seven metres along the river's
+   * centreline, which is enough for the Thames — Tilezen fills it to its
+   * shoreline a metre or two above sea level, so seven metres puts the bed
+   * well under. It is nowhere near enough for the Seine at forty metres above
+   * sea level or the Yamuna at a hundred and fifty. On those two the mask said
+   * "river" and the ground under it stood eleven metres proud of the water
+   * surface: the Seine rendered as a dry strip of park with a puddle at the
+   * bottom corner of the map, which is what the player saw and reported.
+   *
+   * So the channel is also cut here, at load, from the ground the level
+   * actually has rather than from a constant. A map whose DEM already carries
+   * its channel — Westminster — is left exactly as it was, because the test is
+   * whether the mask is mostly under water already.
+   */
+  _cutChannel() {
+    const n = this.size;
+    let full = 0, under = 0;
+    const bank = [];
+    for (let i = 0; i < n * n; i++) {
+      const w = this.mask[i * 3];
+      if (w > 0.9) { full++; if (this.heights[i] < this.waterLevel) under++; }
+      else if (w > 0.05 && w < 0.5) bank.push(this.heights[i]);
+    }
+    if (!full || !bank.length) return;
+    if (under / full > 0.6) return;              // the bake already cut it
+
+    // The surface sits a few metres below the banks, the way a river in a city
+    // sits below its quais, and the bed a few metres below that.
+    bank.sort((a, b) => a - b);
+    const shore = bank[Math.floor(bank.length * 0.5)];
+    const level = shore - 4.2;
+    const smooth = (t) => {
+      const u = Math.max(0, Math.min(1, (t - 0.05) / 0.85));
+      return u * u * (3 - 2 * u);
+    };
+    for (let i = 0; i < n * n; i++) {
+      const w = this.mask[i * 3];
+      if (w <= 0.05) continue;
+      const k = smooth(w);
+      const bed = level - 0.9 - 4.6 * k;
+      if (this.heights[i] > bed) this.heights[i] += (bed - this.heights[i]) * k;
+    }
+    this.waterLevel = level;
   }
 
   /**

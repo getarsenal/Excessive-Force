@@ -18,11 +18,18 @@ import { BlockList, MATERIALS as M } from '../builder.js';
  * sides it reads from any distance as a solid tapering chimney — which is
  * exactly what the first attempt looked like.
  *
- * So every leg here is four corner posts, tied at intervals by horizontals and
- * braced by diagonals, with nothing in between. That is more work per metre of
- * height than a ring, and it is the whole point: you can see the sky through
- * it, and the thing that fails when you shoot it is a member rather than a
- * patch of wall.
+ * That is the tension this file has never fully resolved, and the comment used
+ * to claim a resolution it does not have. Each leg was four corner posts with
+ * nothing between them, which looks right and does not stand: the posts step
+ * inward faster than they are wide and the bearing chain breaks a few courses
+ * off the ground. It is a laced ring instead — see `legs` below — which stands
+ * and reads as more solid than the real thing does.
+ *
+ * Cutting the middle out of every panel to get the openness back has been
+ * tried and measured: the build-time bearing graph stays clean, and the
+ * runtime load solver then sheds nine hundred stones on load and the tower is
+ * see-through on its own centre line. Anyone taking another run at this wants
+ * to start from the load pass in `structure.js`, not from the geometry.
  *
  * Diagonals are stepped rather than rotated. `BlockList.add` yaws a stone but
  * cannot pitch one, so a brace running up and across is laid as a short

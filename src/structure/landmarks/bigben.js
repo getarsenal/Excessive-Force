@@ -160,11 +160,22 @@ export function buildElizabethTower(quality) {
       }
     });
 
-    // Lintel and sill for every opening. The lintel is one stone spanning the
-    // whole bay, so the courses above it bear on masonry rather than relying on
-    // the solver's lateral spanning — and it is a single point of failure the
-    // player can aim at, which is the point of having one.
+    // Lintel, sill and mullion for every opening. The lintel is one stone
+    // spanning the whole bay, so the courses above it bear on masonry rather
+    // than relying on the solver's lateral spanning — and it is a single point
+    // of failure the player can aim at, which is the point of having one.
+    //
+    // The mullion is the bar up the middle, and it is not decoration. Openings
+    // are cut by dropping the stones whose centres fall inside the box, so a
+    // coarse tier blooms a 3.4 m window into a six-metre hole, and a hole that
+    // wide on two opposite faces is a clear line straight through a hollow
+    // tower. Which faces bloomed and which did not came down to where the
+    // course grid happened to fall, so the same building was see-through at one
+    // quality setting and solid at another. A stone standing on the bay's
+    // centre line settles it at every tier: there is always masonry on the
+    // axis, and the two lights either side are what the garrison shoots from.
     const { heights, halfWidth, halfHeight } = TOWER_WINDOWS;
+    const MULLION = 0.30;      // half-width, so 0.6 m on the drawing
     for (const wy of heights) {
       const t = (wy - 6.0) / (SHAFT_TOP - 6.0);
       const wall = 2.3 - t * 1.4;
@@ -177,6 +188,11 @@ export function buildElizabethTower(quality) {
         const hzL = ax !== 0 ? span / 2 : wall / 2;
         B.add(cx, wy + halfHeight + 0.32, cz, hxL, 0.30, hzL, M.REDSTONE);
         B.add(cx, wy - halfHeight - 0.28, cz, hxL, 0.26, hzL, M.REDSTONE);
+        // Between the two, and thin enough to sit inside the narrowest hole
+        // any tier cuts — one stone straddling the axis is the whole point.
+        B.add(cx, wy, cz,
+          ax !== 0 ? wall * 0.42 : MULLION, halfHeight,
+          ax !== 0 ? MULLION : wall * 0.42, M.REDSTONE);
       }
     }
 

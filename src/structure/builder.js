@@ -70,7 +70,10 @@ export const MATERIAL_PROPS = {
   // per-stone ambient occlusion darkens a stone by how many neighbours it has,
   // and in a laced caisson that is all of them. The tower came out as a black
   // obelisk with no arches, galleries or silhouette readable at any distance.
-  [MATERIALS.IRONWORK]:  { density: 7.20, strength: 2.60, toughness: 210, color: 0x9d8468, structural: true },
+  // "Eiffel Tower Brown" is a dark red-bronze, three shades of it up the
+  // tower. At 0x9d8468 under the per-stone jitter and the tonemap it came out
+  // as pale tan and the whole building read as sandstone.
+  [MATERIALS.IRONWORK]:  { density: 7.20, strength: 2.60, toughness: 210, color: 0x7b5f45, structural: true },
 };
 
 
