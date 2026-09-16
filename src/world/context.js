@@ -796,8 +796,11 @@ function bridgeLine(terrain) {
   for (let z = -span * 0.75; z <= span * 0.75; z += 10) {
     for (let x = -span * 0.75; x <= span * 0.75; x += 10) {
       if (!terrain.isWater(x, z)) continue;
-      // Near the monument, but not on top of it.
-      const d = Math.abs(Math.hypot(x, z) - 260);
+      // The closest crossing to the monument, because that is where the city
+      // is and a bridge wants streets at both ends. Picked further out, it
+      // lands on farmland and the road network leaves its abutment as a
+      // junction with nothing else joining it.
+      const d = Math.hypot(x, z);
       if (d < nearD) { nearD = d; near = { x, z }; }
     }
   }
