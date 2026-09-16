@@ -1172,6 +1172,9 @@ export class Battle {
     return true;
   }
 
+  /** The share of the bar that wins the level. */
+  static WIN_AT = 0.90;
+
   /** Has every objective been brought to nothing? For the readouts. */
   get flattened() { return !!this._flattened; }
 
@@ -1188,10 +1191,15 @@ export class Battle {
       }
       return;
     }
-    // Every required structure has to be down. A wing that shoots at the
-    // player for the whole match and then counts for nothing was the odd one
-    // out here: it is a target, so it is part of the job.
-    if (this.objectives.every((o) => this.objectiveDone(o))) {
+    // Ninety per cent on the bar is the win. The bar is every objective's
+    // progress towards its own threshold, weighted by its masonry, so the
+    // whole job is a hundred; demanding that every last target also be over
+    // its own line meant a player with the tower flat and the palace at
+    // sixty per cent sat on 91% with nothing happening. The bar is the
+    // promise, and now it is the rule too — and a level whose objectives are
+    // all down is over whatever the arithmetic says.
+    if (this.objectiveProgress >= Battle.WIN_AT
+        || this.objectives.every((o) => this.objectiveDone(o))) {
       this.state = 'won';
       this.onEvent('win', this.summary());
       return;

@@ -112,10 +112,13 @@ export class HUD {
     const scale = b.level?.unlockScale ?? 1;
     // The bar and the unlocks measure different things. Unlocks are a
     // fraction of all the mass on the map; the bar is each objective's share
-    // of the way to its own threshold, so it reaches the end exactly when
-    // the level is won — the end of the bar *is* the win, and a separate
-    // "WIN" mark at ninety per cent was a promise the game did not keep.
-    // Unlock marks are converted onto the bar's scale.
+    // of the way to its own threshold. Unlock marks are converted onto the
+    // bar's scale, and the win mark sits where the win actually fires.
+    const win = document.createElement('i');
+    win.className = 'tick win';
+    win.style.left = `${(b.constructor.WIN_AT * 100).toFixed(0)}%`;
+    win.title = 'Level won';
+    el.appendChild(win);
     const denom = b.objectives.reduce(
       (a, o) => a + o.structure.totalMass * (1 - o.win.integrity), 0) / Math.max(1, b.totalMass);
     const seen = new Set();
