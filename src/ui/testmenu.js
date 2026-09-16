@@ -2347,7 +2347,6 @@ export class TestMenu {
         // happening, and sampling in the middle of one reports it as a fault.
         for (let k = 0; k < 60 && c.physics.awakeCount > 20; k++) c.fastForward(0.25);
         const gy = b.originGround;
-        const CELL = 5;
         const nodes = [];
         for (const st of c.structures) {
           for (let i = 0; i < st.count; i++) {
@@ -2373,6 +2372,14 @@ export class TestMenu {
           }
         }
         // Union-find over a hash grid: touching stones share a group.
+        //
+        // The cell has to be at least a stone wide, or two stones resting on
+        // each other can sit two cells apart and never be compared: the
+        // Great Pyramid's six-metre blocks on a five-metre grid reported a
+        // dozen stones lying on the flank as a clump hanging in the air, with
+        // the physics quite correctly saying it had found support.
+        const maxR = nodes.reduce((a, n) => Math.max(a, n.r), 0);
+        const CELL = Math.max(5, maxR * 1.3);
         const parent = new Int32Array(nodes.length);
         for (let i = 0; i < parent.length; i++) parent[i] = i;
         const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
