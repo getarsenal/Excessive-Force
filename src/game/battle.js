@@ -1121,7 +1121,12 @@ export class Battle {
     // a pyramid, which never topples, is finished when there is almost nothing
     // of it left.
     const primaryWin = this.level?.win ?? { integrity: 0.10, heightFrac: 0.30 };
-    const otherWin = this.level?.winSecondary ?? { integrity: 0.15 };
+    // The other targets win on height too. A wing shelled into a pile keeps
+    // its lowest courses intact under the rubble, so its mass reads a third
+    // standing when nothing is; digging those out from under the heap is
+    // not a game anyone wants to play. If it is under thirty per cent of its
+    // height, it is down.
+    const otherWin = this.level?.winSecondary ?? { integrity: 0.15, heightFrac: 0.30 };
     this._objectives = this.structures
       .filter((s) => s.required || s === this.primary)
       .map((s) => ({
@@ -1151,6 +1156,9 @@ export class Battle {
       const w = o.structure.totalMass;
       total += w;
       // How far this one has come, as a fraction of what it takes to finish it.
+      // A finished objective is finished, whichever rule finished it: one
+      // brought down by height counts in full, whatever its mass reads.
+      if (this.objectiveDone(o)) { done += w; continue; }
       const integ = o.structure.monumentIntegrity;
       const need = 1 - o.win.integrity;
       done += w * Math.max(0, Math.min(1, (1 - integ) / Math.max(0.01, need)));

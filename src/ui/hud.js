@@ -369,7 +369,9 @@ export class HUD {
         this.el.objectives.hidden = true;
       } else {
         this.el.objectives.hidden = false;
-        const sig = objs.map((o) => `${o.label}:${Math.round(o.structure.monumentIntegrity * 100)}`).join('|');
+        // Keyed on the done state too: a wing brought down by height goes to
+        // DOWN while its mass reading has not moved.
+        const sig = objs.map((o) => `${o.label}:${Math.round(o.structure.monumentIntegrity * 100)}:${b.objectiveDone(o) ? 1 : 0}`).join('|');
         if (sig !== this._objSig) {
           this._objSig = sig;
           this.el.objectives.innerHTML = objs.map((o) => {
