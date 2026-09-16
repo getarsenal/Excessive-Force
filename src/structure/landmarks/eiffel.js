@@ -268,8 +268,19 @@ export function buildEiffelTower(quality) {
         const g = legAt(y);
         return { cx: sx * g.r, cz: sz * g.r, h: g.h };
       };
-      cage(at, 0, EIFFEL.secondFloor, LEG_N,
-        taper(0, EIFFEL.secondFloor, BAR * 1.5, BAR), COURSE);
+      // Stout at both ends. Thick at the ground because a leg carries the
+      // whole tower there, and thick again at the head because the entire
+      // upper shaft and the second platform — three hundred meganewtons of it
+      // — come down onto twenty members per leg through a plate that funnels
+      // rather than spreads. Tapered only downward from the base, the heads
+      // were the thinnest part of the leg at exactly the point carrying the
+      // most, and they crushed. The real tower's leg heads are its heaviest
+      // castings for the same reason.
+      const head = EIFFEL.secondFloor - 26;
+      cage(at, 0, EIFFEL.secondFloor, LEG_N, (y) => Math.max(
+        BAR * (1.5 - 0.55 * Math.min(1, y / EIFFEL.secondFloor)),
+        BAR * (0.95 + 1.35 * Math.max(0, Math.min(1, (y - head) / 26))),
+      ), COURSE);
       // A belt every fourth course, which is what gives the leg its horizontal
       // banding at a distance.
       for (let y = COURSE * 4; y < EIFFEL.secondFloor - COURSE; y += COURSE * 4) {
