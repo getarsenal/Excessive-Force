@@ -86,12 +86,31 @@ function shaftHalf(y) {
 
 export function buildEiffelTower(quality) {
   const B = new BlockList();
-  const s = quality.blockScale;
+  // Capped, unlike every other landmark's.
+  //
+  // A lattice is the one structure here whose stability depends on how finely
+  // it is divided. Each leg is four posts that step inward as the leg batters,
+  // and the step per course is the course height times the batter — so at the
+  // coarsest tier, where a course is 3.7 m instead of 2.4, each post shifts
+  // 1.5 m off the one below it and most of the overlap that was holding it up
+  // is gone. On a phone the whole tower came down on its own the moment the
+  // map loaded: 224 stones detached, 141 of them in the legs.
+  //
+  // The tower is a few thousand stones against Westminster's thirty-two, so it
+  // can afford to stay fine at every tier.
+  const s = Math.min(quality.blockScale, 1.15);
   const member = 1.5 * s;        // nominal length of one iron member
-  const post = 1.5;              // posts are 3 m square in section
+  // Wide enough to still overlap the post below it after the batter has moved
+  // it sideways. Tied to the course height rather than fixed, so this holds at
+  // whatever size the tier builds at.
+  const post = Math.max(1.5, member * 1.6 * 0.62);
+  // Lacing thickness for the legs. The batter moves a leg about 0.4 m sideways
+  // per metre of height, so one course shifts it `courseH * 0.4`; the lacing
+  // must be wider than that to keep bearing on itself.
+  const LACE = Math.max(1.7, member * 1.6 * 0.55);
 
   /** A vertical run of posts from y0 to y1 at (x, z), tapering with the frame. */
-  const column = (xOf, zOf, y0, y1, halfOf, mat = M.IRON) => {
+  const column = (xOf, zOf, y0, y1, halfOf, mat = M.IRONWORK) => {
     let y = y0;
     while (y < y1 - 0.001) {
       const h = Math.min(member * 1.6, y1 - y);
@@ -111,7 +130,7 @@ export function buildEiffelTower(quality) {
     const n = Math.max(1, Math.round(len / (member * 2.2)));
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n;
-      B.add(x0 + dx * t, y, z0 + dz * t, thick, thick, len / (2 * n) - 0.03, M.IRON, ry);
+      B.add(x0 + dx * t, y, z0 + dz * t, thick, thick, len / (2 * n) - 0.03, M.IRONWORK, ry);
     }
   };
 
@@ -126,7 +145,7 @@ export function buildEiffelTower(quality) {
     const segLen = Math.hypot(dx, dz) / 2 + thick;
     for (let i = 0; i < steps; i++) {
       B.add(x0 + dx * (i + 0.5), y0 + dy * (i + 0.5), z0 + dz * (i + 0.5),
-        thick, Math.abs(dy) / 2 + thick * 0.5, segLen, M.IRON, ry);
+        thick, Math.abs(dy) / 2 + thick * 0.5, segLen, M.IRONWORK, ry);
     }
   };
 
@@ -145,38 +164,39 @@ export function buildEiffelTower(quality) {
   // ── The four legs ────────────────────────────────────────────────────────
   B.section('legs', () => {
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      // The four corner posts of this leg, as functions of height so they
-      // follow the batter all the way up.
-      const corners = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-      for (const [cx, cz] of corners) {
-        column(
-          (y) => sx * legAt(y).r + cx * legAt(y).h,
-          (y) => sz * legAt(y).r + cz * legAt(y).h,
-          0, EIFFEL.secondFloor,
-          (y) => post * (1 - (y / EIFFEL.secondFloor) * 0.35),
-        );
-      }
-
-      // Tie and brace every bay. The bays get shorter as the leg narrows,
-      // which is both what the real tower does and what keeps the lattice
-      // looking like lattice rather than like a ladder.
-      const BAY = 9.0;
-      for (let y = BAY; y < EIFFEL.secondFloor; y += BAY) {
-        const a = legAt(y), b = legAt(Math.min(EIFFEL.secondFloor, y + BAY));
-        const pt = (g, cx, cz) => ({ x: sx * g.r + cx * g.h, z: sz * g.r + cz * g.h });
-        // Horizontal ring of ties round the leg.
-        for (const [c0, c1] of [[[1, 1], [1, -1]], [[1, -1], [-1, -1]],
-          [[-1, -1], [-1, 1]], [[-1, 1], [1, 1]]]) {
-          const p0 = pt(a, c0[0], c0[1]), p1 = pt(a, c1[0], c1[1]);
-          tie(p0.x, p0.z, p1.x, p1.z, y);
-          // And an X across that face, up to the next ring.
-          if (y + BAY <= EIFFEL.secondFloor) {
-            const q0 = pt(b, c0[0], c0[1]), q1 = pt(b, c1[0], c1[1]);
-            brace(p0.x, p0.z, y, q1.x, q1.z, y + BAY);
-            brace(p1.x, p1.z, y, q0.x, q0.z, y + BAY);
-          }
+      // Laced on all four faces, course by course.
+      //
+      // Four free-standing posts is what the real leg looks like from a
+      // distance and it is not what the real leg is: it is a closed caisson,
+      // four posts laced together the whole way up. Built as bare posts the
+      // bearing chain broke a few courses off the ground and the outer
+      // corners of every leg came away — on a phone that took the whole tower
+      // down before the player had touched it. The lacing is a continuous load
+      // path; at 0.7 m on a box twenty-five metres across it still reads as a
+      // frame with sky behind it.
+      {
+        let y = 0;
+        let c = 0;
+        while (y < EIFFEL.secondFloor - 0.001) {
+          const h = Math.min(member * 1.6, EIFFEL.secondFloor - y);
+          const g = legAt(y + h / 2);
+          // The wall has to be wider than the batter moves the leg in one
+          // course, or each ring lands inboard of the one below it and bears
+          // on nothing — which is exactly what a 0.7 m wall did.
+          B.ring(sx * g.r, sz * g.r, g.h * 2, g.h * 2, LACE, y, h,
+            member * 2.0, M.IRONWORK, c % 2);
+          y += h;
+          c++;
         }
       }
+
+      // No separate ties or braces on the legs.
+      //
+      // They were laid on the corner-post lines, which is exactly where the
+      // lacing now is, so every one of them shared a volume with a ring block
+      // and spent the first frame shoving at it. The lacing already does their
+      // structural job; what they were adding was texture, and texture is not
+      // worth seventy stones of leg coming apart.
     }
   });
 
@@ -196,9 +216,9 @@ export function buildEiffelTower(quality) {
     const inner = g.r - g.h;
     for (const side of [1, -1]) {
       B.arch(0, y, side * inner, inner * 2, 2.6, 1.5,
-        Math.max(9, Math.round(15 / s)), M.IRON, 'x');
+        Math.max(9, Math.round(15 / s)), M.IRONWORK, 'x');
       B.arch(side * inner, y, 0, inner * 2, 2.6, 1.5,
-        Math.max(9, Math.round(15 / s)), M.IRON, 'z');
+        Math.max(9, Math.round(15 / s)), M.IRONWORK, 'z');
     }
   });
 
@@ -216,7 +236,7 @@ export function buildEiffelTower(quality) {
     for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const cx = sx * (oh - 6.0), cz = sz * (oh - 6.0);
       const w = sx !== 0 ? 9 : 20, d = sx !== 0 ? 20 : 9;
-      B.slab(cx, Y + 3.4, cz, w, 0.5, d, member * 1.8, M.IRON);
+      B.slab(cx, Y + 3.4, cz, w, 0.5, d, member * 1.8, M.IRONWORK);
       // Six posts, not four: the long side of a pavilion is twenty metres, and
       // a roof plate spanning that on its corners alone is a plate resting on
       // nothing for most of its length.
@@ -286,7 +306,7 @@ export function buildEiffelTower(quality) {
     B.tower(0, 0, y0, y1,
       (t, y) => shaftHalf(y) * 2,
       () => 0.85,
-      member * 1.6, member, () => M.IRON);
+      member * 1.6, member, () => M.IRONWORK);
 
     // Bracing across each face, for the look of the thing.
     const BAY = 10.0;
@@ -308,21 +328,21 @@ export function buildEiffelTower(quality) {
     deck(B, Y, oh, 0, member, s);
     // The glazed observation room, and Eiffel's own apartment above it.
     B.slab(0, Y + 2.2, 0, 11, 4.4, 11, member * 1.8, M.GLASS);
-    B.slab(0, Y + 4.7, 0, 12, 0.7, 12, member * 1.8, M.IRON);
+    B.slab(0, Y + 4.7, 0, 12, 0.7, 12, member * 1.8, M.IRONWORK);
     // The lantern.
-    B.spire(0, 0, Y + 5.0, Y + 18, 9.0, 3.0, member * 1.5, member, M.IRON, 0.5);
-    B.slab(0, Y + 19.5, 0, 3.4, 3.0, 3.4, member, M.IRON);
+    B.spire(0, 0, Y + 5.0, Y + 18, 9.0, 3.0, member * 1.5, member, M.IRONWORK, 0.5);
+    B.slab(0, Y + 19.5, 0, 3.4, 3.0, 3.4, member, M.IRONWORK);
     // The broadcast mast, up to 330 m.
     let y = Y + 21;
     while (y < EIFFEL.tip - 6) {
       const t = (y - Y) / (EIFFEL.tip - Y);
       const w = 1.5 * (1 - t * 0.55);
-      B.slab(0, y + 1.2, 0, w, 2.4, w, member, M.IRON);
+      B.slab(0, y + 1.2, 0, w, 2.4, w, member, M.IRONWORK);
       y += 2.4;
     }
     for (let k = 0; k < 4; k++) {
       B.slab(0, EIFFEL.tip - 5 + k * 1.5, 0, 0.9 - k * 0.15, 1.5, 0.9 - k * 0.15,
-        member, M.IRON);
+        member, M.IRONWORK);
     }
   });
 
@@ -338,7 +358,7 @@ function deck(B, y, oh, ih, member, s) {
     // tower stands on. Kept thin: thickening it to a girder deck pushed its
     // underside down into the tops of the legs, and sixty-one stones of deck
     // then spent the first frame shoving at the ironwork holding them up.
-    B.slab(0, y - 0.45, 0, oh * 2, 0.9, oh * 2, step, M.IRON);
+    B.slab(0, y - 0.45, 0, oh * 2, 0.9, oh * 2, step, M.IRONWORK);
     return;
   }
   for (let i = 0; i < n; i++) {
@@ -346,8 +366,8 @@ function deck(B, y, oh, ih, member, s) {
     const r1 = ih + (oh - ih) * ((i + 1) / n);
     const mid = (r0 + r1) / 2, wide = r1 - r0;
     for (const side of [1, -1]) {
-      B.slab(0, y - 0.45, side * mid, oh * 2, 0.9, wide, step, M.IRON);
-      B.slab(side * mid, y - 0.45, 0, wide, 0.9, ih * 2, step, M.IRON);
+      B.slab(0, y - 0.45, side * mid, oh * 2, 0.9, wide, step, M.IRONWORK);
+      B.slab(side * mid, y - 0.45, 0, wide, 0.9, ih * 2, step, M.IRONWORK);
     }
   }
 }
@@ -363,8 +383,8 @@ function deck(B, y, oh, ih, member, s) {
 function balustrade(B, y, half, member) {
   const step = Math.max(2.2, member * 2.0);
   for (const side of [1, -1]) {
-    B.slab(0, y + 0.85, side * (half - 0.3), half * 2, 1.7, 0.36, step, M.IRON);
-    B.slab(side * (half - 0.3), y + 0.85, 0, 0.36, 1.7, half * 2 - 1.2, step, M.IRON);
+    B.slab(0, y + 0.85, side * (half - 0.3), half * 2, 1.7, 0.36, step, M.IRONWORK);
+    B.slab(side * (half - 0.3), y + 0.85, 0, 0.36, 1.7, half * 2 - 1.2, step, M.IRONWORK);
   }
 }
 

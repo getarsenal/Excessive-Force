@@ -24,6 +24,7 @@ export const MATERIALS = {
   SANDSTONE: 8,  // Agra red sandstone
   REDSTONE: 9,   // the Palace of Westminster's own warm red-brown stone
   RUBBLE: 10,    // the packed rubble-and-mortar fill inside a pyramid
+  IRONWORK: 11,  // painted structural ironwork — the Eiffel Tower's own bronze
 };
 
 /**
@@ -62,6 +63,14 @@ export const MATERIAL_PROPS = {
   // core is a quarter the toughness of dressed stone, so a shell that lands on
   // it takes a piece out of the pyramid rather than scuffing it.
   [MATERIALS.RUBBLE]:    { density: 2.10, strength: 0.70, toughness: 26,  color: 0xbaa478, structural: true },
+  // "Eiffel brown", the bronze the tower is actually painted.
+  //
+  // Structurally identical to IRON; the colour is the whole point. Raw IRON is
+  // a dark slate blue, and a lattice is the densest geometry in the game — the
+  // per-stone ambient occlusion darkens a stone by how many neighbours it has,
+  // and in a laced caisson that is all of them. The tower came out as a black
+  // obelisk with no arches, galleries or silhouette readable at any distance.
+  [MATERIALS.IRONWORK]:  { density: 7.20, strength: 2.60, toughness: 210, color: 0x9d8468, structural: true },
 };
 
 
