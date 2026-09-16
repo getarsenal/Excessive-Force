@@ -387,8 +387,46 @@ export class Terrain {
     this._coarse = true;
   }
 
+  /**
+   * Open the river mouths.
+   *
+   * Where the DEM's channel reaches the edge of the map its bed is not
+   * reliably under the waterline: the elevation tiles fill a river flat at
+   * its shoreline, and along the last hundred metres of the Thames the bed
+   * crept above the surface on one side, so a sandbar stood a third of the way
+   * across the mouth with the tail's water starting beyond it. From a phone's
+   * low angle that was a bar of land across the river. The wet run at each
+   * exit is dredged: any wet cell within eighty metres of the edge is put a
+   * metre and a half under, feathered inward so the bed does not step.
+   */
+  _openMouths() {
+    const n = this.size, c = this.cellSize, span = this.span;
+    const h = this.heights, mask = this.mask;
+    const DEPTH = this.waterLevel - 1.6;
+    for (const e of this.riverExits()) {
+      const reach = e.half + 40;
+      for (let j = 0; j < n; j++) {
+        const z = span - j * c;
+        for (let i = 0; i < n; i++) {
+          const x = -span + i * c;
+          // Distance out of the map along the exit's normal (negative inside),
+          // and distance along the edge from the mouth.
+          const ox = x - e.mid.x, oz = z - e.mid.z;
+          const out = ox * e.n.x + oz * e.n.z;
+          const along = Math.abs(ox * -e.n.z + oz * e.n.x);
+          if (out < -80 || along > reach) continue;
+          const idx = j * n + i;
+          if (mask[idx * 3] < 0.5) continue;
+          const k = 1 - THREE.MathUtils.smoothstep(-out, 0, 80);
+          if (h[idx] > DEPTH) h[idx] += (DEPTH - h[idx]) * k;
+        }
+      }
+    }
+  }
+
   buildMesh() {
     if (this.quality.name === 'low' && !this._coarse) this.coarsen();
+    this._openMouths();
     const n = this.size;
     const rn = n;
     const cell = this.cellSize;
@@ -614,19 +652,25 @@ export class Terrain {
         // shoulder either side of a 240 m channel is a third of a kilometre of
         // pale shelving ground, and from the air that band — not the water —
         // was most of what the eye read as "the river out there".
-        if (best > half + 32) continue;
+        if (best > half + 80) continue;
         const k2 = best <= half ? 1
           : 1 - THREE.MathUtils.smoothstep((best - half) / 32, 0, 1);
-        ap.setY(i, sunk * k2);
+        // The channel itself is drawn by the ribbon below, at a resolution
+        // this grid cannot manage: a vertex every eighty-four metres turns a
+        // thirty-metre bank into a staircase, and a chord across the ramp's
+        // toe sits metres above the true profile. So under the ribbon this
+        // grid is carved four metres deeper than the profile, fading to
+        // nothing at the ribbon's outer edge, and the ribbon hides it.
+        const under = 4 * (1 - THREE.MathUtils.smoothstep((best - half - 32) / 48, 0, 1));
+        ap.setY(i, sunk * k2 - under);
         chan[i] = k2;
       }
       ap.needsUpdate = true;
     }
-    const apColors = new Float32Array(ap.count * 3);
     const at = new THREE.Color();
     const at2 = new THREE.Color();
-    for (let i = 0; i < ap.count; i++) {
-      const x = ap.getX(i), z = ap.getZ(i);
+    /** The country's colour at (x, z), `ch` deep into the river channel. */
+    const apronColour = (x, z, ch) => {
       const broad = valueNoise(x * 0.0048, z * 0.0048);
       const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
       at.copy(P.urban).lerp(P.urbanAlt, THREE.MathUtils.clamp(broad * 2.2 + 0.5, 0, 1));
@@ -641,11 +685,16 @@ export class Terrain {
       // Down the channel: silt on the shore, riverbed under the water. The
       // sheet only covers the flat bed, so the bank between the waterline and
       // the fields has to read as a bank.
-      if (chan[i] > 0) {
-        at2.copy(P.bank).lerp(P.bed, THREE.MathUtils.smoothstep(chan[i], 0.55, 0.95));
-        at.lerp(at2, THREE.MathUtils.smoothstep(chan[i], 0.04, 0.4));
+      if (ch > 0) {
+        at2.copy(P.bank).lerp(P.bed, THREE.MathUtils.smoothstep(ch, 0.55, 0.95));
+        at.lerp(at2, THREE.MathUtils.smoothstep(ch, 0.04, 0.4));
       }
-      apColors[i * 3] = at.r; apColors[i * 3 + 1] = at.g; apColors[i * 3 + 2] = at.b;
+      return at;
+    };
+    const apColors = new Float32Array(ap.count * 3);
+    for (let i = 0; i < ap.count; i++) {
+      const c = apronColour(ap.getX(i), ap.getZ(i), chan[i]);
+      apColors[i * 3] = c.r; apColors[i * 3 + 1] = c.g; apColors[i * 3 + 2] = c.b;
     }
     apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
     const apron = new THREE.Mesh(apronGeo, new THREE.MeshStandardMaterial({
@@ -655,10 +704,81 @@ export class Terrain {
     apron.frustumCulled = false;
     apron.renderOrder = -5;
 
+    // The river's own ground, drawn finely.
+    //
+    // A ribbon along each tail: the flat bed, the thirty-metre bank either
+    // side, and a margin of ordinary country beyond, with a vertex every ten
+    // metres across and at every point of the centreline along. It is laid
+    // over the coarse frame, which is carved deeper underneath it, so the
+    // bank you see is this one — a smooth shelf that follows the bends, not
+    // the frame's staircase.
+    const ribbon = this._channelRibbon(edge, apronColour);
+    if (ribbon) ribbon.position.y = edge - 0.4;
+
     this.group = new THREE.Group();
     this.group.add(apron);
+    if (ribbon) this.group.add(ribbon);
     this.group.add(this.mesh);
     return this.group;
+  }
+
+  _channelRibbon(edge, apronColour) {
+    const tails = this.riverTails();
+    if (!tails.length) return null;
+    const sunk = (this.waterLevel - edge) - 2.6;
+    const MARGIN = 80;
+    const pos = [], col = [], index = [];
+    for (const pts of tails) {
+      const cols = [];
+      // Ten-metre columns across the widest part of this tail, symmetric.
+      const wMax = pts.reduce((a, p) => Math.max(a, p.half), 0) + MARGIN;
+      const nCols = Math.max(9, Math.ceil(wMax / 10) * 2 + 1);
+      for (let k = 0; k < nCols; k++) cols.push((k / (nCols - 1)) * 2 - 1);
+      let prev = null;
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i];
+        const ahead = pts[Math.min(pts.length - 1, i + 1)];
+        const back = pts[Math.max(0, i - 1)];
+        let tx = ahead.x - back.x, tz = ahead.z - back.z;
+        const tl = Math.hypot(tx, tz) || 1;
+        tx /= tl; tz /= tl;
+        const nx = -tz, nz = tx;
+        const row = [];
+        for (const u of cols) {
+          const d = Math.abs(u) * (p.half + MARGIN);
+          const k2 = d <= p.half ? 1
+            : 1 - THREE.MathUtils.smoothstep((d - p.half) / 32, 0, 1);
+          const x = p.x + nx * (p.half + MARGIN) * u, z = p.z + nz * (p.half + MARGIN) * u;
+          row.push(pos.length / 3);
+          pos.push(x, sunk * k2, z);
+          const c = apronColour(x, z, k2);
+          col.push(c.r, c.g, c.b);
+        }
+        if (prev) {
+          for (let k = 0; k < cols.length - 1; k++) {
+            index.push(prev[k], row[k], row[k + 1]);
+            index.push(prev[k], row[k + 1], prev[k + 1]);
+          }
+        }
+        prev = row;
+      }
+    }
+    if (!index.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+    geo.setIndex(pos.length / 3 > 65535
+      ? new THREE.BufferAttribute(new Uint32Array(index), 1)
+      : new THREE.BufferAttribute(new Uint16Array(index), 1));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1.0, metalness: 0, side: THREE.DoubleSide,
+      // Its flat margin lies on the frame at the same height.
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    }));
+    mesh.frustumCulled = false;
+    mesh.renderOrder = -4;
+    return mesh;
   }
 
   /**
@@ -701,8 +821,8 @@ export class Terrain {
       const m = (lo + hi) / 2;
       return { x: bx + tx * m * 12, z: bz + tz * m * 12, half: (hi - lo) * 6 };
     };
+    const raw = [];
     for (const side of sides) {
-      let run = null;
       const close = (r) => {
         const a = side.at(r.i0 / N), b = side.at(r.i1 / N);
         const w = Math.hypot(b.x - a.x, b.z - a.z);
@@ -719,15 +839,62 @@ export class Terrain {
             dir = { x: dx / d, z: dz / d };
           }
         }
-        out.push({ mid, half: w / 2, dir });
+        // Which corners of the map this run reaches, if any.
+        const corners = [];
+        if (r.i0 === 0) corners.push(side.at(0));
+        if (r.i1 === N) corners.push(side.at(1));
+        raw.push({ mid, half: w / 2, dir, n: { x: side.n.x, z: side.n.z }, corners });
       };
+      const runs = [];
+      let run = null;
       for (let i = 0; i <= N; i++) {
         const p = side.at(i / N);
         const wet = this._maskWet(p.x - side.n.x * 8, p.z - side.n.z * 8);
         if (wet) { if (!run) run = { i0: i, i1: i }; else run.i1 = i; }
-        else if (run) { close(run); run = null; }
+        else if (run) { runs.push(run); run = null; }
       }
-      if (run) close(run);
+      if (run) runs.push(run);
+      // One channel, not two creeks. A dry notch at the boundary — an island,
+      // a levelled pad, a bank the mask clipped — split the Yamuna's east run
+      // in two, and the river left the map as two thin ditches with a strip of
+      // ground between them. Runs closer than eighty metres are one run.
+      const stepLen = (2 * s) / N;
+      const merged = [];
+      for (const r of runs) {
+        const last = merged[merged.length - 1];
+        if (last && (r.i0 - last.i1) * stepLen < 80) last.i1 = r.i1;
+        else merged.push({ i0: r.i0, i1: r.i1 });
+      }
+      for (const r of merged) close(r);
+    }
+    // One river crossing a corner of the map is wet along both edges that
+    // meet there, and read as two rivers leaving side by side with a wedge of
+    // ground between them. The two become one exit, placed between them and
+    // heading between their bearings.
+    const used = new Set();
+    for (let i = 0; i < raw.length; i++) {
+      if (used.has(i)) continue;
+      let e = raw[i];
+      for (let j = i + 1; j < raw.length; j++) {
+        if (used.has(j)) continue;
+        const o = raw[j];
+        const shared = e.corners.some((c) => o.corners.some(
+          (d) => Math.hypot(c.x - d.x, c.z - d.z) < 1));
+        if (!shared) continue;
+        used.add(j);
+        const dx = e.dir.x + o.dir.x, dz = e.dir.z + o.dir.z;
+        const dl = Math.hypot(dx, dz) || 1;
+        const nx = e.n.x + o.n.x, nz = e.n.z + o.n.z;
+        const nl = Math.hypot(nx, nz) || 1;
+        e = {
+          mid: { x: (e.mid.x + o.mid.x) / 2, z: (e.mid.z + o.mid.z) / 2 },
+          half: (e.half + o.half) / 2,
+          dir: { x: dx / dl, z: dz / dl },
+          n: { x: nx / nl, z: nz / nl },
+          corners: [],
+        };
+      }
+      out.push(e);
     }
     this._exits = out;
     return out;
@@ -813,6 +980,21 @@ export class Terrain {
       }
       pts.push({ x: ctrl[ctrl.length - 2].x, z: ctrl[ctrl.length - 2].z,
         half: ctrl[ctrl.length - 2].half });
+      // The channel starts inside the map, not at its edge.
+      //
+      // The tail's cross-section is square to the channel and the map's edge
+      // is square to the map, and where the river leaves at an angle the two
+      // disagree by half the river's width times the sine of that angle. With
+      // the centreline starting on the boundary, the ground in that wedge was
+      // never sunk and a bar of raised bank stood across one side of the
+      // mouth — from a phone's low angle, a land bridge over the Thames. Run
+      // the centreline back inside by that much and the whole mouth is cut.
+      const sinT = Math.abs(e.dir.x * e.n.z - e.dir.z * e.n.x);
+      const back = e.half * sinT + 30;
+      pts.unshift({
+        x: e.mid.x - e.dir.x * back, z: e.mid.z - e.dir.z * back,
+        half: e.half, inside: true,
+      });
       tails.push(pts);
     }
     this._tails = tails;

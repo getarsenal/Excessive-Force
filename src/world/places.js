@@ -311,16 +311,24 @@ export function buildOutskirts(props, terrain, rng, opts) {
   const gy = (x, z) => terrain.heightAt(x, z);
 
   /** Is this patch dry, off the playfield, and level enough to build on? */
+  //
+  // Sampled across the whole disc, not round its rim. Eight points on a
+  // three-hundred-metre circle are two hundred metres apart, and a river a
+  // hundred and fifty metres wide went straight between two of them: the
+  // airfield at Paris was laid with its runway across the Seine.
   const usable = (x, z, r, tol) => {
     if (Math.hypot(x, z) < inner) return false;
-    let lo = Infinity, hi = -Infinity;
-    for (let a = 0; a < 8; a++) {
-      const th = (a / 8) * Math.PI * 2;
-      const px = x + Math.cos(th) * r, pz = z + Math.sin(th) * r;
-      if (terrain.isWater(px, pz)) return false;
-      const h = gy(px, pz);
-      if (h < terrain.waterLevel + 1.2) return false;
-      lo = Math.min(lo, h); hi = Math.max(hi, h);
+    if (terrain.isWater(x, z)) return false;
+    let lo = gy(x, z), hi = lo;
+    for (const f of [1 / 3, 2 / 3, 1]) {
+      for (let a = 0; a < 12; a++) {
+        const th = (a / 12) * Math.PI * 2;
+        const px = x + Math.cos(th) * r * f, pz = z + Math.sin(th) * r * f;
+        if (terrain.isWater(px, pz)) return false;
+        const h = gy(px, pz);
+        if (h < terrain.waterLevel + 1.2) return false;
+        lo = Math.min(lo, h); hi = Math.max(hi, h);
+      }
     }
     return hi - lo <= tol;
   };

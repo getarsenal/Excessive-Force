@@ -227,7 +227,12 @@ const WATER_FRAG = /* glsl */`
     // gradient along its length that follows the light.
     vec3 refl = reflect(-viewDir, n);
     float up = clamp(refl.y, 0.0, 1.0);
-    vec3 skyCol = mix(uSkyHorizon, uSky, smoothstep(0.0, 0.32, up));
+    // Grazing reflections keep some of the sky's blue. Taken straight, a
+    // reflection that skims the horizon is the horizon's own beige haze, so
+    // from a phone's low camera the far reach of the river was the colour of
+    // the banks either side of it and read as sand: the water looked as if it
+    // stopped a kilometre out and started again further on.
+    vec3 skyCol = mix(uSkyHorizon, uSky, smoothstep(-0.18, 0.32, up));
     skyCol = mix(skyCol, uSkyZenith, smoothstep(0.28, 0.85, up));
     // Forward scatter: the half of the sky around the sun is much brighter than
     // the rest, and on water that is the difference between a river and a strip.
@@ -270,8 +275,13 @@ const WATER_FRAG = /* glsl */`
     // to flat grey. Fogging it puts the river back in the same air as
     // everything else.
     float fogDist = length(cameraPosition - vWorld) * uFogDensity;
-    float fog = 1.0 - exp(-fogDist * fogDist);
-    col = mix(col, uFogColor, clamp(fog, 0.0, 1.0));
+    float fog = clamp(1.0 - exp(-fogDist * fogDist), 0.0, 1.0);
+    // Water in haze stays a shade cooler than the land in the same haze — it
+    // is reflecting sky through it — so the middle distance of the river keeps
+    // reading as river. Right at the horizon it meets the scene fog exactly,
+    // or the channel would end in a blue line where the world stops.
+    vec3 fogCol = mix(mix(uFogColor, uSky, 0.2), uFogColor, smoothstep(0.7, 1.0, fog));
+    col = mix(col, fogCol, fog);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -380,16 +390,14 @@ export function createWater(terrain, sunDirection, quality) {
     const COLS = [-1, -0.55, 0, 0.55, 1];
     for (const tail of terrain.riverTails()) {
       if (tail.length < 2) continue;
-      // Start a little inside the boundary so the strip overlaps the
-      // playfield's sheet rather than leaving a hairline of bare bed between
-      // the two.
-      const line = tail.slice();
-      const bx = line[1].x - line[0].x, bz = line[1].z - line[0].z;
-      const bl = Math.hypot(bx, bz) || 1;
-      line.unshift({
-        x: line[0].x - (bx / bl) * 16, z: line[0].z - (bz / bl) * 16,
-        half: line[0].half,
-      });
+      // The tail's first point is inside the playfield (see `riverTails`), so
+      // the strip overlaps the playfield's own sheet over the last stretch
+      // before the boundary. That first row is sunk eight metres, under the
+      // riverbed: the strip rises out of the bed somewhere inside the map and
+      // is at the waterline by the boundary, so the join is a line under the
+      // water rather than a second sheet laid over the first with its own
+      // shoreline foam drawn across the river.
+      const line = tail;
 
       let prev = null;
       for (let i = 0; i < line.length; i++) {
@@ -406,7 +414,7 @@ export function createWater(terrain, sunDirection, quality) {
           // rather than leaving a ring of bed below the surface and dry.
           const w = p.half * 1.05 * u;
           row.push(pos.length / 3);
-          pos.push(p.x + nx * w, level, p.z + nz * w);
+          pos.push(p.x + nx * w, p.inside ? level - 8 : level, p.z + nz * w);
           // Dredged down the middle, shallowing to the bank. The channel bed
           // out here is flat, so this is a painted gradient rather than a
           // measured one — but it is the gradient a river actually has.
