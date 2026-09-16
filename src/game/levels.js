@@ -15,7 +15,8 @@ import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
  *
  * `primary` marks the landmark the level is named after — the one the height
  * and lean readouts track. `required` marks a structure that has to come down
- * for the level to be won.
+ * for the level to be won. `victory` is the line the end card leads with when
+ * it is.
  *
  * Every structure holding a garrison is required. A wing full of defenders that
  * could be ignored entirely was a strange thing to put in front of a player:
@@ -31,6 +32,7 @@ export const LEVELS = {
     place: 'Westminster, London',
     target: 'ELIZABETH TOWER',
     subtitle: 'Elizabeth Tower · Westminster',
+    victory: 'London Ben has Fallen Down',
     // The tower is twice life size, so everything framed around it moves out
     // with it: the camera sits back far enough to hold 192 m of masonry, and
     // the city keeps clear of a palace with twice the footprint.
@@ -73,6 +75,7 @@ export const LEVELS = {
     place: 'Agra, Uttar Pradesh',
     target: 'TAJ MAHAL',
     subtitle: 'Taj Mahal · Agra',
+    victory: 'Taj Ma-Fall',
     // The complex is 2.2x life size: a 210 m terrace with a dome 141 m over
     // it. Everything framed around it moves out with it.
     cityExcludeRadius: 420,   // keep OSM buildings off the charbagh
@@ -114,6 +117,7 @@ export const LEVELS = {
     place: 'Champ de Mars, Paris',
     target: 'EIFFEL TOWER',
     subtitle: 'Tour Eiffel · Champ de Mars',
+    victory: 'Eiffel-down',
     // The tower's own piers are 125 m apart and the Champ de Mars is open
     // ground for three hundred metres beyond that; the city starts where the
     // park ends.
@@ -153,6 +157,7 @@ export const LEVELS = {
     place: 'Giza Plateau, Egypt',
     target: 'GREAT PYRAMID',
     subtitle: 'Pyramid of Khufu · Giza Plateau',
+    victory: 'Pharaoh From Grace',
     // Khufu's base is 230 m square and Khafre stands 350 m away; the whole
     // plateau is kept clear and the town is pushed back to where Nazlet
     // el-Samman actually starts.

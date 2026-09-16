@@ -274,8 +274,13 @@ export class HUD {
   showEnd(kind, summary) {
     this.el.endcard.hidden = false;
     const won = kind === 'win';
-    this.el.ecTitle.textContent = won ? 'TARGET DOWN' : 'ASSAULT STALLED';
-    this.el.ecTitle.className = `ec-title ${won ? 'win' : 'lose'}`;
+    this.el.ecTitle.textContent = won
+      ? (this.battle.level?.victory ?? 'TARGET DOWN')
+      : 'ASSAULT STALLED';
+    // A five-word title at headline size stacks three deep; give it a step
+    // down so it holds two lines.
+    const long = this.el.ecTitle.textContent.length > 16;
+    this.el.ecTitle.className = `ec-title ${won ? 'win' : 'lose'}${long ? ' long' : ''}`;
     const site = this.battle.level?.subtitle ?? '';
     this.el.ecSub.textContent = won ? site : 'Out of funds with the target still standing';
 

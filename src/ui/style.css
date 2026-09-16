@@ -410,6 +410,7 @@ html, body {
 .ec-title {
   font-size: clamp(32px, 8vw, 54px); font-weight: 700; letter-spacing: 0.12em;
 }
+.ec-title.long { font-size: clamp(26px, 6vw, 42px); letter-spacing: 0.08em; }
 .ec-title.win { color: #eaf1f8; }
 .ec-title.lose { color: var(--danger); }
 .ec-sub {
