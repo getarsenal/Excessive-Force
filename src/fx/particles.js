@@ -11,6 +11,8 @@ import * as THREE from 'three';
  */
 
 const VERT = /* glsl */`
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   attribute vec3 iPos;
   attribute vec4 iData;   // x: size, y: life 0..1, z: seed, w: rotation
   attribute vec3 iColor;
@@ -40,10 +42,12 @@ const VERT = /* glsl */`
 
     vec3 world = iPos + (camRight * r.x + camUp * r.y) * iData.x;
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+    #include <logdepthbuf_vertex>
   }
 `;
 
 const FRAG = /* glsl */`
+  #include <logdepthbuf_pars_fragment>
   uniform sampler2D uMap;
   uniform float uEmissive;
 
@@ -54,6 +58,7 @@ const FRAG = /* glsl */`
   varying float vSeed;
 
   void main() {
+    #include <logdepthbuf_fragment>
     vec4 tex = texture2D(uMap, vUv);
     float a = tex.a * vAlpha;
     if (a < 0.004) discard;

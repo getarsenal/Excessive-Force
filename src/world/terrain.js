@@ -149,7 +149,19 @@ export class Terrain {
         h[idx] += (level - h[idx]) * k;
         // Grass over the pad. Without it the levelled disc drew in the bare
         // paving colour and read as a plate the monument had been set on.
-        if (opts.park) this.mask[idx * 3 + 2] = Math.max(this.mask[idx * 3 + 2], k);
+        //
+        // With a ragged edge, not the levelling's own smooth ramp: the ramp
+        // faded the grass out over forty metres and drew a blurred green
+        // disc, which is not what a lawn's edge looks like from the air. The
+        // grass runs full to just past the pad and then breaks up on a noise
+        // over a few metres, so the boundary wanders and has corners.
+        if (opts.park) {
+          const x = -span + i * c, z = span - j * c;
+          const wob = (valueNoise(x * 0.045 + 3.1, z * 0.045 - 7.7) - 0.5) * 0.5;
+          const e = d <= radius ? 0 : (d - radius) / feather;
+          const kp = 1 - THREE.MathUtils.smoothstep(e, 0.22 + wob, 0.42 + wob);
+          this.mask[idx * 3 + 2] = Math.max(this.mask[idx * 3 + 2], kp);
+        }
       }
     }
     return level;
@@ -267,9 +279,13 @@ export class Terrain {
     const v = THREE.MathUtils.clamp((this.span - z) / (this.span * 2) * (n - 1), 0, n - 1);
     const x0 = Math.floor(u), z0 = Math.floor(v);
     const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
-    const ux = u - x0, uz = v - z0;
-    const fx = ux * ux * (3 - 2 * ux);
-    const fz = uz * uz * (3 - 2 * uz);
+    // Linear, not eased. The rendered mesh and the physics heightfield are
+    // both linear over the same grid, and the eased curve this used to take
+    // between vertices put everything laid on the ground — a road at
+    // heightAt() plus twenty centimetres, a lawn at ten — up to a quarter of
+    // the cell's rise away from the surface actually drawn, sinking into it
+    // on one slope and floating over it on the next.
+    const fx = u - x0, fz = v - z0;
     const h = this.heights;
     const a = h[z0 * n + x0], b = h[z0 * n + x1];
     const c = h[z1 * n + x0], d = h[z1 * n + x1];
@@ -336,12 +352,46 @@ export class Terrain {
     return false;
   }
 
-  buildMesh() {
+  /**
+   * Halve the grid.
+   *
+   * Weaker devices draw the ground at half resolution, and they used to do
+   * that by drawing every other vertex of a grid everything else still
+   * measured at full resolution: the roads, the lawns, the physics and the
+   * picker all followed the fine surface while the eye saw the coarse one,
+   * and where the two disagreed the road sank into the grass. Now the grid
+   * itself is halved, once, before anything is built on it, so there is one
+   * ground and everything agrees about where it is.
+   */
+  coarsen() {
     const n = this.size;
-    // Render at a lower resolution than the collider on weaker devices; the
-    // terrain is gently sloped, so the visual loss is negligible.
-    const step = this.quality.name === 'low' ? 2 : 1;
-    const rn = Math.floor((n - 1) / step) + 1;
+    const rn = Math.floor((n - 1) / 2) + 1;
+    const span = this.span;
+    const heights = new Float32Array(rn * rn);
+    const mask = new Float32Array(rn * rn * 3);
+    for (let j = 0; j < rn; j++) {
+      const z = span - (j / (rn - 1)) * span * 2;
+      for (let i = 0; i < rn; i++) {
+        const x = -span + (i / (rn - 1)) * span * 2;
+        heights[j * rn + i] = this.heightAt(x, z);
+        const m = this.maskAt(x, z);
+        mask[(j * rn + i) * 3] = m.water;
+        mask[(j * rn + i) * 3 + 1] = m.road;
+        mask[(j * rn + i) * 3 + 2] = m.park;
+      }
+    }
+    this.size = rn;
+    this.heights = heights;
+    this.mask = mask;
+    this.cellSize = (span * 2) / (rn - 1);
+    this._coarse = true;
+  }
+
+  buildMesh() {
+    if (this.quality.name === 'low' && !this._coarse) this.coarsen();
+    const n = this.size;
+    const rn = n;
+    const cell = this.cellSize;
 
     const geo = new THREE.PlaneGeometry(this.span * 2, this.span * 2, rn - 1, rn - 1);
     geo.rotateX(-Math.PI / 2);
@@ -398,7 +448,10 @@ export class Terrain {
       // not a wash. Thresholded rather than ramped, so green appears as
       // discrete pockets of ground with edges, which is what a city looks like
       // from above. Ramping it instead turns the entire map into one lawn.
-      const green = THREE.MathUtils.smoothstep(patch, 0.10, 0.30) * 0.62;
+      // The edge is a few vertices wide whatever the grid: a threshold that
+      // fell within one cell drew every patch as a hard-edged square.
+      const soft = Math.min(0.24, 0.10 + cell * 0.018);
+      const green = THREE.MathUtils.smoothstep(patch, 0.20 - soft, 0.20 + soft) * 0.62;
       tmp2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
       tmp.lerp(tmp2, Math.max(green * (1 - m.water), m.park * 0.92));
 
@@ -444,9 +497,13 @@ export class Terrain {
       tmp.lerp(P.bank, Math.pow(wet, 1.3) * 0.86);
       tmp.lerp(P.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
 
-      // Fine mottling on top of all of it.
-      const n = valueNoise(x * 0.055, z * 0.055) * 0.22
-              + valueNoise(x * 0.34, z * 0.34) * 0.10
+      // Fine mottling on top of all of it — but no octave finer than the grid
+      // can carry. Noise with a three-metre period sampled at vertices seven
+      // metres apart is a random value per vertex, and a random value per
+      // vertex is a checkerboard. The grain texture supplies the fine detail
+      // instead, at every resolution.
+      const n = valueNoise(x * 0.055, z * 0.055) * (cell < 4.5 ? 0.22 : 0.16)
+              + (cell < 2.2 ? valueNoise(x * 0.34, z * 0.34) * 0.10 : 0.05)
               + broad * 0.16;
       tmp.multiplyScalar(0.80 + n);
 

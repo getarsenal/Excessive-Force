@@ -1016,11 +1016,15 @@ export function buildStreetSurface(net, terrain, quality) {
       const d = Math.hypot(dx, dz) || 1;
       const nx = -dz / d, nz = dx / d;
       // Ease the ends up to the junction's own level so pad and ribbon meet.
+      // The ribbon runs a little way under the junction pad, and where the
+      // two share ground it sits three centimetres lower: the pad covers the
+      // seam, and two surfaces on exactly the same plane are two surfaces
+      // that flicker against each other.
       const yAt = (pt, w) => {
         if (e.bridge && pt.y !== undefined) return pt.y;
         const g = terrain.heightAt(pt.x, pt.z) + LIFT;
         if (w <= 0) return g;
-        return g * (1 - w) + w * (pt.nearA ? a.y + LIFT : b.y + LIFT);
+        return g * (1 - w) + w * ((pt.nearA ? a.y : b.y) + LIFT - 0.03);
       };
       const wp = endWeight(i, line.length - 1), wq = endWeight(i + 1, line.length - 1);
       p.nearA = i < line.length / 2; q.nearA = (i + 1) < line.length / 2;

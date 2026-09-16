@@ -721,8 +721,12 @@ function buildBlockGround(terrain, net, quality, inPrecinct) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
+  // Its own depth-offset tier, between the terrain and the roads: the
+  // ground's layers are terrain, then this, then tarmac, then paint, and each
+  // is pushed a step nearer the eye than the one under it.
   const mesh = new THREE.Mesh(geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }));
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
   mesh.receiveShadow = quality.shadowMapSize > 0;
   mesh.frustumCulled = false;
   g.add(mesh);

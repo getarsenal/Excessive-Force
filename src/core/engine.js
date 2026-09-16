@@ -84,12 +84,27 @@ export class Engine {
     this.quality = quality;
     this.canvas = canvas;
 
+    // How fine the depth buffer is decides whether the layers of the ground —
+    // terrain, the lawn of a block ten centimetres over it, the road twenty
+    // over that, the paint on the road — can be told apart at playing
+    // distance. A 24-bit buffer resolves millimetres there. Some phones give
+    // sixteen bits, which at four hundred metres is the better part of a
+    // metre: every one of those layers fights every other, and the whole
+    // ground shimmers as the camera moves. On those devices depth is stored
+    // logarithmically instead, which is uniform precision at any distance.
+    // Every custom shader carries the log-depth chunks so it keeps sorting.
+    const bits = depthBits();
+    const forced = new URLSearchParams(location.search).get('depth');
+    const logDepth = forced ? forced === 'log' : bits < 24;
+    console.log(`[tumble] depth buffer: ${bits} bits${logDepth ? ' · logarithmic' : ''}`);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false, // SMAA in the composer instead; cheaper with bloom
       powerPreference: 'high-performance',
       stencil: false,
+      logarithmicDepthBuffer: logDepth,
     });
+    this.logDepth = logDepth;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatioCap));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -603,6 +618,20 @@ export class CameraRig {
 }
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/** The depth precision this device's WebGL gives a default context. */
+function depthBits() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2') || c.getContext('webgl');
+    if (!gl) return 24;
+    const bits = gl.getParameter(gl.DEPTH_BITS);
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return bits || 24;
+  } catch {
+    return 24;
+  }
+}
 
 /**
  * How much of the shake reaches the viewer at a given camera distance: full

@@ -57,8 +57,8 @@ export class PropSet {
         opacity: spec.opacity ?? 1,
         depthWrite: spec.depthWrite !== false,
         polygonOffset: !!spec.offset,
-        polygonOffsetFactor: spec.offset ? -2 : 0,
-        polygonOffsetUnits: spec.offset ? -2 : 0,
+        polygonOffsetFactor: spec.offset ? -(spec.offsetLevel ?? 2) : 0,
+        polygonOffsetUnits: spec.offset ? -(spec.offsetLevel ?? 2) : 0,
       }));
       mesh.name = key;
       mesh.castShadow = shadows && spec.cast !== false;
@@ -102,7 +102,10 @@ export const MATERIALS = {
   foliage: { roughness: 0.9, cast: true },
   // Flat marks laid on the road: never cast, always offset so they do not
   // z-fight with the surface they are painted on.
-  markings: { roughness: 0.97, cast: false, offset: true, renderOrder: 2 },
+  // A tier nearer the eye than the road they are painted on, which is itself
+  // a tier nearer than the ground: paint at the road's own offset was the
+  // shimmer on every crossing.
+  markings: { roughness: 0.97, cast: false, offset: true, offsetLevel: 4, renderOrder: 2 },
 };
 
 /**

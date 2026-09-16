@@ -11,14 +11,18 @@ import * as THREE from 'three';
  */
 
 const SKY_VERT = /* glsl */`
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   varying vec3 vWorld;
   void main() {
     vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    #include <logdepthbuf_vertex>
   }
 `;
 
 const SKY_FRAG = /* glsl */`
+  #include <logdepthbuf_pars_fragment>
   uniform float uTime;
   uniform vec3 uZenith;
   uniform vec3 uMid;
@@ -42,6 +46,7 @@ const SKY_FRAG = /* glsl */`
   }
 
   void main() {
+    #include <logdepthbuf_fragment>
     vec3 dir = normalize(vWorld);
     float h = dir.y;
 
@@ -104,6 +109,8 @@ export function createSky(sunDirection) {
 }
 
 const WATER_VERT = /* glsl */`
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   uniform float uTime;
   attribute float aDepth;
   varying vec3 vWorld;
@@ -141,10 +148,12 @@ const WATER_VERT = /* glsl */`
     p.y += w;
     vWorld = (modelMatrix * vec4(p, 1.0)).xyz;
     gl_Position = projectionMatrix * viewMatrix * vec4(vWorld, 1.0);
+    #include <logdepthbuf_vertex>
   }
 `;
 
 const WATER_FRAG = /* glsl */`
+  #include <logdepthbuf_pars_fragment>
   uniform vec3 uShallow;
   uniform vec3 uDeep;
   uniform vec3 uSky;
@@ -160,6 +169,7 @@ const WATER_FRAG = /* glsl */`
   varying float vDepth;
 
   void main() {
+    #include <logdepthbuf_fragment>
     vec3 viewDir = normalize(cameraPosition - vWorld);
 
     // Slope of the wave field gives a cheap normal.

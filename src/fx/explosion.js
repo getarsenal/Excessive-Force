@@ -13,6 +13,8 @@ import { BillboardParticles, makeSmokeTexture, makeSparkTexture } from './partic
  */
 
 const FIREBALL_VERT = /* glsl */`
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   uniform float uTime;
   uniform float uSeed;
   uniform float uGrow;
@@ -52,10 +54,12 @@ const FIREBALL_VERT = /* glsl */`
 
     vPos = displaced;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
+    #include <logdepthbuf_vertex>
   }
 `;
 
 const FIREBALL_FRAG = /* glsl */`
+  #include <logdepthbuf_pars_fragment>
   uniform float uLife;     // 0..1
   uniform float uIntensity;
   varying vec3 vNormal;
@@ -63,6 +67,7 @@ const FIREBALL_FRAG = /* glsl */`
   varying float vNoise;
 
   void main() {
+    #include <logdepthbuf_fragment>
     // Hot core, cooler rim: the fireball is optically thick, so edges read
     // darker and sootier than the centre.
     float facing = abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)));
@@ -91,18 +96,23 @@ const FIREBALL_FRAG = /* glsl */`
 `;
 
 const SHOCK_VERT = /* glsl */`
+  #include <common>
+  #include <logdepthbuf_pars_vertex>
   varying vec2 vUv;
   void main() {
     vUv = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    #include <logdepthbuf_vertex>
   }
 `;
 
 const SHOCK_FRAG = /* glsl */`
+  #include <logdepthbuf_pars_fragment>
   uniform float uLife;
   uniform vec3 uColor;
   varying vec2 vUv;
   void main() {
+    #include <logdepthbuf_fragment>
     float r = length(vUv - 0.5) * 2.0;
     // A thin bright annulus that widens and softens as it travels.
     float w = mix(0.030, 0.16, uLife);
