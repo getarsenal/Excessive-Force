@@ -587,7 +587,7 @@ async function boot() {
     water.material.uniforms.uTime.value = now * 0.001;
     if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
 
-    const shake = engine.updateShake(rawDt);
+    const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
     engine.sun.target.position.set(rig.target.x, rig.target.y, rig.target.z);
     engine.sun.position.set(

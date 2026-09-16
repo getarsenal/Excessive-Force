@@ -113,7 +113,8 @@ export class Engine {
     this.camera = new THREE.PerspectiveCamera(52, 1, 1.2, 6000);
 
     this.clock = new THREE.Clock();
-    this.shake = { amount: 0, decay: 3.4 };
+    // Dies in well under a second: a thump, not a rumble that carries on.
+    this.shake = { amount: 0, decay: 5.0 };
     this._shakeVec = new THREE.Vector2();
 
     this._setupLights();
@@ -269,10 +270,14 @@ export class Engine {
 
   /** Kick the camera. `amount` is roughly "metres of apparent displacement". */
   addShake(amount) {
-    this.shake.amount = Math.min(1.4, this.shake.amount + amount);
+    // Capped low so a salvo landing together does not stack into a quake.
+    this.shake.amount = Math.min(0.8, this.shake.amount + amount);
   }
 
-  updateShake(dt) {
+  /**
+   * @param {number} distance how far back the camera sits, for the falloff
+   */
+  updateShake(dt, distance = 0) {
     const s = this.shake;
     if (s.amount <= 0.0001) {
       this._shakeVec.set(0, 0);
@@ -285,7 +290,13 @@ export class Engine {
     const x = (Math.sin(t * 47.3) * 0.6 + Math.sin(t * 23.1) * 0.4) * s.amount;
     const y = (Math.cos(t * 41.7) * 0.6 + Math.cos(t * 19.7) * 0.4) * s.amount;
     this._shakeVec.set(x, y);
-    this.gradePass.uniforms.uShake.value.set(x * 0.012, y * 0.012);
+    // The lens shift is the shake you actually see: the camera displacement
+    // below is centimetres at four hundred metres, under a pixel, while this
+    // slides the whole frame. It used to be a flat multiple, with no falloff
+    // at all — which is why pulling back never calmed it. Now it obeys the
+    // same law as the camera: fading from mid-distance, gone from far out.
+    const fall = shakeFalloff(distance);
+    this.gradePass.uniforms.uShake.value.set(x * 0.004 * fall, y * 0.004 * fall);
     return this._shakeVec;
   }
 
@@ -571,11 +582,12 @@ export class CameraRig {
       // the camera, and from right out — where the whole city is in frame and
       // nothing in it is moving much — the picture still jolted. Pulling back
       // should calm it down, and from far enough out it should stop.
-      const fall = clamp((620 - this.distance) / 420, 0, 1);
-      // Half what it was. This is the one place every source of shake — shell
-      // impacts, charges, collapses — reaches the camera, so halving it here
-      // halves all of them by the same amount.
-      const amp = Math.min(this.distance, 260) * 0.002 * fall * fall;
+      const fall = shakeFalloff(this.distance);
+      // An eighth of what it first was. This is the one place every source of
+      // shake — shell impacts, charges, collapses — reaches the camera, so
+      // cutting it here cuts all of them by the same amount. It is meant to
+      // register a hit, not to make the view hard to read.
+      const amp = Math.min(this.distance, 260) * 0.0005 * fall;
       this.camera.position.x += shakeVec.x * amp;
       this.camera.position.y += shakeVec.y * amp;
     }
@@ -583,3 +595,13 @@ export class CameraRig {
 }
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+/**
+ * How much of the shake reaches the viewer at a given camera distance: full
+ * up close, fading through the middle distances, none from far enough out that
+ * the whole city is in frame. Squared so the fade starts gently.
+ */
+function shakeFalloff(distance) {
+  const f = clamp((620 - distance) / 420, 0, 1);
+  return f * f;
+}
