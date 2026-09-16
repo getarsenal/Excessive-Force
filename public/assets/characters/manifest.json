@@ -9,6 +9,34 @@
     "pose": "pointing (accusatory) — reads as an ultimatum",
     "side": "left"
   },
+  "scripts": {
+    "note": "The stand-off before each level: three beats, player / defender / player. Lines verbatim from the writer; the Taj is the one drafted here.",
+    "westminster": [
+      { "who": "us", "line": "Give it up you limey bastard" },
+      { "who": "uk", "line": "God save the queen, and your soul" },
+      { "who": "us", "line": "Thank god, I was worried we dragged this ordnance across the Atlantic for nothing!" }
+    ],
+    "paris": [
+      { "who": "us", "line": "Surrender or die Frenchie" },
+      { "who": "fr", "line": "Va t'étouffer avec une baguette" },
+      { "who": "us", "line": "All I heard was baguette, and that's all I need" }
+    ],
+    "agra": [
+      { "who": "us", "line": "Nice tomb. Vacate the premises before I add to the occupancy." },
+      { "who": "in", "line": "Twenty thousand men built this in twenty-two years. You have four guns and a hangover." },
+      { "who": "us", "line": "Twenty-two years? Give me twenty-two minutes." }
+    ],
+    "agra_alt": [
+      { "who": "us", "line": "That's a hell of a headstone. Move it or lose it, chief." },
+      { "who": "in", "line": "It was built for love, sahib. You would not understand — no one has ever loved you." },
+      { "who": "us", "line": "Love, huh? Boys, show him how much I love a 155." }
+    ],
+    "giza": [
+      { "who": "us", "line": "God it's hot out here, give it up before we all melt would ya?" },
+      { "who": "eg", "line": "اطلع الهرم ده وهاتك يا طفل يا تخين" },
+      { "who": "us", "line": "I don't speak Sanskrit habibi, but I get the gist. Someone get me some damn water and a lot of bombs" }
+    ]
+  },
   "enemies": {
     "westminster": {
       "id": "uk-field-marshal",
