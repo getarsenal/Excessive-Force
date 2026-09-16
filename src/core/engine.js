@@ -572,7 +572,10 @@ export class CameraRig {
       // nothing in it is moving much — the picture still jolted. Pulling back
       // should calm it down, and from far enough out it should stop.
       const fall = clamp((620 - this.distance) / 420, 0, 1);
-      const amp = Math.min(this.distance, 260) * 0.004 * fall * fall;
+      // Half what it was. This is the one place every source of shake — shell
+      // impacts, charges, collapses — reaches the camera, so halving it here
+      // halves all of them by the same amount.
+      const amp = Math.min(this.distance, 260) * 0.002 * fall * fall;
       this.camera.position.x += shakeVec.x * amp;
       this.camera.position.y += shakeVec.y * amp;
     }
