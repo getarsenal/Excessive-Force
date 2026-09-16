@@ -146,7 +146,12 @@ html, body {
   display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
   font-size: 9px; letter-spacing: 0.09em; color: var(--dim);
 }
-.objectives .obj { display: inline-flex; gap: 4px; align-items: baseline; }
+.objectives .obj {
+  display: inline-flex; gap: 4px; align-items: baseline;
+  /* An item wraps as a whole or not at all: "ELIZABETH / TOWER 100%" broken
+     across two lines on a phone read as two objectives. */
+  white-space: nowrap;
+}
 .objectives .obj b {
   color: #e6ebf2; font-weight: 600; font-variant-numeric: tabular-nums;
 }
@@ -431,6 +436,11 @@ html, body {
      target name's wide tracking is what pushed it into an ellipsis. */
   .tb-target-name { letter-spacing: 0.12em; }
   .tb-label { letter-spacing: 0.14em; }
+  /* The height line and the per-structure row share the centre column, which
+     on a phone is a third of the screen. Drop the height line there: the
+     objectives carry the same information per structure. */
+  .tb-meta .tb-sub { display: none; }
+  .objectives { gap: 8px; font-size: 8px; }
   :root { --ui-pad: 8px; }
   #targetcard { width: 142px; top: 84px; padding: 7px 9px; }
   #perf { font-size: 9px; }
