@@ -670,3 +670,103 @@ html, body {
   .ls-blurb { font-size: 11px; }
   #targets-btn { top: 116px; padding: 5px 8px; font-size: 8px; }
 }
+
+/* ── The stand-off ───────────────────────────────────────────────────────
+   Two commanders at the bottom corners of the screen, the world live behind
+   them. Figures rise from below the frame, speech pops beside the head, the
+   whole thing slides back down when the last word is said. The figure's
+   height is the one number everything hangs off, so it is a variable. */
+#standoff {
+  --fig: min(62vh, 70vw);
+  position: fixed; inset: 0; z-index: 30; overflow: hidden;
+  cursor: pointer; touch-action: none;
+  -webkit-user-select: none; user-select: none;
+}
+#standoff::before, #standoff::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 7vh; background: #000;
+  transform: scaleY(0); animation: soBar 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+#standoff::before { top: 0; transform-origin: top; }
+#standoff::after { bottom: 0; transform-origin: bottom; }
+#standoff.out::before, #standoff.out::after { animation: soBarOut 0.45s ease-in forwards; }
+@keyframes soBar { to { transform: scaleY(1); } }
+@keyframes soBarOut { from { transform: scaleY(1); } to { transform: scaleY(0); } }
+
+.so-fig {
+  position: absolute; bottom: 0; height: var(--fig); width: auto; pointer-events: none;
+  transform: translateY(108%);
+  transition: transform 0.6s cubic-bezier(0.2, 0.9, 0.25, 1.12);
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.55));
+}
+.so-fig.left { left: -1vw; }
+.so-fig.right { right: -1vw; }
+.so-fig.in { transform: translateY(2%); }
+#standoff.out .so-fig { transform: translateY(108%); transition: transform 0.5s cubic-bezier(0.5, 0, 0.8, 0.4); }
+
+.so-bubble {
+  position: absolute; bottom: calc(var(--fig) * 0.80);
+  max-width: min(44vw, 520px); min-width: 200px;
+  background: #fbfbf7; color: #14161a;
+  border: 3px solid #14161a; border-radius: 20px;
+  --pad-y: 13px; --pad-x: 18px;
+  padding: var(--pad-y) var(--pad-x) calc(var(--pad-y) + 1px);
+  font-family: 'Oswald', 'Noto Naskh Arabic', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 500; font-size: clamp(16px, 2.2vw, 26px); line-height: 1.28;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0; transform: scale(0.55);
+  transition: opacity 0.18s ease-out, transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.35);
+  pointer-events: none;
+}
+.so-bubble.left { left: calc(var(--fig) * 0.56); transform-origin: 8% 100%; }
+.so-bubble.right { right: calc(var(--fig) * 0.56); transform-origin: 92% 100%; border-color: var(--enemy-a); }
+.so-bubble.in { opacity: 1; transform: scale(1); }
+#standoff.out .so-bubble { opacity: 0; transition: opacity 0.2s; }
+/* The tail: a rotated square hanging off the bottom corner nearest the speaker. */
+.so-bubble::after {
+  content: ''; position: absolute; bottom: -11px; width: 18px; height: 18px;
+  background: inherit; border: inherit; border-width: 0 3px 3px 0; transform: rotate(45deg);
+}
+.so-bubble.left::after { left: 24px; }
+.so-bubble.right::after { right: 24px; }
+/* The whole line sits in the bubble invisibly from the start, so the box is
+   already the right size and shape while the visible copy types over it. */
+.so-ghost, .so-text { unicode-bidi: plaintext; white-space: pre-wrap; overflow-wrap: anywhere; }
+.so-ghost { visibility: hidden; display: block; }
+.so-text { position: absolute; top: var(--pad-y); left: var(--pad-x); right: var(--pad-x); }
+
+.so-hint {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(7vh + 12px); font-size: 10px; letter-spacing: 0.32em;
+  color: rgba(236, 242, 248, 0.8); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.9);
+  animation: soBlink 1.8s ease-in-out infinite; pointer-events: none;
+}
+@keyframes soBlink { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.so-skip {
+  position: absolute; top: calc(7vh + 12px); right: 14px;
+  padding: 7px 14px; font-family: inherit; font-size: 10px; letter-spacing: 0.24em;
+  background: rgba(14, 17, 21, 0.7); border: 1px solid var(--edge-bright); color: var(--text);
+  cursor: pointer; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+.so-skip:hover { border-color: var(--accent); background: rgba(88, 166, 255, 0.14); }
+#standoff.out { opacity: 0; transition: opacity 0.5s ease-in 0.1s; }
+
+/* The HUD waits its turn: hidden under the stand-off, fading up once it ends. */
+#ui.standoff > * { opacity: 0; pointer-events: none; }
+#ui.hud-fade > * { transition: opacity 0.6s ease-out; }
+
+@media (max-width: 620px) {
+  /* Phones: the figures are small, so the words go above them, full width. */
+  #standoff { --fig: min(40vh, 62vw); }
+  .so-bubble, .so-bubble.left, .so-bubble.right {
+    left: 12px; right: 12px; max-width: none; min-width: 0;
+    bottom: calc(var(--fig) + 14px); font-size: 17px; --pad-y: 11px; --pad-x: 14px;
+  }
+  .so-bubble.left { transform-origin: 10% 100%; }
+  .so-bubble.right { transform-origin: 90% 100%; }
+  .so-skip { top: calc(7vh + 8px); right: 10px; padding: 6px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .so-fig, .so-bubble, #standoff.out .so-fig { transition: opacity 0.3s; transform: none; }
+  .so-fig { opacity: 0; } .so-fig.in { opacity: 1; }
+  #standoff::before, #standoff::after { animation: none; transform: none; }
+}

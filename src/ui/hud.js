@@ -1,5 +1,6 @@
 import { UNITS } from '../game/units.js';
 import { unitIcon } from './icons.js';
+import { introsEnabled, setIntrosEnabled } from './standoff.js';
 
 /**
  * HUD.
@@ -157,11 +158,19 @@ export class HUD {
       if (this.el.sound) this.el.sound.click();
       snd.textContent = this.soundOn ? 'SOUND: ON' : 'SOUND: OFF';
     });
+    const intros = menu.querySelector('#menu-intros');
+    if (intros) {
+      const label = () => { intros.textContent = introsEnabled() ? 'INTROS: ON' : 'INTROS: OFF'; };
+      label();
+      intros.addEventListener('click', () => { setIntrosEnabled(!introsEnabled()); label(); });
+    }
     menu.querySelectorAll('[data-quality]').forEach((q) => {
       q.classList.toggle('on', q.dataset.quality === this.qualityId);
       q.addEventListener('click', () => this.onQuality(q.dataset.quality));
     });
     window.addEventListener('keydown', (e) => {
+      // Not during the stand-off: the menu would open unseen under it.
+      if (document.getElementById('ui')?.classList.contains('standoff')) return;
       if (e.code === 'KeyP' || (e.code === 'Escape' && !menu.hidden)) open(menu.hidden && e.code === 'KeyP');
     });
   }

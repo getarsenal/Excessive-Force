@@ -26,6 +26,7 @@ import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
+import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -51,6 +52,9 @@ async function boot() {
   if (sub) sub.textContent = level.name.toUpperCase();
 
   await progress(6, 'starting physics');
+  // The two commanders fetch while the world builds, so the stand-off never
+  // opens on an empty stage.
+  const castReady = introsEnabled() ? preloadCast(level.id) : Promise.resolve();
   await initPhysics();
 
   const canvas = document.getElementById('game-canvas');
@@ -563,10 +567,30 @@ async function boot() {
     }
   });
 
+  const firstPrompt = () => {
+    hud.showPrompt('tap the tower to designate a target');
+    setTimeout(() => hud.hidePrompt(), 5200);
+  };
+  const uiEl = document.getElementById('ui');
+  let standoff = null;
+  if (introsEnabled()) {
+    await castReady;
+    // The HUD stays out of the way until the two of them have had their say.
+    uiEl.classList.add('standoff');
+    standoff = new Standoff({
+      level, rig, groundY,
+      onDone: () => {
+        standoff = null;
+        uiEl.classList.add('hud-fade');
+        uiEl.classList.remove('standoff');
+        setTimeout(() => uiEl.classList.remove('hud-fade'), 700);
+        firstPrompt();
+      },
+    });
+  }
   document.getElementById('loading').style.display = 'none';
-  document.getElementById('ui').hidden = false;
-  hud.showPrompt('tap the tower to designate a target');
-  setTimeout(() => hud.hidePrompt(), 5200);
+  uiEl.hidden = false;
+  if (!standoff) firstPrompt();
 
   const governor = new AdaptiveGovernor(quality);
   const perfEl = document.getElementById('perf');
@@ -659,6 +683,7 @@ async function boot() {
     unitCard.update();
     testMenu.update(rawDt);
     flags.update(rawDt);
+    if (standoff) standoff.update();
 
     water.material.uniforms.uTime.value = now * 0.001;
     if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
@@ -691,6 +716,8 @@ async function boot() {
     // vectors the game does rather than duck-typing them.
     THREE,
   });
+  // Live, because it is replaced by null when the stand-off ends.
+  Object.defineProperty(window, 'standoff', { get: () => standoff, configurable: true });
   window.__fastForward = fastForward;
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
