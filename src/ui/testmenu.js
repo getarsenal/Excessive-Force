@@ -2149,9 +2149,19 @@ export class TestMenu {
           // the stone to a quarter of its toughness only moved that to
           // thirteen — block size, not strength, is what governs it, and that
           // is worth knowing if these numbers ever need moving again.
+          //
+          // Measured as material, not as stones. A count cannot be compared
+          // across quality tiers, because a tier is precisely a choice of how
+          // big a stone is: the same eighty rounds answered seventy-two stones
+          // at high and nine at low while removing 0.79% and 0.36% of the
+          // monument, so a bar of ten stones failed the coarse tier for being
+          // coarse rather than for being unshootable. The pyramid was also
+          // genuinely harder to quarry there, which is a real fault and is
+          // fixed where it belongs — in the stone size `giza.js` builds at.
           const removedFrac = 1 - integ / Math.max(0.001, intactAtStart);
-          assert(st.destroyedCount > 10,
-            `eighty rounds into one face took out only ${st.destroyedCount} stones`);
+          assert(removedFrac > 0.004 && st.destroyedCount > 4,
+            `eighty rounds into one face took out ${st.destroyedCount} stones, `
+            + `${(removedFrac * 100).toFixed(2)}% of the monument`);
           return `cannot topple, and should not: ${st.destroyedCount} stones `
             + `quarried out of one face by eighty light rounds `
             + `(${(removedFrac * 100).toFixed(2)}% of the monument)`;

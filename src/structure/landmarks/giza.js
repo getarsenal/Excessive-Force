@@ -114,7 +114,16 @@ export function buildGreatPyramid(quality) {
   // one block at a time. Four and a half metres is the compromise: two and a
   // half times the bodies, and a charge that takes out a cluster rather than a
   // single stone.
-  const stone = 4.6 * s;
+  //
+  // Capped, because that reasoning was only ever true at one quality tier. The
+  // coarsest tier multiplies every stone size by 1.55, which took these back
+  // to seven-metre blocks — larger than the six-metre ones rejected above, and
+  // unshootable for exactly the reason given: eighty rounds into one face
+  // quarried nine stones out, and the player who reported that the pyramids
+  // could not be destroyed was playing at that tier. Khufu grows by about half
+  // again in stone count on a phone, which is the price of the level being
+  // winnable there.
+  const stone = 4.6 * Math.min(s, 1.35);
 
   const K = KHUFU;
 

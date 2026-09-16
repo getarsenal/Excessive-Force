@@ -38,7 +38,7 @@ export class Terrain {
     this.cellSize = (this.span * 2) / (n - 1);
     this._relax();
     this.waterLevel = this._computeWaterLevel();
-    this._cutChannel();
+    this._repairRiver();
     this.mesh = null;
     this.collider = null;
   }
@@ -101,50 +101,92 @@ export class Terrain {
     return minWet + 5.4;
   }
 
-  /**
-   * Cut the channel the water mask says is there.
-   *
-   * `tools/bake_terrain.py` subtracts a fixed seven metres along the river's
-   * centreline, which is enough for the Thames — Tilezen fills it to its
-   * shoreline a metre or two above sea level, so seven metres puts the bed
-   * well under. It is nowhere near enough for the Seine at forty metres above
-   * sea level or the Yamuna at a hundred and fifty. On those two the mask said
-   * "river" and the ground under it stood eleven metres proud of the water
-   * surface: the Seine rendered as a dry strip of park with a puddle at the
-   * bottom corner of the map, which is what the player saw and reported.
-   *
-   * So the channel is also cut here, at load, from the ground the level
-   * actually has rather than from a constant. A map whose DEM already carries
-   * its channel — Westminster — is left exactly as it was, because the test is
-   * whether the mask is mostly under water already.
-   */
-  _cutChannel() {
+  /** Separable box blur over the DEM grid, by prefix sums. */
+  _blur(src, r) {
     const n = this.size;
-    let full = 0, under = 0;
-    const bank = [];
-    for (let i = 0; i < n * n; i++) {
-      const w = this.mask[i * 3];
-      if (w > 0.9) { full++; if (this.heights[i] < this.waterLevel) under++; }
-      else if (w > 0.05 && w < 0.5) bank.push(this.heights[i]);
+    const tmp = new Float32Array(n * n);
+    const pre = new Float64Array(n + 1);
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) pre[x + 1] = pre[x] + src[y * n + x];
+      for (let x = 0; x < n; x++) {
+        const lo = Math.max(0, x - r), hi = Math.min(n, x + r + 1);
+        tmp[y * n + x] = (pre[hi] - pre[lo]) / (hi - lo);
+      }
     }
-    if (!full || !bank.length) return;
-    if (under / full > 0.6) return;              // the bake already cut it
+    const out = new Float32Array(n * n);
+    for (let x = 0; x < n; x++) {
+      for (let y = 0; y < n; y++) pre[y + 1] = pre[y] + tmp[y * n + x];
+      for (let y = 0; y < n; y++) {
+        const lo = Math.max(0, y - r), hi = Math.min(n, y + r + 1);
+        out[y * n + x] = (pre[hi] - pre[lo]) / (hi - lo);
+      }
+    }
+    return out;
+  }
 
-    // The surface sits a few metres below the banks, the way a river in a city
-    // sits below its quais, and the bed a few metres below that.
-    bank.sort((a, b) => a - b);
-    const shore = bank[Math.floor(bank.length * 0.5)];
-    const level = shore - 4.2;
-    const smooth = (t) => {
-      const u = Math.max(0, Math.min(1, (t - 0.05) / 0.85));
-      return u * u * (3 - 2 * u);
-    };
-    for (let i = 0; i < n * n; i++) {
-      const w = this.mask[i * 3];
-      if (w <= 0.05) continue;
-      const k = smooth(w);
+  /**
+   * Put the river where the ground says it is, and cut it in.
+   *
+   * Two separate things were wrong, and they had the same symptom. The river's
+   * course is hand-drawn in `tools/bake_terrain.py` as a polyline, and the one
+   * for Paris runs across the Trocadéro — sixty metres up a hillside, while
+   * the actual Seine valley sits plainly visible in the same DEM a quarter of
+   * the map away. And the carve is a flat seven metres off the centreline,
+   * which is plenty for the Thames (Tilezen fills it to a shoreline barely
+   * above sea level) and nothing at all for a river at forty metres or a
+   * hundred and fifty. Between them, eighty-nine per cent of the Paris "river"
+   * was dry ground: the Seine drew as a strip of park with a puddle in the
+   * corner of the map, which is what the player saw and reported. Agra had it
+   * too, less obviously.
+   *
+   * The DEM knows better than the polyline does. Tilezen fills water bodies
+   * flat at their shoreline, so a river is a broad plateau at the bottom of
+   * the map's elevation range — here, anything within a metre and a half of
+   * the fifth percentile. Closing that selection (dilate, then erode) bridges
+   * the gaps a levelled building pad punches through it, and the baked mask is
+   * kept only where it happens to agree, which is what carries the Yamuna out
+   * to the eastern edge after it has bent away from the real channel.
+   *
+   * A map whose DEM already carries its channel is left exactly alone — the
+   * test is whether the baked mask is mostly under water already, and
+   * Westminster's is.
+   */
+  _repairRiver() {
+    const n = this.size, N = n * n;
+    const h = this.heights, mask = this.mask;
+
+    let full = 0, under = 0;
+    for (let i = 0; i < N; i++) {
+      if (mask[i * 3] > 0.9) { full++; if (h[i] < this.waterLevel) under++; }
+    }
+    if (!full || under / full > 0.6) return;
+
+    const sorted = Float32Array.from(h).sort();
+    const low = sorted[Math.floor(N * 0.05)];
+
+    const wet = new Float32Array(N);
+    for (let i = 0; i < N; i++) wet[i] = h[i] <= low + 1.5 ? 1 : 0;
+    // Close: 34 cells is about 120 m, which bridges a levelled pad without
+    // swallowing the banks.
+    let b = this._blur(wet, 34);
+    for (let i = 0; i < N; i++) wet[i] = b[i] > 0.08 ? 1 : 0;
+    b = this._blur(wet, 34);
+    for (let i = 0; i < N; i++) wet[i] = b[i] > 0.86 ? 1 : 0;
+    // Keep the baked course where it runs over low ground too.
+    for (let i = 0; i < N; i++) {
+      if (wet[i] < 0.5 && mask[i * 3] > 0.5 && h[i] <= low + 8.0) wet[i] = 1;
+    }
+
+    const soft = this._blur(wet, 4);        // a shoreline, not a cliff edge
+    const level = low + 1.0;
+    for (let i = 0; i < N; i++) {
+      const u = Math.max(0, Math.min(1, (soft[i] - 0.05) / 0.85));
+      const k = u * u * (3 - 2 * u);
+      mask[i * 3] = soft[i];
+      mask[i * 3 + 2] *= 1 - soft[i];       // no parkland in the river
+      if (k <= 0.001) continue;
       const bed = level - 0.9 - 4.6 * k;
-      if (this.heights[i] > bed) this.heights[i] += (bed - this.heights[i]) * k;
+      if (h[i] > bed) h[i] += (bed - h[i]) * k;
     }
     this.waterLevel = level;
   }
