@@ -139,14 +139,14 @@ export function buildStreetNetwork(terrain, rng, opts) {
   }
 
   /** Walk a straight line and report whether a road could be built along it. */
-  const lineClear = (a, b, margin, ignoreReserved = false) => {
+  const lineClear = (a, b, margin, ignoreReserved = false, ignoreExclusion = false) => {
     const d = Math.hypot(b.x - a.x, b.z - a.z);
     const steps = Math.max(2, Math.ceil(d / 7));
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
       if (!onLand(x, z, margin, ignoreReserved)) return false;
-      if (Math.hypot(x, z) < exclude) return false;
+      if (!ignoreExclusion && Math.hypot(x, z) < exclude) return false;
     }
     return true;
   };
@@ -158,9 +158,9 @@ export function buildStreetNetwork(terrain, rng, opts) {
    * point lies exactly on the line between the two junctions, so the street is
    * straight in plan and stepped in section.
    */
-  const addEdge = (na, nb, cls, margin, minLen, ignoreReserved) => {
+  const addEdge = (na, nb, cls, margin, minLen, ignoreReserved, ignoreExclusion) => {
     const a = nodes[na], b = nodes[nb];
-    if (!lineClear(a, b, margin ?? halfWidth(cls) + 1.5, ignoreReserved)) return null;
+    if (!lineClear(a, b, margin ?? halfWidth(cls) + 1.5, ignoreReserved, ignoreExclusion)) return null;
     const dx = b.x - a.x, dz = b.z - a.z;
     const len = Math.hypot(dx, dz);
     if (len < (minLen ?? pitch * 0.35)) return null;
@@ -384,7 +384,12 @@ export function buildStreetNetwork(terrain, rng, opts) {
         (m, mi) => !tried.has(mi) && mi !== n && m.links.length > 0);
       if (near < 0) break;
       tried.add(near);
-      const join = addEdge(n, near, 'avenue', 4, 8, true);
+      // The exclusion is a circle round the monument and the crossing sits
+      // just outside it, so every straight road from the abutment into town
+      // clips the circle and was refused. The circle is the coarse guard; the
+      // precinct rectangle is the precise one, and the approach still honours
+      // that — it may skirt the monument, it may not cross its garden.
+      const join = addEdge(n, near, 'avenue', 4, 8, false, true);
       if (!join) continue;
       join.approach = true;
       // This runs after the tidy-up, so nothing downstream will notice if the

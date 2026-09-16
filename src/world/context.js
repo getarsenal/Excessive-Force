@@ -346,7 +346,15 @@ export function buildContext(terrain, quality, opts = {}) {
   // keep the ordinary streets off them, but the bridge approach outranks them,
   // and a government office standing in the carriageway is still a government
   // office standing in the carriageway.
+  // These are Westminster's own civic buildings at Westminster's own
+  // coordinates — the Abbey at (-128, 118), Portcullis House at (-14, -104)
+  // — and on every other map they land wherever those numbers happen to fall.
+  // On Agra two of them stood inside the Taj's precinct wall. Anything within
+  // the exclusion or inside a precinct is not built; on Westminster, where the
+  // exclusion is 66 m and all of these sit further out, nothing changes.
   for (const c of CIVIC) {
+    if (Math.hypot(c.x, c.z) < EXCLUDE + Math.max(c.w, c.d) / 2) continue;
+    if (inPrecinct(c.x, c.z)) continue;
     block(c.x, c.z, c.w, c.d, c.h, GRID_YAW, { pitchChance: 0.1 });
   }
 
@@ -540,7 +548,14 @@ export function buildContext(terrain, quality, opts = {}) {
   if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
 
   group.add(buildBlockGround(terrain, net, quality, inPrecinct));
-  group.add(buildForecourt(terrain, EXCLUDE, quality));
+  // The paved forecourt is a Westminster thing — a stone apron in front of
+  // the Palace. Laid at the exclusion radius on every map it put three
+  // hundred metres of paving under the Taj's garden and a disc of it on the
+  // Giza plateau, and the levelled ground the monument stands on read as a
+  // bald plate. Where the precinct says its ground is lawn, garden or sand,
+  // the ground is the ground.
+  const paved = !['lawn', 'charbagh', 'sand'].includes(opts.precinct?.ground);
+  if (paved) group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
   group.add(buildEmbankment(terrain));
@@ -792,47 +807,64 @@ function bridgeLine(terrain, exclude = 66) {
   // an aqueduct abandoned in a field: no road came near it and nothing
   // explained why it was there.
   const span = terrain.span;
-  let near = null, nearD = Infinity;
+  // Candidates: wet cells, nearest to the monument first. Each is tried as a
+  // crossing and kept only if *both landings* clear the exclusion — which is
+  // the test that matters, and not the one this used to make. Measuring the
+  // water's distance from the monument let the Yamuna, whose bank is fifty
+  // metres from the Taj's terrace, put the south abutment inside the garden:
+  // the crossing itself was four hundred metres out, and the bridge simply
+  // reached back across the river to land in the precinct.
+  const cands = [];
   for (let z = -span * 0.75; z <= span * 0.75; z += 10) {
     for (let x = -span * 0.75; x <= span * 0.75; x += 10) {
       if (!terrain.isWater(x, z)) continue;
-      // The closest crossing to the monument that is clear of its precinct.
-      // Closest, because that is where the city is and a bridge wants streets
-      // at both ends; clear of the precinct, because inside it there are no
-      // streets at all — the Champ de Mars is kept empty for the tower — and
-      // an abutment there is a junction with nothing else joining it.
       const d = Math.hypot(x, z);
-      if (d < exclude + 70 || d >= nearD) continue;
-      nearD = d; near = { x, z };
+      if (d < exclude) continue;
+      cands.push({ x, z, d });
     }
   }
-  if (!near) return null;
+  if (!cands.length) return null;
+  cands.sort((a, b) => a.d - b.d);
 
-  // Which way the channel runs here: the heading along which the water goes
-  // furthest. Crossing square to that is what a bridge does.
-  let dir = { x: 1, z: 0 }, longest = -1;
-  for (let a = 0; a < Math.PI - 1e-6; a += Math.PI / 24) {
-    const dx = Math.sin(a), dz = Math.cos(a);
-    let run = 0;
-    for (let t = -420; t <= 420; t += 7) {
-      if (terrain.isWater(near.x + dx * t, near.z + dz * t)) run++;
+  const crossingAt = (near) => {
+    // Which way the channel runs here: the heading along which the water goes
+    // furthest. Crossing square to that is what a bridge does.
+    let dir = { x: 1, z: 0 }, longest = -1;
+    for (let a = 0; a < Math.PI - 1e-6; a += Math.PI / 24) {
+      const dx = Math.sin(a), dz = Math.cos(a);
+      let run = 0;
+      for (let t = -420; t <= 420; t += 7) {
+        if (terrain.isWater(near.x + dx * t, near.z + dz * t)) run++;
+      }
+      if (run > longest) { longest = run; dir = { x: dx, z: dz }; }
     }
-    if (run > longest) { longest = run; dir = { x: dx, z: dz }; }
-  }
-  const nx = -dir.z, nz = dir.x;
-
-  // Out to dry land on both sides, and a little beyond.
-  const bank = (sign) => {
-    let last = 0;
-    for (let t = 0; t < 900; t += 4) {
-      if (terrain.isWater(near.x + nx * sign * t, near.z + nz * sign * t)) last = t;
-      else if (t > last + 26) break;
-    }
-    const d = last + 16;
-    return new THREE.Vector3(near.x + nx * sign * d, 0, near.z + nz * sign * d);
+    const nx = -dir.z, nz = dir.x;
+    // Out to dry land on both sides, and a little beyond.
+    const bank = (sign) => {
+      let last = 0;
+      for (let t = 0; t < 900; t += 4) {
+        if (terrain.isWater(near.x + nx * sign * t, near.z + nz * sign * t)) last = t;
+        else if (t > last + 26) break;
+      }
+      const d = last + 16;
+      return new THREE.Vector3(near.x + nx * sign * d, 0, near.z + nz * sign * d);
+    };
+    return { from: bank(-1), to: bank(1) };
   };
-  const from = bank(-1);
-  const to = bank(1);
+
+  // The approach roads run about eighty metres past each landing before they
+  // meet the grid, so the landings themselves need that much clearance too.
+  let pick = null;
+  for (let i = 0; i < Math.min(cands.length, 80) && !pick; i += 2) {
+    const c = crossingAt(cands[i]);
+    const lo = Math.min(Math.hypot(c.from.x, c.from.z), Math.hypot(c.to.x, c.to.z));
+    if (lo < exclude + 80) continue;
+    const L = c.from.distanceTo(c.to);
+    if (L < 40 || L > span * 1.6) continue;
+    pick = c;
+  }
+  if (!pick) return null;
+  const { from, to } = pick;
   const len = from.distanceTo(to);
   if (len < 40 || len > span * 1.6) return null;
   const yaw = Math.atan2(to.x - from.x, to.z - from.z);
