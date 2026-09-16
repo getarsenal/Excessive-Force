@@ -222,7 +222,10 @@ export function buildEiffelTower(quality) {
       const h = Math.min(courseH, y1 - y);
       const yc = y + h / 2;
       const g = at(yc);
-      const bar = barAt(yc);
+      // Never wider than the gap between members, or a stout course becomes a
+      // row of boxes sharing each other's volume — which the physics answers
+      // by throwing one of them off the building.
+      const bar = Math.min(barAt(yc), (2 * g.h / (n - 1)) * 0.46);
       const hy = h / 2 - 0.02;
       // The four corner posts, square in plan.
       for (const ex of [-1, 1]) {
@@ -276,11 +279,17 @@ export function buildEiffelTower(quality) {
       // were the thinnest part of the leg at exactly the point carrying the
       // most, and they crushed. The real tower's leg heads are its heaviest
       // castings for the same reason.
-      const head = EIFFEL.secondFloor - 26;
-      cage(at, 0, EIFFEL.secondFloor, LEG_N, (y) => Math.max(
-        BAR * (1.5 - 0.55 * Math.min(1, y / EIFFEL.secondFloor)),
-        BAR * (0.95 + 1.35 * Math.max(0, Math.min(1, (y - head) / 26))),
-      ), COURSE);
+      // One curve rather than two crossing ones. Thickest at the ground and
+      // thickest again at the head, and — the part I got wrong twice — never
+      // thin in between: the first version tapered only downward and crushed
+      // the heads, the second crossed two tapers and left a waist at ninety
+      // metres that crushed instead. A leg carries the most at its foot and at
+      // its head and a good deal everywhere, so the floor matters as much as
+      // the ends.
+      cage(at, 0, EIFFEL.secondFloor, LEG_N, (y) => {
+        const t = Math.max(0, Math.min(1, y / EIFFEL.secondFloor));
+        return BAR * (1.05 + 0.55 * Math.pow(1 - t, 1.5) + 1.25 * Math.pow(t, 2.2));
+      }, COURSE);
       // A belt every fourth course, which is what gives the leg its horizontal
       // banding at a distance.
       for (let y = COURSE * 4; y < EIFFEL.secondFloor - COURSE; y += COURSE * 4) {
