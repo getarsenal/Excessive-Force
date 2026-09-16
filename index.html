@@ -41,7 +41,7 @@
       <div class="tb-center">
         <div class="tb-target-name" id="hud-target">ELIZABETH TOWER</div>
         <div class="integrity-wrap">
-          <div class="integrity-bar"><div class="integrity-fill" id="hud-integrity"></div></div>
+          <div class="integrity-bar"><div class="integrity-fill" id="hud-integrity"></div><div class="integrity-ticks" id="hud-ticks"></div></div>
           <div class="integrity-pct" id="hud-integrity-pct">100%</div>
         </div>
         <div class="tb-meta">
@@ -71,7 +71,39 @@
       <div class="tc-row"><span>Section</span><b id="tc-section">—</b></div>
       <div class="tc-row"><span>Height</span><b id="tc-height">—</b></div>
       <div class="tc-row"><span>Guns on target</span><b id="tc-guns">0</b></div>
+      <div class="tc-modes" id="tc-modes">
+        <button data-mode="point" title="Every gun converges on the point">POINT</button>
+        <button data-mode="area" title="The sheaf is walked over the area around it">AREA</button>
+        <button data-mode="delay" title="Shells burst inside the stone, not on it">DELAY</button>
+      </div>
       <button id="tc-clear">CLEAR</button>
+    </div>
+
+    <button id="smoke-btn" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
+
+    <button id="menu-btn">MENU</button>
+    <div id="menu" hidden>
+      <div class="menu-inner">
+        <div class="menu-title">PAUSED</div>
+        <div class="menu-grid">
+          <button id="menu-resume">RESUME</button>
+          <button id="menu-sound">SOUND: ON</button>
+          <button id="menu-restart">RESTART</button>
+          <button id="menu-targets">ALL TARGETS</button>
+        </div>
+        <div class="menu-label">QUALITY · reloads the level</div>
+        <div class="menu-grid quality">
+          <button data-quality="low">LOW</button>
+          <button data-quality="medium">MEDIUM</button>
+          <button data-quality="high">HIGH</button>
+          <button data-quality="ultra">ULTRA</button>
+        </div>
+        <div class="menu-label">KEYS</div>
+        <div class="menu-keys">
+          <span><b>1–9</b> pick a unit</span><span><b>Esc</b> cancel</span>
+          <span><b>P</b> pause</span><span><b>drag</b> orbit · <b>wheel</b> zoom</span>
+        </div>
+      </div>
     </div>
 
     <!-- Perf / debug readout -->

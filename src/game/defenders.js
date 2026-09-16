@@ -371,9 +371,34 @@ export class Garrison {
     if (!anchor) return false;
     const bestStruct = anchor.structure, bestChunk = anchor.chunk;
 
+    // Stand on the floor, whatever height the course grid put it at.
+    //
+    // Positions are written as a height above a roof or a sill, and the
+    // roof's actual top moves with the quality tier: two courses of marble
+    // are a metre and a half on one device and two and a half on another. A
+    // man posted a fixed two metres up was standing inside the roof slab on a
+    // phone, with his eyes below the parapet, and floating on a desktop. If
+    // the stone he is anchored to is under him, he stands on it.
+    const snapped = pos.clone();
+    {
+      const s = bestStruct, i = bestChunk;
+      const top = s.py[i] + s.hy[i];
+      // Inside the stone counts too: a roof slab two courses thick swallows
+      // a man posted a fixed height above where its underside used to be.
+      // Only onto something floor-sized, and never far upward: a mullion is
+      // a stone whose footprint contains the man in the window beside it,
+      // and snapping him onto its top put six of them inside the lintel.
+      // Upward only: a man already standing clear of his floor is where he
+      // was put, and pulling him down onto it stood the Eiffel's gunners
+      // behind their own balustrade.
+      const floorish = Math.min(s.hx[i], s.hz[i]) * 2 >= 1.6;
+      if (floorish && Math.abs(s.px[i] - pos.x) <= s.hx[i] + 0.35 && Math.abs(s.pz[i] - pos.z) <= s.hz[i] + 0.35
+        && pos.y > s.py[i] - s.hy[i] - 0.3 && pos.y < top) snapped.y = top;
+    }
+
     const d = {
       type, def,
-      pos: pos.clone(),
+      pos: snapped,
       facing,
       cover: opts.cover || null,     // 'window' | 'roof' | 'ground' | 'arcade'
       sandbags: !!opts.sandbags,
@@ -385,7 +410,8 @@ export class Garrison {
       burstLeft: 0,
       target: null,
       blocked: false,
-      muzzle: pos.clone().add(new THREE.Vector3(0, def.eye ?? 1.25, 0)),
+      muzzle: snapped.clone().add(new THREE.Vector3(0, def.eye ?? 1.25, 0)),
+      suppressed: 0,
     };
 
     this._settleIntoPosition(d);
@@ -831,22 +857,20 @@ export class Garrison {
     const HALF = TAJ.half;
     const ROOF = TAJ.roof;
 
-    // Sandbagged positions along the plinth parapet.
-    const perimeter = counts.plinth ?? 16;
-    for (let i = 0; i < perimeter; i++) {
-      const a = (i / perimeter) * Math.PI * 2;
-      // On the paved top, which is eight metres narrower than the terrace.
-      // Posted at the parapet they stood over the hollow of the shell, and
-      // the floor check under their feet found nothing: twelve of sixteen
-      // died on the first frame at 2.2x, where the gap is six metres wide.
-      const half = PLINTH / 2 - 5.0 * K;
-      const c = Math.cos(a), sn = Math.sin(a);
-      const m = Math.max(Math.abs(c), Math.abs(sn));
-      const p = new THREE.Vector3(
-        origin.x + (c / m) * half, groundY + PLINTH_H + 1.0, origin.z + (sn / m) * half,
-      );
-      this.place(i % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(c, sn), 7 * K,
-        { cover: 'ground', sandbags: true });
+    // Sandbagged positions along the plinth parapet: four to a side, clear of
+    // the corners, because the corners are where the minarets stand and a man
+    // posted on the diagonal was inside one, looking at its wall.
+    const half = PLINTH / 2 - 5.0 * K;
+    let n = 0;
+    for (const [nx, nz] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      for (const t of [-0.62, -0.21, 0.21, 0.62]) {
+        const p = new THREE.Vector3(
+          origin.x + nx * half + nz * t * half, groundY + PLINTH_H + 1.0,
+          origin.z + nz * half + nx * t * half,
+        );
+        this.place(n++ % 3 === 0 ? 'mg' : 'rifleman', p, Math.atan2(nx, nz), 7 * K,
+          { cover: 'ground', sandbags: true });
+      }
     }
 
     // The four great iwans — deep covered recesses looking straight down each
@@ -934,18 +958,34 @@ export class Garrison {
     return out;
   }
 
-  /** Kill anything caught in a blast. */
+  /** Kill anything caught in a blast, and put the heads down around it. */
   splash(center, radius, power) {
     let killed = 0;
+    // A shell landing near a position stops it firing for a few seconds
+    // whether or not it hurts anyone: the men are on the floor. This is the
+    // whole point of suppressive fire, and it is what makes shelling a
+    // window worth doing even when the shell misses.
+    const supR = radius * 2.6;
     for (const d of this.defenders) {
       if (!d.alive) continue;
       const dist = d.pos.distanceTo(center);
+      if (dist < supR) {
+        const t = 1.2 + 3.4 * (1 - dist / supR) * Math.min(1.5, power / 6000);
+        d.suppressed = Math.max(d.suppressed || 0, this.time + t);
+      }
       if (dist > radius) continue;
       const falloff = 1 - dist / radius;
       d.health -= power * falloff * 0.055;
       if (d.health <= 0) { d.alive = false; killed++; }
     }
     return killed;
+  }
+
+  /** How many live defenders are keeping their heads down right now. */
+  get suppressedCount() {
+    let n = 0;
+    for (const d of this.defenders) if (d.alive && d.suppressed > this.time) n++;
+    return n;
   }
 
   /**
@@ -999,6 +1039,11 @@ export class Garrison {
     this.losChecks++;
     this._from.copy(d.muzzle);
     this._to.copy(unit.pos).setY(unit.pos.y + 1.1);
+    // A smoke screen between the two is a wall for as long as it lasts.
+    if (this.smokes && this.smokes.active && this.smokes.blocks(this._from, this._to)) {
+      this.losBlocked++;
+      return false;
+    }
     const clear = lineOfSight(
       structures || this.structures, this._from, this._to, skipFor(d), 0.5,
     );
@@ -1070,6 +1115,8 @@ export class Garrison {
       if (!d.alive || d.def.indirect) continue;
       d.cooldown -= dt;
       if (d.cooldown > 0) continue;
+      // Head down: nothing until the shelling stops.
+      if (d.suppressed > this.time) { d.cooldown = 0.3; continue; }
 
       const best = this._acquire(d, playerUnits, structures);
       if (!best) { d.cooldown = 0.4; continue; }
@@ -1079,7 +1126,8 @@ export class Garrison {
       const hitChance = d.def.accuracy * (1 - 0.55 * (dist / d.def.range));
       const hit = Math.random() < hitChance;
 
-      const damage = d.def.damage * this.damageScale;
+      // A crew that has dug in takes a third less: the sandbags are real.
+      const damage = d.def.damage * this.damageScale * (best.dugIn ? 0.65 : 1);
       shots.push({ from: d.muzzle, to: best.pos, hit, damage, unit: best, defender: d });
       if (hit) best.health -= damage;
 
@@ -1137,6 +1185,7 @@ export class Garrison {
       if (!d.alive || !d.def.indirect) continue;
       d.cooldown -= dt;
       if (d.cooldown > 0) continue;
+      if (d.suppressed > this.time) { d.cooldown = 0.5; continue; }
       let best = null, bestD = d.def.range * d.def.range;
       for (const u of units) {
         if (!u.alive) continue;
@@ -1205,7 +1254,10 @@ export class Garrison {
         bw++;
       }
 
-      this._m4.compose(this._v, this._q, this._s);
+      // A suppressed man is drawn crouched: the squat is the tell.
+      const ducking = d.suppressed > this.time;
+      if (ducking && !this._sDuck) this._sDuck = new THREE.Vector3(1, 0.55, 1);
+      this._m4.compose(this._v, this._q, ducking ? this._sDuck : this._s);
       this.mesh.setMatrixAt(w, this._m4);
       this._col.setHex(d.def.colour);
       this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);

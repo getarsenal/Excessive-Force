@@ -19,6 +19,12 @@ export class HUD {
     this.onNextTarget = opts.onNextTarget || (() => {});
     this.onKeepGoing = opts.onKeepGoing || (() => {});
     this.onPickTarget = opts.onPickTarget || (() => {});
+    this.onFireMode = opts.onFireMode || (() => {});
+    this.onSmoke = opts.onSmoke || (() => {});
+    this.onPause = opts.onPause || (() => {});
+    this.onQuality = opts.onQuality || (() => {});
+    this.picker = opts.picker || null;
+    this.qualityId = opts.qualityId || null;
     this.nextTargetLabel = null;
 
     this.el = {
@@ -48,6 +54,11 @@ export class HUD {
       ecKeep: document.getElementById('ec-keep'),
       ecTargets: document.getElementById('ec-targets'),
       targetsBtn: document.getElementById('targets-btn'),
+      ticks: document.getElementById('hud-ticks'),
+      tcModes: document.getElementById('tc-modes'),
+      smokeBtn: document.getElementById('smoke-btn'),
+      menuBtn: document.getElementById('menu-btn'),
+      menu: document.getElementById('menu'),
     };
 
     if (this.el.target && battle.level) this.el.target.textContent = battle.level.target;
@@ -82,6 +93,135 @@ export class HUD {
     this._promptTimer = 0;
     this._lastUnlocked = new Set();
     this._setupRipples();
+    this._setupTicks();
+    this._setupModes();
+    this._setupMenu();
+    this._setupPopups();
+  }
+
+  /**
+   * Marks on the progress bar where each weapon unlocks, and where the level
+   * is won. The bar used to be a plain fill: how far the next gun was, and
+   * how far the win, were numbers you had to remember from the cards.
+   */
+  _setupTicks() {
+    const el = this.el.ticks;
+    if (!el) return;
+    const b = this.battle;
+    const scale = b.level?.unlockScale ?? 1;
+    const seen = new Set();
+    for (const u of UNITS) {
+      const frac = Math.min(1, (u.unlockFrac ?? 0) / scale);
+      if (frac <= 0.001 || frac >= 0.999) continue;
+      const key = frac.toFixed(3);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const t = document.createElement('i');
+      t.className = 'tick unlock';
+      t.style.left = `${(frac * 100).toFixed(2)}%`;
+      t.title = `${u.name} unlocks`;
+      el.appendChild(t);
+    }
+    // Where it is won: the bar reads "done" from the left, so the win is the
+    // integrity threshold measured from the right.
+    const win = document.createElement('i');
+    win.className = 'tick win';
+    const integ = b.level?.win?.integrity ?? 0.10;
+    win.style.left = `${((1 - integ) * 100).toFixed(1)}%`;
+    win.title = 'target down';
+    el.appendChild(win);
+  }
+
+  _setupModes() {
+    const el = this.el.tcModes;
+    if (!el) return;
+    el.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => this.onFireMode(btn.dataset.mode));
+    });
+    if (this.el.smokeBtn) this.el.smokeBtn.addEventListener('click', () => this.onSmoke());
+  }
+
+  _setupMenu() {
+    const btn = this.el.menuBtn, menu = this.el.menu;
+    if (!btn || !menu) return;
+    const open = (on) => {
+      menu.hidden = !on;
+      this.onPause(on);
+    };
+    btn.addEventListener('click', () => open(menu.hidden));
+    menu.querySelector('#menu-resume').addEventListener('click', () => open(false));
+    menu.querySelector('#menu-restart').addEventListener('click', () => this.onRestart());
+    menu.querySelector('#menu-targets').addEventListener('click', () => { open(false); this.onPickTarget(); });
+    const snd = menu.querySelector('#menu-sound');
+    snd.addEventListener('click', () => {
+      if (this.el.sound) this.el.sound.click();
+      snd.textContent = this.soundOn ? 'SOUND: ON' : 'SOUND: OFF';
+    });
+    menu.querySelectorAll('[data-quality]').forEach((q) => {
+      q.classList.toggle('on', q.dataset.quality === this.qualityId);
+      q.addEventListener('click', () => this.onQuality(q.dataset.quality));
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyP' || (e.code === 'Escape' && !menu.hidden)) open(menu.hidden && e.code === 'KeyP');
+    });
+  }
+
+  /**
+   * Money floating up off the map where it was earned, and chevrons over the
+   * crews that have earned theirs. Pooled DOM, projected through the picker.
+   */
+  _setupPopups() {
+    const layer = document.createElement('div');
+    layer.id = 'popups';
+    this._popups = [];
+    for (let i = 0; i < 14; i++) {
+      const s = document.createElement('span');
+      s.className = 'popup';
+      layer.appendChild(s);
+      this._popups.push({ el: s, age: 99 });
+    }
+    this._badges = [];
+    for (let i = 0; i < 16; i++) {
+      const s = document.createElement('span');
+      s.className = 'badge';
+      s.hidden = true;
+      layer.appendChild(s);
+      this._badges.push(s);
+    }
+    document.body.appendChild(layer);
+  }
+
+  /** "+$120" rising from a world point. */
+  popup(text, worldPoint, kind = '') {
+    if (!this.picker || !worldPoint) return;
+    const sc = this.picker.toScreen(worldPoint);
+    if (sc.behind) return;
+    let slot = this._popups[0];
+    for (const p of this._popups) if (p.age > slot.age) slot = p;
+    slot.age = 0;
+    const el = slot.el;
+    el.className = 'popup';
+    void el.offsetWidth;
+    el.textContent = text;
+    el.style.left = `${sc.x}px`;
+    el.style.top = `${sc.y}px`;
+    el.className = `popup go ${kind}`;
+  }
+
+  _updateBadges() {
+    if (!this.picker) return;
+    let w = 0;
+    for (const u of this.battle.units) {
+      if (!u.alive || !(u.rank > 0) || w >= this._badges.length) continue;
+      const sc = this.picker.toScreen(u.pos.clone().setY(u.pos.y + (u.def.model === 'infantry' ? 3.6 : 5.0)));
+      const el = this._badges[w++];
+      if (sc.behind) { el.hidden = true; continue; }
+      el.hidden = false;
+      el.textContent = '★'.repeat(u.rank);
+      el.style.left = `${sc.x}px`;
+      el.style.top = `${sc.y}px`;
+    }
+    for (let i = w; i < this._badges.length; i++) this._badges[i].hidden = true;
   }
 
   /**
@@ -131,6 +271,7 @@ export class HUD {
 
       card.innerHTML = `
         <div class="uc-tier">${u.tier}</div>
+        <div class="uc-key">${this.cards.size + 1}</div>
         <div class="uc-icon">${unitIcon(u.id) || ''}</div>
         <div class="uc-name">${u.name}</div>
         <div class="uc-cost">$${u.cost.toLocaleString()}</div>
@@ -177,6 +318,22 @@ export class HUD {
     if (this._promptTimer > 0) {
       this._promptTimer -= dt;
       if (this._promptTimer <= 0) this.hidePrompt();
+    }
+    for (const p of this._popups) p.age += dt;
+    this._updateBadges();
+
+    if (this.el.tcModes) {
+      this.el.tcModes.querySelectorAll('button').forEach((btn) => {
+        btn.classList.toggle('on', btn.dataset.mode === b.fireMode);
+      });
+    }
+    if (this.el.smokeBtn) {
+      const cd = b.smokeCooldown;
+      const canPay = b.freeBuild || b.money >= 120;
+      this.el.smokeBtn.textContent = cd > 0 ? `SMOKE ${Math.ceil(cd)}s` : 'SMOKE $120';
+      this.el.smokeBtn.classList.toggle('wait', cd > 0);
+      this.el.smokeBtn.classList.toggle('unaffordable', cd <= 0 && !canPay);
+      this.el.smokeBtn.hidden = !b.smokes;
     }
 
     this.el.money.textContent = `$${Math.floor(b.money).toLocaleString()}`;

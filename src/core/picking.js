@@ -100,8 +100,17 @@ export class Picker {
    * @returns {{kind:'structure'|'ground', point:THREE.Vector3, label:?string,
    *            structure:?object, chunk:number}|null}
    */
-  pick(clientX, clientY, structures, city, garrison) {
+  pick(clientX, clientY, structures, city, garrison, units = null) {
     const ray = this.ray(clientX, clientY);
+
+    // One of the player's own guns, if the tap is on or beside it. Checked
+    // before anything else because a gun is small, stands on the ground the
+    // tap would otherwise land on, and is the one thing a tap near it can
+    // only mean.
+    if (units && units.length) {
+      const u = this._unitNearTap(clientX, clientY, units);
+      if (u) return { kind: 'unit', point: u.pos.clone(), label: u.def.name, structure: null, chunk: -1, unit: u };
+    }
 
     // Defenders first, and ahead of everything.
     //
@@ -229,6 +238,28 @@ export class Picker {
       bestPx = off;
       best = { kind: 'defender', point: new THREE.Vector3(d.pos.x, d.pos.y + 0.9, d.pos.z),
         label: d.def.name, structure: null, chunk: -1, defender: d, distance: dist };
+    }
+    return best;
+  }
+
+  /** The live unit whose position is nearest the tap on screen, in pixels. */
+  _unitNearTap(clientX, clientY, units) {
+    const r = this.canvas.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const tol = Math.max(18, Math.min(r.width, r.height) * 0.04);
+    let best = null, bestPx = tol;
+    const v = this._v;
+    for (const u of units) {
+      if (!u.alive) continue;
+      v.set(u.pos.x, u.pos.y + 1.4, u.pos.z);
+      v.project(this.camera);
+      if (v.z < -1 || v.z > 1) continue;
+      const px = r.left + (v.x * 0.5 + 0.5) * r.width;
+      const py = r.top + (-v.y * 0.5 + 0.5) * r.height;
+      const off = Math.hypot(px - clientX, py - clientY);
+      if (off >= bestPx) continue;
+      bestPx = off;
+      best = u;
     }
     return best;
   }

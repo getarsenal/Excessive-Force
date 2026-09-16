@@ -1184,7 +1184,8 @@ export class Structure {
         colors[k * 3] = c.r; colors[k * 3 + 1] = c.g; colors[k * 3 + 2] = c.b;
       }
       mesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
-      mesh.instanceColor.setUsage(THREE.StaticDrawUsage);
+      // Rewritten when stone is scorched or falls, so not static.
+      mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
 
       this.meshes.push({ mesh, list, matId });
       this.group.add(mesh);
@@ -1436,6 +1437,11 @@ export class Structure {
 
     for (const i of destroyed) this.destroyChunk(i, center);
 
+    // Soot. The stone round a hit is blackened, and stays blackened: a wall
+    // that has been shelled should look shelled from across the map, not
+    // merely have fewer stones in it.
+    this.scorch(center, radius * 1.7, Math.min(1, power / 9000));
+
     // Shock damage to the mortar, out to well beyond the crater.
     //
     // A stone that survives a near miss looking untouched is not undamaged: the
@@ -1521,6 +1527,41 @@ export class Structure {
 
     this.stabilityDirty = true;
     return destroyed.length;
+  }
+
+  /**
+   * Darken the stones round a blast, permanently. Per-stone colour is an
+   * instance attribute, so this is a few multiplications and one upload for
+   * each material mesh touched. Capped so a stone shelled ten times is black
+   * rather than negative.
+   */
+  scorch(center, radius, amount) {
+    if (!this.meshes) return;
+    if (!this._soot) this._soot = new Float32Array(this.count);
+    const r2 = radius * radius;
+    const dirty = new Set();
+    for (let i = 0; i < this.count; i++) {
+      if (!(this.flags[i] & ALIVE)) continue;
+      const dx = this.px[i] - center.x, dy = this.py[i] - center.y, dz = this.pz[i] - center.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > r2) continue;
+      const f = Math.pow(1 - Math.sqrt(d2) / radius, 1.4) * amount * 0.55;
+      const room = 0.72 - this._soot[i];
+      if (room <= 0.01) continue;
+      const k = Math.min(f, room);
+      this._soot[i] += k;
+      this._tint(i, 1 - k, 0.94, 0.9, dirty);
+    }
+    for (const e of dirty) e.mesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Scale a stone's colour: uniform, and a little more on green and blue. */
+  _tint(i, k, kg, kb, dirty) {
+    const entry = this.meshes[this.meshIndexOf[i]];
+    const a = entry.mesh.instanceColor.array;
+    const o = this.instanceIndexOf[i] * 3;
+    a[o] *= k; a[o + 1] *= k * kg; a[o + 2] *= k * kb;
+    if (dirty) dirty.add(entry); else entry.mesh.instanceColor.needsUpdate = true;
   }
 
   /** Remove a stone from the world entirely. */
@@ -1620,6 +1661,20 @@ export class Structure {
 
     if (impulse) body.applyImpulse(impulse, true);
     this.fallenMass += this.mass[i];
+    // A stone that has come off the building is coated in the dust of its
+    // own fall: a shade paler and greyer, so a rubble pile reads as rubble
+    // rather than as tidy masonry lying on its side.
+    if (!this._dusted) this._dusted = new Uint8Array(this.count);
+    if (!this._dusted[i]) {
+      this._dusted[i] = 1;
+      const entry = this.meshes[this.meshIndexOf[i]];
+      const a = entry.mesh.instanceColor.array;
+      const o = this.instanceIndexOf[i] * 3;
+      a[o] = a[o] * 0.72 + 0.74 * 0.28;
+      a[o + 1] = a[o + 1] * 0.72 + 0.68 * 0.28;
+      a[o + 2] = a[o + 2] * 0.72 + 0.57 * 0.28;
+      entry.mesh.instanceColor.needsUpdate = true;
+    }
     return true;
   }
 

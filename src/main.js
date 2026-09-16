@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { detectQuality, AdaptiveGovernor } from './core/quality.js';
+import { detectQuality, setQuality, AdaptiveGovernor } from './core/quality.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
 import { Audio } from './core/audio.js';
@@ -21,6 +21,11 @@ import { Battle } from './game/battle.js';
 import { HUD } from './ui/hud.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
+import { Flags, FLAG_SITES } from './world/flags.js';
+import { cloudShadows, cloudUniforms } from './world/clouds.js';
+import { Fires } from './fx/fires.js';
+import { SmokeScreens } from './game/smoke.js';
+import { attachUnitTips, UnitCard } from './ui/inspector.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -247,6 +252,7 @@ async function boot() {
   await progress(88, 'ranging guns');
 
   let hud;
+  const picker = new Picker(canvas, engine.camera, terrain);
   const battle = new Battle({
     scene: engine.scene, camera: engine.camera, engine, physics, terrain,
     structures, primary, garrison, fx, quality, groundY, audio, level,
@@ -283,6 +289,25 @@ async function boot() {
   // Footprints, so a gun cannot be deployed inside a building.
   battle.cityPlots = (cityGroup || contextGroup)?.userData?.plots || null;
 
+  // Smoke the garrison cannot see through, and fires that burn on after a
+  // heavy hit.
+  battle.smokes = new SmokeScreens(fx);
+  garrison.smokes = battle.smokes;
+  battle.fires = new Fires(fx, quality);
+
+  // Flags on the landmarks, each standing on a stone and going with it.
+  const flags = new Flags(engine.scene, quality);
+  flags.raise(FLAG_SITES[level.id] || [], sites && Object.fromEntries(structures.map((st) => [st.key, st])));
+
+  // Cloud shadows drifting over the ground and the town.
+  cloudShadows(terrain.mesh.material, 0.30);
+  (cityGroup || contextGroup)?.traverse((o) => {
+    if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !o.material.userData.clouded) {
+      o.material.userData.clouded = true;
+      cloudShadows(o.material, 0.26);
+    }
+  });
+
   hud = new HUD(battle, {
     onSelect: (id) => {
       battle.selectUnit(id);
@@ -303,10 +328,44 @@ async function boot() {
       // Picking the level already in play, or backing out, just closes it.
     },
     onToggleSound: (on) => audio.setEnabled(on),
+    onFireMode: (m) => battle.setFireMode(m),
+    onSmoke: () => battle.placeSmoke(),
+    onPause: (p) => { testMenu.paused = p; },
+    onQuality: (id) => { if (setQuality(id)) window.location.reload(); },
+    picker,
+    qualityId: quality.id,
+  });
+  attachUnitTips(hud, battle);
+  const unitCard = new UnitCard(battle, {
+    onSell: (u) => battle.sellUnit(u),
+    onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
   });
 
   function handleEvent(kind, data) {
     switch (kind) {
+      case 'bounty':
+        hud.popup(`+$${data.amount.toLocaleString()}`, data.point, data.kind);
+        break;
+      case 'rank': {
+        const names = ['', 'SEASONED', 'VETERAN', 'ELITE'];
+        hud.feed(`${data.def.name} CREW ${names[data.rank]} ${'★'.repeat(data.rank)}`, 'good');
+        break;
+      }
+      case 'dugin':
+        hud.feed(`${data.def.name} DUG IN`, 'good');
+        break;
+      case 'smoke':
+        hud.feed('SMOKE LAID', 'good');
+        break;
+      case 'smokewait':
+        hud.showPrompt(`smoke ready in ${Math.ceil(data)} s`, 'warn');
+        break;
+      case 'firemode':
+        hud.feed(`FIRE MODE: ${data.toUpperCase()}`, '');
+        break;
+      case 'sold':
+        hud.feed(`${data.unit.def.name} SOLD  +$${data.refund}`, '');
+        break;
       case 'deployed':
         hud.feed(`${data.def.name} DEPLOYED`, 'good');
         battle.selectedUnitId = null;
@@ -409,10 +468,9 @@ async function boot() {
   });
 
   // ── Input: tap the structure to designate a target, tap the ground to
-  // deploy the selected unit.
-  const picker = new Picker(canvas, engine.camera, terrain);
-  const pick = (x, y) =>
-    picker.pick(x, y, structures, cityGroup || contextGroup, garrison);
+  // deploy the selected unit, tap one of your own guns to inspect it.
+  const pick = (x, y, own = false) =>
+    picker.pick(x, y, structures, cityGroup || contextGroup, garrison, own ? battle.units : null);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -424,8 +482,15 @@ async function boot() {
   canvas.addEventListener('pointerup', (e) => {
     if (rig.wasDrag) return;
     if (battle.state !== 'playing') return;
-    const hit = pick(e.clientX, e.clientY);
+    const hit = pick(e.clientX, e.clientY, !battle.selectedUnitId);
     if (!hit) return;
+
+    if (hit.kind === 'unit') {
+      unitCard.show(hit.unit);
+      battle.pulse(hit.point, 0x58a6ff, 10);
+      return;
+    }
+    unitCard.hide();
 
     if (battle.selectedUnitId) {
       if (hit.kind === 'ground' || hit.kind === 'roof') {
@@ -582,10 +647,13 @@ async function boot() {
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     hud.update(rawDt);
+    unitCard.update();
     testMenu.update(rawDt);
+    flags.update(rawDt);
 
     water.material.uniforms.uTime.value = now * 0.001;
     if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
+    cloudUniforms.uCloudTime.value = now * 0.001;
 
     const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
@@ -608,7 +676,7 @@ async function boot() {
 
   Object.assign(window, {
     engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level, life,
-    structures, tower: primary, primary, picker, hud, water, testMenu,
+    structures, tower: primary, primary, picker, hud, water, testMenu, flags, unitCard,
     cityGroup: cityGroup || contextGroup,
     // Exposed so a console session or the headless harness can build the same
     // vectors the game does rather than duck-typing them.

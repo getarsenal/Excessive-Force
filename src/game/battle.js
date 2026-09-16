@@ -53,6 +53,14 @@ export class Battle {
     this.selectedUnitId = null;
     this.target = null;
     this.state = 'playing';
+    // How the battery lays its fire. `point` converges on the aim point;
+    // `area` spreads the sheaf over a circle for a face or a pyramid step;
+    // `delay` fuzes the shell to burst a couple of metres inside the stone it
+    // hits, for depth rather than a crater on the surface.
+    this.fireMode = 'point';
+    this.smokeCooldown = 0;
+    this.smokes = null;        // a SmokeScreens, if the level has one
+    this.fires = null;         // Fires, likewise
 
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
@@ -86,6 +94,99 @@ export class Battle {
     this._setupTargetMarker();
     this._setupGhost();
     this._setupConfirmRing();
+    this._setupEmplacements();
+  }
+
+  /**
+   * Sandbag rings round the guns that have dug in.
+   *
+   * A crew that has been in one place for half a minute has filled sandbags,
+   * and from then on takes a third less from the garrison. The ring is what
+   * tells the player which guns are worth leaving where they are.
+   */
+  _setupEmplacements() {
+    const geo = new THREE.TorusGeometry(1, 0.16, 6, 28);
+    geo.rotateX(Math.PI / 2);
+    const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({
+      color: 0x8b8163, roughness: 0.96, metalness: 0,
+    }), 64);
+    m.count = 0;
+    m.frustumCulled = false;
+    m.castShadow = this.quality.shadowMapSize > 0;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.scene.add(m);
+    this.emplacements = m;
+    this._emQ = new THREE.Quaternion();
+    this._emS = new THREE.Vector3();
+    this._emV = new THREE.Vector3();
+  }
+
+  _updateEmplacements() {
+    let w = 0;
+    for (const u of this.units) {
+      if (!u.alive || !u.dugIn || w >= 64) continue;
+      const r = u.def.model === 'infantry' ? 2.6 : 4.4;
+      this._emV.set(u.pos.x, u.pos.y + 0.45, u.pos.z);
+      this._emS.set(r, 0.9, r);
+      this._hpM4.compose(this._emV, this._emQ, this._emS);
+      this.emplacements.setMatrixAt(w++, this._hpM4);
+    }
+    this.emplacements.count = w;
+    this.emplacements.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Cycle the battery's fire mode. */
+  setFireMode(mode) {
+    if (!['point', 'area', 'delay'].includes(mode)) return;
+    this.fireMode = mode;
+    this.onEvent('firemode', mode);
+  }
+
+  /**
+   * Lay smoke on the designated point, or on the middle of the garrison's
+   * fire if nothing is designated. Costs money and takes half a minute to
+   * come round again, because a screen that is always available is a wall
+   * the garrison can never see through.
+   */
+  static get SMOKE_COST() { return 120; }
+
+  placeSmoke() {
+    if (!this.smokes) return false;
+    if (this.smokeCooldown > 0) { this.onEvent('smokewait', this.smokeCooldown); return false; }
+    if (!this.freeBuild && this.money < Battle.SMOKE_COST) {
+      this.onEvent('poor', { cost: Battle.SMOKE_COST });
+      return false;
+    }
+    // Between the guns and the target, where a screen actually screens.
+    let at = this.target ? this.target.clone() : null;
+    if (!at) {
+      const live = this.units.filter((u) => u.alive);
+      if (!live.length) return false;
+      const c = new THREE.Vector3();
+      for (const u of live) c.add(u.pos);
+      c.multiplyScalar(1 / live.length);
+      at = c.lerp(this.primary.origin, 0.55);
+      at.y = this.terrain.heightAt(at.x, at.z);
+    } else {
+      at.y = Math.max(at.y - 6, this.terrain.heightAt(at.x, at.z));
+    }
+    if (!this.freeBuild) { this.money -= Battle.SMOKE_COST; this.spent += Battle.SMOKE_COST; }
+    this.smokes.place(at, 26, 30);
+    this.smokeCooldown = 32;
+    this.onEvent('smoke', at);
+    return true;
+  }
+
+  /** Sell a placed unit back for half its price. */
+  sellUnit(unit) {
+    if (!unit || !unit.alive) return false;
+    const refund = Math.round(unit.def.cost * 0.5);
+    this.money += refund;
+    this.spent -= refund;
+    unit.alive = false;
+    this.scene.remove(unit.group);
+    this.onEvent('sold', { unit, refund });
+    return true;
   }
 
   /**
@@ -391,6 +492,10 @@ export class Battle {
       onRoof: pos.onRoof,
       yaw: 0,
       kills: 0,
+      hits: 0,
+      rank: 0,
+      age: 0,
+      dugIn: false,
       damageDealt: 0,
     };
     unit.group.position.copy(pos);
@@ -583,14 +688,25 @@ export class Battle {
     const from = unit.pos.clone().setY(unit.pos.y + muzzleHeight);
 
     // Dispersion is applied to the aim point, so error grows along the line of
-    // fire the way real gun dispersion does.
-    const spread = def.dispersion * this.dispersionScale;
+    // fire the way real gun dispersion does. A crew that has landed rounds
+    // shoots tighter: veterancy is a smaller sheaf.
+    const spread = def.dispersion * this.dispersionScale * (1 - 0.14 * (unit.rank || 0));
     const aim = aimPoint.clone();
     const toward = new THREE.Vector3().subVectors(aim, from).setY(0).normalize();
     const across = new THREE.Vector3(-toward.z, 0, toward.x);
     aim.addScaledVector(toward, gauss() * spread * 1.6);
     aim.addScaledVector(across, gauss() * spread * 0.7);
     aim.y += gauss() * spread * 0.5;
+    // Area fire: the sheaf is walked over a circle round the point rather
+    // than converged on it, which is what you want against a face or a step
+    // rather than a pier.
+    if (this.fireMode === 'area' && this.target && aimPoint === this.target) {
+      const r = 9 + def.warhead.radius * 0.8;
+      const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r;
+      aim.x += Math.cos(a) * d;
+      aim.z += Math.sin(a) * d;
+      aim.y += (Math.random() - 0.5) * r * 0.5;
+    }
 
     let vel;
     const p = def.projectile;
@@ -727,6 +843,10 @@ export class Battle {
 
       if (this.invulnerable) u.health = u.maxHealth;
 
+      // Time in place. After half a minute the crew has dug in.
+      u.age += dt;
+      if (!u.dugIn && u.age > 28) { u.dugIn = true; this.onEvent('dugin', u); }
+
       if (u.state === 'setup') {
         u.setupLeft -= dt;
         if (u.setupLeft <= 0) { u.state = 'ready'; u.cooldown = 0; }
@@ -784,7 +904,7 @@ export class Battle {
         if (!u.alive) continue;
         const d = u.pos.distanceTo(point);
         if (d > w.radius) continue;
-        u.health -= w.power * (1 - d / w.radius) * 0.06;
+        u.health -= w.power * (1 - d / w.radius) * 0.06 * (u.dugIn ? 0.65 : 1);
       }
       for (const s of this.structures) {
         s.explode(point, w.lethal * 0.5, w.radius * 0.5, w.power * 0.3, { kinetic: 0.2 });
@@ -807,20 +927,46 @@ export class Battle {
     const dir = { x: v.x / speed, y: v.y / speed, z: v.z / speed };
     const blast = { dir, kinetic: w.kinetic ?? 0.3 };
 
-    let destroyed = 0;
-    for (const s of this.structures) {
-      destroyed += s.explode(point, w.lethal, w.radius, power, blast);
+    // Delay fuze: the shell buries itself before it goes off, so the burst is
+    // inside the wall rather than on it. Deeper damage to the masonry, less
+    // blast on the men outside it, and a little of the energy spent on the
+    // way in.
+    let at = point;
+    let lethal = w.lethal, radius = w.radius, blastPower = power, splashR = w.radius * 1.25;
+    if (this.fireMode === 'delay' && hit.structureHit) {
+      const depth = 1.4 + w.radius * 0.18;
+      at = point.clone().addScaledVector(new THREE.Vector3(dir.x, dir.y, dir.z), depth);
+      lethal *= 1.25; radius *= 1.05; blastPower *= 1.15; splashR *= 0.7;
     }
 
-    const killed = this.garrison.splash(point, w.radius * 1.25, power);
+    let destroyed = 0;
+    for (const s of this.structures) {
+      destroyed += s.explode(at, lethal, radius, blastPower, blast);
+    }
+
+    const killed = this.garrison.splash(at, splashR, power);
     if (killed) {
       this.defendersKilled += killed;
       this.money += killed * MONEY_PER_DEFENDER;
       if (proj.owner) proj.owner.kills += killed;
+      this.onEvent('bounty', { point: at, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
+    }
+    // The crew's record. Rounds that actually took stone out count toward
+    // the next chevron; the sheaf tightens as they earn them.
+    if (proj.owner && (destroyed > 0 || killed > 0)) {
+      const u = proj.owner;
+      u.hits += 1;
+      const rank = Math.min(3, Math.floor((u.hits + u.kills * 3) / 10));
+      if (rank > u.rank) { u.rank = rank; this.onEvent('rank', u); }
+    }
+    // A heavy hit on masonry leaves a fire burning in the hole.
+    if (this.fires && hit.structureHit && destroyed > 8) {
+      this.fires.ignite(at.x, at.y, at.z, Math.min(3, destroyed / 22), 16 + Math.min(28, destroyed));
     }
 
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 4.0;
+    this._lastImpact = point.clone();
     this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
     if (this.life) this.life.startle(point.x, point.z, 60 + w.fx * 40);
     // A round that falls short leaves a mark. Cheap, and it turns a miss into
@@ -895,10 +1041,22 @@ export class Battle {
     const destroyedMass = this.structures.reduce((a, s) => a + s.demolishedMass, 0);
     const delta = destroyedMass - this._lastDestroyedMass;
     if (delta > 0) {
-      this.money += (delta / 1000) * MONEY_PER_TONNE;
+      const earned = (delta / 1000) * MONEY_PER_TONNE;
+      this.money += earned;
       this.score += delta / 1000;
       this._lastDestroyedMass = destroyedMass;
+      // Told in lumps, not a trickle: the readout collects what has come in
+      // and announces it once it is worth announcing.
+      this._bountyAcc = (this._bountyAcc || 0) + earned;
+      if (this._bountyAcc >= 25) {
+        this.onEvent('bounty', { point: this._lastImpact || this.primary.origin,
+          amount: Math.round(this._bountyAcc), kind: 'stone' });
+        this._bountyAcc = 0;
+      }
     }
+    if (this.smokeCooldown > 0) this.smokeCooldown -= dt;
+    if (this.smokes) this.smokes.update(dt);
+    if (this.fires) this.fires.update(dt);
 
     // Defenders.
     if (this.targetDefender && !this.targetDefender.alive) this.clearTarget();
@@ -917,6 +1075,7 @@ export class Battle {
     this.tracerFX.update(dt);
     this._updateRings(dt);
     this._updateHealthBars();
+    this._updateEmplacements();
 
     if (this.targetMarker.visible) {
       this.targetMarker.rotation.y += dt * 0.7;
@@ -1032,6 +1191,17 @@ export class Battle {
       this.state = 'lost';
       this.onEvent('lose', this.summary());
     }
+  }
+
+  /** The placed unit nearest a world point, within `maxDist`. */
+  unitNear(point, maxDist = 6) {
+    let best = null, bestD = maxDist * maxDist;
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      const d = u.pos.distanceToSquared(point);
+      if (d < bestD) { bestD = d; best = u; }
+    }
+    return best;
   }
 
   summary() {
