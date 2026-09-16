@@ -1,0 +1,50 @@
+{
+  "note": "Cast for the pre-level stand-off. Art stored here, not yet wired into the game. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374.",
+  "player": {
+    "id": "us-general",
+    "file": "us-general.png",
+    "nation": "United States",
+    "role": "The player's commander — appears on every level, bottom-left",
+    "look": "Four-star general, helmet with five stars, stars-and-stripes aviators, cigar, pointing finger, swagger stick in the other hand",
+    "pose": "pointing (accusatory) — reads as an ultimatum",
+    "side": "left"
+  },
+  "enemies": {
+    "westminster": {
+      "id": "uk-field-marshal",
+      "file": "uk-field-marshal.png",
+      "nation": "United Kingdom",
+      "defends": "Elizabeth Tower and the Palace of Westminster",
+      "look": "Field marshal, peaked cap with crown badge, Union flag patch, riding crop, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "paris": {
+      "id": "fr-marshal",
+      "file": "fr-marshal.png",
+      "nation": "France",
+      "defends": "Eiffel Tower and the Palais de Chaillot",
+      "look": "Napoleonic marshal, bicorne with tricolore plume and cockade, epaulettes, sabre, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "agra": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Taj Mahal, mosque and jawab",
+      "look": "Maharaja-general, tricolour turban with pearls and plume, cream tunic with gold cords, Ashoka lion buckle, tulwar, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "giza": {
+      "id": "eg-field-marshal",
+      "file": "eg-field-marshal.png",
+      "nation": "Egypt",
+      "defends": "The Great Pyramid and Khafre",
+      "look": "Field marshal, peaked cap with eagle, Egyptian flag patch and belt plate, khaki service dress, sabre, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    }
+  }
+}
