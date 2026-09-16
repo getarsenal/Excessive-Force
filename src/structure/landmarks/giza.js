@@ -130,7 +130,11 @@ export function buildGreatPyramid(quality) {
   // could not be destroyed was playing at that tier. Khufu grows by about half
   // again in stone count on a phone, which is the price of the level being
   // winnable there.
-  const stone = 4.6 * Math.min(s, 1.35);
+  // Measured, not reasoned: ninety seconds of three M777s into one face took
+  // out 0.03% of the mass on a phone against 0.04% on a desktop at the old
+  // cap of 1.35. Bringing the cap in a little closes most of that gap for a
+  // fifth more stones on the phone, which is still fewer than the desktop's.
+  const stone = 4.6 * Math.min(s, 1.25);
 
   const K = KHUFU;
 
