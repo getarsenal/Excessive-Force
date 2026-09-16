@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
 import { solveArc, solveBallistic, solveDirect, ProjectileManager } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
+import { AirWing } from './aircraft.js';
 import { lineOfSight } from '../structure/occupancy.js';
 
 /**
@@ -90,6 +91,10 @@ export class Battle {
     this.powerScale = 1;
 
     this.tracerFX = new TracerFX(this.scene, this.quality);
+    this.air = new AirWing({
+      scene: this.scene, quality: this.quality, terrain: this.terrain,
+      projectiles: this.projectiles, fx: this.fx, audio: this.audio, camera: this.camera,
+    });
     this._setupHealthBars();
     this._setupTargetMarker();
     this._setupGhost();
@@ -462,9 +467,35 @@ export class Battle {
     return { ok: true };
   }
 
+  /**
+   * Call an air strike on a point. Paid for on the call; the aircraft comes
+   * in from behind the camera and the bomb lands a few seconds later.
+   */
+  callStrike(id, point) {
+    const def = UNITS_BY_ID[id];
+    if (!def || !def.strike) return null;
+    if (!this.isUnlocked(def)) return null;
+    if (!point) { this.onEvent('needtarget', def); return null; }
+    if (!this.freeBuild && this.money < def.cost) { this.onEvent('poor', def); return null; }
+    if (!this.freeBuild) {
+      this.money -= def.cost;
+      this.spent += def.cost;
+    }
+    const at = point.clone();
+    // Aim at the ground under the point if it is in the open, or at the
+    // masonry itself: the bomb goes off where it first meets something.
+    const ceiling = this.structures.reduce((a, st) => Math.max(a, st.standingHeight()), at.y);
+    const sortie = this.air.call(def, at, ceiling);
+    this.shotsFired++;
+    this.selectedUnitId = null;
+    this.onEvent('strike', { def, point: at, eta: sortie.releaseAt + sortie.fall });
+    return sortie;
+  }
+
   async deploy(id, point) {
     const def = UNITS_BY_ID[id];
     if (!def) return null;
+    if (def.strike) return this.callStrike(id, point);
     if (!this.isUnlocked(def)) return null;
     if (!this.freeBuild && this.money < def.cost) { this.onEvent('poor', def); return null; }
     const check = this.validPlacement(point);
@@ -892,9 +923,89 @@ export class Battle {
 
   // ─────────────────────────────────────────────────────────────── impacts ──
 
+  /**
+   * The radius round `point` that encloses `frac` of this structure.
+   *
+   * The bombs are sized in *effect*, not in metres: a tenth of the building,
+   * whatever the building. Stones are sorted by distance from the impact and
+   * their mass summed outward until the fraction is met; the blast is then
+   * exactly that big. A pyramid gets a crater a hundred metres across, a
+   * clock tower loses a storey, and both have lost the same share.
+   */
+  _radiusForFraction(s, point, frac, maxR) {
+    const need = frac * s.totalMass;
+    const R2 = maxR * maxR;
+    const near = [];
+    for (let i = 0; i < s.count; i++) {
+      if (!(s.flags[i] & 1) || (s.flags[i] & 2)) continue;   // alive, not loose
+      const dx = s.px[i] - point.x, dy = s.py[i] - point.y, dz = s.pz[i] - point.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 <= R2) near.push(d2, s.mass[i]);
+    }
+    if (!near.length) return null;
+    const idx = [];
+    for (let k = 0; k < near.length; k += 2) idx.push(k);
+    idx.sort((a, b2) => near[a] - near[b2]);
+    let acc = 0;
+    for (const k of idx) {
+      acc += near[k + 1];
+      if (acc >= need) return Math.sqrt(near[k]) + 0.6;
+    }
+    return maxR;
+  }
+
+  /** A bomb from the air wing has gone off. */
+  _strikeImpact(hit) {
+    const { point, proj } = hit;
+    const w = proj.warhead;
+    const st = proj.strikeDef.strike;
+    const down = { x: 0, y: -1, z: 0 };
+    // Sized on the building it lands on — the one with masonry nearest the
+    // impact — and everything else in the sphere is collateral. Sizing each
+    // structure separately had one bomb take its tenth of the tower and its
+    // tenth of the palace wing alongside, which is two bombs' work.
+    let struck = null, best = Infinity;
+    for (const s of this.structures) {
+      for (let i = 0; i < s.count; i += 3) {
+        if (!(s.flags[i] & 1)) continue;
+        const d2 = (s.px[i] - point.x) ** 2 + (s.py[i] - point.y) ** 2 + (s.pz[i] - point.z) ** 2;
+        if (d2 < best) { best = d2; struck = s; }
+      }
+    }
+    const r = struck && best < st.maxR * st.maxR
+      ? this._radiusForFraction(struck, point, st.frac, st.maxR) : null;
+    const rMax = Math.max(st.minR, r ?? st.minR);
+    let destroyed = 0;
+    for (const s of this.structures) {
+      destroyed += s.explode(point, rMax, rMax * 1.15, w.power * this.powerScale, { dir: down, kinetic: w.kinetic ?? 0.35 });
+    }
+    const killed = this.garrison.splash(point, rMax * 1.5, w.power);
+    if (killed) {
+      this.defendersKilled += killed;
+      this.money += killed * MONEY_PER_DEFENDER;
+      this.onEvent('bounty', { point, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
+    }
+    const groundY = this.terrain.heightAt(point.x, point.z);
+    const nearGround = point.y - groundY < 6.0;
+    this._lastImpact = point.clone();
+    this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
+    this.fx.dustColumn(point.x, Math.max(point.y, groundY), point.z, Math.min(4, w.fx * 0.4));
+    if (this.fires) this.fires.ignite(point.x, point.y, point.z, 3, 40);
+    if (this.life) this.life.startle(point.x, point.z, 300);
+    if (nearGround && this.craters) this.craters.add(point.x, groundY, point.z, rMax * 0.9);
+    const camDist = this.camera.position.distanceTo(point);
+    this.engine.addShake(THREE.MathUtils.clamp(w.fx * 40 / Math.max(camDist, 30), 0.1, 1.0));
+    if (this.audio) {
+      this.audio.play('explosion', point, { rate: st.frac > 0.2 ? 0.4 : 0.55, gain: 1.0, rolloff: 1200 });
+      this.audio.rumble(1, point);
+    }
+    this.onEvent('strikehit', { def: proj.strikeDef, point, destroyed, radius: rMax });
+  }
+
   _onImpact(hit) {
     const { point, proj } = hit;
     const w = proj.warhead;
+    if (proj.kind === 'bomb' && proj.strikeDef) { this._strikeImpact(hit); return; }
 
     // Defensive mortar fire lands on the player's guns. It chips whatever it
     // touches on the way — a round that clips the parapet really does take the
@@ -1033,6 +1144,7 @@ export class Battle {
     if (this._aimAge > 0.6) this._refreshAimCandidates();
 
     this._updateUnits(dt);
+    this.air.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
 
     // Money and unlocks track masonry actually brought down. Using the
@@ -1216,8 +1328,9 @@ export class Battle {
     // Loss: nothing deployed, nothing in flight, and not enough money for the
     // cheapest thing that could still make progress.
     const liveUnits = this.units.filter((u) => u.alive).length;
-    const cheapest = Math.min(...UNITS.filter((u) => this.isUnlocked(u)).map((u) => u.cost));
-    if (liveUnits === 0 && this.projectiles.inFlight === 0 && this.money < cheapest) {
+    const cheapest = Math.min(...UNITS.filter((u) => this.isUnlocked(u) && !u.strike).map((u) => u.cost));
+    if (liveUnits === 0 && this.projectiles.inFlight === 0 && this.air.active === 0
+        && this.money < cheapest) {
       this.state = 'lost';
       this.onEvent('lose', this.summary());
     }

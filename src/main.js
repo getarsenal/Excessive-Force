@@ -315,8 +315,9 @@ async function boot() {
   hud = new HUD(battle, {
     onSelect: (id) => {
       battle.selectUnit(id);
-      if (battle.selectedUnitId) hud.showPrompt('tap the ground to deploy');
-      else hud.hidePrompt();
+      if (!battle.selectedUnitId) hud.hidePrompt();
+      else if (UNITS_BY_ID[id].strike) hud.showPrompt('tap the target to call the strike');
+      else hud.showPrompt('tap the ground to deploy');
     },
     onClearTarget: () => battle.clearTarget(),
     onRestart: () => window.location.reload(),
@@ -374,6 +375,17 @@ async function boot() {
         hud.feed(`${data.def.name} DEPLOYED`, 'good');
         battle.selectedUnitId = null;
         hud.hidePrompt();
+        break;
+      case 'strike':
+        hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
+        hud.hidePrompt();
+        battle.pulse(data.point, 0xffa040, 22, true);
+        break;
+      case 'strikehit':
+        hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');
+        break;
+      case 'needtarget':
+        hud.showPrompt('tap the building to mark the drop', 'warn');
         break;
       case 'poor':
         hud.showPrompt(`need $${data.cost.toLocaleString()}`, 'warn');
@@ -495,7 +507,8 @@ async function boot() {
   canvas.addEventListener('pointerup', (e) => {
     if (rig.wasDrag) return;
     if (battle.state !== 'playing') return;
-    const hit = pick(e.clientX, e.clientY, !battle.selectedUnitId);
+    const strike = !!(battle.selectedUnitId && UNITS_BY_ID[battle.selectedUnitId].strike);
+    const hit = pick(e.clientX, e.clientY, !battle.selectedUnitId || strike);
     if (!hit) return;
 
     if (hit.kind === 'unit') {
@@ -505,6 +518,13 @@ async function boot() {
     }
     unitCard.hide();
 
+    if (battle.selectedUnitId && UNITS_BY_ID[battle.selectedUnitId].strike) {
+      // An air strike goes wherever you tap: the building, a defender, the
+      // ground beside it. The aircraft does the rest.
+      const at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
+      battle.callStrike(battle.selectedUnitId, at);
+      return;
+    }
     if (battle.selectedUnitId) {
       if (hit.kind === 'ground' || hit.kind === 'roof') {
         const ok = battle.validPlacement(hit.point);
@@ -534,7 +554,8 @@ async function boot() {
 
   // Hover preview for the deployment footprint (desktop only).
   canvas.addEventListener('pointermove', (e) => {
-    if (!battle.selectedUnitId || e.pointerType === 'touch') {
+    if (!battle.selectedUnitId || e.pointerType === 'touch'
+        || UNITS_BY_ID[battle.selectedUnitId].strike) {
       battle.ghost.visible = false;
       battle.rangeRing.visible = false;
       return;
@@ -563,7 +584,9 @@ async function boot() {
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= 9) {
       const id = [...hud.cards.keys()][n - 1];
-      if (id && battle.selectUnit(id)) hud.showPrompt('tap the ground to deploy');
+      if (id && battle.selectUnit(id)) {
+        hud.showPrompt(UNITS_BY_ID[id].strike ? 'tap the target to call the strike' : 'tap the ground to deploy');
+      }
     }
   });
 

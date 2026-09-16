@@ -13,9 +13,10 @@ import { UNITS_BY_ID, UNITS } from '../game/units.js';
  * position has turned out to be a bad one.
  */
 
-const MAX_POWER = Math.max(...UNITS.map((u) => u.warhead.power));
-const MAX_RANGE = Math.max(...UNITS.map((u) => u.range));
-const MAX_DISP = Math.max(...UNITS.map((u) => u.dispersion));
+const GUNS = UNITS.filter((u) => !u.strike);
+const MAX_POWER = Math.max(...GUNS.map((u) => u.warhead.power));
+const MAX_RANGE = Math.max(...GUNS.map((u) => u.range));
+const MAX_DISP = Math.max(...GUNS.map((u) => u.dispersion));
 
 function bar(label, frac, cls = '') {
   const pct = Math.round(Math.max(0.04, Math.min(1, frac)) * 100);
@@ -28,6 +29,19 @@ export function unitTipHTML(u, battle) {
   const unlocked = battle ? battle.isUnlocked(u) : true;
   const scale = battle?.level?.unlockScale ?? 1;
   const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
+  if (u.strike) {
+    return `
+    <div class="ut-head"><b>${u.full}</b><span>$${u.cost.toLocaleString()}</span></div>
+    <div class="ut-blurb">${u.blurb}</div>
+    ${bar('Vs stone', u.strike.frac / 0.35)}
+    ${bar('Blast', 1)}
+    ${bar('Accuracy', 1)}
+    <div class="ut-foot">
+      <span>called in</span><span>one bomb</span>
+      <span>${Math.round(u.strike.frac * 100)}% of whatever it lands on</span>
+    </div>
+    ${unlocked ? '' : `<div class="ut-lock">Unlocks at ${need}% of the target down</div>`}`;
+  }
   return `
     <div class="ut-head"><b>${u.full}</b><span>$${u.cost.toLocaleString()}</span></div>
     <div class="ut-blurb">${u.blurb}</div>

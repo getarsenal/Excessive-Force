@@ -160,6 +160,33 @@ export const UNITS = [
     salvo: { count: 2, interval: 1.1 },
     blurb: 'GPS-guided 227 mm. Precise, enormous, and it ends arguments.',
   },
+  // ── Air. Called, not placed: the aircraft comes in from behind the camera,
+  // drops on the point you tap, and leaves. `strike.frac` is the share of a
+  // building the bomb takes: the blast radius is sized on arrival to enclose
+  // that fraction of whatever it lands on, so it is ten per cent of a clock
+  // tower and ten per cent of the Great Pyramid alike.
+  {
+    id: 'f15', name: 'F-15E', full: 'F-15E Strike Eagle · GBU-12 500 lb', tier: 'AIR',
+    cost: 200000, unlockFrac: 0.12,
+    model: 'aircraft', strike: { frac: 0.10, maxR: 64, minR: 9, fx: 4.6 },
+    aircraft: { kind: 'eagle', speed: 230, height: 110, clearance: 45, runIn: 2400, offset: 40 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.04, trail: 0.8 },
+    warhead: { lethal: 30, radius: 40, power: 90000, fx: 4.6, kinetic: 0.35 },
+    dispersion: 0,
+    blurb: 'One pass, one 500-pounder, and a tenth of the building goes with it.',
+  },
+  {
+    id: 'b1', name: 'MOAB', full: 'B-1B Lancer · GBU-43/B MOAB', tier: 'AIR',
+    cost: 500000, unlockFrac: 0.25,
+    model: 'aircraft', strike: { frac: 0.35, maxR: 120, minR: 18, fx: 9.5 },
+    aircraft: { kind: 'lancer', speed: 210, height: 330, clearance: 150, runIn: 3200, offset: 60 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 210, gravity: 9.81, drag: 0.11, trail: 1.4 },
+    warhead: { lethal: 90, radius: 110, power: 400000, fx: 9.5, kinetic: 0.4 },
+    dispersion: 0,
+    blurb: 'Eleven tonnes of high explosive on a parachute. A third of anything.',
+  },
 ];
 
 export const UNITS_BY_ID = Object.fromEntries(UNITS.map((u) => [u.id, u]));

@@ -112,6 +112,11 @@ export class Projectile {
     this.hostile = !!opts.hostile;
     this.target = opts.target ? opts.target.clone() : null;
     this.trailRate = opts.trail ?? 0.6;
+    // Bombs slow in the air: a light drag on a slick 500-pounder, a heavy one
+    // on the MOAB under its parachute.
+    this.drag = opts.drag ?? 0;
+    // The unit definition behind an air-dropped bomb, for the strike logic.
+    this.strikeDef = opts.strikeDef ?? null;
     this.age = 0;
     this.alive = true;
     this._trailAcc = 0;
@@ -144,6 +149,7 @@ export class Projectile {
       if (this.kind === 'rocket' && this.age < this.boostTime) {
         this.vel.addScaledVector(this.boostDir, this.boostAccel * dt);
       }
+      if (this.drag > 0) this.vel.addScaledVector(this.vel, -this.drag * dt);
       this.vel.y -= this.gravity * dt;
       this.pos.addScaledVector(this.vel, dt);
     }
@@ -287,6 +293,7 @@ export class ProjectileManager {
       if (p.pos.y < -200) { p.alive = false; continue; }
 
       if (write < 256) {
+        this._scale.setScalar(p.kind === 'bomb' ? (p.drag > 0.08 ? 4.5 : 2.2) : 1);
         this._m4.compose(p.pos, this._q, this._scale);
         this.mesh.setMatrixAt(write, this._m4);
         // Incoming rounds burn red so the player can tell at a glance which

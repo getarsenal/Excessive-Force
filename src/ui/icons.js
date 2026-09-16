@@ -170,6 +170,31 @@ const BODY = {
       <circle cx="7.4" cy="18" r="1.1"/><circle cx="24.4" cy="18" r="1.1"/>
       <circle cx="30.6" cy="18" r="1.1"/>
     </g>`,
+
+  // ── Air. Nose left like every muzzle; seen from the side. ────────────────
+
+  // Strike Eagle: the long nose, the flat body, twin tails and a bomb slung
+  // underneath — the bomb is the point of the card.
+  f15: `
+    <path d="M2.5 12.2 L10 10.6 h20 l6 -1.2 v3.2 l-6 -0.6 h-20 Z" fill="${C.steel}"/>
+    <path d="M12 10.6 l4 -3.2 h2.4 l-1.6 3.2 Z" fill="${C.optic}"/>
+    <path d="M28 10.6 l3.2 -5.4 h2.2 l-1.4 5.4 Z" fill="${C.steelDark}"/>
+    <path d="M25 10.6 l2.6 -4.2 h1.6 l-1 4.2 Z" fill="${C.steelDark}"/>
+    <path d="M16 12.4 h13 l1.6 2.2 h-16 Z" fill="${C.steelDark}"/>
+    <rect x="14" y="15" width="9" height="2.2" rx="1.1" fill="${C.oliveDark}"/>
+    <path d="M14 16.1 l-2.4 -1 v2 Z" fill="${C.oliveDark}"/>
+    <path d="M36 11.4 l3.6 0.8 l-3.6 0.8 Z" fill="${C.heat}"/>`,
+
+  // Lancer: a long dark spindle, wings swept flat back, one tall fin, and
+  // the big bomb under it drawn as big as it is.
+  b1: `
+    <path d="M1.5 10.5 L8 9.4 h24 l4.5 -2.6 h1.6 l-2.6 3.2 l0.6 1.6 h-28.1 Z" fill="${C.steelDark}"/>
+    <path d="M13 10.6 h14 l6 1.6 h-20 Z" fill="${C.steel}"/>
+    <path d="M30 9.4 l2 -5.6 h2 l-0.8 5.6 Z" fill="${C.steelDark}"/>
+    <rect x="9" y="13.4" width="14" height="4.4" rx="2.2" fill="${C.oliveDark}"/>
+    <path d="M9 15.6 l-3 -1.4 v2.8 Z" fill="${C.oliveDark}"/>
+    <rect x="21" y="14.4" width="3" height="2.4" rx="0.6" fill="${C.tandem}"/>
+    <path d="M36.6 9.6 l2.8 0.8 l-2.8 0.8 Z" fill="${C.heat}"/>`,
 };
 
 /** Inline SVG markup for a unit id, or null if it has no icon. */

@@ -604,6 +604,15 @@ export class TestMenu {
     const id = this._spawnId || UNITS[0].id;
     const def = UNITS_BY_ID[id];
     const origin = b.primary.origin;
+    if (def.strike) {
+      // An aircraft is called, not placed: one call on the designated point
+      // or the monument's centre, gates ignored as below.
+      const money = b.money, unlock = b.unlockAll;
+      b.unlockAll = true; b.money = Math.max(b.money, def.cost);
+      b.callStrike(id, b.target || origin.clone().setY(origin.y + 20));
+      b.money = money; b.unlockAll = unlock;
+      return 1;
+    }
     const radius = Math.min(def.range * 0.7, 170);
     let placed = 0;
     for (let a = 0; a < 64 && placed < n; a++) {
@@ -1155,7 +1164,7 @@ export class TestMenu {
         const wrong = [], found = [];
         const v = new THREE.Vector3();
         for (const u of UNITS) {
-          if (u.model === 'infantry') continue;
+          if (u.model === 'infantry' || u.strike) continue;
           // A launcher truck has no barrel; its facing is a judgement, not a
           // measurement.
           if (u.noBarrel) { found.push(`${u.name} n/a`); continue; }
@@ -1296,7 +1305,7 @@ export class TestMenu {
         const times = [];
         for (const u of UNITS) {
           const p = u.projectile;
-          if (p.kind !== 'arc') continue;
+          if (!p || p.kind !== 'arc') continue;
           const vel = solveArc(from, to, p.speed, p.gravity, false);
           if (!vel) { slow.push(`${u.name} cannot reach 300 m flat`); continue; }
           const horiz = Math.hypot(vel.x, vel.z);
