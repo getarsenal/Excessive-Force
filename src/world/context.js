@@ -853,16 +853,26 @@ function bridgeLine(terrain, exclude = 66) {
   };
 
   // The approach roads run about eighty metres past each landing before they
-  // meet the grid, so the landings themselves need that much clearance too.
-  let pick = null;
-  for (let i = 0; i < Math.min(cands.length, 80) && !pick; i += 2) {
+  // meet the grid, so the landings themselves want that much clearance too.
+  //
+  // Wanted, not required. The Thames passes within a hundred metres of the
+  // Palace, so the eighty nearest wet cells are all in that one bend and every
+  // crossing tried from them lands too close — and a search that stopped
+  // there gave Westminster no bridge at all. So the search runs the whole
+  // river, and if nothing clears the full approach it takes the crossing that
+  // comes nearest to doing so: a bridge that lands a little tight beats a
+  // river with no way over it.
+  let pick = null, fallback = null, fallbackLo = -1;
+  for (let i = 0; i < cands.length && !pick; i += 2) {
     const c = crossingAt(cands[i]);
-    const lo = Math.min(Math.hypot(c.from.x, c.from.z), Math.hypot(c.to.x, c.to.z));
-    if (lo < exclude + 80) continue;
     const L = c.from.distanceTo(c.to);
     if (L < 40 || L > span * 1.6) continue;
-    pick = c;
+    const lo = Math.min(Math.hypot(c.from.x, c.from.z), Math.hypot(c.to.x, c.to.z));
+    if (lo >= exclude + 80) { pick = c; break; }
+    if (lo >= exclude + 24 && lo > fallbackLo) { fallback = c; fallbackLo = lo; }
+    if (i >= 600) break;
   }
+  if (!pick) pick = fallback;
   if (!pick) return null;
   const { from, to } = pick;
   const len = from.distanceTo(to);
