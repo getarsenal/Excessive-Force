@@ -95,11 +95,18 @@ function pyramid(B, cx, cz, base, height, stone, opts = {}) {
     // The casing survives as the outermost ring of blocks in each course,
     // which is where the casing is.
     const skin = Math.min(half * 0.45, Math.max(3.0, h * 1.15));
-    B.slab(cx, y + h / 2, cz, half * 2, h, half * 2, stone, coreMat);
-    // Dressed stone laid over the face: thin, non-structural, and stepped back
-    // with the course so the pyramid reads as cased rather than as bare core.
-    B.ring(cx, cz, half * 2 + 0.9, half * 2 + 0.9, skin * 0.5, y, h,
-      stone * 0.9, casingMat, Math.round(y / 1.2) % 2);
+    const wall = skin * 0.5;
+    // The core fills the inside of the casing ring exactly. It used to be laid
+    // the full width of the course with the ring round it, so the two shared
+    // a metre of volume and their tops were on the same plane — every step of
+    // every pyramid was a band of tan rubble and pale limestone fighting for
+    // the same pixels, which read as the stone flashing.
+    B.slab(cx, y + h / 2, cz, (half + 0.45 - wall) * 2, h, (half + 0.45 - wall) * 2, stone, coreMat);
+    // Dressed stone over the face, stepped back with the course so the
+    // pyramid reads as cased rather than as bare core.
+    const casing = opts.casingAt ? opts.casingAt(t) : casingMat;
+    B.ring(cx, cz, half * 2 + 0.9, half * 2 + 0.9, wall, y, h,
+      stone * 0.9, casing, Math.round(y / 1.2) % 2);
     y += h;
   }
 }
@@ -213,8 +220,18 @@ export function buildGreatPyramid(quality) {
     B.slab(0, -2.0, 0, K.base + 16, 4.0, K.base + 16, stone * 2.0, M.CONCRETE);
   });
 
+  // Entrance: the robbers' tunnel, open on the north face. A hole in the
+  // casing the player can already see, and the way in if they want one. The
+  // arch is laid into a slot cut for it, so the tunnel mouth is a real hole
+  // with a real ring of stone round it.
+  const ENTRANCE_Y = 17;
+  const entranceVoid = BlockList.archVoid(0, ENTRANCE_Y, -halfAt(ENTRANCE_Y, K.base, K.height) + 1.5,
+    6.0, 1.4, 3.6, 'x', 0.3);
+  const entranceTunnel = (x, y, z) => y > ENTRANCE_Y - 2.6 && y < ENTRANCE_Y + 0.2
+    && Math.abs(x) < 3.0 && z < -halfAt(ENTRANCE_Y, K.base, K.height) + 6.5;
+
   B.section('pyramid', () => {
-    B.openings(voids, () => {
+    B.openings((x, y, z) => voids(x, y, z) || entranceVoid(x, y, z) || entranceTunnel(x, y, z), () => {
       pyramid(B, 0, 0, K.base, K.height, stone,
         { casing: M.LIMESTONE, core: M.RUBBLE, cap: M.GILT });
     });
@@ -252,12 +269,9 @@ export function buildGreatPyramid(quality) {
     for (const c of charges) B.add(c.x, c.y, c.z, CHARGE_E, CHARGE_E, CHARGE_E, M.CHARGE);
   });
 
-  // Entrance: the robbers' tunnel, open on the north face. A hole in the
-  // casing the player can already see, and the way in if they want one.
   B.section('entrance', () => {
-    const y = 17;
-    const half = halfAt(y, K.base, K.height);
-    B.arch(0, y, -half + 1.5, 6.0, 3.0, 1.4, Math.max(7, Math.round(11 / s)),
+    const half = halfAt(ENTRANCE_Y, K.base, K.height);
+    B.arch(0, ENTRANCE_Y, -half + 1.5, 6.0, 3.0, 1.4, Math.max(7, Math.round(11 / s)),
       M.LIMESTONE, 'x');
   });
 
@@ -275,8 +289,11 @@ export function buildKhafre(quality) {
     B.slab(0, -2.0, 0, 224, 4.0, 224, stone * 2.0, M.CONCRETE);
   });
   B.section('khafre', () => {
+    // The band of Tura casing still on the top third is the thing that tells
+    // Khafre from Khufu at any distance.
     pyramid(B, 0, 0, 215.5, 136.4, stone,
-      { casing: M.SANDSTONE, core: M.RUBBLE, cap: M.LIMESTONE });
+      { casing: M.SANDSTONE, core: M.RUBBLE, cap: M.LIMESTONE,
+        casingAt: (t) => (t > 0.70 ? M.LIMESTONE : M.SANDSTONE) });
   });
   return B;
 }
@@ -290,8 +307,11 @@ export function buildMenkaure(quality) {
     B.slab(0, -1.6, 0, 112, 3.2, 112, stone * 2.0, M.CONCRETE);
   });
   B.section('menkaure', () => {
+    // Granite-cased for its first sixteen courses, which is the red band at
+    // its foot.
     pyramid(B, 0, 0, 102.2, 65.5, stone,
-      { casing: M.LIMESTONE, core: M.RUBBLE, cap: M.LIMESTONE });
+      { casing: M.LIMESTONE, core: M.RUBBLE, cap: M.LIMESTONE,
+        casingAt: (t) => (t < 0.25 ? M.REDSTONE : M.LIMESTONE) });
   });
   return B;
 }

@@ -122,25 +122,40 @@ export function buildTajMahal(quality) {
   // rather than 64,000 m³ of solid stone — which is both how it was actually
   // made and the difference between 9,000 blocks and 400,000.
   B.section('plinth', () => {
-    const half = PLINTH / 2;
+    // `polyRing` centres its wall on the outline, so the outline runs down
+    // the middle of the rim: the rim's outer face is then the plinth's true
+    // edge and its inner face meets the paving. With the outline on the edge
+    // itself the rim stood two metres outside the platform and a trench ran
+    // round the terrace between the two.
+    const half = PLINTH / 2 - 2.25;
     const outline = [[-half, -half], [half, -half], [half, half], [-half, half]];
     let y = -1.5;
     let c = 0;
     while (y < PLINTH_H) {
       const h = Math.min(course * 1.5, PLINTH_H - y);
-      B.polyRing(0, 0, outline, 4.5, y, h, stone * 1.6, M.SANDSTONE, c % 2);
+      const yc = y + h / 2;
+      // A footing, a string course and a coping, all laid proud.
+      const band = yc < 0.6 ? 0.5 : Math.abs(yc - 3.6) < h * 0.55 ? 0.3
+        : yc > PLINTH_H - h * 1.05 ? 0.55 : 0;
+      B.polyRing(0, 0, outline, 4.5, y, h, stone * 1.6, M.SANDSTONE, c % 2, () => band);
       y += h; c++;
     }
     // Rubble core. The plinth is a solid platform, not a box with a lid — and
     // modelling it hollow leaves the paving, and therefore the entire tomb,
     // standing on nothing but its own rim. Coarse blocks keep it cheap.
-    // Runs the full height and overlaps the paving above it — stopping short
-    // leaves a joint the adjacency test cannot see, and then the tomb is again
-    // standing on nothing.
-    B.slab(0, (PLINTH_H - 1.5) / 2, 0,
-      PLINTH - 9, PLINTH_H + 1.5, PLINTH - 9, stone * 3.0, M.SANDSTONE);
+    //
+    // Up to the underside of the paving exactly, and exactly as wide as the
+    // hole inside the rim. It used to run the full height *through* the
+    // paving and half a metre into the rim, on the theory that overlap was
+    // safer than a joint — and the price was the whole terrace: the core's
+    // top and the paving's top on the same plane, flickering against each
+    // other from the default camera across two hundred metres of sandstone.
+    // The adjacency test sees a joint of a few millimetres perfectly well.
+    const PAVING = course * 1.5;
+    B.slab(0, (PLINTH_H - PAVING - 1.5) / 2, 0,
+      PLINTH - 9, PLINTH_H - PAVING + 1.5, PLINTH - 9, stone * 3.0, M.SANDSTONE);
     // Paving, and the bearing the tomb actually stands on.
-    B.slab(0, PLINTH_H - course * 0.75, 0, PLINTH - 8, course * 1.5, PLINTH - 8, stone * 2.4, M.SANDSTONE);
+    B.slab(0, PLINTH_H - PAVING / 2, 0, PLINTH - 9, PAVING, PLINTH - 9, stone * 2.4, M.SANDSTONE);
   });
 
   // ── Tomb walls ───────────────────────────────────────────────────────────
@@ -156,9 +171,11 @@ export function buildTajMahal(quality) {
   // above it. The width now closes over the top two fifths of the height, on
   // a curve, so the void itself is the pointed arch and the ring sits on it.
   const SPRING = PLINTH_H + 12.0;
+  const RISE = IWAN_TOP - SPRING;
+  const RING = 1.9;
   const iwanHalfAt = (y) => {
     if (y <= SPRING) return IWAN_HALF;
-    const t = (y - SPRING) / (IWAN_TOP - SPRING);
+    const t = (y - SPRING) / RISE;
     return IWAN_HALF * Math.sqrt(Math.max(0, 1 - t * t));
   };
   const iwanOpening = (x, y, z) => {
@@ -169,19 +186,104 @@ export function buildTajMahal(quality) {
     if (Math.abs(x) > HALF - 5.0 && Math.abs(z) < w) return true;
     return false;
   };
+  /**
+   * The ring round each iwan, as relief: the wall's own stones, laid proud,
+   * along a band the ring's width outside the pointed opening.
+   *
+   * Not a ring of voussoirs. That was tried, laid into a slot cut for it, and
+   * it is the one thing the support solver cannot hold up: it knows bearing
+   * as standing on something underneath, and near the crown of a forty-metre
+   * pointed arch each voussoir stands beside the next, not on it. The ring
+   * came down on the first frame, took the springing stones with it, and the
+   * wall over the iwan followed. As relief the ring is the wall, and the wall
+   * spans the opening the way it always has.
+   */
+  const inRing = (along, y) => {
+    const a = Math.abs(along);
+    if (y < PLINTH_H + 0.8) return false;
+    if (y <= SPRING) return a > IWAN_HALF - 0.05 && a < IWAN_HALF + RING;
+    const u = a / (IWAN_HALF + RING), v = (y - SPRING) / (RISE + RING);
+    return u * u + v * v < 1;
+  };
+
+  /**
+   * The smaller arched recesses: two tiers on each chamfer, and two tiers
+   * either side of the great iwan on each face. Cut into the marble and the
+   * outer half of the brick, so they have depth without being doors.
+   */
+  const NICHE_HALF = 2.2, NICHE_RISE = 3.2;
+  const NICHE_TIERS = [[PLINTH_H + 1.6, PLINTH_H + 7.4], [PLINTH_H + 13.2, PLINTH_H + 19.0]];
+  const nicheAt = (along, y, tier) => {
+    const [y0, spring] = tier;
+    if (y < y0) return false;
+    if (y <= spring) return Math.abs(along) < NICHE_HALF;
+    const u = along / NICHE_HALF, v = (y - spring) / NICHE_RISE;
+    return u * u + v * v < 1;
+  };
+  const CHAMFER_D = (HALF - CHAMFER / 2) * Math.SQRT2;   // distance of a chamfer's plane
+  const niches = (x, y, z) => {
+    // On the main faces, flanking the iwan.
+    const onZ = Math.abs(z) > HALF - 1.7, onX = Math.abs(x) > HALF - 1.7;
+    if (onZ || onX) {
+      const along = Math.abs(onZ ? x : z) - (IWAN_HALF + 6.6);
+      for (const tier of NICHE_TIERS) if (nicheAt(along, y, tier)) return true;
+    }
+    // On the chamfers, measured along the chamfer's own plane.
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const dist = (x * sx + z * sz) * Math.SQRT1_2;
+      if (dist < CHAMFER_D - 1.7) continue;
+      const along = (x * sz - z * sx) * Math.SQRT1_2;
+      for (const tier of NICHE_TIERS) if (nicheAt(along, y, tier)) return true;
+    }
+    return false;
+  };
+
+  /**
+   * The pishtaq: the rectangular frame round each great iwan, standing well
+   * proud of the wall, and the parapet band along the top. As on every other
+   * landmark, the frame is the wall's own stones laid thicker.
+   */
+  const FRAME_IN = IWAN_HALF + RING + 0.4, FRAME_OUT = FRAME_IN + 1.8;
+  const FRAME_TOP = IWAN_TOP + RING + 1.2;
+  const tombRelief = (x, z, y) => {
+    const onZ = Math.abs(z) > Math.abs(x);
+    const along = Math.abs(onZ ? x : z);
+    const face = Math.max(Math.abs(x), Math.abs(z)) > HALF - 0.6;   // not a chamfer
+    let e = 0;
+    if (y > PLINTH_H + WALL_TOP - course * 1.05) e = 0.35;            // parapet coping
+    if (y < PLINTH_H + 1.3) e = Math.max(e, 0.3);                     // dado
+    if (face) {
+      if (inRing(along, y)) e = Math.max(e, 0.45);
+      if (along > FRAME_IN && along < FRAME_OUT && y < FRAME_TOP + 1.5) e = Math.max(e, 0.6);
+      if (along < FRAME_OUT && y > FRAME_TOP && y < FRAME_TOP + 1.5) e = Math.max(e, 0.6);
+    }
+    return e;
+  };
 
   B.section('tomb', () => {
-    B.openings(iwanOpening, () => {
+    B.openings((x, y, z) => iwanOpening(x, y, z) || niches(x, y, z), () => {
       let y = PLINTH_H;
       let c = 0;
       while (y < PLINTH_H + WALL_TOP) {
         const h = Math.min(course, PLINTH_H + WALL_TOP - y);
-        B.polyRing(0, 0, plan, 1.1, y, h, stone, M.MARBLE, c % 2);
+        const yc = y + h / 2;
+        B.polyRing(0, 0, plan, 1.1, y, h, stone, M.MARBLE, c % 2, (px, pz) => tombRelief(px, pz, yc));
         // Inner brick wall, set back, carrying most of the load.
         B.polyRing(0, 0, chamferedSquare(HALF - 2.6, CHAMFER), 3.0, y, h, stone, M.BRICK, (c + 1) % 2);
         y += h; c++;
       }
     });
+    // The parapet: two courses above the roof line, round the whole plan.
+    let y = PLINTH_H + WALL_TOP;
+    for (let k = 0; k < 2; k++) {
+      B.polyRing(0, 0, plan, 1.1, y, course, stone, M.MARBLE, k % 2, () => (k === 1 ? 0.4 : 0.2));
+      y += course;
+    }
+    // Guldastas: a slender pinnacle at each corner of the chamfered plan,
+    // standing on the roof.
+    for (const [px, pz] of chamferedSquare(HALF - 2.9, CHAMFER)) {
+      B.pinnacle(px, pz, PLINTH_H + WALL_TOP + course * 2, 7.5, 1.9, stone, M.MARBLE);
+    }
   });
 
   // ── The central chamber ──────────────────────────────────────────────────
@@ -199,13 +301,20 @@ export function buildTajMahal(quality) {
   B.section('chamber', () => {
     // Eight arched doorways, so the chamber reads as a room and so a shell
     // through an iwan can reach the wall that matters.
+    // Pointed-headed, like every opening in the building. The head used to be
+    // a ring of voussoirs laid over the uncut wall — buried, sharing its
+    // volume with the stones already there — and cut a slot for it instead,
+    // it came down: see the iwans for why. A pointed void the wall spans is
+    // what the solver holds up.
     const doorway = (x, y, z) => {
-      if (y < PLINTH_H + 1.0 || y > PLINTH_H + 13.0) return false;
+      if (y < PLINTH_H + 1.0 || y > PLINTH_H + 13.5) return false;
       const a = Math.atan2(z, x);
       // Centre of the nearest of eight faces.
       const k = Math.round((a / (Math.PI * 2)) * 8) / 8 * Math.PI * 2;
       const off = Math.abs(((a - k + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
-      return off < 0.20;   // ~6 m of opening on each face
+      const half = y <= PLINTH_H + 10.5 ? 0.20
+        : 0.20 * Math.sqrt(Math.max(0, 1 - ((y - PLINTH_H - 10.5) / 3.0) ** 2));
+      return off < half;   // ~6 m of opening on each face
     };
 
     B.openings(doorway, () => {
@@ -218,31 +327,6 @@ export function buildTajMahal(quality) {
         y += h; c++;
       }
     });
-
-    // Relieving arches over each doorway, carrying the wall across the opening.
-    const voussoirs = Math.max(5, Math.round(9 / s));
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      const rMid = CHAMBER_R - CHAMBER_WALL / 2;
-      B.arch(Math.cos(a) * rMid, PLINTH_H + 12.0, Math.sin(a) * rMid,
-        6.4, CHAMBER_WALL, 1.8, voussoirs, M.BRICK,
-        Math.abs(Math.cos(a)) > 0.7 ? 'z' : 'x');
-    }
-  });
-
-  // ── Iwans ────────────────────────────────────────────────────────────────
-  // The great arched recesses on the four main faces. Modelled as the arch
-  // heads over the openings; the openings themselves are simply where the
-  // facing was never laid.
-  B.section('iwans', () => {
-    const y = PLINTH_H + 21.0;
-    const voussoirs = Math.max(8, Math.round(15 / s));
-    for (const side of [1, -1]) {
-      for (const d of [0.0, 2.2, 4.4]) {   // ringed, so the recess has depth
-        B.arch(0, y, side * (HALF - 0.6 - d), 17.6, 2.0, 1.9, voussoirs, M.MARBLE, 'x');
-        B.arch(side * (HALF - 0.6 - d), y, 0, 17.6, 2.0, 1.9, voussoirs, M.MARBLE, 'z');
-      }
-    }
   });
 
   // ── Roof, drum and dome ──────────────────────────────────────────────────
@@ -254,7 +338,12 @@ export function buildTajMahal(quality) {
     B.openings((x, y, z) => Math.hypot(x, z) < CHAMBER_R + 0.5, () => {
       B.slab(0, roofY + course, 0, HALF * 1.85, course * 2, HALF * 1.85, stone * 1.5, M.MARBLE);
     });
-    B.drum(0, 0, roofY + course * 2, roofY + course * 2 + DRUM_H, DRUM_R, 2.2, course, stone, M.MARBLE);
+    B.drum(0, 0, roofY + course * 2, roofY + course * 2 + DRUM_H - course, DRUM_R, 2.2, course, stone, M.MARBLE);
+    // The lotus band the dome rises from: one corbelled course, standing half
+    // a metre out from the drum, its inner face still on the drum's.
+    const ly = roofY + course * 2 + DRUM_H - course;
+    const sides = Math.max(12, Math.round((2 * Math.PI * (DRUM_R + 0.5)) / stone));
+    B.polyRing(0, 0, BlockList.circle(DRUM_R + 0.5, sides), 2.7, ly, course, stone, M.MARBLE);
   });
 
   const domeY = roofY + course * 2 + DRUM_H;
@@ -364,12 +453,51 @@ export function buildTajMosque(quality, sideSign = -1) {
 
     B.slab(cx, -0.8, 0, w + 5, 1.6, d + 5, stone * 2.0, M.SANDSTONE);
 
+    // Five pointed arches down the front, facing the tomb, the centre one a
+    // storey taller; a frame round each, a dado below and a cornice above.
+    const front = -sideSign;                  // which way the tomb is
+    const BAYS = [-22, -11, 0, 11, 22];
+    const arched = (x, y, z) => {
+      if ((x - cx) * front < w / 2 - 2.0) return false;
+      for (const bz of BAYS) {
+        const big = bz === 0;
+        const half = big ? 3.4 : 2.6, y0 = 1.0, spring = big ? 8.0 : 5.6, rise = big ? 3.6 : 3.0;
+        const along = z - bz;
+        if (y < y0) continue;
+        if (y <= spring) { if (Math.abs(along) < half) return true; continue; }
+        const u = along / half, v = (y - spring) / rise;
+        if (u * u + v * v < 1) return true;
+      }
+      return false;
+    };
+    const relief = (x, z, y) => {
+      let e = 0;
+      if (y < 1.4) e = 0.3;
+      if (y > h - course * 1.05) e = Math.max(e, 0.45);
+      if ((x - cx) * front < w / 2 - 0.6) return e;
+      for (const bz of BAYS) {
+        const big = bz === 0;
+        const half = big ? 3.4 : 2.6, top = big ? 11.6 : 8.6;
+        const a = Math.abs(z - bz);
+        if (a > half + 0.3 && a < half + 1.3 && y < top + 1.4) e = Math.max(e, 0.4);
+        if (a < half + 1.3 && y > top && y < top + 1.4) e = Math.max(e, 0.4);
+      }
+      return e;
+    };
+
     let y = 0;
     let c = 0;
-    while (y < h) {
-      const hh = Math.min(course, h - y);
-      B.polyRing(cx, 0, outline, 1.8, y, hh, stone, M.SANDSTONE, c % 2);
-      y += hh; c++;
+    B.openings(arched, () => {
+      while (y < h) {
+        const hh = Math.min(course, h - y);
+        const yc = y + hh / 2;
+        B.polyRing(cx, 0, outline, 1.8, y, hh, stone, M.SANDSTONE, c % 2, (px, pz) => relief(px, pz, yc));
+        y += hh; c++;
+      }
+    });
+    // Corner chattris on the roof.
+    for (const [ex, ez] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      B.pinnacle(cx + ex * (w / 2 - 1.3), ez * (d / 2 - 1.3), h + course * 2, 4.5, 1.8, stone, M.SANDSTONE);
     }
     // Cross walls, so the roof has bearing along its length rather than only
     // at the two ends.

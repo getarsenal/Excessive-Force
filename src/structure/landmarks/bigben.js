@@ -44,8 +44,10 @@ const STONE_FINENESS = 0.74;
  * same number of storeys reads as a model of itself.
  */
 const TOWER_WINDOWS = {
-  heights: [12.5, 16.5, 20.5, 24.5, 28.5, 32.5,
-    36.5, 40.5, 44.5, 48.5, 52.0, 56.0],
+  // Ten bays, all below the clock stage. The two that used to sit at 52 and
+  // 56 m were cut into shaft masonry hidden inside the stage's own wall, so
+  // they were never visible and the men posted in them stood inside stone.
+  heights: [12.5, 16.5, 20.5, 24.5, 28.5, 32.5, 36.5, 40.5, 44.5, 48.5],
   halfWidth: 0.85,      // opening is 1.7 m across
   halfHeight: 1.15,     // and 2.3 m tall
   faceInset: 3.0,       // how far out from the axis a wall stone has to be
@@ -53,8 +55,10 @@ const TOWER_WINDOWS = {
 
 const W = 12.2;              // shaft width, metres
 const PLINTH_TOP = 6.0;
-const SHAFT_TOP = 61.0;
+const SHAFT_TOP = 61.0;      // the taper's nominal top; the stage takes over below it
 const CLOCK_Y = 55.0;
+const STAGE_Y0 = CLOCK_Y - 4.6;
+const STAGE_Y1 = CLOCK_Y + 5.4;   // a course taller than the dial needs, for the cornice
 const BELFRY_TOP = 68.5;
 const SPIRE_TOP = 96.3;
 
@@ -90,17 +94,78 @@ export const TOWER = {
   widthAt: (y) => widthAt(y / TOWER_SCALE) * TOWER_SCALE,
 };
 
-function towerWindowCutter() {
+/** The course grid of the shaft: course `k` is centred at this height. */
+const SHAFT_Y0 = PLINTH_TOP;
+const courseCentre = (k, course) => SHAFT_Y0 + (k + 0.5) * course;
+/** The first course whose centre clears `y` going up, and the last below it. */
+const courseAbove = (y, course) => Math.ceil((y - SHAFT_Y0) / course - 0.5);
+const courseBelow = (y, course) => Math.floor((y - SHAFT_Y0) / course - 0.5);
+
+/** Half-width of the corner buttress and its inner edge, at height `y`. */
+const buttressAt = (y) => {
+  const t = (y - PLINTH_TOP) / (SHAFT_TOP - PLINTH_TOP);
+  const off = (W / 2 - 0.3) - t * 0.25;
+  const bw = 2.1 - t * 0.5;
+  return { off, bw, inner: off - bw / 2 };
+};
+
+/**
+ * Where the shaft's masonry is *not* laid: the windows, the slots the lintels
+ * and sills go into, and the corners the buttresses fill.
+ *
+ * The lintel used to be laid over an uncut wall — a stone spanning the bay
+ * on top of the stones already there, sharing their volume, its outer face
+ * on exactly the plane of the facing. Every lintel on the tower was a patch
+ * of wall that flickered between two tints as the camera moved. Now the slot
+ * is left in the course grid and the lintel is a course stone that happens to
+ * be one piece.
+ */
+function towerShaftCutter(course) {
   const { heights, halfWidth, halfHeight, faceInset } = TOWER_WINDOWS;
+  const span = halfWidth + 0.75;
   return (x, y, z) => {
+    const onZ = Math.abs(z) > faceInset, onX = Math.abs(x) > faceInset;
+    if (!onZ && !onX) return false;
+    const along = onZ ? x : z;
+    // The corner buttresses take the corners.
+    const b = buttressAt(y);
+    if (Math.abs(x) > b.inner && Math.abs(z) > b.inner) return true;
     for (const wy of heights) {
+      const k = Math.round((y - SHAFT_Y0) / course - 0.5);
+      const kL = courseAbove(wy + halfHeight, course);
+      const kS = courseBelow(wy - halfHeight, course);
+      if ((k === kL || k === kS) && Math.abs(along) < span) return true;
       if (y < wy - halfHeight || y > wy + halfHeight) continue;
-      // A window is cut where a stone sits on a face (far out on one axis,
-      // near the centre line on the other).
-      if (Math.abs(x) < halfWidth && Math.abs(z) > faceInset) return true;
-      if (Math.abs(z) < halfWidth && Math.abs(x) > faceInset) return true;
+      if (Math.abs(along) < halfWidth) return true;
     }
     return false;
+  };
+}
+
+/**
+ * The facing's ornament, as how far each stone stands proud of the wall.
+ *
+ * Jambs either side of every window, a string course at each storey, and the
+ * hood over each bay. All of it is the wall's own stones laid thicker, which
+ * is the only kind of ornament that stays on.
+ */
+function towerRelief(course) {
+  const { heights, halfWidth, halfHeight } = TOWER_WINDOWS;
+  const STRINGS = [10.5, 26.5, 42.5];
+  return (x, z, y) => {
+    const onZ = Math.abs(z) > Math.abs(x);
+    const along = onZ ? x : z;
+    let e = 0;
+    for (const sy of STRINGS) if (Math.abs(y - sy) < course * 0.55) e = Math.max(e, 0.30);
+    for (const wy of heights) {
+      const a = Math.abs(along);
+      if (a > halfWidth + 0.02 && a < halfWidth + 1.05
+        && Math.abs(y - wy) < halfHeight + course * 1.6) e = Math.max(e, 0.22);
+      // The hood mould: one course over the lintel, a little wider than it.
+      if (a < halfWidth + 1.05 && y > wy + halfHeight + course
+        && y < wy + halfHeight + course * 2.1) e = Math.max(e, 0.26);
+    }
+    return e;
   };
 }
 
@@ -140,20 +205,29 @@ export function buildElizabethTower(quality) {
     // support graph is correct from the start: the wall genuinely spans each
     // opening through the lintel course, and shooting that lintel out genuinely
     // drops the masonry above it.
-    B.openings(towerWindowCutter(), () => {
-      let y = 6.0;
+    // The shaft stops where the clock stage begins. It used to run on inside
+    // the stage's own wall to 61 m and into the belfry piers above that —
+    // three thousand stones sharing volume with the sleeve around them.
+    const relief = towerRelief(course);
+    B.openings(towerShaftCutter(course), () => {
+      let y = SHAFT_Y0;
       let c = 0;
-      while (y < SHAFT_TOP) {
-        const h = Math.min(course, SHAFT_TOP - y);
-        const t = (y - 6.0) / (SHAFT_TOP - 6.0);
+      while (y < STAGE_Y0) {
+        const h = Math.min(course, STAGE_Y0 - y);
+        const t = (y - SHAFT_Y0) / (SHAFT_TOP - SHAFT_Y0);
         // Walls thin as they rise, like the real tower.
         const wall = 2.3 - t * 1.4;
         const w = W - t * 0.5;
+        const yc = y + h / 2;
 
-        // Structural brick ring.
-        B.ring(0, 0, w - 1.0, w - 1.0, wall, y, h, stone, M.BRICK, c % 2);
+        // Structural brick ring, its outer face exactly on the facing's inner
+        // one. Five centimetres of overlap used to put the brick's face just
+        // behind the stone's — close enough to show through it from the
+        // default camera as a flicker of orange.
+        B.ring(0, 0, w - 1.1, w - 1.1, wall, y, h, stone, M.BRICK, c % 2);
         // Limestone facing, half a course out of phase with the core.
-        B.ring(0, 0, w, w, 0.55, y, h, stone * 0.9, M.REDSTONE, (c + 1) % 2);
+        B.ring(0, 0, w, w, 0.55, y, h, stone * 0.9, M.REDSTONE, (c + 1) % 2,
+          (x, z) => relief(x, z, yc));
 
         y += h;
         c++;
@@ -164,6 +238,10 @@ export function buildElizabethTower(quality) {
     // spanning the whole bay, so the courses above it bear on masonry rather
     // than relying on the solver's lateral spanning — and it is a single point
     // of failure the player can aim at, which is the point of having one.
+    //
+    // Both are laid in the course grid, in the slot the cutter left for them,
+    // and stand a little proud of the face: a dressed surround, and no two
+    // faces on the same plane.
     //
     // The mullion is the bar up the middle, and it is not decoration. Openings
     // are cut by dropping the stones whose centres fall inside the box, so a
@@ -176,35 +254,57 @@ export function buildElizabethTower(quality) {
     // axis, and the two lights either side are what the garrison shoots from.
     const { heights, halfWidth, halfHeight } = TOWER_WINDOWS;
     const MULLION = 0.30;      // half-width, so 0.6 m on the drawing
+    // Further out than the jambs beside them, so where a sill's end and a
+    // jamb stone share a few centimetres their faces are on different planes.
+    const PROUD = 0.32;
     for (const wy of heights) {
-      const t = (wy - 6.0) / (SHAFT_TOP - 6.0);
+      const span = halfWidth + 0.75;
+      for (const k of [courseAbove(wy + halfHeight, course), courseBelow(wy - halfHeight, course)]) {
+        const yc = courseCentre(k, course);
+        const t = (yc - course / 2 - SHAFT_Y0) / (SHAFT_TOP - SHAFT_Y0);
+        const wall = 2.3 - t * 1.4;
+        const w = W - t * 0.5;
+        const hy = course / 2 - 0.015;
+        for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          // The brick half of the slot, then the facing half standing proud.
+          const offB = (w - 1.1) / 2 - wall / 2;
+          B.add(ax * offB, yc, az * offB,
+            ax !== 0 ? wall / 2 : span, hy, ax !== 0 ? span : wall / 2, M.BRICK);
+          const offF = w / 2 - 0.275 + PROUD / 2;
+          B.add(ax * offF, yc, az * offF,
+            ax !== 0 ? 0.275 + PROUD / 2 : span, hy,
+            ax !== 0 ? span : 0.275 + PROUD / 2, M.REDSTONE);
+        }
+      }
+      const t = (wy - SHAFT_Y0) / (SHAFT_TOP - SHAFT_Y0);
       const wall = 2.3 - t * 1.4;
       const w = W - t * 0.5;
-      const span = halfWidth * 2 + 1.5;
+      // From the top of the sill to the underside of the lintel, so it stands
+      // on the one and carries the other whatever the course grid does.
+      const sillTop = courseCentre(courseBelow(wy - halfHeight, course), course) + course / 2;
+      const lintelBot = courseCentre(courseAbove(wy + halfHeight, course), course) - course / 2;
       for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
         const off = (w - wall) / 2;
-        const cx = ax * off, cz = az * off;
-        const hxL = ax !== 0 ? wall / 2 : span / 2;
-        const hzL = ax !== 0 ? span / 2 : wall / 2;
-        B.add(cx, wy + halfHeight + 0.32, cz, hxL, 0.30, hzL, M.REDSTONE);
-        B.add(cx, wy - halfHeight - 0.28, cz, hxL, 0.26, hzL, M.REDSTONE);
         // Between the two, and thin enough to sit inside the narrowest hole
         // any tier cuts — one stone straddling the axis is the whole point.
-        B.add(cx, wy, cz,
-          ax !== 0 ? wall * 0.42 : MULLION, halfHeight,
+        B.add(ax * off, (sillTop + lintelBot) / 2, az * off,
+          ax !== 0 ? wall * 0.42 : MULLION, (lintelBot - sillTop) / 2 - 0.012,
           ax !== 0 ? MULLION : wall * 0.42, M.REDSTONE);
       }
     }
 
     // Corner buttresses run the full height and carry a real share of load.
+    // Toothed: alternate courses a hand wider, which is what quoins are.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      let by = 6.0;
+      let by = SHAFT_Y0;
       let bc = 0;
-      while (by < SHAFT_TOP) {
-        const h = Math.min(course, SHAFT_TOP - by);
-        const t = (by - 6.0) / (SHAFT_TOP - 6.0);
-        const off = (W / 2 - 0.3) - t * 0.25;
-        const bw = 2.1 - t * 0.5;
+      while (by < STAGE_Y0) {
+        const h = Math.min(course, STAGE_Y0 - by);
+        const b = buttressAt(by + h / 2);
+        const tooth = bc % 2 ? 0.14 : -0.14;
+        const bw = b.bw + tooth;
+        // Grows outward only: the inner edge stays on the cutter's line.
+        const off = b.inner + bw / 2;
         B.slab(sx * off, by + h / 2, sz * off, bw, h, bw, stone, M.REDSTONE);
         by += h;
         bc++;
@@ -217,18 +317,48 @@ export function buildElizabethTower(quality) {
   // weakest material in the game — the dials go early and they go loudly.
   B.section('clock', () => {
     const dialR = 3.5;
-    const stageY0 = CLOCK_Y - 4.6;
-    const stageY1 = CLOCK_Y + 4.6;
-    let y = stageY0;
-    let c = 0;
-    while (y < stageY1) {
-      const h = Math.min(course, stageY1 - y);
-      B.ring(0, 0, W + 0.9, W + 0.9, 1.25, y, h, stone, M.REDSTONE, c % 2);
-      y += h;
-      c++;
+    const stageY0 = STAGE_Y0;
+    const stageY1 = STAGE_Y1;
+    const SW = W + 0.9;
+    // The dial sits in a hole in the stage, not on top of it, with a proud
+    // surround of stone round it and a corbelled cornice closing the stage.
+    // With a lintel course over each hole, one stone spanning it, so the
+    // stage above bears on masonry rather than on the glass.
+    const kLintel = Math.ceil((CLOCK_Y + dialR - stageY0) / course - 0.5);
+    const LSPAN = dialR + 0.7;
+    const dialHole = (x, y, z) => {
+      const onZ = Math.abs(z) > SW / 2 - 1.7, onX = Math.abs(x) > SW / 2 - 1.7;
+      if (!onZ && !onX) return false;
+      const along = onZ ? x : z;
+      if (Math.round((y - stageY0) / course - 0.5) === kLintel) return Math.abs(along) < LSPAN;
+      return Math.hypot(along, y - CLOCK_Y) < dialR + 0.05;
+    };
+    for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const off = SW / 2 - 0.8 + 0.22;
+      B.add(ax * off, stageY0 + (kLintel + 0.5) * course, az * off,
+        ax !== 0 ? 1.02 : LSPAN, course / 2 - 0.015, ax !== 0 ? LSPAN : 1.02, M.REDSTONE);
     }
+    B.openings(dialHole, () => {
+      let y = stageY0;
+      let c = 0;
+      while (y < stageY1) {
+        const h = Math.min(course, stageY1 - y);
+        const yc = y + h / 2;
+        // As thick as the brick and the facing it replaces, since the whole
+        // belfry and spire now come down through it.
+        B.ring(0, 0, SW, SW, 1.6, y, h, stone, M.REDSTONE, c % 2, (x, z) => {
+          const r = Math.hypot(Math.abs(z) > Math.abs(x) ? x : z, yc - CLOCK_Y);
+          if (r > dialR && r < dialR + 1.1) return 0.32;
+          if (yc > stageY1 - course * 1.05) return 0.45;   // cornice
+          if (yc < stageY0 + course * 1.05) return 0.25;   // base band
+          return 0;
+        });
+        y += h;
+        c++;
+      }
+    });
 
-    const faceOffset = (W + 0.9) / 2 - 0.2;
+    const faceOffset = SW / 2 - 0.2;
     const dialStone = Math.max(0.55, 0.72 * s);
     // Each dial: a disc of glass segments in a gilt frame, on all four faces.
     for (const [ax, az, rot] of [
@@ -257,15 +387,17 @@ export function buildElizabethTower(quality) {
   // Open arcade housing the bells. Structurally this is the tower's weak
   // point: the load of the whole spire lands on eight slender piers.
   B.section('belfry', () => {
-    const y0 = CLOCK_Y + 4.6;
+    const y0 = STAGE_Y1;
     const bw = W + 0.4;
     const CORNICE = 2.2;      // depth of the ring that closes the arcade
     // Corner piers.
+    // Up to the cornice, which then sits on them: run through it and the two
+    // share the corner's volume.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       let y = y0;
       let c = 0;
-      while (y < BELFRY_TOP) {
-        const h = Math.min(course, BELFRY_TOP - y);
+      while (y < BELFRY_TOP - CORNICE) {
+        const h = Math.min(course, BELFRY_TOP - CORNICE - y);
         B.slab(sx * (bw / 2 - 1.1), y + h / 2, sz * (bw / 2 - 1.1), 2.2, h, 2.2, stone, M.REDSTONE);
         y += h;
         c++;
@@ -292,7 +424,9 @@ export function buildElizabethTower(quality) {
     // 10.4 m apart puts both feet in the middle of an opening, and the
     // voussoirs near the crown then have nothing holding them up at all.
     const pier = bw / 2 - 1.1;
-    const archY = BELFRY_TOP - CORNICE - pier - 0.2;
+    // The crown — springing plus radius plus the ring's own thickness — has
+    // to clear the underside of the cornice, not just the springing.
+    const archY = BELFRY_TOP - CORNICE - pier - 0.9 - 0.15;
     for (const side of [1, -1]) {
       B.arch(0, archY, side * (bw / 2 - 0.9), pier * 2, 1.6, 0.9,
         Math.max(5, Math.round(9 / s)), M.REDSTONE, 'x');
@@ -323,7 +457,7 @@ export function buildElizabethTower(quality) {
     // mass this dense with nothing over it and nothing under it is a stone the
     // solver has no reason to hold up, and it simply fell out of the tower.
     for (const along of [-1, 1]) {
-      B.slab(along * 2.2, BELFRY_TOP - 1.0, 0, 0.9, 0.8, bw - 2.2, stone * 1.6, M.IRON);
+      B.slab(along * 2.2, BELFRY_TOP - 1.0, 0, 0.9, 0.8, bw - 3.1, stone * 1.6, M.IRON);
     }
     B.slab(0, BELFRY_TOP - 3.0, 0, 2.8, 2.6, 2.8, 1.4 * s, M.IRON);
   });
@@ -331,18 +465,29 @@ export function buildElizabethTower(quality) {
   // ── Spire ────────────────────────────────────────────────────────────────
   B.section('spire', () => {
     const y0 = BELFRY_TOP + 1.6;
-    // Ornate lower stage.
-    B.spire(0, 0, y0, y0 + 7.0, 11.4, 8.6, course * 1.1, stone, M.SLATE, 0.34);
-    // Main cast-iron spire.
-    B.spire(0, 0, y0 + 7.0, SPIRE_TOP - 3.4, 8.6, 1.5, course * 1.2, stone, M.IRON, 0.38);
-    // Finial and cross.
-    B.slab(0, SPIRE_TOP - 3.0, 0, 1.6, 1.4, 1.6, 0.7 * s, M.GILT);
-    B.slab(0, SPIRE_TOP - 1.6, 0, 0.7, 1.8, 0.7, 0.6 * s, M.GILT);
-    B.slab(0, SPIRE_TOP - 0.4, 0, 1.5, 0.32, 0.32, 0.5 * s, M.GILT);
+    // Ornate lower stage, with a lucarne on each face: four courses of the
+    // roof laid a metre proud, which from the ground is a gabled dormer.
+    // Narrow enough that the corner pinnacles stand beside it on the belfry
+    // roof rather than inside its wall.
+    B.spire(0, 0, y0, y0 + 7.0, 9.6, 8.6, course * 1.1, stone, M.SLATE, 0.34,
+      (x, z, y, c) => {
+        const along = Math.abs(z) > Math.abs(x) ? x : z;
+        return c < 4 && Math.abs(along) < 1.3 ? 1.0 - c * 0.12 : 0;
+      });
+    // Main cast-iron spire, with a rib up each corner.
+    B.spire(0, 0, y0 + 7.0, SPIRE_TOP - 3.4, 8.6, 1.5, course * 1.2, stone, M.IRON, 0.38,
+      (x, z) => {
+        const a = Math.abs(x), b = Math.abs(z);
+        return Math.abs(a - b) < 0.45 && Math.max(a, b) > 1.6 ? 0.22 : 0;
+      });
+    // Finial and cross, each piece standing on the one below.
+    B.slab(0, SPIRE_TOP - 2.7, 0, 1.6, 1.4, 1.6, 0.7 * s, M.GILT);
+    B.slab(0, SPIRE_TOP - 1.1, 0, 0.7, 1.8, 0.7, 0.6 * s, M.GILT);
+    B.slab(0, SPIRE_TOP - 0.04, 0, 1.5, 0.32, 0.32, 0.5 * s, M.GILT);
 
-    // Corner pinnacles around the spire base.
+    // Corner pinnacles around the spire base, on the belfry roof.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-      B.pinnacle(sx * 5.2, sz * 5.2, y0 + 1.0, 9.0, 2.0, stone, M.REDSTONE);
+      B.pinnacle(sx * 5.5, sz * 5.5, y0, 9.0, 1.6, stone, M.REDSTONE);
     }
   });
 
@@ -377,18 +522,66 @@ export const WING = {
   },
 };
 
-function wingWindowCutter(z0, len, depth) {
-  const { heights, first, spacing, halfWidth, halfHeight } = WING_WINDOWS;
+/** The wing's bay centres along its length. */
+function wingBays(z0, len) {
+  const out = [];
+  for (let bz = z0 + WING_WINDOWS.first; bz < z0 + len - 3; bz += WING_WINDOWS.spacing) out.push(bz);
+  return out;
+}
+
+/**
+ * Windows, and the slots for their lintels and sills, on the long elevations.
+ * The wing's course grid starts at the ground, so course `k` is centred at
+ * `(k + 0.5) * course`.
+ */
+function wingWindowCutter(z0, len, depth, course) {
+  const { heights, halfWidth, halfHeight } = WING_WINDOWS;
   const faceX = depth / 2 - 1.6;
+  const bays = wingBays(z0, len);
   return (x, y, z) => {
     if (Math.abs(x) < faceX) return false;      // only the long elevations
+    const k = Math.round(y / course - 0.5);
     for (const wy of heights) {
-      if (y < wy - halfHeight || y > wy + halfHeight) continue;
-      for (let bz = z0 + first; bz < z0 + len - 3; bz += spacing) {
-        if (Math.abs(z - bz) < halfWidth) return true;
+      const kL = Math.ceil((wy + halfHeight) / course - 0.5);
+      const kS = Math.floor((wy - halfHeight) / course - 0.5);
+      const slot = k === kL || k === kS;
+      const light = y > wy - halfHeight && y < wy + halfHeight;
+      if (!slot && !light) continue;
+      for (const bz of bays) {
+        if (Math.abs(z - bz) < (slot ? halfWidth + 0.7 : halfWidth)) return true;
       }
     }
     return false;
+  };
+}
+
+/**
+ * The Palace's own ornament: pilasters between the bays, jambs round each
+ * window, a string course at each floor, a battered plinth and a corbelled
+ * cornice under the parapet. As on the tower, every bit of it is a wall stone
+ * laid thicker.
+ */
+function wingRelief(z0, len, depth, height, course) {
+  const { heights, halfWidth, halfHeight, spacing } = WING_WINDOWS;
+  const bays = wingBays(z0, len);
+  const faceX = depth / 2 - 1.6;
+  return (x, z, y) => {
+    let e = 0;
+    if (y < 2.2) e = Math.max(e, 0.40);                                   // plinth
+    if (y > height - 0.05) e = Math.max(e, 0.55);                          // cornice
+    for (const sy of [9.0, 16.0]) if (Math.abs(y - sy) < course * 0.55) e = Math.max(e, 0.30);
+    if (Math.abs(x) < faceX) return e;        // the ends carry only the bands
+    for (const bz of bays) {
+      const dz = Math.abs(z - bz);
+      if (dz > halfWidth + 0.02 && dz < halfWidth + 0.95) {
+        for (const wy of heights) {
+          if (Math.abs(y - wy) < halfHeight + course * 1.6) e = Math.max(e, 0.22);
+        }
+      }
+      // Pilaster strip midway to the next bay, full height.
+      if (Math.abs(z - (bz + spacing / 2)) < 0.65 && y < height - 0.05) e = Math.max(e, 0.36);
+    }
+    return e;
   };
 }
 
@@ -413,56 +606,74 @@ export function buildPalaceWing(quality) {
 
     // Three storeys of windows down both long elevations, on the real bay
     // spacing of the Palace. The garrison stands in them.
-    const cut = wingWindowCutter(z0, len, depth);
+    //
+    // The wall runs two courses above the roof line as a parapet, which is
+    // what the pinnacles stand on and what hides the foot of the roof.
+    const PARAPET = course * 2;
+    const relief = wingRelief(z0, len, depth, height, course);
+    const cut = wingWindowCutter(z0, len, depth, course);
     B.openings(cut, () => {
       let y = 0;
       let c = 0;
-      while (y < height) {
-        const h = Math.min(course, height - y);
-        B.ring(0, z0 + len / 2, depth, len, 1.5, y, h, stone, M.REDSTONE, c % 2);
+      while (y < height + PARAPET) {
+        const h = Math.min(course, height + PARAPET - y);
+        const yc = y + h / 2;
+        B.ring(0, z0 + len / 2, depth, len, 1.5, y, h, stone, M.REDSTONE, c % 2,
+          (x, z) => relief(x, z, yc));
         y += h; c++;
       }
     });
-    // Lintels over the bays.
+    // Lintels and sills, in their slots, standing proud of the face — and
+    // further out than the jambs, so the two never share a plane.
+    const PROUD = 0.32;
     for (const wy of WING_WINDOWS.heights) {
-      for (let z = z0 + WING_WINDOWS.first; z < z0 + len - 3; z += WING_WINDOWS.spacing) {
+      const kL = Math.ceil((wy + WING_WINDOWS.halfHeight) / course - 0.5);
+      const kS = Math.floor((wy - WING_WINDOWS.halfHeight) / course - 0.5);
+      for (const bz of wingBays(z0, len)) {
         for (const sx of [1, -1]) {
-          B.add(sx * (depth / 2 - 0.75), wy + WING_WINDOWS.halfHeight + 0.3, z,
-            0.75, 0.28, WING_WINDOWS.halfWidth + 0.7, M.REDSTONE);
-          B.add(sx * (depth / 2 - 0.75), wy - WING_WINDOWS.halfHeight - 0.26, z,
-            0.75, 0.24, WING_WINDOWS.halfWidth + 0.7, M.REDSTONE);
+          for (const k of [kL, kS]) {
+            B.add(sx * (depth / 2 - 0.75 + PROUD / 2), (k + 0.5) * course, bz,
+              0.75 + PROUD / 2, course / 2 - 0.015, WING_WINDOWS.halfWidth + 0.7, M.REDSTONE);
+          }
         }
       }
     }
     // Cross walls every 8 m give the wing real internal structure, and give
-    // the roof bearing often enough that it does not rely on spanning.
+    // the roof bearing often enough that it does not rely on spanning. They
+    // meet the outer walls exactly, rather than running into them.
     for (let zc = z0 + 8; zc < z0 + len; zc += 8) {
       let wy = 0;
       while (wy < height) {
         const h = Math.min(course, height - wy);
-        B.slab(0, wy + h / 2, zc, depth - 2.4, h, 1.2, stone, M.BRICK);
+        B.slab(0, wy + h / 2, zc, depth - 3.0, h, 1.2, stone, M.BRICK);
         wy += h;
       }
     }
-    // Pitched roof.
+    // Pitched roof, set inside the parapet.
     // A spine wall down the ridge, so the narrowing upper courses of the roof
-    // have something under them rather than relying on the slab below.
+    // have something under them rather than relying on the slab below. The
+    // roof is laid round it, not through it.
+    const ROOF_H = 6.0;
     let sy = height;
-    while (sy < height + 6.0) {
-      const hh = Math.min(course, height + 6.0 - sy);
-      B.slab(0, sy + hh / 2, z0 + len / 2, 1.6, hh, len - 2, stone, M.BRICK);
+    while (sy < height + ROOF_H) {
+      const hh = Math.min(course, height + ROOF_H - sy);
+      B.slab(0, sy + hh / 2, z0 + len / 2, 1.6, hh, len - 3.4, stone, M.BRICK);
       sy += hh;
     }
     const roofSteps = Math.max(3, Math.round(7 / s));
-    for (let i = 0; i < roofSteps; i++) {
-      const t = i / roofSteps;
-      const w = depth * (1 - t * 0.92);
-      B.slab(0, height + 0.6 + i * (6.0 / roofSteps), z0 + len / 2, w, 6.0 / roofSteps, len, stone * 1.2, M.SLATE);
-    }
-    // Victoria Tower-ish pinnacles along the parapet.
+    const inner = depth - 3.2;
+    B.openings((x) => Math.abs(x) < 0.8 + 0.01, () => {
+      for (let i = 0; i < roofSteps; i++) {
+        const t = i / roofSteps;
+        const w = inner * (1 - t * 0.92);
+        B.slab(0, height + (i + 0.5) * (ROOF_H / roofSteps), z0 + len / 2,
+          w, ROOF_H / roofSteps, len - 3.4, stone * 1.2, M.SLATE);
+      }
+    });
+    // Victoria Tower-ish pinnacles, on the parapet.
     for (let zc = z0 + 6; zc < z0 + len; zc += 11) {
       for (const sx of [1, -1]) {
-        B.pinnacle(sx * (depth / 2 - 0.9), zc, height, 5.0, 1.6, stone, M.REDSTONE);
+        B.pinnacle(sx * (depth / 2 - 0.75), zc, height + PARAPET, 5.0, 1.5, stone, M.REDSTONE);
       }
     }
   });

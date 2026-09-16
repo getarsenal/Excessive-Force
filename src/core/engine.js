@@ -110,7 +110,15 @@ export class Engine {
     }
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(52, 1, 1.2, 6000);
+    // The near plane is what sets depth precision, and it is what decides
+    // whether two faces a joint's width apart can be told from each other at
+    // playing distance. At 1.2 m a 24-bit buffer resolves about a centimetre
+    // at four hundred metres and four at nine hundred, so the brick core
+    // three centimetres behind a tower's facing fought it for the same pixels
+    // from the default camera. The rig never brings the camera within six
+    // metres of the ground or thirty-five of its target, so it can afford
+    // three times the precision.
+    this.camera = new THREE.PerspectiveCamera(52, 1, 3.5, 6000);
 
     this.clock = new THREE.Clock();
     // Dies in well under a second: a thump, not a rumble that carries on.

@@ -166,26 +166,42 @@ export class BlockList {
   /**
    * One course of a hollow rectangular tower: four bonded walls of thickness
    * `wall`, outer footprint `w` x `d`, centred on (cx, cz).
+   *
+   * `relief(x, z)` is how a wall gets its ornament. It returns how far a stone
+   * at that point stands proud of the face, in metres, and the stone is laid
+   * that much thicker and shifted outward by half of it — so a string course,
+   * a pilaster, a window surround or a corbelled cornice is still a stone
+   * standing squarely on the course beneath it, and the solver never sees
+   * anything it has to think about. Ornament hung on the outside of a wall as
+   * separate blocks has nothing under it and falls off on the first frame.
    */
-  ring(cx, cz, w, d, wall, y, courseH, stone, mat, bondOffset = 0) {
+  ring(cx, cz, w, d, wall, y, courseH, stone, mat, bondOffset = 0, relief = null) {
     const hw = w / 2, hd = d / 2;
     const halfH = courseH / 2;
     const yc = y + halfH;
 
-    // North and south walls run the full width; east and west fill the gap
-    // between them, so corners interlock instead of butting.
-    const alongX = (zCentre, zHalf) => {
-      const span = w;
+    // Two walls run between the other two, and which pair runs through swaps
+    // every course, so corners interlock instead of butting.
+    //
+    // Both pairs used to run the full length on even courses, so every even
+    // course laid its four corners twice: two stones sharing the same cubic
+    // metre with their outer faces on exactly the same plane. On screen that
+    // is a corner that flickers between two tints as the depth test changes
+    // its mind, on every ring-built structure in the game; in the physics it
+    // is two bodies interpenetrating.
+    const alongX = (zCentre, zHalf, out, xFrom, xTo) => {
+      const span = xTo - xFrom;
+      if (span <= 0.02) return;
       const n = Math.max(1, Math.round(span / stone));
       const len = span / n;
       for (let i = 0; i < n; i++) {
-        // Bond offset shifts the joint pattern every other course.
         const t = (i + 0.5) / n;
-        const x = cx - hw + t * span + (bondOffset ? 0 : 0);
-        this.add(x, yc, zCentre, shrink(len / 2), shrink(halfH), zHalf, mat);
+        const x = xFrom + t * span;
+        const e = relief ? Math.max(0, relief(x, zCentre + out * zHalf)) : 0;
+        this.add(x, yc, zCentre + out * e / 2, shrink(len / 2), shrink(halfH), zHalf + e / 2, mat);
       }
     };
-    const alongZ = (xCentre, xHalf, zFrom, zTo) => {
+    const alongZ = (xCentre, xHalf, out, zFrom, zTo) => {
       const span = zTo - zFrom;
       if (span <= 0.02) return;
       const n = Math.max(1, Math.round(span / stone));
@@ -193,23 +209,45 @@ export class BlockList {
       for (let i = 0; i < n; i++) {
         const t = (i + 0.5) / n;
         const z = zFrom + t * span;
-        this.add(xCentre, yc, z, xHalf, shrink(halfH), shrink(len / 2), mat);
+        const e = relief ? Math.max(0, relief(xCentre + out * xHalf, z)) : 0;
+        this.add(xCentre + out * e / 2, yc, z, xHalf + e / 2, shrink(halfH), shrink(len / 2), mat);
       }
     };
 
     const halfWall = wall / 2;
-    // Stagger the two wall pairs between courses so the corner bond alternates.
     if (bondOffset) {
-      alongX(cz - hd + halfWall, halfWall);
-      alongX(cz + hd - halfWall, halfWall);
-      alongZ(cx - hw + halfWall, halfWall, cz - hd + wall, cz + hd - wall);
-      alongZ(cx + hw - halfWall, halfWall, cz - hd + wall, cz + hd - wall);
+      alongX(cz - hd + halfWall, halfWall, -1, cx - hw, cx + hw);
+      alongX(cz + hd - halfWall, halfWall, 1, cx - hw, cx + hw);
+      alongZ(cx - hw + halfWall, halfWall, -1, cz - hd + wall, cz + hd - wall);
+      alongZ(cx + hw - halfWall, halfWall, 1, cz - hd + wall, cz + hd - wall);
     } else {
-      alongZ(cx - hw + halfWall, halfWall, cz - hd, cz + hd);
-      alongZ(cx + hw - halfWall, halfWall, cz - hd, cz + hd);
-      alongX(cz - hd + halfWall, halfWall);
-      alongX(cz + hd - halfWall, halfWall);
+      alongZ(cx - hw + halfWall, halfWall, -1, cz - hd, cz + hd);
+      alongZ(cx + hw - halfWall, halfWall, 1, cz - hd, cz + hd);
+      alongX(cz - hd + halfWall, halfWall, -1, cx - hw + wall, cx + hw - wall);
+      alongX(cz + hd - halfWall, halfWall, 1, cx - hw + wall, cx + hw - wall);
     }
+  }
+
+  /**
+   * The volume an `arch` will occupy, as an opening predicate.
+   *
+   * An arch is laid *into* a wall, not onto one: the masonry has to be left
+   * out where the ring and the opening under its crown will be, and then the
+   * voussoirs fill the gap. Laid over an uncut wall — which is what the Taj's
+   * iwans and the chamber doorways did — every voussoir shares its volume with
+   * the stones already there, the ring is buried, and the faces that do show
+   * fight the wall's for the same pixels.
+   */
+  static archVoid(cx, cy, cz, span, thickness, depth, axis = 'x', margin = 0.12) {
+    const rOut = span / 2 + thickness + margin;
+    const hd = depth / 2 + margin;
+    return (x, y, z) => {
+      if (y < cy - 0.05) return false;
+      const along = axis === 'x' ? x - cx : z - cz;
+      const perp = axis === 'x' ? z - cz : x - cx;
+      if (Math.abs(perp) > hd) return false;
+      return Math.hypot(along, y - cy) < rOut;
+    };
   }
 
   /** A stack of bonded ring courses between two heights. */
@@ -265,16 +303,21 @@ export class BlockList {
       const bx = Math.cos(am) * rc;
       const by = Math.sin(am) * rc;
       const segLen = (Math.PI * rc) / count;
+      // Neighbouring voussoirs overlap a little where the ring curves, and
+      // their faces would then share a plane. Alternate ones are laid a
+      // hand's width smaller all round, so no face of one is on a face of
+      // the next — which is what a rusticated ring looks like anyway.
+      const ins = (i % 2) * 0.07;
       if (axis === 'x') {
-        this.add(cx + bx, cy + by, cz, shrink(segLen / 2), shrink(thickness / 2), depth / 2, mat, 0);
+        this.add(cx + bx, cy + by, cz, shrink(segLen / 2) - ins, shrink(thickness / 2) - ins, depth / 2 - ins, mat, 0);
       } else {
-        this.add(cx, cy + by, cz + bx, depth / 2, shrink(thickness / 2), shrink(segLen / 2), mat, 0);
+        this.add(cx, cy + by, cz + bx, depth / 2 - ins, shrink(thickness / 2) - ins, shrink(segLen / 2) - ins, mat, 0);
       }
     }
   }
 
   /** Hollow tapering spire built from bonded courses. */
-  spire(cx, cz, y0, y1, baseW, topW, courseH, stone, mat, wallFrac = 0.42) {
+  spire(cx, cz, y0, y1, baseW, topW, courseH, stone, mat, wallFrac = 0.42, relief = null) {
     let y = y0;
     let course = 0;
     while (y < y1 - 0.001) {
@@ -287,7 +330,8 @@ export class BlockList {
       if (w <= wall * 2.1) {
         this.slab(cx, y + h / 2, cz, w, h, w, stone, mat);
       } else {
-        this.ring(cx, cz, w, w, wall, y, h, stone, mat, course % 2);
+        this.ring(cx, cz, w, w, wall, y, h, stone, mat, course % 2,
+          relief ? (x, z) => relief(x, z, y, course) : null);
       }
       y += h;
       course++;
@@ -313,7 +357,7 @@ export class BlockList {
    * OpenStreetMap footprint — from one primitive. `pts` are [x, z] offsets from
    * (cx, cz), walked as a closed loop.
    */
-  polyRing(cx, cz, pts, wall, y, courseH, stone, mat, phase = 0) {
+  polyRing(cx, cz, pts, wall, y, courseH, stone, mat, phase = 0, relief = null) {
     const halfH = courseH / 2;
     const yc = y + halfH;
     const n = pts.length;
@@ -329,6 +373,11 @@ export class BlockList {
       const seg = len / count;
       // Local +z runs along the edge, local +x is the wall thickness.
       const ry = Math.atan2(dx, dz);
+      // Which way is out: the edge normal that points away from the centre.
+      // Relief is laid along it, the same way `ring` does — see there.
+      let nx = dz / len, nz = -dx / len;
+      const mx = a[0] + dx / 2, mz = a[1] + dz / 2;
+      if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }
 
       // Only stagger when the edge actually holds more than one stone. With a
       // single stone the half-segment shift pushes it past the end of the edge
@@ -341,9 +390,11 @@ export class BlockList {
       for (let k = 0; k < count; k++) {
         const t = (k + 0.5 + stagger) / count;
         if (t >= 1.0) continue;
+        const sx = cx + a[0] + dx * t, sz = cz + a[1] + dz * t;
+        const e = relief ? Math.max(0, relief(sx + nx * wall / 2, sz + nz * wall / 2)) : 0;
         this.add(
-          cx + a[0] + dx * t, yc, cz + a[1] + dz * t,
-          shrink(wall / 2), shrink(halfH), shrink(seg / 2), mat, ry,
+          sx + nx * e / 2, yc, sz + nz * e / 2,
+          shrink(wall / 2) + e / 2, shrink(halfH), shrink(seg / 2), mat, ry,
         );
       }
     }
