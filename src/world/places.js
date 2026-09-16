@@ -150,17 +150,85 @@ export function buildPrecinct(props, terrain, rng, opts) {
       }
     }
   } else {
-    // Lawn panels, gravel walks between them, and a line of plane trees along
-    // the inside of the railings — which is what a London square actually is.
-    for (let k = 0; k < 90; k++) {
-      const u = u0 + 8 + rng() * (u1 - u0 - 16);
-      const v = v0 + 8 + rng() * (v1 - v0 - 16);
+    // A square with a plan to it: a gravel walk round the inside of the
+    // railings, walks in from the gates to the building, a few planted beds,
+    // and a line of plane trees along the fence.
+    //
+    // The grass itself is the ground's — the terrain paints the whole pad as
+    // lawn — so nothing green is laid on top of it. The version this replaces
+    // scattered ninety lawn panels of random size and shade across the
+    // precinct, overlapping each other, the walks and the building's foot,
+    // and from a phone the whole square read as a patchwork quilt.
+    const WALK = 3.4;
+    const walk = (x, z, len, ang) => {
+      if (!clear(x, z)) return false;
+      props.add('stone', box(WALK, 0.16, len + 0.1, x, gy(x, z) + 0.14, z, ang),
+        0xc6bca2, 0.92 + rng() * 0.1);
+      counts.walks++;
+      return true;
+    };
+    // The perimeter walk: the enclosure's outline again, eight metres in, so
+    // the trees stand on the grass between it and the railings.
+    const IN = 8;
+    const cut2 = Math.max(4, CUT - IN * 0.4);
+    const inner = [
+      [u0 + IN + cut2, v0 + IN], [u1 - IN - cut2, v0 + IN], [u1 - IN, v0 + IN + cut2],
+      [u1 - IN, v1 - IN - cut2], [u1 - IN - cut2, v1 - IN], [u0 + IN + cut2, v1 - IN],
+      [u0 + IN, v1 - IN - cut2], [u0 + IN, v0 + IN + cut2],
+    ].map(([u, v]) => toWorld(u, v));
+    for (let i = 0; i < inner.length; i++) {
+      const a = inner[i], b = inner[(i + 1) % inner.length];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz);
+      const n2 = Math.max(1, Math.round(len / 6));
+      const ang = Math.atan2(dx, dz);
+      for (let k = 0; k < n2; k++) {
+        const t = (k + 0.5) / n2;
+        walk(a.x + dx * t, a.z + dz * t, len / n2, ang);
+      }
+    }
+    // From each gate, straight in to the building's foot.
+    const cx = (u0 + u1) / 2, cz = (v0 + v1) / 2;
+    const centre = toWorld(cx, cz);
+    const seen = [];
+    for (const gt of gates) {
+      if (seen.some((s) => Math.hypot(s.x - gt.x, s.z - gt.z) < 40)) continue;
+      seen.push(gt);
+      const dx = centre.x - gt.x, dz = centre.z - gt.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 1) continue;
+      const ux = dx / len, uz = dz / len;
+      const ang = Math.atan2(ux, uz);
+      for (let t = 3; t < len; t += 5) {
+        const x = gt.x + ux * t, z = gt.z + uz * t;
+        if (!inside(x, z)) continue;
+        if (onLandmark(x, z)) break;
+        walk(x, z, 5, ang);
+      }
+    }
+    // Beds: a handful, round, dark earth with planting, and never on a walk.
+    for (let k = 0, tries = 0; k < 6 && tries < 40; tries++) {
+      const u = u0 + IN + 10 + rng() * (u1 - u0 - 2 * IN - 20);
+      const v = v0 + IN + 10 + rng() * (v1 - v0 - 2 * IN - 20);
       const q = toWorld(u, v);
       if (!clear(q.x, q.z)) continue;
-      const w = 11 + rng() * 17, d = 11 + rng() * 17;
-      props.add('foliage', box(w, 0.24, d, q.x, gy(q.x, q.z) + 0.15, q.z, yaw),
-        rng() < 0.2 ? 0xb6ab8e : 0x4e7038, 0.86 + rng() * 0.26);
+      const dg = centre.x - q.x, dgz = centre.z - q.z;
+      const onCross = seen.some((gt) => {
+        const ex = centre.x - gt.x, ez = centre.z - gt.z, el = Math.hypot(ex, ez);
+        const s = ((q.x - gt.x) * ex + (q.z - gt.z) * ez) / (el * el);
+        if (s < 0 || s > 1) return false;
+        const px = gt.x + ex * s, pz = gt.z + ez * s;
+        return Math.hypot(q.x - px, q.z - pz) < 6;
+      });
+      if (onCross || Math.hypot(dg, dgz) < 12) continue;
+      const g = gy(q.x, q.z);
+      const r = 2.6 + rng() * 1.4;
+      props.add('stone', cyl(r + 0.4, r + 0.4, 0.3, 10, q.x, g + 0.2, q.z), 0xb9b09a, 0.95);
+      props.add('dark', cyl(r, r, 0.4, 10, q.x, g + 0.3, q.z), 0x4b3627, 1);
+      props.add('foliage', cyl(r * 0.55, r * 0.9, 0.9, 8, q.x, g + 0.85, q.z),
+        [0x7a3a5a, 0xa8474a, 0xc9a23a, 0x4e7a3a][Math.floor(rng() * 4)], 0.9 + rng() * 0.2);
       counts.beds++;
+      k++;
     }
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length];
