@@ -118,6 +118,7 @@ export function showLevelSelect({ current = null, canResume = false } = {}) {
   root.innerHTML = `
     <div class="ls-inner">
       <div class="ls-head">
+        <img class="ls-logo" src="./logo-512.png" alt="Excessive Force" width="512" height="512">
         <div class="ls-title">EXCESSIVE FORCE</div>
         <div class="ls-sub">SELECT TARGET · ${done} OF ${list.length} DOWN</div>
       </div>

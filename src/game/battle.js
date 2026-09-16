@@ -1172,8 +1172,22 @@ export class Battle {
     return true;
   }
 
+  /** Has every objective been brought to nothing? For the readouts. */
+  get flattened() { return !!this._flattened; }
+
   _checkEnd() {
-    if (this._winAcknowledged) return;
+    if (this._winAcknowledged) {
+      // The win is banked and play went on. When there is nothing left of
+      // any objective, say so once: a player who has taken the last ten per
+      // cent down deserves a card for it, and without one the hundred looked
+      // like a win that never came.
+      if (!this._flattened && this.objectives.every((o) => o.structure.monumentIntegrity < 0.03)) {
+        this._flattened = true;
+        this.state = 'won';
+        this.onEvent('flattened', this.summary());
+      }
+      return;
+    }
     // Every required structure has to be down. A wing that shoots at the
     // player for the whole match and then counts for nothing was the odd one
     // out here: it is a target, so it is part of the job.

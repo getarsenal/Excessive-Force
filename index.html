@@ -4,12 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>EXCESSIVE FORCE</title>
-<meta name="description" content="Bring down the world's landmarks, one stone at a time.">
+<meta name="description" content="Bring down the world's landmarks, one stone at a time. A 3D artillery demolition game — Big Ben, the Eiffel Tower, the Taj Mahal and the Pyramids, on their real ground.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Excessive Force">
 <meta name="theme-color" content="#0b0d10">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b0d10'/%3E%3Cpath d='M13 27V11l3-6 3 6v16z' fill='%23c9bfa4'/%3E%3Crect x='14' y='13' width='4' height='4' fill='%23dfeaf2'/%3E%3Cpath d='M6 27l4-5 2 5zM22 27l3-4 2 4z' fill='%238a5341'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="64x64" href="./favicon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+<link rel="manifest" href="./site.webmanifest">
+<!-- What a shared link unfurls into. Absolute, because a card fetcher has no
+     idea where a relative path points. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Excessive Force">
+<meta property="og:title" content="Excessive Force">
+<meta property="og:description" content="Bring down the world's landmarks, one stone at a time. Big Ben, the Eiffel Tower, the Taj Mahal and the Pyramids — real ground, real masonry, your artillery.">
+<meta property="og:url" content="https://getarsenal.app/">
+<meta property="og:image" content="https://getarsenal.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Excessive Force — the Taj Mahal coming apart under artillery fire">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Excessive Force">
+<meta name="twitter:description" content="Bring down the world's landmarks, one stone at a time.">
+<meta name="twitter:image" content="https://getarsenal.app/og.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -20,6 +39,7 @@
 
   <div id="loading">
     <div class="load-inner">
+      <img class="load-logo" src="./logo-512.png" alt="Excessive Force" width="512" height="512" decoding="async">
       <div class="load-title">EXCESSIVE FORCE</div>
       <div class="load-sub">WESTMINSTER · LONDON</div>
       <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>

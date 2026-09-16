@@ -109,10 +109,18 @@ export class HUD {
     if (!el) return;
     const b = this.battle;
     const scale = b.level?.unlockScale ?? 1;
+    // The bar and the unlocks measure different things. Unlocks are a
+    // fraction of all the mass on the map; the bar is each objective's share
+    // of the way to its own threshold, so it reaches the end exactly when
+    // the level is won — the end of the bar *is* the win, and a separate
+    // "WIN" mark at ninety per cent was a promise the game did not keep.
+    // Unlock marks are converted onto the bar's scale.
+    const denom = b.objectives.reduce(
+      (a, o) => a + o.structure.totalMass * (1 - o.win.integrity), 0) / Math.max(1, b.totalMass);
     const seen = new Set();
     for (const u of UNITS) {
-      const frac = Math.min(1, (u.unlockFrac ?? 0) / scale);
-      if (frac <= 0.001 || frac >= 0.999) continue;
+      const frac = Math.min(1, ((u.unlockFrac ?? 0) / scale) / Math.max(0.05, denom));
+      if (frac <= 0.001 || frac >= 0.97) continue;
       const key = frac.toFixed(3);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -122,14 +130,6 @@ export class HUD {
       t.title = `${u.name} unlocks`;
       el.appendChild(t);
     }
-    // Where it is won: the bar reads "done" from the left, so the win is the
-    // integrity threshold measured from the right.
-    const win = document.createElement('i');
-    win.className = 'tick win';
-    const integ = b.level?.win?.integrity ?? 0.10;
-    win.style.left = `${((1 - integ) * 100).toFixed(1)}%`;
-    win.title = 'target down';
-    el.appendChild(win);
   }
 
   _setupModes() {
@@ -428,18 +428,18 @@ export class HUD {
     }
   }
 
-  showEnd(kind, summary) {
+  showEnd(kind, summary, opts = {}) {
     this.el.endcard.hidden = false;
     const won = kind === 'win';
-    this.el.ecTitle.textContent = won
+    this.el.ecTitle.textContent = opts.title ?? (won
       ? (this.battle.level?.victory ?? 'TARGET DOWN')
-      : 'ASSAULT STALLED';
+      : 'ASSAULT STALLED');
     // A five-word title at headline size stacks three deep; give it a step
     // down so it holds two lines.
     const long = this.el.ecTitle.textContent.length > 16;
     this.el.ecTitle.className = `ec-title ${won ? 'win' : 'lose'}${long ? ' long' : ''}`;
     const site = this.battle.level?.subtitle ?? '';
-    this.el.ecSub.textContent = won ? site : 'Out of funds with the target still standing';
+    this.el.ecSub.textContent = opts.sub ?? (won ? site : 'Out of funds with the target still standing');
 
     const mins = Math.floor(summary.time / 60);
     const secs = Math.floor(summary.time % 60);

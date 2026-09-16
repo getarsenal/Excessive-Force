@@ -399,6 +399,15 @@ async function boot() {
           hud.showEnd('win', sum);
         }, 7000);
         break;
+      case 'flattened':
+        hud.feed('NOTHING LEFT STANDING', 'big');
+        setTimeout(() => {
+          const sum = battle.summary();
+          recordResult(level.id, true, sum);
+          hud.nextTargetLabel = nextTarget(level.id).target;
+          hud.showEnd('win', sum, { title: 'Flattened', sub: `${level.subtitle} · nothing left standing` });
+        }, 3000);
+        break;
       case 'lose':
         setTimeout(() => {
           recordResult(level.id, false, data);
