@@ -21,7 +21,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // Force a quality tier so tests can check what a desktop actually gets; the
 // software rasteriser here would otherwise always be detected as "low".
-await page.addInitScript(([tier, intro]) => {
+await page.addInitScript(([tier, intro, opening]) => {
   try {
     localStorage.setItem('tt.quality', tier);
     // Skip the target-select screen. A fresh browser profile has never chosen
@@ -31,8 +31,12 @@ await page.addInitScript(([tier, intro]) => {
     // And the stand-off before the level, unless a run wants to look at it
     // (TT_INTRO=1): the suites need guns on the ground, not a cutscene.
     localStorage.setItem('tt.intros', intro);
+    // The opening waits on a tap by design — it has to, to unlock audio — so
+    // a harness run would sit on the gate for ever. TT_OPENING=1 to see it.
+    localStorage.setItem('tt.opening', opening);
   } catch { /* private mode */ }
-}, [process.env.TT_TIER || 'high', process.env.TT_INTRO === '1' ? '1' : '0']);
+}, [process.env.TT_TIER || 'high', process.env.TT_INTRO === '1' ? '1' : '0',
+    process.env.TT_OPENING === '1' ? '1' : '0']);
 
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));

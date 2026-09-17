@@ -1,16 +1,10 @@
 import { UNITS } from '../game/units.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
+import { openingEnabled, setOpeningEnabled } from './opening.js';
+export { TAP } from './pointer.js';
 
-/**
- * What the player does with the pointer they have.
- *
- * Every prompt in the game told the player to "tap", which on a desktop is
- * an instruction to do something they cannot do with the hardware in front
- * of them. A mouse is a fine pointer that hovers; a finger is neither.
- */
-export const TAP = (typeof matchMedia === 'function'
-  && matchMedia('(hover: hover) and (pointer: fine)').matches) ? 'click' : 'tap';
+
 
 
 /**
@@ -172,6 +166,12 @@ export class HUD {
       if (this.el.sound) this.el.sound.click();
       snd.textContent = this.soundOn ? 'SOUND: ON' : 'SOUND: OFF';
     });
+    const opening = menu.querySelector('#menu-opening');
+    if (opening) {
+      const label = () => { opening.textContent = openingEnabled() ? 'OPENING: ON' : 'OPENING: OFF'; };
+      label();
+      opening.addEventListener('click', () => { setOpeningEnabled(!openingEnabled()); label(); });
+    }
     const intros = menu.querySelector('#menu-intros');
     if (intros) {
       const label = () => { intros.textContent = introsEnabled() ? 'INTROS: ON' : 'INTROS: OFF'; };

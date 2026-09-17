@@ -18,7 +18,8 @@ import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
 import { Garrison, loadSoldierGeometry } from './game/defenders.js';
 import { Battle } from './game/battle.js';
-import { HUD, TAP } from './ui/hud.js';
+import { HUD } from './ui/hud.js';
+import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
@@ -27,6 +28,7 @@ import { Fires } from './fx/fires.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
+import { runOpening, openingEnabled } from './ui/opening.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -43,6 +45,20 @@ async function boot() {
   console.log('[tumble] quality', quality.id, '· wasm simd', quality.simd,
     '· body budget', quality.activeBodies);
 
+  // The wasm starts down the wire now, not after the opening.
+  //
+  // Physics does not care which level was chosen, so there is no reason for
+  // it to wait behind a studio card. Started here it loads while the player
+  // is watching the title arrive, and the await further down is usually
+  // already satisfied by the time we reach it — the opening costs the player
+  // nothing but the seconds they would have spent on a progress bar. The
+  // no-op catch only stops the browser reporting an unhandled rejection in
+  // the window before that await; the await itself still throws.
+  const physicsReady = initPhysics();
+  physicsReady.catch(() => { /* surfaced at the await below */ });
+
+  if (openingEnabled()) await runOpening();
+
   // Ask which target, unless the player has already said or a link says for
   // them. This is the front door: without it the only level a player can
   // reach is Westminster.
@@ -55,7 +71,7 @@ async function boot() {
   // The two commanders fetch while the world builds, so the stand-off never
   // opens on an empty stage.
   const castReady = introsEnabled() ? preloadCast(level.id) : Promise.resolve();
-  await initPhysics();
+  await physicsReady;
 
   const canvas = document.getElementById('game-canvas');
   const engine = new Engine(canvas, quality);

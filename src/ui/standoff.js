@@ -1,5 +1,5 @@
 import { CAST, DEFENDER_OF, STANDOFF } from '../game/cast.js';
-import { TAP } from './hud.js';
+import { TAP } from './pointer.js';
 
 /**
  * The stand-off before a level.

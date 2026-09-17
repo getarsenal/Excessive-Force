@@ -785,3 +785,152 @@ html, body {
   .so-fig { opacity: 0; } .so-fig.in { opacity: 1; }
   #standoff::before, #standoff::after { animation: none; transform: none; }
 }
+
+/* ── The opening ─────────────────────────────────────────────────────────
+   Gate, studio sting, title card. Above the loading screen, which is
+   building the world underneath the whole time and is what this fades on to. */
+#opening {
+  position: fixed; inset: 0; z-index: 200;
+  background: #05070a;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  transition: opacity 0.55s ease;
+}
+#opening.done { opacity: 0; pointer-events: none; }
+.op-stage { position: absolute; inset: 0; }
+
+/* Each beat fills the stage and centres its own content. They are stacked
+   rather than laid out side by side: as flex siblings, a faded-out gate still
+   held its slot and shunted the title half a screen to the right. */
+.op-gate, .op-title {
+  position: absolute; inset: 0; z-index: 3;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 0 20px;
+}
+
+/* The door. */
+.op-gate { transition: opacity 0.4s ease, transform 0.4s ease; }
+.op-gate.out { opacity: 0; transform: scale(1.04); pointer-events: none; visibility: hidden; }
+.op-logo {
+  width: clamp(150px, 38vmin, 280px); height: auto;
+  opacity: 0.85; filter: drop-shadow(0 12px 34px rgba(0, 0, 0, 0.7));
+  animation: opBreathe 4.5s ease-in-out infinite;
+}
+@keyframes opBreathe { 0%, 100% { opacity: 0.74; } 50% { opacity: 0.95; } }
+.op-begin {
+  margin-top: 26px; font-size: 12px; letter-spacing: 0.44em;
+  color: var(--text); text-transform: uppercase;
+  animation: opBlink 2s ease-in-out infinite;
+}
+@keyframes opBlink { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.op-studio-small {
+  position: absolute; bottom: 9vh; left: 0; right: 0;
+  font-size: 9px; letter-spacing: 0.4em; color: rgba(126, 139, 155, 0.6);
+  white-space: nowrap;
+}
+
+/* The studio sting: full bleed, and it is the only thing on screen. */
+.op-sting {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; z-index: 2; opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.op-sting.in { opacity: 1; }
+
+/* The title. */
+.op-words { position: relative; max-width: 100%; }
+.op-word {
+  font-weight: 700; line-height: 0.96; text-transform: uppercase;
+  color: #e7edf5; opacity: 0;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.8);
+}
+.op-w1 { font-size: clamp(28px, 9.6vw, 96px); letter-spacing: 0.09em; white-space: nowrap; }
+.op-w2 {
+  font-size: clamp(42px, 14.5vw, 140px); letter-spacing: 0.05em; white-space: nowrap;
+  /* The heavier word carries the stone colour the masonry is drawn in. */
+  background: linear-gradient(180deg, #fbfdff 0%, #cfd9e4 52%, #93a2b4 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+/* Each word arrives from above and stops dead — no ease-out drift, because
+   nothing this game drops on a building decelerates on the way down. */
+.op-title.hit1 .op-w1 { animation: opSlam 0.34s cubic-bezier(0.2, 0.9, 0.1, 1) forwards; }
+.op-title.hit2 .op-w2 { animation: opSlam 0.3s cubic-bezier(0.2, 0.95, 0.08, 1) forwards; }
+@keyframes opSlam {
+  0% { opacity: 0; transform: translateY(-38px) scale(1.1); filter: blur(6px); }
+  60% { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+/* The ring the second word throws out. */
+.op-shock {
+  position: absolute; left: 50%; top: 50%; width: 10px; height: 10px;
+  margin: -5px 0 0 -5px; border-radius: 50%;
+  border: 2px solid rgba(220, 232, 245, 0.55); opacity: 0;
+  pointer-events: none;
+}
+.op-title.hit2 .op-shock { animation: opShock 0.9s ease-out forwards; }
+@keyframes opShock {
+  0% { opacity: 0.8; transform: scale(1); border-width: 3px; }
+  100% { opacity: 0; transform: scale(46); border-width: 0.5px; }
+}
+
+.op-rule {
+  height: 1px; width: 0; margin: 22px auto 0;
+  background: linear-gradient(90deg, transparent, rgba(180, 200, 225, 0.55), transparent);
+}
+.op-tag {
+  margin-top: 14px; max-width: min(88vw, 560px); line-height: 1.7;
+  font-size: clamp(8px, 2.2vw, 11px); letter-spacing: 0.3em;
+  color: var(--dim); text-transform: uppercase; opacity: 0;
+  transition: opacity 0.8s ease 0.15s;
+}
+.op-title.settled .op-rule { width: min(78vw, 520px); transition: width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.op-title.settled .op-tag { opacity: 1; }
+
+/* The impact flash, and the ground moving under it. */
+.op-flash {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  background: #dfe9f5; opacity: 0;
+}
+.op-flash.on { opacity: 0.16; }
+.op-flash.on.hard { opacity: 0.34; }
+.op-stage.shake-1 { animation: opShake1 0.36s ease-out; }
+.op-stage.shake-2 { animation: opShake2 0.5s ease-out; }
+@keyframes opShake1 {
+  0% { transform: translate(0, 0); } 18% { transform: translate(-5px, 4px); }
+  38% { transform: translate(4px, -3px); } 60% { transform: translate(-3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes opShake2 {
+  0% { transform: translate(0, 0) scale(1.012); } 14% { transform: translate(11px, -8px) scale(1.012); }
+  30% { transform: translate(-9px, 6px) scale(1.008); } 48% { transform: translate(7px, 5px) scale(1.005); }
+  68% { transform: translate(-4px, -3px) scale(1.002); } 100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Dust, lit from below, drifting up through the card. */
+.op-dust {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.55;
+  background:
+    radial-gradient(1.5px 1.5px at 18% 82%, rgba(210, 224, 240, 0.5), transparent),
+    radial-gradient(2px 2px at 71% 91%, rgba(210, 224, 240, 0.38), transparent),
+    radial-gradient(1.5px 1.5px at 42% 74%, rgba(210, 224, 240, 0.42), transparent),
+    radial-gradient(1px 1px at 88% 68%, rgba(210, 224, 240, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 8% 61%, rgba(210, 224, 240, 0.35), transparent),
+    radial-gradient(ellipse 60% 40% at 50% 108%, rgba(90, 110, 135, 0.35), transparent 70%);
+  animation: opDrift 14s linear infinite;
+}
+@keyframes opDrift {
+  0% { transform: translateY(0); opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { transform: translateY(-34px); opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .op-stage.shake-1, .op-stage.shake-2 { animation: none; }
+  .op-dust { animation: none; }
+  .op-logo { animation: none; opacity: 0.85; }
+  .op-title.hit1 .op-w1, .op-title.hit2 .op-w2 { animation: opFadeIn 0.4s ease forwards; }
+  @keyframes opFadeIn { from { opacity: 0; } to { opacity: 1; transform: none; } }
+}
