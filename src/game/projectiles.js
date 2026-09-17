@@ -87,6 +87,87 @@ export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5) {
   return high || flat;
 }
 
+/**
+ * What a rocket's motor does to it after it leaves the rail.
+ *
+ * Shared with the projectile itself so the solver and the flight model can
+ * never drift apart: a solution computed against one set of numbers and flown
+ * against another is precisely the bug this pair of constants exists to stop.
+ */
+export const ROCKET_BOOST = { time: 0.85, accel: 95 };
+
+/** The slowest a rocket can usefully leave the rail. Below this it is a prop. */
+const MIN_LAUNCH = 18;
+
+/**
+ * Fly a boosted rocket and report where it comes down through `targetY`.
+ *
+ * The same integration the projectile runs, at a fixed step: the motor along
+ * the launch line for its burn, then gravity alone.
+ */
+function flyBoosted(from, vel, gravity, targetY) {
+  const dt = 1 / 60;
+  let x = from.x, y = from.y, z = from.z;
+  let vx = vel.x, vy = vel.y, vz = vel.z;
+  const s = Math.hypot(vx, vy, vz) || 1;
+  const bx = vx / s, by = vy / s, bz = vz / s;
+  for (let t = 0; t < 40; t += dt) {
+    if (t < ROCKET_BOOST.time) {
+      const a = ROCKET_BOOST.accel * dt;
+      vx += bx * a; vy += by * a; vz += bz * a;
+    }
+    vy -= gravity * dt;
+    const prevY = y;
+    x += vx * dt; y += vy * dt; z += vz * dt;
+    if (vy < 0 && prevY >= targetY && y <= targetY) return { x, z, t };
+  }
+  return null;
+}
+
+/**
+ * A firing solution for a rocket, which is not a shell.
+ *
+ * A rocket leaves the rail and then its motor adds eighty metres a second
+ * along the launch line for the next second. Solving the trajectory
+ * ballistically and lighting the motor afterwards is not an approximation, it
+ * is a different shot: at a hundred metres the ballistic answer is 36 m/s at
+ * sixty-six degrees, the motor turns that into 117 m/s at sixty-six degrees,
+ * and the rocket lands a kilometre away. That is the launcher that "shoots up
+ * in the air and lands far away", and it only does it when it is close enough
+ * for the minimum-energy arc to be the steep one.
+ *
+ * So the burn is part of the solve. Work out the velocity the rocket needs to
+ * *end the burn* with, launch it that much slower, then fly the result and
+ * walk the aim point back by however far it went long — the burn also carries
+ * it forward while it is running, which no closed form is going to capture.
+ * Two or three passes settle it to within a couple of metres.
+ *
+ * Inside minimum range there is no answer: the motor alone carries the rocket
+ * further than the target, and no launch speed can be low enough. The crew is
+ * told so and holds its fire, which is what a real battery does with a target
+ * inside its minimum range.
+ */
+export function solveBoosted(from, to, maxSpeed, gravity, maxFlight = 9.0) {
+  const dv = ROCKET_BOOST.accel * ROCKET_BOOST.time;
+  const aim = { x: to.x, y: to.y, z: to.z };
+  let out = null;
+  for (let pass = 0; pass < 4; pass++) {
+    const sol = solveBallistic(from, aim, maxSpeed, gravity, maxFlight);
+    if (!sol) return null;
+    const speed = Math.hypot(sol.vel.x, sol.vel.y, sol.vel.z);
+    const launch = speed - dv;
+    if (launch < MIN_LAUNCH) return null;          // inside minimum range
+    const vel = sol.vel.clone().multiplyScalar(launch / speed);
+    const land = flyBoosted(from, vel, gravity, to.y);
+    if (!land) return null;
+    out = vel;
+    const ex = land.x - to.x, ez = land.z - to.z;
+    if (Math.hypot(ex, ez) < 2) break;
+    aim.x -= ex; aim.z -= ez;
+  }
+  return out;
+}
+
 /** Flat-ish direct fire: aim straight, with a small lead for the drop. */
 export function solveDirect(from, to, speed, gravity) {
   const delta = new THREE.Vector3().subVectors(to, from);
@@ -132,8 +213,8 @@ export class Projectile {
       this._lastRange = Infinity;
     }
     if (this.kind === 'rocket') {
-      this.boostTime = 0.85;
-      this.boostAccel = 95;
+      this.boostTime = ROCKET_BOOST.time;
+      this.boostAccel = ROCKET_BOOST.accel;
       this.boostDir = this.vel.clone().normalize();
     }
   }

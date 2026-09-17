@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
-import { solveArc, solveBallistic, solveDirect, ProjectileManager } from './projectiles.js';
+import {
+  solveArc, solveBallistic, solveBoosted, solveDirect, ProjectileManager, ROCKET_BOOST,
+} from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
 import { lineOfSight } from '../structure/occupancy.js';
@@ -419,8 +421,14 @@ export class Battle {
     return true;
   }
 
-  /** Can a unit stand here? */
-  validPlacement(point) {
+  /**
+   * Can a unit stand here?
+   *
+   * `def` is optional — most callers only care about the ground — but a
+   * launcher's near limit depends on what it is being asked to shoot, so
+   * placing one is the moment to say no.
+   */
+  validPlacement(point, def = null) {
     if (!point) return { ok: false, reason: 'no ground' };
     // A rooftop has already been established as a flat surface by the picker;
     // what is underneath it — river, road, another building — is beside the
@@ -451,6 +459,23 @@ export class Battle {
     for (const u of this.units) {
       if (!u.alive) continue;
       if (u.pos.distanceTo(point) < 7) return { ok: false, reason: 'occupied' };
+    }
+    // A launcher has a near limit and this is where the player finds out.
+    // Its rocket cannot come down closer than the motor carries it, so one
+    // parked against the building it is meant to shell has no shot at all —
+    // and saying so here beats a launcher that sits there silently, or the
+    // old behaviour, which was to throw the rocket over the target and into
+    // the next borough.
+    if (def && def.minRange) {
+      for (const s of this.structures) {
+        const f = s.footprint;
+        if (!f) continue;
+        const dx = Math.max(f.x0 - point.x, 0, point.x - f.x1);
+        const dz = Math.max(f.z0 - point.z, 0, point.z - f.z1);
+        if (Math.hypot(dx, dz) < def.minRange) {
+          return { ok: false, reason: 'inside minimum range' };
+        }
+      }
     }
     // And not inside a building. Nothing stopped this before, so a gun placed
     // on a street that happened to be a block would simply be swallowed — it
@@ -498,7 +523,7 @@ export class Battle {
     if (def.strike) return this.callStrike(id, point);
     if (!this.isUnlocked(def)) return null;
     if (!this.freeBuild && this.money < def.cost) { this.onEvent('poor', def); return null; }
-    const check = this.validPlacement(point);
+    const check = this.validPlacement(point, def);
     if (!check.ok) { this.onEvent('badplace', check); return null; }
 
     if (!this.freeBuild) {
@@ -671,7 +696,20 @@ export class Battle {
    */
   aimFor(unit) {
     const r = unit.def.range;
-    if (this.target && unit.pos.distanceTo(this.target) <= r) return this.target;
+    // A launcher has a minimum range as well as a maximum, and the near limit
+    // is the one that bites: its rocket cannot come down closer than the motor
+    // carries it. Laying on something inside that is not a shot, so the crew
+    // looks past it — and if there is nothing further out, it stands idle,
+    // which at least reads as a unit in the wrong place rather than one
+    // lobbing rockets over the far side of the map.
+    const near = unit.def.minRange || 0;
+    const near2 = near * near;
+    const reaches = (x, y, z) => {
+      const dx = x - unit.pos.x, dy = y - unit.pos.y, dz = z - unit.pos.z;
+      const d = dx * dx + dy * dy + dz * dz;
+      return d <= r * r && d >= near2;
+    };
+    if (this.target && reaches(this.target.x, this.target.y, this.target.z)) return this.target;
     if (!this.autoEngage) return null;
 
     // ── Defenders first.
@@ -684,6 +722,7 @@ export class Battle {
         if (!p) continue;
         const dx = p.x - unit.pos.x, dy = p.y - unit.pos.y, dz = p.z - unit.pos.z;
         const dd = dx * dx + dy * dy + dz * dz;
+        if (dd < near2) continue;
         if (dd < bestD) { bestD = dd; best = p; }
       }
       // Every tier, not just the infantry. The garrison fires from the
@@ -699,6 +738,7 @@ export class Battle {
       if (c.lowly) continue;
       const dx = c.x - unit.pos.x, dy = c.y - unit.pos.y, dz = c.z - unit.pos.z;
       const d = dx * dx + dy * dy + dz * dz;
+      if (d < near2) continue;
       if (d < bestD) { bestD = d; best = c; }
     }
     if (best) return best;
@@ -706,6 +746,7 @@ export class Battle {
     for (const c of this._aimCandidates) {
       const dx = c.x - unit.pos.x, dy = c.y - unit.pos.y, dz = c.z - unit.pos.z;
       const d = dx * dx + dy * dy + dz * dz;
+      if (d < near2) continue;
       if (d < bestD) { bestD = d; best = c; }
     }
     return best;
@@ -772,11 +813,29 @@ export class Battle {
         if (!lofted && !low) return false;
         vel = lofted ? lofted.vel : low;
       }
-    } else if (p.kind === 'arc' || p.kind === 'rocket') {
-      // Rockets burn for their first second, so they need less launch energy;
-      // the solver is given a correspondingly lower ceiling.
-      const maxSpeed = p.kind === 'rocket' ? p.speed * 0.62 : p.speed;
-      const sol = solveBallistic(from, aim, maxSpeed, p.gravity, 9.0);
+    } else if (p.kind === 'rocket') {
+      // The motor is part of the solve, not something that happens to the
+      // shot afterwards. `solveBoosted` returns null for a target inside
+      // minimum range, where the burn alone overshoots whatever the launch —
+      // the crew holds its fire rather than throwing the rocket over the city.
+      //
+      // Flat first and loft only when it has to, the same rule the guns
+      // follow: a compensated rocket is fast and shallow, which is right up
+      // until there is a roof between the launcher and the target. The
+      // clearance is tested against the speed the rocket will actually be
+      // doing once the motor has finished with it, not the speed it leaves
+      // the rail at, or every shot reads as blocked by the ground in front.
+      vel = solveBoosted(from, aim, p.speed, p.gravity, 9.0);
+      if (vel) {
+        const flown = vel.clone().setLength(vel.length() + ROCKET_BOOST.accel * ROCKET_BOOST.time);
+        if (!this._trajectoryClear(from, flown, p.gravity)) {
+          // Up and over, on the longer time of flight an arcing rocket takes.
+          vel = solveBoosted(from, aim, p.speed, p.gravity, 20.0) || vel;
+        }
+      }
+      if (!vel) return false;
+    } else if (p.kind === 'arc') {
+      const sol = solveBallistic(from, aim, p.speed, p.gravity, 9.0);
       if (!sol) return false; // genuinely out of range
       vel = sol.vel;
     } else if (p.kind === 'topattack') {
@@ -954,6 +1013,45 @@ export class Battle {
     return maxR;
   }
 
+  /**
+   * How wide a hole this bomb is allowed to cut in what it hits.
+   *
+   * `frac` sizes a blast by its share of the whole building, which is the
+   * right instinct for a pyramid and the wrong one for a tower: a tenth of
+   * the Elizabeth Tower's stone, gathered round one point, is a sphere wider
+   * than the tower. The bomb then takes the whole cross section, the load
+   * solver correctly finds nothing under the next two hundred feet of it,
+   * and one 500 lb bomb lays the entire tower in the road.
+   *
+   * So a bomb may only cut `bite` of the way across the masonry standing at
+   * the height it goes off at. Under that the frac sizing is untouched, and
+   * on anything broader than the blast — which is most things — this never
+   * binds. Over it a spine is left on the far side, and what happens next is
+   * the stress model's business: often a lean, sometimes a collapse anyway if
+   * the hit was central enough, and never the guaranteed clean slice.
+   *
+   * It is also what separates the two aircraft. The Strike Eagle bites
+   * (`bite` below 1) and cannot fell a tower alone; the Lancer's MOAB is
+   * written with no bite at all, because eleven tonnes of it genuinely does
+   * take a third of whatever it lands on in one pass. That is what the extra
+   * $300k buys.
+   */
+  _sectionCap(s, point, bite) {
+    const BAND = 6.0;                       // the course the bomb goes off in
+    const d = [];
+    for (let i = 0; i < s.count; i++) {
+      if (!(s.flags[i] & 1) || (s.flags[i] & 2)) continue;   // alive, not loose
+      if (Math.abs(s.py[i] - point.y) > BAND) continue;
+      d.push(Math.hypot(s.px[i] - point.x, s.pz[i] - point.z));
+    }
+    if (d.length < 8) return Infinity;      // nothing to measure: don't cap
+    // The 85th percentile rather than the far corner, so one outlying
+    // buttress cannot argue the tower is twice as wide as it is.
+    d.sort((a, b) => a - b);
+    const span = d[Math.floor(d.length * 0.85)];
+    return span * bite;
+  }
+
   /** A bomb from the air wing has gone off. */
   _strikeImpact(hit) {
     const { point, proj } = hit;
@@ -974,10 +1072,13 @@ export class Battle {
     }
     const r = struck && best < st.maxR * st.maxR
       ? this._radiusForFraction(struck, point, st.frac, st.maxR) : null;
-    const rMax = Math.max(st.minR, r ?? st.minR);
+    let rMax = Math.max(st.minR, r ?? st.minR);
+    // Never wider than the masonry it lands in can afford to lose.
+    if (struck && st.bite) rMax = Math.max(st.minR, Math.min(rMax, this._sectionCap(struck, point, st.bite)));
     let destroyed = 0;
     for (const s of this.structures) {
-      destroyed += s.explode(point, rMax, rMax * 1.15, w.power * this.powerScale, { dir: down, kinetic: w.kinetic ?? 0.35 });
+      destroyed += s.explode(point, rMax, rMax * 1.15, w.power * this.powerScale,
+        { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4 });
     }
     const killed = this.garrison.splash(point, rMax * 1.5, w.power);
     if (killed) {

@@ -1450,7 +1450,12 @@ export class Structure {
     // tower with one face cleanly removed still has a fivefold margin in
     // compression — which is arithmetically true of undamaged masonry, and has
     // nothing to do with what is left after six rounds of 105 mm.
-    const shockR = radius * 2.4;
+    //
+    // `opts.shock` is how many blast radii out the mortar goes. Shells leave
+    // it alone; an air-dropped bomb is sized in share-of-building rather than
+    // in metres, so on a slender target its radius is already most of the way
+    // across and 2.4 of them shakes the mortar out of the whole shaft.
+    const shockR = radius * (opts.shock ?? 2.4);
     const shockR2 = shockR * shockR;
     for (let i = 0; i < this.count; i++) {
       if (!(this.flags[i] & ALIVE)) continue;

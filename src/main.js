@@ -527,7 +527,7 @@ async function boot() {
     }
     if (battle.selectedUnitId) {
       if (hit.kind === 'ground' || hit.kind === 'roof') {
-        const ok = battle.validPlacement(hit.point);
+        const ok = battle.validPlacement(hit.point, UNITS_BY_ID[battle.selectedUnitId]);
         battle.pulse(hit.point, ok.ok ? 0x6fd08c : 0xe8604c, 14);
         battle.deploy(battle.selectedUnitId, hit.point);
         battle.rangeRing.visible = false;
@@ -566,7 +566,7 @@ async function boot() {
       battle.rangeRing.visible = false;
       return;
     }
-    const ok = battle.validPlacement(hit.point).ok;
+    const ok = battle.validPlacement(hit.point, UNITS_BY_ID[battle.selectedUnitId]).ok;
     battle.ghost.position.copy(hit.point).setY(hit.point.y + 0.25);
     battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
     battle.ghost.visible = true;
