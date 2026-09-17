@@ -2351,7 +2351,7 @@ export class Structure {
       // moving exactly the way it is already moving.
       const band = L.band;
       this._lastLeanState = {
-        axisX: L.axisX, axisZ: L.axisZ, vel: L.vel,
+        axisX: L.axisX, axisZ: L.axisZ, vel: L.vel, angle: L.angle,
         pivotX: L.pivotX, pivotY: L.pivotY, pivotZ: L.pivotZ,
       };
       this._bakeLean();
@@ -2706,7 +2706,8 @@ export class Structure {
     for (const segment of byBand.values()) {
       for (const group of this._connectedGroups(segment)) {
         if (group.length < 12) { this._releaseGroup(group); moved += group.length; continue; }
-        const island = this._weldIsland(group, null, { settling: true, spin: vel });
+        const island = this._weldIsland(group, null,
+          { settling: true, spin: vel, tilt0: (L && L.angle) || 0 });
         if (island) moved += group.length;
       }
     }
@@ -2852,6 +2853,11 @@ export class Structure {
     const island = {
       id, body, members, localPos, localQuat, impacts: 0,
       settling, age: opts.age || 0,
+      // How far out of plumb this section already was when it broke off.
+      // The lean bakes its angle into the stones and then hands over a body
+      // that starts at identity, so without this the section's own tilt is
+      // invisible to everything downstream — see `maintainIslands`.
+      tilt0: opts.tilt0 || 0,
       origin: { x: mx, y: my, z: mz },
       mass: mt,
     };
@@ -3064,12 +3070,28 @@ export class Structure {
 
     for (const island of this.islands.values()) {
       if (!island.settling || !PhysicsWorld.alive(island.body)) continue;
+      // A section the debris recycler has frozen will never move again, so
+      // whatever it reads now is its final answer. It is still measured —
+      // the tilt it broke off at may already condemn it — but it can never
+      // earn its way out of `settling` by moving, which is how sections used
+      // to sit in the books as standing masonry for the rest of the level.
       const t = island.body.translation();
       const drop = island.origin.y - t.y;
       const slide = Math.hypot(t.x - island.origin.x, t.z - island.origin.z);
       const r = island.body.rotation();
-      // Angle between the body's up axis and world up, from the quaternion.
-      const tilt = Math.acos(Math.max(-1, Math.min(1,
+      // Angle between the body's up axis and world up, from the quaternion —
+      // plus whatever it was already leaning when it broke off.
+      //
+      // The body's own rotation measures how far the section has turned
+      // *since it was welded*, which is not the same question as how far out
+      // of plumb it is standing. A section handed over by the lean has had
+      // its angle baked into its stones and its body starts at identity, so
+      // a roof that came off at twelve degrees, settled against what was left
+      // and was then frozen by the debris recycler read as perfectly upright
+      // for ever: never reclassified, and a settling section counts as
+      // standing masonry, so the building stopped registering damage with a
+      // visibly collapsed section still on the books.
+      const tilt = (island.tilt0 || 0) + Math.acos(Math.max(-1, Math.min(1,
         1 - 2 * (r.x * r.x + r.z * r.z))));
       island.tilt = tilt;
       island.drop = drop;
