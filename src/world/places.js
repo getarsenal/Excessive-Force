@@ -78,7 +78,15 @@ export function buildPrecinct(props, terrain, rng, opts) {
 
   const sandstone = spec.boundary === 'sandstone';
   const STEP = 3.2;
-  for (let i = 0; i < poly.length; i++) {
+  // A precinct only gets a boundary if it has one.
+  //
+  // This function used to read two fields out of the spec — whether the wall
+  // was sandstone and whether the garden was a charbagh — and build a London
+  // square for every other answer. Giza's spec says `boundary: 'none'`,
+  // `ground: 'sand'`, `ornament: 'none'`, and its comment says there is no
+  // wall on the plateau, only sand. It was getting ironwork on a plinth all
+  // the way round, eight statues, and a gravel walk in from every gate.
+  if (spec.boundary !== 'none') for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
     const dx = b.x - a.x, dz = b.z - a.z;
     const len = Math.hypot(dx, dz);
@@ -149,10 +157,17 @@ export function buildPrecinct(props, terrain, rng, opts) {
         counts.walks++;
       }
     }
-  } else {
+  } else if (spec.ground !== 'sand') {
     // A square with a plan to it: a gravel walk round the inside of the
     // railings, walks in from the gates to the building, a few planted beds,
     // and a line of plane trees along the fence.
+    //
+    // Not on sand. The walks run from each gate to the middle of the
+    // enclosure, and the enclosure is the landmarks' combined footprint — on
+    // a plateau holding three pyramids and a sphinx that is most of the map,
+    // so every one of them drew a paved line hundreds of metres across open
+    // desert. From above they are the pale scratches fanning out from the
+    // pyramids: a garden path, laid on the Western Desert.
     //
     // The grass itself is the ground's — the terrain paints the whole pad as
     // lawn — so nothing green is laid on top of it. The version this replaces
@@ -256,7 +271,8 @@ export function buildPrecinct(props, terrain, rng, opts) {
 
   // ── Ornament. A square with nothing to look at is a lawn with a fence round
   // it, and a statue on a plinth is the cheapest possible full stop.
-  const ornaments = spec.ornament === 'pavilions' ? 4 : 8;
+  const ornaments = spec.ornament === 'none' ? 0
+    : spec.ornament === 'pavilions' ? 4 : 8;
   for (let k = 0; k < ornaments; k++) {
     let placed = false;
     for (let tries = 0; tries < 20 && !placed; tries++) {
