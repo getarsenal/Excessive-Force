@@ -99,8 +99,23 @@ function guessTier() {
   if (mobile) {
     // Apple silicon phones genuinely can run the medium budget; most Android
     // mid-range cannot, so only promote on strong signals.
-    const strongApple = /Apple\s*(A1[5-9]|A2\d|M\d)/i.test(renderer) || (cores >= 6 && mem >= 6);
-    return strongApple ? 'medium' : 'low';
+    //
+    // The signals this used to ask for do not exist on an iPhone, and between
+    // them they handed every iPhone ever made the tier built for the weakest
+    // Android in the world. Safari stopped naming the GPU years ago: the
+    // unmasked renderer string is the literal text "Apple GPU" on every iOS
+    // device, so a pattern looking for A15 or M-series never matched one.
+    // `navigator.deviceMemory` is not implemented in Safari at all, so it fell
+    // back to 4 and failed the `>= 6` test as well. Two dead signals, one
+    // verdict: low. No shadows, no bloom, coarser stone, half the debris and
+    // a capped pixel ratio, on hardware that renders this at sixty frames.
+    //
+    // So the renderer saying Apple at all is the signal, because only Apple
+    // hardware says it. Anything that turns out to be too optimistic is
+    // caught from both ends anyway — the governor drops the body budget when
+    // frames slip, and the quality menu is two taps away.
+    const apple = /Apple/i.test(renderer) || /iPhone|iPad|iPod/i.test(ua);
+    return (apple || (cores >= 6 && mem >= 6)) ? 'medium' : 'low';
   }
   if (/SwiftShader|llvmpipe|Software/i.test(renderer)) return 'low';
   if (cores >= 12 && mem >= 8) return 'ultra';
