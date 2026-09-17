@@ -1090,15 +1090,43 @@ export class Battle {
     const nearGround = point.y - groundY < 6.0;
     this._lastImpact = point.clone();
     this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
-    this.fx.dustColumn(point.x, Math.max(point.y, groundY), point.z, Math.min(4, w.fx * 0.4));
-    if (this.fires) this.fires.ignite(point.x, point.y, point.z, 3, 40);
-    if (this.life) this.life.startle(point.x, point.z, 300);
+    // The column stands over the site for the rest of the level, and it is
+    // the thing you see from across the map. A bomb earns a bigger one than a
+    // shell does, so this is not clamped to the shell's ceiling.
+    this.fx.dustColumn(point.x, Math.max(point.y, groundY), point.z, w.fx * 0.52);
+    if (this.fires) this.fires.ignite(point.x, point.y, point.z, 3 + st.frac * 6, 40 + st.frac * 80);
+    if (this.life) this.life.startle(point.x, point.z, 300 + w.fx * 60);
     if (nearGround && this.craters) this.craters.add(point.x, groundY, point.z, rMax * 0.9);
     const camDist = this.camera.position.distanceTo(point);
-    this.engine.addShake(THREE.MathUtils.clamp(w.fx * 40 / Math.max(camDist, 30), 0.1, 1.0));
+    this.engine.addShake(THREE.MathUtils.clamp(w.fx * 52 / Math.max(camDist, 30), 0.12, 1.35));
     if (this.audio) {
-      this.audio.play('explosion', point, { rate: st.frac > 0.2 ? 0.4 : 0.55, gain: 1.0, rolloff: 1200 });
-      this.audio.rumble(1, point);
+      // Sound arrives late, and that is most of what sells the size.
+      //
+      // The flash reaches the camera instantly and the noise does not: at six
+      // hundred metres the bang is the better part of two seconds behind it.
+      // Playing both on the same frame is what makes a distant blast read as
+      // a firework rather than as eleven tonnes going off a long way away, so
+      // the report is delayed by the distance it has to travel.
+      //
+      // Three layers, because one sample cannot be both a crack and a boom:
+      // the detonation itself, the same sample dropped an octave under it for
+      // the body, and a longer, quieter tail for the echo off everything
+      // around the site.
+      const wait = Math.min(2600, (camDist / 343) * 1000);
+      const deep = st.frac > 0.2;
+      const boom = () => {
+        this.audio.play('explosion', point, {
+          rate: deep ? 0.42 : 0.6, gain: 1.0, rolloff: 1400,
+        });
+        this.audio.play('explosion', point, {
+          rate: deep ? 0.26 : 0.36, gain: deep ? 0.95 : 0.7, rolloff: 2200,
+        });
+        this.audio.rumble(deep ? 1.6 : 1, point);
+        setTimeout(() => this.audio?.play('explosion', point, {
+          rate: deep ? 0.2 : 0.3, gain: deep ? 0.5 : 0.3, rolloff: 3000,
+        }), deep ? 420 : 300);
+      };
+      if (wait > 60) setTimeout(boom, wait); else boom();
     }
     this.onEvent('strikehit', { def: proj.strikeDef, point, destroyed, radius: rMax });
   }

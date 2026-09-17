@@ -247,6 +247,30 @@ export class ExplosionFX {
 
     for (const s of [this.smoke, this.dust, this.fire, this.sparks]) scene.add(s.mesh);
 
+    // How many particles one blast may take.
+    //
+    // These used to be four fixed numbers — 54 fire, 70 smoke, 90 sparks, 46
+    // dust — and they were low enough that a blast of any real size hit all
+    // four. Measured on the air wing: a 500 lb bomb threw 48 / 66 / 78 / 46,
+    // and the eleven-tonne MOAB threw 54 / 70 / 90 / 46. Twelve per cent more
+    // fire, six per cent more smoke and *exactly the same* ground burst, for
+    // a weapon forty times the size. Everything above a certain point looked
+    // the same because above that point it was the same.
+    //
+    // Taken off the pool instead, they scale with what the device has agreed
+    // to draw: a phone keeps roughly the old numbers, a desktop lets the big
+    // one be big, and nothing can exhaust a pool and start recycling live
+    // particles out from under a blast that is still going.
+    /** Second beats of large blasts, waiting their turn. */
+    this._rolls = [];
+    const cap = (pool, frac, floor) => Math.max(floor, Math.round(pool.max * frac));
+    this._caps = {
+      fire: cap(this.fire, 0.34, 54),
+      smoke: cap(this.smoke, 0.30, 70),
+      sparks: cap(this.sparks, 0.30, 90),
+      dust: cap(this.dust, 0.26, 46),
+    };
+
     const ballCount = quality.name === 'low' ? 5 : quality.name === 'medium' ? 8 : 14;
     this.fireballs = Array.from({ length: ballCount }, () => {
       const f = new Fireball();
@@ -319,7 +343,7 @@ export class ExplosionFX {
     lg.age = 0;
 
     // ── Fire: a dense burst that dies within half a second.
-    const fireN = Math.round(THREE.MathUtils.clamp(16 * scale, 8, 54) * (q.name === 'low' ? 0.5 : 1));
+    const fireN = Math.round(THREE.MathUtils.clamp(16 * scale, 8, this._caps.fire) * (q.name === 'low' ? 0.5 : 1));
     for (let i = 0; i < fireN; i++) {
       const dir = randomDir();
       const sp = (7 + Math.random() * 17) * scale;
@@ -336,7 +360,7 @@ export class ExplosionFX {
     }
 
     // ── Smoke: slower, bigger, lasts long after the fire is out.
-    const smokeN = Math.round(THREE.MathUtils.clamp(22 * scale, 10, 70) * (q.name === 'low' ? 0.45 : 1));
+    const smokeN = Math.round(THREE.MathUtils.clamp(22 * scale, 10, this._caps.smoke) * (q.name === 'low' ? 0.45 : 1));
     for (let i = 0; i < smokeN; i++) {
       const dir = randomDir();
       const sp = (3.5 + Math.random() * 9) * scale;
@@ -354,7 +378,7 @@ export class ExplosionFX {
     }
 
     // ── Sparks and glowing fragments, thrown further than the fireball.
-    const sparkN = Math.round(THREE.MathUtils.clamp(26 * scale, 12, 90) * (q.name === 'low' ? 0.4 : 1));
+    const sparkN = Math.round(THREE.MathUtils.clamp(26 * scale, 12, this._caps.sparks) * (q.name === 'low' ? 0.4 : 1));
     for (let i = 0; i < sparkN; i++) {
       const dir = randomDir();
       const sp = (16 + Math.random() * 44) * scale;
@@ -369,11 +393,66 @@ export class ExplosionFX {
     }
 
     if (opts.ground) this.groundBurst(pos, scale, opts.groundY ?? pos.y);
+
+    // ── The roll.
+    //
+    // A big charge does not go off in one event. The first ball is the
+    // detonation; a beat later the fuel and everything it threw up burn in
+    // air, and that is the part that reads as enormous — slower, darker,
+    // wider, rising. Without it a large blast is a small blast drawn bigger,
+    // which is exactly how eleven tonnes looked next to a 500-pounder.
+    //
+    // Only real charges earn it. A tank round goes off once.
+    if (scale > 4.0) {
+      this._rolls.push({
+        t: 0.19, x: pos.x, y: pos.y, z: pos.z, scale,
+        ground: !!opts.ground, groundY: opts.groundY ?? pos.y,
+      });
+    }
+  }
+
+  /** The second beat of a large blast: the fireball rolling out and up. */
+  _roll(r) {
+    const q = this.quality;
+    const scale = r.scale;
+    const radius = 5.2 * scale;
+    const pos = this._v.set(r.x, r.y + radius * 0.22, r.z);
+
+    const ball = this._freeFireball();
+    if (ball) ball.fire(pos, radius * 1.55, 0.9 + 0.22 * scale, 0.78 + scale * 0.12);
+
+    const lg = this._freeLight();
+    lg.light.visible = true;
+    lg.light.position.copy(pos);
+    lg.light.distance = radius * 18;
+    lg.peak = 620 * scale * scale;
+    lg.life = 0.7 + 0.12 * scale;
+    lg.age = 0;
+
+    // Dark, slow and buoyant: the head of the column that stands afterwards.
+    const n = Math.round(THREE.MathUtils.clamp(18 * scale, 10, this._caps.smoke * 0.8)
+      * (q.name === 'low' ? 0.4 : 1));
+    for (let i = 0; i < n; i++) {
+      const dir = randomDir();
+      const sp = (2.5 + Math.random() * 6) * scale;
+      this.smoke.spawn({
+        x: pos.x + dir.x * radius * 0.5,
+        y: pos.y + Math.abs(dir.y) * radius * 0.5,
+        z: pos.z + dir.z * radius * 0.5,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.5 + 7.5 * scale, vz: dir.z * sp,
+        life: 4.5 + Math.random() * 5.0 * scale,
+        size0: radius * 0.8, size1: radius * (2.8 + Math.random() * 2.4),
+        color0: this._c.smokeDark, color1: this._c.smokeLight,
+        drag: 0.85, grav: 1.1, turb: 3.0 * scale,
+        spin: (Math.random() - 0.5) * 0.7, alpha: 0.8,
+      });
+    }
+    if (r.ground) this.groundBurst(this._v.set(r.x, r.y, r.z), scale * 0.8, r.groundY);
   }
 
   /** Dust running outward along the ground at the base of a blast. */
   groundBurst(pos, scale, groundY) {
-    const n = Math.round(THREE.MathUtils.clamp(18 * scale, 8, 46) * (this.quality.name === 'low' ? 0.45 : 1));
+    const n = Math.round(THREE.MathUtils.clamp(18 * scale, 8, this._caps.dust) * (this.quality.name === 'low' ? 0.45 : 1));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = (9 + Math.random() * 20) * scale;
@@ -445,8 +524,12 @@ export class ExplosionFX {
    * appears rather than growing out of a puddle.
    */
   dustColumn(x, y, z, strength = 1) {
-    const s = THREE.MathUtils.clamp(strength, 0.5, 4);
-    const n = Math.round(26 * s);
+    // The ceiling was four, which a collapse and a 500 lb bomb and eleven
+    // tonnes of MOAB all reached, so all three stood the same column. Six now,
+    // and the particle count is held to the device's own dust budget rather
+    // than growing without limit.
+    const s = THREE.MathUtils.clamp(strength, 0.5, 6);
+    const n = Math.min(Math.round(26 * s), Math.round(this.dust.max * 0.34));
     const wind = 0.6 + Math.random() * 0.5;
     for (let i = 0; i < n; i++) {
       const t = i / n;
@@ -520,6 +603,12 @@ export class ExplosionFX {
 
   update(dt) {
     this.time += dt;
+    // The second beat of any large blast that is due.
+    for (let i = this._rolls.length - 1; i >= 0; i--) {
+      const r = this._rolls[i];
+      r.t -= dt;
+      if (r.t <= 0) { this._rolls.splice(i, 1); this._roll(r); }
+    }
     for (const f of this.fireballs) f.update(dt);
     for (const s of this.shocks) s.update(dt);
 
