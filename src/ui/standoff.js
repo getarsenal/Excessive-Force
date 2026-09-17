@@ -156,11 +156,24 @@ export class Standoff {
   update() {
     if (this.done) return;
     const now = performance.now();
+    if (this._t0 == null) this._t0 = now;
     const dt = this._last == null ? 0 : Math.min(1, (now - this._last) / 1000);
     this._last = now;
     this.t += dt;
+    // The camera glide runs on the clock, not on accumulated frame deltas.
+    //
+    // Those deltas are capped at a second each so that one long frame cannot
+    // throw the typing or the beats, which is right for them and wrong here:
+    // a device that stalls for three seconds advances a summed clock by one,
+    // so the glide runs long by exactly the length of every stall it meets.
+    // The stall it always meets is the first few frames, where the renderer
+    // compiles its shaders — cheap at the lowest quality, and most of a
+    // second on a phone once there are shadows and bloom to compile. The
+    // glide starts wide, high and off to one side by design, so stretching it
+    // parks the camera in that establishing shot for the whole conversation
+    // and the building never arrives in the middle of the screen.
     if (this.camT < this.camLen) {
-      this.camT = Math.min(this.camLen, this.camT + dt);
+      this.camT = Math.min(this.camLen, (now - this._t0) / 1000);
       this._applyCam(this.camT / this.camLen);
     }
     // Type the current line out, forty characters a second.

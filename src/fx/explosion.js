@@ -284,10 +284,25 @@ export class ExplosionFX {
     });
 
     // A short-lived light per blast is what makes nearby stone flare.
+    // These stay visible for the life of the scene, lit and unlit by intensity
+    // alone, and that is not a detail.
+    //
+    // Three.js keys its shader programs on how many lights are *visible*. Turn
+    // one on for a blast and off again afterwards and the count changes twice,
+    // and on each change every material in the scene that takes light is
+    // marked for recompile. While a program is rebuilding, what it is drawing
+    // is not there — so a scene lit like this flashes black, repeatedly, at
+    // exactly the moments the game is most worth looking at. Costlier shaders
+    // make it worse, which is why it went from a flicker to something genuinely
+    // unpleasant the moment phones stopped being handed the cheapest tier.
+    //
+    // An unused point light costs a few instructions per fragment. A recompiled
+    // scene costs the frame. Keep the count still.
     const lightCount = quality.name === 'low' ? 2 : quality.name === 'medium' ? 4 : 7;
     this.lights = Array.from({ length: lightCount }, () => {
       const l = new THREE.PointLight(0xffb060, 0, 190, 2.0);
-      l.visible = false;
+      l.visible = true;
+      l.intensity = 0;
       scene.add(l);
       return { light: l, age: 0, life: 0, peak: 0 };
     });
@@ -335,7 +350,6 @@ export class ExplosionFX {
     }
 
     const lg = this._freeLight();
-    lg.light.visible = true;
     lg.light.position.copy(pos);
     lg.light.distance = radius * 14;
     lg.peak = 900 * scale * scale;
@@ -422,7 +436,6 @@ export class ExplosionFX {
     if (ball) ball.fire(pos, radius * 1.55, 0.9 + 0.22 * scale, 0.78 + scale * 0.12);
 
     const lg = this._freeLight();
-    lg.light.visible = true;
     lg.light.position.copy(pos);
     lg.light.distance = radius * 18;
     lg.peak = 620 * scale * scale;
@@ -554,7 +567,6 @@ export class ExplosionFX {
   muzzleFlash(pos, dir, power) {
     const scale = Math.pow(power, 0.5);
     const lg = this._freeLight();
-    lg.light.visible = true;
     lg.light.position.copy(pos);
     lg.light.distance = 60 * scale;
     lg.peak = 300 * scale;
@@ -616,7 +628,7 @@ export class ExplosionFX {
       if (l.life <= 0) continue;
       l.age += dt;
       const t = l.age / l.life;
-      if (t >= 1) { l.life = 0; l.light.visible = false; l.light.intensity = 0; continue; }
+      if (t >= 1) { l.life = 0; l.light.intensity = 0; continue; }
       // Sharp attack, exponential decay — the flash is over before the eye
       // resolves it, which is exactly right.
       l.light.intensity = l.peak * Math.pow(1 - t, 3.0) * (t < 0.06 ? t / 0.06 : 1);
