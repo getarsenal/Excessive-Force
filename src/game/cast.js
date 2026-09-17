@@ -6,31 +6,38 @@
  * screen they stand on, and the colours their speech takes — the defender's
  * bubble is trimmed in his own flag, so the stand-off reads as two nations
  * before a word is on screen.
+ *
+ * They are named, and the name is on a plate over the bubble while they
+ * speak. Invented officers, all of them: the game knocks down real buildings
+ * and that is quite enough reality — nobody who ever held these ranks is
+ * being put in the game's mouth. The rank is the one the nation actually
+ * uses, which is half the characterisation, and the Egyptian's is his own
+ * word for it rather than the English translation.
  */
 export const CAST = {
   us: {
     id: 'us', file: 'assets/characters/us-general.png',
-    name: 'The General', nation: 'United States', side: 'left',
+    rank: 'Gen.', name: 'Buck Hollister', nation: 'United States', side: 'left',
     colours: ['#b22234', '#ffffff', '#3c3b6e'],
   },
   uk: {
     id: 'uk', file: 'assets/characters/uk-field-marshal.png',
-    name: 'The Field Marshal', nation: 'United Kingdom', side: 'right',
+    rank: 'F.M.', name: 'Sir Aubrey Pell', nation: 'United Kingdom', side: 'right',
     colours: ['#c8102e', '#ffffff', '#012169'],
   },
   fr: {
     id: 'fr', file: 'assets/characters/fr-marshal.png',
-    name: 'Le Maréchal', nation: 'France', side: 'right',
+    rank: 'Maréchal', name: 'Gaspard Thibault', nation: 'France', side: 'right',
     colours: ['#0055a4', '#ffffff', '#ef4135'],
   },
   in: {
     id: 'in', file: 'assets/characters/in-maharaja-general.png',
-    name: 'The Maharaja-General', nation: 'India', side: 'right',
+    rank: 'Maharaja-Gen.', name: 'Arvind Rathore', nation: 'India', side: 'right',
     colours: ['#ff9933', '#ffffff', '#138808'],
   },
   eg: {
     id: 'eg', file: 'assets/characters/eg-field-marshal.png',
-    name: 'The Field Marshal', nation: 'Egypt', side: 'right',
+    rank: 'Mushir', name: 'Tarek El-Masry', nation: 'Egypt', side: 'right',
     colours: ['#ce1126', '#ffffff', '#000000'],
   },
 };

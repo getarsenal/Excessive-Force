@@ -708,7 +708,7 @@ html, body {
   max-width: min(44vw, 520px); min-width: 200px;
   background: #fbfbf7; color: #14161a;
   border: 3px solid #14161a; border-radius: 20px;
-  --pad-y: 13px; --pad-x: 18px;
+  --pad-y: 15px; --pad-x: 18px;
   padding: var(--pad-y) var(--pad-x) calc(var(--pad-y) + 1px);
   font-family: 'Oswald', 'Noto Naskh Arabic', 'Segoe UI', system-ui, sans-serif;
   font-weight: 500; font-size: clamp(16px, 2.2vw, 26px); line-height: 1.28;
@@ -721,6 +721,21 @@ html, body {
 .so-bubble.right { right: calc(var(--fig) * 0.56); transform-origin: 92% 100%; border-color: var(--enemy-a); }
 .so-bubble.in { opacity: 1; transform: scale(1); }
 #standoff.out .so-bubble { opacity: 0; transition: opacity 0.2s; }
+/* Who is speaking, on a plate sitting astride the top edge of the bubble.
+   Both plates are dark with the speaker's own colour as the rim rather than
+   as the fill: the Indian saffron and the French white are far too light to
+   carry small type, and a rule that holds for every flag beats five. */
+.so-plate {
+  position: absolute; top: -12px;
+  padding: 3px 11px 2px; border-radius: 999px;
+  background: #14161a; border: 2px solid #b22234; color: #fbfbf7;
+  font-size: clamp(9px, 1.05vw, 12px); font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap;
+  text-shadow: none;
+}
+.so-bubble.left .so-plate { left: 18px; }
+.so-bubble.right .so-plate { right: 18px; border-color: var(--enemy-a); }
+
 /* The tail: a rotated square hanging off the bottom corner nearest the speaker. */
 .so-bubble::after {
   content: ''; position: absolute; bottom: -11px; width: 18px; height: 18px;

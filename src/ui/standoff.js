@@ -57,13 +57,16 @@ export class Standoff {
 
   _build() {
     const enemy = CAST[DEFENDER_OF[this.level.id]] || CAST.uk;
+    // Rank and name on a plate over the bubble: the two of them are strangers
+    // to the player until something says who is doing the shouting.
+    const who = (c) => `${c.rank} ${c.name}`;
     const root = document.createElement('div');
     root.id = 'standoff';
     root.innerHTML = `
-      <img class="so-fig left" src="${CAST.us.file}" alt="${CAST.us.name}" draggable="false">
-      <img class="so-fig right" src="${enemy.file}" alt="${enemy.name}" draggable="false">
-      <div class="so-bubble left" dir="auto"><span class="so-ghost"></span><span class="so-text"></span></div>
-      <div class="so-bubble right" dir="auto"><span class="so-ghost"></span><span class="so-text"></span></div>
+      <img class="so-fig left" src="${CAST.us.file}" alt="${who(CAST.us)}" draggable="false">
+      <img class="so-fig right" src="${enemy.file}" alt="${who(enemy)}" draggable="false">
+      <div class="so-bubble left" dir="auto"><span class="so-plate">${who(CAST.us)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
+      <div class="so-bubble right" dir="auto"><span class="so-plate">${who(enemy)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
       <div class="so-hint">TAP TO CONTINUE</div>
       <button class="so-skip">SKIP</button>`;
     const [c0, c1, c2] = enemy.colours;
