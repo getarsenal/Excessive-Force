@@ -123,12 +123,46 @@ function guessTier() {
   return 'medium';
 }
 
+/** A phone, by any of the signals that survive on one. */
+function isMobile() {
+  const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+    || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+}
+
+/**
+ * What a phone may not have, whatever tier it is on.
+ *
+ * Promoting phones off the bottom tier was right — they were rendering with
+ * no shadows and the coarsest stone on hardware that manages sixty frames —
+ * but two of the things that came with it are priced in video memory rather
+ * than in frame time, and a phone browser does not fail gracefully when it
+ * runs out. It discards the page. What that looks like from the sofa is the
+ * screen going black, the game hitching, and the whole app quietly starting
+ * again from the top.
+ *
+ * Bloom is five render targets at half and quarter resolution, allocated for
+ * the life of the session. A pixel ratio of 2 doubles the area of every one
+ * of those and of the frame itself: on a 430-point screen it is the
+ * difference between an 860-pixel buffer and a 1720-pixel one, four times
+ * the memory, for a sharpness gain nobody can see at arm's length.
+ *
+ * Shadows, the finer stone, the ground clutter and the extra debris are all
+ * frame-time costs that the governor can throttle if it needs to, so they
+ * stay — they are also most of what the promotion was for. These two do not
+ * throttle, so a phone does not get them.
+ */
+function forPhone(tier) {
+  if (!isMobile()) return tier;
+  return { ...tier, bloom: false, pixelRatioCap: Math.min(tier.pixelRatioCap, 1.5) };
+}
+
 export function detectQuality(override) {
   const stored = override || (typeof localStorage !== 'undefined'
     ? localStorage.getItem('tt.quality')
     : null);
   const id = TIERS[stored] ? stored : guessTier();
-  return { ...TIERS[id], id, simd: hasWasmSimd() };
+  return { ...forPhone(TIERS[id]), id, simd: hasWasmSimd() };
 }
 
 export function setQuality(id) {

@@ -43,18 +43,24 @@ export function setOpeningEnabled(on) {
  * out; a reload the player asked for themselves carries no such note, so
  * refreshing still opens the game properly.
  *
- * Session storage rather than local: closing the tab and coming back is
- * opening the app again, and should look like it.
+ * The note is kept in local storage rather than session storage, and that is
+ * the difference between this working and only appearing to. Session storage
+ * dies with the tab, and a phone browser does not always keep the tab: iOS
+ * discards a web app that is using too much and reloads it when the player
+ * comes back, which reads to the game as a cold start and replays the sting.
+ * A note that outlives the tab is skipped exactly once, by whoever picks it
+ * up, however the reload came about.
  */
 export function suppressNextOpening() {
-  try { sessionStorage.setItem(SKIP_KEY, '1'); } catch { /* private mode */ }
+  try { localStorage.setItem(SKIP_KEY, '1'); } catch { /* private mode */ }
 }
 
 /** Should the opening run on this load? Consumes the suppression if set. */
 export function shouldPlayOpening() {
   if (!openingEnabled()) return false;
   try {
-    if (sessionStorage.getItem(SKIP_KEY) === '1') {
+    if (localStorage.getItem(SKIP_KEY) === '1' || sessionStorage.getItem(SKIP_KEY) === '1') {
+      localStorage.removeItem(SKIP_KEY);
       sessionStorage.removeItem(SKIP_KEY);
       return false;
     }

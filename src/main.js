@@ -650,6 +650,34 @@ async function boot() {
       },
     });
   }
+  // Build every shader now, while there is still a progress bar to hide it.
+  //
+  // A WebGL program is compiled the first time something needs it, and the
+  // renderer needs a new one the first time each combination of material,
+  // lights and shadows appears. That is not spread evenly over a level: the
+  // scene sits on a handful of programs until the garrison opens fire, and
+  // then the tracers, the muzzle flashes, the sparks and the men themselves
+  // all arrive within a second of each other and every one of them stops the
+  // frame while its shader is built. On a phone that is the game hitching
+  // hard and going black at the exact moment the shooting starts — which is
+  // the exact moment it was reported.
+  //
+  // `compileAsync` walks the scene and builds them up front, off the main
+  // thread where the driver supports it. It costs a second here, where a
+  // second is already being spent, and buys back every stall out there.
+  await progress(97, 'building shaders');
+  try {
+    if (engine.renderer.compileAsync) {
+      await engine.renderer.compileAsync(engine.scene, engine.camera);
+    } else {
+      engine.renderer.compile(engine.scene, engine.camera);
+    }
+  } catch (err) {
+    // A driver that will not pre-compile still runs the game; it just pays
+    // for each shader when it first needs it, as it did before.
+    console.warn('[tumble] shader pre-compile skipped:', err?.message || err);
+  }
+
   document.getElementById('loading').style.display = 'none';
   uiEl.hidden = false;
   if (!standoff) firstPrompt();
