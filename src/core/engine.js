@@ -449,6 +449,10 @@ export class CameraRig {
     dom.addEventListener('pointermove', move);
     dom.addEventListener('pointerup', up);
     dom.addEventListener('pointercancel', up);
+    // Also on the window: a pointer that leaves the canvas mid-drag ends
+    // there, and the canvas never hears about it.
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
     dom.addEventListener('contextmenu', (e) => e.preventDefault());
     dom.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
@@ -462,6 +466,50 @@ export class CameraRig {
     this._keys = new Set();
     window.addEventListener('keydown', (e) => this._keys.add(e.code));
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
+
+    /**
+     * Forget every finger and every key.
+     *
+     * The operating system takes gestures away from the page and does not
+     * always say so: on iOS a two-finger swipe that strays into the
+     * app-switcher or Safari's edge swipe slides the whole view away, and the
+     * touches it stole may never deliver a pointerup. Whatever is left in
+     * `_pointers` is then a phantom — and because a gesture stays in
+     * two-finger mode until every finger lifts, and that count can never
+     * reach zero again, the camera is wedged for the rest of the session:
+     * a single drag does nothing, the view jumps to a centroid measured
+     * against a finger that is gone, and pinch zoom is stuck. Coming back to
+     * the game with the controls "completely fucked up" is this and nothing
+     * else.
+     *
+     * Keys go the same way. Hold W, alt-tab, and the keyup lands in the other
+     * window: the camera slides north for ever.
+     *
+     * So losing the input or the foreground abandons the gesture outright.
+     * The next touch starts from nothing, which is the only honest state to
+     * be in when the page has no idea what the hand is doing any more.
+     */
+    const abandon = () => {
+      for (const id of this._pointers.keys()) {
+        try { dom.releasePointerCapture?.(id); } catch { /* already gone */ }
+      }
+      this._pointers.clear();
+      this._keys.clear();
+      this._dragMode = null;
+      this._lastCentroid = null;
+      this._lastPinch = 0;
+      this._moved = 0;
+    };
+    this.abandonGesture = abandon;
+    document.addEventListener('visibilitychange', () => { if (document.hidden) abandon(); });
+    window.addEventListener('pagehide', abandon);
+    window.addEventListener('blur', abandon);
+    // Ground truth, and the reason this is belt and braces: `touches` is what
+    // the glass actually has on it. When the last one leaves, the gesture is
+    // over whatever the pointer events did or did not deliver.
+    const settle = (e) => { if (e.touches.length === 0) abandon(); };
+    dom.addEventListener('touchend', settle);
+    dom.addEventListener('touchcancel', settle);
   }
 
   _pinchDistance() {

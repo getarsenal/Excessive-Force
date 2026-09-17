@@ -18,7 +18,7 @@ import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
 import { Garrison, loadSoldierGeometry } from './game/defenders.js';
 import { Battle } from './game/battle.js';
-import { HUD } from './ui/hud.js';
+import { HUD, TAP } from './ui/hud.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
@@ -316,8 +316,8 @@ async function boot() {
     onSelect: (id) => {
       battle.selectUnit(id);
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike) hud.showPrompt('tap the target to call the strike');
-      else hud.showPrompt('tap the ground to deploy');
+      else if (UNITS_BY_ID[id].strike) hud.showPrompt(`${TAP} the target to call the strike`);
+      else hud.showPrompt(`${TAP} the ground to deploy`);
     },
     onClearTarget: () => battle.clearTarget(),
     onRestart: () => window.location.reload(),
@@ -385,7 +385,7 @@ async function boot() {
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');
         break;
       case 'needtarget':
-        hud.showPrompt('tap the building to mark the drop', 'warn');
+        hud.showPrompt(`${TAP} the building to mark the drop`, 'warn');
         break;
       case 'poor':
         hud.showPrompt(`need $${data.cost.toLocaleString()}`, 'warn');
@@ -500,11 +500,27 @@ async function boot() {
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
   // decision is feedback that arrives too late to be reassuring.
+  // Which pointers actually went down on the canvas.
+  //
+  // A tap is only a tap if this page saw it start. When the system steals a
+  // gesture — the iOS app-switcher swipe — the touches it took can deliver
+  // their pointerup on the way back in, with no drag recorded against them,
+  // and that reads as a deliberate tap: a target designated or a gun planted
+  // somewhere the player never touched, at the exact moment they are trying
+  // to work out why the camera stopped working.
+  const livePointers = new Set();
+  const forgetPointers = () => livePointers.clear();
+  document.addEventListener('visibilitychange', () => { if (document.hidden) forgetPointers(); });
+  window.addEventListener('blur', forgetPointers);
+  canvas.addEventListener('pointercancel', (e) => livePointers.delete(e.pointerId));
+
   canvas.addEventListener('pointerdown', (e) => {
+    livePointers.add(e.pointerId);
     hud.ripple(e.clientX, e.clientY, battle.selectedUnitId ? 'deploy' : 'aim');
   });
 
   canvas.addEventListener('pointerup', (e) => {
+    if (!livePointers.delete(e.pointerId)) return;
     if (rig.wasDrag) return;
     if (battle.state !== 'playing') return;
     const strike = !!(battle.selectedUnitId && UNITS_BY_ID[battle.selectedUnitId].strike);
@@ -580,18 +596,25 @@ async function boot() {
       battle.ghost.visible = false;
       battle.rangeRing.visible = false;
     }
-    // Number keys pick the corresponding slot in the build bar.
-    const n = parseInt(e.key, 10);
-    if (n >= 1 && n <= 9) {
+    // Number keys pick the corresponding slot in the build bar. The bar runs
+    // to eleven cards and prints the number on each one, so 0 and - carry the
+    // last two rather than leaving the air wing — the two the badges promise
+    // and the only ones you cannot reach any other way from the keyboard —
+    // pickable by mouse alone.
+    let n = parseInt(e.key, 10);
+    if (e.key === '0') n = 10;
+    else if (e.key === '-') n = 11;
+    if (n >= 1 && n <= 11) {
       const id = [...hud.cards.keys()][n - 1];
       if (id && battle.selectUnit(id)) {
-        hud.showPrompt(UNITS_BY_ID[id].strike ? 'tap the target to call the strike' : 'tap the ground to deploy');
+        hud.showPrompt(UNITS_BY_ID[id].strike
+          ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`);
       }
     }
   });
 
   const firstPrompt = () => {
-    hud.showPrompt('tap the tower to designate a target');
+    hud.showPrompt(`${TAP} the tower to designate a target`);
     setTimeout(() => hud.hidePrompt(), 5200);
   };
   const uiEl = document.getElementById('ui');

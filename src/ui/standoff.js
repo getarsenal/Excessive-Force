@@ -1,4 +1,5 @@
 import { CAST, DEFENDER_OF, STANDOFF } from '../game/cast.js';
+import { TAP } from './hud.js';
 
 /**
  * The stand-off before a level.
@@ -67,7 +68,7 @@ export class Standoff {
       <img class="so-fig right" src="${enemy.file}" alt="${who(enemy)}" draggable="false">
       <div class="so-bubble left" dir="auto"><span class="so-plate">${who(CAST.us)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
       <div class="so-bubble right" dir="auto"><span class="so-plate">${who(enemy)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
-      <div class="so-hint">TAP TO CONTINUE</div>
+      <div class="so-hint">${TAP} TO CONTINUE</div>
       <button class="so-skip">SKIP</button>`;
     const [c0, c1, c2] = enemy.colours;
     root.style.setProperty('--enemy-a', c0);
