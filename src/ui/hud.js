@@ -69,10 +69,28 @@ export class HUD {
 
     if (this.el.target && battle.level) this.el.target.textContent = battle.level.target;
 
+    this._measureTopBar();
+
     this.cards = new Map();
     this._buildBar();
 
     this.el.tcClear.addEventListener('click', () => this.onClearTarget());
+
+    // Clear view: the whole interface off, for watching rather than playing.
+    // The way back is a single dim pill at the bottom — present enough to
+    // find, faint enough not to be in the shot.
+    this.el.clearBtn = document.getElementById('clear-btn');
+    this.el.restoreBtn = document.getElementById('restore-btn');
+    this.setClearView = (on) => {
+      this.clearView = !!on;
+      document.body.classList.toggle('clear-view', this.clearView);
+      if (this.el.restoreBtn) this.el.restoreBtn.hidden = !this.clearView;
+    };
+    this.el.clearBtn?.addEventListener('click', () => this.setClearView(true));
+    this.el.restoreBtn?.addEventListener('click', () => this.setClearView(false));
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyH') this.setClearView(!this.clearView);
+    });
     this.soundOn = true;
     this.el.sound = document.getElementById('sound-toggle');
     if (this.el.sound) {
@@ -282,6 +300,34 @@ export class HUD {
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.className = `ripple go ${kind}`;
+  }
+
+  /**
+   * Publish how far down the screen the top bar really reaches.
+   *
+   * Everything down either side used to be pinned to a guessed offset — 92,
+   * 124, 156, and a 232 for the case where the target card was open. Those
+   * numbers were measured on one phone in a browser tab. Add a notch, add
+   * the home-screen app's taller status bar, or add a third objective line
+   * to the bar, and the whole rail slides underneath the readouts it was
+   * supposed to sit below. Measured, it cannot: the bar says how tall it is
+   * and the rails follow.
+   */
+  _measureTopBar() {
+    const bar = document.getElementById('topbar');
+    if (!bar) return;
+    const publish = () => {
+      const h = Math.round(bar.getBoundingClientRect().height);
+      if (h > 0) document.documentElement.style.setProperty('--hud-top', `${h}px`);
+    };
+    publish();
+    if (typeof ResizeObserver === 'function') {
+      this._topObserver = new ResizeObserver(publish);
+      this._topObserver.observe(bar);
+    } else {
+      window.addEventListener('resize', publish);
+      window.addEventListener('orientationchange', publish);
+    }
   }
 
   _buildBar() {

@@ -28,7 +28,7 @@ import { Fires } from './fx/fires.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
-import { runOpening, openingEnabled } from './ui/opening.js';
+import { runOpening, shouldPlayOpening, suppressNextOpening } from './ui/opening.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -57,7 +57,7 @@ async function boot() {
   const physicsReady = initPhysics();
   physicsReady.catch(() => { /* surfaced at the await below */ });
 
-  if (openingEnabled()) await runOpening();
+  if (shouldPlayOpening()) await runOpening();
 
   // Ask which target, unless the player has already said or a link says for
   // them. This is the front door: without it the only level a player can
@@ -336,7 +336,7 @@ async function boot() {
       else hud.showPrompt(`${TAP} the ground to deploy`);
     },
     onClearTarget: () => battle.clearTarget(),
-    onRestart: () => window.location.reload(),
+    onRestart: () => { suppressNextOpening(); window.location.reload(); },
     onNextTarget: () => goToLevel(nextTarget(level.id).id),
     // The win is already banked; this just lets play carry on against
     // whatever is still standing.
@@ -352,7 +352,7 @@ async function boot() {
     onFireMode: (m) => battle.setFireMode(m),
     onSmoke: () => battle.placeSmoke(),
     onPause: (p) => { testMenu.paused = p; },
-    onQuality: (id) => { if (setQuality(id)) window.location.reload(); },
+    onQuality: (id) => { if (setQuality(id)) { suppressNextOpening(); window.location.reload(); } },
     picker,
     qualityId: quality.id,
   });

@@ -1,4 +1,5 @@
 import { LEVELS, DEFAULT_LEVEL, LEVEL_BLURB, levelList } from '../game/levels.js';
+import { suppressNextOpening } from './opening.js';
 
 /**
  * Target select, and the record of what has been brought down.
@@ -66,6 +67,7 @@ export function nextTarget(id) {
 
 /** Load a level. A full page load, deliberately — see the note at the top. */
 export function goToLevel(id, opts = {}) {
+  suppressNextOpening();
   const params = new URLSearchParams(window.location.search);
   params.set('level', id);
   if (opts.test) params.set('test', '1'); else params.delete('test');

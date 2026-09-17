@@ -22,6 +22,7 @@ import { TAP } from './pointer.js';
  */
 
 const KEY = 'tt.opening';
+const SKIP_KEY = 'tt.opening.skip';
 const STING = 'studio-sting.mp4';
 
 /** Whether the player wants the opening. Off for the harness and the curmudgeons. */
@@ -30,6 +31,35 @@ export function openingEnabled() {
 }
 export function setOpeningEnabled(on) {
   try { localStorage.setItem(KEY, on ? '1' : '0'); } catch { /* private mode */ }
+}
+
+/**
+ * Don't play it on the way to the next mission.
+ *
+ * Every level change, restart and quality switch is a page load, so an
+ * opening tied to page load is an opening that plays between missions — a
+ * studio sting is a thing you see when you open the game, not something that
+ * interrupts you on your way to the Taj Mahal. The game says so on its way
+ * out; a reload the player asked for themselves carries no such note, so
+ * refreshing still opens the game properly.
+ *
+ * Session storage rather than local: closing the tab and coming back is
+ * opening the app again, and should look like it.
+ */
+export function suppressNextOpening() {
+  try { sessionStorage.setItem(SKIP_KEY, '1'); } catch { /* private mode */ }
+}
+
+/** Should the opening run on this load? Consumes the suppression if set. */
+export function shouldPlayOpening() {
+  if (!openingEnabled()) return false;
+  try {
+    if (sessionStorage.getItem(SKIP_KEY) === '1') {
+      sessionStorage.removeItem(SKIP_KEY);
+      return false;
+    }
+  } catch { /* private mode */ }
+  return true;
 }
 
 /**

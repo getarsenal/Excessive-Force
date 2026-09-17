@@ -11,6 +11,15 @@
   --warn: #e0a33c;
   --accent: #58a6ff;
   --ui-pad: 14px;
+  /* How far down the screen the top bar actually reaches, published by the
+     HUD once it can measure itself. The fallback covers the frames before
+     that and any browser without ResizeObserver; everything anchored to it
+     is placed relative to the real bar rather than to a guess, which is what
+     the notch, the font and a third objective line all quietly break. */
+  --hud-top: calc(env(safe-area-inset-top, 0px) + 84px);
+  /* One row of the side rails: taller than the buttons on any device,
+     so stacking them by multiples of it cannot produce a collision. */
+  --rail-step: 40px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -103,7 +112,23 @@ html, body {
   align-items: center;
   background: linear-gradient(180deg, rgba(6, 8, 11, 0.92) 0%, rgba(6, 8, 11, 0) 100%);
 }
-.tb-block { min-width: 54px; }
+/* On a phone, five columns on one row leaves the middle one about a hundred
+   points wide, and the building's name, its bar, its percentage and its
+   objective list all try to live in it at once. Below this width the four
+   readouts take a row of their own and the centre block gets the full width
+   of the screen underneath them. */
+@media (max-width: 620px) {
+  #topbar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 7px; column-gap: 10px;
+  }
+  /* Explicitly placed, so the four readouts auto-fill the row above it. */
+  .tb-center { grid-column: 1 / -1; grid-row: 2; }
+  .tb-value { font-size: clamp(14px, 4.4vw, 19px); }
+  .tb-label { font-size: 8px; letter-spacing: 0.16em; }
+}
+
+.tb-block { min-width: 0; }
 .tb-block.right { text-align: right; }
 .tb-label {
   font-size: 9px; letter-spacing: 0.22em; color: var(--dim);
@@ -143,7 +168,7 @@ html, body {
 .integrity-fill.critical { background: linear-gradient(90deg, #e8604c, #c4402c); }
 .integrity-pct {
   font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
-  min-width: 38px; text-align: right;
+  min-width: 38px; text-align: right; flex: 0 0 auto;
 }
 /* Height and per-structure breakdown share a line. Four stacked rows under a
    fifteen-character building name is a lot of furniture for the top of a phone
@@ -317,7 +342,7 @@ html, body {
 
 /* ── Menu ────────────────────────────────────────────────────────────── */
 #menu-btn {
-  position: absolute; left: var(--ui-pad); top: 156px; z-index: 20;
+  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step) * 2); z-index: 20;
   padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
   background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; cursor: pointer;
@@ -341,25 +366,34 @@ html, body {
 .menu-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 10px; color: var(--dim); text-align: left; }
 .menu-keys b { color: var(--text); }
 @media (max-width: 620px) {
-  #menu-btn { top: 148px; padding: 5px 8px; font-size: 8px; }
+  #menu-btn { padding: 5px 8px; font-size: 8px; }
   #unit-card { width: 160px; }
 }
 
 /* ── Prompt ──────────────────────────────────────────────────────────── */
 #prompt {
+  /* Clear above the smoke button rather than level with it, and allowed to
+     wrap: pinned at the same height and set to never wrap, it ran straight
+     through SMOKE on the left and off the screen on the right. */
   position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 104px);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 152px);
+  max-width: calc(100vw - var(--ui-pad) * 2 - 8px); text-align: center;
   background: var(--panel); border: 1px solid var(--edge-bright);
   padding: 7px 16px; font-size: 11px; letter-spacing: 0.16em;
-  text-transform: uppercase; white-space: nowrap;
+  text-transform: uppercase; z-index: 18;
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
 #prompt.warn { border-color: var(--warn); color: var(--warn); }
 
 /* ── Target card ─────────────────────────────────────────────────────── */
 #targetcard {
-  position: absolute; right: var(--ui-pad); top: 92px;
-  width: 178px; background: var(--panel); border: 1px solid var(--edge);
+  /* Under the sound button, which is itself under the measured top bar. Both
+     used to be pinned at a guessed 92px: correct on the phone it was guessed
+     on, and straight through the readouts on a notched one in standalone,
+     where the bar is sixty points taller. */
+  position: absolute; right: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step));
+  width: 178px; max-width: calc(100vw - var(--ui-pad) * 2);
+  background: var(--panel); border: 1px solid var(--edge); z-index: 19;
   padding: 9px 11px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
 .tc-title {
@@ -392,7 +426,7 @@ html, body {
 }
 
 #sound-toggle {
-  position: absolute; right: var(--ui-pad); top: 92px;
+  position: absolute; right: var(--ui-pad); top: calc(var(--hud-top) + 8px); z-index: 20;
   background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
   padding: 6px 10px; cursor: pointer;
@@ -400,12 +434,37 @@ html, body {
 }
 #sound-toggle:hover { border-color: var(--edge-bright); color: var(--text); }
 #sound-toggle.off { color: var(--danger); border-color: rgba(232, 96, 76, 0.4); }
-/* The target card takes this corner when it appears, so step the button down. */
-#targetcard:not([hidden]) ~ #sound-toggle { top: 232px; }
+
+/* ── Clear view ──────────────────────────────────────────────────────────
+   Everything off but the world. For watching a building come down without a
+   readout in front of it, and for anyone filming one. */
+#clear-btn {
+  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step) * 3); z-index: 20;
+  padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
+  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
+  font-family: inherit; cursor: pointer;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#clear-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+#restore-btn {
+  position: absolute; z-index: 30;
+  left: 50%; transform: translateX(-50%);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 10px);
+  padding: 8px 18px; font-size: 9px; letter-spacing: 0.24em;
+  background: rgba(10, 13, 17, 0.55); border: 1px solid rgba(150, 168, 190, 0.22);
+  color: rgba(219, 227, 236, 0.75); font-family: inherit; cursor: pointer;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  opacity: 0.32; transition: opacity 0.25s ease;
+}
+#restore-btn:hover, #restore-btn:active { opacity: 1; }
+/* One rule, so nothing new can be added to the HUD and quietly stay on
+   screen through a clear view: everything inside #ui goes, and the handful
+   of things that must remain are named back in. */
+body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 
 /* ── Test menu ───────────────────────────────────────────────────────── */
 #test-btn {
-  position: absolute; left: var(--ui-pad); top: 92px;
+  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px); z-index: 20;
   background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
   padding: 6px 10px; cursor: pointer;
@@ -415,7 +474,7 @@ html, body {
 #test-btn.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
 
 #testmenu {
-  position: absolute; left: var(--ui-pad); top: 122px;
+  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step));
   width: min(330px, calc(100vw - var(--ui-pad) * 2));
   max-height: calc(100vh - 240px);
   display: flex; flex-direction: column;
@@ -512,7 +571,9 @@ html, body {
 
 /* ── Kill feed ───────────────────────────────────────────────────────── */
 #feed {
-  position: absolute; right: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  /* Above the prompt band rather than beside it: the prompt is centred and
+     on a tablet it is wide enough to reach this corner. */
+  position: absolute; right: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 202px);
   display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
   pointer-events: none; max-width: 46vw;
 }
@@ -571,12 +632,15 @@ html, body {
   .tb-meta .tb-sub { display: none; }
   .objectives { gap: 8px; font-size: 8px; }
   :root { --ui-pad: 8px; }
-  #targetcard { width: 142px; top: 84px; padding: 7px 9px; }
+  /* Widths and padding only. The vertical placement of everything down the
+     sides comes from the measured bar and must not be second-guessed here:
+     these three rules used to re-pin the card and the buttons to 84px, which
+     is what put them back through the readouts on a tall bar. */
+  #targetcard { width: 142px; padding: 7px 9px; }
   #perf { font-size: 9px; }
   #feed { display: none; }
   .tb-block { min-width: 0; }
-  #test-btn { top: 84px; }
-  #testmenu { top: 112px; max-height: calc(100vh - 210px); }
+  #testmenu { top: calc(var(--hud-top) + 8px + var(--rail-step)); max-height: calc(100vh - var(--hud-top) - 130px); }
 }
 @media (max-height: 480px) {
   #targetcard { display: none; }
@@ -656,9 +720,7 @@ html, body {
 #ec-next { border-color: var(--accent); background: rgba(88, 166, 255, 0.12); }
 .ec-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 #targets-btn {
-  /* Under the TEST button, clear of the top bar — at the top it sat straight
-     on top of the FUNDS readout. */
-  position: absolute; left: var(--ui-pad); top: 124px; z-index: 20;
+  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step)); z-index: 20;
   padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
   background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
@@ -668,7 +730,7 @@ html, body {
   .ls-grid { grid-template-columns: 1fr; }
   .ls-card { padding: 13px 13px 15px; }
   .ls-blurb { font-size: 11px; }
-  #targets-btn { top: 116px; padding: 5px 8px; font-size: 8px; }
+  #targets-btn { padding: 5px 8px; font-size: 8px; }
 }
 
 /* ── The stand-off ───────────────────────────────────────────────────────
