@@ -29,7 +29,7 @@ await page.addInitScript(() => { try {
   localStorage.setItem('tt.quality', 'medium'); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); } catch {} });
 await page.goto(`http://localhost:5177/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
-await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none', { timeout: 400000 });
+await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none', null, { timeout: 400000 });
 await page.waitForTimeout(2600);
 console.log(JSON.stringify(await page.evaluate(() => {
   const s = window.primary, g = window.battle.garrison;

@@ -1447,7 +1447,12 @@ export class TestMenu {
         // the map was a wash of colour running to the fog. All three are the
         // same failure — ground with nothing on it and no reason to be empty.
         const city = this.ctx.cityGroup;
-        const d = city?.userData?.detail || {};
+        const raw = city?.userData?.detail || {};
+        // Canopy counts as country. The assertion is that there is something
+        // out there past the last street rather than a wash of colour, and on
+        // a map whose hinterland is rainforest the something is trees: the
+        // Yucatan has no fields in it and is not supposed to.
+        const d = { ...raw, fields: (raw.fields || 0) + (raw.canopy || 0) };
         const traits = c.level.traits || {};
         const want = {
           railing: 40,        // something stands round the monument

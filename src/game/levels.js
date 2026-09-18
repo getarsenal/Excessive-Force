@@ -203,6 +203,10 @@ export const LEVELS = {
     },
     // No windows to post men in, no river, and nothing that can be made to
     // fall over.
+    // Forest to the horizon in every direction. There are no fields in the
+    // Yucatan interior and no airfield: there is the site, the road, a village
+    // on one side of it, and jungle.
+    setting: { hinterland: 'jungle', canopy: 2.5, canopyFrom: 235 },
     traits: { windows: false, river: false, topples: false },
     // A twentieth of Khufu, so nothing like Giza's factor — but still a solid
     // mass rather than a hollow tower.
@@ -310,6 +314,13 @@ export const LEVELS = {
       ornament: 'none',
       river: 'quay',
     },
+    // The CBD, packed against the water on the far side of Sydney Cove, which
+    // is what stands behind this building in every photograph ever taken of
+    // it. No farms and no airfield: the hinterland here is harbour.
+    setting: {
+      hinterland: 'harbour',
+      downtown: { x: -470, z: 150, radius: 440, peak: 235 },
+    },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
     brief: 'A shell has no mass and nothing above it. Hit the haunches, not the crowns.',
@@ -391,7 +402,7 @@ export const LEVELS = {
     // High enough, and far enough back, to get the rim of the summit into the
     // frame. Level with the terraces the plateau runs to the horizon and the
     // most famous mountain in Brazil reads as a lawn.
-    camera: { yaw: -1.57, pitch: 0.34, distance: 340, height: 44 },
+    camera: { yaw: -0.79, pitch: 0.30, distance: 330, height: 44 },
     // One structure. The statue stands on the pedestal and the pedestal stands
     // on the terraces, and separate structures never learn about each other.
     structures: (quality) => [
@@ -413,6 +424,9 @@ export const LEVELS = {
       ground: 'lawn',
       ornament: 'none',
     },
+    // Tijuca, which is the largest urban rainforest in the world and covers
+    // every slope on this map.
+    setting: { hinterland: 'forest', canopy: 2.6, canopyFrom: 92 },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
     brief: 'The arms are the whole silhouette and almost none of the building.',

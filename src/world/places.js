@@ -322,8 +322,21 @@ export function buildPrecinct(props, terrain, rng, opts) {
 export function buildOutskirts(props, terrain, rng, opts) {
   const inner = opts.inner;                 // the town's own reach
   const outer = terrain.span * 2.4;
+  // What is out there, which is not the same everywhere.
+  //
+  // Fields, an airfield and a reservoir are the right middle distance for a
+  // European river city and the wrong one for everywhere else: the Yucatan is
+  // forest to the horizon, the Corcovado is forest on a mountainside, and
+  // Bennelong Point is mostly water. `hinterland` picks which.
+  const kind = opts.hinterland || 'fields';
+  const farmed = kind === 'fields';
+  // A harbour city has no crops round it and it is not bare either: what is
+  // out past the last street in Sydney is ovals, golf, bush and more suburb.
+  // The field machinery lays exactly that shape — big flat patches with hard
+  // edges — so it runs, in green, without the barns and the hedgerows.
+  const patched = farmed || kind === 'harbour';
   const counts = { fields: 0, hedges: 0, barns: 0, runway: 0, hangars: 0,
-    woods: 0, reservoir: 0, masts: 0 };
+    woods: 0, reservoir: 0, masts: 0, canopy: 0 };
   const gy = (x, z) => terrain.heightAt(x, z);
 
   /** Is this patch dry, off the playfield, and level enough to build on? */
@@ -353,7 +366,7 @@ export function buildOutskirts(props, terrain, rng, opts) {
   // and a few aircraft parked on it. Nothing says "this is the edge of town"
   // like two kilometres of concrete laid in a straight line.
   let field = null;
-  for (let k = 0; k < 220 && !field; k++) {
+  for (let k = 0; k < (farmed ? 220 : 0) && !field; k++) {
     const a0 = rng() * Math.PI * 2;
     const rr = inner * 1.25 + rng() * (outer - inner * 1.25);
     const x = Math.sin(a0) * rr, z = Math.cos(a0) * rr;
@@ -442,14 +455,16 @@ export function buildOutskirts(props, terrain, rng, opts) {
   const FARM_YAW = 0.41;
   const fca = Math.cos(FARM_YAW), fsa = Math.sin(FARM_YAW);
   const CROPS = [0x7d8a45, 0x9aa055, 0x6f7f3e, 0xb0a469, 0x5f7238, 0xa89a5e];
-  for (let u = -outer; u <= outer; u += 104) {
+  const CROPS_GREEN = [0x4f6b3a, 0x5d7742, 0x46613a, 0x6c8149, 0x3f5c34, 0x738b52];
+  for (let u = patched ? -outer : outer + 1; u <= outer; u += 104) {
     for (let v = -outer; v <= outer; v += 104) {
       const jx = u + (rng() - 0.5) * 30, jz = v + (rng() - 0.5) * 30;
       const x = jx * fca - jz * fsa, z = jx * fsa + jz * fca;
       const w = 74 + rng() * 54, d = 70 + rng() * 50;
       if (!usable(x, z, Math.max(w, d) * 0.55, 26)) continue;
       const g = gy(x, z);
-      const crop = CROPS[Math.floor(rng() * CROPS.length)];
+      const pal = farmed ? CROPS : CROPS_GREEN;
+      const crop = pal[Math.floor(rng() * pal.length)];
       props.add('foliage', box(w, 0.3, d, x, g + 0.18, z, FARM_YAW), crop,
         0.86 + rng() * 0.28);
       counts.fields++;
@@ -460,8 +475,9 @@ export function buildOutskirts(props, terrain, rng, opts) {
           0x3d5a2c, 0.88 + rng() * 0.2);
         counts.hedges++;
       }
-      // A farmstead every so often: a house, a barn and a yard.
-      if (rng() < 0.16) {
+      // A farmstead every so often: a house, a barn and a yard. Not where
+      // there is no farming — those patches are playing fields and bush.
+      if (farmed && rng() < 0.16) {
         const g2 = gy(x, z);
         props.add('stone', box(14, 7, 10, x, g2 + 3.5, z, FARM_YAW), 0xbdae94, 0.95);
         props.add('dark', box(15, 1.2, 11, x, g2 + 7.6, z, FARM_YAW), 0x6b4b3a, 1);
@@ -472,9 +488,45 @@ export function buildOutskirts(props, terrain, rng, opts) {
     }
   }
 
+  // ── Forest.
+  //
+  // Not a wood, which is a shape with fields round it — a canopy, laid on a
+  // jittered grid over everything out here that is dry and is not already
+  // something else. Trees grow on slopes, so this does not use `usable`: the
+  // flanks of the Corcovado are forty-five degrees of rainforest and refusing
+  // them leaves the most-photographed mountain in Brazil bald.
+  if (kind === 'jungle' || kind === 'forest') {
+    const tall = kind === 'jungle';
+    // Wide pitch and big trees: see the note on the in-field canopy. The
+    // outskirts disc is nearly four kilometres across and a tight grid over it
+    // is tens of thousands of meshes.
+    const step = 88 / Math.max(0.5, opts.canopyFar || 1);
+    const lim = outer * 0.92;
+    for (let gx = -lim; gx <= lim; gx += step) {
+      for (let gz = -lim; gz <= lim; gz += step) {
+        const x = gx + (rng() - 0.5) * step * 0.85;
+        const z = gz + (rng() - 0.5) * step * 0.85;
+        const r = Math.hypot(x, z);
+        if (r < inner || r > lim) continue;
+        if (terrain.isWater(x, z)) continue;
+        const g = gy(x, z);
+        if (g < terrain.waterLevel + 1.0) continue;
+        // Clearings, so it reads as forest and not as a lawn with a texture.
+        if (rng() < 0.16) continue;
+        const h = (tall ? 24 : 20) + rng() * (tall ? 18 : 14);
+        const w = h * (0.32 + rng() * 0.14);
+        props.add('dark', cyl(0.9, 1.5, h * 0.46, 4, x, g + h * 0.22, z),
+          0x46352a, 1);
+        props.add('foliage', cyl(w, w * 0.55, h * 0.62, 6, x, g + h * 0.68, z),
+          rng() < 0.45 ? 0x2c4a22 : 0x37582a, 0.76 + rng() * 0.38);
+        counts.canopy++;
+      }
+    }
+  }
+
   // ── Woods, and a reservoir with a dam wall. Both are single large shapes,
   // which is exactly what the middle distance needs between the fields.
-  for (let k = 0; k < 26; k++) {
+  for (let k = 0; k < (farmed ? 26 : 0); k++) {
     const a0 = rng() * Math.PI * 2;
     const rr = inner * 1.15 + rng() * (outer - inner * 1.15);
     const cx = Math.sin(a0) * rr, cz = Math.cos(a0) * rr;

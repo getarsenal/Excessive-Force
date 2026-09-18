@@ -40,7 +40,7 @@ await page.addInitScript(([t]) => {
 }, [tier]);
 await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(
-  () => document.getElementById('loading')?.style.display === 'none', { timeout: 400000 });
+  () => document.getElementById('loading')?.style.display === 'none', null, { timeout: 400000 });
 await page.waitForTimeout(1500);
 
 const found = await page.evaluate(() => {

@@ -183,11 +183,19 @@ async function boot() {
   } else {
     contextGroup = buildContext(terrain, quality, {
       landmarks, precinct: level.precinct, exclude: level.contextExclude,
+      // What is beyond the town. A level says where it is; the generator does
+      // not guess it from the terrain, because fields and forest look much the
+      // same to a heightmap and nothing like each other from the air.
+      hinterland: level.setting?.hinterland,
+      canopy: level.setting?.canopy,
+      canopyFrom: level.setting?.canopyFrom,
+      downtown: level.setting?.downtown,
     });
     engine.scene.add(contextGroup);
     console.log(`[tumble] city: hand-placed approximation, `
       + `${contextGroup.userData.plots.length} buildings, `
-      + `${contextGroup.userData.roofs.length} deployable roofs`
+      + `${contextGroup.userData.roofs.length} deployable roofs, `
+      + `${contextGroup.userData.detail?.canopy || 0} trees`
       + ' (run tools/bake_buildings.py for real footprints)');
   }
 

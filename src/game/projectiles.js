@@ -59,7 +59,8 @@ export function solveArc(from, to, speed, gravity, high = true) {
  *
  * @returns {{vel: THREE.Vector3, speed: number, time: number}|null}
  */
-export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5) {
+export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5,
+  clear = null) {
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const d = Math.hypot(dx, dz);
@@ -77,12 +78,41 @@ export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5) {
     return { vel, speed, time };
   };
 
+  // `clear(vel)` is the caller's terrain-and-masonry test. Without it this is
+  // the old behaviour exactly: minimum-energy loft if it lands inside the
+  // flight budget, otherwise the flat shot at full charge.
+  const ok = (sol) => !!sol && (!clear || clear(sol.vel));
+
   const charge = Math.min(maxSpeed, vMin * 1.16);
   const high = attempt(charge, true);
-  if (high && high.time <= maxFlight) return high;
+  if (ok(high) && high.time <= maxFlight) return high;
 
   const flat = attempt(maxSpeed, false);
-  if (flat && flat.time > 0.05) return flat;
+  if (ok(flat) && flat.time > 0.05) return flat;
+
+  // A shot that clears and takes a while beats a fast one into the hillside.
+  // The flight budget is a matter of how long the player is willing to watch
+  // the shell; the hill is a matter of whether there is a shot at all.
+  if (ok(high)) return high;
+
+  // Neither of the two standard charges gets over it. Walk the charge up from
+  // minimum energy and take the first high arc that clears.
+  //
+  // Upward from the minimum and not downward from the standard loft, because
+  // at exactly the minimum-energy speed the two solutions meet: that is the
+  // flattest high arc there is, and every extra knot of charge makes the
+  // high one steeper and longer in the air. The first arc that clears the
+  // ridge is therefore also the quickest shell to arrive, which matters — a
+  // battery on the flank of the Corcovado firing at the summit was putting
+  // rounds up on a thirty-second flight and the match was over before the
+  // first one landed.
+  if (clear) {
+    for (let k = 0; k <= 9; k++) {
+      const sp = Math.min(maxSpeed, vMin * (1.004 + k * 0.042));
+      const s = attempt(sp, true);
+      if (ok(s)) return s;
+    }
+  }
 
   return high || flat;
 }

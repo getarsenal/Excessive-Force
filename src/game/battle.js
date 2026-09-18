@@ -455,6 +455,29 @@ export class Battle {
     if (!onRoof && this.terrain.isWater(point.x, point.z)) {
       return { ok: false, reason: 'in the river' };
     }
+    // Not on a cliff.
+    //
+    // A gun crew needs ground it can stand the trail on, and until there was a
+    // mountain in the campaign nothing in the game was steep enough for that to
+    // come up. The Corcovado is: its flanks fall at better than fifty degrees
+    // between the benches, and a howitzer bedded into one of those sat at forty
+    // degrees of roll with its muzzle in the hillside. Refusing them is also
+    // what makes the shelves matter — the level is fought from one bench to the
+    // next because those are the only places a battery will go.
+    if (!onRoof && this.terrain) {
+        const g0 = this.terrain.heightAt(point.x, point.z);
+        let lo = g0, hi = g0;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const g = this.terrain.heightAt(point.x + Math.cos(a) * 7, point.z + Math.sin(a) * 7);
+          lo = Math.min(lo, g); hi = Math.max(hi, g);
+        }
+        // Generous. A city on a hillside — the Trocadéro, Circular Quay — is
+        // ground a gun can stand on; the flank of a mountain between two
+        // benches falls twenty metres across the same seven and is not.
+        if (hi - lo > 8.0) return { ok: false, reason: 'too steep' };
+    }
+
     // And it has to be a roof worth climbing. A building is bedded to the
     // ground at its own centre, so where the ground climbs across its
     // footprint the top of it can finish level with the hillside behind —
@@ -841,7 +864,8 @@ export class Battle {
         // is the classic trap: at short range it throws the shell very nearly
         // straight up, and it is still climbing when its flight time runs out.
         // The minimum-energy solver picks the charge a real crew would.
-        const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0);
+        const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0,
+          (v) => this._trajectoryClear(from, v, p.gravity));
         if (!lofted && !low) return false;
         vel = lofted ? lofted.vel : low;
       }
@@ -867,7 +891,8 @@ export class Battle {
       }
       if (!vel) return false;
     } else if (p.kind === 'arc') {
-      const sol = solveBallistic(from, aim, p.speed, p.gravity, 9.0);
+      const sol = solveBallistic(from, aim, p.speed, p.gravity, 9.0,
+        (v) => this._trajectoryClear(from, v, p.gravity));
       if (!sol) return false; // genuinely out of range
       vel = sol.vel;
     } else if (p.kind === 'topattack') {
@@ -930,10 +955,13 @@ export class Battle {
     const a = this._trajA || (this._trajA = new THREE.Vector3());
     const bpt = this._trajB || (this._trajB = new THREE.Vector3());
     // Time to the apex-or-target; sampling the first 85% avoids condemning the
-    // shot because the last leg runs into the wall it is aimed at.
+    // shot because the last leg runs into the wall it is aimed at. The cap is
+    // generous enough to cover a lofted shell, which is in the air far longer
+    // than a flat one and spends most of that time over the ground it has to
+    // clear.
     const flight = Math.max(0.1, (2 * Math.max(0, vel.y)) / gravity);
-    const span = Math.min(flight, 6) * 0.85;
-    const steps = 7;
+    const span = Math.min(flight, 14) * 0.85;
+    const steps = 12;
     a.copy(from);
     for (let i = 1; i <= steps; i++) {
       const t = (span * i) / steps;
@@ -943,6 +971,17 @@ export class Battle {
         from.z + vel.z * t,
       );
       if (!lineOfSight(this.structures, a, bpt, 0, 0)) return false;
+      // And the ground, which this did not look at for a long time. Masonry
+      // was the only thing that could block a shot, so a gun on the flank of a
+      // mountain firing at something above it never discovered that its flat
+      // trajectory went into the hillside forty metres in front of the muzzle:
+      // it fired, the shell detonated at its own feet, and nothing up the hill
+      // was ever touched. The first tenth is skipped because the muzzle is
+      // standing on the ground by definition.
+      if (i > 1 && this.terrain) {
+        const g = this.terrain.heightAt(bpt.x, bpt.z);
+        if (bpt.y < g + 1.5) return false;
+      }
       a.copy(bpt);
     }
     return true;

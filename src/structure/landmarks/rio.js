@@ -38,7 +38,11 @@ import { BlockList, MATERIALS as M } from '../builder.js';
  * climbs — and the garrison on the terraces is firing down the whole way.
  */
 
-const S = 2.0;
+// 2.5x. The Elizabeth Tower and El Castillo are doubled; this one is not a
+// building, it is a figure on a mountain, and the whole point of it is that it
+// can be seen from the far side of a city. At 2x it is a statue on a summit; at
+// 2.5 it is the thing on the skyline.
+const S = 2.5;
 
 export const REDEEMER = {
   scale: S,
@@ -48,11 +52,11 @@ export const REDEEMER = {
   // with walks over them instead, each terrace ends up standing on the edge
   // of a plate that is standing on nothing.
   terraces: [
-    { half: 34, y: 0, h: 4.6 },
-    { half: 24, y: 4.6, h: 3.8 },
-    { half: 16, y: 8.4, h: 3.2 },
+    { half: 41, y: 0, h: 5.4 },
+    { half: 29, y: 5.4, h: 4.5 },
+    { half: 20, y: 9.9, h: 3.8 },
   ],
-  plinth: 11.6,               // the top terrace, which the pedestal stands on
+  plinth: 13.7,               // the top terrace, which the pedestal stands on
   pedHalf: 5.4 * S,
   pedH: 8.0 * S,
   chapelHalf: 3.2 * S,

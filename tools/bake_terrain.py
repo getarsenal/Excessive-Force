@@ -175,28 +175,26 @@ LEVELS = {
         "zoom": 15,
         # Tijuca forest on every side, because that is what is down there.
         "parks": [[0, 0, 1000], [-400, -400, 400], [420, 380, 400]],
-        # The statue's terrace, at the summit's own height. Levelled to the
-        # median of the ring instead, it came out seventy metres *below* the
-        # ridge beside it, and the most famous viewpoint in Brazil was a
-        # hollow with a hill next to it.
-        # A broad summit, and broader than the real one — this is the one
-        # place in the campaign where the terrain is a compromise and it is
-        # worth saying why. Cut to the Corcovado's true platform, the nearest
-        # ground a battery can stand on is a hundred and seventy metres below
-        # the statue with a sixty-degree face between the two, and a howitzer
-        # firing up that face puts its shell into the hillside in front of it
-        # every time: ten rounds out, ten impacts at the gun's own feet, and
-        # not a stone touched. So the summit is a ridge rather than a cone,
-        # and it is offset: four hundred metres of it running one way, where
-        # the batteries come up and have to have somewhere level to stand, and
-        # the rim seventy metres the other way, where the camera looks and the
-        # ground falls four hundred metres to the city. (A pad's second
-        # coordinate is northing, and the game's +z is south, so the sign of
-        # this one is the opposite of the direction it puts the flat ground.) Centred and
-        # circular, a summit wide enough for the guns is wide enough to hide
-        # the drop from every angle, and the level stops being a mountain at
-        # all.
-        "flatten": [[0, -60, [185, 245], 85, 690.0]],
+        # The summit, cut the way a summit of bedded rock actually weathers:
+        # a platform for the statue and three benches of level ground below
+        # it, each one a firing step. See `cut_peak` for why this is a
+        # landform and a level design at the same time.
+        "peak": {
+            "height": 700.0,
+            "top": 66.0,
+            "slope": 1.6,
+            # Wide benches, and wide on purpose. A shelf is a firing step and
+            # a gun needs level ground under the trail, so each one has to be
+            # deep enough that a battery placed anywhere on it stands square —
+            # and deep enough that the wobble cannot drop a position into the
+            # face between two of them.
+            "shelves": [
+                [96.0, 40.0],
+                [152.0, 62.0],
+                [246.0, 70.0],
+            ],
+            "fade": 70.0,
+        },
     },
     "giza": {
         "name": "Great Pyramids, Giza",
@@ -327,6 +325,77 @@ def flood_sea(height: np.ndarray, mask: np.ndarray, sea: dict):
     mask[:, :, 0] = np.maximum(mask[:, :, 0], wet)
     # Down to a bed, deepest where the water is widest.
     return height - wet * depth
+
+
+def cut_peak(height: np.ndarray, peak: dict, span: float) -> np.ndarray:
+    """Carve a real mountain with ledges you can stand a gun on.
+
+    The problem this solves is not scenery, it is that a landmark on a summit
+    is unplayable on the summit's real shape. Cut the Corcovado to its true
+    platform and the nearest ground a battery can stand on is a hundred and
+    seventy metres below the statue with a sixty-degree face between the two;
+    flatten enough of it for the guns and the most famous mountain in Brazil
+    is a lawn. Neither is the building.
+
+    So the mountain keeps its height and its slope, and has terraces cut into
+    it: a flat summit platform, and rings of level shelf below it, each one a
+    firing step. That is a real landform — a peak of bedded rock weathers into
+    exactly these benches — and it is the level's structure as well, because
+    the fight is up the shelves and every one is closer than the last.
+
+    The profile is built as a descent budget. `g` is how far a point has come
+    down the slope; a shelf freezes it for the width of the shelf and then
+    hands it back, so the ground falls at `slope` between shelves and is dead
+    level on them. The radii are wobbled by bearing so the benches wander in
+    and out the way weathered rock does rather than reading as a wedding cake.
+    """
+    size = height.shape[0]
+    gx = np.linspace(-span, span, size)[None, :]
+    gy = np.linspace(span, -span, size)[:, None]
+    px = np.broadcast_to(gx, (size, size))
+    py = np.broadcast_to(gy, (size, size))
+
+    ox, oy = peak.get("at", (0.0, 0.0))
+    dx, dy = px - ox, py - oy
+    d = np.hypot(dx, dy)
+    th = np.arctan2(dy, dx)
+
+    wob = 1.0
+    for amp, freq, phase in peak.get("wobble", [(0.10, 3, 1.1), (0.055, 7, 0.4)]):
+        wob = wob + amp * np.sin(freq * th + phase)
+    dd = d * wob
+
+    summit = float(peak["height"])
+    top = float(peak["top"])
+    slope = float(peak.get("slope", 1.2))
+
+    g = np.maximum(0.0, dd - top)
+    last = top
+    for shelf in peak.get("shelves", []):
+        r_in, width = float(shelf[0]), float(shelf[1])
+        arc = shelf[2] if len(shelf) > 2 else None
+        r_out = r_in + width
+        inarc = np.ones_like(d, dtype=bool)
+        if arc is not None:
+            a0, a1 = [math.radians(v) for v in arc]
+            rel = np.mod(th - a0, 2 * math.pi)
+            inarc = rel <= np.mod(a1 - a0, 2 * math.pi)
+        on = (dd >= r_in) & (dd < r_out) & inarc
+        past = (dd >= r_out) & inarc
+        g = np.where(on, g - (dd - r_in), g)
+        g = np.where(past, g - width, g)
+        last = r_out
+
+    peaked = summit - slope * np.maximum(g, 0.0)
+
+    # Back to the real ground beyond the last bench.
+    fade = float(peak.get("fade", 60.0))
+    t = np.clip((last + fade - dd) / max(fade, 1e-3), 0.0, 1.0)
+    k = t * t * (3.0 - 2.0 * t)
+    out = peaked * k + height * (1.0 - k)
+    print(f"  cut a peak at ({ox}, {oy}) to {summit:.0f} m "
+          f"with {len(peak.get('shelves', []))} shelves out to {last:.0f} m")
+    return out
 
 
 def carve_river(height: np.ndarray, mask: np.ndarray, river: dict, span: float, sea: float):
@@ -466,6 +535,9 @@ def bake(level_id: str):
 
     if cfg.get("flatten"):
         height = flatten_pads(height, cfg["flatten"], cfg["span"])
+
+    if "peak" in cfg:
+        height = cut_peak(height, cfg["peak"], cfg["span"])
 
     if "river" in cfg:
         height = carve_river(height, mask, cfg["river"], cfg["span"], sea)

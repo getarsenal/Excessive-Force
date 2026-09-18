@@ -19,7 +19,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 // footprints are the same city rather than two different ones.
 import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 import { valueNoise } from './terrain.js';
-import { PropSet, MATERIALS, addStreetFurniture, addBuildingDetail,
+import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
   addRiverEdge, addRoofAndFrontage } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
@@ -66,6 +66,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // four assertions down with it, none of which looked like they had anything
   // to do with the city.
   const EXCLUDE = opts.exclude || 66;
+  const DOWNTOWN = opts.downtown || null;
 
   // ── The bridge comes first, because the street network has to know where it
   // lands: a crossing with no road to it is the thing that made the old layout
@@ -425,7 +426,25 @@ export function buildContext(terrain, quality, opts = {}) {
     // District character: taller in the middle of town, lower out at the edges,
     // with a slow drift across the map so neighbourhoods differ.
     const drift = valueNoise(b.x * 0.0026 + 5.1, b.z * 0.0026 - 2.3);
-    const baseH = (10 + 20 * (1 - Math.min(1, r / (terrain.span * 0.8)))) * (0.7 + drift * 0.9);
+    let baseH = (10 + 20 * (1 - Math.min(1, r / (terrain.span * 0.8)))) * (0.7 + drift * 0.9);
+
+    // A downtown, where a level has one.
+    //
+    // "Taller in the middle, lower at the edges" is how a European river city
+    // is shaped and is not how a harbour city is: Sydney's tall quarter is a
+    // kilometre of towers packed against the water on one side of the cove,
+    // and the thing you actually see behind the Opera House. Without it the
+    // Opera House stands in front of a village.
+    if (DOWNTOWN) {
+      const dd = Math.hypot(b.x - DOWNTOWN.x, b.z - DOWNTOWN.z);
+      const f = Math.max(0, 1 - dd / DOWNTOWN.radius);
+      if (f > 0) {
+        // Squared, so the core is dense and the fall-off to the suburbs is
+        // quick — a skyline has an edge.
+        const lift = (DOWNTOWN.peak / 30) * f * f * (0.55 + drift * 0.9);
+        baseH = Math.max(baseH, 10 + lift * 20);
+      }
+    }
 
     // ── One building, filling the block. Offices, a department store, a
     // ministry: the thing a terrace of houses is not.
@@ -590,7 +609,63 @@ export function buildContext(terrain, quality, opts = {}) {
     precinct: opts.precinct, radius: EXCLUDE - 4, net,
     landmarks: opts.landmarks || [], yaw: GRID_YAW,
   }));
-  Object.assign(counts, buildOutskirts(props, terrain, rng, { inner: reach * 1.02 }));
+  // Forest inside the playfield as well as beyond it.
+  //
+  // The outskirts start where the town stops, which on a map with a town on it
+  // is the right place for them and on a mountain is a kilometre past anything
+  // the player can see. El Castillo stands in a clearing and the Corcovado is
+  // rainforest from the benches to the sea, so the canopy has to come in as
+  // far as the precinct — off the roads, off the plots, and off the landmark's
+  // own ground.
+  if (opts.hinterland === 'jungle' || opts.hinterland === 'forest') {
+    const tall = opts.hinterland === 'jungle';
+    // Big trees, widely spaced. A canopy is a texture at this distance and the
+    // cost of it is geometry: at a thirty-metre pitch this is seventeen
+    // thousand trees, thirty-four thousand meshes to merge, and the level
+    // never finishes loading. Sixty metres of pitch and a twenty-five metre
+    // tree reads as continuous forest from anywhere a player stands.
+    const step = 62 / Math.max(0.5, opts.canopy || 1) * (dense < 1 ? 1.3 : 1);
+    const net = group.userData.network;
+    const inner = opts.canopyFrom || EXCLUDE * 1.04;
+    const near = (x, z) => plots.some((p) => Math.abs(x - p.x) < p.ax / 2 + 7
+      && Math.abs(z - p.z) < p.az / 2 + 7);
+    for (let gx = -reach; gx <= reach; gx += step) {
+      for (let gz = -reach; gz <= reach; gz += step) {
+        const x = gx + (rng() - 0.5) * step * 0.9;
+        const z = gz + (rng() - 0.5) * step * 0.9;
+        const r = Math.hypot(x, z);
+        // Where the forest starts. Not `contextExclude`, which is how far the
+        // *town* is held off the landmark and on a mountain is four hundred
+        // metres of bare hillside: trees grow right up to the terrace wall.
+        if (r < inner || r > reach) continue;
+        if (terrain.isWater(x, z)) continue;
+        if (net && net.roadClearance && net.roadClearance(x, z) < 9) continue;
+        if (near(x, z)) continue;
+        if (rng() < 0.14) continue;
+        const g = terrain.heightAt(x, z);
+        if (g < terrain.waterLevel + 1.0) continue;
+        const h = (tall ? 21 : 17) + rng() * (tall ? 15 : 12);
+        const w = h * (0.30 + rng() * 0.13);
+        props.add('dark', cyl(0.8, 1.3, h * 0.46, 4, x, g + h * 0.22, z),
+          0x46352a, 1);
+        // Broad at the top and narrower under it. A rainforest crown is an
+        // umbrella; a cone is a Christmas tree, and two thousand Christmas
+        // trees on the Corcovado is a garden centre.
+        props.add('foliage', cyl(w, w * 0.55, h * 0.62, 6, x, g + h * 0.68, z),
+          rng() < 0.45 ? 0x2c4a22 : 0x37582a, 0.76 + rng() * 0.38);
+        counts.canopy = (counts.canopy || 0) + 1;
+      }
+    }
+  }
+
+  const nearCanopy = counts.canopy || 0;
+  Object.assign(counts, buildOutskirts(props, terrain, rng, {
+    inner: reach * 1.02,
+    hinterland: opts.hinterland,
+    canopyFar: opts.canopyFar || (opts.canopy || 1) * 0.55,
+  }));
+  // Both passes count trees under the same name and the outskirts run second.
+  counts.canopy = (counts.canopy || 0) + nearCanopy;
   Object.assign(counts, buildHorizon(props, terrain, rng));
   Object.assign(counts, buildRailway(props, terrain, rng, { yaw: GRID_YAW, net }));
   // Whatever each open block is for, laid out in the block's own frame.
