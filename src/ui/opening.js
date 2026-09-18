@@ -11,9 +11,12 @@ import { TAP } from './pointer.js';
  *      tap doubles as the audio unlock for the whole session.
  *   2. The studio. Scheidel Interactive, the same sting Castle Hassle opens
  *      with, so the two games share a front door.
- *   3. The title. The game is artillery, so the title arrives the way its
- *      shells do: out of the dark, one word per impact, and the screen moves
- *      when they land.
+ *   3. The title. One thing arriving hard. The badge comes in out of the dark
+ *      at four times its size and is stopped dead by the backdrop — a slam,
+ *      a flash, the screen kicking, dust off the impact — and then the map.
+ *      It used to be the two words of the title arriving one per shell with a
+ *      tagline underneath, which is three beats and a paragraph to say what the
+ *      logo says in one frame with the sound on.
  *
  * The whole thing is skippable at any point with a tap, and the world loads
  * behind it — physics and the wasm are already on their way down while the
@@ -109,13 +112,8 @@ export async function runOpening() {
       </div>
       <video class="op-sting" playsinline preload="auto" hidden></video>
       <div class="op-title" hidden>
-        <div class="op-shock"></div>
-        <div class="op-words">
-          <div class="op-word op-w1">EXCESSIVE</div>
-          <div class="op-word op-w2">FORCE</div>
-        </div>
-        <div class="op-rule"></div>
-        <div class="op-tag">BRING DOWN THE WORLD'S LANDMARKS — ONE STONE AT A TIME</div>
+        <div class="op-ring"></div>
+        <img class="op-mark" src="logo-512.png" alt="EXCESSIVE FORCE" draggable="false">
       </div>
       <div class="op-flash"></div>
       <div class="op-dust"></div>
@@ -191,40 +189,30 @@ export async function runOpening() {
     sting.hidden = true;
   }
 
-  // ── 3. The title, one word per impact.
+  // ── 3. The slam.
   if (!bailed) {
     title.hidden = false;
-    // A long way off: the sample at half speed, under the first word, so the
-    // card opens on something that is already in the air.
-    thump('assets/explosion.mp3', { rate: 0.5, gain: 0.32 });
-
-    await hold(180);
+    // A long way off, under the approach: the explosion sample at half speed,
+    // so the card opens on something that is already in the air.
+    thump('assets/explosion.mp3', { rate: 0.5, gain: 0.3 });
+    // One frame of it sitting still at full size before it is let go, or the
+    // browser starts the transition from wherever the layout happened to be.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     if (!bailed) {
-      title.classList.add('hit1');
-      stage.classList.add('shake-1');
-      flash.classList.add('on');
-      thump('assets/cannon.mp3', { rate: 0.72, gain: 0.55 });
-      await hold(120);
-      flash.classList.remove('on');
+      title.classList.add('go');
+      // The impact is timed to the landing, not to the start: the mark is in
+      // the air for 420 ms and everything else happens when it stops.
+      setTimeout(() => {
+        if (bailed) return;
+        title.classList.add('hit');
+        stage.classList.add('shake-2');
+        flash.classList.add('on', 'hard');
+        thump('assets/explosion.mp3', { rate: 0.34, gain: 0.95 });
+        thump('assets/cannon.mp3', { rate: 0.6, gain: 0.7, delay: 40 });
+        setTimeout(() => flash.classList.remove('on', 'hard'), 130);
+      }, 400);
+      await hold(1900);
     }
-
-    await hold(560);
-    if (!bailed) {
-      title.classList.add('hit2');
-      stage.classList.remove('shake-1');
-      // Reflow, or a class re-added inside the same frame animates nothing.
-      void stage.offsetWidth;
-      stage.classList.add('shake-2');
-      flash.classList.add('on', 'hard');
-      thump('assets/explosion.mp3', { rate: 0.82, gain: 0.85 });
-      thump('assets/explosion.mp3', { rate: 0.42, gain: 0.5, delay: 90 });
-      await hold(150);
-      flash.classList.remove('on', 'hard');
-    }
-
-    await hold(520);
-    title.classList.add('settled');
-    await hold(2300);
   }
 
   // ── Out, onto whatever the loader has got to by now.

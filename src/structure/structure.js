@@ -202,8 +202,28 @@ export class Structure {
       const vol = 8 * b.hx * b.hy * b.hz;
       this.mass[i] = vol * props.density * 1000; // tonnes -> kg
       // Health scales with volume so a big foundation block genuinely shrugs
-      // off what shatters a clock-face mullion.
-      this.maxHealth[i] = props.toughness * Math.pow(vol, 0.62) * 21.0;
+      // off what shatters a clock-face mullion — but with the *grid* taken out
+      // of the volume first.
+      //
+      // A quality tier coarsens the masonry: a phone lays the Taj in 11,000
+      // stones where a desktop lays it in 27,000, so the same physical block of
+      // marble is two and a half times the volume on the phone and, at a 0.62
+      // exponent, 73 % tougher. Measured: the median stone at Agra needs 8.3
+      // direct 105 mm hits at the low tier and 4.8 at the high one. A battery
+      // that quarries a hole out of the terrace on a desktop bounces off it on
+      // a phone, and the level is hardest on the hardware least able to fight
+      // it — which is exactly backwards, and is the "nothing destroyed — 8
+      // rounds fired" the regression suite has been catching for weeks.
+      //
+      // `explode()` already refuses to let the tier decide the size of the
+      // hole, weighting damage by the fraction of each stone the blast
+      // encloses. This is the other half of the same idea: a stone's toughness
+      // is a fact about the marble and the block, not about how finely the
+      // device happened to dice it. The volume is divided back down to the
+      // reference tier before the curve is applied, so the same wall takes the
+      // same work to break everywhere and only the debris is coarser.
+      const grid = Math.pow(this.quality?.blockScale ?? 1, 3);
+      this.maxHealth[i] = props.toughness * Math.pow(vol / grid, 0.62) * 21.0;
       this.health[i] = this.maxHealth[i];
       this.flags[i] = ALIVE;
       if (this.py[i] - this.hy[i] <= this.groundY + 0.45) this.flags[i] |= GROUNDED;

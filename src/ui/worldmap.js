@@ -3,37 +3,57 @@ import { loadProgress } from './levelselect.js';
 import {
   campaignState, objectivesFor, freeDeploy, setFreeDeploy, pendingBurn, markBurnSeen,
 } from '../game/campaign.js';
-import { TAP } from './pointer.js';
 
 /**
  * The map.
  *
- * The front door is a world, not a list of four cards. That is partly because a
- * campaign wants a board to be fought over, and partly because of what happens
- * when a contract closes: the country burns out. A ring of fire runs from the
- * building to the border and leaves the place charred, and it stays charred —
- * so the map is the scoreboard, and by the end of the game it is four black
- * holes in the world.
+ * The front door is a world, and the world is the menu — not a picture of one
+ * over a list. It pans, it zooms, the countries answer to a tap, and the camera
+ * goes to whatever you pick. That matters beyond feel: four contracts on one
+ * board is the shape of the game, and a board you can only look at is a
+ * decoration on a list that is doing the real work.
  *
- * Drawn from real borders rather than from a picture of a map. Natural Earth's
- * 110m outlines are public domain and about forty kilobytes over the wire, and
+ * It is also the scoreboard. A contract closed is a country burnt out — a ring
+ * of fire from the building to the border, and the place stays charred — so by
+ * the end of the campaign the map is four black holes in the world.
+ *
+ * Drawn from real borders rather than from a picture. Natural Earth's 110m
+ * outlines are public domain and about forty kilobytes over the wire, and
  * having the actual polygons is what makes the fire possible at all: with an
  * image every country would need a hand-cut mask before it could be set alight,
  * and the flame would stop at whatever line somebody drew rather than at the
  * coast. See `tools/make_world.py`.
  *
- * Plate carrée, because it is the projection whose arithmetic is two
- * subtractions and because the alternative — Mercator — spends a third of its
- * height on Greenland and Siberia, neither of which is a contract. Latitude is
- * clipped to the inhabited band for the same reason.
+ * Plate carrée, because its arithmetic is two subtractions, and clipped to the
+ * inhabited band because Mercator spends a third of its height on Greenland and
+ * Siberia and neither of them is a contract.
+ *
+ * ── The camera ──
+ *
+ * The projection is fixed and a transform moves over it. The alternative —
+ * fitting the SVG's own `viewBox` to whatever should be on screen — was what
+ * this did first, and it makes every pixel on the map a function of the zoom:
+ * the labels grew to four centimetres tall the moment the view was fitted to
+ * Europe, and each of the sizes had to be divided back down by hand. Here one
+ * unit is one pixel, always. The land sits inside a group that is translated
+ * and scaled, and the pins are placed in screen coordinates on top of it — so
+ * the coastline zooms and the furniture never does.
  */
 
 const LAT0 = 78, LAT1 = -56;          // the band the map draws
-const W = 1000;                        // viewBox units; the SVG scales to fit
+const W = 2000;                        // projection units across the world
 const H = Math.round(W * (LAT0 - LAT1) / 360);
 
 const x = (lon) => (lon + 180) / 360 * W;
 const y = (lat) => (LAT0 - lat) / (LAT0 - LAT1) * H;
+
+const SVG = 'http://www.w3.org/2000/svg';
+const el = (name, attrs) => {
+  const n = document.createElementNS(SVG, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+};
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 let cache = null;
 
@@ -56,10 +76,10 @@ function pathFor(country) {
   for (const poly of country.p) {
     for (const ring of poly) {
       // Clip to the drawn band by clamping rather than by cutting: a country
-      // that runs off the top of the map should end at the top of the map, not
-      // disappear, and no contract is anywhere near the clamp.
+      // that runs off the top should end at the top, not disappear, and no
+      // contract is anywhere near the clamp.
       d += `M${ring.map(([lo, la]) =>
-        `${x(lo).toFixed(1)} ${y(Math.max(LAT1, Math.min(LAT0, la))).toFixed(1)}`).join('L')}Z`;
+        `${x(lo).toFixed(1)} ${y(clamp(la, LAT1, LAT0)).toFixed(1)}`).join('L')}Z`;
     }
   }
   return d;
@@ -86,140 +106,6 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
 
   const root = document.createElement('div');
   root.id = 'worldmap';
-
-  // Every country, with the contracts picked out of the crowd.
-  const byIso = new Map(state.list.map((t) => [t.iso, t]));
-  const land = world.map((c) => {
-    const t = byIso.get(c.i);
-    const cls = t
-      ? `wm-land wm-target${t.down && t.iso !== burning ? ' burnt' : ''}`
-      : 'wm-land';
-    return `<path class="${cls}" d="${pathFor(c)}"${t ? ` data-iso="${c.i}"` : ''}/>`;
-  }).join('');
-
-  // And the fire, one clipped overlay per contract, idle until it is wanted.
-  //
-  // Each one carries how far it has to run: the distance from the building to
-  // the furthest corner of its own country. Sized to the map instead — one
-  // radius for all of them — the front crossed France in about a sixth of a
-  // second and then spent two and a half more expanding into sea that was
-  // clipped away, so the only thing anyone ever saw was the result.
-  const burns = state.list.map((t) => {
-    const c = world.find((w) => w.i === t.iso);
-    if (!c) return '';
-    const cx = x(t.lon), cy = y(t.lat);
-    // The landmass the target is standing on, not the country's whole estate.
-    //
-    // France's outline includes French Guiana, so "furthest corner of France"
-    // is four thousand miles across the Atlantic and the fire crossed the part
-    // anyone was looking at in a sixth of a second. The reach is measured over
-    // the one polygon the building is inside — the rest of the country goes
-    // black at the end with everything else.
-    let reach = 1, best = null, bestD = Infinity;
-    for (const poly of c.p) {
-      let near = Infinity, far = 0;
-      for (const ring of poly) {
-        for (const [lo, la] of ring) {
-          const d = Math.hypot(x(lo) - cx, y(la) - cy);
-          if (d < near) near = d;
-          if (d > far) far = d;
-        }
-      }
-      if (near < bestD) { bestD = near; best = far; }
-    }
-    reach = Math.max(6, best || 1);
-    return `
-      <clipPath id="wm-clip-${t.iso}"><path d="${pathFor(c)}"/></clipPath>
-      <g class="wm-burn" data-iso="${t.iso}" data-reach="${reach.toFixed(1)}"
-         clip-path="url(#wm-clip-${t.iso})">
-        <circle class="wm-char" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="0"/>
-        <circle class="wm-flame" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="0"
-                stroke-width="${Math.max(3, reach * 0.16).toFixed(1)}"/>
-      </g>`;
-  }).join('');
-
-  // The board is the theatre, not the planet.
-  //
-  // Plate carrée over the whole world puts four contracts inside one eighth of
-  // the picture, and at phone width that is a map 190 px tall with London and
-  // Paris in the same four pixels. The view is fitted to the contracts with a
-  // wide margin and then opened out to the shape of the screen — so a phone
-  // gets Europe to India at a readable size and a desktop still sees an ocean
-  // either side of it. It opens out to the whole world on its own once the
-  // contracts are spread that far.
-  const view = (() => {
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    for (const t of state.list) {
-      x0 = Math.min(x0, x(t.lon)); x1 = Math.max(x1, x(t.lon));
-      y0 = Math.min(y0, y(t.lat)); y1 = Math.max(y1, y(t.lat));
-    }
-    if (!Number.isFinite(x0)) return { x: 0, y: 0, w: W, h: H };
-    // Margin scaled to the spread of the contracts, with a floor — four pins
-    // in one country still wants a continent round them.
-    const padX = Math.max((x1 - x0) * 0.95, W * 0.09);
-    const padY = Math.max((y1 - y0) * 1.5, H * 0.16);
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    const vw = Math.max(1, window.innerWidth || 1000);
-    const aspect = Math.max(1.12, Math.min(2.6, vw / 470));
-    let w = (x1 - x0) + padX * 2, h = (y1 - y0) + padY * 2;
-    // The shape of the screen first.
-    if (w / h < aspect) w = h * aspect; else h = w / aspect;
-    // Then shrink to fit inside the world *keeping* that shape — clamping the
-    // two sides independently is what letterboxed the phone into a strip.
-    const k = Math.min(1, W / w, H / h);
-    w *= k; h *= k;
-    return {
-      x: Math.max(0, Math.min(W - w, cx - w / 2)),
-      y: Math.max(0, Math.min(H - h, cy - h / 2)),
-      w,
-      h,
-    };
-  })();
-
-  /**
-   * Map units per screen pixel.
-   *
-   * Everything drawn on top of the map — the names, the dots, the leaders — is
-   * furniture and wants to be the same size whatever the view is showing. Sized
-   * in map units instead, the labels grew to four centimetres tall the moment
-   * the view was fitted to Europe. One number converts.
-   */
-  const u = view.w / Math.max(320, Math.min(1148, (window.innerWidth || 1000) - 32));
-
-  const pins = state.list.map((t) => {
-    const px = x(t.lon), py = y(t.lat);
-    const anchor = (t.lx || 0) < 0 ? 'end' : 'start';
-    const lx = px + (t.lx || 0) * u;
-    const ly = Math.max(view.y + 10 * u,
-      Math.min(view.y + view.h - 10 * u, py + (t.ly || 0) * u));
-    const cls = `wm-pin${t.down ? ' down' : ''}${t.open ? '' : ' locked'}`
-      + `${t.id === current ? ' here' : ''}`;
-    // A leader from the dot to the name, because the name is not over the city
-    // any more and a label floating in the Atlantic belongs to nothing.
-    //
-    // And an invisible disc over the dot, because a `<g>` has no fill and so
-    // catches nothing: a tap between the circle and the letters went straight
-    // through the pin to the sea behind it. The disc is small, though — London
-    // and Paris are fifteen pixels apart on this map and two finger-sized
-    // targets there would simply be one. The label is the target, which is
-    // half of why the labels are pushed apart in the first place; the box over
-    // it is added below, once the browser has said how big it is.
-    return `
-      <g class="${cls}" data-level="${t.id}" tabindex="0" role="button"
-         aria-label="Contract ${t.no}, ${t.city}, ${t.title}">
-        <line class="wm-lead" x1="${px.toFixed(1)}" y1="${py.toFixed(1)}"
-              x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke-width="${(1.3 * u).toFixed(2)}"/>
-        <circle class="wm-halo" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(13 * u).toFixed(2)}"
-                stroke-width="${(1 * u).toFixed(2)}"/>
-        <circle class="wm-hit" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(9 * u).toFixed(2)}"/>
-        <circle class="wm-dot" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(5 * u).toFixed(2)}"
-                stroke-width="${(1.6 * u).toFixed(2)}"/>
-        <text class="wm-city" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}"
-              font-size="${(15 * u).toFixed(2)}" stroke-width="${(3.4 * u).toFixed(2)}"
-              text-anchor="${anchor}">0${t.no} ${t.city}</text>
-      </g>`;
-  }).join('');
-
   root.innerHTML = `
     <div class="wm-inner">
       <div class="wm-head">
@@ -228,16 +114,15 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
         <div class="wm-sub">${state.done} OF ${state.total} CONTRACTS CLOSED</div>
       </div>
       <div class="wm-stage">
-        <svg class="wm-svg"
-             viewBox="${view.x.toFixed(1)} ${view.y.toFixed(1)} ${view.w.toFixed(1)} ${view.h.toFixed(1)}"
-             preserveAspectRatio="xMidYMid meet" role="img" aria-label="Campaign map">
-          <rect class="wm-sea" x="0" y="0" width="${W}" height="${H}"/>
-          <g class="wm-lands">${land}</g>
-          <g class="wm-burns">${burns}</g>
-          <g class="wm-pins">${pins}</g>
-        </svg>
+        <svg class="wm-svg" role="application" aria-label="Campaign map"></svg>
+        <div class="wm-zoom">
+          <button type="button" data-z="in" aria-label="Zoom in">+</button>
+          <button type="button" data-z="out" aria-label="Zoom out">&minus;</button>
+          <button type="button" data-z="fit" aria-label="Show the whole world">&#9974;</button>
+        </div>
+        <div class="wm-hint">DRAG TO PAN · PINCH OR SCROLL TO ZOOM</div>
       </div>
-      <div class="wm-panel" hidden></div>
+      <div class="wm-panel"></div>
       <div class="wm-foot">
         <button class="wm-free${state.free ? ' on' : ''}" id="wm-free" type="button">
           FREE DEPLOY${state.free ? ' · ON' : ''}</button>
@@ -246,42 +131,222 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     </div>`;
   document.body.appendChild(root);
 
-  // Pull any label that has run off the edge back on, and bring its leader
-  // with it.
-  //
-  // Measured rather than estimated. The offsets are written for a wide view and
-  // a phone shows a third of it, so the same push in pixels walks a name off
-  // the side — and working out where the edge of "01 LONDON" is from the number
-  // of characters got it wrong by a fifth, which on a 430-point screen is the
-  // first letter. The browser knows exactly how wide it drew the text.
-  for (const el of root.querySelectorAll('.wm-city')) {
-    let bb;
-    try { bb = el.getBBox(); } catch { continue; }   // not laid out yet
-    if (!bb || !bb.width) continue;
-    const m = 5 * u;
-    let dx = 0;
-    if (bb.x < view.x + m) dx = (view.x + m) - bb.x;
-    else if (bb.x + bb.width > view.x + view.w - m) {
-      dx = (view.x + view.w - m) - (bb.x + bb.width);
-    }
-    if (dx) {
-      el.setAttribute('x', (parseFloat(el.getAttribute('x')) + dx).toFixed(1));
-      const lead = el.parentNode.querySelector('.wm-lead');
-      if (lead) lead.setAttribute('x2', (parseFloat(lead.getAttribute('x2')) + dx).toFixed(1));
-      bb = el.getBBox();
-    }
-    // The label's own hit box, generous and behind the letters.
-    const pad = 5 * u;
-    const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    hit.setAttribute('class', 'wm-hit');
-    hit.setAttribute('x', (bb.x - pad).toFixed(1));
-    hit.setAttribute('y', (bb.y - pad).toFixed(1));
-    hit.setAttribute('width', (bb.width + pad * 2).toFixed(1));
-    hit.setAttribute('height', (bb.height + pad * 2).toFixed(1));
-    el.parentNode.insertBefore(hit, el);
+  const svg = root.querySelector('.wm-svg');
+  const stage = root.querySelector('.wm-stage');
+  const panel = root.querySelector('.wm-panel');
+
+  const sea = el('rect', { class: 'wm-sea', x: 0, y: 0, width: '100%', height: '100%' });
+  const cam = el('g', { class: 'wm-cam' });
+  const lands = el('g', { class: 'wm-lands' });
+  const burnG = el('g', { class: 'wm-burns' });
+  const pinG = el('g', { class: 'wm-pins' });
+  cam.append(lands, burnG);
+  svg.append(sea, cam, pinG);
+
+  const byIso = new Map(state.list.map((t) => [t.iso, t]));
+  for (const c of world) {
+    const t = byIso.get(c.i);
+    const p = el('path', {
+      class: t ? `wm-land wm-target${t.down && t.iso !== burning ? ' burnt' : ''}` : 'wm-land',
+      d: pathFor(c),
+    });
+    if (t) p.setAttribute('data-iso', c.i);
+    lands.appendChild(p);
   }
 
-  const panel = root.querySelector('.wm-panel');
+  // The fire, one clipped overlay per contract, idle until it is wanted. Each
+  // carries how far it has to run: the distance from the building to the far
+  // side of the landmass it stands on — the landmass, not the country, because
+  // France's outline includes French Guiana and "the far corner of France" is
+  // four thousand miles across the Atlantic.
+  const defs = el('defs', {});
+  svg.appendChild(defs);
+  for (const t of state.list) {
+    const c = world.find((w) => w.i === t.iso);
+    if (!c) continue;
+    const cx = x(t.lon), cy = y(t.lat);
+    let near = Infinity, reach = 1;
+    for (const poly of c.p) {
+      let n = Infinity, far = 0;
+      for (const ring of poly) {
+        for (const [lo, la] of ring) {
+          const d = Math.hypot(x(lo) - cx, y(clamp(la, LAT1, LAT0)) - cy);
+          if (d < n) n = d;
+          if (d > far) far = d;
+        }
+      }
+      if (n < near) { near = n; reach = far; }
+    }
+    reach = Math.max(12, reach);
+    const clip = el('clipPath', { id: `wm-clip-${t.iso}` });
+    clip.appendChild(el('path', { d: pathFor(c) }));
+    defs.appendChild(clip);
+    const g = el('g', {
+      class: 'wm-burn', 'data-iso': t.iso, 'data-reach': reach.toFixed(1),
+      'clip-path': `url(#wm-clip-${t.iso})`,
+    });
+    g.append(
+      el('circle', { class: 'wm-char', cx, cy, r: 0 }),
+      el('circle', { class: 'wm-flame', cx, cy, r: 0, 'stroke-width': (reach * 0.16).toFixed(1) }),
+    );
+    burnG.appendChild(g);
+  }
+
+  // ── Pins. Built once and moved every frame, because they live in screen
+  // space: the coastline zooms and the names do not.
+  const pins = state.list.map((t) => {
+    const g = el('g', {
+      class: `wm-pin${t.down ? ' down' : ''}${t.open ? '' : ' locked'}`
+        + `${t.id === current ? ' here' : ''}`,
+      'data-level': t.id, tabindex: '0', role: 'button',
+      'aria-label': `Contract ${t.no}, ${t.city}, ${t.title}`,
+    });
+    const parts = {
+      lead: el('line', { class: 'wm-lead' }),
+      halo: el('circle', { class: 'wm-halo', r: 13 }),
+      dot: el('circle', { class: 'wm-dot', r: 5 }),
+      // Small, deliberately: London and Paris are a dozen pixels apart at the
+      // opening zoom, and two finger-sized discs there would be one target.
+      // The label is the thing to hit — which is half of why the labels are
+      // pushed off their pins in the first place.
+      hit: el('circle', { class: 'wm-hit', r: 11 }),
+      box: el('rect', { class: 'wm-hit', rx: 4 }),
+      text: el('text', { class: 'wm-city' }),
+    };
+    parts.text.textContent = `0${t.no} ${t.city}`;
+    g.append(parts.lead, parts.halo, parts.dot, parts.hit, parts.box, parts.text);
+    pinG.appendChild(g);
+    return { t, g, ...parts };
+  });
+
+  // ── The camera. `k` pixels per projection unit, `tx`/`ty` the world's origin
+  // on screen.
+  const view = { k: 1, tx: 0, ty: 0, w: 1, h: 1 };
+  let kFit = 1;
+
+  const measure = () => {
+    const r = stage.getBoundingClientRect();
+    view.w = Math.max(160, Math.round(r.width));
+    view.h = Math.max(120, Math.round(r.height));
+    svg.setAttribute('viewBox', `0 0 ${view.w} ${view.h}`);
+    kFit = Math.min(view.w / W, view.h / H);
+  };
+
+  const clampView = () => {
+    view.k = clamp(view.k, kFit, kFit * 14);
+    const sw = W * view.k, sh = H * view.k;
+    view.tx = sw <= view.w ? (view.w - sw) / 2 : clamp(view.tx, view.w - sw, 0);
+    view.ty = sh <= view.h ? (view.h - sh) / 2 : clamp(view.ty, view.h - sh, 0);
+  };
+
+  const sx = (wx) => view.tx + wx * view.k;
+  const sy = (wy) => view.ty + wy * view.k;
+
+  const layout = () => {
+    cam.setAttribute('transform', `translate(${view.tx.toFixed(2)} ${view.ty.toFixed(2)}) scale(${view.k.toFixed(5)})`);
+    for (const p of pins) {
+      const px = sx(x(p.t.lon)), py = sy(y(p.t.lat));
+      // The label is pushed off its pin, and then pulled back on if the push
+      // has run it over the edge. Measured rather than estimated: working out
+      // where the end of "01 LONDON" is from its character count was wrong by a
+      // fifth, which on a phone is the first letter.
+      const anchor = (p.t.lx || 0) < 0 ? 'end' : 'start';
+      let lx = px + (p.t.lx || 0);
+      const ly = clamp(py + (p.t.ly || 0), 14, view.h - 10);
+      p.text.setAttribute('text-anchor', anchor);
+      p.text.setAttribute('x', lx.toFixed(1));
+      p.text.setAttribute('y', ly.toFixed(1));
+      let bb = null;
+      try { bb = p.text.getBBox(); } catch { /* not laid out yet */ }
+      if (bb && bb.width) {
+        const m = 6;
+        let dx = 0;
+        if (bb.x < m) dx = m - bb.x;
+        else if (bb.x + bb.width > view.w - m) dx = (view.w - m) - (bb.x + bb.width);
+        if (dx) { lx += dx; p.text.setAttribute('x', lx.toFixed(1)); bb = p.text.getBBox(); }
+        p.box.setAttribute('x', (bb.x - 6).toFixed(1));
+        p.box.setAttribute('y', (bb.y - 5).toFixed(1));
+        p.box.setAttribute('width', (bb.width + 12).toFixed(1));
+        p.box.setAttribute('height', (bb.height + 10).toFixed(1));
+      }
+      for (const c of [p.halo, p.dot, p.hit]) {
+        c.setAttribute('cx', px.toFixed(1));
+        c.setAttribute('cy', py.toFixed(1));
+      }
+      p.lead.setAttribute('x1', px.toFixed(1));
+      p.lead.setAttribute('y1', py.toFixed(1));
+      p.lead.setAttribute('x2', lx.toFixed(1));
+      p.lead.setAttribute('y2', ly.toFixed(1));
+      // A pin that has been panned off the edge stops taking taps.
+      p.g.classList.toggle('off', px < -40 || px > view.w + 40 || py < -40 || py > view.h + 40);
+    }
+  };
+
+  const apply = () => { clampView(); layout(); };
+
+  /** Put a world point in the middle of the stage, at zoom `k`. */
+  const centreOn = (wx, wy, k = view.k) => {
+    view.k = k;
+    view.tx = view.w / 2 - wx * view.k;
+    view.ty = view.h / 2 - wy * view.k;
+    apply();
+  };
+
+  /** Glide there instead, which is what makes picking a contract read as a move. */
+  let gliding = 0;
+  const glideTo = (wx, wy, k) => {
+    const from = { k: view.k, tx: view.tx, ty: view.ty };
+    view.k = k;
+    view.tx = view.w / 2 - wx * k;
+    view.ty = view.h / 2 - wy * k;
+    clampView();
+    const to = { k: view.k, tx: view.tx, ty: view.ty };
+    Object.assign(view, from);
+    const id = ++gliding;
+    const t0 = performance.now();
+    const tick = (now) => {
+      if (id !== gliding) return;
+      const u = Math.min(1, (now - t0) / 480);
+      const e = 1 - Math.pow(1 - u, 3);
+      view.k = from.k + (to.k - from.k) * e;
+      view.tx = from.tx + (to.tx - from.tx) * e;
+      view.ty = from.ty + (to.ty - from.ty) * e;
+      layout();
+      if (u < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+
+  /** Zoom about a point on the stage, so the thing under the finger stays put. */
+  const zoomAt = (px, py, factor) => {
+    const wx = (px - view.tx) / view.k, wy = (py - view.ty) / view.k;
+    view.k = clamp(view.k * factor, kFit, kFit * 14);
+    view.tx = px - wx * view.k;
+    view.ty = py - wy * view.k;
+    gliding++;                      // cancel any glide in flight
+    apply();
+  };
+
+  // ── The opening framing: the contracts, with room round them.
+  measure();
+  {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const t of state.list) {
+      x0 = Math.min(x0, x(t.lon)); x1 = Math.max(x1, x(t.lon));
+      y0 = Math.min(y0, y(t.lat)); y1 = Math.max(y1, y(t.lat));
+    }
+    if (Number.isFinite(x0)) {
+      const padX = Math.max((x1 - x0) * 0.85, W * 0.06);
+      const padY = Math.max((y1 - y0) * 1.4, H * 0.14);
+      const k = Math.min(view.w / ((x1 - x0) + padX * 2), view.h / ((y1 - y0) + padY * 2));
+      centreOn((x0 + x1) / 2, (y0 + y1) / 2, clamp(k, kFit, kFit * 6));
+    } else {
+      centreOn(W / 2, H / 2, kFit);
+    }
+  }
+  // A second pass once the browser has actually laid the text out, because the
+  // first call measures boxes that do not exist yet.
+  requestAnimationFrame(layout);
 
   /** The dossier for one contract, under the map. */
   const show = (t) => {
@@ -295,7 +360,6 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
         + `<span>${fmtTime(rec.bestTime)}</span>`
         + `<span>${rec.runs} attempt${rec.runs > 1 ? 's' : ''}</span></div>`
       : '';
-    panel.hidden = false;
     panel.innerHTML = `
       <div class="wm-doss">
         <div class="wm-doss-no">CONTRACT 0${t.no}</div>
@@ -312,68 +376,185 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       </div>`;
   };
 
-  if (burning) {
-    // After the pins are in the document, so the fire runs under them and the
-    // city stays readable while its country goes black.
-    burnCountry(root, burning, 2600).then(() => {
-      markBurnSeen(burning);
-      root.querySelector(`.wm-target[data-iso="${burning}"]`)?.classList.add('burnt');
-    });
-  }
+  let selected = null;
+  const select = (id, { move = true } = {}) => {
+    const t = state.list.find((k) => k.id === id);
+    if (!t || t === selected) return;
+    selected = t;
+    for (const p of pins) p.g.classList.toggle('sel', p.t.id === id);
+    for (const p of lands.querySelectorAll('.wm-target')) {
+      p.classList.toggle('sel', p.getAttribute('data-iso') === t.iso);
+    }
+    show(t);
+    if (move) glideTo(x(t.lon), y(t.lat), Math.max(view.k, kFit * 2.4));
+  };
 
-  // Open on whatever is next, so the map answers "where am I" before it is asked.
   const opening = state.list.find((t) => t.id === current) || state.next || state.list[0];
-  if (opening) {
-    show(opening);
-    root.querySelector(`.wm-pin[data-level="${opening.id}"]`)?.classList.add('sel');
+  if (opening) select(opening.id, { move: false });
+
+  if (burning) {
+    // Go and look at it first, then light it.
+    glideTo(x(byIso.get(burning).lon), y(byIso.get(burning).lat), Math.max(kFit * 3.2, view.k));
+    setTimeout(() => {
+      burnCountry(root, burning, 2600).then(() => {
+        markBurnSeen(burning);
+        lands.querySelector(`.wm-target[data-iso="${burning}"]`)?.classList.add('burnt');
+      });
+    }, 520);
   }
 
   return new Promise((resolve) => {
-    const finish = (id) => { root.remove(); resolve(id); };
+    const finish = (id) => { cleanup(); root.remove(); resolve(id); };
 
-    const pick = (el) => {
-      const id = el.getAttribute('data-level');
-      const t = state.list.find((k) => k.id === id);
-      if (!t) return;
-      root.querySelectorAll('.wm-pin.sel').forEach((p) => p.classList.remove('sel'));
-      el.classList.add('sel');
-      show(t);
+    // ── Panning, pinching, and telling a tap from a drag.
+    //
+    // The pointer is captured only once a drag has actually started, which is
+    // the one thing holding both halves of this together. Capturing on every
+    // pointerdown — the obvious way to write it — sends the matching pointerup
+    // to the stage instead of to whatever was pressed, and a `click` only fires
+    // where the press and the release agree: the zoom buttons did nothing and
+    // neither did tapping a country, because the map was eating its own clicks.
+    // Refusing to pan when the press landed on something clickable fixes that
+    // too, and costs you the ability to drag the map by a place name, which is
+    // most of what your thumb lands on. Waiting for the threshold gives both:
+    // a press that never moves is a click on whatever is under it, and a press
+    // that moves is a pan from wherever it started.
+    const active = new Map();
+    let moved = 0, pinch = 0, held = false;
+    const onDown = (e) => {
+      if (e.button != null && e.button > 0) return;
+      if (active.size === 0) { moved = 0; held = false; }
+      active.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (active.size === 2) {
+        const [a, b] = [...active.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+      }
     };
-    root.querySelectorAll('.wm-pin').forEach((el) => {
-      el.addEventListener(TAP, () => pick(el));
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(el); }
+    const grab = (id) => {
+      if (held) return;
+      held = true;
+      try { stage.setPointerCapture(id); } catch { /* not capturable */ }
+    };
+    const onMove = (e) => {
+      const p = active.get(e.pointerId);
+      if (!p) return;
+      const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      p.x = e.clientX; p.y = e.clientY;
+      if (active.size === 2 && pinch > 0) {
+        const [a, b] = [...active.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const r = stage.getBoundingClientRect();
+        if (d > 4) {
+          grab(e.pointerId);
+          zoomAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, d / pinch);
+          pinch = d;
+        }
+        moved += 20;
+        return;
+      }
+      moved += Math.abs(dx) + Math.abs(dy);
+      if (moved < 6) return;
+      grab(e.pointerId);
+      gliding++;
+      view.tx += dx; view.ty += dy;
+      apply();
+    };
+    const onUp = (e) => {
+      active.delete(e.pointerId);
+      if (active.size < 2) pinch = 0;
+      if (active.size === 0) held = false;
+      try { stage.releasePointerCapture(e.pointerId); } catch { /* never held */ }
+    };
+    stage.addEventListener('pointerdown', onDown);
+    stage.addEventListener('pointermove', onMove);
+    stage.addEventListener('pointerup', onUp);
+    stage.addEventListener('pointercancel', onUp);
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      const r = stage.getBoundingClientRect();
+      zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0022));
+    };
+    stage.addEventListener('wheel', onWheel, { passive: false });
+
+    // A tap that was really a drag selects nothing.
+    const onClick = (e) => {
+      if (moved > 8) return;
+      const pin = e.target.closest('.wm-pin');
+      if (pin) { select(pin.getAttribute('data-level')); return; }
+      const land = e.target.closest('.wm-target');
+      if (land) {
+        const t = state.list.find((k) => k.iso === land.getAttribute('data-iso'));
+        if (t) select(t.id);
+      }
+    };
+    svg.addEventListener('click', onClick);
+
+    const onKey = (e) => {
+      const step = 60;
+      const at = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] }[e.key];
+      if (at) {
+        e.preventDefault(); gliding++;
+        view.tx += at[0]; view.ty += at[1]; apply();
+        return;
+      }
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomAt(view.w / 2, view.h / 2, 1.3); }
+      if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomAt(view.w / 2, view.h / 2, 1 / 1.3); }
+    };
+    root.addEventListener('keydown', onKey);
+
+    for (const p of pins) {
+      p.g.addEventListener('click', () => select(p.t.id));
+      p.g.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.t.id); }
       });
+    }
+
+    root.querySelector('.wm-zoom').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const z = btn.getAttribute('data-z');
+      if (z === 'in') zoomAt(view.w / 2, view.h / 2, 1.45);
+      else if (z === 'out') zoomAt(view.w / 2, view.h / 2, 1 / 1.45);
+      else { gliding++; centreOn(W / 2, H / 2, kFit); }
     });
 
     panel.addEventListener('click', (e) => {
       const go = e.target.closest('.wm-go');
       if (go) finish(go.getAttribute('data-level'));
     });
-
     root.querySelector('#wm-free')?.addEventListener('click', () => {
       // Kept because the campaign order is the point and testing it is not: a
       // player who wants to go straight back to the Taj can, and the map says
       // out loud that it has been let off the leash.
       setFreeDeploy(!freeDeploy());
+      cleanup();
       root.remove();
       showWorldMap({ current, canResume }).then(resolve);
     });
     root.querySelector('#wm-back')?.addEventListener('click', () => finish(null));
+
+    const onResize = () => { measure(); apply(); };
+    window.addEventListener('resize', onResize);
+
+    function cleanup() {
+      gliding++;
+      window.removeEventListener('resize', onResize);
+      stage.removeEventListener('wheel', onWheel);
+    }
   });
 }
 
 /**
  * Burn a country out.
  *
- * Run on the after-action screen, on the map the player is about to be sent
- * back to. The ring starts at the building and runs to whatever radius covers
- * the country, with the char following a little way behind it — so the fire
- * arrives at the border first and the black fills in after, which is the way a
- * fire actually crosses ground.
+ * The ring starts at the building and runs to the far side of its landmass,
+ * with the char following a little way behind it — so the fire reaches the
+ * border first and the black fills in after, which is the way a fire actually
+ * crosses ground.
  *
- * Resolves when it has finished. Always resolves: a menu that can hang on an
- * animation is a menu that can strand the player.
+ * Always resolves: a menu that can hang on an animation is a menu that can
+ * strand the player.
  */
 export function burnCountry(root, iso, ms = 2600) {
   return new Promise((resolve) => {
@@ -381,8 +562,6 @@ export function burnCountry(root, iso, ms = 2600) {
     if (!g) { resolve(); return; }
     const char = g.querySelector('.wm-char');
     const flame = g.querySelector('.wm-flame');
-    // As far as this country goes, and a little past it so the last corner
-    // actually catches.
     const R = (parseFloat(g.getAttribute('data-reach')) || W * 0.3) * 1.12;
     g.classList.add('lit');
     const t0 = performance.now();
