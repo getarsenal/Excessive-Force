@@ -27,6 +27,7 @@ export const MATERIALS = {
   IRONWORK: 11,  // painted structural ironwork — the Eiffel Tower's own bronze
   CHARGE: 12,    // a buried demolition charge; destroying one sets it off
   RAILING: 13,   // ironwork nothing may rest on: balustrades and screens
+  VERDE: 14,     // the grey-green stone of Pisan banding
 };
 
 /**
@@ -46,6 +47,16 @@ export const MATERIAL_PROPS = {
   [MATERIALS.CONCRETE]:  { density: 2.35, strength: 1.45, toughness: 150, color: 0xa39c8e, structural: true },
   [MATERIALS.MARBLE]:    { density: 2.70, strength: 1.08, toughness: 112, color: 0xf4ece0, structural: true },
   [MATERIALS.SANDSTONE]: { density: 2.30, strength: 0.82, toughness: 84,  color: 0xb85f3e, structural: true },
+  // The dark half of Pisan banding: verde di Prato, the grey-green serpentine
+  // laid in courses against white Carrara. Physically it is as good a stone as
+  // the marble beside it, which is why it can be a structural course rather
+  // than applied facing — striping a building with something weak would put a
+  // failure plane every other course, which is not what these walls are.
+  //
+  // Undersaturated for the same reason REDSTONE is: the per-stone jitter and
+  // the grade downstream both push colour, and a convincing green here comes
+  // out of the pipeline as billiard baize.
+  [MATERIALS.VERDE]:     { density: 2.62, strength: 1.02, toughness: 106, color: 0x8b9489, structural: true },
   // Anston limestone weathered to the warm red-brown the tower reads as
   // against a low sun. Physically it is limestone; only the colour differs.
   //

@@ -3,6 +3,8 @@ import { buildElizabethTower, buildPalaceWing } from '../structure/landmarks/big
 import { buildTajMahal, buildTajMosque } from '../structure/landmarks/tajmahal.js';
 import { buildEiffelTower, buildChaillotWing } from '../structure/landmarks/eiffel.js';
 import { buildElCastillo, buildTempleOfWarriors } from '../structure/landmarks/chichen.js';
+import { buildCampanile, buildDuomo, buildBaptistery }
+  from '../structure/landmarks/pisa.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -205,6 +207,61 @@ export const LEVELS = {
     brief: 'There is an older pyramid inside this one, and the top of the new one is standing on it.',
   },
 
+  pisa: {
+    id: 'pisa',
+    terrain: 'pisa',
+    name: 'Torre di Pisa',
+    place: 'Piazza dei Miracoli, Pisa',
+    target: 'THE CAMPANILE',
+    subtitle: 'Torre pendente · Piazza dei Miracoli',
+    victory: 'It Finally Fell Over',
+    // Tuscan brick and terracotta round a piazza of white marble, on the
+    // alluvial silt of the Arno plain — which is the soft ground the whole
+    // level is about.
+    palette: {
+      urban: new THREE.Color(0xc0a086),
+      urbanAlt: new THREE.Color(0xa9805f),
+      park: new THREE.Color(0x5f7040),
+      parkAlt: new THREE.Color(0x6d7c46),
+      road: new THREE.Color(0x77706a),
+      bank: new THREE.Color(0xb6a98d),
+      bed: new THREE.Color(0x60684a),
+      dry: new THREE.Color(0xc8bda4),
+    },
+    // The Campo dei Miracoli is walled lawn from the Baptistery to the
+    // Camposanto, and the city stops at the wall.
+    cityExcludeRadius: 330,
+    contextExclude: 300,
+    camera: { yaw: -0.40, pitch: 0.26, distance: 300, height: 58 },
+    structures: (quality) => [
+      { key: 'campanile', blocks: buildCampanile(quality), primary: true,
+        required: true, label: 'CAMPANILE' },
+      { key: 'duomo', blocks: buildDuomo(quality), required: true,
+        label: 'DUOMO', offset: { x: -96, z: -40 } },
+      // Not required, and not garrisoned. Every other map in the campaign
+      // asks for everything on it; this one has a building the client did not
+      // pay for, standing in plain sight, worth points and nothing else.
+      { key: 'baptistery', blocks: buildBaptistery(quality),
+        label: 'BAPTISTERY', offset: { x: -256, z: -40 } },
+    ],
+    garrison: (g, origin, groundY, sites) => {
+      g.populateCampanile(origin, groundY);
+      const d = sites && sites.duomo;
+      if (d) g.populateDuomo({ x: 0, y: d.groundY, z: 0 }, d.groundY);
+    },
+    // The tower is a cantilever and it is already past vertical, so height is
+    // the honest measure here the way it is at Westminster.
+    scoreTags: ['shaft', 'loggias', 'belfry'],
+    precinct: {
+      boundary: 'wall',           // the Campo is walled on two sides
+      ground: 'lawn',
+      ornament: 'none',
+    },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    brief: 'It is bent, not tilted. The overhang at the top is the part they corrected.',
+  },
+
   giza: {
     id: 'giza',
     terrain: 'giza',
@@ -296,7 +353,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -305,6 +362,7 @@ export const LEVEL_BLURB = {
   agra: 'A dome on four piers over a marble terrace. It will not topple; it has to be broken.',
   giza: 'Two and a third million cubic metres of limestone. Nothing here falls over.',
   chichen: 'A pyramid built over an older pyramid. The skin is not the building.',
+  pisa: 'Eighty-nine metres already falling. The part that overhangs is the part that is safe.',
 };
 
 /** Ordered level records, for menus. */

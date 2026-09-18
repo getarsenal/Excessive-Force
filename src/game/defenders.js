@@ -7,6 +7,7 @@ import { EIFFEL, legAt as eiffelLegAt } from '../structure/landmarks/eiffel.js';
 import { CASTILLO, WARRIORS } from '../structure/landmarks/chichen.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
+import { PISA, DUOMO, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 
 /**
  * The garrison.
@@ -1021,6 +1022,115 @@ export class Garrison {
           base.y + colH + 4.4,
           colZ0 + j * pch), 0, 7, { cover: 'roof' });
       }
+    }
+  }
+
+  /**
+   * The campanile at Pisa.
+   *
+   * Six open galleries stacked one on the next, which is the best firing step
+   * any landmark here has: a ring of arches every nine metres, open the whole
+   * way round, with a marble parapet at knee height and eighty-nine metres of
+   * elevation over a flat piazza. Positions are taken off the tower's own axis
+   * rather than off its base, because the axis moves five and a half metres
+   * south on the way up and a ring drawn on the base centre puts half of every
+   * gallery inside the masonry and the other half in the air.
+   */
+  populateCampanile(origin, groundY) {
+    const P = PISA;
+    const ring = (y, n, type, cover, phase = 0) => {
+      const cz = pisaAxisAt(y);
+      const r = P.outerR - P.gallery * 0.35;
+      for (let i = 0; i < n; i++) {
+        const a = phase + (i / n) * Math.PI * 2;
+        const p = new THREE.Vector3(
+          origin.x + Math.cos(a) * r, groundY + y + 0.6,
+          origin.z + cz + Math.sin(a) * r);
+        this.place(type, p, Math.atan2(Math.cos(a), Math.sin(a)), 7, { cover });
+      }
+    };
+    for (let k = 0; k < P.loggias; k++) {
+      const y = P.stage1 + k * P.loggiaH + 0.4;
+      // The higher the gallery, the longer the weapon: from up there the whole
+      // piazza and both approaches are inside a rifle's range anyway, so the
+      // long stuff goes where it can see furthest.
+      ring(y, k < 2 ? 6 : 5, k > 3 ? 'sniper' : k > 1 ? 'mg' : 'rifleman',
+        'arcade', k * 0.3);
+    }
+    // The bell chamber, and the mortar crews on the gallery roof under it.
+    const bz = pisaAxisAt(P.bellY + P.bellH * 0.3);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + 0.4;
+      this.place('at', new THREE.Vector3(
+        origin.x + Math.cos(a) * (P.bellR - 1.0),
+        groundY + P.bellY + P.bellH * 0.25,
+        origin.z + bz + Math.sin(a) * (P.bellR - 1.0)),
+      Math.atan2(Math.cos(a), Math.sin(a)), 8, { cover: 'window' });
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 1.1;
+      this.place('mortar', new THREE.Vector3(
+        origin.x + Math.cos(a) * (P.outerR - 2.2),
+        groundY + P.bellY + 0.8,
+        origin.z + pisaAxisAt(P.bellY) + Math.sin(a) * (P.outerR - 2.2)),
+      0, 8, { cover: 'roof' });
+    }
+  }
+
+  /**
+   * Pisa Cathedral.
+   *
+   * The clerestory runs the whole hundred and sixty metres on both sides and
+   * looks straight down on anything crossing the piazza, and the west front is
+   * four more galleries on top of that. The aisle roofs either side of the
+   * nave are the parapet walk between them.
+   */
+  populateDuomo(origin, groundY) {
+    const D = DUOMO;
+    const halfX = D.len / 2;
+    // The clerestory, both sides of the nave.
+    for (let i = 0; i < 9; i++) {
+      const x = -halfX + 10 + i * ((D.len - 20) / 8);
+      for (const sz of [1, -1]) {
+        // Above the aisle roof, not below it. A clerestory window set at
+        // four fifths of the aisle height is inside the aisle, looking at the
+        // back of the outer wall — which is how this rank was blind.
+        this.place(i % 3 === 1 ? 'mg' : 'rifleman', new THREE.Vector3(
+          origin.x + x, groundY + D.aisleH + 5.6 * DUOMO.scale, origin.z + sz * D.naveHalfZ),
+        sz > 0 ? Math.PI / 2 : -Math.PI / 2, 5, { cover: 'window' });
+      }
+    }
+    // The aisle roofs, which are the walk between the nave and the outer wall.
+    for (let i = 0; i < 7; i++) {
+      const x = -halfX + 14 + i * ((D.len - 28) / 6);
+      for (const sz of [1, -1]) {
+        this.place(i % 4 === 0 ? 'at' : 'rifleman', new THREE.Vector3(
+          origin.x + x, groundY + D.aisleH + 1.4,
+          origin.z + sz * (D.halfZ + D.naveHalfZ) / 2),
+        sz > 0 ? Math.PI / 2 : -Math.PI / 2, 6, { cover: 'roof' });
+      }
+    }
+    // The four galleries of the west front.
+    for (let k = 0; k < D.frontTiers; k++) {
+      const y = D.aisleH + k * 7.4 * DUOMO.scale;
+      for (const sz of [1, -1]) {
+        this.place(k > 1 ? 'sniper' : 'rifleman', new THREE.Vector3(
+          origin.x - halfX + 1.2, groundY + y + 0.6,
+          origin.z + sz * D.halfZ * (0.55 - k * 0.09)), -Math.PI / 2, 7,
+        { cover: 'arcade' });
+      }
+    }
+    // The transept ends, and mortars behind the nave ridge.
+    for (const sz of [1, -1]) {
+      this.place('at', new THREE.Vector3(
+        origin.x + D.crossX, groundY + D.aisleH * 1.35 + 1.4,
+        origin.z + sz * (D.transHalf - 3)), sz > 0 ? Math.PI / 2 : -Math.PI / 2,
+      7, { cover: 'roof' });
+    }
+    for (let i = 0; i < 3; i++) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x - 30 + i * 30, groundY + D.aisleH + 1.4,
+        origin.z + D.halfZ * 0.72), 0, 7, { cover: 'roof' });
     }
   }
 

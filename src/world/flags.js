@@ -3,6 +3,7 @@ import { WING } from '../structure/landmarks/bigben.js';
 import { EIFFEL } from '../structure/landmarks/eiffel.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { CASTILLO } from '../structure/landmarks/chichen.js';
+import { PISA, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 
 /**
  * Flags on the landmarks.
@@ -46,6 +47,14 @@ export const FLAG_SITES = {
     { key: 'castillo', x: CASTILLO.templeHalf - 1.4,
       y: CASTILLO.platform + CASTILLO.templeH + 2.6, z: 0,
       pattern: 'mexico', w: 9, h: 5, pole: 9 },
+  ],
+  pisa: [
+    // On the bell chamber, at the top of the campanile. Its foot is set on the
+    // tower's own axis rather than on the base centre: five and a half metres
+    // of lean separate the two by the time you are up there.
+    { key: 'campanile', x: PISA.bellR - 1.2,
+      y: PISA.bellY + PISA.bellH * 0.9, z: pisaAxisAt(PISA.bellY + PISA.bellH),
+      pattern: 'italy', w: 8, h: 5, pole: 8 },
   ],
 };
 

@@ -110,6 +110,21 @@ export const THEATRES = [
     unlocks: ['b1'],
     unlockLine: 'Heavy bomber on call',
   },
+  {
+    id: 'pisa',
+    iso: 'ITA',
+    lx: 34, ly: 36,
+    city: 'PISA',
+    lon: 10.3966, lat: 43.7230,
+    no: 6,
+    title: 'ALREADY FALLING',
+    brief: 'Eighty-nine metres of marble that has been going over for eight '
+      + 'hundred years and has not arrived. It is bent rather than tilted: the '
+      + 'part that overhangs is the part the masons corrected, and it is the '
+      + 'only part of the tower that is safe.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
 ];
 
 /** The contract for a level id, if that level is one. */
