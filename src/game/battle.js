@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
 import {
   solveArc, solveBallistic, solveBoosted, solveDirect, ProjectileManager, ROCKET_BOOST,
@@ -403,7 +404,24 @@ export class Battle {
     return Math.min(1, this.progress * (this.level?.unlockScale ?? 1));
   }
 
-  isUnlocked(u) { return this.unlockAll || this.unlockProgress >= (u.unlockFrac ?? 0); }
+  /**
+   * Whether a weapon can be bought.
+   *
+   * Two gates, and they do different jobs. The campaign releases a weapon —
+   * London's contract buys the 155, Paris's buys the Paladin and the air — and
+   * that is progression across the war. The level then earns it, on the same
+   * fraction-of-the-building rule as before, and that is progression inside one
+   * afternoon. A weapon needs both, which is why arriving at the Great Pyramid
+   * with a bomber released still means working up to it on the day.
+   */
+  isUnlocked(u) {
+    if (this.unlockAll) return true;
+    if (!isReleased(u.id)) return false;
+    return this.unlockProgress >= (u.unlockFrac ?? 0);
+  }
+
+  /** Released by the campaign but not yet earned here, for the build bar. */
+  isReleased(u) { return this.unlockAll || isReleased(u.id); }
   canAfford(u) { return this.freeBuild || this.money >= u.cost; }
 
   get income() {

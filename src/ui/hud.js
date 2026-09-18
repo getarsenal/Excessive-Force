@@ -55,6 +55,7 @@ export class HUD {
       ecTitle: document.getElementById('ec-title'),
       ecSub: document.getElementById('ec-sub'),
       ecStats: document.getElementById('ec-stats'),
+      ecRelease: document.getElementById('ec-release'),
       ecAgain: document.getElementById('ec-again'),
       ecNext: document.getElementById('ec-next'),
       ecKeep: document.getElementById('ec-keep'),
@@ -470,12 +471,23 @@ export class HUD {
       card.classList.toggle('selected', b.selectedUnitId === u.id);
 
       if (!unlocked) {
-        // Shown against the same scaled progress the gate uses, or the
-        // number on the card is not the number being tested.
-        const scale = b.level?.unlockScale ?? 1;
-        const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
-        card.querySelector('.uc-lock').textContent = `UNLOCK ${need}%`;
+        // Two ways to be locked and they want different words. A weapon the
+        // campaign has not released yet is not going to appear however much of
+        // this building comes down, and telling a player to reach 12% for it is
+        // a promise the level cannot keep.
+        if (b.isReleased && !b.isReleased(u)) {
+          card.classList.add('sealed');
+          card.querySelector('.uc-lock').textContent = 'CONTRACT';
+        } else {
+          card.classList.remove('sealed');
+          // Shown against the same scaled progress the gate uses, or the
+          // number on the card is not the number being tested.
+          const scale = b.level?.unlockScale ?? 1;
+          const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
+          card.querySelector('.uc-lock').textContent = `UNLOCK ${need}%`;
+        }
       } else if (!this._lastUnlocked.has(u.id)) {
+        card.classList.remove('sealed');
         this._lastUnlocked.add(u.id);
         this.feed(`${u.full} AVAILABLE`, 'big');
       }
@@ -535,6 +547,16 @@ export class HUD {
       this.el.ecNext.hidden = !won;
       this.el.ecNext.textContent = this.nextTargetLabel
         ? `NEXT: ${this.nextTargetLabel}` : 'NEXT TARGET';
+    }
+    // What closing the contract bought. Said here rather than on the map,
+    // because this is the moment it was earned.
+    if (this.el.ecRelease) {
+      const r = won ? opts.release : null;
+      this.el.ecRelease.hidden = !r;
+      if (r) {
+        this.el.ecRelease.innerHTML = `<span class="ec-rel-tag">CONTRACT CLOSED</span>`
+          + `<span class="ec-rel-line">${r.unlockLine}</span>`;
+      }
     }
   }
 }

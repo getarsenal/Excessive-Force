@@ -70,12 +70,11 @@ html, body {
 .load-inner { text-align: center; width: min(80vw, 420px); }
 /* The badge carries the name; the text title under it is for screen readers
    and for the moment before the image arrives. */
-.load-logo, .ls-logo {
+.load-logo {
   display: block; margin: 0 auto 6px; width: clamp(160px, 42vmin, 300px); height: auto;
   filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
 }
-.ls-logo { width: clamp(140px, 30vmin, 240px); }
-.load-title, .ls-title {
+.load-title {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
 }
 .load-sub {
@@ -647,92 +646,6 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
   #testmenu { max-height: calc(100vh - 130px); }
 }
 
-/* ── Target select ───────────────────────────────────────────────────────
-   The front door, and the only way a player can reach any level but the
-   first. Deliberately the same furniture as the loading screen and the end
-   card: same ground, same type, same thin rules. */
-#levelselect {
-  position: fixed; inset: 0; z-index: 140;
-  background: radial-gradient(ellipse at 50% 38%, #1a212b 0%, #07090c 74%);
-  display: flex; align-items: center; justify-content: center;
-  overflow-y: auto; animation: fadeIn 0.4s ease;
-  padding: calc(env(safe-area-inset-top, 0px) + 24px) 16px
-           calc(env(safe-area-inset-bottom, 0px) + 24px);
-}
-.ls-inner { width: min(96vw, 940px); margin: auto; }
-.ls-head { text-align: center; margin-bottom: 26px; }
-.ls-sub {
-  margin-top: 6px; font-size: 11px; letter-spacing: 0.38em;
-  color: var(--dim); text-transform: uppercase;
-}
-.ls-grid {
-  display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-}
-.ls-card {
-  position: relative; text-align: left; cursor: pointer;
-  font-family: inherit; color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--edge); border-left-width: 2px;
-  padding: 16px 16px 18px; transition: all 0.15s;
-}
-.ls-card:hover {
-  background: rgba(88, 166, 255, 0.10);
-  border-color: var(--accent); transform: translateY(-2px);
-}
-.ls-card.done { border-left-color: #6fbf73; }
-.ls-card.tried { border-left-color: #c8a24a; }
-.ls-card.new { border-left-color: var(--edge-bright); }
-.ls-card.here { background: rgba(88, 166, 255, 0.07); }
-.ls-badge {
-  font-size: 9px; letter-spacing: 0.24em; color: var(--dim);
-  text-transform: uppercase;
-}
-.ls-card.done .ls-badge { color: #6fbf73; }
-.ls-target {
-  margin-top: 8px; font-size: 19px; font-weight: 600; letter-spacing: 0.06em;
-}
-.ls-place {
-  font-size: 11px; letter-spacing: 0.16em; color: var(--dim);
-  text-transform: uppercase; margin-top: 2px;
-}
-.ls-blurb {
-  margin-top: 11px; font-size: 12px; line-height: 1.45; color: #9fb0c2;
-}
-.ls-stats {
-  margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--edge);
-  display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
-}
-.ls-here {
-  position: absolute; top: 14px; right: 14px;
-  font-size: 9px; letter-spacing: 0.2em; color: var(--accent);
-}
-.ls-foot { margin-top: 22px; text-align: center; }
-.ls-back, #ec-next, #ec-targets, #ec-keep, #targets-btn {
-  background: transparent; border: 1px solid var(--edge-bright); color: var(--text);
-  font-family: inherit; font-size: 11px; letter-spacing: 0.2em;
-  padding: 10px 24px; cursor: pointer; transition: all 0.15s;
-}
-.ls-back:hover, #ec-next:hover, #ec-targets:hover, #ec-keep:hover, #targets-btn:hover {
-  background: rgba(88, 166, 255, 0.14); border-color: var(--accent);
-}
-#ec-next { border-color: var(--accent); background: rgba(88, 166, 255, 0.12); }
-.ec-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-#targets-btn {
-  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step)); z-index: 20;
-  padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
-  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
-}
-#targets-btn:hover { border-color: var(--edge-bright); color: var(--text); }
-@media (max-width: 620px) {
-  .ls-grid { grid-template-columns: 1fr; }
-  .ls-card { padding: 13px 13px 15px; }
-  .ls-blurb { font-size: 11px; }
-  #targets-btn { padding: 5px 8px; font-size: 8px; }
-}
-
 /* ── The stand-off ───────────────────────────────────────────────────────
    Two commanders at the bottom corners of the screen, the world live behind
    them. Figures rise from below the frame, speech pops beside the head, the
@@ -996,3 +909,192 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
   .op-title.hit1 .op-w1, .op-title.hit2 .op-w2 { animation: opFadeIn 0.4s ease forwards; }
   @keyframes opFadeIn { from { opacity: 0; } to { opacity: 1; transform: none; } }
 }
+
+/* ── The campaign map ───────────────────────────────────────────────────────
+   The front door. Dark, because everything else in the game is, and because a
+   charred country has to read as charred against it. */
+#worldmap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  background:
+    radial-gradient(120% 80% at 50% 0%, #1a2230 0%, #0b0f16 62%, #070a0f 100%);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.wm-inner {
+  margin: auto;
+  width: min(1180px, 100%);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) 16px
+           calc(env(safe-area-inset-bottom, 0px) + 18px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.wm-head { text-align: center; }
+.wm-logo { width: 54px; height: 54px; opacity: 0.9; }
+.wm-title {
+  font-size: clamp(22px, 5vw, 38px);
+  letter-spacing: 0.16em;
+  font-weight: 700;
+  color: #e8eef6;
+  margin-top: 2px;
+}
+.wm-sub {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: #6f8299;
+  margin-top: 4px;
+}
+
+.wm-stage {
+  border: 1px solid #1d2836;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #070c13;
+}
+.wm-svg { display: block; width: 100%; height: auto; }
+.wm-sea { fill: #0a121c; }
+
+.wm-land {
+  fill: #1e2a33;
+  stroke: #0a121c;
+  stroke-width: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+/* A country with a contract on it is lit before anything happens to it. */
+.wm-target { fill: #3c4a3a; }
+.wm-target.burnt { fill: #14100e; }
+
+/* The fire. Both circles are clipped to the country, so the front stops at the
+   coast without anybody drawing the coast twice. */
+.wm-burn { opacity: 0; }
+.wm-burn.lit { opacity: 1; }
+.wm-char { fill: #14100e; }
+.wm-flame {
+  fill: none;
+  stroke: #ff7a22;
+  opacity: 0.94;
+  filter: drop-shadow(0 0 6px #ff5a10);
+}
+.wm-burn.done .wm-flame { opacity: 0; transition: opacity 0.7s ease; }
+
+/* Pins. */
+.wm-pin { cursor: pointer; outline: none; }
+/* The thing a finger actually hits. Invisible, and the only child of the pin
+   that takes a pointer, so the whole group behaves as one button. */
+.wm-hit { fill: transparent; }
+.wm-city { pointer-events: all; }
+.wm-halo { fill: rgba(224, 108, 52, 0.12); stroke: rgba(224, 108, 52, 0.4); }
+.wm-dot { fill: #e06c34; stroke: #12181f; }
+.wm-city {
+  fill: #dbe5ef;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  paint-order: stroke;
+  stroke: #070c13;
+  dominant-baseline: middle;
+}
+.wm-lead { stroke: rgba(224, 108, 52, 0.5); }
+.wm-pin.sel .wm-halo { fill: rgba(224, 108, 52, 0.3); stroke: #e06c34; }
+.wm-pin.sel .wm-city { fill: #ffd9c0; }
+.wm-pin.down .wm-dot { fill: #46586b; }
+.wm-pin.down .wm-halo { fill: rgba(70, 88, 107, 0.1); stroke: rgba(70, 88, 107, 0.4); }
+.wm-pin.locked .wm-dot { fill: #2c3945; }
+.wm-pin.locked .wm-city { fill: #64758a; }
+.wm-pin:focus-visible .wm-halo { stroke: #9fc6ff; stroke-width: 2; }
+
+/* The dossier. */
+.wm-panel { min-height: 1px; }
+.wm-doss {
+  border: 1px solid #1d2836;
+  border-left: 3px solid #e06c34;
+  border-radius: 8px;
+  background: #0e141c;
+  padding: 14px 16px;
+}
+.wm-doss-no { font-size: 10px; letter-spacing: 0.26em; color: #e06c34; }
+.wm-doss-target {
+  font-size: clamp(17px, 3.6vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #e8eef6;
+  margin-top: 3px;
+}
+.wm-doss-place { font-size: 12px; letter-spacing: 0.1em; color: #7d8ea1; margin-top: 1px; }
+.wm-doss-brief { margin: 10px 0 0; color: #9fb0c2; font-size: 13px; line-height: 1.5; max-width: 62ch; }
+.wm-doss-obj { margin: 10px 0 0; padding: 0; list-style: none; }
+.wm-doss-obj li {
+  font-size: 12px;
+  color: #7d8ea1;
+  padding: 2px 0 2px 20px;
+  position: relative;
+}
+.wm-doss-obj li::before {
+  content: '';
+  position: absolute;
+  left: 2px; top: 6px;
+  width: 9px; height: 9px;
+  border: 1px solid #3b4b5d;
+  border-radius: 2px;
+}
+.wm-doss-obj li.met { color: #cfe0b8; }
+.wm-doss-obj li.met::before { background: #8fbf5a; border-color: #8fbf5a; }
+.wm-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #6f8299; letter-spacing: 0.08em; }
+.wm-doss-go { margin-top: 12px; }
+.wm-go {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #0b0f16;
+  background: #e06c34;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 22px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.wm-go:active { transform: translateY(1px); }
+.wm-sealed { font-size: 11px; letter-spacing: 0.18em; color: #64758a; }
+
+.wm-foot { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.wm-free, .wm-back {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: #7d8ea1;
+  background: transparent;
+  border: 1px solid #23303d;
+  border-radius: 6px;
+  padding: 9px 16px;
+  cursor: pointer;
+  min-height: 40px;
+}
+.wm-free.on { color: #e06c34; border-color: #4a3325; }
+
+@media (max-width: 620px) {
+  .wm-inner { gap: 10px; }
+  .wm-doss-brief { font-size: 12.5px; }
+}
+
+/* What closing a contract bought, on the after-action card. */
+.ec-release {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #4a3325;
+  border-left: 3px solid #e06c34;
+  border-radius: 6px;
+  background: rgba(224, 108, 52, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ec-rel-tag { font-size: 10px; letter-spacing: 0.24em; color: #e06c34; }
+.ec-rel-line { font-size: 13px; color: #e2e9f2; }
+
+/* A weapon the campaign has not released yet is not coming however much of
+   this building falls, so it says so rather than quoting a percentage. */
+.unit-card.sealed { opacity: 0.4; }
+.unit-card.sealed .uc-lock { color: #d08a52; letter-spacing: 0.14em; }

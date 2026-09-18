@@ -11,9 +11,10 @@ import { loadCity, buildCity } from './world/city.js';
 import { buildFieldWorks } from './world/works.js';
 import { Structure } from './structure/structure.js';
 import {
-  resolveStartLevel, showLevelSelect, recordResult, nextTarget, goToLevel,
+  resolveStartLevel, recordResult, nextTarget, goToLevel,
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
+import { recordTheatre, releaseNoteFor } from './game/campaign.js';
 import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
@@ -367,7 +368,8 @@ async function boot() {
       if (battle.resumeAfterWin()) hud.feed('ASSAULT CONTINUES', 'big');
     },
     onPickTarget: async () => {
-      const id = await showLevelSelect({ current: level.id, canResume: true });
+      const { showWorldMap } = await import('./ui/worldmap.js');
+      const id = await showWorldMap({ current: level.id, canResume: true });
       if (id && id !== level.id) goToLevel(id);
       // Picking the level already in play, or backing out, just closes it.
     },
@@ -456,8 +458,9 @@ async function boot() {
         setTimeout(() => {
           const sum = battle.summary();
           recordResult(level.id, true, sum);
+          recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
-          hud.showEnd('win', sum);
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id) });
         }, 7000);
         break;
       case 'flattened':
@@ -465,13 +468,19 @@ async function boot() {
         setTimeout(() => {
           const sum = battle.summary();
           recordResult(level.id, true, sum);
+          recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
-          hud.showEnd('win', sum, { title: 'Flattened', sub: `${level.subtitle} · nothing left standing` });
+          hud.showEnd('win', sum, {
+            title: 'Flattened',
+            sub: `${level.subtitle} · nothing left standing`,
+            release: releaseNoteFor(level.id),
+          });
         }, 3000);
         break;
       case 'lose':
         setTimeout(() => {
           recordResult(level.id, false, data);
+          recordTheatre(level.id, false, data);
           hud.showEnd('lose', data);
         }, 1500);
         break;
@@ -840,7 +849,8 @@ async function boot() {
   window.__fastForward = fastForward;
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
-    recordResult(level.id, true, sum);
+recordResult(level.id, true, sum);
+    recordTheatre(level.id, true, sum);
     hud.nextTargetLabel = nextTarget(level.id).target;
     hud.showEnd('win', sum);
   };

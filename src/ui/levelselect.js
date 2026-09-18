@@ -2,12 +2,12 @@ import { LEVELS, DEFAULT_LEVEL, LEVEL_BLURB, levelList } from '../game/levels.js
 import { suppressNextOpening } from './opening.js';
 
 /**
- * Target select, and the record of what has been brought down.
+ * The record of what has been brought down, and how a level gets started.
  *
- * Until this existed there was no way for a player to reach any level but
- * Westminster: the other maps were behind a hand-edited query string or the
- * developer test panel. Three quarters of the game was unreachable from inside
- * the game.
+ * The screen that used to live here — a grid of four cards — is now the
+ * campaign map in `worldmap.js`. What is left is the part that is not a
+ * picture: the saved record of every run, and the one function that boots a
+ * level.
  *
  * Choosing a target reloads the page. That is not a shortcut — a level is a
  * different DEM, a different city, a different set of structures and its own
@@ -75,77 +75,13 @@ export function goToLevel(id, opts = {}) {
   window.location.search = params.toString();
 }
 
-const fmtTime = (t) => {
-  if (t == null) return '—';
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
-
-/**
- * Build the screen and return a promise that resolves to the chosen level id.
- *
- * `current` marks the level in play, if any, so the screen can be reopened
- * mid-match as a "where else can I go" rather than only as a front door.
- */
-export function showLevelSelect({ current = null, canResume = false } = {}) {
-  const progress = loadProgress();
-  const list = levelList();
-  const done = list.filter((l) => progress[l.id]?.won).length;
-
-  const root = document.createElement('div');
-  root.id = 'levelselect';
-
-  const cards = list.map((l) => {
-    const rec = progress[l.id] || {};
-    const state = rec.won ? 'done' : (rec.runs ? 'tried' : 'new');
-    const badge = rec.won ? 'DOWN' : (rec.runs ? `${rec.runs} ATTEMPT${rec.runs > 1 ? 'S' : ''}` : 'STANDING');
-    const stats = rec.won
-      ? `<div class="ls-stats"><span>Best ${Math.round(rec.bestScore).toLocaleString()} t</span>`
-        + `<span>${fmtTime(rec.bestTime)}</span></div>`
-      : (rec.runs
-        ? `<div class="ls-stats"><span>Best ${Math.round(rec.bestScore || 0).toLocaleString()} t</span></div>`
-        : '');
-    return `
-      <button class="ls-card ${state}${l.id === current ? ' here' : ''}" data-level="${l.id}">
-        <div class="ls-badge">${badge}</div>
-        <div class="ls-target">${l.target}</div>
-        <div class="ls-place">${l.place || l.name}</div>
-        <div class="ls-blurb">${LEVEL_BLURB[l.id] || l.brief || ''}</div>
-        ${stats}
-        ${l.id === current ? '<div class="ls-here">IN PLAY</div>' : ''}
-      </button>`;
-  }).join('');
-
-  root.innerHTML = `
-    <div class="ls-inner">
-      <div class="ls-head">
-        <img class="ls-logo" src="./logo-512.png" alt="Excessive Force" width="512" height="512">
-        <div class="ls-title">EXCESSIVE FORCE</div>
-        <div class="ls-sub">SELECT TARGET · ${done} OF ${list.length} DOWN</div>
-      </div>
-      <div class="ls-grid">${cards}</div>
-      <div class="ls-foot">
-        ${canResume ? '<button class="ls-back" id="ls-back">BACK TO THE MATCH</button>' : ''}
-      </div>
-    </div>`;
-  document.body.appendChild(root);
-
-  return new Promise((resolve) => {
-    root.querySelectorAll('.ls-card').forEach((el) => {
-      el.addEventListener('click', () => {
-        const id = el.getAttribute('data-level');
-        root.remove();
-        resolve(id);
-      });
-    });
-    const back = root.querySelector('#ls-back');
-    if (back) back.addEventListener('click', () => { root.remove(); resolve(null); });
-  });
-}
 
 /**
  * Which level to boot, asking the player if they have not said.
+ *
+ * The asking is the campaign map — see `worldmap.js` — imported here rather
+ * than at the top of the file because it pulls in a hundred kilobytes of
+ * coastline that a level started from a deep link never needs.
  *
  * An explicit `?level=` always wins, so deep links and the headless test
  * harness keep working. `tt.autostart` is set once the player has chosen
@@ -171,7 +107,8 @@ export async function resolveStartLevel() {
   // the URL and are handled above.
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
-  const id = await showLevelSelect({});
+  const { showWorldMap } = await import('./worldmap.js');
+  const id = await showWorldMap({});
   if (loading) loading.style.display = '';
   try { localStorage.setItem(AUTOSTART_KEY, '1'); } catch { /* no storage */ }
   // Chosen from the front door: no reload needed, this is the first boot.
