@@ -1719,7 +1719,23 @@ export class Structure {
    * progressive collapse.
    */
   solveStability(force = false) {
-    if (!this.stabilityDirty && !force) return 0;
+    // A periodic re-check, on top of the event-driven one.
+    //
+    // The solver runs when something marks it dirty, which is the right design
+    // — it is the most expensive thing in the frame and most frames change
+    // nothing. But it means the *only* way a section can be noticed to have
+    // lost its footing is if something thought to say so, and the paths that
+    // set the flag are all about damage. Anything that becomes unsupported
+    // without a shell landing at that moment — rubble shifting out from under
+    // a section, an island breaking up beneath one, a body the recycler froze —
+    // is simply never asked about again, and sits there. Once a second while a
+    // building has anything loose about it is nothing next to the cost of a
+    // stone hanging in the air for the rest of the level.
+    if (!this.stabilityDirty && !force) {
+      const due = (this.clock || 0) - (this._lastSolve || 0) > 1.0;
+      if (!due || (this.islands.size === 0 && this.destroyedCount === 0)) return 0;
+    }
+    this._lastSolve = this.clock || 0;
     this.stabilityDirty = false;
 
     const n = this.count;
@@ -1894,7 +1910,8 @@ export class Structure {
       // description of what just happened.
       if (group.length > WELD_THRESHOLD
           && groupMass > this._significantLoad * 3
-          && this._restingCount(group, reach) >= 4) {
+          && this._restingCount(group, reach) >= 4
+          && !this._deferredTooLong(group)) {
         // It has lost its bearing but it is still sitting on the stumps. Let
         // it lean off them rather than dropping it: a section this size handed
         // straight to the contact solver sinks through its own base.
@@ -1902,6 +1919,7 @@ export class Structure {
         for (const i of group) lowest = Math.min(lowest, this.bandOf[i]);
         if (leanBand < 0 || lowest < leanBand) leanBand = lowest;
         leanRatio = Math.max(leanRatio, NO_EQUILIBRIUM * 0.9);
+        group.lowBand = lowest;
         deferred.push(group);
       } else {
         this._releaseGroup(group);
@@ -1985,8 +2003,29 @@ export class Structure {
     // they were: alive, unsupported, and still fixed bodies, which is masonry
     // hanging motionless in the air over a demolished building. Measured at
     // its worst: a thousand stones, the highest eighty-six metres up.
-    if (deferred.length && !this.lean) {
-      for (const group of deferred) this._releaseGroup(group);
+    for (const group of deferred) {
+      // Carried, or let go. Those are the only two states, and the old rule
+      // only checked the first half of the first one.
+      //
+      // A group that has lost its bearing is handed to the lean on the
+      // understanding that the lean will carry it, and `_armLean` refuses for
+      // perfectly good reasons — the slice has already let go once, the mass
+      // above it is too small to be worth tilting, the bearing has no area
+      // left. The old guard released the deferred groups when no lean existed
+      // *at all*, which is right as far as it goes and misses the case that
+      // actually shows up in play: a lean is running, on some other slice, and
+      // a lean only rotates what is above its own hinge. Anything below that
+      // hinge was deferred to a gesture that does not touch it, and sat there —
+      // alive, unsupported, still a fixed body — for as long as the lean took.
+      // Both of the reported floaters are this: a minaret cut off its drum
+      // while the Taj leaned somewhere else, and the Elizabeth Tower hanging
+      // over its own severed base while the base crumbled underneath it.
+      const carried = this.lean && group.lowBand >= this.lean.band;
+      if (carried) {
+        this._markDeferred(group);
+        continue;
+      }
+      this._releaseGroup(group);
     }
 
     this.lastStressRatio = bearing2.ratio;
@@ -2540,6 +2579,37 @@ export class Structure {
    * So: joint contact if there is any, and failing that, whether there is still
    * masonry standing in the few metres underneath it.
    */
+  /**
+   * How long a section may hang while the lean it was handed to makes up its
+   * mind.
+   *
+   * The lean is a slow gesture on purpose — a cut tower creeps, then tips, then
+   * goes, and the creep is the drama. But the section being creeped is, in the
+   * meantime, masonry with a gap under it, and a gap under a building is a
+   * thing the player can see. Left unbounded, a section that is genuinely being
+   * carried but whose lean takes eight seconds to commit is eight seconds of
+   * visibly floating stone. Past this it goes whether or not the lean was going
+   * to get there, which is the honest reading anyway: something that has been
+   * unsupported for two and a half seconds is not resting on anything.
+   */
+  _deferredTooLong(group) {
+    const since = this._deferSince;
+    if (!since) return false;
+    let oldest = 0;
+    for (const i of group) {
+      const t = since[i];
+      if (t > 0) oldest = Math.max(oldest, (this.clock || 0) - t);
+    }
+    return oldest > 2.5;
+  }
+
+  _markDeferred(group) {
+    const since = this._deferSince
+      || (this._deferSince = new Float32Array(this.count));
+    const now = Math.max(0.001, this.clock || 0.001);
+    for (const i of group) if (!since[i]) since[i] = now;
+  }
+
   _restingCount(group, reach) {
     let n = 0;
     for (const i of group) {
@@ -3052,6 +3122,10 @@ export class Structure {
    * island per call so a big collapse spreads the cost over several frames.
    */
   maintainIslands(dt = 1 / 60) {
+    // The structure's own clock. Only the frame loop knows what a second is —
+    // the solver runs when something changes, not on a schedule — and the
+    // deferral guard below needs to know how long a section has been waiting.
+    this.clock = (this.clock || 0) + dt;
     // Lift the lockout if the section that was handed over never went.
     //
     // Cheap, and it runs whether or not there are islands left, because the
@@ -3085,7 +3159,34 @@ export class Structure {
     // and the "it has been down long enough, break it up" backstop could not
     // fire for precisely the pile it exists for.
     for (const island of this.islands.values()) {
-      if (!island.settling) island.age = (island.age || 0) + dt;
+      island.age = (island.age || 0) + dt;
+      if (!island.settling) continue;
+      // A section may ease itself down. It may not hang there.
+      //
+      // A settling island is braked hard — damping 0.9 against 0.03 — so that a
+      // tower sagging into its own crater sags rather than dropping, and it
+      // stops being "settling" only once it has visibly moved: 1.6 m down,
+      // 1.6 m sideways, or seven degrees over. Every one of those is a test on
+      // *movement*, and a section that is wedged, or that was welded with
+      // nothing under it and went to sleep before gravity got hold of it, never
+      // satisfies any of them. It then keeps the brakes on and keeps counting
+      // as standing masonry, for the rest of the level — which from the outside
+      // is a minaret hanging over the gap where its drum used to be.
+      //
+      // Nothing was even counting how long that had been going on: the age
+      // above used to be advanced only for islands that were *not* settling,
+      // so the one state that could last forever was the one state with no
+      // clock on it. Past a few seconds the brakes come off and the body is
+      // woken. It keeps its `settling` status — if it really is resting on
+      // rubble it simply sits there under ordinary damping, which is the
+      // truthful outcome — and if it was hanging, it now falls, and the
+      // movement test picks it up on the way down.
+      if (island.age > 2.5 && !island.unbraked && PhysicsWorld.alive(island.body)) {
+        island.unbraked = true;
+        island.body.setLinearDamping(0.05);
+        island.body.setAngularDamping(0.15);
+        island.body.wakeUp();
+      }
     }
 
     for (const island of this.islands.values()) {

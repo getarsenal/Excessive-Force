@@ -107,6 +107,7 @@ export class HUD {
     if (this.el.ecKeep) {
       this.el.ecKeep.addEventListener('click', () => {
         this.el.endcard.hidden = true;
+        document.body.classList.remove('ended');
         this.onKeepGoing();
       });
     }
@@ -145,6 +146,8 @@ export class HUD {
     el.appendChild(win);
     const denom = b.objectives.reduce(
       (a, o) => a + o.structure.totalMass * (1 - o.win.integrity), 0) / Math.max(1, b.totalMass);
+    // Kept, because the cards have to quote the same number the bar is showing.
+    this._unlockDenom = denom;
     const seen = new Set();
     for (const u of UNITS) {
       const frac = Math.min(1, ((u.unlockFrac ?? 0) / scale) / Math.max(0.05, denom));
@@ -480,11 +483,18 @@ export class HUD {
           card.querySelector('.uc-lock').textContent = 'CONTRACT';
         } else {
           card.classList.remove('sealed');
-          // Shown against the same scaled progress the gate uses, or the
-          // number on the card is not the number being tested.
+          // Quoted on the bar's scale, not on its own.
+          //
+          // The bar at the top is each objective's share of the way to its own
+          // threshold; an unlock is a fraction of all the mass on the map, and
+          // at Giza the two differ by a factor of sixteen. So the bar read 14 %
+          // while a card said "UNLOCK 12 %" and stayed locked, which is the
+          // game contradicting itself in two places a thumb's width apart.
+          // Same conversion the tick marks on the bar already use.
           const scale = b.level?.unlockScale ?? 1;
-          const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
-          card.querySelector('.uc-lock').textContent = `UNLOCK ${need}%`;
+          const denom = Math.max(0.05, this._unlockDenom ?? 1);
+          const at = Math.min(0.999, ((u.unlockFrac ?? 0) / scale) / denom);
+          card.querySelector('.uc-lock').textContent = `AT ${Math.max(1, Math.round(at * 100))}%`;
         }
       } else if (!this._lastUnlocked.has(u.id)) {
         card.classList.remove('sealed');
@@ -513,6 +523,14 @@ export class HUD {
 
   showEnd(kind, summary, opts = {}) {
     this.el.endcard.hidden = false;
+    // Everything else goes away.
+    //
+    // The card is one more thing inside `#ui`, so the whole battle interface
+    // stayed on screen behind it: the target readout, the fire-mode buttons,
+    // SMOKE, TEST, and the "tap the target to call the strike" prompt, all
+    // sitting over an after-action report for a battle that had finished. The
+    // same rule the clear-view key uses hides the lot.
+    document.body.classList.add('ended');
     const won = kind === 'win';
     this.el.ecTitle.textContent = opts.title ?? (won
       ? (this.battle.level?.victory ?? 'TARGET DOWN')

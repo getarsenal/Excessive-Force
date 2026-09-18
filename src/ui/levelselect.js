@@ -94,7 +94,26 @@ export async function resolveStartLevel() {
   try {
     explicit = new URLSearchParams(window.location.search).get('level');
   } catch { /* no location in some embeds */ }
-  if (explicit && LEVELS[explicit]) return LEVELS[explicit];
+  if (explicit && LEVELS[explicit]) {
+    // And then take it out of the address bar.
+    //
+    // `?level=` is how the game navigates to a level and how a shared link
+    // names one, and both of those are a thing that happens *once*. Left in
+    // place it is also the address the browser reopens on — so a player who
+    // closed the game inside Westminster and came back to it half an hour
+    // later was put straight back into Westminster, with no way to the map
+    // except a button inside the HUD. Restarting and switching quality go back
+    // through `goToLevel`, which puts the parameter back for the one load that
+    // needs it.
+    try {
+      const u = new URL(window.location.href);
+      if (u.searchParams.has('level')) {
+        u.searchParams.delete('level');
+        window.history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
+      }
+    } catch { /* no history in some embeds */ }
+    return LEVELS[explicit];
+  }
 
   // The front door is the front door, every time.
   //

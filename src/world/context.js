@@ -610,6 +610,9 @@ export function buildContext(terrain, quality, opts = {}) {
   group.add(detail);
   group.userData.detail = counts;
   group.userData.network = net;
+  // The frame the whole place is laid out on. The field works read it so the
+  // defence line is square to the streets it is dug beside.
+  group.userData.gridYaw = GRID_YAW;
   group.userData.layout = rejects;
   group.userData.bridge = bridge;
 

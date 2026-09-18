@@ -56,7 +56,8 @@ export class Audio {
    * called from the first pointerdown rather than at boot.
    */
   async unlock() {
-    if (this.ctx || this._failed) return;
+    if (this.ctx) { this.resume(); return; }
+    if (this._failed) return;
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) { this._failed = true; return; }
@@ -77,10 +78,48 @@ export class Audio {
 
       await this._loadAll();
       this.ready = true;
+      this._watch();
     } catch (e) {
       console.warn('[tumble] audio unavailable:', e.message);
       this._failed = true;
     }
+  }
+
+  /**
+   * Bring the context back when the game does.
+   *
+   * A browser suspends an AudioContext when its page goes into the background
+   * and does not necessarily start it again on the way back — iOS in
+   * particular hands the page back with the context still suspended, and
+   * nothing here was asking. Every sound after that was scheduled into a clock
+   * that was not running, which from the sofa is a game that has gone silent
+   * for no reason and stays silent until it is reloaded.
+   *
+   * Three ways in, because no single one of them fires everywhere: the
+   * visibility change, the back-forward cache restore, and the next thing the
+   * player touches. `resume()` on a context that is already running is a no-op,
+   * so asking three times costs nothing.
+   */
+  _watch() {
+    if (this._watching) return;
+    this._watching = true;
+    const wake = () => this.resume();
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) wake();
+    });
+    window.addEventListener('pageshow', wake);
+    window.addEventListener('focus', wake);
+    // Not `once`: the gesture is a fallback for every return, not just the
+    // first one.
+    window.addEventListener('pointerdown', wake, { passive: true });
+    window.addEventListener('keydown', wake);
+  }
+
+  /** Start the clock again if something stopped it. Safe to call at any time. */
+  resume() {
+    if (!this.ctx || this._failed) return;
+    if (this.ctx.state === 'running') return;
+    this.ctx.resume().catch(() => { /* still no gesture; the next one will do */ });
   }
 
   async _loadAll() {

@@ -244,6 +244,21 @@ html, body {
   position: absolute; top: 3px; left: 4px; font-size: 8px;
   color: var(--dim); letter-spacing: 0.1em;
 }
+/* What the bar is, said once, because a bar with ticks on it and a percentage
+   beside it is three different things and the player was left to guess which.
+   The number on a locked card is now quoted on this bar's scale, so "AT 12 %"
+   means the mark at 12 % along here. */
+.tb-barlabel {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  opacity: 0.75;
+  margin: 2px 0 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .uc-lock {
   /* A band over the price, not a curtain over the card: the icon and the
      name stay readable, so the bar reads as a roster with some of it still
@@ -254,7 +269,22 @@ html, body {
   background: rgba(6, 8, 11, 0.86); color: var(--warn); text-align: center; padding: 4px 2px;
 }
 .uc-lock::before { content: '\1F512'; font-size: 8px; filter: grayscale(1); }
-.unit-card:not(.locked) .uc-lock { display: none; }
+.unit-card:not(.locked) /* What the bar is, said once, because a bar with ticks on it and a percentage
+   beside it is three different things and the player was left to guess which.
+   The number on a locked card is now quoted on this bar's scale, so "AT 12 %"
+   means the mark at 12 % along here. */
+.tb-barlabel {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  opacity: 0.75;
+  margin: 2px 0 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uc-lock { display: none; }
 .uc-key {
   position: absolute; top: 2px; right: 4px; font-size: 8px; color: var(--dim);
   border: 1px solid var(--edge); padding: 0 3px; line-height: 11px;
@@ -612,12 +642,29 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 .ec-stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
 .ec-stat span { color: var(--dim); }
 .ec-stat b { font-variant-numeric: tabular-nums; }
-#ec-again {
-  background: transparent; border: 1px solid var(--edge-bright); color: var(--text);
+/* The buttons had no rules at all, so four native controls ran into each other
+   in the middle of the report. One column, one order, one size. */
+.ec-buttons { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.ec-btn {
   font-family: inherit; font-size: 12px; letter-spacing: 0.2em;
-  padding: 11px 30px; cursor: pointer; transition: all 0.15s;
+  color: var(--text); background: transparent;
+  border: 1px solid var(--edge-bright); border-radius: 6px;
+  padding: 0 22px; min-height: 46px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-#ec-again:hover { background: rgba(88, 166, 255, 0.14); border-color: var(--accent); }
+.ec-btn:hover { background: rgba(88, 166, 255, 0.14); border-color: var(--accent); }
+.ec-btn:active { transform: translateY(1px); }
+.ec-btn.primary {
+  color: #0b0f16; background: #e06c34; border-color: #e06c34; font-weight: 700;
+}
+.ec-btn.primary:hover { background: #ef7c42; border-color: #ef7c42; }
+.ec-btn.quiet { border-color: var(--edge); color: var(--dim); font-size: 11px; min-height: 40px; }
+
+/* The report is the only thing on screen while it is up. Everything in the
+   battle interface — the target readout, the fire modes, SMOKE, the prompt —
+   belongs to a fight that has finished. */
+body.ended #ui > *:not(#endcard) { display: none !important; }
 
 /* ── Phone ───────────────────────────────────────────────────────────── */
 @media (max-width: 620px) {
@@ -1138,4 +1185,19 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 /* A weapon the campaign has not released yet is not coming however much of
    this building falls, so it says so rather than quoting a percentage. */
 .unit-card.sealed { opacity: 0.4; }
-.unit-card.sealed .uc-lock { color: #d08a52; letter-spacing: 0.14em; }
+.unit-card.sealed /* What the bar is, said once, because a bar with ticks on it and a percentage
+   beside it is three different things and the player was left to guess which.
+   The number on a locked card is now quoted on this bar's scale, so "AT 12 %"
+   means the mark at 12 % along here. */
+.tb-barlabel {
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+  opacity: 0.75;
+  margin: 2px 0 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.uc-lock { color: #d08a52; letter-spacing: 0.14em; }

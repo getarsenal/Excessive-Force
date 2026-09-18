@@ -30,7 +30,7 @@ import { Fires } from './fx/fires.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
-import { runOpening, shouldPlayOpening, suppressNextOpening } from './ui/opening.js';
+import { runOpening, shouldPlayOpening } from './ui/opening.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -81,9 +81,11 @@ async function boot() {
   const audio = new Audio();
   // Browsers won't start an AudioContext without a gesture, so the first tap
   // on the canvas is what brings sound up.
+  // Not `once`: `unlock()` doubles as "start the clock again", and a game that
+  // has been in the background comes back with its context suspended.
   const unlockAudio = () => { audio.unlock(); };
-  canvas.addEventListener('pointerdown', unlockAudio, { once: true });
-  window.addEventListener('keydown', unlockAudio, { once: true });
+  canvas.addEventListener('pointerdown', unlockAudio, { passive: true });
+  window.addEventListener('keydown', unlockAudio);
 
   await progress(18, `surveying ${level.name.split(',')[1]?.trim() || level.name}`);
   const terrain = await loadTerrain(level.terrain, quality);
@@ -193,6 +195,10 @@ async function boot() {
   const fieldWorks = buildFieldWorks(terrain, quality, {
     landmarks,
     plots: (cityGroup || contextGroup)?.userData?.plots || [],
+    // The street network and the frame it is laid on, so the belt is square to
+    // the place rather than to the map, and so it knows where the roads are.
+    net: (cityGroup || contextGroup)?.userData?.network || null,
+    yaw: (cityGroup || contextGroup)?.userData?.gridYaw || 0,
     exclude: level.contextExclude || level.cityExcludeRadius || 70,
   });
   engine.scene.add(fieldWorks.group);
@@ -360,7 +366,10 @@ async function boot() {
       else hud.showPrompt(`${TAP} the ground to deploy`);
     },
     onClearTarget: () => battle.clearTarget(),
-    onRestart: () => { suppressNextOpening(); window.location.reload(); },
+    // Through `goToLevel` rather than a bare reload: the level is no longer in
+    // the address bar by the time anyone can press this, so a reload would
+    // land on the map.
+    onRestart: () => goToLevel(level.id),
     onNextTarget: () => goToLevel(nextTarget(level.id).id),
     // The win is already banked; this just lets play carry on against
     // whatever is still standing.
@@ -377,7 +386,7 @@ async function boot() {
     onFireMode: (m) => battle.setFireMode(m),
     onSmoke: () => battle.placeSmoke(),
     onPause: (p) => { testMenu.paused = p; },
-    onQuality: (id) => { if (setQuality(id)) { suppressNextOpening(); window.location.reload(); } },
+    onQuality: (id) => { if (setQuality(id)) goToLevel(level.id); },
     picker,
     qualityId: quality.id,
   });

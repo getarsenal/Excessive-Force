@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { box, cyl, PropSet, MATERIALS } from './detail.js';
+import { halfWidth } from './streets.js';
 
 /**
  * Field works.
@@ -49,10 +50,67 @@ const GUNMETAL = 0x4a5238;
  * can post men into works it did not have to know how to build.
  */
 function planFieldWorks(opts = {}) {
-  const { terrain, landmarks = [], plots = [], exclude = 66, budget = 90 } = opts;
+  const {
+    terrain, landmarks = [], plots = [], net = null, yaw = 0,
+    exclude = 66, budget = 90,
+  } = opts;
   const rnd = mulberry(0x31f2a7);
   const lines = [];
   const posts = [];
+
+  // ── Where a work may go.
+  //
+  // One predicate, asked everywhere, rather than a list of special cases per
+  // level. Everything that has ever looked wrong in this belt — a parapet
+  // through a road, a gun pit half in the Thames, a trench climbing the Taj's
+  // plinth, a bay hanging off the side of a cutting — is the same question
+  // asked in a different place, and a map that has not been written yet will
+  // ask it again. So it lives here, and the levels get it for free.
+  const roads = [];
+  if (net && net.edges) {
+    for (const e of net.edges) {
+      const r = halfWidth(e.cls) + 2.5;
+      for (let i = 0; i < e.pts.length - 1; i++) {
+        roads.push({ x0: e.pts[i].x, z0: e.pts[i].z, x1: e.pts[i + 1].x, z1: e.pts[i + 1].z, r });
+      }
+    }
+  }
+  const footprints = plots.map((p) => ({
+    x: p.x, z: p.z, r: Math.max(p.ax || p.w, p.az || p.d) / 2 + 2.5,
+  }));
+
+  /** Distance from a point to a segment, squared. */
+  const segD2 = (px, pz, s) => {
+    const dx = s.x1 - s.x0, dz = s.z1 - s.z0;
+    const L = dx * dx + dz * dz;
+    const t = L > 0 ? Math.max(0, Math.min(1, ((px - s.x0) * dx + (pz - s.z0) * dz) / L)) : 0;
+    const qx = s.x0 + dx * t - px, qz = s.z0 + dz * t - pz;
+    return qx * qx + qz * qz;
+  };
+
+  const siteOk = (x, z) => {
+    if (terrain.isWater(x, z)) return false;
+    // Ground you could actually dig in. A bay laid across a cutting or down an
+    // embankment has half its length buried and the other half in mid-air,
+    // which is most of what "they do not line up with the terrain" looks like.
+    const g = terrain.heightAt(x, z);
+    const slope = Math.max(
+      Math.abs(terrain.heightAt(x + 4, z) - g),
+      Math.abs(terrain.heightAt(x - 4, z) - g),
+      Math.abs(terrain.heightAt(x, z + 4) - g),
+      Math.abs(terrain.heightAt(x, z - 4) - g),
+    ) / 4;
+    if (slope > 0.30) return false;
+    // And ground nobody has already built on or paved.
+    for (const f of footprints) {
+      const dx = f.x - x, dz = f.z - z;
+      if (dx * dx + dz * dz < f.r * f.r) return false;
+    }
+    for (const r of roads) {
+      if (segD2(x, z, r) < r.r * r.r) return false;
+    }
+    return true;
+  };
 
   /**
    * One run of trench, `len` long, centred at (cx, cz) and facing outward
@@ -61,33 +119,42 @@ function planFieldWorks(opts = {}) {
    * Broken into bays with a traverse between each pair. That is not decoration:
    * a straight trench is one long room, and the whole reason a real one zigzags
    * is that a shell landing anywhere in it would otherwise sweep the lot. It is
-   * also the thing that makes a line read as a trench at two hundred metres
-   * rather than as a hedge.
+   * also what makes a line read as a trench at two hundred metres rather than
+   * as a hedge.
+   *
+   * A bay whose ground will not take it is skipped rather than moved. The line
+   * then has gaps in it where the river, the road or the terrace is, which is
+   * what a real one does and is far better than a continuous line that walks
+   * through all three.
    */
   const run = (cx, cz, nx, nz, len, weight) => {
-    const yaw = Math.atan2(nx, nz);
+    const face = Math.atan2(nx, nz);
     const tx = -nz, tz = nx;                  // along the line
     const bays = Math.max(2, Math.round(len / 19));
+    let laid = 0;
     for (let b = 0; b < bays; b++) {
       const f = ((b + 0.5) / bays) * 2 - 1;
       const step = (b % 2) * 1.8;             // the zigzag, one bay in two
       const x = cx + tx * f * len / 2 + nx * step;
       const z = cz + tz * f * len / 2 + nz * step;
-      if (terrain.isWater(x, z)) continue;
       const bayLen = len / bays - 1.6;
-      lines.push({ x, z, yaw, len: bayLen, traverse: b < bays - 1 });
+      // Both ends and the middle, so a bay never straddles a kerb or a bank.
+      if (!siteOk(x, z)) continue;
+      if (!siteOk(x + tx * bayLen * 0.45, z + tz * bayLen * 0.45)) continue;
+      if (!siteOk(x - tx * bayLen * 0.45, z - tz * bayLen * 0.45)) continue;
+      lines.push({ x, z, yaw: face, len: bayLen, traverse: b < bays - 1 });
+      laid++;
       // Two men to a bay, and not two of the same thing.
       //
       // Mostly rifles, a gun group in about one bay in three, and the odd
-      // sniper or AT team — which is roughly the mix a rifle section carries
-      // and, more to the point, means the line does not answer every attack
-      // the same way. An AT team in a trench is the reason walking a gun up to
-      // the line at close range is a bad idea.
-      const men = weight > 1 ? 2 : 2;
-      for (let m = 0; m < men; m++) {
-        const g = ((m + 0.5) / men) * 2 - 1;
-        const px = x + tx * g * bayLen * 0.4 - nx * 1.15;
-        const pz = z + tz * g * bayLen * 0.4 - nz * 1.15;
+      // sniper or AT team — roughly the mix a rifle section carries and, more
+      // to the point, it means the line does not answer every attack the same
+      // way. An AT team in a trench is the reason walking a gun up to the line
+      // at close range is a bad idea.
+      for (let m = 0; m < 2; m++) {
+        const g = (m + 0.5) - 1;
+        const px = x + tx * g * bayLen * 0.8 - nx * 1.15;
+        const pz = z + tz * g * bayLen * 0.8 - nz * 1.15;
         const roll = rnd();
         const type = (m === 0 && b % 3 === 0) ? 'mg'
           : roll < 0.09 ? 'sniper'
@@ -96,21 +163,33 @@ function planFieldWorks(opts = {}) {
         // Standing *in* it, not beside it. A man at full height behind a
         // knee-high bank reads as someone who happens to be near a wall; drop
         // him two thirds of a metre and the bank takes his legs, which is the
-        // whole picture the word "dug in" is doing.
+        // whole picture the words "dug in" are doing.
         posts.push({
-          x: px, z: pz, y: terrain.heightAt(px, pz) - 0.62, yaw, type, kind: 'trench',
+          x: px, z: pz, y: terrain.heightAt(px, pz) - 0.62, yaw: face, type, kind: 'trench',
         });
       }
     }
+    return laid;
   };
 
   /** A gun pit behind the line, with something heavy in it. */
   const pit = (x, z, nx, nz, type) => {
-    if (terrain.isWater(x, z)) return;
-    const yaw = Math.atan2(nx, nz);
-    lines.push({ x, z, yaw, pit: true, weapon: type });
-    posts.push({ x, z, y: terrain.heightAt(x, z) + 0.3, yaw, type, kind: 'pit' });
+    if (!siteOk(x, z)) return false;
+    const face = Math.atan2(nx, nz);
+    lines.push({ x, z, yaw: face, pit: true, weapon: type });
+    posts.push({ x, z, y: terrain.heightAt(x, z) + 0.3, yaw: face, type, kind: 'pit' });
+    return true;
   };
+
+  // The frame the place is laid out on, not the compass.
+  //
+  // The city, its streets and its precinct are all built square to `GRID_YAW`,
+  // and a defence line that ignores it crosses every road it meets at whatever
+  // angle the map happens to make — which is the other half of "they do not
+  // line up with the buildings". Rotating the four outward normals into the
+  // same frame puts the belt square to the place it is defending.
+  const cy = Math.cos(yaw), sy = Math.sin(yaw);
+  const rot = (nx, nz) => [nx * cy - nz * sy, nx * sy + nz * cy];
 
   // ── The landmarks. The belt that matters, and the only one the player can
   // see from the opening camera.
@@ -123,8 +202,7 @@ function planFieldWorks(opts = {}) {
   // a couple of hundred metres shares one perimeter.
   const clusters = [];
   for (const L of landmarks) {
-    const near = clusters.find(
-      (c) => Math.hypot(c.x - L.x, c.z - L.z) < 200);
+    const near = clusters.find((c) => Math.hypot(c.x - L.x, c.z - L.z) < 200);
     if (near) {
       const x0 = Math.min(near.x - near.w / 2, L.x - L.w / 2);
       const x1 = Math.max(near.x + near.w / 2, L.x + L.w / 2);
@@ -140,15 +218,14 @@ function planFieldWorks(opts = {}) {
     const half = Math.max(L.w, L.d) / 2;
     const stand = half * 1.22 + 26;
     const len = Math.min(half * 2.4 + 40, stand * 1.9);
-    // And still nothing facing another objective. Giza's pyramids are half a
-    // kilometre apart, which is far too far to share a perimeter and close
-    // enough that Khufu's western line would be looking straight at Khafre.
+    // Nothing facing another objective. Giza's pyramids are half a kilometre
+    // apart, which is far too far to share a perimeter and close enough that
+    // Khufu's western line would be looking straight at Khafre.
     //
-    // On the bearing, not merely on that side of the line. A bare sign test
-    // says a cluster one metre to the east is "east", so the Palais de
-    // Chaillot — 210 m up the Champ de Mars and a metre off its axis — took
-    // the Eiffel's eastern run, its eastern gun and both of its flak pits with
-    // it, and the level went up with no anti-aircraft gun on it at all.
+    // On the bearing, not merely on that side of the line: a bare sign test
+    // says a cluster one metre to the east is "east", and the Palais de
+    // Chaillot — 210 m up the Champ de Mars and a metre off its axis — took the
+    // Eiffel's eastern run, its eastern gun and both of its flak pits with it.
     const facesFriend = (nx, nz) => {
       const nl = Math.hypot(nx, nz) || 1;
       return clusters.some((o) => {
@@ -159,24 +236,26 @@ function planFieldWorks(opts = {}) {
         return dist - Math.max(o.w, o.d) / 2 < stand * 2.6;
       });
     };
-    for (const [nx, nz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const [nx, nz] = rot(ax, az);
       if (facesFriend(nx, nz)) continue;
-      run(L.x + nx * stand, L.z + nz * stand, nx, nz, len, 2);
-      // A field gun behind the middle of each run, and flak on two corners.
+      // A line that could not be dug at all — the whole side is river, or road,
+      // or the terrace — gets no gun behind it either.
+      if (!run(L.x + nx * stand, L.z + nz * stand, nx, nz, len, 2)) continue;
       pit(L.x + nx * (stand + 13), L.z + nz * (stand + 13), nx, nz, 'fieldgun');
     }
-    for (const [sx, sz] of [[1, 1], [-1, -1]]) {
-      if (facesFriend(sx, sz)) continue;
-      pit(L.x + sx * (stand + 6), L.z + sz * (stand + 6), sx * 0.7, sz * 0.7, 'aa');
+    for (const [ax, az] of [[1, 1], [-1, -1]]) {
+      const [nx, nz] = rot(ax * 0.7071, az * 0.7071);
+      if (facesFriend(nx, nz)) continue;
+      pit(L.x + nx * (stand + 6), L.z + nz * (stand + 6), nx, nz, 'aa');
     }
     // An observer, far enough back to see the whole approach — and on land.
-    // Westminster's landmarks sit on a river bend, and the first corner tried
-    // put both observers in the Thames.
-    for (const [sx, sz] of [[1, -1], [-1, -1], [1, 1], [-1, 1]]) {
-      const ox = L.x + sx * stand * 1.6, oz = L.z + sz * stand * 1.6;
-      if (terrain.isWater(ox, oz)) continue;
+    for (const [ax, az] of [[1, -1], [-1, -1], [1, 1], [-1, 1]]) {
+      const [nx, nz] = rot(ax * 0.7071, az * 0.7071);
+      const ox = L.x + nx * stand * 2.2, oz = L.z + nz * stand * 2.2;
+      if (!siteOk(ox, oz)) continue;
       posts.push({ x: ox, z: oz, y: terrain.heightAt(ox, oz) + 0.3,
-        yaw: Math.atan2(-sx, -sz), type: 'spotter', kind: 'pit' });
+        yaw: Math.atan2(-nx, -nz), type: 'spotter', kind: 'pit' });
       break;
     }
   }
@@ -185,9 +264,9 @@ function planFieldWorks(opts = {}) {
   //
   // "All the buildings" is the point, but it is also two hundred terraces on a
   // map that can carry a couple of hundred defenders in total. So the belt
-  // thins with distance: every block near the objective is dug in, and it
-  // falls away to the odd corner position at the edge of the city, which is
-  // also what a defence in depth actually looks like from the air.
+  // thins with distance: every block near the objective is dug in, and it falls
+  // away to the odd corner position at the edge of the city, which is also what
+  // a defence in depth looks like from the air.
   const ranked = plots
     .map((p) => ({ p, r: Math.hypot(p.x, p.z) }))
     .filter((e) => e.r > exclude - 10)
@@ -196,16 +275,26 @@ function planFieldWorks(opts = {}) {
   let dug = 0;
   for (const { p, r } of ranked) {
     if (dug >= budget) break;
-    // Near the objective everything is dug in; at the edge of the map one in
-    // six is.
     const t = Math.min(1, Math.max(0, (r - exclude) / Math.max(1, far - exclude)));
     if (rnd() > 1 - t * 0.86) continue;
+    // Along the building's own frontage, not along a compass bearing. A terrace
+    // stands square to its street, so the line in front of it should too.
     const half = Math.max(p.ax || p.w, p.az || p.d) / 2;
     const stand = half + 7;
-    // On the outward side only: the men are defending the objective, so they
-    // are looking away from it.
-    const nx = p.x / (r || 1), nz = p.z / (r || 1);
-    run(p.x + nx * stand, p.z + nz * stand, nx, nz, Math.min(half * 2 + 8, 30), 1);
+    const py = p.yaw || yaw;
+    // Whichever of the building's four faces points furthest from the
+    // objective: the men are defending it, so they are looking away from it.
+    const away = Math.hypot(p.x, p.z) || 1;
+    const ux = p.x / away, uz = p.z / away;
+    let bestN = null, bestDot = -Infinity;
+    for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+      const nx = ax * Math.cos(py) - az * Math.sin(py);
+      const nz = ax * Math.sin(py) + az * Math.cos(py);
+      const dot = nx * ux + nz * uz;
+      if (dot > bestDot) { bestDot = dot; bestN = [nx, nz]; }
+    }
+    const [nx, nz] = bestN;
+    if (!run(p.x + nx * stand, p.z + nz * stand, nx, nz, Math.min(half * 2 + 8, 30), 1)) continue;
     if (t < 0.3 && dug % 3 === 0) {
       pit(p.x + nx * (stand + 9), p.z + nz * (stand + 9), nx, nz, 'fieldgun');
     }
@@ -235,36 +324,72 @@ function addFieldWorks(props, terrain, plan, rng) {
 /** One bay: the bank in front, the fire step behind it, and a traverse. */
 function parapet(props, terrain, L, rng) {
   const { x, z, yaw, len } = L;
+  // Buried to the local ground, not to the bay's.
+  //
+  // Each box takes its own height off the terrain and is sunk far enough that
+  // the lowest corner it could have is still under the surface. Sitting a
+  // fixed-height box on a single sampled height is what left banks floating
+  // over a slope on one side and half-swallowed on the other, and the ground
+  // under a two-hundred-metre belt is never flat for all of it.
   const tx = -Math.sin(yaw + Math.PI / 2), tz = -Math.cos(yaw + Math.PI / 2);
   const nx = Math.sin(yaw), nz = Math.cos(yaw);
   const n = Math.max(2, Math.round(len / 2.6));
   for (let i = 0; i < n; i++) {
     const f = ((i + 0.5) / n) * 2 - 1;
     const px = x + tx * f * len / 2, pz = z + tz * f * len / 2;
-    const g = terrain.heightAt(px, pz);
+    // The lowest ground any corner of this box stands over, so nothing floats.
+    const bankX = px + nx * 0.85, bankZ = pz + nz * 0.85;
+    const low = lowestUnder(terrain, bankX, bankZ, 1.5, 1.1, yaw);
     const h = 1.15 + rng() * 0.3;
+    const sink = Math.max(0.35, terrain.heightAt(bankX, bankZ) - low + 0.3);
     // The bank, thrown a little unevenly the way spoil lands.
-    props.add('stone', box(2.7, h, 1.9,
-      px + nx * 0.85, g + h / 2 - 0.35, pz + nz * 0.85, yaw), SPOIL, 0.94 + rng() * 0.12);
+    props.add('stone', box(2.7, h + sink, 1.9,
+      bankX, low + (h + sink) / 2 - 0.05, bankZ, yaw), SPOIL, 0.94 + rng() * 0.12);
     // Sandbags along the crest of every second length, so the line has a
     // rhythm rather than being one long mound.
     if (i % 2 === 0) {
       props.add('stone', box(2.5, 0.36, 0.7,
-        px + nx * 1.3, g + h - 0.16, pz + nz * 1.3, yaw), BAG, 0.92 + rng() * 0.16);
+        px + nx * 1.3, low + sink + h - 0.2, pz + nz * 1.3, yaw), BAG, 0.92 + rng() * 0.16);
     }
     // The parados behind the trench, which is both what a real one has and
     // what stops the men reading as sunk into bare grass when the camera comes
     // round to the objective's side.
-    props.add('stone', box(2.6, 0.75, 0.75,
-      px - nx * 1.25, g + 0.02, pz - nz * 1.25, yaw), SPOIL, 0.9 + rng() * 0.1);
+    const backX = px - nx * 1.25, backZ = pz - nz * 1.25;
+    const backLow = lowestUnder(terrain, backX, backZ, 1.3, 0.6, yaw);
+    props.add('stone', box(2.6, 0.75 + (terrain.heightAt(backX, backZ) - backLow),
+      0.75, backX, backLow + 0.38, backZ, yaw), SPOIL, 0.9 + rng() * 0.1);
     props.add('dark', box(2.6, 0.62, 0.14,
-      px - nx * 0.78, g - 0.12, pz - nz * 0.78, yaw), BOARD, 1);
+      px - nx * 0.78, terrain.heightAt(px - nx * 0.78, pz - nz * 0.78) - 0.12,
+      pz - nz * 0.78, yaw), BOARD, 1);
   }
   if (L.traverse) {
     const ex = x + tx * (len / 2 + 0.9), ez = z + tz * (len / 2 + 0.9);
-    const g = terrain.heightAt(ex, ez);
-    props.add('stone', box(1.2, 1.0, 3.2, ex, g + 0.44, ez, yaw), SPOIL, 0.96);
+    const low = lowestUnder(terrain, ex, ez, 0.7, 1.7, yaw);
+    const rise = terrain.heightAt(ex, ez) - low;
+    props.add('stone', box(1.2, 1.0 + rise, 3.2, ex, low + (1.0 + rise) / 2 - 0.06, ez, yaw),
+      SPOIL, 0.96);
   }
+}
+
+/**
+ * The lowest ground under a box's footprint.
+ *
+ * Four corners and the middle. A box is axis-aligned about its own yaw and
+ * cannot be pitched, so the only way to keep one from hanging over a slope is
+ * to start it at the bottom of what it covers and make it tall enough to reach
+ * the top. That is also what a real parapet is: the bank is thicker on the
+ * downhill side because that is where the spoil went.
+ */
+function lowestUnder(terrain, cx, cz, hx, hz, yaw) {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  let low = terrain.heightAt(cx, cz);
+  for (const [ox, oz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]]) {
+    const x = cx + ox * c + oz * s;
+    const z = cz - ox * s + oz * c;
+    const g = terrain.heightAt(x, z);
+    if (g < low) low = g;
+  }
+  return low;
 }
 
 /**
@@ -282,7 +407,9 @@ function gunPit(props, terrain, L, rng) {
     const a = yaw + Math.PI + (-0.76 + (i / (n - 1)) * 1.52) * Math.PI;
     const px = x + Math.sin(a) * R, pz = z + Math.cos(a) * R;
     const h = 0.95 + rng() * 0.25;
-    props.add('stone', box(1.5, h, 1.2, px, terrain.heightAt(px, pz) + h / 2 - 0.15, pz,
+    const low = lowestUnder(terrain, px, pz, 0.75, 0.6, a);
+    const rise = terrain.heightAt(px, pz) - low;
+    props.add('stone', box(1.5, h + rise, 1.2, px, low + (h + rise) / 2 - 0.1, pz,
       a), SPOIL, 0.93 + rng() * 0.13);
   }
   if (L.weapon === 'fieldgun') {

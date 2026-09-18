@@ -1147,8 +1147,24 @@ export class Garrison {
         d.suppressed = Math.max(d.suppressed || 0, this.time + t);
       }
       if (dist > radius) continue;
-      const falloff = 1 - dist / radius;
-      d.health -= power * falloff * 0.055;
+      // Fragments do not fall off linearly, and cover is a real number rather
+      // than an accident.
+      //
+      // It used to be a straight taper at a flat rate, which made the lethal
+      // zone of an AT4 about a metre across a three-and-a-half metre burst —
+      // and the sheaf of a shoulder-launched weapon at two hundred metres is a
+      // couple of metres wide, so against a man in a trench it was very nearly
+      // a hundred per cent misses. The curve is gentler now and the rate is
+      // higher, and cover takes its cut openly: a crew below a parapet keeps
+      // about a third of it off, a man at a window rather less, and a man in
+      // the open none at all. An AT4 kills a trench rifleman inside about two
+      // metres, which it manages often enough to be worth firing and rarely
+      // enough that digging in was still worth doing.
+      const cover = d.cover === 'trench' ? 0.7
+        : d.sandbags ? 0.8
+          : (d.cover === 'window' || d.cover === 'arcade') ? 0.85 : 1;
+      const falloff = Math.pow(1 - dist / radius, 0.6);
+      d.health -= power * falloff * 0.095 * cover;
       if (d.health <= 0) { d.alive = false; killed++; }
     }
     return killed;
