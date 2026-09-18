@@ -160,10 +160,15 @@ export async function resolveStartLevel() {
   } catch { /* no location in some embeds */ }
   if (explicit && LEVELS[explicit]) return LEVELS[explicit];
 
-  let seen = false;
-  try { seen = localStorage.getItem(AUTOSTART_KEY) === '1'; } catch { /* no storage */ }
-  if (seen) return LEVELS[DEFAULT_LEVEL];
-
+  // The front door is the front door, every time.
+  //
+  // This used to remember that the player had chosen once and then send them
+  // straight back into Westminster on every later launch, so opening the game
+  // dropped you into the middle of a battle with no way back to the map
+  // except a button inside the HUD. A level only starts without asking when
+  // something has explicitly asked for it — a shared link, or the game's own
+  // navigation on the way to the next target, both of which name the level in
+  // the URL and are handled above.
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
   const id = await showLevelSelect({});

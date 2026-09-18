@@ -6,7 +6,7 @@ import { BlockList, MATERIALS as M } from '../builder.js';
  * Reference figures (Société d'Exploitation de la Tour Eiffel, published):
  *   height to the tip            330 m with the broadcast mast
  *   height to the third floor    276 m
- *   second floor                 116 m, deck 35 m square
+ *   second floor                 116 m, deck 30 m square
  *   first floor                  57 m, deck 65 m square
  *   base                         125 m square between the outer piers
  *   wrought iron                 7,300 t in 18,038 pieces
@@ -15,37 +15,44 @@ import { BlockList, MATERIALS as M } from '../builder.js';
  * building the opposite way round. A stone tower is a shell: you model the
  * walls and the openings are what is left over. A lattice is a frame: there is
  * no wall at all, only members, and if you build it as a hollow box with thin
- * sides it reads from any distance as a solid tapering chimney — which is
- * exactly what the first attempt looked like.
+ * sides it reads from any distance as a solid tapering chimney.
  *
- * That is the tension this file has never fully resolved, and the comment used
- * to claim a resolution it does not have. Each leg was four corner posts with
- * nothing between them, which looks right and does not stand: the posts step
- * inward faster than they are wide and the bearing chain breaks a few courses
- * off the ground. It is a laced ring instead — see `legs` below — which stands
- * and reads as more solid than the real thing does.
+ * Three things had to be right together, and the file used to have one of them.
  *
- * Cutting the middle out of every panel to get the openness back has been
- * tried and measured: the build-time bearing graph stays clean, and the
- * runtime load solver then sheds nine hundred stones on load and the tower is
- * see-through on its own centre line. Anyone taking another run at this wants
- * to start from the load pass in `structure.js`, not from the geometry.
+ *   1. The curve. Eiffel sized the tower so the wind's overturning moment is
+ *      carried by the weight above each height rather than by tension in the
+ *      iron, and the shape that falls out of that condition is an exponential.
+ *      It fits the published tower almost exactly: the outer envelope is
+ *      62.5 m from the axis at the ground, 32.5 m at the first platform,
+ *      about 15 m at the second and a few metres at the third, and
+ *      `4.2 + 58.3 · e^(-y / 76)` passes through all four. A table of five
+ *      points linearly interpolated — which is what was here — has a batter
+ *      that barely changes over the whole height, and a tower with a constant
+ *      batter is a pylon. The curve is most of what people recognise.
+ *   2. The merge. The four piers are not four towers standing beside a fifth.
+ *      Each one's inner face runs in to the axis and they close up into a
+ *      single box at the second platform, which is where the upper tower
+ *      starts. Holding the legs 8 m off the axis and then starting a separate
+ *      shaft above them leaves a step in the silhouette at 116 m — the part
+ *      that read as thin and chunky on top.
+ *   3. The openness. The one rule the support solver enforces is that a stone
+ *      must stand on something underneath it, so a lattice has to be built out
+ *      of members that are continuous from the ground up: every bar is a
+ *      column standing on the bar below it, and the gaps between the bars are
+ *      sky. That much was already true. What was not is how much of the gap
+ *      each bar took — capped at four fifths of its own spacing, so every face
+ *      closed up into a plate and the tower came out as a brown chimney. The
+ *      bars here take about a third, which is what the real web looks like
+ *      from the Trocadéro, and they are carried by ironwork strong enough to
+ *      stand at that size: see `MATERIALS.IRONWORK` in `builder.js`, which
+ *      used to be rated at a tenth of wrought iron's real capacity and so
+ *      could only hold the tower up as a solid.
  *
  * Diagonals are stepped rather than rotated. `BlockList.add` yaws a stone but
  * cannot pitch one, so a brace running up and across is laid as a short
  * staircase of boxes. At this scale the steps read as rivetted segments, which
  * is close enough to what is actually there.
  */
-
-/** Where a leg's centre and cross-section are at height `y`. */
-const PROFILE = [
-  // [height, distance of leg centre from the axis, leg half-width]
-  [0, 51.0, 12.5],
-  [30, 41.0, 10.6],
-  [57, 31.5, 8.8],        // first floor
-  [85, 22.0, 7.0],
-  [116, 13.5, 5.6],       // second floor, where the legs have merged
-];
 
 export const EIFFEL = {
   firstFloor: 57,
@@ -54,41 +61,65 @@ export const EIFFEL = {
   tip: 330,
   baseHalf: 62.5,
   firstDeckHalf: 32.5,
-  secondDeckHalf: 17.5,
+  secondDeckHalf: 19.0,
   thirdDeckHalf: 8.0,
 };
 
-/** Linear interpolation down the leg profile table. */
-function legAt(y) {
-  const P = PROFILE;
-  if (y <= P[0][0]) return { r: P[0][1], h: P[0][2] };
-  for (let i = 0; i < P.length - 1; i++) {
-    if (y <= P[i + 1][0]) {
-      const t = (y - P[i][0]) / (P[i + 1][0] - P[i][0]);
-      return {
-        r: P[i][1] + (P[i + 1][1] - P[i][1]) * t,
-        h: P[i][2] + (P[i + 1][2] - P[i][2]) * t,
-      };
-    }
-  }
-  return { r: P[P.length - 1][1], h: P[P.length - 1][2] };
+/**
+ * The outer envelope, from the ground to the summit: one curve for the whole
+ * tower, legs and shaft alike.
+ *
+ * Eiffel's own condition — the wind moment at any height balanced by the
+ * weight above it, with no tension anywhere in the iron — integrates to an
+ * exponential, and this is that exponential fitted to the published widths.
+ * The constant term is what stops it running to nothing at the top, where the
+ * real tower still has a few metres of box under the lantern.
+ */
+function outerAt(y) {
+  return 4.2 + 58.3 * Math.exp(-Math.max(0, y) / 76);
 }
 
 /**
- * Half-width of the upper shaft, which tapers from the second floor to the top.
+ * The inner face of a pier, which runs in to the axis and meets the other
+ * three at the second platform.
  *
- * Concave, like the legs below it — but not a bare power curve. `t^0.78` has
- * infinite slope at t = 0, so the first courses off the platform narrowed
- * faster than a course can bear on the one beneath it, and the bottom of the
- * caisson was the one part of the tower still starting the level detached.
- * Mixing in a linear term gives the same silhouette with a finite slope where
- * it leaves the deck.
+ * Very nearly a straight line — the exponent is 1.15, not 2 — because the
+ * legs' convergence is mostly the outer envelope's doing. Past the merge
+ * height it is pinned at zero and the four boxes tile one square, which is the
+ * upper shaft: above 116 m there are no legs, there is a tower.
+ */
+function innerAt(y) {
+  const t = Math.max(0, Math.min(1, y / EIFFEL.secondFloor));
+  return 37.5 * Math.pow(1 - t, 1.15);
+}
+
+/**
+ * Where a leg's centre and cross-section are at height `y`.
+ *
+ * Exported because the garrison stands in this ironwork and has to know where
+ * it is. It used to carry its own copy of the old profile as two numbers
+ * interpolated in place, which is the kind of duplication that survives every
+ * change to the thing it duplicates: the men were posted on the straight legs
+ * long after the legs had stopped being straight.
+ */
+export function legAt(y) {
+  const o = outerAt(y);
+  const i = Math.min(innerAt(y), o - 2.0);
+  return { r: (o + i) / 2, h: (o - i) / 2 };
+}
+
+/**
+ * Half-width of the upper shaft, which is simply the envelope above the merge.
+ *
+ * It used to be a separate curve starting from its own guessed width, and the
+ * join showed: the legs ended 19 m out and the shaft began 13.5 m out, so the
+ * tower stepped inward by six metres in the space of one course and then went
+ * up as a chimney. Sharing the envelope means the shaft's corners land on the
+ * leg heads' outer posts with the platform between them, which is both what
+ * the real tower does and what the load pass needs.
  */
 function shaftHalf(y) {
-  const t = Math.max(0, Math.min(1,
-    (y - EIFFEL.secondFloor) / (EIFFEL.thirdFloor - EIFFEL.secondFloor)));
-  const shape = 0.30 * t + 0.70 * Math.pow(t, 1.35);
-  return 13.5 + (4.6 - 13.5) * shape;
+  return outerAt(y);
 }
 
 export function buildEiffelTower(quality) {
@@ -172,49 +203,49 @@ export function buildEiffelTower(quality) {
   //
   // A cage of continuous vertical members, not a wall with holes in it.
   //
-  // This has been three things and only the third one is both true and stable.
-  // Four bare corner posts look right and fall down: a post that steps inward
-  // faster than it is wide bears on nothing, and on a phone that took the whole
-  // tower down before the player had touched it. A closed laced ring stands
-  // perfectly and reads from the camera as a solid brown chimney — which is
-  // not what anybody means by the Eiffel Tower. Cutting panels out of that ring
-  // gives back the openness and sheds nine hundred stones on load, because the
-  // one rule the support solver actually enforces is that a stone must stand on
-  // something *underneath* it, and a hole in a wall is precisely a place where
-  // the stone above has nothing under it.
-  //
-  // So: build the wall out of members that are continuous all the way up. Every
-  // bar is a column standing on the bar below it, so the bearing chain is
-  // unbroken at every point on every face — and the gaps between the bars,
-  // which are three quarters of each face, are sky. That is also how the real
-  // tower is built, which is usually a sign of being on the right track.
-  const LEG_N = 6;                          // members across each face
+  // Every bar is a column standing on the bar below it, so the bearing chain is
+  // unbroken at every point on every face — which matters because the one rule
+  // the support solver enforces is that a stone must stand on something
+  // *underneath* it, and a hole cut in a wall is precisely a place where the
+  // stone above has nothing under it. Build the wall out of bars instead and
+  // the holes are free: the two thirds of each face that is not a bar is sky,
+  // and no stone anywhere has lost its footing.
+  const LEG_N = 4;                          // members across each face
   const COURSE = member * 0.9;              // finer than the ring's, on purpose:
-  // the batter moves a member sideways by 0.4 m for every metre of height, so a
-  // shorter course is a smaller step, and a smaller step is a thinner bar that
-  // still overlaps the one beneath it.
-  const BAR = Math.max(0.5, COURSE * 0.36);
-  /** Member half-thickness, tapering from `a` at `y0` to `b` at `y1`. */
-  const taper = (y0, y1, a, b) => (y) => {
-    const t = Math.max(0, Math.min(1, (y - y0) / (y1 - y0)));
-    return a + (b - a) * t;
-  };
+  // the batter moves a member sideways by up to half a metre for every metre of
+  // height near the ground, so a shorter course is a smaller step, and a smaller
+  // step is a thinner bar that still overlaps the one beneath it.
+  //
+  // Nothing thinner than this, wherever the arithmetic says otherwise. At the
+  // summit the spacing is under three metres and a third of that is a bar you
+  // cannot see and the physics cannot keep hold of.
+  const MIN_BAR = Math.max(0.34, COURSE * 0.25);
 
   /**
    * One tapering box built as a cage: `at(y)` gives its centre and half-width,
-   * `barAt(y)` the half-thickness of a member there.
+   * `fillOf(y)` how much of the gap between two members a member takes there.
    *
-   * The members taper, and that is structural rather than decorative. A stone
-   * is crushed when the load on it passes its plan area times its material
-   * strength, and the bars at the foot of the upper shaft carry every one of
-   * the hundred and sixty metres above them: at a constant 0.84 m square they
-   * went straight through their twenty-six meganewtons and a hundred and
-   * seventy-four of them were condemned on the first frame — which is what
-   * took the whole tower over, since a loss that size arms the collapse. Stout
-   * where the load is and slender where it is not is also what the real tower
-   * does.
+   * Sizing the members as a fraction of their own spacing rather than in metres
+   * is the whole trick, and getting it wrong is what made this tower a chimney.
+   * The frame narrows by a factor of four from the ground to the second
+   * platform; a bar of fixed width therefore goes from covering a fifth of its
+   * gap at the bottom to covering four fifths of it at the top, and four fifths
+   * is a plate. Tie the bar to the gap and the face reads the same from top to
+   * bottom — about a third solid, which is what the real web looks like from
+   * across the river.
+   *
+   * The fill still varies, because the load does. A leg carries the most at its
+   * foot, where it holds up the whole tower, and again at its head, where the
+   * entire upper shaft and the second platform come down onto its twelve
+   * members through a plate that funnels rather than spreads. Stout at both
+   * ends and slender between is also what the real tower does.
+   *
+   * The corners get half again what the face members do. The shaft's own
+   * corners stand over the legs' outer corner posts with nothing but the
+   * platform in between, so a corner carries several times what a face member
+   * beside it does.
    */
-  const cage = (at, y0, y1, n, barAt, courseH) => {
+  const cage = (at, y0, y1, n, fillOf, courseH) => {
     const fr = [];
     for (let i = 0; i < n; i++) fr.push(-1 + (2 * i) / (n - 1));
     let y = y0;
@@ -222,22 +253,15 @@ export function buildEiffelTower(quality) {
       const h = Math.min(courseH, y1 - y);
       const yc = y + h / 2;
       const g = at(yc);
-      // Never wider than the gap between members, or a stout course becomes a
-      // row of boxes sharing each other's volume — which the physics answers
-      // by throwing one of them off the building.
-      //
-      // The corners get more of that gap than the face members do. Where the
-      // legs meet the second platform the plate funnels the upper tower into
-      // the leg's inner corner post — the shaft's own corner stands on the
-      // plate stone over it, and that stone has one thing under it — so the
-      // corner carries several times what a face member does. Sharing the
-      // gap evenly left the corners at 0.46 of the spacing and crushed nine
-      // of them on a phone before the map had loaded.
       const spacing = 2 * g.h / (n - 1);
-      const bar = Math.min(barAt(yc), spacing * 0.40);
-      const corner = Math.min(barAt(yc) * 1.3, spacing * 0.58);
+      const f = fillOf(yc);
+      // Never more than half the gap, or a stout course becomes a row of boxes
+      // sharing each other's volume — which the physics answers by throwing one
+      // of them off the building.
+      const bar = Math.max(MIN_BAR, spacing * Math.min(f, 0.50) / 2);
+      const corner = Math.max(MIN_BAR * 1.4, spacing * Math.min(f * 1.55, 0.62) / 2);
       const hy = h / 2 - 0.02;
-      // The four corner posts, square in plan.
+      // The four corner posts — the arêtes, square in plan.
       for (const ex of [-1, 1]) {
         for (const ez of [-1, 1]) {
           B.add(g.cx + ex * g.h, yc, g.cz + ez * g.h, corner, hy, corner, M.IRONWORK);
@@ -245,12 +269,12 @@ export function buildEiffelTower(quality) {
       }
       // And the members along each face, between the corners.
       for (let k = 1; k < n - 1; k++) {
-        const f = fr[k];
+        const fk = fr[k];
         for (const ex of [-1, 1]) {
-          B.add(g.cx + ex * g.h, yc, g.cz + f * g.h, bar, hy, bar, M.IRONWORK);
+          B.add(g.cx + ex * g.h, yc, g.cz + fk * g.h, bar, hy, bar, M.IRONWORK);
         }
         for (const ez of [-1, 1]) {
-          B.add(g.cx + f * g.h, yc, g.cz + ez * g.h, bar, hy, bar, M.IRONWORK);
+          B.add(g.cx + fk * g.h, yc, g.cz + ez * g.h, bar, hy, bar, M.IRONWORK);
         }
       }
       y += h;
@@ -264,8 +288,8 @@ export function buildEiffelTower(quality) {
    * Laid exactly on a course boundary so each belt sits on the tops of the
    * members it crosses and has a real bearing edge to every one of them. A
    * horizontal floating between two courses has nothing under it at all and
-   * lives or dies on the grout pass, which is the other way nine hundred stones
-   * came off this tower.
+   * lives or dies on the grout pass, which is one of the ways nine hundred
+   * stones came off this tower.
    */
   const belt = (at, y, bar) => {
     const g = at(y);
@@ -275,35 +299,55 @@ export function buildEiffelTower(quality) {
     }
   };
 
+  /**
+   * The X across one bay of one face of a cage, between two belts.
+   *
+   * This is the part that turns a row of posts into ironwork. Four posts a face
+   * with sky between them is an open frame and reads, correctly, as scaffolding;
+   * what makes the Eiffel Tower look like the Eiffel Tower is that every panel
+   * between two belts is crossed. The diagonals are stepped rather than pitched
+   * and they run corner to corner, so each one starts on a post and every step
+   * after that stands on the step below it — a brace hung in the middle of a
+   * panel would be the one thing in this building with nothing underneath it.
+   */
+  const cross = (at, y0, y1, thick) => {
+    const a = at(y0), b = at(y1);
+    const ring = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
+    for (let i = 0; i < 4; i++) {
+      const c0 = ring[i], c1 = ring[(i + 1) % 4];
+      brace(a.cx + c0[0] * a.h, a.cz + c0[1] * a.h, y0,
+        b.cx + c1[0] * b.h, b.cz + c1[1] * b.h, y1, thick);
+      brace(a.cx + c1[0] * a.h, a.cz + c1[1] * a.h, y0,
+        b.cx + c0[0] * b.h, b.cz + c0[1] * b.h, y1, thick);
+    }
+  };
+
   B.section('legs', () => {
+    // Stout at the foot, stout at the head, slender in between — and never so
+    // slender in the middle that a waist forms, which is the other way this has
+    // been got wrong. The two added terms are small on purpose: most of the
+    // shape is the flat 0.14, so the web looks the same all the way up.
+    const legFill = (y) => {
+      const t = Math.max(0, Math.min(1, y / EIFFEL.secondFloor));
+      return 0.14 + 0.12 * Math.pow(1 - t, 1.6) + 0.14 * Math.pow(t, 2.4);
+    };
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const at = (y) => {
         const g = legAt(y);
         return { cx: sx * g.r, cz: sz * g.r, h: g.h };
       };
-      // Stout at both ends. Thick at the ground because a leg carries the
-      // whole tower there, and thick again at the head because the entire
-      // upper shaft and the second platform — three hundred meganewtons of it
-      // — come down onto twenty members per leg through a plate that funnels
-      // rather than spreads. Tapered only downward from the base, the heads
-      // were the thinnest part of the leg at exactly the point carrying the
-      // most, and they crushed. The real tower's leg heads are its heaviest
-      // castings for the same reason.
-      // One curve rather than two crossing ones. Thickest at the ground and
-      // thickest again at the head, and — the part I got wrong twice — never
-      // thin in between: the first version tapered only downward and crushed
-      // the heads, the second crossed two tapers and left a waist at ninety
-      // metres that crushed instead. A leg carries the most at its foot and at
-      // its head and a good deal everywhere, so the floor matters as much as
-      // the ends.
-      cage(at, 0, EIFFEL.secondFloor, LEG_N, (y) => {
-        const t = Math.max(0, Math.min(1, y / EIFFEL.secondFloor));
-        return BAR * (1.18 + 0.55 * Math.pow(1 - t, 1.5) + 1.25 * Math.pow(t, 2.2));
-      }, COURSE);
-      // A belt every fourth course, which is what gives the leg its horizontal
-      // banding at a distance.
-      for (let y = COURSE * 4; y < EIFFEL.secondFloor - COURSE; y += COURSE * 4) {
-        belt(at, y, BAR * 0.8);
+      cage(at, 0, EIFFEL.secondFloor, LEG_N, legFill, COURSE);
+      // A belt at every panel boundary and an X inside every panel, which is
+      // the unit the real tower is assembled from and what gives a leg its
+      // banding at a distance. The panels are eight courses deep — eleven
+      // metres — because a belt is a solid hoop on all four faces at once, and
+      // at four courses the legs came out striped like a radiator.
+      const BAY = COURSE * 8;
+      for (let y = BAY; y < EIFFEL.secondFloor - COURSE; y += BAY) {
+        belt(at, y, MIN_BAR * 0.9);
+      }
+      for (let y = 0; y < EIFFEL.secondFloor - BAY; y += BAY) {
+        cross(at, y, Math.min(y + BAY, EIFFEL.secondFloor), MIN_BAR * 0.8);
       }
     }
   });
@@ -312,21 +356,38 @@ export function buildEiffelTower(quality) {
   // Decorative rather than structural on the real tower, and decorative here
   // too — but they are the silhouette everyone knows, and without them the
   // base reads as four unrelated pylons.
+  //
+  // Sprung from where the piers actually are rather than from as low as they
+  // would go. The real arcs spring about a quarter of the way up the legs and
+  // crown just under the first platform, so the arch is nearly sixty metres
+  // across and the opening under it is the size of a cathedral nave; the old
+  // one sprang at 10 m, spanned a third of that, and disappeared into the
+  // ironwork. Each foot still sits exactly on a pier's inner corner post — an
+  // arch centred between two posts lands on neither of them, and eight of its
+  // voussoirs fell out of the tower on the first frame the one time that was
+  // tried.
   B.section('arches', () => {
-    // Springing low, where the legs are widest, and set on the *inner* corner
-    // posts rather than on the leg centrelines. An arch centred between two
-    // posts lands on neither of them: the first cut of this sprang from 40 m
-    // with its feet in mid-air, and eight of its voussoirs fell out of the
-    // tower on the first frame. Here each foot sits exactly on the inner post,
-    // so the ring bears the way an arch is supposed to.
-    const y = 10;
-    const g = legAt(y);
-    const inner = g.r - g.h;
+    const y = 24;
+    const inner = innerAt(y);
+    const count = Math.max(13, Math.round(22 / s));
+    const RING = 3.2;                       // thickness of the arc itself
     for (const side of [1, -1]) {
-      B.arch(0, y, side * inner, inner * 2, 2.6, 1.5,
-        Math.max(9, Math.round(15 / s)), M.IRONWORK, 'x');
-      B.arch(side * inner, y, 0, inner * 2, 2.6, 1.5,
-        Math.max(9, Math.round(15 / s)), M.IRONWORK, 'z');
+      B.arch(0, y, side * inner, inner * 2, 4.2, RING, count, M.IRONWORK, 'x');
+      B.arch(side * inner, y, 0, inner * 2, 4.2, RING, count, M.IRONWORK, 'z');
+    }
+    // The spandrel: the web of ironwork between the arc's back and the
+    // underside of the first platform. Hangers rather than a plate, so you can
+    // still see through it, and each one stands on a voussoir — which is the
+    // only place in the arch that has anything under it to stand on.
+    const rc = inner + RING / 2;
+    const deckU = EIFFEL.firstFloor - 1.1;
+    for (const a of [0.42, 0.62, 0.82, Math.PI - 0.42, Math.PI - 0.62, Math.PI - 0.82]) {
+      const bx = Math.cos(a) * rc, by = y + Math.sin(a) * rc;
+      if (by > deckU - 2.5) continue;
+      for (const side of [1, -1]) {
+        column(() => bx, () => side * inner, by, deckU, () => MIN_BAR * 0.95);
+        column(() => side * inner, () => bx, by, deckU, () => MIN_BAR * 0.95);
+      }
     }
   });
 
@@ -394,37 +455,28 @@ export function buildEiffelTower(quality) {
   // than losing anything above.
   B.section('shaft', () => {
     const y0 = EIFFEL.secondFloor, y1 = EIFFEL.thirdFloor;
-    // Built as the legs are: a cage of continuous members.
+    // Built as the legs are, on the same envelope, so the shaft's foot is
+    // exactly the width the four leg heads make between them and the tower has
+    // no step in it at 116 m.
     //
-    // This was a closed ring for the same reason the legs were, and it cost the
-    // same thing. Above the second platform the real tower is a single braced
-    // box a hundred and sixty metres tall, and that is most of what you see of
-    // the building from anywhere on the map — solid, it turns the whole upper
-    // tower into a tapering chimney. Members that run the full height bear on
-    // themselves the whole way up, so the box is open and still stands.
-    //
-    // Fewer members than a leg has, and thinner, because the shaft barely
-    // batters: it loses nine metres of half-width over a hundred and sixty of
-    // height, so a course moves a member about five centimetres sideways and
-    // almost anything overlaps itself.
+    // Stout where it leaves the platform and slender at the top, because that
+    // is where the load is: the shaft's foot carries a hundred and sixty metres
+    // of tower and its head carries the lantern. Sized as a fraction of the
+    // spacing, like the legs — the shaft narrows threefold over its height, so
+    // a bar of fixed width would close the box up into a chimney over the top
+    // fifty metres, which is exactly what it used to do.
     const SN = 5;
-    const SBAR = Math.max(0.42, COURSE * 0.30);
-    cage((y) => ({ cx: 0, cz: 0, h: shaftHalf(y) }), y0, y1, SN,
-      taper(y0, y1, SBAR * 2.6, SBAR * 0.92), COURSE);
-    for (let y = y0 + COURSE * 5; y < y1 - COURSE; y += COURSE * 5) {
-      belt((yy) => ({ cx: 0, cz: 0, h: shaftHalf(yy) }), y, SBAR * 0.8);
-    }
-
-    // Bracing across each face, for the look of the thing.
-    const BAY = 10.0;
-    for (let y = y0 + BAY; y < y1 - BAY; y += BAY) {
-      const ha = shaftHalf(y) - 0.7, hb = shaftHalf(y + BAY) - 0.7;
-      const ring = [[1, 1], [1, -1], [-1, -1], [-1, 1]];
-      for (let i = 0; i < 4; i++) {
-        const c0 = ring[i], c1 = ring[(i + 1) % 4];
-        brace(c0[0] * ha, c0[1] * ha, y, c1[0] * hb, c1[1] * hb, y + BAY, 0.5);
-        brace(c1[0] * ha, c1[1] * ha, y, c0[0] * hb, c0[1] * hb, y + BAY, 0.5);
-      }
+    const shaftAt = (y) => ({ cx: 0, cz: 0, h: shaftHalf(y) });
+    const shaftFill = (y) => {
+      const u = Math.max(0, Math.min(1, (y - y0) / (y1 - y0)));
+      return 0.14 + 0.19 * Math.pow(1 - u, 2.0);
+    };
+    cage(shaftAt, y0, y1, SN, shaftFill, COURSE);
+    // Belts and crosses on the same panel boundaries as the legs below.
+    const BAY = COURSE * 8;
+    for (let y = y0 + BAY; y < y1 - COURSE; y += BAY) belt(shaftAt, y, MIN_BAR * 0.9);
+    for (let y = y0; y < y1 - BAY; y += BAY) {
+      cross(shaftAt, y, Math.min(y + BAY, y1), MIN_BAR * 0.8);
     }
   });
 

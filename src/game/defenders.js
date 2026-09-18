@@ -3,7 +3,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
 import { TOWER, WING } from '../structure/landmarks/bigben.js';
-import { EIFFEL } from '../structure/landmarks/eiffel.js';
+import { EIFFEL, legAt as eiffelLegAt } from '../structure/landmarks/eiffel.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
 
@@ -667,11 +667,13 @@ export class Garrison {
       }
     }
 
-    // In the ironwork of each leg, on the bracing.
+    // In the ironwork of each leg, on the bracing. On the outer face, which is
+    // the one that can see the guns: the middle of a pier is a hollow caisson
+    // and a man posted there is looking at the inside of his own leg.
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       for (const y of [18, 36]) {
-        const t = y / EIFFEL.secondFloor;
-        const r = 51 + (13.5 - 51) * t;
+        const g = eiffelLegAt(y);
+        const r = g.r + g.h * 0.72;
         const p = new THREE.Vector3(origin.x + sx * r, groundY + y + 0.8, origin.z + sz * r);
         this.place(y > 26 ? 'mg' : 'rifleman', p, Math.atan2(sx, sz), 7,
           { cover: 'arcade' });
@@ -681,9 +683,10 @@ export class Garrison {
     // First gallery: the widest deck and the best arcs over the city. The legs
     // pass through its corners, so the ring stops short of them.
     deckRing(EIFFEL.firstFloor, EIFFEL.firstDeckHalf, 20, 'mg', 'roof', 2.2, 0.68);
-    // Second gallery, where the legs have all but merged and the clear run of
-    // deck either side of them is shorter still.
-    deckRing(EIFFEL.secondFloor, EIFFEL.secondDeckHalf, 12, 'sniper', 'roof', 1.8, 0.42);
+    // Second gallery. The legs have finished merging by here — above 116 m
+    // there is one shaft and no corner girders in the way — so the ring runs
+    // most of the way along each side instead of huddling at the middle.
+    deckRing(EIFFEL.secondFloor, EIFFEL.secondDeckHalf, 12, 'sniper', 'roof', 1.8, 0.78);
     // AT teams on the galleries, at the middle of each side rather than at the
     // corners: a corner of this building is a girder, not a parapet.
     for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {

@@ -10,17 +10,32 @@
  * thirty pixels a card actually gives them they turn into a smudge, and five
  * smudges look alike too.
  *
- * So each unit gets a side-profile silhouette, built from the handful of
- * features that make that weapon recognisable at a glance and nothing else —
- * the Carl Gustaf's venturi cone, the Javelin's boxed sight, the M777's long
- * barrel and spread trails, HIMARS on wheels where the M270 is on tracks.
- * Vector, so they are crisp at any density and free to recolour; every muzzle
- * points left, so a row of them reads as one armoury rather than a shelf.
+ * So each unit is a side-profile silhouette built from the handful of features
+ * that make that weapon recognisable and nothing else — the Carl Gustaf's
+ * venturi cone, the Javelin's boxed sight under the tube, the M777's long
+ * barrel and four spread trails against the M119's stub and box trail, HIMARS
+ * on six wheels where the M270 is on tracks. Every muzzle points left, so a row
+ * of them reads as one armoury rather than a shelf.
+ *
+ * Two things were missing from the first set and they were the two that made it
+ * read as "ok but not really what they are".
+ *
+ *   1. Scale. A Javelin and an M777 both filled their box, so the build bar
+ *      said they were the same size of thing. Everything here now stands on a
+ *      ground line with a crewman beside it, drawn at the same metres-per-pixel
+ *      as the weapon he is serving. That one figure is what says a howitzer is
+ *      a machine three men tall and a Carl Gustaf is a tube on a shoulder, and
+ *      it does it without a word of text.
+ *   2. Room. At a 40x24 box a muzzle brake is two pixels and there is nowhere
+ *      to put a trail, a wheel and a breech without them touching. The box is
+ *      64x40 now — the same size on screen, four times the drawing room — and
+ *      the shapes have space to be different from each other.
  *
  * The palette carries information: infantry are steel, guns are the same olive
- * drab the models wear in the field, and the warhead on each shoulder-launched
- * round is tipped in its own colour — which is the real difference between
- * them.
+ * drab the models wear in the field, aircraft are a paler grey so the two air
+ * cards read as a different kind of thing altogether, and the warhead on each
+ * shoulder-launched round is tipped in its own colour — which is the real
+ * difference between them.
  */
 
 const C = {
@@ -28,180 +43,253 @@ const C = {
   steelDark: '#5d6c80',
   olive: '#8d9a63',
   oliveDark: '#4f5b36',
+  air: '#c3ccd8',
+  airDark: '#6b7686',
+  crew: '#7d8698',
+  ground: '#3a4149',
   optic: '#5fa8e0',
   heat: '#d9653f',
   thermo: '#c96fd0',
   tandem: '#e0a33c',
 };
 
-/** Road wheels and a track band, shared by the two tracked vehicles. */
-function tracks(y = 17.4) {
-  return `
-    <rect x="3.4" y="${y - 2.6}" width="26" height="5.2" rx="2.6" fill="${C.oliveDark}"/>
-    <g fill="${C.olive}">
-      <circle cx="7.4" cy="${y}" r="1.5"/><circle cx="12.4" cy="${y}" r="1.5"/>
-      <circle cx="17.4" cy="${y}" r="1.5"/><circle cx="22.4" cy="${y}" r="1.5"/>
-      <circle cx="27" cy="${y}" r="1.5"/>
-    </g>`;
+const GY = 35;          // the ground line every unit stands on
+
+/** The strip of dirt under the unit, so nothing floats. */
+const GROUND = `<rect x="0" y="${GY}" width="64" height="1.6" rx="0.8" fill="${C.ground}"/>`;
+
+/**
+ * A crewman, `h` pixels tall, standing at `x` and facing left with the gun.
+ *
+ * The one piece of scale information on the card. Drawn at whatever height the
+ * unit's own drawing scale makes 1.8 m, so on the infantry cards he is most of
+ * the picture and on the howitzer cards he comes up to the breech — which is
+ * exactly the comparison the player needs and cannot get from the model render.
+ */
+function crew(x, h, fill = C.crew) {
+  const u = h / 18;     // one unit = a tenth of a metre at this figure's scale
+  const y = GY;
+  return `<g fill="${fill}">
+    <circle cx="${(x).toFixed(2)}" cy="${(y - 16 * u).toFixed(2)}" r="${(2.1 * u).toFixed(2)}"/>
+    <path d="M${(x - 3.1 * u).toFixed(2)} ${(y - 13.9 * u).toFixed(2)}
+      h${(6.2 * u).toFixed(2)} l${(0.4 * u).toFixed(2)} ${(6.7 * u).toFixed(2)}
+      h${(-7 * u).toFixed(2)} Z"/>
+    <rect x="${(x - 2.2 * u).toFixed(2)}" y="${(y - 7.2 * u).toFixed(2)}"
+      width="${(1.8 * u).toFixed(2)}" height="${(7.2 * u).toFixed(2)}" rx="${(0.8 * u).toFixed(2)}"/>
+    <rect x="${(x + 0.5 * u).toFixed(2)}" y="${(y - 7.2 * u).toFixed(2)}"
+      width="${(1.8 * u).toFixed(2)}" height="${(7.2 * u).toFixed(2)}" rx="${(0.8 * u).toFixed(2)}"/>
+  </g>`;
 }
 
-/** A launcher pod: a box of rocket tubes, tilted the way it would be laid. */
+/** Road wheels and a track band, shared by the two tracked vehicles. */
+function tracks(x, w, y, r) {
+  const n = Math.max(4, Math.round(w / (r * 2.4)));
+  let wheels = '';
+  for (let i = 0; i < n; i++) {
+    const cx = x + r * 1.4 + (i / (n - 1)) * (w - r * 2.8);
+    wheels += `<circle cx="${cx.toFixed(2)}" cy="${y.toFixed(2)}" r="${(r * 0.62).toFixed(2)}"/>`;
+  }
+  return `<rect x="${x}" y="${(y - r).toFixed(2)}" width="${w}" height="${(r * 2).toFixed(2)}"
+      rx="${r.toFixed(2)}" fill="${C.oliveDark}"/>
+    <g fill="${C.olive}">${wheels}</g>`;
+}
+
+/** A launcher pod: a box of rocket tubes, seen end-on down the muzzles. */
 function pod(x, y, w, h, cols, rows) {
   let tubes = '';
   const cw = w / cols, ch = h / rows;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      tubes += `<rect x="${(x + c * cw + cw * 0.22).toFixed(2)}"
-        y="${(y + r * ch + ch * 0.22).toFixed(2)}"
-        width="${(cw * 0.56).toFixed(2)}" height="${(ch * 0.56).toFixed(2)}"
-        rx="${(Math.min(cw, ch) * 0.2).toFixed(2)}" fill="${C.oliveDark}"/>`;
+      tubes += `<rect x="${(x + c * cw + cw * 0.2).toFixed(2)}"
+        y="${(y + r * ch + ch * 0.2).toFixed(2)}"
+        width="${(cw * 0.6).toFixed(2)}" height="${(ch * 0.6).toFixed(2)}"
+        rx="${(Math.min(cw, ch) * 0.18).toFixed(2)}" fill="${C.oliveDark}"/>`;
     }
   }
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.2"
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.4"
     fill="${C.olive}"/>${tubes}`;
 }
 
 const BODY = {
-  // ── Infantry: shoulder-launched, muzzle left ──────────────────────────────
+  // ── Infantry ──────────────────────────────────────────────────────────────
+  //
+  // The man is the subject and the weapon is on him. Drawn floating beside him
+  // the first time round, which turned every infantry card into a picture of a
+  // soldier standing next to a missile; drawn across his chest the second, which
+  // turned it into a picture of a soldier run through with a pole. It sits on
+  // the shoulder line with his head clear above it, and he is drawn after it, so
+  // the tube passes behind him the way it actually does.
 
-  // Disposable single-shot tube. Nothing on it but a sight and a shoulder stop,
-  // which is exactly what makes it read as an AT4.
-  at4: `
-    <rect x="5.5" y="10" width="28" height="4.6" rx="2.3" fill="${C.steel}"/>
-    <path d="M5.5 8.2 L2.4 10.2 v4.2 l3.1 2 Z" fill="${C.steelDark}"/>
-    <path d="M33.5 9 l3.6 2.2 v2.2 l-3.6 2.2 Z" fill="${C.steelDark}"/>
-    <rect x="20.5" y="7.2" width="4.6" height="2.9" rx="0.8" fill="${C.steelDark}"/>
-    <path d="M14.5 14.6 l-1.8 4.6 h3.8 Z" fill="${C.steelDark}"/>
-    <circle cx="4.2" cy="12.3" r="1.5" fill="${C.heat}"/>`,
+  // Disposable single-shot tube, a metre of it, with nothing on it but a flip
+  // sight. The plainness is the identification.
+  at4: `${GROUND}
+    <rect x="10" y="15.4" width="33" height="3.4" rx="1.7" fill="${C.steel}"/>
+    <path d="M10 13.9 L6.2 15.8 v2.6 l3.8 1.9 Z" fill="${C.steelDark}"/>
+    <path d="M43 14.3 l3.6 2.2 v1.6 l-3.6 2.2 Z" fill="${C.steelDark}"/>
+    <rect x="24" y="12.8" width="4.2" height="2.6" rx="0.7" fill="${C.steelDark}"/>
+    <circle cx="7" cy="17.1" r="1.8" fill="${C.heat}"/>
+    ${crew(36, 26)}
+    <path d="M33.2 18.8 l-6.4 3.1 l1.1 2.2 l6.4 -3.1 Z" fill="${C.crew}"/>`,
 
-  // Recoilless rifle: the rear venturi cone is the whole silhouette, plus the
-  // optic and two grips that mark it as a reusable weapon rather than a tube.
-  gustaf: `
-    <rect x="7.5" y="10.1" width="25" height="4.4" rx="2.2" fill="${C.steel}"/>
-    <path d="M32.5 7.4 L37.6 10 v4.6 l-5.1 2.6 Z" fill="${C.steelDark}"/>
-    <rect x="3.4" y="9.2" width="4.6" height="6.2" rx="1.1" fill="${C.steelDark}"/>
-    <rect x="16.5" y="6.4" width="9.5" height="2.8" rx="0.9" fill="${C.steelDark}"/>
-    <rect x="18.6" y="7.1" width="2.4" height="1.4" rx="0.4" fill="${C.optic}"/>
-    <path d="M13.5 14.5 l-1.5 4.4 h3.2 Z" fill="${C.steelDark}"/>
-    <path d="M25.5 14.5 l1.6 4.4 h-3.4 Z" fill="${C.steelDark}"/>
-    <circle cx="5.7" cy="12.3" r="1.4" fill="${C.heat}"/>`,
+  // Recoilless rifle: the flared venturi behind the firer is the whole
+  // silhouette, and the optic and forward grip mark it as a weapon a crew keeps
+  // rather than one it throws away.
+  gustaf: `${GROUND}
+    <rect x="8" y="15.4" width="38" height="3.6" rx="1.8" fill="${C.steel}"/>
+    <path d="M46 12.4 L53.6 15.8 v2.8 l-7.6 3.4 Z" fill="${C.steelDark}"/>
+    <rect x="3.6" y="14" width="4.8" height="6.4" rx="1.1" fill="${C.steelDark}"/>
+    <rect x="21" y="11.4" width="10.4" height="3.2" rx="0.9" fill="${C.steelDark}"/>
+    <rect x="23.6" y="12.2" width="2.8" height="1.6" rx="0.4" fill="${C.optic}"/>
+    <path d="M17 19 l-1.8 4 h3.6 Z" fill="${C.steelDark}"/>
+    <circle cx="6" cy="17.2" r="1.8" fill="${C.heat}"/>
+    ${crew(37, 26)}
+    <path d="M34.2 18.8 l-6.6 3.2 l1.1 2.2 l6.6 -3.2 Z" fill="${C.crew}"/>`,
 
-  // Thermobaric: the round is bigger than the launcher, and it hangs out the
-  // front. That overhanging warhead is the recognisable part.
-  rpg32: `
-    <rect x="11" y="10.2" width="22" height="4.6" rx="2.3" fill="${C.steel}"/>
-    <path d="M11.5 8 c-3.6 0-7 1.9-8.8 4.5 c1.8 2.6 5.2 4.5 8.8 4.5 Z"
+  // Thermobaric: the round is fatter than the launcher and hangs out the front
+  // of it. That bulb is the only thing anyone remembers about an RPG-32.
+  rpg32: `${GROUND}
+    <rect x="13" y="15.6" width="31" height="3.4" rx="1.7" fill="${C.steel}"/>
+    <path d="M13.6 11.6 c-5.6 0-10.8 2.9-13.4 5.7 c2.6 2.8 7.8 5.7 13.4 5.7 Z"
       fill="${C.thermo}"/>
-    <rect x="9.8" y="8.6" width="2" height="7.4" rx="0.6" fill="${C.steelDark}"/>
-    <rect x="18.5" y="6.6" width="8" height="2.8" rx="0.9" fill="${C.steelDark}"/>
-    <rect x="20.4" y="7.3" width="2.2" height="1.4" rx="0.4" fill="${C.optic}"/>
-    <path d="M21 14.8 l1.6 4.4 h-3.6 Z" fill="${C.steelDark}"/>
-    <path d="M30.5 14.8 l1.4 3.6 h-3 Z" fill="${C.steelDark}"/>`,
+    <rect x="11.4" y="12.2" width="2.6" height="10.6" rx="0.7" fill="${C.steelDark}"/>
+    <rect x="22" y="11.6" width="9.6" height="3.2" rx="0.9" fill="${C.steelDark}"/>
+    <rect x="24.2" y="12.4" width="2.8" height="1.6" rx="0.4" fill="${C.optic}"/>
+    <path d="M44 14.1 l3.4 2.1 v1.4 l-3.4 2.1 Z" fill="${C.steelDark}"/>
+    ${crew(37, 26)}
+    <path d="M34.2 19 l-6.6 3.2 l1.1 2.2 l6.6 -3.2 Z" fill="${C.crew}"/>`,
 
-  // Command launch unit under the tube, with the thermal sight facing forward.
-  // The boxy CLU is what nobody mistakes for anything else.
-  javelin: `
-    <rect x="6" y="5.8" width="28" height="5.2" rx="2.6" fill="${C.steel}"/>
-    <path d="M6 5.8 L2.6 7.6 v3.6 L6 11 Z" fill="${C.steelDark}"/>
-    <rect x="11.5" y="11.4" width="14" height="6.6" rx="1.5" fill="${C.steelDark}"/>
-    <rect x="13.2" y="13" width="5.4" height="3.6" rx="0.7" fill="${C.optic}"/>
-    <rect x="20.5" y="13" width="3.4" height="1.3" rx="0.4" fill="${C.steel}"/>
-    <path d="M24 18 l1.8 3.6 h-3.8 Z" fill="${C.steelDark}"/>
-    <circle cx="31" cy="8.4" r="1.5" fill="${C.tandem}"/>`,
+  // Command launch unit slung under the tube, thermal sight forward, and a
+  // soft-launch tube much fatter than a rocket needs to be. The boxy CLU is
+  // what nobody mistakes for anything else.
+  javelin: `${GROUND}
+    <rect x="11" y="14.2" width="31" height="5" rx="2.5" fill="${C.steel}"/>
+    <path d="M11 14.2 L7 16 v3.4 L11 19.2 Z" fill="${C.steelDark}"/>
+    <rect x="16.4" y="19.4" width="13.6" height="6" rx="1.4" fill="${C.steelDark}"/>
+    <rect x="18" y="20.8" width="5.6" height="3.2" rx="0.6" fill="${C.optic}"/>
+    <rect x="25" y="21" width="3.4" height="1.3" rx="0.4" fill="${C.steel}"/>
+    <circle cx="39.4" cy="16.7" r="1.9" fill="${C.tandem}"/>
+    ${crew(38, 26)}
+    <path d="M35.2 19.2 l-5.8 2.8 l1.1 2.2 l5.8 -2.8 Z" fill="${C.crew}"/>`,
 
-  // ── Towed guns: barrel left, split trails right ───────────────────────────
+  // ── Towed guns ────────────────────────────────────────────────────────────
+  //
+  // About five pixels to the metre from here on, so the crewman at the breech
+  // is a third the height of a road wheel and the card reads as a machine
+  // rather than as a tool.
 
-  // Light and short-barrelled, on a compact two-wheel carriage.
-  m119: `
-    <rect x="3.2" y="8.6" width="20" height="2.8" rx="1.4" fill="${C.olive}"/>
-    <rect x="1.4" y="7.8" width="3" height="4.4" rx="0.9" fill="${C.oliveDark}"/>
-    <path d="M20.5 6.6 h6.2 l1.4 7.4 h-8.4 Z" fill="${C.olive}"/>
-    <path d="M26.5 13.4 L37.5 16.6" stroke="${C.olive}" stroke-width="2.3"
-      stroke-linecap="round"/>
-    <path d="M26.5 14.2 L36.4 20.6" stroke="${C.oliveDark}" stroke-width="2.3"
-      stroke-linecap="round"/>
-    <circle cx="23.8" cy="16" r="3.8" fill="${C.oliveDark}"/>
-    <circle cx="23.8" cy="16" r="1.5" fill="${C.olive}"/>`,
+  // 105 mm: a short barrel over a box trail on two small wheels, five metres of
+  // gun altogether. Next to the M777 it is a toy, which is what the card is for.
+  m119: `${GROUND}
+    ${crew(38, 9)}
+    <rect x="6" y="19.6" width="21" height="2.6" rx="1.3" fill="${C.olive}"/>
+    <rect x="4" y="18.8" width="3.2" height="4.2" rx="0.8" fill="${C.oliveDark}"/>
+    <path d="M25 17.8 h5 l2 7.2 h-8 Z" fill="${C.olive}"/>
+    <path d="M30 25 L44 28.6" stroke="${C.olive}" stroke-width="2.3" stroke-linecap="round"/>
+    <path d="M30 25.6 L42 32.4" stroke="${C.oliveDark}" stroke-width="2.3" stroke-linecap="round"/>
+    <circle cx="27.6" cy="28.6" r="6.2" fill="${C.oliveDark}"/>
+    <circle cx="27.6" cy="28.6" r="2.4" fill="${C.olive}"/>`,
 
-  // Longer barrel with a muzzle brake, taller shield, trails spread wider —
-  // the same gun as the M119, one size up, which is the point.
-  m777: `
-    <rect x="2.2" y="7.4" width="24" height="2.6" rx="1.3" fill="${C.olive}"/>
-    <rect x="0.6" y="6.4" width="3.4" height="4.6" rx="0.9" fill="${C.oliveDark}"/>
-    <rect x="5.6" y="6.9" width="1.6" height="3.6" rx="0.5" fill="${C.oliveDark}"/>
-    <path d="M23.5 5.6 h6.6 l1.6 8.2 h-9 Z" fill="${C.olive}"/>
-    <path d="M30 13 L39.4 13.8" stroke="${C.olive}" stroke-width="2.4"
-      stroke-linecap="round"/>
-    <path d="M30 13.8 L38.4 21" stroke="${C.oliveDark}" stroke-width="2.4"
-      stroke-linecap="round"/>
-    <circle cx="26.6" cy="15.6" r="3.5" fill="${C.oliveDark}"/>
-    <circle cx="26.6" cy="15.6" r="1.4" fill="${C.olive}"/>`,
+  // 155 mm: ten metres of gun. A long thin barrel with a double-baffle muzzle
+  // brake, a skeletal titanium cradle carrying no shield at all, and four
+  // trails spread right across the card.
+  m777: `${GROUND}
+    <path d="M34 23.6 L52 31.4" stroke="${C.oliveDark}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M34 23.6 L49.6 33.4" stroke="${C.oliveDark}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M34 23.6 L53.4 26.6" stroke="${C.olive}" stroke-width="2" stroke-linecap="round"/>
+    <path d="M34 23.6 L51.6 21" stroke="${C.olive}" stroke-width="2" stroke-linecap="round"/>
+    ${crew(42, 9)}
+    <rect x="3" y="13.8" width="31" height="2.8" rx="1.4" fill="${C.olive}"/>
+    <rect x="1.4" y="12.6" width="4" height="5.2" rx="0.9" fill="${C.oliveDark}"/>
+    <rect x="7.6" y="13.2" width="1.8" height="4" rx="0.5" fill="${C.oliveDark}"/>
+    <path d="M29 13 h6 l2.6 11 h-9.6 Z" fill="${C.oliveDark}"/>
+    <circle cx="33.4" cy="28.4" r="6.4" fill="${C.oliveDark}"/>
+    <circle cx="33.4" cy="28.4" r="2.4" fill="${C.olive}"/>`,
 
   // ── Self-propelled and rocket artillery ───────────────────────────────────
 
-  // Armoured turret over tracks, barrel out the front.
-  m109: `
-    ${tracks(17.2)}
-    <path d="M4.6 11.6 h25.4 l-0.8 3.6 h-24 Z" fill="${C.oliveDark}"/>
-    <path d="M11 6.4 h15.4 l1.6 5.2 h-18.6 Z" fill="${C.olive}"/>
-    <rect x="0.8" y="6.2" width="12" height="2.4" rx="1.2" fill="${C.oliveDark}"/>
-    <rect x="0.4" y="5.6" width="2.4" height="3.6" rx="0.7" fill="${C.olive}"/>
-    <rect x="18.5" y="4.2" width="3.4" height="2.4" rx="0.7" fill="${C.oliveDark}"/>`,
+  // Armoured turret over tracks, six metres of barrel out over the front deck,
+  // and a fume extractor two thirds of the way along that nothing else in the
+  // battery has.
+  m109: `${GROUND}
+    ${crew(50, 9)}
+    ${tracks(6, 40, 30.2, 4.4)}
+    <path d="M7 21.2 h38 l-1.2 4.8 h-36 Z" fill="${C.oliveDark}"/>
+    <path d="M17 12.4 h21 l2.6 8.8 h-26 Z" fill="${C.olive}"/>
+    <rect x="1.6" y="11.6" width="21" height="2.8" rx="1.4" fill="${C.oliveDark}"/>
+    <rect x="10.4" y="10.8" width="3.2" height="4.4" rx="0.7" fill="${C.olive}"/>
+    <rect x="0.8" y="10.8" width="2.8" height="4.4" rx="0.8" fill="${C.olive}"/>
+    <rect x="28" y="8.8" width="4.4" height="3.6" rx="0.8" fill="${C.oliveDark}"/>`,
 
-  // Twelve tubes in a boxed pod, laid back on a tracked chassis.
-  m270: `
-    ${tracks(17.2)}
-    <path d="M4.6 11.6 h25.4 l-0.8 3.6 h-24 Z" fill="${C.oliveDark}"/>
-    <g transform="rotate(-15 20 8)">${pod(11.5, 3.4, 17, 8, 3, 2)}</g>
-    <path d="M3.6 8.6 h5.4 l1.6 3 v2.4 h-7 Z" fill="${C.olive}"/>`,
+  // Twelve tubes in one boxed pod, elevated over the back of a tracked
+  // chassis. Tracks and a full pod: that pair is the whole difference from
+  // HIMARS, and it is the only thing anybody has to read.
+  m270: `${GROUND}
+    ${crew(52, 9)}
+    ${tracks(3, 42, 30.2, 4.4)}
+    <path d="M4 20.6 h41 l-1.2 4.8 h-39 Z" fill="${C.oliveDark}"/>
+    <path d="M4.2 14.4 h9 l2.4 4.6 v3 h-11.4 Z" fill="${C.olive}"/>
+    <rect x="5.4" y="15.4" width="5.6" height="3" rx="0.6" fill="${C.optic}"/>
+    <rect x="17" y="16.4" width="9" height="5" rx="1" fill="${C.oliveDark}"/>
+    <g transform="rotate(-15 22 18)">${pod(19, 8.6, 25, 11, 3, 2)}</g>`,
 
-  // The same pod on a six-wheel truck: half the tubes, twice the reach, and
-  // wheels rather than tracks is the only thing you need to tell them apart.
-  m142: `
-    <rect x="2.8" y="14.2" width="30" height="2.6" rx="1" fill="${C.oliveDark}"/>
-    <g transform="rotate(-15 21 8)">${pod(14, 3.6, 14, 7.6, 2, 2)}</g>
-    <path d="M2.8 8.2 h5.6 l1.8 3.2 v3 h-7.4 Z" fill="${C.olive}"/>
-    <rect x="3.6" y="9" width="3.8" height="2.3" rx="0.5" fill="${C.optic}"/>
+  // The same rockets on a five-tonne truck: half the tubes, twice the road
+  // speed, and wheels rather than tracks is all you need to tell them apart.
+  m142: `${GROUND}
+    ${crew(52, 9)}
+    <rect x="5" y="24.4" width="43" height="3.6" rx="1.2" fill="${C.oliveDark}"/>
+    <path d="M4.6 13.6 h9 l2.8 5 v6 h-11.8 Z" fill="${C.olive}"/>
+    <rect x="5.8" y="14.8" width="6" height="3.6" rx="0.6" fill="${C.optic}"/>
+    <rect x="20" y="19.6" width="8" height="5" rx="1" fill="${C.oliveDark}"/>
+    <g transform="rotate(-15 25 21)">${pod(22, 11.6, 20, 10, 2, 2)}</g>
     <g fill="${C.oliveDark}">
-      <circle cx="7.4" cy="18" r="2.9"/><circle cx="24.4" cy="18" r="2.9"/>
-      <circle cx="30.6" cy="18" r="2.9"/>
+      <circle cx="11.6" cy="30" r="4.8"/><circle cx="36" cy="30" r="4.8"/>
+      <circle cx="44.6" cy="30" r="4.8"/>
     </g>
     <g fill="${C.olive}">
-      <circle cx="7.4" cy="18" r="1.1"/><circle cx="24.4" cy="18" r="1.1"/>
-      <circle cx="30.6" cy="18" r="1.1"/>
+      <circle cx="11.6" cy="30" r="1.9"/><circle cx="36" cy="30" r="1.9"/>
+      <circle cx="44.6" cy="30" r="1.9"/>
     </g>`,
 
-  // ── Air. Nose left like every muzzle; seen from the side. ────────────────
+  // ── Air ───────────────────────────────────────────────────────────────────
+  //
+  // No ground line and no crewman: these two are the only cards that are not a
+  // thing standing in a field, and taking the ground away is what says so at a
+  // glance. Nose left, like every muzzle.
 
-  // Strike Eagle: the long nose, the flat body, twin tails and a bomb slung
-  // underneath — the bomb is the point of the card.
+  // Strike Eagle: long nose, a small bubble canopy well forward, twin canted
+  // tails and a pair of 2,000 lb bombs on the centreline. The bombs are the
+  // point of the card.
   f15: `
-    <path d="M2.5 12.2 L10 10.6 h20 l6 -1.2 v3.2 l-6 -0.6 h-20 Z" fill="${C.steel}"/>
-    <path d="M12 10.6 l4 -3.2 h2.4 l-1.6 3.2 Z" fill="${C.optic}"/>
-    <path d="M28 10.6 l3.2 -5.4 h2.2 l-1.4 5.4 Z" fill="${C.steelDark}"/>
-    <path d="M25 10.6 l2.6 -4.2 h1.6 l-1 4.2 Z" fill="${C.steelDark}"/>
-    <path d="M16 12.4 h13 l1.6 2.2 h-16 Z" fill="${C.steelDark}"/>
-    <rect x="14" y="15" width="9" height="2.2" rx="1.1" fill="${C.oliveDark}"/>
-    <path d="M14 16.1 l-2.4 -1 v2 Z" fill="${C.oliveDark}"/>
-    <path d="M36 11.4 l3.6 0.8 l-3.6 0.8 Z" fill="${C.heat}"/>`,
+    <path d="M3 19 L14 16.4 h30 l9 -2 v4.6 l-9 -1 h-30 Z" fill="${C.air}"/>
+    <path d="M14.6 16.2 l4.4 -2.6 h3 l-1.6 2.6 Z" fill="${C.optic}"/>
+    <path d="M41 16.4 l4.6 -8 h3 l-2 8 Z" fill="${C.airDark}"/>
+    <path d="M36.6 16.4 l3.8 -6.4 h2.4 l-1.6 6.4 Z" fill="${C.airDark}"/>
+    <path d="M23 19.4 h20 l2.6 3.4 h-24.6 Z" fill="${C.airDark}"/>
+    <rect x="20" y="23.4" width="13" height="3" rx="1.5" fill="${C.oliveDark}"/>
+    <path d="M20 24.9 l-3.4 -1.4 v2.8 Z" fill="${C.oliveDark}"/>
+    <rect x="34" y="23.4" width="11" height="3" rx="1.5" fill="${C.oliveDark}"/>
+    <path d="M34 24.9 l-3.2 -1.3 v2.6 Z" fill="${C.oliveDark}"/>
+    <path d="M53 17.6 l5.4 1.2 l-5.4 1.2 Z" fill="${C.heat}"/>`,
 
-  // Lancer: a long dark spindle, wings swept flat back, one tall fin, and
-  // the big bomb under it drawn as big as it is.
+  // Lancer: a long blended spindle with the wings swept flat back against it,
+  // one tall fin, and a bomb bay the size of a bus. Drawn dark, because the one
+  // people picture is black and flying low.
   b1: `
-    <path d="M1.5 10.5 L8 9.4 h24 l4.5 -2.6 h1.6 l-2.6 3.2 l0.6 1.6 h-28.1 Z" fill="${C.steelDark}"/>
-    <path d="M13 10.6 h14 l6 1.6 h-20 Z" fill="${C.steel}"/>
-    <path d="M30 9.4 l2 -5.6 h2 l-0.8 5.6 Z" fill="${C.steelDark}"/>
-    <rect x="9" y="13.4" width="14" height="4.4" rx="2.2" fill="${C.oliveDark}"/>
-    <path d="M9 15.6 l-3 -1.4 v2.8 Z" fill="${C.oliveDark}"/>
-    <rect x="21" y="14.4" width="3" height="2.4" rx="0.6" fill="${C.tandem}"/>
-    <path d="M36.6 9.6 l2.8 0.8 l-2.8 0.8 Z" fill="${C.heat}"/>`,
+    <path d="M2 17.4 L12 15.6 h36 l7 -4.2 h2.6 l-4.2 5.2 l1 2.6 h-42 Z"
+      fill="${C.airDark}"/>
+    <path d="M20 17.6 h21 l9 2.6 h-30 Z" fill="${C.air}"/>
+    <path d="M45 15.6 l3.2 -8.8 h3 l-1.2 8.8 Z" fill="${C.airDark}"/>
+    <rect x="14" y="21.8" width="22" height="5" rx="2.5" fill="${C.oliveDark}"/>
+    <path d="M14 24.3 l-4.6 -2 v4 Z" fill="${C.oliveDark}"/>
+    <rect x="33" y="23" width="4.6" height="3.4" rx="0.8" fill="${C.tandem}"/>
+    <path d="M55 15.8 l4.4 1.2 l-4.4 1.2 Z" fill="${C.heat}"/>`,
 };
 
 /** Inline SVG markup for a unit id, or null if it has no icon. */
 export function unitIcon(id) {
   const body = BODY[id];
   if (!body) return null;
-  return `<svg class="uc-svg" viewBox="0 0 40 24" width="40" height="24"
+  return `<svg class="uc-svg" viewBox="0 0 64 40" width="64" height="40"
     aria-hidden="true" focusable="false">${body}</svg>`;
 }
 

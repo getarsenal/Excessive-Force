@@ -75,7 +75,18 @@ export const MATERIAL_PROPS = {
   // "Eiffel Tower Brown" is a dark red-bronze, three shades of it up the
   // tower. At 0x9d8468 under the per-stone jitter and the tonemap it came out
   // as pale tan and the whole building read as sandstone.
-  [MATERIALS.IRONWORK]:  { density: 7.20, strength: 2.60, toughness: 210, color: 0x7b5f45, structural: true },
+  //
+  // Rated as iron rather than as masonry, which it had never been. Capacity
+  // here is `area x strength x 14 MPa`, and 14 MPa is the working compressive
+  // strength of coursed limestone — governed by the mortar joints, not the
+  // stone. A riveted wrought-iron section has no mortar in it: the material
+  // runs to 200-350 MPa and a working figure near 200 is conservative. At 2.60
+  // this was rated at 36 MPa, a tenth of the real thing, and that one number
+  // decided the shape of the whole tower — members thin enough to see through
+  // could not carry what stands on them, so the only lattice that would stand
+  // was one solid enough to read as a chimney. At 14.0 it is 196 MPa and the
+  // web can be the third-solid thing it is in Paris.
+  [MATERIALS.IRONWORK]:  { density: 7.20, strength: 14.0, toughness: 260, color: 0x7b5f45, structural: true },
   // A crate of explosive walled into the masonry. Structural, because it is
   // packed in and the stone above rests on it, and soft, because the reward
   // for quarrying down to one should be that the next round sets it off.
@@ -87,7 +98,7 @@ export const MATERIAL_PROPS = {
   // was: the solver's grout joined the shaft's corner posts to the railing
   // two metres beside them, split the posts' hundred meganewtons across
   // both, and the railing went first.
-  [MATERIALS.RAILING]:   { density: 7.20, strength: 2.60, toughness: 210, color: 0x7b5f45, structural: false },
+  [MATERIALS.RAILING]:   { density: 7.20, strength: 14.0, toughness: 260, color: 0x7b5f45, structural: false },
 };
 
 
