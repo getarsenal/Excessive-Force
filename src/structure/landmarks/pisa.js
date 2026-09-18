@@ -72,7 +72,11 @@ export const PISA = {
   loggias: 6,
   loggiaH: 5.75 * S,
   bays: 30,
-  gallery: 1.05 * S,         // how far the columns stand outboard of the wall
+  // How far the columns stand outboard of the wall behind them. This is the
+  // depth of the shadow in every photograph of this tower: set too shallow,
+  // the loggias stop reading as galleries and the whole shaft comes out as one
+  // fluted tube with stripes on it.
+  gallery: 1.70 * S,
   bellY: (10.6 + 6 * 5.75) * S,
   bellR: 6.00 * S,
   bellH: 10.7 * S,
@@ -174,13 +178,23 @@ function loggia(B, cx, cz, y0, r, bays, colH, stone, courseH, mat, phase) {
   return springY + span / 2 + thick;
 }
 
-/** One cornice ring: what a loggia stands on and what it carries. */
+/**
+ * One cornice ring: what a loggia stands on and what it carries.
+ *
+ * Three courses, each standing a little further out than the one below. Eight
+ * storeys of thirty columns each read as vertical fluting from any distance,
+ * and the only thing that says "eight storeys" rather than "one fluted column"
+ * is a hard horizontal line every five and three quarter metres — so these are
+ * worth the stone.
+ */
 function cornice(B, cx, cz, y, r, wall, courseH, stone, mat) {
   const sides = Math.max(16, Math.round((TAU * r) / stone));
   B.polyRing(cx, cz, BlockList.circle(r, sides), wall, y, courseH, stone, mat);
-  B.polyRing(cx, cz, BlockList.circle(r + courseH * 0.35, sides, Math.PI / sides),
-    wall * 0.8, y + courseH, courseH * 0.7, stone, mat);
-  return y + courseH * 1.7;
+  B.polyRing(cx, cz, BlockList.circle(r + courseH * 0.30, sides, Math.PI / sides),
+    wall * 0.9, y + courseH, courseH * 0.62, stone, mat);
+  B.polyRing(cx, cz, BlockList.circle(r + courseH * 0.62, sides),
+    wall * 0.7, y + courseH * 1.62, courseH * 0.55, stone, mat);
+  return y + courseH * 2.2;
 }
 
 export function buildCampanile(quality) {
@@ -285,12 +299,12 @@ export function buildCampanile(quality) {
     for (let k = 0; k < P.loggias; k++) {
       const y0 = P.stage1 + k * P.loggiaH;
       const cz = axisAt(y0);
-      cornice(B, 0, cz, y0 - courseH * 1.7, P.outerR - P.gallery * 0.5,
+      cornice(B, 0, cz, y0 - courseH * 2.2, P.outerR - P.gallery * 0.5,
         P.gallery * 1.9, courseH, stone, M.MARBLE);
       loggia(B, 0, cz, y0, colR, P.bays, P.loggiaH * 0.62,
         stone, courseH, M.MARBLE, k * 0.05);
     }
-    cornice(B, 0, axisAt(P.bellY), P.bellY - courseH * 1.7,
+    cornice(B, 0, axisAt(P.bellY), P.bellY - courseH * 2.2,
       P.outerR - P.gallery * 0.5, P.gallery * 2.1, courseH, stone, M.MARBLE);
   });
 
@@ -396,7 +410,9 @@ function archedWall(B, cx, y0, cz, len, height, thick, axis, bays, openFrac,
     const h = stone;
     while (y < y0 + height - 0.001) {
       const ch = Math.min(h, y0 + height - y);
-      const striped = y < bandTo && c % 2;
+      // Every third course, not every other. White marble banded with verde is
+      // a wall; white and verde in equal measure is a deck chair.
+      const striped = y < bandTo && c % 3 === 1;
       B.slab(cx, y + ch / 2, cz, axis === 'x' ? len : thick, ch,
         axis === 'x' ? thick : len, stone, striped ? M.VERDE : M.MARBLE);
       y += ch; c++;
@@ -498,15 +514,33 @@ export function buildDuomo(quality) {
     for (const sz of [1, -1]) {
       archedWall(B, 0, 0, sz * D.halfZ, D.len, D.aisleH, 2.2 * S, 'x',
         18, 0.34, D.aisleH * 0.52, stone, M.MARBLE, true);
+      // The blind arcade along the flank: engaged columns on a plinth with a
+      // string course over them. It is the one thing that says "Romanesque"
+      // from a hundred metres, and without it a hundred and sixty metres of
+      // banded wall is an office block with stripes on it.
+      const face = sz * (D.halfZ + 1.1 * S);
+      for (let i = 0; i <= 26; i++) {
+        const x = -halfX + (i / 26) * D.len;
+        B.slab(x, D.aisleH * 0.30, face, 1.3 * S, D.aisleH * 0.56,
+          1.0 * S, stone, M.MARBLE);
+        B.slab(x, D.aisleH * 0.60, face, 1.9 * S, courseH * 0.7,
+          1.2 * S, stone, M.MARBLE);
+      }
+      B.slab(0, D.aisleH * 0.63, face, D.len, courseH * 0.8, 1.0 * S,
+        stone, M.VERDE);
+      B.slab(0, D.aisleH * 0.13, face, D.len, courseH * 0.9, 1.2 * S,
+        stone, M.MARBLE);
     }
     // The aisle roofs: a flat walk over the outer aisle, which is where the
     // garrison stands, and a tiled lean-to falling to it off the nave wall.
     for (const sz of [1, -1]) {
       const w = D.halfZ - D.naveHalfZ;
-      B.slab(0, D.aisleH + courseH / 2, sz * (D.naveHalfZ + w * 0.35),
-        D.len, courseH, w * 0.7, stone, M.SANDSTONE);
-      B.slab(0, D.aisleH + courseH / 2, sz * (D.halfZ - w * 0.15),
-        D.len, courseH, w * 0.3, stone, M.MARBLE);
+      // A tiled lean-to falling away from the nave wall, and a marble walk at
+      // the outer edge, which is the parapet the garrison stands behind.
+      penthouse(B, 0, D.aisleH, sz * D.naveHalfZ, D.len, w * 0.72,
+        w * 0.30, 'x', sz, stone, courseH, M.SANDSTONE);
+      B.slab(0, D.aisleH + courseH / 2, sz * (D.halfZ - w * 0.14),
+        D.len, courseH, w * 0.28, stone, M.MARBLE);
     }
   });
 
@@ -602,13 +636,27 @@ export function buildDuomo(quality) {
       const h = Math.min(courseH, y0 + drumH - y);
       const n = Math.max(16, Math.round((Math.PI * 2 * D.domeR) / stone));
       B.polyRing(D.crossX, 0, BlockList.circle(D.domeR, n, (c % 2) * 0.1),
-        1.8 * S, y, h, stone, c % 2 ? M.VERDE : M.MARBLE, c % 2);
+        1.8 * S, y, h, stone, c % 3 === 1 ? M.VERDE : M.MARBLE, c % 2);
       y += h; c++;
     }
-    // Elliptical in plan on the real thing; near enough a hemisphere here,
-    // squashed, which is what an elliptical dome looks like from the plaza.
-    B.dome(D.crossX, 0, y0 + drumH, D.domeR * 1.15, D.domeR, 1.5 * S,
-      courseH, stone, M.MARBLE, (t) => Math.cos(t * Math.PI / 2) ** 0.72);
+    // Pointed, and with a lantern on it. Pisa's is an elliptical dome and
+    // reads as a cone with a rounded shoulder from the plaza, not as the
+    // hemisphere a cosine profile gives — which came out as a white ball
+    // resting on the roof.
+    const dh = D.domeR * 1.55;
+    B.dome(D.crossX, 0, y0 + drumH, dh, D.domeR, 1.4 * S, courseH * 0.7, stone,
+      M.MARBLE, (t) => Math.pow(Math.max(0, 1 - Math.pow(t, 1.45)), 0.62));
+    const ly = y0 + drumH + dh;
+    let y2 = ly;
+    while (y2 < ly + 4.0 * S - 0.001) {
+      const h = Math.min(courseH, ly + 4.0 * S - y2);
+      const n2 = Math.max(10, Math.round((TAU * D.domeR * 0.22) / stone));
+      B.polyRing(D.crossX, 0, BlockList.circle(D.domeR * 0.22, n2), 0.8 * S,
+        y2, h, stone, M.MARBLE);
+      y2 += h;
+    }
+    B.slab(D.crossX, ly + 4.6 * S, 0, D.domeR * 0.7, courseH * 0.8,
+      D.domeR * 0.7, stone, M.MARBLE);
   });
 
   return B;

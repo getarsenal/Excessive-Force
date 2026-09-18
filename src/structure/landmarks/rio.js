@@ -60,29 +60,49 @@ export const REDEEMER = {
   figure: 30.0 * S,           // feet to the crown of the head
   armSpan: 14.0 * S,          // out to the fingertips, each side
   armY: 21.0 * S,             // shoulder height above the feet
+  armDrop: 1.1 * S,           // how far the fingertips fall below the shoulder
   headH: 3.75 * S,
 };
 
 /**
- * The figure's section at height `y` above its own feet.
+ * The figure's section at height `t` of its own height.
  *
- * `w` runs along the arms, `d` front to back. Written as a list of stations
- * and interpolated, because a robed standing figure is a handful of
- * measurements — hem, waist, chest, shoulder, neck, head — and everything
- * between them is a straight line at the scale a stone is cut to.
+ * `w` runs along the arms, `d` front to back, both half-extents in metres of
+ * the real statue. A robed standing figure is a handful of measurements — hem,
+ * waist, chest, shoulder, neck, jaw, crown — and everything between them is a
+ * straight line at the scale a stone is cut to.
+ *
+ * Written from the real thing's own proportions rather than eyeballed: the
+ * head is 3.75 m of 30, so it starts at 0.875 and not a stone lower; the
+ * shoulders are the widest part of the body and the arms leave from them at
+ * 0.70; the robe is at its widest at the hem and narrows to the waist. The
+ * first version of this had six stations and came out as a tapered chimney
+ * with a box on top and two planks nailed across it, which is exactly what a
+ * figure with no shoulder, no neck and no jaw looks like.
  */
 const STATIONS = [
-  [0.00, 4.5, 2.6],
-  [0.06, 4.6, 2.7],
-  [0.42, 3.4, 2.1],
-  [0.62, 3.9, 2.2],
-  [0.72, 4.8, 2.3],
-  [0.74, 4.9, 2.3],
-  [0.80, 1.5, 1.4],
-  [0.86, 1.3, 1.3],
-  [0.90, 1.9, 1.9],
-  [0.95, 2.0, 2.0],
-  [1.00, 0.7, 0.7],
+  [0.000, 4.70, 2.80],   // the hem
+  [0.035, 4.52, 2.72],
+  [0.140, 4.00, 2.50],
+  [0.300, 3.50, 2.20],
+  [0.460, 3.20, 2.00],   // the waist
+  [0.560, 3.30, 2.05],
+  [0.640, 3.70, 2.20],
+  [0.700, 4.15, 2.35],   // the shoulders, and where the arms leave
+  [0.730, 4.05, 2.30],
+  [0.780, 2.60, 2.00],   // sloping in
+  [0.820, 1.55, 1.55],
+  [0.855, 1.15, 1.20],   // the neck
+  // The head is 3.75 m tall and about 3.5 m across on the real thing, so its
+  // half-width is 1.75 and not 2.1 — at 2.1 it comes out wider than it is
+  // tall, which is why the first one read as a box on a neck. Deeper than it
+  // is wide, because that is where the hair and the beard are.
+  [0.875, 1.30, 1.45],   // the jaw
+  [0.900, 1.66, 1.80],
+  [0.935, 1.76, 1.88],   // the head at its widest
+  [0.965, 1.60, 1.70],
+  [0.990, 1.02, 1.08],
+  [1.000, 0.40, 0.42],   // the crown
 ];
 
 function sectionAt(t) {
@@ -93,7 +113,30 @@ function sectionAt(t) {
     const f = (u - a[0]) / Math.max(1e-6, b[0] - a[0]);
     return { w: (a[1] + (b[1] - a[1]) * f) * S, d: (a[2] + (b[2] - a[2]) * f) * S };
   }
-  return { w: STATIONS[STATIONS.length - 1][1] * S, d: STATIONS[STATIONS.length - 1][2] * S };
+  const last = STATIONS[STATIONS.length - 1];
+  return { w: last[1] * S, d: last[2] * S };
+}
+
+/**
+ * The arm's section at `f` of the way out from the shoulder.
+ *
+ * Thick at the sleeve, thin at the wrist, and then the hand — three and a
+ * quarter metres of it, held flat and open, which is wider than the wrist it
+ * is on the end of and is most of what makes this silhouette readable from a
+ * kilometre away.
+ */
+function armAt(f) {
+  const hand = f > 0.80;
+  const g = Math.min(1, f / 0.80);
+  // The sleeve is the thickest part and it is thickest right at the body: a
+  // separate collar of stone bolted on at the shoulder reads as a yoke, and
+  // raises the shoulder line until the head looks like it is sitting on it.
+  const hy = (1.42 - 0.72 * g) * S;
+  const hx = (1.52 - 0.74 * g) * S;
+  if (!hand) return { hy, hx };
+  const k = (f - 0.80) / 0.20;
+  // Flat: it gains breadth front-to-back and loses depth top-to-bottom.
+  return { hy: hy * (1 - 0.34 * k), hx: hx * (1 + 1.25 * k) };
 }
 
 export function buildRedeemer(quality) {
@@ -145,44 +188,68 @@ export function buildRedeemer(quality) {
 
   const feet = R.plinth + R.pedH;
 
-  // ── The figure. Courses of soapstone-faced concrete, laid to the section.
+  // ── The figure.
+  //
+  // Laid at half the stone of everything under it. A head three and three
+  // quarter metres tall is three blocks across at the terraces' 2.3 m stone,
+  // and three blocks across is a cube — so the statue gets its own grid, fine
+  // enough that a jaw, a neck and a shoulder are shapes rather than rounding.
+  const fine = 1.05 * Math.min(s, 1.3);
+  const fineH = 0.95 * Math.min(s, 1.3);
+
   B.section('statue', () => {
     let y = feet;
     let c = 0;
     while (y < feet + R.figure - 0.001) {
-      const h = Math.min(courseH, feet + R.figure - y);
+      const h = Math.min(fineH, feet + R.figure - y);
       const t = (y + h / 2 - feet) / R.figure;
       const q = sectionAt(t);
-      // Hollow through the trunk, which is what the shaft with the stair in it
-      // actually is, and solid once the section is too small to be hollow.
-      const wall = 1.1 * S;
-      // `w` is the shoulder measurement and goes on the z axis, because that
-      // is the axis the arms run on; `d` is front to back and goes on x, which
-      // is the way this statue looks. Laid the other way round the arms start
-      // four metres clear of the body, and every stone in them is culled
-      // before the level loads — which is how the first build of this arrived
-      // with its arms already off.
-      if (q.w > wall * 2.4 && q.d > wall * 2.4) {
-        B.ring(0, 0, q.d * 2, q.w * 2, wall, y, h, stone, M.VERDE, c % 2);
+      // The robe, as relief rather than as geometry: vertical folds running
+      // the height of it, deepest at the hem and gone by the shoulder. The
+      // block is laid that much thicker and shifted out by half of it, so a
+      // fold is still a stone standing on the stone below.
+      const foldDepth = t < 0.70 ? 0.42 * S * (1 - t / 0.70) ** 0.5 : 0;
+      const fold = foldDepth > 0.02
+        ? (fx, fz) => {
+          const a = Math.atan2(fz, fx);
+          return foldDepth * (0.5 + 0.5 * Math.cos(a * 7));
+        }
+        : null;
+      // Hollow where the section can carry a wall, solid where it cannot —
+      // the neck and the crown are 2 m of stone and there is nothing to be
+      // hollow about.
+      const wall = 0.95 * S;
+      if (q.w > wall * 2.2 && q.d > wall * 2.2) {
+        B.ring(0, 0, q.d * 2, q.w * 2, wall, y, h, fine, M.VERDE, c % 2, fold);
       } else {
-        B.slab(0, y + h / 2, 0, q.d * 2, h, q.w * 2, stone, M.VERDE);
+        B.slab(0, y + h / 2, 0, q.d * 2, h, q.w * 2, fine, M.VERDE);
       }
       y += h; c++;
     }
   });
 
-  // ── The arms. Two horizontal cantilevers off the shoulders, carrying
-  // nothing but themselves, and the first thing anybody shoots.
+  // ── The arms.
+  //
+  // Two cantilevers, and the shape everybody knows. They leave the shoulders
+  // at seventy per cent of the figure's height, fall about a metre over their
+  // own length, taper from sleeve to wrist and finish in a flat open hand.
+  // Laid as a run of short segments rather than one long box, so the taper and
+  // the droop are in the stone and not in a comment.
   B.section('arms', () => {
-    const y0 = feet + R.armY;
     const shoulder = sectionAt(R.armY / R.figure).w;
+    const reach = R.armSpan - shoulder;
+    const n = Math.max(6, Math.round(reach / fine));
+    const y0 = feet + R.armY;
     for (const sg of [1, -1]) {
-      const len = R.armSpan - shoulder;
-      const mid = sg * (shoulder + len / 2);
-      B.slab(0, y0 + 1.15 * S, mid, 2.3 * S, 2.3 * S, len, stone, M.VERDE);
-      // The hand, which is three metres of it on the real thing.
-      B.slab(0, y0 + 1.15 * S, sg * (R.armSpan - 0.9 * S), 2.9 * S, 2.9 * S,
-        1.8 * S, stone, M.VERDE);
+      for (let i = 0; i < n; i++) {
+        const f = (i + 0.5) / n;
+        const a = armAt(f);
+        const u = shoulder + f * reach;
+        const len = reach / n;
+        // A shoulder that slopes into the arm rather than meeting it square.
+        const drop = R.armDrop * Math.pow(f, 1.3);
+        B.slab(0, y0 - drop, sg * u, a.hx * 2, a.hy * 2, len * 1.08, fine, M.VERDE);
+      }
     }
   });
 

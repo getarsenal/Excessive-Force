@@ -63,24 +63,30 @@ export const OPERA = {
   // Each shell: where its mouth is, which way it faces, and how far it runs.
   //
   // The mouths face south-west, over Circular Quay and the city, and the tips
-  // point north-east out to the harbour mouth — which is why every aerial
-  // photograph of this building shows points at the far end and glass at the
-  // near one. Each group runs tallest-first from the steps and steps *down*
-  // going north, so the tail of one shell passes inside the next, and from the
-  // quay you get the stack of arcs the thing is famous for. Built the other
-  // way round, tallest at the front, it is a row of aircraft hangars.
+  // point north-east out to the harbour — which is why every aerial photograph
+  // of this building shows points at the far end and glass at the near one.
   //
-  // The eastern group is the Concert Hall and is the taller of the two.
+  // They are laid end to end and not overlapping. Each one's tail comes down
+  // to the deck a couple of metres before the next one's mouth leaves it, so
+  // there is sky between them: that row of separate sails stepping back and
+  // down is the whole silhouette. Nested instead — each mouth rising inside
+  // the shell in front of it, which is how this was built first — they merge
+  // into one mass and the building reads as a beehive.
+  //
+  // The eastern group is the Concert Hall and is the taller of the two. The
+  // western group is set twenty metres further along the point and turned the
+  // other way: the two groups diverge on the real point, and parallel they
+  // line up into two rows of identical mouths, which reads as a campsite.
   shells: [
-    { x: 27, z: -56, yaw: 0.05, len: 78, s: 27.5, h: 58.0, group: 'concert' },
-    { x: 25, z: -18, yaw: 0.05, len: 62, s: 24.0, h: 47.0, group: 'concert' },
-    { x: 23, z: 14, yaw: 0.05, len: 46, s: 19.5, h: 35.0, group: 'concert' },
-    { x: 21, z: 44, yaw: 0.05, len: 32, s: 14.5, h: 23.0, group: 'concert' },
-    { x: -28, z: -46, yaw: -0.05, len: 66, s: 23.0, h: 46.0, group: 'opera' },
-    { x: -26, z: -14, yaw: -0.05, len: 50, s: 19.0, h: 35.0, group: 'opera' },
-    { x: -24, z: 16, yaw: -0.05, len: 36, s: 14.0, h: 24.0, group: 'opera' },
-    { x: -3, z: -74, yaw: 0.55, len: 30, s: 11.0, h: 17.0, group: 'bennelong' },
-    { x: -3, z: -74, yaw: -0.55, len: 26, s: 9.5, h: 14.5, group: 'bennelong' },
+    { x: 28, z: -78, yaw: 0.13, len: 58, s: 27.0, h: 58.0, group: 'concert' },
+    { x: 28, z: -18, yaw: 0.13, len: 46, s: 21.5, h: 46.0, group: 'concert' },
+    { x: 28, z: 30, yaw: 0.13, len: 34, s: 16.0, h: 33.0, group: 'concert' },
+    { x: 28, z: 66, yaw: 0.13, len: 22, s: 11.0, h: 21.0, group: 'concert' },
+    { x: -29, z: -58, yaw: -0.19, len: 50, s: 23.0, h: 48.0, group: 'opera' },
+    { x: -29, z: -6, yaw: -0.19, len: 40, s: 18.0, h: 36.0, group: 'opera' },
+    { x: -29, z: 36, yaw: -0.19, len: 28, s: 13.0, h: 25.0, group: 'opera' },
+    { x: -2, z: -84, yaw: 0.62, len: 26, s: 10.0, h: 17.0, group: 'bennelong' },
+    { x: -2, z: -84, yaw: -0.62, len: 22, s: 8.5, h: 14.0, group: 'bennelong' },
   ],
   // Where a rib stops being a haunch and starts being a shell, as a fraction
   // of the arc measured up from the foot.
@@ -140,7 +146,10 @@ function sweep(B, sh, stone, mat, band) {
   const sy = Math.sin(sh.yaw), cy = Math.cos(sh.yaw);
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    const s = sh.s * Math.pow(1 - t, 0.52);
+    // A shell narrows fast. At 0.52 it is still two thirds of its width at
+    // three quarters of its length, which is a tube with a rounded end; the
+    // real thing is a sail and is nearly closed by then.
+    const s = sh.s * Math.pow(1 - t, 0.80);
     const h = sh.h * ridgeAt(t);
     const d = t * sh.len;
     rib(B, sh.x - d * sy, sh.z + d * cy, sh.yaw, s, h,
@@ -177,26 +186,51 @@ export function buildOperaHouse(quality) {
     for (const sh of O.shells) sweep(B, sh, stone, M.TILE, (f) => f >= O.haunch);
   });
 
-  // The glass walls across the mouths. Bronze-framed glazing, which carries
-  // nothing and is marked as carrying nothing, so the best-looking shot on the
-  // map is also the emptiest.
+  // The glass walls across the mouths.
+  //
+  // Set back under the shell, not stretched across its edge. On the real
+  // building the glazing stands well inside the mouth, so what you see from
+  // the quay is the shell's edge rib, then a band of shadow under the vault,
+  // and only then the glass — and the glass itself is a grid of bronze
+  // mullions with panes between them, which at any distance reads dark. Laid
+  // flush with the mouth and unmullioned, as this was first, every shell is a
+  // sail with a blank white panel in it and the building looks like a tent.
+  //
+  // Bronze carries nothing and neither does glass, which is marked on both, so
+  // the best-looking shot on the map still moves the needle by nothing.
   B.section('glass', () => {
+    const SET = 0.17;
     for (const sh of O.shells) {
-      const h = sh.h * ridgeAt(0);
-      const c = (sh.s * sh.s - h * h) / (2 * sh.s);
-      const R = sh.s - c;
+      const ss = sh.s * Math.pow(1 - SET, 0.80);
+      const h = sh.h * ridgeAt(SET);
+      if (ss < 3 || h < 3) continue;
+      const c = (ss * ss - h * h) / (2 * ss);
+      const R = ss - c;
       const cy = Math.cos(sh.yaw), sy = Math.sin(sh.yaw);
-      const step = stone * 1.05;
+      const d = SET * sh.len;
+      const ox = sh.x - d * sy, oz = sh.z + d * cy;
+      const step = Math.max(2.0, stone * 0.95);
+      // A frame, not a louvre. A mullion every two panes reads as white bars
+      // on black; the real wall is mostly glass with a bronze rib every eight
+      // metres or so.
+      const mull = Math.max(7.5, stone * 3.4);
       for (let y = step / 2; y < h; y += step) {
-        // How wide the mouth is at this height, on the same arc as the rib.
-        const dy = y;
-        const w = Math.sqrt(Math.max(0, R * R - dy * dy)) + c;
-        if (w < step) continue;
+        const w = Math.sqrt(Math.max(0, R * R - y * y)) + c;
+        if (w < step * 0.6) continue;
         for (let q = -w + step / 2; q < w; q += step) {
-          B.add(sh.x + q * cy, O.deck + y, sh.z - q * sy,
-            step / 2, step / 2, 0.22, M.GLASS, sh.yaw);
+          // A mullion every few panes, and a transom every few courses: the
+          // bronze frame is the thing you actually see.
+          const rib = Math.abs(q % mull) < step * 0.40
+            || Math.abs(y % (mull * 1.9)) < step * 0.40;
+          B.add(ox + q * cy, O.deck + y, oz - q * sy,
+            rib ? 0.45 : 0.20, step / 2, step / 2,
+            rib ? M.CONCRETE : M.GLASS, sh.yaw);
         }
       }
+      // And the edge rib at the mouth itself, heavier than the ribs behind it,
+      // which is what frames all of that.
+      rib(B, sh.x, sh.z, sh.yaw, sh.s, sh.h * ridgeAt(0),
+        Math.max(1.6, stone * 0.95), stone * 1.5, stone, M.TILE, null, O.deck);
     }
   });
 

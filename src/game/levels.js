@@ -289,7 +289,11 @@ export const LEVELS = {
     // thing on the point.
     cityExcludeRadius: 300,
     contextExclude: 260,
-    camera: { yaw: 2.60, pitch: 0.22, distance: 330, height: 46 },
+    // Three-quarter from the south-west, over Circular Quay. Square on to the
+    // mouths every shell shows its glass at once and the building reads as a
+    // row of tents; from here the two groups overlap and you get the flanks
+    // and the tips, which is the photograph everyone has seen.
+    camera: { yaw: 2.16, pitch: 0.17, distance: 305, height: 40 },
     // One structure, not two. The shells stand on the deck and the deck stands
     // on the substructure — see the builder.
     structures: (quality) => [
@@ -333,7 +337,7 @@ export const LEVELS = {
     },
     cityExcludeRadius: 300,
     contextExclude: 240,
-    camera: { yaw: 1.10, pitch: 0.26, distance: 300, height: 56 },
+    camera: { yaw: 1.10, pitch: 0.26, distance: 215, height: 48 },
     structures: (quality) => [
       { key: 'basils', blocks: buildSaintBasils(quality), primary: true,
         required: true, label: "SAINT BASIL'S" },
@@ -384,7 +388,10 @@ export const LEVELS = {
     // drop beyond it is a building with its roof at ground level.
     cityExcludeRadius: 430,
     contextExclude: 400,
-    camera: { yaw: -1.35, pitch: 0.18, distance: 260, height: 54 },
+    // High enough, and far enough back, to get the rim of the summit into the
+    // frame. Level with the terraces the plateau runs to the horizon and the
+    // most famous mountain in Brazil reads as a lawn.
+    camera: { yaw: -1.57, pitch: 0.34, distance: 340, height: 44 },
     // One structure. The statue stands on the pedestal and the pedestal stands
     // on the terraces, and separate structures never learn about each other.
     structures: (quality) => [

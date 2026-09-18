@@ -101,6 +101,7 @@ function terraceHalf(y, base, height, platHalf, n) {
  */
 function steppedPyramid(B, cx, cz, o) {
   const { base, height, platHalf, terraces, stone, courseH } = o;
+  o.scale = o.scale || S;
   const core = o.core ?? M.RUBBLE;
   const skin = o.skin ?? M.LIMESTONE;
   // What another building already occupies at this height. The outer pyramid
@@ -112,10 +113,30 @@ function steppedPyramid(B, cx, cz, o) {
   let c = 0;
   while (y < height - 0.001) {
     const h = Math.min(courseH, height - y);
-    const half = terraceHalf(y + h / 2, base, height, platHalf, terraces);
-    const wall = Math.max(stone * 1.1, half * 0.16);
-    const inner = half - wall;
-    B.ring(cx, cz, half * 2, half * 2, wall, y, h, stone * 0.9, skin, c % 2);
+    const full = terraceHalf(y + h / 2, base, height, platHalf, terraces);
+
+    // Talud and tablero, which is how a Maya terrace is actually built and the
+    // only reason this reads as a stepped pyramid rather than as a mound.
+    //
+    // Each terrace is a full-width course at its foot, a recessed panel above
+    // it, and a projecting moulding at its head. A plain stepped cone gives
+    // nine four-metre treads, which sounds like plenty and is not: at two
+    // hundred metres the tread is three pixels and the per-stone colour
+    // jitter swallows it, so the whole thing comes out as a heap of rubble.
+    // A recess is in shadow whatever the sun is doing, which a projection is
+    // not — the first attempt at this was a moulding alone and was invisible.
+    const idx = Math.floor(((y + h / 2) / height) * terraces);
+    const nxt = Math.floor(((y + h * 1.5) / height) * terraces);
+    const prv = Math.floor(((y - h * 0.5) / height) * terraces);
+    const head = nxt > idx;                 // the last course of this terrace
+    const foot = prv < idx || idx === 0;    // and the first
+    const inset = (head || foot) ? 0 : o.scale * 1.15;
+    const half = full - inset;
+    const wall = Math.max(stone * 1.1, full * 0.16) - inset;
+    const inner = full - Math.max(stone * 1.1, full * 0.16);
+    const proud = head ? o.scale * 0.85 : 0;
+    B.ring(cx, cz, half * 2, half * 2, Math.max(stone * 0.8, wall), y, h,
+      stone * 0.9, skin, c % 2, proud > 0 ? () => proud : null);
     const hh = hole(y + h / 2);
     if (inner > stone * 0.6) {
       if (hh > 0 && hh < inner - stone * 0.6) {
@@ -140,27 +161,51 @@ function steppedPyramid(B, cx, cz, o) {
  * as applied treads each step is a block whose only neighbour is the terrace
  * behind it, and the support solver is quite right to drop the lot.
  */
+/**
+ * One of the four stairways.
+ *
+ * On the real pyramid these are the thing you see: ten metres wide, ninety-one
+ * steps, standing well clear of the terraces they climb, and walled either
+ * side by an alfarda — a ramped balustrade a good two metres high that runs
+ * unbroken from the plaza to the temple door, and finishes at the bottom in a
+ * serpent's head.
+ *
+ * The first version of this stood the stair three metres proud of a face that
+ * steps back four and a half, with balustrades half a metre high. From the
+ * plaza it was indistinguishable from the pyramid and El Castillo had no
+ * stairs at all.
+ */
 function stairway(B, cx, cz, dirX, dirZ, o) {
   const { base, height, platHalf, terraces, width, stone, courseH } = o;
   const half = width / 2;
+  const sc = o.scale;
   let y = 0;
   while (y < height - 0.001) {
     const h = Math.min(courseH, height - y);
     const face = terraceHalf(y + h / 2, base, height, platHalf, terraces);
-    // The stair's nose stands a little proud of the terrace it is climbing.
-    const out = face + 1.4 * o.scale;
+    // The nose stands clear of the terrace, and clear of the recessed panel
+    // in it, so the ramp is a solid wedge against the stepped flank.
+    const out = face + 2.4 * sc;
     const depth = out - platHalf * 0.4;
     if (depth < stone) { y += h; continue; }
     const mx = cx + dirX * (out + platHalf * 0.4) / 2;
     const mz = cz + dirZ * (out + platHalf * 0.4) / 2;
     B.slab(mx, y + h / 2, mz,
       dirX ? depth : width, h, dirX ? width : depth, stone, M.LIMESTONE);
-    // The alfardas: the heavy ramped balustrades either side of every stair.
+    // The tread nose: a course-deep lip at the outer edge of every course, so
+    // the ramp reads as steps and not as a slide.
+    const nx = cx + dirX * (out - 0.9 * sc);
+    const nz = cz + dirZ * (out - 0.9 * sc);
+    B.slab(nx, y + h * 0.78, nz,
+      dirX ? 1.8 * sc : width, h * 0.45, dirX ? width : 1.8 * sc,
+      stone, M.LIMESTONE);
+    // The alfardas, standing a full two metres over the steps between them.
     for (const sgn of [-1, 1]) {
-      const bx = mx + (dirX ? 0 : sgn * (half + 0.9 * o.scale));
-      const bz = mz + (dirX ? sgn * (half + 0.9 * o.scale) : 0);
-      B.slab(bx, y + h / 2 + h * 0.3, bz,
-        dirX ? depth : 1.8 * o.scale, h, dirX ? 1.8 * o.scale : depth,
+      const bx = mx + (dirX ? 0 : sgn * (half + 1.1 * sc));
+      const bz = mz + (dirX ? sgn * (half + 1.1 * sc) : 0);
+      const rise = 1.9 * sc;
+      B.slab(bx, y + (h + rise) / 2, bz,
+        dirX ? depth : 2.2 * sc, h + rise, dirX ? 2.2 * sc : depth,
         stone, M.LIMESTONE);
     }
     y += h;

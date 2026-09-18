@@ -55,10 +55,10 @@ export const BASIL = {
   // Heights are measured from the deck of the basement and not from the
   // ground, because that is where every one of these towers starts: the
   // cathedral's famous 47.5 m includes the 4.2 m of basement under it.
-  central: { half: 6.4 * S, base: 10.0 * S, oct: 19.5 * S, tent: 35.0 * S, top: 41.5 * S },
-  axial: { r: 10.9 * S, half: 4.2 * S, base: 7.2 * S, oct: 12.2 * S, top: 23.5 * S },
-  diag: { r: 13.4 * S, half: 3.2 * S, base: 6.2 * S, oct: 10.0 * S, top: 19.5 * S },
-  bell: { x: 12.0 * S, z: 15.5 * S, half: 3.9 * S, shaft: 18.0 * S, top: 29.0 * S },
+  central: { half: 6.3 * S, base: 10.0 * S, oct: 19.5 * S, tent: 35.0 * S, top: 41.5 * S },
+  axial: { r: 10.9 * S, half: 3.7 * S, base: 7.0 * S, oct: 15.5 * S, top: 28.0 * S },
+  diag: { r: 13.4 * S, half: 2.9 * S, base: 6.0 * S, oct: 12.8 * S, top: 23.0 * S },
+  bell: { x: 12.0 * S, z: 15.5 * S, half: 3.6 * S, shaft: 18.0 * S, top: 29.5 * S },
 };
 
 /**
@@ -72,7 +72,49 @@ export const BASIL = {
  * Basil's does — and every one of them is a stone or a tile a dome could
  * honestly be covered in.
  */
-const DOMES = [M.VERDE, M.LIMESTONE, M.SLATE, M.LIMESTONE, M.SLATE, M.VERDE, M.LIMESTONE, M.SLATE];
+const DOMES = [
+  [M.VERDE, M.MARBLE], [M.SLATE, M.MARBLE], [M.SANDSTONE, M.VERDE],
+  [M.VERDE, M.SANDSTONE], [M.SLATE, M.MARBLE], [M.SANDSTONE, M.MARBLE],
+  [M.VERDE, M.MARBLE], [M.SLATE, M.SANDSTONE],
+];
+
+/**
+ * An onion with spiral ribs, laid stone by stone.
+ *
+ * `BlockList.dome` takes one material for the whole shell, and a Saint Basil's
+ * dome in one colour is a balloon. Every one of these is ribbed, and most of
+ * them spiral — the ribs wind a few degrees per course, which is done here by
+ * rotating the colour phase and not the geometry. It is also the only thing
+ * that makes a pale dome read at all: the cream ones were invisible against a
+ * hazy sky and three of the nine churches looked as though they had lost their
+ * heads.
+ */
+function ribbedDome(B, cx, cz, y0, height, maxR, wall, courseH, stone, pair) {
+  const RIBS = 10;
+  const TWIST = 0.09;
+  let y = y0;
+  let course = 0;
+  while (y < y0 + height - 0.001) {
+    const h = Math.min(courseH, y0 + height - y);
+    const t = (y + h / 2 - y0) / height;
+    const r = maxR * onion(t);
+    if (r <= wall * 1.2) {
+      const w = Math.max(r * 2, stone * 0.7);
+      B.slab(cx, y + h / 2, cz, w, h, w, stone, pair[0]);
+    } else {
+      const n = Math.max(12, Math.round((TAU * r) / stone));
+      const seg = (TAU * r) / n;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + course * TWIST;
+        const k = Math.floor((((a % TAU) + TAU) % TAU) / TAU * RIBS);
+        B.add(cx + Math.cos(a) * r, y + h / 2, cz + Math.sin(a) * r,
+          wall / 2, h / 2, seg / 2, k % 2 ? pair[1] : pair[0], -a);
+      }
+    }
+    y += h;
+    course++;
+  }
+}
 
 /** An onion: out past the drum, then in to a point. */
 function onion(t) {
@@ -86,7 +128,10 @@ function squareTower(B, cx, cz, y0, y1, half, wall, stone, courseH) {
   let c = 0;
   while (y < y1 - 0.001) {
     const h = Math.min(courseH, y1 - y);
-    const white = y > y1 - courseH * 2.2;
+    // A white string course every sixth, and the cornice in white. Saint
+    // Basil's is red brick *patterned* with white stone, and without the
+    // pattern a fifty-metre tower is one flat slab of red.
+    const white = y > y1 - courseH * 2.2 || c % 6 === 3;
     B.ring(cx, cz, half * 2, half * 2, wall, y, h, stone,
       white ? M.LIMESTONE : M.BRICK, c % 2,
       // A pilaster at each corner and a band under the cornice: the white
@@ -104,30 +149,48 @@ function octagon(B, cx, cz, y0, y1, r, wall, stone, courseH, mat) {
   while (y < y1 - 0.001) {
     const h = Math.min(courseH, y1 - y);
     B.polyRing(cx, cz, BlockList.circle(r, 8, Math.PI / 8), wall, y, h, stone,
-      (y > y1 - courseH * 1.6) ? M.LIMESTONE : mat, c % 2);
+      (y > y1 - courseH * 1.6 || c % 6 === 2) ? M.LIMESTONE : mat, c % 2);
     y += h; c++;
   }
 }
 
-/** Drum, dome and cross: the head of one church. */
-function head(B, cx, cz, y0, y1, r, stone, courseH, colour) {
-  const drumH = (y1 - y0) * 0.30;
+/**
+ * Drum, dome and cross: the head of one church.
+ *
+ * Three things make this building read vertical rather than as a row of silos,
+ * and all three are here. The drum is *half* the width of the tower under it,
+ * not three quarters — the first version's heads were as wide as their own
+ * churches and the whole cathedral came out as a red brick tank farm. The
+ * kokoshniki step the tower in to the drum in receding tiers of gables rather
+ * than in one shoulder, which is what a Russian church does instead of a
+ * cornice. And the onion is taller than it is wide and wider than the drum it
+ * sits on, which is the only reason anyone would call it an onion.
+ */
+function head(B, cx, cz, y0, y1, half, stone, courseH, colour) {
+  const r = half * 0.56;
+  // The kokoshniki: three receding tiers between the octagon and the drum.
+  const tiers = 3;
   let y = y0;
+  for (let k = 0; k < tiers; k++) {
+    const rr = half * 0.94 + (r * 1.22 - half * 0.94) * ((k + 1) / tiers);
+    const h = courseH * 0.62;
+    B.polyRing(cx, cz, BlockList.circle(rr, 8, Math.PI / 8), 1.2 * S, y, h,
+      stone, k % 2 ? M.LIMESTONE : M.BRICK);
+    y += h;
+  }
+  const drumH = (y1 - y) * 0.30;
   let c = 0;
-  while (y < y0 + drumH - 0.001) {
-    const h = Math.min(courseH, y0 + drumH - y);
+  const drumTop = y + drumH;
+  while (y < drumTop - 0.001) {
+    const h = Math.min(courseH, drumTop - y);
     const n = Math.max(10, Math.round((TAU * r) / stone));
-    B.polyRing(cx, cz, BlockList.circle(r, n, (c % 2) * 0.1), 0.9 * S, y, h,
+    B.polyRing(cx, cz, BlockList.circle(r, n, (c % 2) * 0.1), 0.85 * S, y, h,
       stone, M.BRICK, c % 2);
     y += h; c++;
   }
-  const domeH = (y1 - y0) - drumH;
-  // Wide enough at the springing to meet the drum it stands on, which means
-  // the widest part of the onion is a quarter wider again — and laid in half
-  // courses, because an onion resolved into three rings is a cylinder with a
-  // cone on it, which is what the first attempt at this looked like.
-  B.dome(cx, cz, y0 + drumH, domeH, r / onion(0), 0.8 * S, courseH * 0.55,
-    stone, colour, onion);
+  const domeH = y1 - y;
+  ribbedDome(B, cx, cz, y, domeH, r / onion(0), 0.75 * S, courseH * 0.5,
+    stone, colour);
   // The cross. Gilt carries nothing and nothing rests on it, which is exactly
   // right for the one piece of this building that is above everything else.
   B.add(cx, y1 + 1.1 * S, cz, 0.22 * S, 1.3 * S, 0.22 * S, M.GILT);
@@ -188,10 +251,7 @@ export function buildSaintBasils(quality) {
       squareTower(B, x, z, deck, deck + A.base, A.half, 2.1 * S, stone, courseH);
       octagon(B, x, z, deck + A.base, deck + A.oct, A.half * 0.94, 1.8 * S,
         stone, courseH, M.BRICK);
-      // The onion is as wide as the tower it stands on, which is what these
-      // are: a cap a third of the drum's width reads as a lid, and that is
-      // what this cathedral looked like before the heads were sized properly.
-      head(B, x, z, deck + A.oct, deck + A.top, A.half * 0.78, stone, courseH,
+      head(B, x, z, deck + A.oct, deck + A.top, A.half, stone, courseH,
         DOMES[i]);
     }
     for (let i = 0; i < 4; i++) {
@@ -201,7 +261,7 @@ export function buildSaintBasils(quality) {
       squareTower(B, x, z, deck, deck + D.base, D.half, 1.9 * S, stone, courseH);
       octagon(B, x, z, deck + D.base, deck + D.oct, D.half * 0.94, 1.6 * S,
         stone, courseH, M.BRICK);
-      head(B, x, z, deck + D.oct, deck + D.top, D.half * 0.80, stone, courseH,
+      head(B, x, z, deck + D.oct, deck + D.top, D.half, stone, courseH,
         DOMES[4 + i]);
     }
   });
@@ -226,7 +286,8 @@ export function buildSaintBasils(quality) {
         stone, c % 3 === 1 ? M.LIMESTONE : M.BRICK, c % 2);
       y += h; c++;
     }
-    head(B, 0, 0, y1, deck + T.top, T.half * 0.24, stone, courseH, M.GILT);
+    head(B, 0, 0, y1, deck + T.top, T.half * 0.46, stone, courseH,
+      [M.GILT, M.GILT]);
   });
 
   // ── The bell tower, off the south-east corner, a hundred and thirty years
@@ -249,7 +310,7 @@ export function buildSaintBasils(quality) {
         stone, courseH, M.BRICK);
     });
     head(B, L.x, L.z, deck + L.shaft + (L.top - L.shaft) * 0.48, deck + L.top,
-      L.half * 0.78, stone, courseH, M.VERDE);
+      L.half, stone, courseH, [M.GILT, M.GILT]);
   });
 
   return B;
