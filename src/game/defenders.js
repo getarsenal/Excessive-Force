@@ -9,6 +9,7 @@ import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
 import { PISA, DUOMO, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 import { OPERA, ridgeAt as operaRidgeAt } from '../structure/landmarks/sydney.js';
+import { BASIL, KREMLIN } from '../structure/landmarks/moscow.js';
 
 /**
  * The garrison.
@@ -1196,6 +1197,89 @@ export class Garrison {
       this.place('mortar', new THREE.Vector3(
         origin.x, groundY + O.deck + 1.2, origin.z + 60 - i * 34), Math.PI, 8,
       { cover: 'roof' });
+    }
+  }
+
+  /**
+   * Saint Basil's.
+   *
+   * There is no one roof here and no one parapet — there are nine towers with
+   * the gaps between them, and the gaps are the position. Men stand on the
+   * deck of the basement between the churches, where every one of them has a
+   * tower at his back and a clear lane out between two others, and the gallery
+   * underneath is the rank below that.
+   */
+  populateSaintBasils(origin, groundY) {
+    const C = BASIL;
+    const deck = C.podH + 2.4;
+    // The gallery arcade round the basement. On the four faces at the arched
+    // openings, not on a circle: a ring drawn at the basement's half-width
+    // puts every man inside six metres of wall, which is where this rank spent
+    // its first outing.
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let k = -1; k <= 1; k++) {
+        const u = k * (C.podHalf * 0.52);
+        const p = new THREE.Vector3(
+          origin.x + nx * (C.podHalf + 1.4) + (nx ? 0 : u),
+          groundY + C.podH * 0.42,
+          origin.z + nz * (C.podHalf + 1.4) + (nz ? 0 : u));
+        this.place(k === 0 ? 'mg' : 'rifleman', p, Math.atan2(nx, nz), 7,
+          { cover: 'arcade' });
+      }
+    }
+    // On the deck, in the gaps between the churches — on the diagonals of the
+    // axial ring, which is where the ground between them actually is.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const r = C.podHalf - 5.0;
+      const p = new THREE.Vector3(origin.x + Math.cos(a) * r,
+        groundY + deck + 1.0, origin.z + Math.sin(a) * r);
+      this.place(i % 3 === 0 ? 'at' : 'mg', p,
+        Math.atan2(Math.cos(a), Math.sin(a)), 7, { cover: 'roof' });
+    }
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 0.9;
+      this.place('mortar', new THREE.Vector3(
+        origin.x + Math.cos(a) * (C.podHalf - 9.0), groundY + deck + 1.0,
+        origin.z + Math.sin(a) * (C.podHalf - 9.0)), 0, 8, { cover: 'roof' });
+    }
+    // In the belfry of the bell tower, which is the only opening in this
+    // cathedral wide enough to shoot out of.
+    const L = C.bell;
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      this.place('sniper', new THREE.Vector3(
+        origin.x + L.x + nx * (L.half * 0.8), groundY + deck + L.shaft + 3.0,
+        origin.z + L.z + nz * (L.half * 0.8)), Math.atan2(nx, nz), 7,
+      { cover: 'window' });
+    }
+  }
+
+  /** The Kremlin wall, and the towers in it. */
+  populateKremlinWall(origin, groundY) {
+    const K = KREMLIN;
+    const half = K.len / 2;
+    // Behind the merlons, the length of the wall, all facing the square.
+    for (let i = 0; i < 20; i++) {
+      const z = -half + 8 + i * ((K.len - 16) / 19);
+      this.place(i % 4 === 1 ? 'at' : i % 2 ? 'mg' : 'rifleman', new THREE.Vector3(
+        origin.x - K.thick * 0.1, groundY + K.height + 1.2, origin.z + z),
+      Math.PI / 2, 6, { cover: 'window' });
+    }
+    // On the tower tops, which see over everything on the square.
+    for (const t of K.towers) {
+      // All three facing the square. A post on the wall side of a wall tower
+      // is a post looking at the wall.
+      for (const [nx, nz] of [[1, 0], [0.72, 0.72], [0.72, -0.72]]) {
+        this.place(t.gate ? 'sniper' : 'mg', new THREE.Vector3(
+          origin.x + nx * (t.half - 1.2), groundY + t.h * 0.62 + 1.2,
+          origin.z + t.z + nz * (t.half - 1.2)), Math.atan2(nx, nz), 7,
+        { cover: 'roof' });
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x - K.thick * 0.1, groundY + K.height + 1.2,
+        origin.z - 80 + i * 80), Math.PI / 2, 7, { cover: 'roof' });
     }
   }
 

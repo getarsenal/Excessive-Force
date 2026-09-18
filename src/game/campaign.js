@@ -140,6 +140,21 @@ export const THEATRES = [
     unlocks: [],
     unlockLine: 'Nothing new — you have it all',
   },
+  {
+    id: 'moscow',
+    iso: 'RUS',
+    lx: 44, ly: -22,
+    city: 'MOSCOW',
+    lon: 37.6231, lat: 55.7525,
+    no: 8,
+    title: 'NINE OF THEM',
+    brief: 'Nine churches on one basement, and no single cut wins: every tower '
+      + 'here is its own column of brick standing on its own square of '
+      + 'foundation, and dropping the middle one leaves eight watching. What '
+      + 'they share is underneath them.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
 ];
 
 /** The contract for a level id, if that level is one. */

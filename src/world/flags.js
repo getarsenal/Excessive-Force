@@ -5,6 +5,7 @@ import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { CASTILLO } from '../structure/landmarks/chichen.js';
 import { PISA, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 import { OPERA } from '../structure/landmarks/sydney.js';
+import { BASIL, KREMLIN } from '../structure/landmarks/moscow.js';
 
 /**
  * Flags on the landmarks.
@@ -64,6 +65,14 @@ export const FLAG_SITES = {
       z: -OPERA.podiumZ + 6, pattern: 'australia', w: 10, h: 6, pole: 12 },
     { key: 'opera', x: OPERA.stepsW * 0.28, y: OPERA.deck + 1.0,
       z: -OPERA.podiumZ + 6, pattern: 'australia', w: 10, h: 6, pole: 12 },
+  ],
+  moscow: [
+    // On the Spasskaya Tower, over the gate, which is where it flies.
+    { key: 'kremlin', x: 0, y: KREMLIN.towers[0].h * 0.62 + 2.0, z: 0,
+      pattern: 'russia', w: 10, h: 6, pole: 11 },
+    // And on the deck of the basement, at the corner of the gallery.
+    { key: 'basils', x: BASIL.podHalf - 3.0, y: BASIL.podH + 3.0,
+      z: -BASIL.podHalf + 3.0, pattern: 'russia', w: 8, h: 5, pole: 9 },
   ],
 };
 

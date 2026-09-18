@@ -6,6 +6,7 @@ import { buildElCastillo, buildTempleOfWarriors } from '../structure/landmarks/c
 import { buildCampanile, buildDuomo, buildBaptistery }
   from '../structure/landmarks/pisa.js';
 import { buildOperaHouse } from '../structure/landmarks/sydney.js';
+import { buildSaintBasils, buildKremlinWall } from '../structure/landmarks/moscow.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -309,6 +310,54 @@ export const LEVELS = {
     brief: 'A shell has no mass and nothing above it. Hit the haunches, not the crowns.',
   },
 
+  moscow: {
+    id: 'moscow',
+    terrain: 'moscow',
+    name: "Saint Basil's Cathedral",
+    place: 'Red Square, Moscow',
+    target: "SAINT BASIL'S",
+    subtitle: 'Cathedral of the Intercession · Red Square',
+    victory: 'Nine Down, None Left',
+    // Red Square is red granite setts and the wall behind it is red brick;
+    // the ground is winter, which here means not much green anywhere.
+    palette: {
+      urban: new THREE.Color(0xa08578),
+      urbanAlt: new THREE.Color(0x8d7166),
+      park: new THREE.Color(0x4a563c),
+      parkAlt: new THREE.Color(0x56613f),
+      road: new THREE.Color(0x716a66),
+      bank: new THREE.Color(0x968b80),
+      bed: new THREE.Color(0x475140),
+      dry: new THREE.Color(0xa99c8e),
+    },
+    cityExcludeRadius: 300,
+    contextExclude: 240,
+    camera: { yaw: 1.10, pitch: 0.26, distance: 300, height: 56 },
+    structures: (quality) => [
+      { key: 'basils', blocks: buildSaintBasils(quality), primary: true,
+        required: true, label: "SAINT BASIL'S" },
+      { key: 'kremlin', blocks: buildKremlinWall(quality), required: true,
+        label: 'KREMLIN WALL', offset: { x: -150, z: 0 } },
+    ],
+    garrison: (g, origin, groundY, sites) => {
+      g.populateSaintBasils(origin, groundY);
+      const k = sites && sites.kremlin;
+      if (k) g.populateKremlinWall({ x: 0, y: k.groundY, z: 0 }, k.groundY);
+    },
+    // Scored on the churches and on the basement they all stand on — the
+    // gallery, the piers and the vaults are the building here as much as the
+    // towers are, and more to the point than the bell tower.
+    scoreTags: ['podium', 'chapels', 'tent'],
+    precinct: {
+      boundary: 'none',           // Red Square has no railing on it
+      ground: 'paving',
+      ornament: 'statues',
+    },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    brief: 'Nine churches that do not touch. The only thing they share is underneath them.',
+  },
+
   giza: {
     id: 'giza',
     terrain: 'giza',
@@ -400,7 +449,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -411,6 +460,7 @@ export const LEVEL_BLURB = {
   chichen: 'A pyramid built over an older pyramid. The skin is not the building.',
   pisa: 'Eighty-nine metres already falling. The part that overhangs is the part that is safe.',
   sydney: 'Fourteen shells on a headland with one road in. Arches, not walls.',
+  moscow: 'Nine towers on one basement. No single cut wins; the basement is shared.',
 };
 
 /** Ordered level records, for menus. */
