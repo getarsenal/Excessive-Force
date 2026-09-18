@@ -4,6 +4,7 @@ import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
 import { TOWER, WING } from '../structure/landmarks/bigben.js';
 import { EIFFEL, legAt as eiffelLegAt } from '../structure/landmarks/eiffel.js';
+import { CASTILLO, WARRIORS } from '../structure/landmarks/chichen.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
 
@@ -879,6 +880,148 @@ export class Garrison {
       })) placed++;
     }
     return placed;
+  }
+
+  /**
+   * El Castillo.
+   *
+   * A pyramid gives a garrison something no other landmark here does: nine
+   * terraces of parapet, each one a step back from the one below, so every man
+   * on the thing can shoot over the heads of the men beneath him. That is why
+   * it is worth defending and why it is unpleasant to attack — there is no
+   * dead ground on the face of a stepped pyramid.
+   *
+   * Positions are read off the builder's own constants, so the pyramid can be
+   * rescaled without leaving the garrison standing in mid-air.
+   */
+  populateElCastillo(origin, groundY, counts = {}) {
+    const C = CASTILLO;
+    // Half-width of terrace `k`, counted from the ground.
+    const halfOf = (k) => (C.base / 2)
+      + (C.platHalf - C.base / 2) * (Math.min(k, C.terraces - 1) / (C.terraces - 1));
+
+    // One rank per terrace, thinning as the terraces shrink. The lower ones
+    // are riflemen; the upper ones get the long weapons, because from up there
+    // they can see the whole plaza.
+    //
+    // A man stands on the *tread* — the flat top of the terrace below him,
+    // between that terrace's face and the face of the one above. Set an inset
+    // in from the face instead, which is the obvious way to write it, and he
+    // is six metres inside the casing: the wall of a pyramid this size is a
+    // sixth of its half-width, so "just inside the edge" is buried.
+    const ranks = counts.ranks ?? C.terraces - 1;
+    for (let k = 1; k <= ranks; k++) {
+      const y = (k / C.terraces) * C.platform;
+      const r = (halfOf(k) + halfOf(k - 1)) / 2;
+      const n = Math.max(4, Math.round((r * 8) / 26));
+      const type = k >= ranks - 1 ? 'sniper' : k > ranks / 2 ? 'mg' : 'rifleman';
+      for (let i = 0; i < n; i++) {
+        const t = (i / n) * 4;
+        const side = Math.floor(t);
+        const f = ((t - side) * 2 - 1) * 0.82;
+        const p = new THREE.Vector3(origin.x, groundY + y + 0.5, origin.z);
+        if (side === 0) { p.x += f * r; p.z += r; }
+        else if (side === 1) { p.x += r; p.z -= f * r; }
+        else if (side === 2) { p.x -= f * r; p.z -= r; }
+        else { p.x -= r; p.z += f * r; }
+        this.place(type, p, Math.atan2(p.x - origin.x, p.z - origin.z), 7,
+          { cover: 'roof' });
+      }
+    }
+
+    // The temple on the platform: AT teams at its doorways, which have the
+    // longest sightline on the map.
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      this.place('at', new THREE.Vector3(
+        origin.x + nx * (C.templeHalf - 1.2),
+        groundY + C.platform + 0.6,
+        origin.z + nz * (C.templeHalf - 1.2)), Math.atan2(nx, nz), 7,
+      { cover: 'window' });
+    }
+    // Mortars behind the temple's own walls.
+    for (const [sx, sz] of [[1, 1], [-1, -1]]) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x + sx * C.templeHalf * 0.5, groundY + C.platform + 0.6,
+        origin.z + sz * C.templeHalf * 0.5), 0, 8, { cover: 'roof' });
+    }
+    // The chamber inside the older pyramid. Nothing can reach these two until
+    // the outer casing and then the inner one are off the top of them, which is
+    // most of the level — they are the reserve, and finding them is the point
+    // of the building.
+    for (const dx of [-2.2, 2.2]) {
+      this.place('at', new THREE.Vector3(origin.x + dx, groundY + C.chamberY + 1.0,
+        origin.z), 0, 7, { cover: 'arcade' });
+    }
+
+    // And the stairways, which are the only way up and are covered as such.
+    // On the stair's own surface, which stands a little proud of the terrace
+    // face it is climbing.
+    for (const [nx, nz] of [[0, -1], [0, 1], [1, 0], [-1, 0]]) {
+      for (const f of [0.34, 0.66]) {
+        const k = Math.round(f * C.terraces);
+        const y = (k / C.terraces) * C.platform;
+        const r = halfOf(k) + 1.0;
+        this.place('mg', new THREE.Vector3(
+          origin.x + nx * r, groundY + y + 0.5, origin.z + nz * r),
+        Math.atan2(nx, nz), 7, { cover: 'roof' });
+      }
+    }
+  }
+
+  /** The Temple of the Warriors, and the colonnade in front of it. */
+  populateTempleOfWarriors(origin, groundY) {
+    const W = WARRIORS;
+    const o = W.offset;
+    const base = new THREE.Vector3(origin.x + o.x, groundY, origin.z + o.z);
+    // On the temple platform.
+    for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      this.place('sniper', new THREE.Vector3(
+        base.x + nx * (W.templeHalf - 1.0), base.y + W.height + W.templeH * 0.55,
+        base.z + nz * (W.templeHalf - 1.0)), Math.atan2(nx, nz), 7,
+      { cover: 'window' });
+    }
+    // On the terraces — on the tread, between one face and the next, for the
+    // same reason as El Castillo: an inset from the face is an inset into six
+    // metres of casing.
+    const halfOf = (k) => (W.base / 2)
+      + (W.base * 0.30 - W.base / 2) * (Math.min(k, W.steps - 1) / (W.steps - 1));
+    for (let k = 1; k < W.steps; k++) {
+      const y = (k / W.steps) * W.height;
+      const r = (halfOf(k) + halfOf(k - 1)) / 2;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + 0.4;
+        const p = new THREE.Vector3(
+          base.x + Math.sin(a) * r, base.y + y + 0.5, base.z + Math.cos(a) * r);
+        this.place(k > W.steps / 2 ? 'mg' : 'rifleman', p,
+          Math.atan2(p.x - base.x, p.z - base.z), 7, { cover: 'roof' });
+      }
+    }
+    // Under the colonnade, at its outer line of piers. The Group of a Thousand
+    // Columns is a roof on stone posts with nothing between them, which is a
+    // firing position and not a wall: a man standing at the drip line has three
+    // metres of slab over his head and the whole plaza in front of him. Set him
+    // a row further in and the piers behind the front row take his sightline,
+    // which is how this rank was blind the first time it was laid.
+    // Then on the roof, which is flat and is the best firing step on this half
+    // of the site.
+    const { colCols: nx2, colRows: nz2, colPitch: pch, colH } = W;
+    const colZ0 = base.z + W.base / 2 + pch * 1.4;
+    for (let i = 0; i < nx2; i++) {
+      this.place(i % 3 === 1 ? 'mg' : 'rifleman', new THREE.Vector3(
+        base.x - (nx2 - 1) * pch / 2 + i * pch,
+        base.y + 0.9,
+        colZ0 + (nz2 - 1) * pch + pch * 0.55), 0, 8, { cover: 'arcade' });
+    }
+    for (let i = 0; i < nx2; i += 2) {
+      for (let j = 0; j < nz2; j += 2) {
+        // Standing *on* the roof, not in it: the slab and its beams are
+        // nearly four metres of stone above the pier tops.
+        this.place('rifleman', new THREE.Vector3(
+          base.x - (nx2 - 1) * pch / 2 + i * pch,
+          base.y + colH + 4.4,
+          colZ0 + j * pch), 0, 7, { cover: 'roof' });
+      }
+    }
   }
 
   /** The Palais de Chaillot wing, across the Seine. */

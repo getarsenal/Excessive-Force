@@ -1,0 +1,13 @@
+{
+  "id": "chichen",
+  "name": "El Castillo, Chich\u00e9n Itz\u00e1",
+  "lat": 20.68285,
+  "lon": -88.56867,
+  "spanMeters": 800.0,
+  "size": 512,
+  "minElevation": 17.678,
+  "maxElevation": 48.01,
+  "metersPerDemPixel": 8.9388,
+  "seaLevel": 26.621,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

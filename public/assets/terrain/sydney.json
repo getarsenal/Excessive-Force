@@ -1,0 +1,13 @@
+{
+  "id": "sydney",
+  "name": "Sydney Opera House, Sydney",
+  "lat": -33.85681,
+  "lon": 151.21526,
+  "spanMeters": 850.0,
+  "size": 512,
+  "minElevation": -20.105,
+  "maxElevation": 97.227,
+  "metersPerDemPixel": 7.9345,
+  "seaLevel": -1.051,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

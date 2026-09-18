@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { buildElizabethTower, buildPalaceWing } from '../structure/landmarks/bigben.js';
 import { buildTajMahal, buildTajMosque } from '../structure/landmarks/tajmahal.js';
 import { buildEiffelTower, buildChaillotWing } from '../structure/landmarks/eiffel.js';
+import { buildElCastillo, buildTempleOfWarriors } from '../structure/landmarks/chichen.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -150,6 +151,60 @@ export const LEVELS = {
     brief: 'It stands on four legs and nothing else. Cut one and it falls that way.',
   },
 
+  chichen: {
+    id: 'chichen',
+    terrain: 'chichen',
+    name: 'El Castillo, Chichén Itzá',
+    place: 'Chichén Itzá, Yucatán',
+    target: 'EL CASTILLO',
+    subtitle: 'Temple of Kukulcán · Chichén Itzá',
+    victory: 'Step Pyramid, Step Down',
+    // Limestone shelf under a jungle canopy. The default London ground — brick
+    // dust and parkland — reads as the Home Counties with a pyramid in them,
+    // and the Yucatán is pale rock with very dark green growing out of it.
+    palette: {
+      urban: new THREE.Color(0xbdb096),
+      urbanAlt: new THREE.Color(0xa79a80),
+      park: new THREE.Color(0x3f5b30),
+      parkAlt: new THREE.Color(0x4e6b34),
+      road: new THREE.Color(0x6a6152),
+      bank: new THREE.Color(0xc8bb9c),
+      bed: new THREE.Color(0x55603f),
+      dry: new THREE.Color(0xd6cbb0),
+    },
+    // The Great Plaza is open ground for two hundred metres in every
+    // direction, and the Temple of the Warriors stands at the far side of it.
+    cityExcludeRadius: 300,
+    contextExclude: 300,
+    camera: { yaw: 0.72, pitch: 0.30, distance: 330, height: 66 },
+    structures: (quality) => [
+      { key: 'castillo', blocks: buildElCastillo(quality), primary: true,
+        required: true, label: 'EL CASTILLO' },
+      { key: 'warriors', blocks: buildTempleOfWarriors(quality), required: true,
+        label: 'TEMPLE OF THE WARRIORS', offset: { x: 150, z: -120 } },
+    ],
+    garrison: (g, origin, groundY, sites) => {
+      g.populateElCastillo(origin, groundY);
+      const w = sites && sites.warriors;
+      if (w) g.populateTempleOfWarriors({ x: 0, y: w.groundY, z: 0 }, w.groundY);
+    },
+    // Scored on the two pyramids, inner and outer — the stairways and the
+    // temple are the building, the colonnade across the plaza is not.
+    scoreTags: ['castillo', 'inner', 'stairs', 'temple'],
+    precinct: {
+      boundary: 'none',           // the plaza has no wall, it has jungle
+      ground: 'lawn',
+      ornament: 'none',
+    },
+    // No windows to post men in, no river, and nothing that can be made to
+    // fall over.
+    traits: { windows: false, river: false, topples: false },
+    // A twentieth of Khufu, so nothing like Giza's factor — but still a solid
+    // mass rather than a hollow tower.
+    unlockScale: 4,
+    brief: 'There is an older pyramid inside this one, and the top of the new one is standing on it.',
+  },
+
   giza: {
     id: 'giza',
     terrain: 'giza',
@@ -241,7 +296,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -249,6 +304,7 @@ export const LEVEL_BLURB = {
   paris: 'Three hundred metres of iron on four legs. Cut one and it falls towards it.',
   agra: 'A dome on four piers over a marble terrace. It will not topple; it has to be broken.',
   giza: 'Two and a third million cubic metres of limestone. Nothing here falls over.',
+  chichen: 'A pyramid built over an older pyramid. The skin is not the building.',
 };
 
 /** Ordered level records, for menus. */

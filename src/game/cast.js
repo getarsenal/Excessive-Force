@@ -40,10 +40,42 @@ export const CAST = {
     rank: 'Mushir', name: 'Tarek El-Masry', nation: 'Egypt', side: 'right',
     colours: ['#ce1126', '#ffffff', '#000000'],
   },
+  // The second half of the campaign. Art not drawn yet: each of these points
+  // at a file that does not exist, and the stand-off falls back to the plate
+  // and the bubble without it, so the level plays and the slot is documented
+  // in `characters/manifest.json` for whoever draws them.
+  mx: {
+    id: 'mx', file: 'assets/characters/mx-general.png',
+    rank: 'Gral. de División', name: 'Rodrigo Salazar-Quiroz', nation: 'Mexico',
+    side: 'right', colours: ['#006847', '#ffffff', '#ce1126'],
+  },
+  it: {
+    id: 'it', file: 'assets/characters/it-generale.png',
+    rank: 'Generale', name: 'Ottavio Brambilla', nation: 'Italy', side: 'right',
+    colours: ['#008c45', '#ffffff', '#cd212a'],
+  },
+  ru: {
+    id: 'ru', file: 'assets/characters/ru-marshal.png',
+    rank: 'Marshal', name: 'Lev Zimyanin', nation: 'Russia', side: 'right',
+    colours: ['#ffffff', '#0039a6', '#d52b1e'],
+  },
+  au: {
+    id: 'au', file: 'assets/characters/au-general.png',
+    rank: 'Gen.', name: 'Angus Kerrigan', nation: 'Australia', side: 'right',
+    colours: ['#00247d', '#ffffff', '#c8202f'],
+  },
+  br: {
+    id: 'br', file: 'assets/characters/br-marechal.png',
+    rank: 'Marechal', name: 'Joaquim Duarte-Ribeiro', nation: 'Brazil',
+    side: 'right', colours: ['#009739', '#fedd00', '#012169'],
+  },
 };
 
 /** Which defender holds each level. */
-export const DEFENDER_OF = { westminster: 'uk', paris: 'fr', agra: 'in', giza: 'eg' };
+export const DEFENDER_OF = {
+  westminster: 'uk', paris: 'fr', agra: 'in', giza: 'eg',
+  chichen: 'mx', pisa: 'it', moscow: 'ru', sydney: 'au', rio: 'br',
+};
 
 /**
  * The stand-off before each level: ultimatum, refusal, last word.
@@ -71,5 +103,34 @@ export const STANDOFF = {
     { who: 'us', line: "God it's hot out here, give it up before we all melt would ya?" },
     { who: 'eg', line: 'اطلع الهرم ده وهاتك يا طفل يا تخين' },
     { who: 'us', line: "I don't speak Sanskrit habibi, but I get the gist. Someone get me some damn water and a lot of bombs" },
+  ],
+  // ── Drafts. The five below are written here rather than handed over by the
+  // writer, and are marked as such in `characters/manifest.json`. Same shape
+  // as the rest: ultimatum, refusal in his own language, and a last word from
+  // a man who did not understand a syllable of it.
+  chichen: [
+    { who: 'us', line: 'Step aside, chief. We do not negotiate with calendars.' },
+    { who: 'mx', line: 'Llevas mil años tarde. Esto ya lo enterramos una vez y lo volvimos a construir encima.' },
+    { who: 'us', line: 'Built it twice, huh? Well hell, that is half my work done for me.' },
+  ],
+  pisa: [
+    { who: 'us', line: 'That thing is already falling over. Save us both the ammunition.' },
+    { who: 'it', line: "Pende da ottocento anni, americano. Tu non duri otto minuti in questo sole." },
+    { who: 'us', line: 'Eight hundred years of leaning. Let us call it a running start.' },
+  ],
+  moscow: [
+    { who: 'us', line: 'Nine churches. I brought enough for ten.' },
+    { who: 'ru', line: 'Иван ослепил зодчего, чтобы он не построил второго. Тебе глаза оставим — смотри.' },
+    { who: 'us', line: 'I did not catch a word of that, but he sounded real confident about it.' },
+  ],
+  sydney: [
+    { who: 'us', line: 'You are on a point with water on three sides. Where exactly are you going?' },
+    { who: 'au', line: 'Mate, you have got one road in and we have got the whole harbour. Take your shot.' },
+    { who: 'us', line: 'Finally, one of them speaks English. Does not make him right.' },
+  ],
+  rio: [
+    { who: 'us', line: 'Seven hundred metres up with no road out. Walk down or be carried.' },
+    { who: 'br', line: 'Ele está de braços abertos há um século. Nem por você ele abaixa.' },
+    { who: 'us', line: 'Arms out like that? Son, that is not a welcome, that is a target.' },
   ],
 };

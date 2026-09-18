@@ -1,0 +1,13 @@
+{
+  "id": "moscow",
+  "name": "Saint Basil's Cathedral, Moscow",
+  "lat": 55.7525,
+  "lon": 37.6231,
+  "spanMeters": 850.0,
+  "size": 512,
+  "minElevation": 113.056,
+  "maxElevation": 170.473,
+  "metersPerDemPixel": 5.377,
+  "seaLevel": 123.814,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

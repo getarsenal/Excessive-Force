@@ -1,0 +1,13 @@
+{
+  "id": "pisa",
+  "name": "Leaning Tower, Pisa",
+  "lat": 43.72304,
+  "lon": 10.39664,
+  "spanMeters": 700.0,
+  "size": 512,
+  "minElevation": -0.045,
+  "maxElevation": 15.442,
+  "metersPerDemPixel": 6.905,
+  "seaLevel": 1.57,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

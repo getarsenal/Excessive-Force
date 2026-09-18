@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WING } from '../structure/landmarks/bigben.js';
 import { EIFFEL } from '../structure/landmarks/eiffel.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
+import { CASTILLO } from '../structure/landmarks/chichen.js';
 
 /**
  * Flags on the landmarks.
@@ -39,6 +40,13 @@ export const FLAG_SITES = {
     // On the Sphinx's back.
     { key: 'sphinx', x: 0, y: 16, z: 18, pattern: 'egypt', w: 8, h: 5, pole: 8 },
   ],
+  chichen: [
+    // On the roof of the temple of Kukulcán, which is the highest stone on
+    // the site and comes down with the crown of the pyramid.
+    { key: 'castillo', x: CASTILLO.templeHalf - 1.4,
+      y: CASTILLO.platform + CASTILLO.templeH + 2.6, z: 0,
+      pattern: 'mexico', w: 9, h: 5, pole: 9 },
+  ],
 };
 
 /** The cloth's pattern, drawn once into a small canvas. */
@@ -67,6 +75,63 @@ const PATTERNS = {
     ctx.fillStyle = '#2d8a4b'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
     ctx.strokeStyle = '#1e3f8c'; ctx.lineWidth = h * 0.03;
     ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.13, 0, Math.PI * 2); ctx.stroke();
+  },
+  mexico(ctx, w, h) {
+    ctx.fillStyle = '#006847'; ctx.fillRect(0, 0, w / 3, h);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(w / 3, 0, w / 3, h);
+    ctx.fillStyle = '#ce1126'; ctx.fillRect((w * 2) / 3, 0, w / 3, h);
+    // The eagle, at this size, is a dark mark in the middle band.
+    ctx.fillStyle = '#5c4326';
+    ctx.beginPath(); ctx.ellipse(w / 2, h / 2, h * 0.13, h * 0.10, 0, 0, Math.PI * 2); ctx.fill();
+  },
+  italy(ctx, w, h) {
+    ctx.fillStyle = '#008c45'; ctx.fillRect(0, 0, w / 3, h);
+    ctx.fillStyle = '#f4f5f0'; ctx.fillRect(w / 3, 0, w / 3, h);
+    ctx.fillStyle = '#cd212a'; ctx.fillRect((w * 2) / 3, 0, w / 3, h);
+  },
+  russia(ctx, w, h) {
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, 0, w, h / 3);
+    ctx.fillStyle = '#0039a6'; ctx.fillRect(0, h / 3, w, h / 3);
+    ctx.fillStyle = '#d52b1e'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+  },
+  australia(ctx, w, h) {
+    ctx.fillStyle = '#00247d'; ctx.fillRect(0, 0, w, h);
+    // The canton, drawn as the Union's crosses at a quarter size.
+    const cw = w * 0.5, ch = h * 0.5;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cw, ch); ctx.clip();
+    ctx.strokeStyle = '#f2f2ec'; ctx.lineWidth = ch * 0.2;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cw, ch); ctx.moveTo(cw, 0); ctx.lineTo(0, ch); ctx.stroke();
+    ctx.strokeStyle = '#c8202f'; ctx.lineWidth = ch * 0.07;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cw, ch); ctx.moveTo(cw, 0); ctx.lineTo(0, ch); ctx.stroke();
+    ctx.fillStyle = '#f2f2ec';
+    ctx.fillRect(cw * 0.5 - ch * 0.17, 0, ch * 0.34, ch);
+    ctx.fillRect(0, ch * 0.5 - ch * 0.17, cw, ch * 0.34);
+    ctx.fillStyle = '#c8202f';
+    ctx.fillRect(cw * 0.5 - ch * 0.1, 0, ch * 0.2, ch);
+    ctx.fillRect(0, ch * 0.5 - ch * 0.1, cw, ch * 0.2);
+    ctx.restore();
+    // The Commonwealth Star under the canton, and the Southern Cross on the fly.
+    ctx.fillStyle = '#f2f2ec';
+    const star = (x, y, r) => {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    };
+    star(cw * 0.5, ch + (h - ch) * 0.45, h * 0.075);
+    for (const [fx, fy, fr] of [[0.76, 0.22, 0.05], [0.70, 0.50, 0.062],
+      [0.80, 0.66, 0.045], [0.88, 0.40, 0.05], [0.755, 0.40, 0.028]]) {
+      star(w * fx, h * fy, h * fr);
+    }
+  },
+  brazil(ctx, w, h) {
+    ctx.fillStyle = '#009739'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#fedd00';
+    ctx.beginPath();
+    ctx.moveTo(w / 2, h * 0.12); ctx.lineTo(w * 0.88, h / 2);
+    ctx.lineTo(w / 2, h * 0.88); ctx.lineTo(w * 0.12, h / 2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#012169';
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f4f2ec'; ctx.lineWidth = h * 0.045;
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.64, h * 0.30, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
   },
   egypt(ctx, w, h) {
     ctx.fillStyle = '#cf2231'; ctx.fillRect(0, 0, w, h / 3);

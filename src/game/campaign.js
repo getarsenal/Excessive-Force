@@ -4,11 +4,18 @@ import { loadProgress } from '../ui/levelselect.js';
 /**
  * The campaign.
  *
- * Four contracts, in one order, each one a country on the map. The order is not
+ * Nine contracts, in one order, each one a country on the map. The order is not
  * decoration: the arsenal opens up as contracts are closed, so London is fought
  * with light guns and Egypt with whatever is left of the air force, and a
  * player who arrives at the Great Pyramid with an AT4 has been sent there by
  * the game rather than by their own bad idea.
+ *
+ * The first five contracts each release a rung of the arsenal and the last four
+ * release nothing, because by then there is nothing left to hand over. That is
+ * deliberate: the back half of the campaign is not harder because the guns are
+ * bigger on the other side, it is harder because a leaning tower, nine towers on
+ * one podium, a shell vault over water and a statue on a mountain cannot be
+ * solved by bringing more.
  *
  * Two things are tracked and they are not the same. `tt.progress` already knows
  * which levels have been won and what the best run was; that is the record of
@@ -43,8 +50,8 @@ export const THEATRES = [
     brief: 'Ninety-six metres of Anston stone on four walls and a hollow shaft. '
       + 'The client wants it in the river. Open one face and it will go that way '
       + 'on its own.',
-    unlocks: ['m109', 'f15'],
-    unlockLine: 'Paladin and close air support released',
+    unlocks: ['m109'],
+    unlockLine: 'Paladin self-propelled howitzer released',
   },
   {
     id: 'paris',
@@ -57,8 +64,8 @@ export const THEATRES = [
     brief: 'Seven thousand tonnes of wrought iron standing on nothing but its '
       + 'own piers. It will not be shelled down like masonry — it has to be cut. '
       + 'Take a leg and it falls towards the gap.',
-    unlocks: ['m270', 'm142'],
-    unlockLine: 'Rocket artillery released',
+    unlocks: ['f15'],
+    unlockLine: 'Close air support released',
   },
   {
     id: 'agra',
@@ -71,8 +78,8 @@ export const THEATRES = [
     brief: 'A marble shell on four piers over a terrace the size of a parade '
       + 'ground. Nothing here topples. The dome has to be broken, and the piers '
       + 'under it are the only thing holding the roof up.',
-    unlocks: ['b1'],
-    unlockLine: 'Heavy bomber on call',
+    unlocks: ['m142'],
+    unlockLine: 'HIMARS released',
   },
   {
     id: 'giza',
@@ -81,13 +88,27 @@ export const THEATRES = [
     city: 'GIZA',
     lon: 31.1342, lat: 29.9792,
     no: 4,
-    title: 'THE LAST ONE',
+    title: 'THE MOUNTAIN',
     brief: 'Two and a third million cubic metres of limestone that has stood for '
       + 'four and a half thousand years. It cannot fall over. There is nothing to '
       + 'undercut and nothing to topple: it comes down by being removed.',
-    // Nothing left to release: this is the one you finish with everything.
-    unlocks: [],
-    unlockLine: 'The board is clear',
+    unlocks: ['m270'],
+    unlockLine: 'M270 rocket artillery released',
+  },
+  {
+    id: 'chichen',
+    iso: 'MEX',
+    lx: -48, ly: 30,
+    city: 'CHICHEN ITZA',
+    lon: -88.5687, lat: 20.6829,
+    no: 5,
+    title: 'THE ONE INSIDE',
+    brief: 'Nine limestone terraces the Maya raised over a pyramid they had '
+      + 'already finished. Cut into the flank and you are not opening a core, you '
+      + 'are opening the older building — and the top of the new one is standing '
+      + 'on its roof.',
+    unlocks: ['b1'],
+    unlockLine: 'Heavy bomber on call',
   },
 ];
 
@@ -195,11 +216,12 @@ function closedCount() {
  *
  * The towed guns are issued from the start — a contract nobody can open is not
  * a campaign, it is a wall, and the Elizabeth Tower is thirty-two thousand
- * stones to be got through with what you are given. Each closed contract
- * releases the next rung, and the last one releases nothing because there is
- * nothing after it: Giza is the contract you arrive at holding everything. This gate sits *on top of* the per-level unlock: a weapon has
- * to be released by the campaign and earned inside the level, which is why
- * turning up at the Great Pyramid with a bomber still means working up to it.
+ * stones to be got through with what you are given. Each of the first five
+ * contracts releases the next rung, and the four after them release nothing,
+ * because Chichen Itza is the contract you come out of holding everything.
+ * This gate sits *on top of* the per-level unlock: a weapon has to be released
+ * by the campaign and earned inside the level, which is why turning up at the
+ * Great Pyramid with rockets still means working up to them.
  */
 export function releasedUnits() {
   const out = new Set(['at4', 'gustaf', 'rpg32', 'javelin', 'm119', 'm777']);

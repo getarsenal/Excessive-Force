@@ -92,6 +92,80 @@ LEVELS = {
             [40, -300, 330], [20, -560, 260], [-90, 400, 170],
         ],
     },
+    # ── Chichén Itzá: El Castillo on the flat limestone shelf of the northern
+    # Yucatán. No river within forty kilometres and no relief worth the name —
+    # the whole peninsula is a raised reef — so the ground here is jungle and
+    # the pyramid is the only thing on the skyline.
+    "chichen": {
+        "name": "El Castillo, Chichén Itzá",
+        "lat": 20.68285,
+        "lon": -88.56867,
+        "span": 800.0,
+        "zoom": 14,
+        "parks": [[0, 0, 900], [420, 300, 380], [-380, -260, 340]],
+        # The DEM has the pyramid as a low bump; the game builds its own.
+        "flatten": [[0, 0, 90, 46]],
+    },
+    # ── Sydney: Bennelong Point, with the harbour on three sides of it. The
+    # first level whose water is not a river, and the reason `flood_sea`
+    # exists — the shoreline here is a shape, not a line.
+    "sydney": {
+        "name": "Sydney Opera House, Sydney",
+        "lat": -33.85681,
+        "lon": 151.21526,
+        "span": 850.0,
+        "zoom": 14,
+        "sea": {"level": 1.5, "depth": 11.0, "shore": 3.0},
+        # The Royal Botanic Garden, which is the only ground east of the point
+        # and therefore most of the map a battery can stand on.
+        "parks": [[330, -150, 380], [180, -420, 260]],
+        "flatten": [[0, 0, 130, 60]],
+    },
+    # ── Pisa: the Field of Miracles, outside the north wall of the old city.
+    # The Arno is a kilometre south, well off a map this size, so there is no
+    # water here at all.
+    "pisa": {
+        "name": "Leaning Tower, Pisa",
+        "lat": 43.72304,
+        "lon": 10.39664,
+        "span": 700.0,
+        "zoom": 14,
+        "parks": [[-40, 20, 180], [-260, 120, 130]],
+        "flatten": [[0, 0, 95, 50]],
+    },
+    # ── Moscow: Red Square, with the Moskva running past the south end of it.
+    "moscow": {
+        "name": "Saint Basil's Cathedral, Moscow",
+        "lat": 55.75250,
+        "lon": 37.62310,
+        "span": 850.0,
+        "zoom": 14,
+        # The river bends east-north-east past the Kremlin's south wall. Held
+        # ~300 m clear of the cathedral's own footings.
+        "river": {
+            "width": 200.0,
+            "points": [
+                [-840, -470], [-560, -430], [-300, -370], [-60, -320],
+                [200, -300], [460, -330], [700, -420], [840, -500],
+            ],
+        },
+        "parks": [[-330, 120, 200], [-520, 380, 240]],
+        "flatten": [[0, 0, 85, 48]],
+    },
+    # ── Rio: the summit of Corcovado, seven hundred metres up. The most relief
+    # of any level by a factor of ten, and the whole problem of the map.
+    "rio": {
+        "name": "Christ the Redeemer, Rio de Janeiro",
+        "lat": -22.95186,
+        "lon": -43.21054,
+        "span": 800.0,
+        "zoom": 14,
+        # Tijuca forest on every side, because that is what is down there.
+        "parks": [[0, 0, 1000], [-400, -400, 400], [420, 380, 400]],
+        # A terrace for the statue's own plinth and nothing more: the peak is
+        # the level.
+        "flatten": [[0, 0, 55, 34]],
+    },
     "giza": {
         "name": "Great Pyramids, Giza",
         "lat": 29.97918,
@@ -200,6 +274,29 @@ def smooth(arr: np.ndarray, passes: int = 2) -> np.ndarray:
     return out
 
 
+def flood_sea(height: np.ndarray, mask: np.ndarray, sea: dict):
+    """Mark open water from the DEM itself, for coastal maps.
+
+    A river is a line and is carved from a polyline. A harbour is not a line —
+    Bennelong Point has water on three sides of it and the shore is a shape
+    nobody is going to type in as a list of points. The DEM already knows where
+    it is: Tilezen fills water flat at its own surface level, so everything at
+    or below the waterline is sea and everything above it is land, and the
+    coastline comes out of the tiles at the resolution the tiles have.
+
+    The channel is then dredged the same way a river is, because a harbour that
+    is flat at the shoreline is a car park: shells that fall in have to splash,
+    and the water shader wants something under it.
+    """
+    level = float(sea.get("level", 1.5))
+    depth = float(sea.get("depth", 9.0))
+    shore = float(sea.get("shore", 2.5))
+    wet = np.clip((level + shore - height) / max(0.5, shore * 2.0), 0.0, 1.0)
+    mask[:, :, 0] = np.maximum(mask[:, :, 0], wet)
+    # Down to a bed, deepest where the water is widest.
+    return height - wet * depth
+
+
 def carve_river(height: np.ndarray, mask: np.ndarray, river: dict, span: float, sea: float):
     """Cut the river channel into the DEM and write the water mask.
 
@@ -275,6 +372,23 @@ def bake(level_id: str):
     elev, mpp = build_mosaic(cfg["lat"], cfg["lon"], cfg["span"], cfg["zoom"])
     print(f"  raw DEM {elev.shape}, {elev.min():.1f}..{elev.max():.1f} m")
 
+    # Throw out the corrupt pixels before anything is measured off them.
+    #
+    # Terrarium carries occasional junk in water tiles: Sydney Harbour comes
+    # back with a handful of samples at -1929 m in water that is three metres
+    # deep, and since the height PNG is rescaled to the DEM's own min and max,
+    # those few pixels squash the entire level into the top five per cent of
+    # the range. A robust window around the 0.2nd and 99.8th percentiles keeps
+    # every real feature — Corcovado's own 620 m of relief is untouched by it —
+    # and clips anything that could only be a decode error.
+    lo = float(np.percentile(elev, 0.2))
+    hi = float(np.percentile(elev, 99.8))
+    pad = max(20.0, (hi - lo) * 0.25)
+    bad = int(np.count_nonzero((elev < lo - pad) | (elev > hi + pad)))
+    if bad:
+        elev = np.clip(elev, lo - pad, hi + pad)
+        print(f"  clipped {bad} outlying samples to {lo - pad:.1f}..{hi + pad:.1f} m")
+
     size = 512
     height = resample(elev, size)
     height = smooth(height, passes=3)
@@ -287,6 +401,9 @@ def bake(level_id: str):
 
     if "river" in cfg:
         height = carve_river(height, mask, cfg["river"], cfg["span"], sea)
+
+    if "sea" in cfg:
+        height = flood_sea(height, mask, cfg["sea"])
 
     # Parkland (St James's / Victoria Tower Gardens) — a soft blob west and
     # south of the tower so the ground shader has something to vary on.
