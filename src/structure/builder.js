@@ -28,6 +28,7 @@ export const MATERIALS = {
   CHARGE: 12,    // a buried demolition charge; destroying one sets it off
   RAILING: 13,   // ironwork nothing may rest on: balustrades and screens
   VERDE: 14,     // the grey-green stone of Pisan banding
+  TILE: 15,      // glazed ceramic over a concrete rib: a shell vault
 };
 
 /**
@@ -57,6 +58,12 @@ export const MATERIAL_PROPS = {
   // the grade downstream both push colour, and a convincing green here comes
   // out of the pipeline as billiard baize.
   [MATERIALS.VERDE]:     { density: 2.62, strength: 1.02, toughness: 106, color: 0x8b9489, structural: true },
+  // A shell vault: precast concrete rib with a skin of glazed ceramic on it.
+  // Rated as the concrete, because the concrete is what carries — the tile is
+  // a millimetre of glaze and a colour. Off-white and slightly warm, which is
+  // what a million Hoganas tiles look like in sunlight and a long way from the
+  // grey CONCRETE would have made of the Sydney Opera House.
+  [MATERIALS.TILE]:      { density: 2.40, strength: 1.40, toughness: 145, color: 0xe9e5da, structural: true },
   // Anston limestone weathered to the warm red-brown the tower reads as
   // against a low sun. Physically it is limestone; only the colour differs.
   //

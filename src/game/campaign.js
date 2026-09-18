@@ -125,6 +125,21 @@ export const THEATRES = [
     unlocks: [],
     unlockLine: 'Nothing new — you have it all',
   },
+  {
+    id: 'sydney',
+    iso: 'AUS',
+    lx: -62, ly: 22,
+    city: 'SYDNEY',
+    lon: 151.2153, lat: -33.8568,
+    no: 7,
+    title: 'ONE ROAD IN',
+    brief: 'Fourteen concrete shells on a headland with water on three sides. '
+      + 'There is no mass here and nothing above the roof, so shelling the '
+      + 'roof achieves a hole in the roof. An arch dies at its haunches, and '
+      + 'the haunches are at deck level behind the glass.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
 ];
 
 /** The contract for a level id, if that level is one. */

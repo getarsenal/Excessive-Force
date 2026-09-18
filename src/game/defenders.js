@@ -8,6 +8,7 @@ import { CASTILLO, WARRIORS } from '../structure/landmarks/chichen.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { KHUFU } from '../structure/landmarks/giza.js';
 import { PISA, DUOMO, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
+import { OPERA, ridgeAt as operaRidgeAt } from '../structure/landmarks/sydney.js';
 
 /**
  * The garrison.
@@ -1131,6 +1132,70 @@ export class Garrison {
       this.place('mortar', new THREE.Vector3(
         origin.x - 30 + i * 30, groundY + D.aisleH + 1.4,
         origin.z + D.halfZ * 0.72), 0, 7, { cover: 'roof' });
+    }
+  }
+
+  /**
+   * The Sydney Opera House.
+   *
+   * A garrison with nowhere to go. Bennelong Point is water on three sides,
+   * so every position here faces the same way — south, down the one neck of
+   * land — and the whole defence is depth on a single approach rather than a
+   * ring. The podium's arcade is the front line, the deck is the step above
+   * it, and the glass mouths of the shells are the top floor.
+   */
+  populateOperaHouse(origin, groundY) {
+    const O = OPERA;
+    // The arcade along both long faces of the podium, at the waterline.
+    for (const sx of [1, -1]) {
+      for (let i = 0; i < 9; i++) {
+        const z = -O.podiumZ + 14 + i * ((O.podiumZ * 2 - 28) / 8);
+        this.place(i % 3 === 0 ? 'mg' : 'rifleman', new THREE.Vector3(
+          origin.x + sx * (O.podiumX - 1.6), groundY + O.arcadeH * 0.45,
+          origin.z + z), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 6,
+        { cover: 'arcade' });
+      }
+    }
+    // The deck: a parapet line all the way round, heaviest at the south end
+    // where the steps come up, because that is the only way anyone arrives.
+    for (let i = 0; i < 10; i++) {
+      const f = i / 9;
+      for (const sx of [1, -1]) {
+        this.place(f < 0.35 ? 'at' : f < 0.7 ? 'mg' : 'rifleman', new THREE.Vector3(
+          origin.x + sx * (O.podiumX - 3.0), groundY + O.deck + 1.2,
+          origin.z + -O.podiumZ + 8 + f * (O.podiumZ * 2 - 16)),
+        sx > 0 ? Math.PI / 2 : -Math.PI / 2, 7, { cover: 'roof' });
+      }
+    }
+    for (let i = 0; i < 5; i++) {
+      this.place(i % 2 ? 'at' : 'mg', new THREE.Vector3(
+        origin.x - O.stepsW / 2 + 8 + i * ((O.stepsW - 16) / 4),
+        groundY + O.deck + 1.2, origin.z - O.podiumZ + 3.0), Math.PI, 7,
+      { cover: 'roof' });
+    }
+    // In the mouths of the shells, behind the glass. The tallest of them puts
+    // a rifle fifty-eight metres over a flat point with nothing between it and
+    // the far shore.
+    for (const sh of O.shells) {
+      const h = sh.h * operaRidgeAt(0);
+      const cy = Math.cos(sh.yaw), sy = Math.sin(sh.yaw);
+      // In front of the glass, not behind it. Glazing is occupancy as far as
+      // a line of sight is concerned, and a rank posted inside the mouth is a
+      // rank that cannot see the steps it is there to cover.
+      for (const q of [-sh.s * 0.55, sh.s * 0.55]) {
+        this.place(sh.h > 40 ? 'sniper' : 'rifleman', new THREE.Vector3(
+          origin.x + sh.x + q * cy - 3.2 * sy,
+          groundY + O.deck + Math.min(6.0, h * 0.2),
+          origin.z + sh.z - q * sy - 3.2 * cy), sh.yaw + Math.PI, 8,
+        { cover: 'window' });
+      }
+    }
+    // Mortars on the deck between the two shell groups, in the one strip of
+    // flat roof that nothing is standing on.
+    for (let i = 0; i < 4; i++) {
+      this.place('mortar', new THREE.Vector3(
+        origin.x, groundY + O.deck + 1.2, origin.z + 60 - i * 34), Math.PI, 8,
+      { cover: 'roof' });
     }
   }
 

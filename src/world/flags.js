@@ -4,6 +4,7 @@ import { EIFFEL } from '../structure/landmarks/eiffel.js';
 import { TAJ } from '../structure/landmarks/tajmahal.js';
 import { CASTILLO } from '../structure/landmarks/chichen.js';
 import { PISA, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
+import { OPERA } from '../structure/landmarks/sydney.js';
 
 /**
  * Flags on the landmarks.
@@ -55,6 +56,14 @@ export const FLAG_SITES = {
     { key: 'campanile', x: PISA.bellR - 1.2,
       y: PISA.bellY + PISA.bellH * 0.9, z: pisaAxisAt(PISA.bellY + PISA.bellH),
       pattern: 'italy', w: 8, h: 5, pole: 8 },
+  ],
+  sydney: [
+    // On the deck at the head of the monumental steps, which is where the
+    // flagpoles actually stand and the first thing anyone coming up sees.
+    { key: 'opera', x: -OPERA.stepsW * 0.28, y: OPERA.deck + 1.0,
+      z: -OPERA.podiumZ + 6, pattern: 'australia', w: 10, h: 6, pole: 12 },
+    { key: 'opera', x: OPERA.stepsW * 0.28, y: OPERA.deck + 1.0,
+      z: -OPERA.podiumZ + 6, pattern: 'australia', w: 10, h: 6, pole: 12 },
   ],
 };
 

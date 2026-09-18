@@ -5,6 +5,7 @@ import { buildEiffelTower, buildChaillotWing } from '../structure/landmarks/eiff
 import { buildElCastillo, buildTempleOfWarriors } from '../structure/landmarks/chichen.js';
 import { buildCampanile, buildDuomo, buildBaptistery }
   from '../structure/landmarks/pisa.js';
+import { buildOperaHouse } from '../structure/landmarks/sydney.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -262,6 +263,52 @@ export const LEVELS = {
     brief: 'It is bent, not tilted. The overhang at the top is the part they corrected.',
   },
 
+  sydney: {
+    id: 'sydney',
+    terrain: 'sydney',
+    name: 'Sydney Opera House',
+    place: 'Bennelong Point, Sydney',
+    target: 'THE OPERA HOUSE',
+    subtitle: 'Bennelong Point · Sydney Harbour',
+    victory: 'Curtain Down',
+    // Sydney sandstone and harbour water: pale gold ground, very dark green
+    // on the Botanic Garden side, and nothing warm anywhere near the sea.
+    palette: {
+      urban: new THREE.Color(0xc3b291),
+      urbanAlt: new THREE.Color(0xad9c78),
+      park: new THREE.Color(0x3b5a33),
+      parkAlt: new THREE.Color(0x4a6b38),
+      road: new THREE.Color(0x6f6b64),
+      bank: new THREE.Color(0xb0a486),
+      bed: new THREE.Color(0x2c4348),
+      dry: new THREE.Color(0xc7b998),
+    },
+    // Circular Quay is across the cove; nothing is built on the point but the
+    // thing on the point.
+    cityExcludeRadius: 300,
+    contextExclude: 260,
+    camera: { yaw: 2.60, pitch: 0.22, distance: 330, height: 46 },
+    // One structure, not two. The shells stand on the deck and the deck stands
+    // on the substructure — see the builder.
+    structures: (quality) => [
+      { key: 'opera', blocks: buildOperaHouse(quality), primary: true,
+        required: true, label: 'OPERA HOUSE' },
+    ],
+    garrison: (g, origin, groundY) => {
+      g.populateOperaHouse(origin, groundY);
+    },
+    scoreTags: ['haunches', 'shells', 'walls', 'deck'],
+    precinct: {
+      boundary: 'none',           // the boundary here is the harbour
+      ground: 'paving',
+      ornament: 'none',
+      river: 'quay',
+    },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    brief: 'A shell has no mass and nothing above it. Hit the haunches, not the crowns.',
+  },
+
   giza: {
     id: 'giza',
     terrain: 'giza',
@@ -353,7 +400,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -363,6 +410,7 @@ export const LEVEL_BLURB = {
   giza: 'Two and a third million cubic metres of limestone. Nothing here falls over.',
   chichen: 'A pyramid built over an older pyramid. The skin is not the building.',
   pisa: 'Eighty-nine metres already falling. The part that overhangs is the part that is safe.',
+  sydney: 'Fourteen shells on a headland with one road in. Arches, not walls.',
 };
 
 /** Ordered level records, for menus. */

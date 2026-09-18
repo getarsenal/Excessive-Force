@@ -755,11 +755,35 @@ export function buildRailway(props, terrain, rng, opts) {
   const span = terrain.span;
   const counts = { track: 0, arches: 0, station: 0, carriages: 0 };
   const yaw = opts.yaw ?? 0.23;
-  // Run it across one side of the map, clear of the middle.
-  const off = span * (0.55 + rng() * 0.2) * (rng() < 0.5 ? 1 : -1);
   const ux = Math.cos(yaw), uz = -Math.sin(yaw);
   const vx = Math.sin(yaw), vz = Math.cos(yaw);
-  const at = (t) => ({ x: ux * t + vx * off, z: uz * t + vz * off });
+  const line = (off) => (t) => ({ x: ux * t + vx * off, z: uz * t + vz * off });
+
+  // Run it across one side of the map, clear of the middle — and on the side
+  // that has ground on it. Picking the offset at random works on a map that is
+  // land with a river through it and fails on one that is water with a
+  // headland in it: at Sydney the line landed in the harbour and the railway
+  // came out as fifteen disconnected sleepers. Try both sides at a few
+  // distances and keep whichever crosses the most dry ground.
+  let off = span * 0.6;
+  let bestDry = -1;
+  for (const sg of [1, -1]) {
+    for (const f of [0.55, 0.65, 0.75]) {
+      const cand = span * f * sg;
+      const a = line(cand);
+      let dry = 0;
+      for (let t = -span * 1.1; t < span * 1.1; t += 12) {
+        const p = a(t);
+        if (terrain.isWater(p.x, p.z)) continue;
+        if (opts.net && opts.net.roadClearance(p.x, p.z) < 8) continue;
+        dry++;
+      }
+      // A tie goes to the first tried, which keeps the four existing maps'
+      // railways exactly where they were.
+      if (dry > bestDry) { bestDry = dry; off = cand; }
+    }
+  }
+  const at = line(off);
 
   let deck = -Infinity;
   for (let t = -span; t <= span; t += 40) {

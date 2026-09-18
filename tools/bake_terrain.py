@@ -114,12 +114,23 @@ LEVELS = {
         "lat": -33.85681,
         "lon": 151.21526,
         "span": 850.0,
-        "zoom": 14,
-        "sea": {"level": 1.5, "depth": 11.0, "shore": 3.0},
+        # The DEM here is a surface model over a city: see `ceiling`.
+        "ceiling": 42.0,
+        # One zoom finer than everywhere else. Bennelong Point is a hundred
+        # metres across and at z14 that is twelve DEM pixels, most of which the
+        # smoothing pass hands to the harbour — the point simply is not there.
+        "zoom": 15,
+        # The waterline sits just under the quay, and the shore band is narrow:
+        # widen it and the flood walks up the peninsula it is supposed to be
+        # going round.
+        "sea": {"level": 0.6, "depth": 10.0, "shore": 1.2},
         # The Royal Botanic Garden, which is the only ground east of the point
         # and therefore most of the map a battery can stand on.
         "parks": [[330, -150, 380], [180, -420, 260]],
-        "flatten": [[0, 0, 130, 60]],
+        # The podium, at its real height above the harbour, and the shape of
+        # the podium — the Opera House covers essentially the whole of
+        # Bennelong Point, so the pad and the building are the same rectangle.
+        "flatten": [[0, -6, [62, 90], 24, 4.2]],
     },
     # ── Pisa: the Field of Miracles, outside the north wall of the old city.
     # The Arno is a kilometre south, well off a map this size, so there is no
@@ -351,12 +362,30 @@ def flatten_pads(height: np.ndarray, pads: list, span: float) -> np.ndarray:
     gy = np.linspace(span, -span, size)[:, None]
     px = np.broadcast_to(gx, (size, size))
     py = np.broadcast_to(gy, (size, size))
-    for ox, oy, r, feather in pads:
-        d = np.hypot(px - ox, py - oy)
+    for pad in pads:
+        ox, oy, r, feather = pad[:4]
+        fixed = pad[4] if len(pad) > 4 else None
+        if isinstance(r, (list, tuple)):
+            # A rounded rectangle, for a pad that has to match a rectangular
+            # building on a peninsula. A disc big enough to reach the corners
+            # of the Opera House's podium reclaims fifty metres of harbour down
+            # both sides of Bennelong Point; a disc small enough not to leaves
+            # the corners under water.
+            rx, ry = float(r[0]), float(r[1])
+            d = np.hypot(np.maximum(np.abs(px - ox) - rx, 0.0),
+                         np.maximum(np.abs(py - oy) - ry, 0.0))
+            r = 0.0
+        else:
+            d = np.hypot(px - ox, py - oy)
         ring = (d > r) & (d < r + feather * 1.4)
         if not ring.any():
             continue
-        target = float(np.median(height[ring]))
+        # The ring's median is the right target on dry sites and the wrong one
+        # on a peninsula: at Bennelong Point the ring is nine tenths harbour,
+        # so levelling to it dropped the whole of the Opera House's ground to
+        # eight metres under water. A pad with water round it states its own
+        # height instead.
+        target = float(fixed) if fixed is not None else float(np.median(height[ring]))
         t = np.clip((r + feather - d) / max(feather, 1e-3), 0.0, 1.0)
         k = t * t * (3.0 - 2.0 * t)
         height = height * (1.0 - k) + target * k
@@ -391,6 +420,24 @@ def bake(level_id: str):
 
     size = 512
     height = resample(elev, size)
+
+    # A ceiling on the DEM, for a level whose city is in it.
+    #
+    # Terrarium is a surface model, not a bare-earth one, and at z15 over a
+    # central business district it is mostly office blocks: Sydney comes back
+    # with ninety-eight metres of "terrain" where the tallest real ground
+    # within a kilometre of Bennelong Point is about forty. The game then
+    # builds its own city on top of that, which puts roofs level with the
+    # hillside they are standing in and makes half of them undeployable.
+    # Compressed rather than clipped, so the high ground is still high and is
+    # no longer a tower.
+    ceiling = cfg.get("ceiling")
+    if ceiling is not None:
+        over = height > ceiling
+        if over.any():
+            height = np.where(over, ceiling + (height - ceiling) * 0.12, height)
+            print(f"  compressed {int(over.sum())} samples above {ceiling:.0f} m")
+
     height = smooth(height, passes=3)
 
     sea = float(np.percentile(height, 5))
