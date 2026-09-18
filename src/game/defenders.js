@@ -10,6 +10,7 @@ import { KHUFU } from '../structure/landmarks/giza.js';
 import { PISA, DUOMO, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 import { OPERA, ridgeAt as operaRidgeAt } from '../structure/landmarks/sydney.js';
 import { BASIL, KREMLIN } from '../structure/landmarks/moscow.js';
+import { REDEEMER } from '../structure/landmarks/rio.js';
 
 /**
  * The garrison.
@@ -1280,6 +1281,52 @@ export class Garrison {
       this.place('mortar', new THREE.Vector3(
         origin.x - K.thick * 0.1, groundY + K.height + 1.2,
         origin.z - 80 + i * 80), Math.PI / 2, 7, { cover: 'roof' });
+    }
+  }
+
+  /**
+   * The Corcovado.
+   *
+   * Three terraces cut into the top of a seven-hundred-metre peak, each one
+   * looking down on the one below it and all three looking down on everything
+   * else on the map. There is no cover up here worth the name and there does
+   * not need to be: the whole garrison is firing downhill, at people who have
+   * to come up a road to reach it.
+   */
+  populateRedeemer(origin, groundY) {
+    const R = REDEEMER;
+    R.terraces.forEach((t, k) => {
+      const n = [14, 10, 6][k];
+      const deck = t.y + t.h + 1.6;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + k * 0.3;
+        const r = t.half - 2.6;
+        const p = new THREE.Vector3(origin.x + Math.cos(a) * r,
+          groundY + deck, origin.z + Math.sin(a) * r);
+        // The lowest terrace takes the anti-tank and the machine guns, because
+        // it is the one the road arrives at; the top one takes the long
+        // weapons, because from there nothing on this mountain is out of
+        // range.
+        const type = k === 0 ? (i % 3 === 0 ? 'at' : 'mg')
+          : k === 1 ? (i % 3 === 0 ? 'mg' : 'rifleman') : 'sniper';
+        this.place(type, p, Math.atan2(Math.cos(a), Math.sin(a)), 7,
+          { cover: k === 0 ? 'window' : 'roof' });
+      }
+    });
+    // Mortars on the middle terrace, behind its parapet.
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + 1.2;
+      const t = R.terraces[1];
+      this.place('mortar', new THREE.Vector3(
+        origin.x + Math.cos(a) * (t.half - 6.0),
+        groundY + t.y + t.h + 1.6, origin.z + Math.sin(a) * (t.half - 6.0)),
+      0, 8, { cover: 'roof' });
+    }
+    // And two in the chapel inside the pedestal, which is the one room on this
+    // mountain with a roof on it.
+    for (const dz of [-1.4, 1.4]) {
+      this.place('at', new THREE.Vector3(origin.x, groundY + R.plinth + 1.4,
+        origin.z + dz), 0, 7, { cover: 'arcade' });
     }
   }
 

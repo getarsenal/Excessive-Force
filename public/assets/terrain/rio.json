@@ -5,9 +5,9 @@
   "lon": -43.21054,
   "spanMeters": 800.0,
   "size": 512,
-  "minElevation": 20.547,
-  "maxElevation": 646.764,
-  "metersPerDemPixel": 8.7982,
-  "seaLevel": 67.391,
+  "minElevation": 19.333,
+  "maxElevation": 690.0,
+  "metersPerDemPixel": 4.3991,
+  "seaLevel": 65.937,
   "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
 }

@@ -455,6 +455,15 @@ export class Battle {
     if (!onRoof && this.terrain.isWater(point.x, point.z)) {
       return { ok: false, reason: 'in the river' };
     }
+    // And it has to be a roof worth climbing. A building is bedded to the
+    // ground at its own centre, so where the ground climbs across its
+    // footprint the top of it can finish level with the hillside behind —
+    // which the picker still reports as a roof, because it is one, and the
+    // player still pays the roof price for a gun standing in a field. Found
+    // on the Corcovado, where the summit is ringed by ground like that.
+    if (onRoof && point.y < this.terrain.heightAt(point.x, point.z) + 4.0) {
+      return { ok: false, reason: 'level with the ground' };
+    }
     const span = this.terrain.span;
     if (Math.abs(point.x) > span * 0.92 || Math.abs(point.z) > span * 0.92) {
       return { ok: false, reason: 'off map' };

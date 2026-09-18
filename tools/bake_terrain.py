@@ -170,12 +170,33 @@ LEVELS = {
         "lat": -22.95186,
         "lon": -43.21054,
         "span": 800.0,
-        "zoom": 14,
+        # One zoom finer, because the whole level is one peak and at z14 the
+        # Corcovado arrives as a broad hill with its top rounded off.
+        "zoom": 15,
         # Tijuca forest on every side, because that is what is down there.
         "parks": [[0, 0, 1000], [-400, -400, 400], [420, 380, 400]],
-        # A terrace for the statue's own plinth and nothing more: the peak is
-        # the level.
-        "flatten": [[0, 0, 55, 34]],
+        # The statue's terrace, at the summit's own height. Levelled to the
+        # median of the ring instead, it came out seventy metres *below* the
+        # ridge beside it, and the most famous viewpoint in Brazil was a
+        # hollow with a hill next to it.
+        # A broad summit, and broader than the real one — this is the one
+        # place in the campaign where the terrain is a compromise and it is
+        # worth saying why. Cut to the Corcovado's true platform, the nearest
+        # ground a battery can stand on is a hundred and seventy metres below
+        # the statue with a sixty-degree face between the two, and a howitzer
+        # firing up that face puts its shell into the hillside in front of it
+        # every time: ten rounds out, ten impacts at the gun's own feet, and
+        # not a stone touched. So the summit is a ridge rather than a cone,
+        # and it is offset: four hundred metres of it running one way, where
+        # the batteries come up and have to have somewhere level to stand, and
+        # the rim seventy metres the other way, where the camera looks and the
+        # ground falls four hundred metres to the city. (A pad's second
+        # coordinate is northing, and the game's +z is south, so the sign of
+        # this one is the opposite of the direction it puts the flat ground.) Centred and
+        # circular, a summit wide enough for the guns is wide enough to hide
+        # the drop from every angle, and the level stops being a mountain at
+        # all.
+        "flatten": [[0, -60, [185, 245], 85, 690.0]],
     },
     "giza": {
         "name": "Great Pyramids, Giza",

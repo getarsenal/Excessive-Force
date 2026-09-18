@@ -265,6 +265,14 @@ export function buildContext(terrain, quality, opts = {}) {
       if (gp > gHi) gHi = gp;
     }
     const fall = Math.min(7, Math.max(0, gHi - gLo));
+    // Past that cap the trick stops working: the block is bedded to the low
+    // corner and made `fall` taller, so on ground that drops more than seven
+    // metres across the plot the uphill side is buried by the difference, and
+    // on a real slope — Corcovado's flanks, where the ground falls forty-five
+    // degrees — the whole building disappears into the hill and its roof comes
+    // out level with the grass. Nobody builds a flat-roofed block on a cliff.
+    // Leave the ground empty instead; there is a forest on it.
+    if (gHi - gLo > 10.0) return false;
     const g = gLo - 0.3;
     const roll = rng();
     const pitched = roll < (opts.pitchChance ?? 0.42) && Math.min(w, d) < 26;
@@ -618,8 +626,25 @@ export function buildContext(terrain, quality, opts = {}) {
 
   // The flat roofs, for deployment. A gun on a roof has the sightlines the
   // ground does not, which is worth the climb.
-  group.userData.roofs = plots.filter(
-    (p) => p.flat !== false && Math.min(p.w, p.d) > 12 && p.h > 8);
+  group.userData.roofs = plots.filter((p) => {
+    if (p.flat === false || Math.min(p.w, p.d) <= 12 || p.h <= 8) return false;
+    // And it has to actually be a roof. A building is bedded to the ground at
+    // its own centre, so on a slope that climbs across its footprint the top
+    // of a nine-metre block can be level with the hillside behind it — and a
+    // gun deployed "on the roof" is a gun standing in a field. Corcovado's
+    // summit is ringed by ground like that and it is where this was found.
+    let hi = -Infinity;
+    // Over the plot's *rotated* extent, which is what it actually covers: a
+    // yawed footprint reaches past the corners of its own w by d box, and the
+    // high ground that makes a roof useless is exactly the bit outside it.
+    const hx = (p.ax || p.w) / 2, hz = (p.az || p.d) / 2;
+    for (const fx of [-1, 0, 1]) {
+      for (const fz of [-1, 0, 1]) {
+        hi = Math.max(hi, terrain.heightAt(p.x + fx * hx, p.z + fz * hz));
+      }
+    }
+    return p.base + p.h - hi > 5.0;
+  });
   group.userData.plots = plots;
   return group;
 }

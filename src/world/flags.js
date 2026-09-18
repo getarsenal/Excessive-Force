@@ -6,6 +6,7 @@ import { CASTILLO } from '../structure/landmarks/chichen.js';
 import { PISA, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 import { OPERA } from '../structure/landmarks/sydney.js';
 import { BASIL, KREMLIN } from '../structure/landmarks/moscow.js';
+import { REDEEMER } from '../structure/landmarks/rio.js';
 
 /**
  * Flags on the landmarks.
@@ -73,6 +74,17 @@ export const FLAG_SITES = {
     // And on the deck of the basement, at the corner of the gallery.
     { key: 'basils', x: BASIL.podHalf - 3.0, y: BASIL.podH + 3.0,
       z: -BASIL.podHalf + 3.0, pattern: 'russia', w: 8, h: 5, pole: 9 },
+  ],
+  rio: [
+    // On the bottom terrace, either side of the stair, which is where a flag
+    // on a mountain goes: high enough to be seen from the city below and low
+    // enough that it is not competing with the statue.
+    { key: 'redeemer', x: -REDEEMER.terraces[0].half + 4.0,
+      y: REDEEMER.terraces[0].h + 1.4, z: REDEEMER.terraces[0].half - 4.0,
+      pattern: 'brazil', w: 9, h: 6, pole: 10 },
+    { key: 'redeemer', x: REDEEMER.terraces[0].half - 4.0,
+      y: REDEEMER.terraces[0].h + 1.4, z: REDEEMER.terraces[0].half - 4.0,
+      pattern: 'brazil', w: 9, h: 6, pole: 10 },
   ],
 };
 

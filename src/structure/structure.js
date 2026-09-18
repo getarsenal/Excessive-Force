@@ -987,13 +987,29 @@ export class Structure {
         below[i].push(this.belowList[a]);
       }
     }
+    // Repeated until it stops changing, rather than swept once.
+    //
+    // One sweep lowest-stone-first is enough while every bearing edge points
+    // strictly downward, because by the time a stone is visited everything it
+    // could be standing on has been. The cantilever pass below adds edges
+    // between stones at the *same* height, and then one sweep only propagates
+    // in whichever direction the height sort happened to order them: the arms
+    // of Christ the Redeemer came out three stones long on one course and six
+    // on the next, the pass joining the same twenty-four stones every round
+    // and none of them ever being reached.
     const flood = () => {
       reach.fill(0);
-      for (let k = n - 1; k >= 0; k--) {
-        const i = byHeight[k];
-        if (!(this.flags[i] & ALIVE)) continue;
-        if (this.flags[i] & GROUNDED) { reach[i] = 1; continue; }
-        for (const j of below[i]) if (reach[j]) { reach[i] = 1; break; }
+      for (let round = 0; round < 12; round++) {
+        let changed = false;
+        for (let k = n - 1; k >= 0; k--) {
+          const i = byHeight[k];
+          if (reach[i] || !(this.flags[i] & ALIVE)) continue;
+          if (this.flags[i] & GROUNDED) { reach[i] = 1; changed = true; continue; }
+          for (const j of below[i]) {
+            if (reach[j]) { reach[i] = 1; changed = true; break; }
+          }
+        }
+        if (!changed) break;
       }
     };
 
@@ -1033,11 +1049,68 @@ export class Structure {
       if (!joined) break;
     }
 
-    // Anything the widest search still cannot find a floor for has nothing
-    // under it at all, at any distance — it was never part of the building, in
-    // the same sense `_groutOrphans` means when it culls a stone nothing at all
-    // is touching. Removing it is better than shipping a building that sheds it
-    // on the first frame.
+    // Last, the cantilever.
+    //
+    // Everything above looks *downward*, because almost everything in masonry
+    // is held up by something underneath it, and a rule that let a stone be
+    // held by the stone beside it would let a whole floating wall hold itself
+    // up by its own elbows — which is a bug this solver exists to catch.
+    //
+    // But a cantilever is a real thing a building can do, and there is one in
+    // this campaign: Christ the Redeemer's arms are twenty-eight metres of
+    // reinforced concrete held out horizontally with nothing whatever below
+    // them, which is the whole point of the level they are in. Under the rule
+    // above every stone in them is stranded and gets deleted, and the statue
+    // arrives with its arms already off.
+    //
+    // So: one more pass, for stones that six widening searches could find no
+    // floor for and that are therefore about to be culled anyway. Such a stone
+    // may take a bearing edge sideways, to a touching neighbour that is itself
+    // already standing. It cannot rescue a floating wall — every stone in a
+    // wall finds a floor in the first pass and never reaches this code — and it
+    // cannot rescue anything whose neighbours are floating too, because the
+    // neighbour has to be reaching the ground already. Repeated, so the edge
+    // travels out along the arm one stone at a time, which is also the order in
+    // which the real one is carrying.
+    //
+    // Bounded, and deliberately. If a *lot* of a structure is stranded after
+    // the searches above, the thing that is wrong is not that it contains a
+    // cantilever — it is that something has been laid with nothing under it,
+    // and rescuing all of it sideways is exactly the floating wall this rule
+    // must never build. Past a twentieth of the structure the pass stands
+    // down and lets the cull report the problem, which is what caught an
+    // eighty-metre terrace deck spanning a hollow retaining ring.
+    let cantilever = 0;
+    const budget = Math.max(64, Math.round(n * 0.05));
+    for (let pass = 0; pass < 64; pass++) {
+      flood();
+      let stranded = 0;
+      for (let i = 0; i < n; i++) if ((this.flags[i] & ALIVE) && !reach[i]) stranded++;
+      if (pass === 0 && stranded > budget) break;
+      let joined = 0;
+      for (let i = 0; i < n; i++) {
+        if (!(this.flags[i] & ALIVE) || reach[i]) continue;
+        let best = -1, bestD = Infinity;
+        for (let j = 0; j < n; j++) {
+          if (j === i || !(this.flags[j] & ALIVE) || !reach[j]) continue;
+          const dy = Math.abs(this.py[j] - this.py[i]) - this.hy[i] - this.hy[j];
+          if (dy > 0.9) continue;                     // not alongside
+          const dx = Math.abs(this.px[j] - this.px[i]) - this._aabbX[i] - this._aabbX[j];
+          const dz = Math.abs(this.pz[j] - this.pz[i]) - this._aabbZ[i] - this._aabbZ[j];
+          if (dx > 0.9 || dz > 0.9) continue;          // and not touching
+          const d = Math.max(0, dx) + Math.max(0, dz) + Math.max(0, dy);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        if (best >= 0) { below[i].push(best); added++; cantilever++; joined++; }
+      }
+      if (!joined) break;
+    }
+    this.bearingCantilever = cantilever;
+
+    // Anything even that cannot find a hold has nothing near it at all, in the
+    // same sense `_groutOrphans` means when it culls a stone nothing is
+    // touching. Removing it is better than shipping a building that sheds it on
+    // the first frame.
     flood();
     let culled = 0;
     for (let i = 0; i < n; i++) {
@@ -1752,21 +1825,39 @@ export class Structure {
     // reaches the ground somewhere else. Masonry does not hang from its
     // neighbours.
     //
-    // Walking in ascending height order means one pass settles it, since
-    // everything below a stone has already been decided by the time we reach
-    // it. Arches, corbels and bonded courses all still work: their voussoirs
-    // genuinely do have lower neighbours.
+    // Walking in ascending height order settles almost all of it in one pass,
+    // since everything below a stone has already been decided by the time we
+    // reach it. Arches, corbels and bonded courses all still work: their
+    // voussoirs genuinely do have lower neighbours.
+    //
+    // Almost. The build-time grout can give a stone a bearing edge to a
+    // neighbour at its own height, for the one thing in this campaign that
+    // genuinely hangs off its own side — the arms of Christ the Redeemer, held
+    // out twenty-eight metres with nothing under them. Two stones at the same
+    // height have no order between them, so a single sweep propagates along
+    // such a chain only in whichever direction the height sort happened to put
+    // them, and the arms came apart three stones out. A few extra rounds, each
+    // one only able to add reach, settle it; on a building with no cantilever
+    // in it the second round changes nothing and stops.
     const byHeight = this.heightOrder;
     const bearing = this._bearing;
     bearing.fill(0);
-    for (let k = n - 1; k >= 0; k--) {
-      const i = byHeight[k];
-      if (!(this.flags[i] & ALIVE)) continue;
-      if (this.flags[i] & (FREE | ISLAND)) continue;
-      if (this.flags[i] & GROUNDED) { reach[i] = 1; bearing[i] = 1; continue; }
-      for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
-        if (reach[this.belowList[a]]) { reach[i] = 1; bearing[i] = 1; break; }
+    for (let round = 0; round < 5; round++) {
+      let changed = false;
+      for (let k = n - 1; k >= 0; k--) {
+        const i = byHeight[k];
+        if (reach[i] || !(this.flags[i] & ALIVE)) continue;
+        if (this.flags[i] & (FREE | ISLAND)) continue;
+        if (this.flags[i] & GROUNDED) {
+          reach[i] = 1; bearing[i] = 1; changed = true; continue;
+        }
+        for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
+          if (reach[this.belowList[a]]) {
+            reach[i] = 1; bearing[i] = 1; changed = true; break;
+          }
+        }
       }
+      if (!changed) break;
     }
 
     // Spanning, measured in metres of reach rather than in stones.

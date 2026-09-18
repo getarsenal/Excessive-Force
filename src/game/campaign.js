@@ -155,6 +155,21 @@ export const THEATRES = [
     unlocks: [],
     unlockLine: 'Nothing new — you have it all',
   },
+  {
+    id: 'rio',
+    iso: 'BRA',
+    lx: 46, ly: 24,
+    city: 'RIO DE JANEIRO',
+    lon: -43.2105, lat: -22.9519,
+    no: 9,
+    title: 'OPEN ARMS',
+    brief: 'Seven hundred metres up, and the part everybody shoots weighs '
+      + 'nothing. The arms are twenty-eight metres of concrete carrying only '
+      + 'themselves; take both and the statue stands exactly as it did. What '
+      + 'holds it up is two legs into a chapel with a door in it.',
+    unlocks: [],
+    unlockLine: 'The board is clear',
+  },
 ];
 
 /** The contract for a level id, if that level is one. */

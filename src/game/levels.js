@@ -7,6 +7,7 @@ import { buildCampanile, buildDuomo, buildBaptistery }
   from '../structure/landmarks/pisa.js';
 import { buildOperaHouse } from '../structure/landmarks/sydney.js';
 import { buildSaintBasils, buildKremlinWall } from '../structure/landmarks/moscow.js';
+import { buildRedeemer } from '../structure/landmarks/rio.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -358,6 +359,58 @@ export const LEVELS = {
     brief: 'Nine churches that do not touch. The only thing they share is underneath them.',
   },
 
+  rio: {
+    id: 'rio',
+    terrain: 'rio',
+    name: 'Christ the Redeemer',
+    place: 'Corcovado, Rio de Janeiro',
+    target: 'O REDENTOR',
+    subtitle: 'Cristo Redentor · Corcovado',
+    victory: 'He Put His Arms Down',
+    // Tijuca rainforest on granite: almost nothing here is a built colour.
+    palette: {
+      urban: new THREE.Color(0xa89b8a),
+      urbanAlt: new THREE.Color(0x8f8272),
+      park: new THREE.Color(0x2f4a24),
+      parkAlt: new THREE.Color(0x3a5a29),
+      road: new THREE.Color(0x6b655e),
+      bank: new THREE.Color(0x9a9083),
+      bed: new THREE.Color(0x35452c),
+      dry: new THREE.Color(0xb3a894),
+    },
+    // Nothing is built on the summit and nothing is going to be. The numbers
+    // are large because the summit is: it has to be level far enough out for a
+    // battery to have somewhere to stand, and a building on the lip of the
+    // drop beyond it is a building with its roof at ground level.
+    cityExcludeRadius: 430,
+    contextExclude: 400,
+    camera: { yaw: -1.35, pitch: 0.18, distance: 260, height: 54 },
+    // One structure. The statue stands on the pedestal and the pedestal stands
+    // on the terraces, and separate structures never learn about each other.
+    structures: (quality) => [
+      { key: 'redeemer', blocks: buildRedeemer(quality), primary: true,
+        required: true, label: 'CRISTO REDENTOR' },
+    ],
+    garrison: (g, origin, groundY) => {
+      g.populateRedeemer(origin, groundY);
+    },
+    // The arms are scored and they are worth what they weigh, which is the
+    // lesson: shoot them off and watch the bar barely move.
+    scoreTags: ['statue', 'arms', 'pedestal'],
+    // Forest, not paving. A paved precinct here draws a hard pale disc across
+    // the summit with the jungle stopping dead at its edge, which from the
+    // air reads as a crop circle; the Corcovado is Tijuca rainforest right up
+    // to the terrace steps.
+    precinct: {
+      boundary: 'none',
+      ground: 'lawn',
+      ornament: 'none',
+    },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    brief: 'The arms are the whole silhouette and almost none of the building.',
+  },
+
   giza: {
     id: 'giza',
     terrain: 'giza',
@@ -449,7 +502,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -461,6 +514,7 @@ export const LEVEL_BLURB = {
   pisa: 'Eighty-nine metres already falling. The part that overhangs is the part that is safe.',
   sydney: 'Fourteen shells on a headland with one road in. Arches, not walls.',
   moscow: 'Nine towers on one basement. No single cut wins; the basement is shared.',
+  rio: 'Seven hundred metres up, and the part everyone shoots weighs nothing.',
 };
 
 /** Ordered level records, for menus. */
