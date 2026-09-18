@@ -96,6 +96,10 @@ export function buildCity(city, terrain, quality, opts = {}) {
 
   const walls = [];
   const roofs = [];
+  // Where each building ended up, in the same shape the procedural city
+  // reports: the field works are laid round these and do not care which of the
+  // two built them.
+  const plots = [];
   let used = 0;
 
   for (const b of city.buildings) {
@@ -147,6 +151,12 @@ export function buildCity(city, terrain, quality, opts = {}) {
       roofs.push(cap);
     } catch { /* cap is optional */ }
 
+    let w = 0, d = 0;
+    for (const q of pts) {
+      w = Math.max(w, Math.abs(q[0] - cx) * 2);
+      d = Math.max(d, Math.abs(q[1] - cz) * 2);
+    }
+    plots.push({ x: cx, z: cz, w, d, ax: w, az: d, h: height, base: ground, yaw: 0 });
     used++;
   }
 
@@ -188,6 +198,7 @@ export function buildCity(city, terrain, quality, opts = {}) {
 
   group.userData.built = used;
   group.userData.available = city.buildings.length;
+  group.userData.plots = plots;
   return group;
 }
 

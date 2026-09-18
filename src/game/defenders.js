@@ -53,6 +53,51 @@ export const DEFENDER_TYPES = {
     name: 'AT Team', health: 90, damage: 88, rof: 8.0, range: 340,
     accuracy: 0.62, colour: 0x4a3c2c, threat: 8, eye: 1.3,
   },
+  /**
+   * A field gun, dug in behind the line.
+   *
+   * The garrison's only piece that shoots back at the guns on their own terms:
+   * a direct-fire weapon with the range to reach a battery that has stood off
+   * and the weight to wreck one when it hits. Slow, and it cannot traverse out
+   * of its pit — everything else in the list can be anywhere, and this is the
+   * one the player can outflank.
+   */
+  fieldgun: {
+    key: 'fieldgun', look: 'fieldgun',
+    name: 'Field Gun', health: 155, damage: 135, rof: 9.5, range: 470,
+    accuracy: 0.6, colour: 0x4a5238, threat: 10, eye: 1.05, emplaced: true,
+  },
+  /**
+   * Light flak, in a pit.
+   *
+   * Fires in long bursts at anything on the ground, and is the one thing on the
+   * map that can do something about an air strike — see `aircraft.js`, which
+   * asks the garrison what is still shooting before it lets a bomb go. Until
+   * this existed the strike aircraft flew through a defended objective as
+   * though it were empty airspace, which made the two most expensive cards in
+   * the arsenal the two safest.
+   */
+  aa: {
+    key: 'aa', look: 'aa',
+    name: 'AA Gun', health: 120, damage: 6.2, rof: 0.15, burst: 12, burstGap: 3.6,
+    range: 470, accuracy: 0.4, colour: 0x515a3c, threat: 7, eye: 1.15,
+    emplaced: true, flak: true,
+  },
+  /**
+   * A forward observer.
+   *
+   * Carries nothing and kills nobody, and while he is alive every mortar on the
+   * map fires faster and straighter. He is the reason a player who has cleared
+   * the roofs and the galleries still has a reason to look at the ground behind
+   * the line — and, unlike everything else here, killing him is worth doing
+   * even though it puts nothing on the scoreboard.
+   */
+  spotter: {
+    key: 'spotter', look: 'spotter',
+    name: 'Observer', health: 40, damage: 0, rof: 6, range: 700,
+    accuracy: 1, colour: 0x6f7a52, threat: 2, eye: 1.35,
+    emplaced: true, observer: true,
+  },
   mortar: {
     key: 'mortar', look: 'mortar',
     name: 'Mortar', health: 60, damage: 0, rof: 7.5, range: 620,
@@ -255,6 +300,64 @@ function mortarGeometry() {
   return BufferGeometryUtils.mergeGeometries(parts, false);
 }
 
+/**
+ * A field gun on its trail, and light flak on its pedestal.
+ *
+ * Both are drawn muzzle along +Z so they can share the instance matrix with
+ * everything else in the garrison, which is placed by a yaw about Y. The pit
+ * they sit in is world geometry — `world/works.js` builds the spoil — and this
+ * is only the piece inside it.
+ */
+function fieldGunGeometry() {
+  const parts = [];
+  const barrel = new THREE.CylinderGeometry(0.11, 0.14, 4.4, 8);
+  barrel.rotateX(Math.PI / 2);
+  barrel.translate(0, 1.15, 1.7);
+  parts.push(barrel);
+  const brake = new THREE.CylinderGeometry(0.2, 0.2, 0.42, 8);
+  brake.rotateX(Math.PI / 2);
+  brake.translate(0, 1.15, 3.8);
+  parts.push(brake);
+  const shield = new THREE.BoxGeometry(2.3, 1.1, 0.12);
+  shield.translate(0, 0.9, 0.3);
+  parts.push(shield);
+  const breech = new THREE.BoxGeometry(0.55, 0.55, 1.0);
+  breech.translate(0, 1.1, -0.35);
+  parts.push(breech);
+  for (const sx of [-1, 1]) {
+    const wheel = new THREE.CylinderGeometry(0.52, 0.52, 0.2, 12);
+    wheel.rotateZ(Math.PI / 2);
+    wheel.translate(sx * 1.05, 0.52, 0.1);
+    parts.push(wheel);
+    const trail = new THREE.BoxGeometry(0.16, 0.16, 2.6);
+    trail.rotateY(sx * 0.16);
+    trail.translate(sx * 0.5, 0.3, -1.5);
+    parts.push(trail);
+  }
+  return BufferGeometryUtils.mergeGeometries(parts, false);
+}
+
+/** Light flak: a short barrel cocked up off a pedestal mount. */
+function flakGeometry() {
+  const parts = [];
+  const base = new THREE.CylinderGeometry(0.62, 0.8, 0.5, 10);
+  base.translate(0, 0.25, 0);
+  parts.push(base);
+  const ring = new THREE.BoxGeometry(1.5, 0.42, 1.5);
+  ring.translate(0, 0.7, 0);
+  parts.push(ring);
+  for (const sx of [-0.18, 0.18]) {
+    const tube = new THREE.CylinderGeometry(0.075, 0.09, 2.7, 7);
+    tube.rotateX(-0.95);
+    tube.translate(sx, 1.85, 0.62);
+    parts.push(tube);
+  }
+  const box2 = new THREE.BoxGeometry(0.75, 0.5, 0.6);
+  box2.translate(0, 1.15, -0.32);
+  parts.push(box2);
+  return BufferGeometryUtils.mergeGeometries(parts, false);
+}
+
 /** A low horseshoe of sandbags, so ground positions read as prepared. */
 function sandbagGeometry() {
   const parts = [];
@@ -308,9 +411,21 @@ export class Garrison {
       return m;
     };
 
-    this.mesh = mk(soldierGeometry(), 0xffffff, 256);
+    // How many men the map can hold.
+    //
+    // A flat 256 was fine while the garrison was the men inside the building.
+    // A belt of trenches round every structure and through the streets asks for
+    // more than that before it reaches the second landmark, and the cap binding
+    // in the middle of the first trench line is worse than a smaller belt: the
+    // gun pits and the observers are posted after it and simply never appeared.
+    // The figures are instanced and the cost is the line-of-sight pass, which
+    // is what the tiers are for.
+    this.cap = { low: 200, medium: 288, high: 360, ultra: 420 }[quality.name] ?? 288;
+    this.mesh = mk(soldierGeometry(), 0xffffff, this.cap);
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 48);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 96);
+    this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
+    this.flakMesh = mk(flakGeometry(), 0xffffff, 24);
     this._mk = mk;
 
     this._m4 = new THREE.Matrix4();
@@ -343,7 +458,7 @@ export class Garrison {
     // The instance colour is the type tint; a base map would fight it.
     if (mat.color) mat.color.set(0xffffff);
 
-    const mesh = new THREE.InstancedMesh(geometry, mat, 256);
+    const mesh = new THREE.InstancedMesh(geometry, mat, this.cap);
     mesh.castShadow = this.quality.shadowMapSize > 0;
     mesh.frustumCulled = false;
     mesh.instanceMatrix = old.instanceMatrix;
@@ -363,13 +478,23 @@ export class Garrison {
    * position that would have floated in mid-air quietly declines to exist.
    */
   place(type, pos, facing = 0, maxDist = 6, opts = {}) {
-    if (this.defenders.length >= 256) return false;
+    if (this.defenders.length >= this.cap) return false;
     const def = DEFENDER_TYPES[type];
     if (!def) return false;
 
-    const anchor = this._nearestStone(pos, maxDist);
-    if (!anchor) return false;
-    const bestStruct = anchor.structure, bestChunk = anchor.chunk;
+    // A crew in a pit stands on the ground, not on the building.
+    //
+    // Every other position in the game is written as a height above a floor and
+    // pinned to the nearest stone, which is what makes a man ride the masonry
+    // down when it goes. A gun in the Champ de Mars has no masonry anywhere
+    // near it, and pinning it to the nearest stone eighty metres away would
+    // mean the whole belt died the moment the tower did. Emplaced positions
+    // carry no anchor at all and are killed only by fire.
+    const emplaced = !!(opts.emplaced || def.emplaced);
+    const anchor = emplaced ? null : this._nearestStone(pos, maxDist);
+    if (!anchor && !emplaced) return false;
+    const bestStruct = anchor ? anchor.structure : null;
+    const bestChunk = anchor ? anchor.chunk : -1;
 
     // Stand on the floor, whatever height the course grid put it at.
     //
@@ -380,7 +505,7 @@ export class Garrison {
     // phone, with his eyes below the parapet, and floating on a desktop. If
     // the stone he is anchored to is under him, he stands on it.
     const snapped = pos.clone();
-    {
+    if (bestStruct) {
       const s = bestStruct, i = bestChunk;
       const top = s.py[i] + s.hy[i];
       // Inside the stone counts too: a roof slab two courses thick swallows
@@ -400,8 +525,9 @@ export class Garrison {
       type, def,
       pos: snapped,
       facing,
-      cover: opts.cover || null,     // 'window' | 'roof' | 'ground' | 'arcade'
+      cover: opts.cover || null,     // 'window' | 'roof' | 'ground' | 'arcade' | 'trench'
       sandbags: !!opts.sandbags,
+      emplaced,
       structure: bestStruct,
       chunk: bestChunk,
       health: def.health,
@@ -424,8 +550,10 @@ export class Garrison {
     // move further still. The two drift apart, and a man whose recorded anchor
     // is ten metres away is a man who survives the destruction of the masonry
     // under his feet and keeps firing from thin air.
-    const re = this._nearestStone(d.pos, Math.max(maxDist, 9));
-    if (re) { d.structure = re.structure; d.chunk = re.chunk; }
+    if (!emplaced) {
+      const re = this._nearestStone(d.pos, Math.max(maxDist, 9));
+      if (re) { d.structure = re.structure; d.chunk = re.chunk; }
+    }
     this.defenders.push(d);
     return true;
   }
@@ -468,6 +596,10 @@ export class Garrison {
    */
   _settleIntoPosition(d) {
     if (d.def.indirect) return;
+    // An emplaced gun is in a pit that was dug where it is. Nudging it out and
+    // upward looking for a field of fire would walk it out of its own works,
+    // and in the open it has one anyway.
+    if (d.emplaced) { d.blind = false; return; }
     if (this.hasFieldOfFire(d)) { d.blind = false; return; }
 
     const fx = Math.sin(d.facing), fz = Math.cos(d.facing);
@@ -709,6 +841,44 @@ export class Garrison {
         origin.x + sx * (EIFFEL.firstDeckHalf - 8), groundY + EIFFEL.firstFloor + 0.6,
         origin.z + sz * (EIFFEL.firstDeckHalf - 8)), 0, 7, { cover: 'roof' });
     }
+  }
+
+  /**
+   * Man the field works.
+   *
+   * The plan comes from the world layer, which laid the belt round the
+   * landmarks' footprints and through the city's plots — so this does not know
+   * or care which level it is on, and a new map gets its garrison dug in
+   * without a line written for it.
+   *
+   * Filled from the objective outward, and stopped at whatever is left of the
+   * cap once the buildings have had their men. The belt is the last thing
+   * posted for exactly that reason: a hundred riflemen in a field are worth
+   * less than the crews on the galleries, and if something has to go without,
+   * it should be the far end of the line rather than the top of the tower.
+   */
+  populateFieldWorks(posts, groundY = 0) {
+    if (!posts || !posts.length) return 0;
+    // Guns first, then the line, each from the objective outward.
+    //
+    // Sorting the whole plan by range alone spent the cap inside the first
+    // trench line and the map ended up with a hundred and fifty riflemen, no
+    // field guns beyond the nearest few, no flak at all and no observer. A belt
+    // with its guns and a thin line still reads as a prepared position; a line
+    // of riflemen with nothing behind it is the garrison this was meant to
+    // replace, only further out.
+    const rank = (w) => (w.kind === 'pit' ? 0 : 1e6) + Math.hypot(w.x, w.z);
+    const ordered = posts.slice().sort((a, b) => rank(a) - rank(b));
+    let placed = 0;
+    for (const w of ordered) {
+      const p = new THREE.Vector3(w.x, Math.max(w.y, groundY - 40), w.z);
+      if (this.place(w.type, p, w.yaw, 4, {
+        cover: w.kind === 'pit' ? 'ground' : 'trench',
+        sandbags: w.kind === 'trench',
+        emplaced: true,
+      })) placed++;
+    }
+    return placed;
   }
 
   /** The Palais de Chaillot wing, across the Seine. */
@@ -1000,6 +1170,7 @@ export class Garrison {
     for (const d of this.defenders) {
       if (!d.alive) continue;
       const s = d.structure;
+      if (!s) continue;                      // in a pit, on the ground
       const f = s.flags[d.chunk];
       const dead = !(f & 1);
       const falling = (f & 2) || (f & 8);
@@ -1184,6 +1355,13 @@ export class Garrison {
    */
   updateMortars(dt, projectiles, units) {
     if (!this.fireEnabled || !projectiles) return;
+    // Is anyone observing? A mortar crew cannot see what it is shooting at —
+    // that is the whole nature of indirect fire — so without an observer it is
+    // firing on a map reference and correcting by ear, and with one it is being
+    // walked onto the target. The difference is worth a real amount, because
+    // otherwise nobody would ever bother to kill him.
+    const observed = this.defenders.some((o) => o.alive && o.def.observer);
+    this.observed = observed;
     for (const d of this.defenders) {
       if (!d.alive || !d.def.indirect) continue;
       d.cooldown -= dt;
@@ -1200,9 +1378,10 @@ export class Garrison {
 
       // Lead the shot a little and scatter it, so a mortar suppresses a
       // position rather than deleting whatever stands in it.
+      const spread = observed ? 4.5 : 11;
       const aim = best.pos.clone();
-      aim.x += (Math.random() - 0.5) * 11;
-      aim.z += (Math.random() - 0.5) * 11;
+      aim.x += (Math.random() - 0.5) * spread;
+      aim.z += (Math.random() - 0.5) * spread;
       aim.y = best.pos.y;
 
       const sh = d.def.shell;
@@ -1215,15 +1394,35 @@ export class Garrison {
         trail: sh.trail, hostile: true,
       });
       d.facing = Math.atan2(aim.x - d.pos.x, aim.z - d.pos.z);
-      d.cooldown = d.def.rof * (0.75 + Math.random() * 0.5);
+      d.cooldown = d.def.rof * (observed ? 0.6 : 1.0) * (0.75 + Math.random() * 0.5);
       this.mortarsFired++;
       if (this.onMortarFire) this.onMortarFire(d);
     }
   }
 
+  /**
+   * Live flak that can reach a point, weighted by how hard it is shooting.
+   *
+   * Asked by `aircraft.js` before a bomb goes, which is the only place in the
+   * game where a defender affects something it cannot draw a line of sight to.
+   * A gun that is suppressed counts for nothing: crews with shells landing on
+   * them are not tracking anything.
+   */
+  flakOver(point, radius = 0) {
+    let n = 0;
+    for (const d of this.defenders) {
+      if (!d.alive || !d.def.flak) continue;
+      if (d.suppressed > this.time) continue;
+      const reach = d.def.range + radius;
+      if (d.pos.distanceToSquared(point) > reach * reach) continue;
+      n++;
+    }
+    return n;
+  }
+
   /** Rebuild the instance buffers. Only live defenders are drawn. */
   sync() {
-    let w = 0, mw = 0, bw = 0;
+    let w = 0, mw = 0, bw = 0, gw = 0, fw = 0;
     // Which defender each drawn figure is, so a tap on one can be traced back.
     // The instanced mesh is packed with only the living, in no fixed order, so
     // without this the raycast knows a soldier was hit and nothing else.
@@ -1249,6 +1448,22 @@ export class Garrison {
         this._v.copy(d.pos);
       }
 
+      // The piece, where there is one, and a crewman standing to the side of
+      // it rather than inside the breech.
+      if (d.def.key === 'fieldgun' || d.def.key === 'aa') {
+        const pit = d.def.key === 'aa' ? this.flakMesh : this.gunMesh;
+        const cur = d.def.key === 'aa' ? fw : gw;
+        if (cur < pit.instanceMatrix.count) {
+          this._m4.compose(d.pos, this._q, this._s);
+          pit.setMatrixAt(cur, this._m4);
+          this._col.setHex(0x4e5639);
+          pit.instanceColor.setXYZ(cur, this._col.r, this._col.g, this._col.b);
+          if (d.def.key === 'aa') fw++; else gw++;
+        }
+        this._v.set(d.pos.x + Math.cos(d.facing) * 1.5, d.pos.y,
+          d.pos.z - Math.sin(d.facing) * 1.5);
+      }
+
       if (d.sandbags && bw < this.bagMesh.instanceMatrix.count) {
         this._m4.compose(this._v, this._q, this._s);
         this.bagMesh.setMatrixAt(bw, this._m4);
@@ -1270,7 +1485,9 @@ export class Garrison {
     this.mesh.count = w;
     this.mortarMesh.count = mw;
     this.bagMesh.count = bw;
-    for (const m of [this.mesh, this.mortarMesh, this.bagMesh]) {
+    this.gunMesh.count = gw;
+    this.flakMesh.count = fw;
+    for (const m of [this.mesh, this.mortarMesh, this.bagMesh, this.gunMesh, this.flakMesh]) {
       m.instanceMatrix.needsUpdate = true;
       m.instanceColor.needsUpdate = true;
     }

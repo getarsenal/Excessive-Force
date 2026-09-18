@@ -8,6 +8,7 @@ import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
 import { Life } from './world/life.js';
 import { loadCity, buildCity } from './world/city.js';
+import { buildFieldWorks } from './world/works.js';
 import { Structure } from './structure/structure.js';
 import {
   resolveStartLevel, showLevelSelect, recordResult, nextTarget, goToLevel,
@@ -187,6 +188,14 @@ async function boot() {
       + ' (run tools/bake_buildings.py for real footprints)');
   }
 
+  // The defence, laid round whichever set of buildings got built.
+  const fieldWorks = buildFieldWorks(terrain, quality, {
+    landmarks,
+    plots: (cityGroup || contextGroup)?.userData?.plots || [],
+    exclude: level.contextExclude || level.cityExcludeRadius || 70,
+  });
+  engine.scene.add(fieldWorks.group);
+
   // The things that move. A still city is uncanny however detailed it is: the
   // eye reads motion as life long before it reads a bollard.
   const lifeRng = () => {
@@ -262,6 +271,20 @@ async function boot() {
   const sites = {};
   for (const st of structures) sites[st.key] = { origin: st.origin, groundY: st.groundY };
   level.garrison(garrison, origin, groundY, sites);
+  // And the belt, last of all.
+  //
+  // An objective an army has had time to prepare is not a building with men in
+  // it: it is a trench line stood off from every structure on the map and
+  // through the streets behind them, with gun pits behind the line. It is
+  // posted after the buildings on purpose — the cap is finite, and if anything
+  // has to go unmanned it should be the far end of the line rather than the
+  // top of the tower.
+  {
+    const manned = garrison.populateFieldWorks(fieldWorks.posts, groundY);
+    console.log(`[tumble] field works: ${fieldWorks.counts.trenchBays} bays, `
+      + `${fieldWorks.counts.gunPits} gun pits, `
+      + `${manned} of ${fieldWorks.posts.length} positions manned`);
+  }
 
   const rig = new CameraRig(engine.camera, canvas, {
     tx: 0, ty: groundY + level.camera.height, tz: 0,
@@ -396,6 +419,12 @@ async function boot() {
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
         hud.hidePrompt();
         battle.pulse(data.point, 0xffa040, 22, true);
+        break;
+      case 'flak':
+        // Said before the INBOUND line, so the player reads "under fire" and
+        // then watches the bomb miss, rather than wondering afterwards why it
+        // did.
+        hud.feed(`FLAK OVER TARGET · ${data.guns} GUN${data.guns > 1 ? 'S' : ''} — RUN SPOILED`, 'bad');
         break;
       case 'strikehit':
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');

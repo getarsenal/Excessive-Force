@@ -380,7 +380,7 @@ export class AirWing {
    * @param {number} ceiling  the highest standing masonry near the run, so a
    *                          low pass is low but not through the tower
    */
-  call(def, target, ceiling) {
+  call(def, target, ceiling, opts = {}) {
     const a = def.aircraft;
     const p = def.projectile;
     // Run in from behind the camera, across the target, and out the far side.
@@ -412,7 +412,29 @@ export class AirWing {
       pullUpAt: runLen / a.speed + 1.2,
       climb: 0, roar: 0, life: 0,
       fall: rel.time,
+      // Flak.
+      //
+      // Until the garrison had guns that could reach up, the two most expensive
+      // cards in the arsenal were also the two safest: the aircraft flew
+      // through a defended objective as though the airspace were empty and put
+      // its bomb exactly where it was told to. Each gun still shooting over the
+      // target is one roll at spoiling the run — a pilot jinking through
+      // tracer, which does not stop the bomb, it stops the bomb landing where
+      // he meant it to. Killing the flak first is therefore worth doing, and
+      // that is the whole point of it being there.
+      flak: opts.flak || 0,
     };
+    if (s.flak > 0) {
+      const spoil = 1 - Math.pow(0.72, s.flak);
+      if (Math.random() < spoil) {
+        s.harried = 22 + 26 * Math.random() * Math.min(1, s.flak / 3);
+        const ang = Math.random() * Math.PI * 2;
+        s.target.x += Math.cos(ang) * s.harried;
+        s.target.z += Math.sin(ang) * s.harried;
+        // Off early rather than off late: a pilot under fire releases sooner.
+        s.releaseAt = Math.max(0.2, s.releaseAt - (0.25 + Math.random() * 0.5));
+      }
+    }
     this.sorties.push(s);
     return s;
   }

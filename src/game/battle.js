@@ -510,9 +510,14 @@ export class Battle {
     // Aim at the ground under the point if it is in the open, or at the
     // masonry itself: the bomb goes off where it first meets something.
     const ceiling = this.structures.reduce((a, st) => Math.max(a, st.standingHeight()), at.y);
-    const sortie = this.air.call(def, at, ceiling);
+    // Who is shooting back at it. Flak does not stop the aircraft; it stops
+    // the bomb landing where the player pointed, which is the difference
+    // between an air strike and a very expensive button.
+    const flak = this.garrison ? this.garrison.flakOver(at, 120) : 0;
+    const sortie = this.air.call(def, at, ceiling, { flak });
     this.shotsFired++;
     this.selectedUnitId = null;
+    if (sortie.harried) this.onEvent('flak', { def, guns: flak });
     this.onEvent('strike', { def, point: at, eta: sortie.releaseAt + sortie.fall });
     return sortie;
   }

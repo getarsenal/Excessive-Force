@@ -893,7 +893,7 @@ export class TestMenu {
         // building he is standing on, rather than to something across the site.
         let bad = 0, checked = 0;
         for (const d of g.defenders) {
-          if (!d.alive) continue;
+          if (!d.alive || !d.structure) continue;    // a gun pit has no anchor stone
           const i = d.chunk;
           const s = d.structure;
           if (!(s.flags[i] & 1) || (s.flags[i] & 10)) continue;   // dead or falling
@@ -1333,7 +1333,7 @@ export class TestMenu {
         const unsupported = () => {
           let n = 0;
           for (const d of g.defenders) {
-            if (!d.alive || d.pos.y - gy < 1.6) continue;
+            if (!d.alive || !d.structure || d.pos.y - gy < 1.6) continue;
             const occ = d.structure.occupancy;
             if (!occ) continue;
             if (!occ.solidAt(d.pos.x, d.pos.y - 1.0, d.pos.z)
@@ -1365,6 +1365,7 @@ export class TestMenu {
         // another — which fails the test for the one reason it should not.
         const floorOf = (d) => {
           const st2 = d.structure;
+          if (!st2) return [];
           const under = [];
           for (let i = 0; i < st2.count; i++) {
             if (!(st2.flags[i] & 1) || (st2.flags[i] & 10)) continue;
