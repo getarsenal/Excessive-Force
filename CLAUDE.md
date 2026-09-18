@@ -8,10 +8,11 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
 
 - Every task goes all the way to production: verified, committed, `main`
   fast-forwarded, deploy run confirmed green. Do not stop to ask.
-- Develop on `claude/landmark-destruction-game-4gxy06`. Deploy is
-  `git push origin <branch>:main`. Keep the remote on
-  `https://github.com/getarsenal/Tumble-Town` (the repo was renamed; the
-  credential is bound to the old URL and it redirects).
+- Develop on the branch the session names (most recently
+  `claude/excessive-force-handoff-i40ha3`). Deploy is
+  `git push origin <branch>:main`. The remote is
+  `https://github.com/getarsenal/Excessive-Force`; the repo has been
+  renamed twice and pushes to the current name work.
 - Never commit synthetic fixtures to `public/assets/city/`. Never put a
   model identifier in a commit message, code comment or asset.
 - Do not edit source or run heavy probes while a harness suite is running:
@@ -26,9 +27,14 @@ python3 tools/report.py /tmp/out/<id>-console.txt      # expect 35 pass 0 fail
 npx vite build
 ```
 
-Levels: `westminster`, `paris`, `agra`, `giza`. Tiers: `low` (phones;
-the grid is coarsened) to `ultra`. Giza at high and Paris at ultra time
-out in the software rasteriser; verify those at low.
+Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
+`chichen`, `pisa`, `sydney`, `moscow`, `rio`. Tiers: `low` (phones; the
+grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out in
+the software rasteriser; verify those at low.
+
+`node tools/loose.mjs <level> low` says *where* the loose stones are and
+`node tools/look.mjs /tmp/out/<id> <level>` gives three views plus the
+blind ranks — both are quicker than the whole suite while building.
 
 ## Adding a map
 

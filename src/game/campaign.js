@@ -113,7 +113,7 @@ export const THEATRES = [
   {
     id: 'pisa',
     iso: 'ITA',
-    lx: 34, ly: 36,
+    lx: 30, ly: 58,
     city: 'PISA',
     lon: 10.3966, lat: 43.7230,
     no: 6,

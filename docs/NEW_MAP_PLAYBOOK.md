@@ -69,14 +69,19 @@ builder (see §4).
         "points": [[east, north], ...],   # metres from the landmark
     },
     "parks": [[east, north, radius], ...],
-    "flatten": [[east, north, pad, feather], ...],   # only when the DEM already has the building in it
+    "sea": {"level": 0.6, "depth": 10.0, "shore": 1.2},   # a coast, not a river
+    "ceiling": 42.0,             # cap the DEM where it is really a city's roofs
+    # pad: [east, north, radius | [rx, rz], feather, height?]
+    "flatten": [[east, north, 44, 30, 690.0], ...],
 },
 ```
 
 Then `python3 tools/bake_terrain.py <id>`. It fetches AWS Terrarium
 tiles (no key), writes the three files, and prints the elevation range.
-Needs outbound network; it will not run inside the sandboxed session, so
-bake locally and commit the three files.
+It needs outbound network and **it does run in-session** — the tile host is
+reachable through the proxy and `pillow`/`numpy` are installed. (An earlier
+version of this page said it could not; it can, and five maps were baked
+that way.)
 
 **What we learned:**
 
@@ -108,6 +113,36 @@ bake locally and commit the three files.
 - **Low tier halves the grid before anything is built** (`coarsen`). The
   roads, lawn, physics and picker all follow the same coarse ground, so
   never sample the fine grid for one thing and the coarse for another.
+- **A pad on a peninsula has to state its own height.** `flatten` levels to
+  the median of the ring around the pad, which is right on dry land and
+  wrong where the ring is nine tenths water: Bennelong Point came out eight
+  metres under the harbour. A fifth element in the pad is an explicit height
+  in metres. A pad's `radius` may also be `[rx, rz]`, a rounded rectangle,
+  because a disc big enough to reach the corners of the Opera House's podium
+  reclaims fifty metres of harbour down both sides of the point.
+- **A pad's second coordinate is northing and the game's +z is south**, so
+  the sign of it is the opposite of the direction it puts the ground.
+- **`sea` is for a coast.** A river is a line and is carved from a polyline;
+  a harbour is a shape nobody is going to type in, so `flood_sea` takes it
+  from the DEM — everything at or below the waterline is sea — and dredges
+  it. Keep `shore` narrow: widen it and the flood walks up the headland it
+  is supposed to be going round.
+- **The DEM is a surface model, and over a city it is the roofs.** Sydney at
+  z15 comes back with ninety-eight metres of "terrain" where the highest real
+  ground near Bennelong Point is about forty; the game then builds its own
+  city on that and half the roofs are level with the hillside they stand in.
+  `ceiling` compresses everything above a height rather than clipping it.
+- **z15 where the subject is small.** Bennelong Point is a hundred metres
+  across, which at z14 is twelve DEM pixels, most of which the smoothing
+  hands to the harbour — the point is simply not there. Corcovado at z14 is
+  a hill with its top rounded off.
+- **The guns have to have somewhere to stand.** This is the constraint that
+  decides the shape of a summit. A howitzer below a rise puts its shell into
+  the rise: on the Corcovado cut to its true platform, ten rounds went out
+  and ten landed at the guns' own feet. The suite spawns its battery at 220 m
+  and the ring test at 170 m, so the ground has to be level out to about
+  250 m in the direction the guns come from. Offset the pad — a ridge rather
+  than a cone — and the rim can still be close on the side the camera looks.
 
 ---
 
@@ -182,6 +217,45 @@ menu (TEST button) or the harness, the checks that matter:
   over" test, scaled to the monument's mass).
 - **Screenshots at the level camera at low and high.** Giza at high and
   the Eiffel Tower at ultra time out in the harness; use low for those.
+
+**What five more landmarks taught the builder:**
+
+- **Size an arch's ring off its bay, not off the course height.** A
+  voussoir as thick as a course is most of a two-metre bay on a coarse
+  tier, and the springing stones then land past the column they are
+  supposed to stand on — thirty of them, hanging in the air, on every
+  loggia of the campanile at Pisa.
+- **A ring is laid either side of its own outline.** `polyRing` puts the
+  stone *on* the line, so a course meant to span radius a to b goes on the
+  outline `(a+b)/2` with thickness `b-a`. Put it on `b` and it leaves a
+  hand's width of daylight at `a`, which the solver reads as detached; and
+  a single ring on the outer edge of a plinth leaves the tower's inner skin
+  over a hole.
+- **Check a wall thickness that varies.** Pisa's rubble core is `face −
+  core − 2·shell`, and `face` steps inward by the loggia depth above the
+  first stage. Measured off the outer face instead, the core went to four
+  centimetres and then negative, and the builder laid rings of four-
+  centimetre stones nothing could bear on.
+- **A flat slab does not span.** Twenty-six metres of roof between two
+  walls is seventy stones with nothing under them. A corbelled gable —
+  courses stepping in by less than their own width — carries itself, and is
+  also what the roof actually is.
+- **Resolution beats fidelity on a coarse tier.** Twelve openings through a
+  bell chamber leaves no pier between them once the stone is 2.6 m; the
+  answer was to build that stage the way it really is, as columns and
+  arches rather than a wall with holes in it. An onion dome resolved into
+  three rings is a cylinder with a cone on it — lay a dome in half courses.
+- **One structure, not two, when one stands on the other.** Structures are
+  each placed on the terrain at their own ground level and never learn
+  about each other, so the Opera House's shells had to be built in the same
+  `BlockList` as its podium. Two structures is for two buildings with
+  ground between them.
+- **A cantilever is the one thing the solver has no rule for.** The bearing
+  walk looks downward, on purpose. `_groutBearing` has a last pass that
+  lets a stone about to be culled take a bearing edge *sideways* to a
+  touching neighbour that is already standing — bounded to a twentieth of
+  the structure, so it can never rescue a floating plate. If a new landmark
+  has something held out horizontally, that is what keeps it on.
 
 ---
 
@@ -336,6 +410,22 @@ the console log. Useful handles on `window`: `battle`, `primary`,
 `structures`, `terrain`, `rig`, `garrison`, `testMenu`, `standoff`,
 `__fastForward(seconds)`, `__runTests()`.
 
+Two probes worth reaching for before the whole suite:
+
+```
+node tools/loose.mjs <id> low      # where the loose stones are, not how many
+node tools/look.mjs /tmp/out/<id> <id>   # three views, plus the blind ranks
+```
+
+`loose.mjs` prints each detached stone's section, height, distance from the
+origin and size, which usually names the bug without opening the builder:
+four-centimetre stones at one height are a ring whose wall has gone to
+nothing, and a whole tag at one height is a slab spanning further than
+anything can carry it. `look.mjs` prints the blind defenders' height and
+radius, which is how twenty-seven blind men at Chichen Itza turned out to
+be on the other building two hundred metres away rather than on the
+pyramid everyone assumed.
+
 Rules of the harness, learned the hard way:
 - Never edit a source file or run a heavy probe while a suite is in
   flight. Vite's reload corrupts the run and a concurrent probe caused a
@@ -351,8 +441,9 @@ Rules of the harness, learned the hard way:
 Ship: commit to `claude/landmark-destruction-game-4gxy06`, fast-forward
 `main` (`git push origin <branch>:main`), and confirm the "Deploy to
 GitHub Pages" run is green. The remote stays on the old repo URL
-(`getarsenal/Tumble-Town`); the credential is bound to it and the new name
-redirects.
+(`getarsenal/Excessive-Force`). The repo has been renamed twice —
+Tumble-Town, then this — and pushes to the current name work; if a
+credential ever fails, the old URL redirects.
 
 ---
 
@@ -373,6 +464,20 @@ following, in this order, each verified before the next:
    are not given; draft one option and mark it as a draft).
 8. Suite green at low tier, build clean, screenshots looked at, deployed.
 
-What a new map has not needed so far: engine changes, new unit types, new
-UI. If a new map seems to need one, the design is probably wrong for the
-engine, and it is worth saying so before building it.
+The first four maps needed no engine change at all, and that was worth
+saying. The second five needed six, and every one of them was the engine
+being wrong rather than the map being clever: a bearing walk that settled
+same-height edges in whatever order the height sort happened to produce; no
+rule at all for a cantilever; a railway that picked its side of the map at
+random and landed in a harbour; a building bedded to its low corner and
+buried when the ground fell more than seven metres across its plot; a roof
+level with the hillside still offered as a firing position; a flatten pad
+that could only be a disc levelled to the median of the ring round it.
+
+So the rule stands, with the exception stated: a new map should not need
+new *gameplay*. If it seems to need a new unit type, a new UI, or a special
+case in the win rules, the design is wrong for the engine and it is worth
+saying so before building it. If it turns up a physical situation the
+solver has never been asked about — a shell, a cantilever, a coast, a
+mountain — that is not the map being difficult, that is the map finding a
+hole, and the fix belongs in the engine where every later map gets it.
