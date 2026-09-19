@@ -268,32 +268,112 @@ def infer_heights(buildings, cell=180.0, floor=6.0):
         b["h"] = round(max(floor, min(h * scale, h * 1.6, 140.0)), 1)
 
 
+# How far past the playfield the city is carried, and how it is carried.
+#
+# A map is 1.7 km across and the place it is cut out of is not. Stopping the
+# buildings at the boundary leaves the town ending in a clean line with fields
+# beyond it, which is the one thing every one of these levels is not: London
+# does not stop at Lambeth Bridge. So the survey is read out to more than twice
+# the playfield and everything past the edge is kept as well.
+#
+# Not as outlines, though. Out there nothing is shot at, nothing is stood on and
+# nothing is closer than eight hundred metres, so a building is a box — and a
+# box is six numbers against a polygon's twenty. Fifteen thousand outlines is
+# four megabytes and fifteen thousand boxes is three hundred kilobytes, which is
+# the difference between shipping the surround and not.
+SURROUND = 2.25          # how far out to read, in playfield spans
+SURROUND_MIN_AREA = 55   # a shed at nine hundred metres is not a building
+SURROUND_CAP = 9000      # largest first, so a cap loses sheds and not towers
+
+
+def bounding_rect(pts):
+    """Smallest enclosing rectangle: (cx, cz, w, d, yaw).
+
+    `yaw` in the game's convention, where a bearing of y turns the width axis
+    to (cos y, -sin y) — the same one `block()` and `footprintPoints` use.
+    """
+    best = None
+    n = len(pts)
+    for i in range(n):
+        ax, az = pts[i]
+        bx, bz = pts[(i + 1) % n]
+        ex, ez = bx - ax, bz - az
+        L = math.hypot(ex, ez)
+        if L < 0.4:
+            continue
+        ux, uz = ex / L, ez / L
+        us = [q[0] * ux + q[1] * uz for q in pts]
+        vs = [-q[0] * uz + q[1] * ux for q in pts]
+        area = (max(us) - min(us)) * (max(vs) - min(vs))
+        if best is None or area < best[0]:
+            best = (area, ux, uz, min(us), max(us), min(vs), max(vs))
+    if best is None:
+        return None
+    _, ux, uz, u0, u1, v0, v1 = best
+    cu, cv = (u0 + u1) / 2, (v0 + v1) / 2
+    return (cu * ux - cv * uz, cu * uz + cv * ux,
+            u1 - u0, v1 - v0, math.atan2(-uz, ux))
+
+
 def bake_buildings(sink, level_id, cfg, lat0, lon0, span, roads=None):
     to_local, m_lat, m_lon = projector(lat0, lon0)
-    pad = span * 1.25
+    pad = span * SURROUND
     tab = read_theme(sink, "buildings", "building", lat0, lon0,
                      pad / m_lat, pad / m_lon,
                      ["geometry", "height", "num_floors", "class", "subtype",
                       "names"])
     rows = tab.to_pylist()
-    out, tagged = [], 0
+    out, far, tagged = [], [], 0
     for row in rows:
         try:
             geom = wkb.loads(bytes(row["geometry"]))
         except Exception:
             continue
-        pts = ring_points(geom, to_local, span * 1.05)
+        pts = ring_points(geom, to_local, span * SURROUND)
         if pts is None:
             continue
         h, real = height_of(row)
-        if real:
-            tagged += 1
-        names = row.get("names") or {}
-        name = names.get("primary") if isinstance(names, dict) else None
-        out.append({"pts": simplify(pts), "h": round(h, 1), "real": real,
-                    "kind": row.get("class") or row.get("subtype") or "yes",
-                    "name": name})
-    infer_heights(out)
+        inside = any(abs(q[0]) <= span * 1.05 and abs(q[1]) <= span * 1.05 for q in pts)
+        rec = {"pts": simplify(pts), "h": round(h, 1), "real": real,
+               "kind": row.get("class") or row.get("subtype") or "yes"}
+        if inside:
+            if real:
+                tagged += 1
+            names = row.get("names") or {}
+            rec["name"] = names.get("primary") if isinstance(names, dict) else None
+            out.append(rec)
+        else:
+            far.append(rec)
+
+    # Heights are inferred from the neighbourhood, so the two sets have to be
+    # measured together: the surround is mostly untagged and the quarters it
+    # borrows from are inside the map.
+    infer_heights(out + far)
+
+    # The surround, as boxes.
+    boxes = []
+    for rec in far:
+        pts = rec["pts"]
+        a = 0.0
+        for i in range(len(pts)):
+            q, r = pts[i], pts[(i + 1) % len(pts)]
+            a += q[0] * r[1] - r[0] * q[1]
+        area = abs(a / 2)
+        if area < SURROUND_MIN_AREA:
+            continue
+        rect = bounding_rect(pts)
+        if rect is None:
+            continue
+        cx, cz, w, d, yaw = rect
+        if min(w, d) < 3.0:
+            continue
+        boxes.append((area, [round(cx), round(cz), round(w, 1), round(d, 1),
+                             round(math.degrees(yaw)), round(rec["h"], 1)]))
+    boxes.sort(key=lambda t: -t[0])
+    flat = []
+    for _, b in boxes[:SURROUND_CAP]:
+        flat.extend(b)
+
     out.sort(key=lambda b: -len(b["pts"]))
     CITY_DIR.mkdir(parents=True, exist_ok=True)
     meta = {
@@ -301,15 +381,19 @@ def bake_buildings(sink, level_id, cfg, lat0, lon0, span, roads=None):
         "spanMeters": span, "count": len(out), "withRealHeights": tagged,
         "source": "Overture Maps Foundation (OpenStreetMap contributors, ODbL "
                   "1.0; Microsoft and Google building footprints)",
-        "note": "Footprints in metres east (+x) / south (+z) of the level origin.",
+        "note": "Footprints in metres east (+x) / south (+z) of the level origin. "
+                "`outer` is the city beyond the playfield, flat-packed as "
+                "x, z, w, d, yaw in degrees, height.",
         "buildings": out,
+        "outerReach": round(span * SURROUND),
+        "outer": flat,
     }
     if roads:
         meta["roads"] = roads
     path = CITY_DIR / f"{level_id}.json"
     path.write_text(json.dumps(meta, separators=(",", ":")))
-    print(f"  buildings: {len(out)} ({tagged} with real heights), "
-          f"{path.stat().st_size / 1024:.0f} KB")
+    print(f"  buildings: {len(out)} ({tagged} with real heights) "
+          f"+ {len(flat) // 6} beyond the map, {path.stat().st_size / 1024:.0f} KB")
     return len(out)
 
 

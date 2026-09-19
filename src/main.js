@@ -213,12 +213,14 @@ async function boot() {
   // it and into the monument.
   const cityBodies = buildCityBodies(physics, contextGroup.userData.plots);
   physics.cityBody = cityBodies ? cityBodies.body : null;
+
   const d = contextGroup.userData.detail || {};
   console.log(`[tumble] city: ${d.plan} street plan, `
     + `${contextGroup.userData.plots.length} buildings `
     + `(${d.real || 0} surveyed), ${d.junctions} junctions, `
     + `${contextGroup.userData.roofs.length} deployable roofs, `
     + `${d.canopy || 0} trees`
+    + (d.surround ? `, ${d.surround} of ${d.surroundAvailable} beyond the map` : '')
     + (city ? ` — ${city.source}` : ' (run tools/bake_overture.py for the real place)'));
 
   // The defence, laid round whichever set of buildings got built.

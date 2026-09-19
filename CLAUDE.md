@@ -47,6 +47,13 @@ coastline and land cover into `public/assets/terrain/<level>_mask.png`,
 dredging `<level>_height.png` underneath it so the two agree. It re-cuts
 the DEM first, so it is safe to re-run.
 
+The city file carries two sets. `buildings` is the playfield: outlines,
+heights, and what the game lays up, collides and deploys on. `outer` is
+everything from the boundary out to 2.25 spans, flat-packed six numbers at
+a time — x, z, w, d, yaw in degrees, height — and built by
+`src/world/surround.js` as boxes with no physics and no plots. That split
+is why the surround costs a few hundred kilobytes rather than megabytes.
+
 Egress: `s3.amazonaws.com` and `raw.githubusercontent.com` are allowed.
 Overpass, `tile.openstreetmap.org`, `basemaps.cartocdn.com` and
 `extensions.duckdb.org` are all 403 at the proxy — organisation policy,
@@ -54,8 +61,10 @@ so report it rather than retrying. Needs `pyarrow`, `shapely`, `pillow`.
 
 There is one world builder. `buildContext` invents a city when no bake
 exists and lays the surveyed one on the surveyed streets when it does; it
-builds the roads, parks, trees, furniture and railway either way. The
-console line on load says which.
+builds the roads, parks, trees, furniture, railway and the surround either
+way. The console line on load says which, and how much of each. What is
+beyond the map decides what the outskirts may do: fields and hedgerows keep
+off ground the surveyed city stands on.
 
 ## Adding a map
 

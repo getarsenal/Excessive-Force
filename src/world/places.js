@@ -348,15 +348,26 @@ export function buildOutskirts(props, terrain, rng, opts) {
   // three-hundred-metre circle are two hundred metres apart, and a river a
   // hundred and fifty metres wide went straight between two of them: the
   // airfield at Paris was laid with its runway across the Seine.
+  // Where the surveyed city stands past the edge of the map, if there is one.
+  // Everything this function lays — fields, hedgerows, farmsteads, an airfield,
+  // a reservoir — is what is beyond a town that *ends*, and a hedge through
+  // the middle of Southwark is worse than no hedge at all.
+  const builtUp = opts.builtUp || null;
+
   const usable = (x, z, r, tol) => {
     if (Math.hypot(x, z) < inner) return false;
     if (terrain.isWater(x, z)) return false;
+    if (builtUp && builtUp(x, z)) return false;
     let lo = gy(x, z), hi = lo;
     for (const f of [1 / 3, 2 / 3, 1]) {
       for (let a = 0; a < 12; a++) {
         const th = (a / 12) * Math.PI * 2;
         const px = x + Math.cos(th) * r * f, pz = z + Math.sin(th) * r * f;
         if (terrain.isWater(px, pz)) return false;
+        // Across the whole patch, not only at its middle: a field two hundred
+        // metres across laid from a centre that happens to fall in a gap still
+        // puts its far half through somebody's terrace.
+        if (builtUp && builtUp(px, pz)) return false;
         const h = gy(px, pz);
         if (h < terrain.waterLevel + 1.2) return false;
         lo = Math.min(lo, h); hi = Math.max(hi, h);
@@ -773,7 +784,7 @@ export function fillOpenBlock(props, terrain, rng, kind, frame) {
  * never approached, and they are the difference between "a city" and "a model
  * of a city".
  */
-export function buildHorizon(props, terrain, rng) {
+export function buildHorizon(props, terrain, rng, opts = null) {
   const span = terrain.span;
   let towers = 0;
   // Keep going until there is a skyline, rather than taking a fixed number of
@@ -781,9 +792,13 @@ export function buildHorizon(props, terrain, rng) {
   // dry ground and the two are the same thing; on a harbour most of the ring
   // is open sea, and a hundred and ninety tries came back with thirty-one
   // towers — which from Bennelong Point is a horizon with gaps in it.
+  // Past the surveyed surround, not through it. The real city is carried to
+  // two and a quarter spans now, and abstract blocks standing in among it are
+  // the one thing on the map that has no business being a guess.
+  const from = opts && opts.beyond ? Math.max(2.4, opts.beyond) : 1.9;
   for (let k = 0; k < 1200 && towers < 150; k++) {
     const a = rng() * Math.PI * 2;
-    const r = span * (1.9 + rng() * 1.5);
+    const r = span * (from + rng() * 1.5);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (terrain.isWater(x, z)) continue;
     const g = terrain.surfaceAt(x, z);
@@ -845,19 +860,54 @@ export function buildRailway(props, terrain, rng, opts) {
   }
   const at = line(off);
 
-  let deck = -Infinity;
-  for (let t = -span; t <= span; t += 40) {
-    const p = at(t);
-    deck = Math.max(deck, terrain.surfaceAt(p.x, p.z));
+  // ── The deck follows the ground, at a grade a train could take.
+  //
+  // It used to be one level, put at the highest point the line crosses plus
+  // five and a half metres, and the piers under it made up the difference. On
+  // a river city that is a viaduct a few metres tall and it is right. On a
+  // mountain it is a horizontal line at the height of the summit with four
+  // hundred metres of stone under it — a picket fence of piers standing across
+  // the hillside beside the Corcovado, which is exactly what it looked like.
+  //
+  // A railway climbs at about one in forty. So the profile is the ground,
+  // smoothed, then swept forward and back clamping every step to that grade,
+  // which lifts it over the dips and cuts it through the rises the way a line
+  // is actually surveyed.
+  const T0 = -span * 1.1, T1 = span * 1.1, DT = 12;
+  const n = Math.max(2, Math.round((T1 - T0) / DT) + 1);
+  const prof = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const p = at(T0 + k * DT);
+    prof[k] = terrain.surfaceAt(p.x, p.z);
   }
-  deck += 5.5;
-  if (!isFinite(deck)) return counts;
+  for (let pass = 0; pass < 6; pass++) {
+    for (let k = 1; k < n - 1; k++) prof[k] = (prof[k - 1] + prof[k] * 2 + prof[k + 1]) / 4;
+  }
+  // One in forty is a railway. One in four is a rack railway, and a line that
+  // has to climb six hundred metres in a kilometre and a half is one or it is
+  // nothing: held to a main-line grade the Corcovado's deck runs level at the
+  // height of the summit and every tie on it is either forty metres in the air
+  // or buried, so the mountain came out with no railway at all. The Trem do
+  // Corcovado has been climbing that hill since 1884.
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0; k < n; k++) { lo = Math.min(lo, prof[k]); hi = Math.max(hi, prof[k]); }
+  const GRADE = (hi - lo) > (T1 - T0) / 40 ? DT / 4 : DT / 40;
+  for (let k = 1; k < n; k++) prof[k] = Math.min(prof[k], prof[k - 1] + GRADE);
+  for (let k = n - 2; k >= 0; k--) prof[k] = Math.min(prof[k], prof[k + 1] + GRADE);
+  if (!isFinite(prof[0])) return counts;
 
-  for (let t = -span * 1.1; t < span * 1.1; t += 12) {
+  for (let k = 0; k < n; k++) {
+    const t = T0 + k * DT;
     const p = at(t);
+    const deck = prof[k] + 5.5;
     if (terrain.isWater(p.x, p.z)) continue;
     if (opts.net && opts.net.roadClearance(p.x, p.z) < 8) continue;
     const g = terrain.surfaceAt(p.x, p.z);
+    // Where the line would be in a deep cutting it is in a tunnel instead, and
+    // a tunnel has nothing to draw. Where it would be forty metres in the air
+    // it is on a bridge this generator does not build, and a pier that tall on
+    // a mountainside is the picket fence this came from.
+    if (g - deck > 6 || deck - g > 40) continue;
     // Ballast and two rails.
     props.add('dark', box(9.4, 1.0, 12.4, p.x, deck - 0.5, p.z, yaw), 0x615a50,
       0.88 + rng() * 0.2);
@@ -881,12 +931,19 @@ export function buildRailway(props, terrain, rng, opts) {
   // A station: a platform each side, a canopy, and a train standing at one.
   // Tried a few places along the line, because one sample can easily land in
   // the river and a railway with no station on it is a missed opportunity.
-  let sp = null;
+  // Sited by index along the profile, so the platforms stand at the height the
+  // line is actually at there rather than at one number for the whole railway.
+  let sp = null, deck = 0;
   for (let k = 0; k < 24 && !sp; k++) {
-    const q = at((rng() - 0.5) * span * 1.6);
+    const idx = Math.max(2, Math.min(n - 3,
+      Math.round(n * (0.2 + rng() * 0.6))));
+    const q = at(T0 + idx * DT);
     if (terrain.isWater(q.x, q.z)) continue;
-    if (terrain.surfaceAt(q.x, q.z) < terrain.waterLevel + 1.5) continue;
+    const g = terrain.surfaceAt(q.x, q.z);
+    if (g < terrain.waterLevel + 1.5) continue;
+    if (Math.abs(prof[idx] - g) > 8) continue;   // not on a viaduct or in a cutting
     sp = q;
+    deck = prof[idx] + 5.5;
   }
   if (sp) {
     for (const s of [-1, 1]) {

@@ -24,6 +24,7 @@ import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
+import { buildSurround } from './surround.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
   GRID_YAW, ROAD_CLASS, SURFACE_LIFT } from './streets.js';
@@ -528,7 +529,7 @@ export function buildContext(terrain, quality, opts = {}) {
     // carriageway, somebody's river bank, or six feet lower than the building.
     const box = footprintPoints(rect.x, rect.z, rect.w, rect.d, rect.yaw);
     const all = ring.concat(box);
-    if (!onDryLand(all, 1.5, 0.7)) { rejects.water++; return false; }
+    if (!onDryLand(all, 0.8, 0.7)) { rejects.water++; return false; }
     if (!offStreet(all, PAVEMENT)) { rejects.street++; return false; }
     if (!offBridge(ring)) { rejects.bridge++; return false; }
     if (!offLandmark(ring)) { rejects.landmark = (rejects.landmark || 0) + 1; return false; }
@@ -614,10 +615,10 @@ export function buildContext(terrain, quality, opts = {}) {
     // go through the same box path and the shaped ones merge into the same two
     // meshes — and a budget stopping at nine hundred leaves Westminster as a
     // few streets of houses in a field, which the generated city never was.
-    const budget = { low: 700, medium: 1600, high: 2600, ultra: 4000 }[quality.name] ?? 1600;
+    const budget = { low: 900, medium: 2100, high: 3400, ultra: 5000 }[quality.name] ?? 2100;
     for (const { b, a } of list) {
       if (realBuilt + realShaped >= budget) { rejects.budget = (rejects.budget || 0) + 1; continue; }
-      if (a < 30) { rejects.tiny = (rejects.tiny || 0) + 1; continue; }
+      if (a < 18) { rejects.tiny = (rejects.tiny || 0) + 1; continue; }
       const rect = boundingRect(b.pts);
       if (!rect) continue;
       // The whole playfield, not the grid's inset. `reach` is where the
@@ -640,7 +641,7 @@ export function buildContext(terrain, quality, opts = {}) {
           // small houses, whose heights are guessed anyway, get a roof pitch.
           pitchChance: (b.real || h > 14 || Math.min(rect.w, rect.d) > 19) ? 0 : 0.5,
           real: true, allow: PAVEMENT, gap: -0.8, skip: (q) => q.real,
-          margin: 1.5, freeboard: 0.7,
+          margin: 0.8, freeboard: 0.7,
         })) realBuilt++;
       } else if (shapeBuilding(b.pts, rect, h)) {
         realShaped++;
@@ -860,6 +861,77 @@ export function buildContext(terrain, quality, opts = {}) {
     t.anisotropy = quality.anisotropy;
   }
 
+  // ── Filling in what neither the survey nor the blocks reached.
+  //
+  // A surveyed city arrives with holes in it, from three directions at once.
+  // The survey itself is not complete — Overture has most of central London and
+  // not all of it. A footprint is refused where it stands in our own nominal
+  // carriageway, or over a bank the DEM puts a metre lower than the survey
+  // does. And the block machinery, which is what fills a generated city, only
+  // reaches the land its own streets enclose: Westminster's real plan closes
+  // fifty-one blocks out of a map that has several hundred blocks' worth of
+  // ground in it, so everything outside those fifty-one got nothing at all.
+  //
+  // The result was a city with the right buildings in it and daylight between
+  // them. So the ground is walked on a grid, and where the bake says this is a
+  // built-up quarter and nothing is standing yet, something is built. It is
+  // square to the nearest street, because that is what a building is square to,
+  // and its height comes from its neighbours. Everything else — dry land, off
+  // the carriageway, off the landmark, clear of what is already there — is the
+  // same test every other building in this function has to pass.
+  let filled = 0;
+  if (city && net.segs) {
+    // The bearing of the nearest piece of carriageway, in the yaw convention
+    // `block()` takes.
+    const facing = (x, z) => {
+      let best = 900, ry = YAW;
+      for (const sg of net.segs) {
+        const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
+        const d = Math.abs(mx - x) + Math.abs(mz - z);
+        if (d >= best) continue;
+        best = d;
+        ry = Math.atan2(-(sg.b.z - sg.a.z), sg.b.x - sg.a.x);
+      }
+      return ry;
+    };
+    // The heights around here, so an infill block belongs to its own quarter
+    // rather than to a formula. Sampled off the surveyed plots, which are the
+    // only honest source for it.
+    const nearHeight = (x, z) => {
+      let sum = 0, n = 0;
+      for (const q of plots) {
+        if (!q.real) continue;
+        if (Math.abs(q.x - x) > 140 || Math.abs(q.z - z) > 140) continue;
+        sum += q.h; n++;
+      }
+      return n >= 3 ? sum / n : null;
+    };
+    const STEP = 24;
+    for (let gx = -span; gx <= span; gx += STEP) {
+      for (let gz = -span; gz <= span; gz += STEP) {
+        const x = gx + (rng() - 0.5) * STEP * 0.8;
+        const z = gz + (rng() - 0.5) * STEP * 0.8;
+        if (Math.hypot(x, z) < CITY_EXCLUDE) continue;
+        if (Math.abs(x) > span || Math.abs(z) > span) continue;
+        const m = terrain.maskAt(x, z);
+        // Only where the town is. `road` is the hardstanding channel — real
+        // streets and real built parcels — so this follows the city rather
+        // than covering the map, and it keeps out of the parks.
+        if (m.water > 0.05 || m.park > 0.34) continue;
+        if (m.road < 0.07) continue;
+        const h = nearHeight(x, z);
+        if (h === null) continue;
+        const ry = facing(x, z);
+        const w = 9 + rng() * 15;
+        const d = 9 + rng() * 17;
+        if (block(x, z, w, d, h * (0.75 + rng() * 0.55), ry, {
+          pitchChance: h < 13 ? 0.45 : 0.06,
+          allow: PAVEMENT, gap: 1.4,
+        })) filled++;
+      }
+    }
+  }
+
   const bodyMat = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.93, metalness: 0.01,
     map: facade,
@@ -906,7 +978,8 @@ export function buildContext(terrain, quality, opts = {}) {
   detail.name = 'citydetail';
   const counts = { terraces, squares, civics, works, yards,
     junctions: net.nodes.length, streets: net.edges.length,
-    real: realBuilt + realShaped, realShaped, plan: realNet ? 'surveyed' : 'generated' };
+    real: realBuilt + realShaped, realShaped, filled,
+    plan: realNet ? 'surveyed' : 'generated' };
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
@@ -970,14 +1043,31 @@ export function buildContext(terrain, quality, opts = {}) {
   }
 
   const nearCanopy = counts.canopy || 0;
+  // ── The rest of the place, past the edge of the map.
+  //
+  // Built here rather than beside the world builder, because what is out there
+  // decides what the outskirts may do: fields, hedgerows and a farmstead are
+  // the right middle distance for a town that ends, and Southwark is not a
+  // town that ends.
+  const surround = city && city.outer
+    ? buildSurround(terrain, quality, city.outer, { inner: terrain.span })
+    : null;
+  if (surround) {
+    group.add(surround);
+    counts.surround = surround.userData.built;
+    counts.surroundAvailable = surround.userData.available;
+  }
+
   Object.assign(counts, buildOutskirts(props, terrain, rng, {
     inner: reach * 1.02,
     hinterland: opts.hinterland,
     canopyFar: opts.canopyFar || (opts.canopy || 1) * 0.55,
+    builtUp: surround ? surround.userData.occupied : null,
   }));
   // Both passes count trees under the same name and the outskirts run second.
   counts.canopy = (counts.canopy || 0) + nearCanopy;
-  Object.assign(counts, buildHorizon(props, terrain, rng));
+  Object.assign(counts, buildHorizon(props, terrain, rng,
+    surround ? { beyond: 2.4 } : null));
   Object.assign(counts, buildRailway(props, terrain, rng, { yaw: YAW, net }));
   // Whatever each open block is for, laid out in the block's own frame.
   // `openBig` is the number of open blocks with room for a programme in them,

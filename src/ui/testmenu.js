@@ -1502,11 +1502,18 @@ export class TestMenu {
         // same failure — ground with nothing on it and no reason to be empty.
         const city = this.ctx.cityGroup;
         const raw = city?.userData?.detail || {};
-        // Canopy counts as country. The assertion is that there is something
-        // out there past the last street rather than a wash of colour, and on
-        // a map whose hinterland is rainforest the something is trees: the
-        // Yucatan has no fields in it and is not supposed to.
-        const d = { ...raw, fields: (raw.fields || 0) + (raw.canopy || 0) };
+        // Canopy counts as country, and so does more city.
+        //
+        // The assertion is that there is *something* out there past the last
+        // street rather than a wash of colour. On a map whose hinterland is
+        // rainforest the something is trees — the Yucatan has no fields in it
+        // and is not supposed to. And on a map whose hinterland is London, it
+        // is London: the surveyed city is carried two and a quarter spans out
+        // now, and the fields were quite correctly refusing to lay themselves
+        // through the middle of Southwark. Two thousand seven hundred
+        // buildings is not a wash of colour.
+        const d = { ...raw,
+          fields: (raw.fields || 0) + (raw.canopy || 0) + (raw.surround || 0) };
         const traits = c.level.traits || {};
         const want = {
           railing: 40,        // something stands round the monument
