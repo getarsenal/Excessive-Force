@@ -455,30 +455,21 @@ export class Battle {
     if (!onRoof && this.terrain.isWater(point.x, point.z)) {
       return { ok: false, reason: 'in the river' };
     }
-    // Not on a cliff.
+    // There is no slope rule here, and there was.
     //
-    // A gun crew needs ground it can stand the trail on, and until there was a
-    // mountain in the campaign nothing in the game was steep enough for that to
-    // come up. The Corcovado is: its flanks fall at better than fifty degrees
-    // between the benches, and a howitzer bedded into one of those sat at forty
-    // degrees of roll with its muzzle in the hillside. Refusing them is also
-    // what makes the shelves matter — the level is fought from one bench to the
-    // next because those are the only places a battery will go.
-    if (!onRoof && this.terrain) {
-        const g0 = this.terrain.heightAt(point.x, point.z);
-        let lo = g0, hi = g0;
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2;
-          const g = this.terrain.heightAt(point.x + Math.cos(a) * 7, point.z + Math.sin(a) * 7);
-          lo = Math.min(lo, g); hi = Math.max(hi, g);
-        }
-        // Generous. A city on a hillside — the Trocadéro, Circular Quay — is
-        // ground a gun can stand on; the flank of a mountain between two
-        // benches falls twenty metres across the same seven and is not.
-        if (hi - lo > 8.0) return { ok: false, reason: 'too steep' };
-    }
+    // It refused ground that fell more than eight metres across the seven a gun
+    // crew needs, on the reasoning that a howitzer cannot be bedded on a cliff.
+    // That is true and it is not worth what it cost: eight metres across seven
+    // is a *city on a hillside* as often as it is a mountainside, so the refusal
+    // landed on the Trocadéro, on the streets above Circular Quay and on half
+    // the ground round the Corcovado's benches — and what the player got for it
+    // was a tap that did nothing and an error message, in places where the
+    // ground plainly looked fine. A gun that looks slightly wrong on a steep
+    // bank is a far smaller problem than a deployment that is refused for
+    // reasons the player cannot see. The mountain's benches still matter,
+    // because what makes them matter is the line of sight from them.
 
-    // And it has to be a roof worth climbing. A building is bedded to the
+    // It has to be a roof worth climbing. A building is bedded to the
     // ground at its own centre, so where the ground climbs across its
     // footprint the top of it can finish level with the hillside behind —
     // which the picker still reports as a roof, because it is one, and the
@@ -908,10 +899,15 @@ export class Battle {
     if (vel && p.kind !== 'topattack') {
       const len = Math.hypot(vel.x, vel.y, vel.z);
       if (len > 1e-3) {
+        // Rubble and masonry only. The city is in the physics world now, and a
+        // gun limbered up two and a half metres from a wall is where a gun
+        // goes — refusing to fire for that would mute half the batteries in
+        // town, when what the shot actually needs is the loft the clearance
+        // test above has already worked out.
         const blocked = this.physics.castRay(
           { x: from.x, y: from.y, z: from.z },
           { x: vel.x / len, y: vel.y / len, z: vel.z / len },
-          2.6,
+          2.6, null, this.physics.cityBody,
         );
         if (blocked) return false;
       }
@@ -971,6 +967,12 @@ export class Battle {
         from.z + vel.z * t,
       );
       if (!lineOfSight(this.structures, a, bpt, 0, 0)) return false;
+      // And the city, which is now masonry as far as a shell is concerned. A
+      // gun in a street has a roof in front of it, and a flat trajectory into
+      // that roof is a round that detonates on somebody's chimney: the solver
+      // has to know, or every battery deployed among the buildings spends the
+      // match shelling the buildings.
+      if (this.cityBlocker && this.cityBlocker.blocks(a, bpt)) return false;
       // And the ground, which this did not look at for a long time. Masonry
       // was the only thing that could block a shot, so a gun on the flank of a
       // mountain firing at something above it never discovered that its flat
@@ -1149,7 +1151,10 @@ export class Battle {
     let destroyed = 0;
     for (const s of this.structures) {
       destroyed += s.explode(point, rMax, rMax * 1.15, w.power * this.powerScale,
-        { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4 });
+        // A third of the core comes out as stone rather than as dust. A bomb
+        // this size does not make masonry vanish, it throws it, and the throw
+        // is most of what the player is paying half a million dollars to see.
+        { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4, eject: 0.34 });
     }
     const killed = this.garrison.splash(point, rMax * 1.5, w.power);
     if (killed) {
@@ -1160,7 +1165,7 @@ export class Battle {
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 6.0;
     this._lastImpact = point.clone();
-    this.fx.detonate(point, w.fx, { ground: nearGround, groundY });
+    this.fx.strikeBlast(point, w.fx, { groundY });
     // The column stands over the site for the rest of the level, and it is
     // the thing you see from across the map. A bomb earns a bigger one than a
     // shell does, so this is not clamped to the shell's ceiling.

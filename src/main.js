@@ -8,6 +8,7 @@ import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
 import { Life } from './world/life.js';
 import { loadCity } from './world/city.js';
+import { buildCityBodies } from './world/citybodies.js';
 import { buildFieldWorks } from './world/works.js';
 import { Structure } from './structure/structure.js';
 import {
@@ -207,6 +208,11 @@ async function boot() {
     downtown: level.setting?.downtown,
   });
   engine.scene.add(contextGroup);
+  // And the city is solid. Until this it was scenery: a round fired at a gun
+  // behind a terrace went through the terrace, through the office block behind
+  // it and into the monument.
+  const cityBodies = buildCityBodies(physics, contextGroup.userData.plots);
+  physics.cityBody = cityBodies ? cityBodies.body : null;
   const d = contextGroup.userData.detail || {};
   console.log(`[tumble] city: ${d.plan} street plan, `
     + `${contextGroup.userData.plots.length} buildings `
@@ -362,6 +368,9 @@ async function boot() {
   })();
   // Footprints, so a gun cannot be deployed inside a building.
   battle.cityPlots = contextGroup?.userData?.plots || null;
+  // The firing solution reads this: a gun in a street has to put the shell
+  // over the roof in front of it rather than into it.
+  battle.cityBlocker = cityBodies;
 
   // Smoke the garrison cannot see through, and fires that burn on after a
   // heavy hit.
@@ -550,7 +559,64 @@ async function boot() {
   // during a collapse.
   physics.groundAt = (x, z) => terrain.heightAt(x, z);
 
-  physics.onImpact((a, b, force) => {
+  physics.onImpact((a, b, force, c1, c2) => {
+    // ── Masonry landing on masonry destroys masonry.
+    //
+    // Standing stone is a collider on the structure's one fixed body, and a
+    // fixed body does not care what lands on it — so a tower cut clean through
+    // at the base dropped everything above the cut onto the stumps and stopped
+    // there, upright, a few metres lower, for the rest of the match. That is
+    // the reported "the top part floats and slowly crumbles": the section is
+    // resting on its own base and the base is being ground away underneath it
+    // one stone at a time by the load solver. Nothing survives having a tower
+    // dropped on it, and now nothing does.
+    if (force > 34000) {
+      for (const [live, col] of [[a, c2], [b, c1]]) {
+        if (!live || !col) continue;
+        const st = live.structure;
+        if (!st) continue;
+        // How much came down. An island knows its own mass; a single stone
+        // falling off a cornice is not an event.
+        let mass = 0;
+        if (live.island !== undefined) {
+          const isl = st.islands.get(live.island);
+          if (!isl) continue;
+          mass = isl.mass;
+        } else if (live.chunk !== undefined) {
+          mass = st.mass[live.chunk];
+        }
+        if (mass < 4000) continue;
+        for (const target of structures) {
+          const i = target.chunkAtCollider(col);
+          if (i < 0) continue;
+          const at = new THREE.Vector3(target.px[i], target.py[i] + target.hy[i], target.pz[i]);
+          const gone = target.crushUnder(at, mass, force);
+          if (gone > 3) {
+            fx.impactDust(at.x, at.y, at.z, Math.min(2.6, gone / 20));
+            engine.addShake(Math.min(0.3, gone / 240));
+            // And it goes over, rather than down.
+            //
+            // The support under this edge has just failed, so the weight is
+            // now bearing on whatever is left on the other side and the
+            // section rotates about it. Without this a severed tower is
+            // symmetric, has nothing to tip it, and telescopes straight into
+            // its own crater — the base grinding away underneath while the
+            // shaft slides down it, which reads exactly as "it crumbles from
+            // the bottom up". A demolition charge works this way for the same
+            // reason: you do not cut the base evenly, you cut one side.
+            const isl = live.island !== undefined ? st.islands.get(live.island) : null;
+            if (isl && PhysicsWorld.alive(isl.body)) {
+              isl.body.applyImpulseAtPoint(
+                { x: 0, y: -mass * 0.30, z: 0 },
+                { x: at.x, y: at.y, z: at.z }, true,
+              );
+            }
+          }
+          break;
+        }
+      }
+    }
+
     for (const o of [a, b]) {
       if (!o || o.island === undefined) continue;
       const st = o.structure;

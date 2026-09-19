@@ -2120,7 +2120,13 @@ export class TestMenu {
           // reported thirteen stones hanging while the sweep's own tally said
           // it had checked a hundred and fifty thousand and found all but
           // three hundred of them standing.
-          for (let k = 0; k < 3; k++) {
+          // Six rounds rather than three. The invariant is that nothing
+          // *stays* hanging, and the window in which a stone legitimately is
+          // hanging — between the rubble under it being culled and the sweep
+          // reaching it — got wider once landing sections started destroying
+          // the masonry they land on, because that is one more way for a
+          // stone's footing to go away underneath it.
+          for (let k = 0; k < 6; k++) {
             P.auditFrozen(P.frozen.length);
             c.fastForward(0.4);
           }
@@ -2525,6 +2531,42 @@ export class TestMenu {
         // happening, and sampling in the middle of one reports it as a fault.
         for (let k = 0; k < 60 && c.physics.awakeCount > 20; k++) c.fastForward(0.25);
         const gy = b.originGround;
+        // A roof is ground.
+        //
+        // The city has colliders now, so rubble thrown off a collapse lands on
+        // the buildings around it and stays there — which is what masonry does
+        // and is the whole point of having made them solid. This test knows
+        // about the terrain and about the structures and nothing else, so
+        // without this every piece of debris on a roof reads as a stone
+        // hanging in the air twenty-three metres up.
+        const roofs = (c.cityGroup?.userData?.plots) || [];
+        const CROOF = 64;
+        const roofGrid = new Map();
+        const rkey = (cx, cz) => `${cx},${cz}`;
+        for (const p of roofs) {
+          const rr = Math.hypot(p.w, p.d) / 2;
+          for (let cx = Math.floor((p.x - rr) / CROOF); cx <= Math.floor((p.x + rr) / CROOF); cx++) {
+            for (let cz = Math.floor((p.z - rr) / CROOF); cz <= Math.floor((p.z + rr) / CROOF); cz++) {
+              const k2 = rkey(cx, cz);
+              let bucket = roofGrid.get(k2);
+              if (!bucket) roofGrid.set(k2, bucket = []);
+              bucket.push(p);
+            }
+          }
+        }
+        const onRoof = (x, y, z, r) => {
+          const bucket = roofGrid.get(rkey(Math.floor(x / CROOF), Math.floor(z / CROOF)));
+          if (!bucket) return false;
+          for (const p of bucket) {
+            const top = p.base + p.h;
+            if (y - r > top + 1.6 || y + r < p.base - 0.5) continue;
+            const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+            const dx = x - p.x, dz = z - p.z;
+            const u = dx * ca - dz * sa, v = dx * sa + dz * ca;
+            if (Math.abs(u) <= p.w / 2 + r && Math.abs(v) <= p.d / 2 + r) return true;
+          }
+          return false;
+        };
         const nodes = [];
         for (const st of c.structures) {
           for (let i = 0; i < st.count; i++) {
@@ -2545,7 +2587,8 @@ export class TestMenu {
               // Masonry still attached to the building is ground by definition;
               // so is anything lying on the terrain.
               ground: !(st.flags[i] & 10)
-                || st.py[i] - st.hy[i] <= c.terrain.heightAt(st.px[i], st.pz[i]) + 1.4,
+                || st.py[i] - st.hy[i] <= c.terrain.heightAt(st.px[i], st.pz[i]) + 1.4
+                || onRoof(st.px[i], st.py[i], st.pz[i], r),
             });
           }
         }

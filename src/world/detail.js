@@ -408,139 +408,170 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
   const built = new Set();
 
   /**
-   * One sweep along the bank.
+   * Trace the bank, in order, as runs of points.
    *
-   * `axis` 0 walks lines of constant z and finds the shoreline east and west,
-   * so the wall it builds runs north-south. `axis` 1 does the same the other
-   * way round. Both are needed, and only having the first is why Agra had a
-   * third of the river wall the map wants: a scan of constant-z lines finds
-   * the *ends* of an east-west river and nothing along its length, so the
-   * Yamuna got two tips of embankment and eight hundred metres of bare edge
-   * between them. The Thames runs north-south and never showed it.
+   * `axis` 0 walks lines of constant z and finds the shoreline east and west;
+   * `axis` 1 does the same the other way round. Both are needed: a scan of
+   * constant-z lines finds the *ends* of an east-west river and nothing along
+   * its length, which is why Agra used to get two tips of embankment and eight
+   * hundred metres of bare edge between them.
    *
-   * Everything below is written in (along, across) and mapped out at the end,
-   * which is the only way this stays readable in two orientations.
+   * A run breaks wherever the waterline jumps, because a jump is not a bank —
+   * it is the scan crossing the mouth of a dock, or finding a different body of
+   * water altogether, and joining the two points either side of it would build
+   * a wall straight across open water.
    */
-  const sweep = (axis) => {
+  const trace = (axis, dir) => {
     const at = (along, across) => (axis === 0
       ? { x: across, z: along }
       : { x: along, z: across });
-    // A box `thick` across the wall, `len` along it.
-    const slab = (kind, thick, hgt, len, along, y, across, color, jitter) => {
-      const p = at(along, across);
-      props.add(kind, axis === 0
-        ? box(thick, hgt, len, p.x, y, p.z)
-        : box(len, hgt, thick, p.x, y, p.z), color, jitter);
-    };
-    const post = (kind, r0, r1, hgt, seg, along, y, across, color, jitter) => {
-      const p = at(along, across);
-      props.add(kind, cyl(r0, r1, hgt, seg, p.x, y, p.z), color, jitter);
-    };
-
+    const runs = [];
+    let run = null;
     for (let a = -span * 0.96; a < span * 0.96; a += step) {
-      for (const dir of [1, -1]) {
-        let found = null;
-        for (let t = 0; t < span * 1.9; t += 3) {
-          const c = dir > 0 ? -span * 0.96 + t : span * 0.96 - t;
-          const p = at(a, c);
-          if (terrain.isWater(p.x, p.z)) { found = c; break; }
-        }
-        if (found === null) continue;
-        // Step back from the waterline until the ground is above the water,
-        // rather than by a fixed metre and a half.
-        //
-        // The channel is cut with a feathered shoulder, so the first few
-        // metres outside the wet mask are still below the surface. A fixed
-        // offset put the wall's footing underwater along most of the Yamuna
-        // and skipped it there.
-        let across = null, gy = 0;
+      let found = null;
+      for (let t = 0; t < span * 1.9; t += 3) {
+        const c = dir > 0 ? -span * 0.96 + t : span * 0.96 - t;
+        const p = at(a, c);
+        if (terrain.isWater(p.x, p.z)) { found = c; break; }
+      }
+      // Step back from the waterline until the ground is above the water,
+      // rather than by a fixed metre and a half: the channel is cut with a
+      // feathered shoulder, so the first few metres outside the wet mask are
+      // still below the surface.
+      let across = null, gy = 0;
+      if (found !== null) {
         for (let back = 1.6; back <= 26; back += 2.0) {
           const c = found - dir * back;
           const p = at(a, c);
           const g = terrain.heightAt(p.x, p.z);
           if (g >= level - 0.2) { across = c; gy = g; break; }
         }
-        if (across === null) continue;
-        const w = at(a, across);
-        const key = `${Math.round(w.x / 9)},${Math.round(w.z / 9)}`;
-        if (built.has(key)) continue;
-        built.add(key);
+      }
+      if (across === null) { run = null; continue; }
+      const w = at(a, across);
+      const pt = { x: w.x, z: w.z, gy, across, along: a };
+      if (run && Math.hypot(pt.x - run[run.length - 1].x, pt.z - run[run.length - 1].z) > step * 3) {
+        run = null;
+      }
+      if (!run) { run = []; runs.push(run); }
+      run.push(pt);
+    }
+    return { runs, at };
+  };
 
-        const h = Math.max(1.0, gy - level + 1.6);
-        const top = level - 1.6 + h;
-        slab('stone', 2.6, h, step + 0.6, a, level - 1.6 + h / 2, across,
-          0x8f8778, 0.86 + rng() * 0.2);
-        // Coping: a paler cap along the top of the wall.
-        slab('stone', 3.0, 0.32, step + 0.6, a, top + 0.16, across,
-          0xc3bba8, 0.9 + rng() * 0.16);
-        counts.wall++;
+  /**
+   * Lay one traced run as a continuous wall.
+   *
+   * The wall used to be built as an axis-aligned slab dropped at each sample,
+   * which is correct for a river that runs north and south and is a staircase
+   * for one that does not: on a surveyed coastline every piece sat square to
+   * the map while the bank ran across it at forty degrees, so the embankment
+   * came out as a broken line of steps with the ground showing through between
+   * them. Each piece now runs from one sample to the next, in that direction,
+   * long enough to meet its neighbours.
+   */
+  const lay = (run, dir, axis) => {
+    if (run.length < 2) return;
+    for (let k = 0; k < run.length - 1; k++) {
+      const p0 = run[k], p1 = run[k + 1];
+      const dx = p1.x - p0.x, dz = p1.z - p0.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.5) continue;
+      const ux = dx / len, uz = dz / len;
+      // `box` turns local +X to (cos ry, -sin ry), so this points the piece's
+      // length along the bank.
+      const ry = Math.atan2(-uz, ux);
+      // Toward the water: the sweep walked inward from the map edge, so the
+      // waterline is `dir` further along the across axis.
+      const nx = axis === 0 ? dir : 0;
+      const nz = axis === 0 ? 0 : dir;
+      const cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2;
+      const gy = (p0.gy + p1.gy) / 2;
 
-        if (ghats) {
-          // The Yamuna side is steps down to the water, not a parapet: broad
-          // shallow ghats running the length of the bank.
-          for (let k = 0; k < 6; k++) {
-            slab('stone', 1.6, 0.34, step + 0.4, a, top - k * 0.36,
-              across + dir * (1.6 + k * 1.5), 0xb2a68d, 0.88 + rng() * 0.2);
-          }
-          counts.stairs++;
-          continue;
-        }
+      const key = `${Math.round(cx / 9)},${Math.round(cz / 9)}`;
+      if (built.has(key)) continue;
+      built.add(key);
 
-        // ── A parapet, and above it a stone balustrade: the thing that makes
-        // an embankment read as an embankment from any distance is the
-        // *dotted* line of light and shadow along its top, which a solid wall
-        // does not give you.
-        slab('stone', 0.55, 0.36, step + 0.6, a, top + 0.5, across - dir * 0.9,
-          0xbdb5a2, 0.94);
-        slab('stone', 0.55, 0.3, step + 0.6, a, top + 1.42, across - dir * 0.9,
-          0xc7bfab, 0.94);
-        const bal = Math.max(3, Math.round(step / 1.1));
-        for (let k = 0; k < bal; k++) {
-          const ba = a - step / 2 + (k + 0.5) * (step / bal);
-          post('stone', 0.13, 0.19, 0.9, 6, ba, top + 1.0, across - dir * 0.9,
-            0xc1b9a6, 0.9 + rng() * 0.14);
-          counts.balusters++;
-        }
+      /** A box in the piece's own frame: `l` along the bank, `t` across it. */
+      const piece = (kind, t, hgt, l, off, y, color, jitter) => {
+        props.add(kind, box(l, hgt, t, cx + nx * off, y, cz + nz * off, ry),
+          color, jitter);
+      };
+      const postAt = (kind, r0, r1, hgt, seg, s, off, y, color, jitter) => {
+        props.add(kind, cyl(r0, r1, hgt, seg,
+          cx + ux * s + nx * off, y, cz + uz * s + nz * off), color, jitter);
+      };
 
-        // Sturgeon lamps along the parapet, and mooring rings below them.
-        if (Math.abs(a % (step * 5)) < step * 0.5) {
-          const la = across - dir * 0.9;
-          post('metal', 0.3, 0.42, 1.1, 8, a, top + 2.1, la, 0x2c3a3a, 1);
-          post('metal', 0.1, 0.16, 4.6, 6, a, top + 4.7, la, 0x30403f, 1);
-          slab('metal', 0.72, 0.9, 0.72, a, top + 7.3, la, 0x283634, 1);
-          // The lamp itself, bright enough to read at dusk.
-          slab('glow', 0.5, 0.62, 0.5, a, top + 7.3, la, 0xffe6b4, 1);
-          counts.lamps++;
+      const h = Math.max(1.0, gy - level + 1.6);
+      const top = level - 1.6 + h;
+      piece('stone', 2.6, h, len + 1.2, 0, level - 1.6 + h / 2, 0x8f8778,
+        0.86 + rng() * 0.2);
+      // Coping: a paler cap along the top of the wall.
+      piece('stone', 3.0, 0.32, len + 1.2, 0, top + 0.16, 0xc3bba8,
+        0.9 + rng() * 0.16);
+      counts.wall++;
+
+      if (ghats) {
+        // The Yamuna side is steps down to the water, not a parapet: broad
+        // shallow ghats running the length of the bank.
+        for (let j = 0; j < 6; j++) {
+          piece('stone', 1.6, 0.34, len + 1.0, 1.6 + j * 1.5, top - j * 0.36,
+            0xb2a68d, 0.88 + rng() * 0.2);
         }
-        if (rng() < 0.12) {
-          post('metal', 0.28, 0.28, 0.12, 8, a, level + 0.9,
-            across + dir * 1.2, 0x3b3f42, 1);
-          counts.rings++;
+        counts.stairs++;
+        continue;
+      }
+
+      // ── A parapet, and above it a stone balustrade: the thing that makes an
+      // embankment read as an embankment from any distance is the *dotted*
+      // line of light and shadow along its top, which a solid wall does not
+      // give you.
+      piece('stone', 0.55, 0.36, len + 1.2, -0.9, top + 0.5, 0xbdb5a2, 0.94);
+      piece('stone', 0.55, 0.3, len + 1.2, -0.9, top + 1.42, 0xc7bfab, 0.94);
+      const bal = Math.max(3, Math.round(len / 1.1));
+      for (let j = 0; j < bal; j++) {
+        const sOff = -len / 2 + (j + 0.5) * (len / bal);
+        postAt('stone', 0.13, 0.19, 0.9, 6, sOff, -0.9, top + 1.0,
+          0xc1b9a6, 0.9 + rng() * 0.14);
+        counts.balusters++;
+      }
+
+      // Sturgeon lamps along the parapet, and mooring rings below them.
+      if (k % 5 === 0) {
+        postAt('metal', 0.3, 0.42, 1.1, 8, 0, -0.9, top + 2.1, 0x2c3a3a, 1);
+        postAt('metal', 0.1, 0.16, 4.6, 6, 0, -0.9, top + 4.7, 0x30403f, 1);
+        piece('metal', 0.72, 0.9, 0.72, -0.9, top + 7.3, 0x283634, 1);
+        // The lamp itself, bright enough to read at dusk.
+        piece('glow', 0.5, 0.62, 0.5, -0.9, top + 7.3, 0xffe6b4, 1);
+        counts.lamps++;
+      }
+      if (rng() < 0.12) {
+        postAt('metal', 0.28, 0.28, 0.12, 8, 0, 1.2, level + 0.9, 0x3b3f42, 1);
+        counts.rings++;
+      }
+      // Occasional stair down to the water, with a landing at the bottom.
+      if (rng() < 0.045) {
+        for (let j = 0; j < 6; j++) {
+          piece('stone', 2.0, 0.3, 1.0 + j * 0.2, 1.4 + j * 0.5,
+            top - 0.2 - j * 0.42, 0xa39a88, 0.9);
         }
-        // Occasional stair down to the water, with a landing at the bottom.
-        if (rng() < 0.045) {
-          for (let k = 0; k < 6; k++) {
-            slab('stone', 2.0, 0.3, 1.0 + k * 0.2, a, top - 0.2 - k * 0.42,
-              across + dir * (1.4 + k * 0.5), 0xa39a88, 0.9);
-          }
-          slab('stone', 3.0, 0.3, 4.0, a, level + 0.35, across + dir * 4.4,
-            0x9d9483, 0.92);
-          counts.stairs++;
-        }
-        // A moored barge or launch, tied against the wall.
-        if (rng() < 0.05) {
-          const ba = across + dir * 5.5;
-          slab('dark', 4.4, 1.5, 15, a, level + 0.4, ba, 0x3b4249,
-            0.86 + rng() * 0.24);
-          slab('paint', 3.4, 1.3, 5.5, a - 3, level + 1.6, ba, 0xb8b2a2, 1);
-          slab('paint', 0.2, 2.6, 0.2, a + 4, level + 2.6, ba, 0xd8d2c2, 1);
-          counts.moorings++;
-        }
+        piece('stone', 3.0, 0.3, 4.0, 4.4, level + 0.35, 0x9d9483, 0.92);
+        counts.stairs++;
+      }
+      // A moored barge or launch, tied against the wall.
+      if (rng() < 0.05) {
+        piece('dark', 4.4, 1.5, 15, 5.5, level + 0.4, 0x3b4249,
+          0.86 + rng() * 0.24);
+        piece('paint', 3.4, 1.3, 5.5, 5.5, level + 1.6, 0xb8b2a2, 1);
       }
     }
   };
 
-  sweep(0);
-  sweep(1);
+  for (const axis of [0, 1]) {
+    for (const dir of [1, -1]) {
+      const { runs } = trace(axis, dir);
+      for (const run of runs) lay(run, dir, axis);
+    }
+  }
   return counts;
 }

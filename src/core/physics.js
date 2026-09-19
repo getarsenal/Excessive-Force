@@ -827,6 +827,11 @@ export class PhysicsWorld {
       //
       // Nothing is resolved inside the callback either, not even a collider
       // lookup: the handles are numbers, and numbers can be carried out.
+      //
+      // The colliders themselves go through as well as the body owners,
+      // because standing masonry has no owner to find: a structure keeps every
+      // stone it has not lost as a collider on one fixed body, so the body is
+      // "the building" and only the collider says which stone.
       const raw = this._contactBuf || (this._contactBuf = []);
       raw.length = 0;
       this.eventQueue.drainContactForceEvents((e) => {
@@ -839,7 +844,7 @@ export class PhysicsWorld {
         const c2 = this.world.getCollider(raw[i + 1]);
         const o1 = c1 && this.owners.get(c1.parent()?.handle);
         const o2 = c2 && this.owners.get(c2.parent()?.handle);
-        for (const fn of this.contactListeners) fn(o1, o2, raw[i + 2]);
+        for (const fn of this.contactListeners) fn(o1, o2, raw[i + 2], c1, c2);
       }
       raw.length = 0;
     }
@@ -923,10 +928,20 @@ export class PhysicsWorld {
     return n;
   }
 
-  castRay(origin, dir, maxToi, filter) {
+  /**
+   * @param {object} origin   world point
+   * @param {object} dir      unit direction
+   * @param {number} maxToi   how far to look
+   * @param {Function} filter optional collider predicate
+   * @param {object} skipBody a rigid body to ignore — the city, for the tests
+   *                          that are about masonry and rubble rather than
+   *                          about the town the gun is standing in
+   */
+  castRay(origin, dir, maxToi, filter, skipBody) {
     const rapier = this.rapier;
     const ray = new rapier.Ray(origin, dir);
-    const hit = this.world.castRay(ray, maxToi, true, undefined, undefined, undefined, undefined, filter);
+    const hit = this.world.castRay(ray, maxToi, true, undefined, undefined,
+      undefined, skipBody || undefined, filter);
     if (!hit) return null;
 
     // Rapier has returned the collider as an object in some versions and as a

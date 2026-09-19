@@ -1182,6 +1182,98 @@ export class Structure {
     return col;
   }
 
+  /**
+   * Shake the mortar out of the joints, out to `radius`.
+   *
+   * A stone that survives a near miss looking untouched is not undamaged: the
+   * joints around it have been shaken apart, and a course whose mortar has gone
+   * carries a fraction of what it did.
+   */
+  shockMortar(center, radius, amount) {
+    const r2 = radius * radius;
+    for (let i = 0; i < this.count; i++) {
+      if (!(this.flags[i] & ALIVE)) continue;
+      if (this.bond[i] <= 0.16) continue;
+      const dx = this.px[i] - center.x;
+      const dy = this.py[i] - center.y;
+      const dz = this.pz[i] - center.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > r2) continue;
+      const f = 1 - Math.sqrt(d2) / radius;
+      this.bond[i] = Math.max(0.15, this.bond[i] - f * f * amount);
+    }
+  }
+
+  /** The standing stone behind one of this structure's colliders, or -1. */
+  chunkAtCollider(col) {
+    if (!col || !this.staticBody || !this.colliderToChunk) return -1;
+    const parent = col.parent();
+    if (!parent || parent.handle !== this.staticBody.handle) return -1;
+    const i = this.colliderToChunk.get(col.handle);
+    return (i === undefined || !(this.flags[i] & ALIVE)) ? -1 : i;
+  }
+
+  /**
+   * A section has come down on this stone.
+   *
+   * Masonry landing on masonry destroys masonry, and nothing in the model said
+   * so. Every standing stone is a collider on one fixed body, and a fixed body
+   * does not care what lands on it — so a tower cut clean through at the base
+   * dropped the thirteen thousand tonnes above the cut onto the stumps of its
+   * own base and *stopped there*, upright, thirteen metres lower than it
+   * started, for the rest of the match. From outside that is the top half of
+   * the building hanging in the air over a hole, which is what it was reported
+   * as. The stumps have to fail, because in life they do: nothing survives
+   * having a tower dropped on it.
+   *
+   * Scaled by what landed. A pinnacle coming off a roof chips the parapet it
+   * bounces on; a section of tower takes out everything under it for its own
+   * width. The radius is capped so that a collapse cannot walk across the map,
+   * and the whole thing is rate-limited per landing section, because a welded
+   * body resting on rubble reports contacts every frame and this is not a
+   * per-frame job.
+   */
+  crushUnder(point, mass, force) {
+    const now = this.clock || 0;
+    if (now - (this._lastCrush || -9) < 0.25) return 0;
+    this._lastCrush = now;
+    // Stone crushes at a few tens of megapascals; what matters here is the
+    // shape of the answer, not the constant. A fifty-tonne pinnacle clears
+    // about a metre and a half; a section of tower clears eight.
+    const radius = Math.max(1.6, Math.min(9.0, Math.cbrt(Math.max(1, mass)) * 0.55));
+    const r2 = radius * radius;
+    // Wake whatever was resting on what is about to go.
+    //
+    // Debris that has come to rest is frozen back into scenery, and a frozen
+    // body is only re-examined when something says its footing may have
+    // changed. `explode` says so; this did not, so a clump of masonry sitting
+    // on a stone that a landing section then pulverised stayed exactly where it
+    // was — twenty stones welded together, at rest, twenty metres up, with
+    // nothing at all underneath them.
+    this.physics.wakeNear(point, radius * 2.4);
+    let killed = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (!(this.flags[i] & ALIVE)) continue;
+      if (this.flags[i] & (FREE | ISLAND)) continue;   // already coming down
+      // Only what is under it. A section landing beside a wall does not take
+      // the wall out sideways; it takes out what it landed on.
+      if (this.py[i] > point.y + this.hy[i] + 0.6) continue;
+      const dx = this.px[i] - point.x;
+      const dy = this.py[i] - point.y;
+      const dz = this.pz[i] - point.z;
+      if (dx * dx + dy * dy * 0.45 + dz * dz > r2) continue;
+      this.destroyChunk(i, point);
+      killed++;
+      if (killed > 120) break;
+    }
+    if (killed) {
+      // Everything round the crater has just lost a neighbour.
+      this.shockMortar(point, radius * 2.0, Math.min(0.7, force / 160000));
+      this.stabilityDirty = true;
+    }
+    return killed;
+  }
+
   _quatFor(i) {
     const h = this.ry[i] * 0.5;
     return { x: 0, y: Math.sin(h), z: 0, w: Math.cos(h) };
@@ -1480,6 +1572,7 @@ export class Structure {
   explode(center, lethal, radius, power, opts = {}) {
     const destroyed = [];
     const thrown = [];
+    const ejected = new Set();
     const r2 = radius * radius;
 
     // Rubble that settled on this wall is about to have the wall taken out
@@ -1528,7 +1621,61 @@ export class Structure {
       }
     }
 
-    for (const i of destroyed) this.destroyChunk(i, center);
+    // ── Some of it is thrown rather than removed.
+    //
+    // Everything inside the lethal radius used to be deleted and replaced with
+    // a puff of dust, which is right for a shell taking a bite out of a wall
+    // and wrong for a bomb: eleven tonnes of high explosive into a building
+    // does not make the building's masonry disappear, it throws it — and "no
+    // bricks flying out away" is exactly what that looked like. So a share of
+    // the core is cut loose as real stone with real bodies instead, thrown
+    // outward and up, and lands as rubble where it falls.
+    //
+    // Taken from the *rim* of the lethal zone rather than its middle: the hole
+    // still has to be a hole, and the stones that would plausibly survive the
+    // detonation intact are the ones furthest from it.
+    const eject = Math.max(0, Math.min(1, opts.eject ?? 0));
+    if (eject > 0 && destroyed.length > 4) {
+      const want = Math.min(Math.round(destroyed.length * eject), 90);
+      const room = this.physics.reclaim(want);
+      if (room > 0) {
+        const rim = destroyed
+          .map((i) => ({
+            i,
+            d: Math.hypot(this.px[i] - center.x, this.py[i] - center.y, this.pz[i] - center.z),
+          }))
+          .sort((a, b) => b.d - a.d)
+          .slice(0, Math.min(want, room));
+        for (const t of rim) {
+          const i = t.i;
+          const inv = 1 / (t.d || 1);
+          const dx = (this.px[i] - center.x) * inv;
+          const dy = (this.py[i] - center.y) * inv;
+          const dz = (this.pz[i] - center.z) * inv;
+          // Hard, and mostly outward: a fragment leaves a detonation far faster
+          // than anything the blast merely shoves.
+          const mag = this.mass[i] * (26 + Math.random() * 30);
+          if (this.freeChunk(i, {
+            x: dx * mag, y: (Math.abs(dy) * 0.55 + 0.45) * mag, z: dz * mag,
+          })) {
+            const b = this.bodyOf[i];
+            if (b) {
+              b.setAngvel({
+                x: (Math.random() - 0.5) * 22,
+                y: (Math.random() - 0.5) * 22,
+                z: (Math.random() - 0.5) * 22,
+              }, true);
+            }
+            ejected.add(i);
+          }
+        }
+      }
+    }
+
+    for (const i of destroyed) {
+      if (ejected.has(i)) continue;
+      this.destroyChunk(i, center);
+    }
 
     // Soot. The stone round a hit is blackened, and stays blackened: a wall
     // that has been shelled should look shelled from across the map, not
@@ -1548,19 +1695,7 @@ export class Structure {
     // it alone; an air-dropped bomb is sized in share-of-building rather than
     // in metres, so on a slender target its radius is already most of the way
     // across and 2.4 of them shakes the mortar out of the whole shaft.
-    const shockR = radius * (opts.shock ?? 2.4);
-    const shockR2 = shockR * shockR;
-    for (let i = 0; i < this.count; i++) {
-      if (!(this.flags[i] & ALIVE)) continue;
-      if (this.bond[i] <= 0.16) continue;
-      const dx = this.px[i] - center.x;
-      const dy = this.py[i] - center.y;
-      const dz = this.pz[i] - center.z;
-      const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 > shockR2) continue;
-      const f = 1 - Math.sqrt(d2) / shockR;
-      this.bond[i] = Math.max(0.15, this.bond[i] - f * f * 0.7);
-    }
+    this.shockMortar(center, radius * (opts.shock ?? 2.4), 0.7);
 
     // Anything already leaning takes the hit as a real impulse on the section,
     // so shelling a tower that is out of plumb visibly rocks it.
@@ -3337,7 +3472,17 @@ export class Structure {
       // up without asking is why a phone was left with a four-hundred-stone
       // section of tower lying on the ground intact: the budget was full of
       // pebbles that had stopped moving two seconds earlier.
-      if (this.physics.dynamicSet.size > this.physics.activeBudget
+      // The budget guard belongs on the last generation only.
+      //
+      // Splitting a two-thousand-stone section in half costs *one* extra body:
+      // `fragmentIsland` frees stones individually only when the budget will
+      // take all of them, and otherwise cuts the section into pieces that are
+      // still welded. Refusing the whole operation because the budget is full
+      // meant a phone never split anything at all — the tower came down as one
+      // welded column, slid into its own crater and lay there with every stone
+      // in perfect register, which is the shape of the building it used to be.
+      if (island.members.length < 64
+          && this.physics.dynamicSet.size > this.physics.activeBudget
           && this.physics.reclaim(32) <= 0) break;
       const body = island.body;
       if (!PhysicsWorld.alive(body)) continue;

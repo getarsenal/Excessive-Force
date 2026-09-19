@@ -692,12 +692,20 @@ export function buildContext(terrain, quality, opts = {}) {
     const occupied = city && plots.some((q) => Math.abs(q.x - b.x) < f.L1 / 2 + 4
       && Math.abs(q.z - b.z) < f.L0 / 2 + 4);
     if (occupied) use = 'terrace';
-    else if (m.park > 0.40) use = 'park';
+    else if (m.park > 0.40) use = 'park';   // the mask says this is green
     else if (roll < 0.09) use = 'park';
     else if (roll < 0.15) use = 'carpark';
     else if (roll < 0.25 && r > terrain.span * 0.42) use = 'works';
     else if (roll < 0.34 && r < terrain.span * 0.6) use = 'civic';
-    if (occupied) { b.use = use; b.open = false; continue; }
+    // An occupied block is *built on*, not *finished*.
+    //
+    // This used to skip the fill entirely the moment a single surveyed
+    // footprint landed in the block, which is right for a block the survey has
+    // filled and wrong for the far more common case: three real buildings in
+    // one corner and eighty metres of bare ground behind them. Those came out
+    // as the empty plots in the middle of town — grass with a kerb round it and
+    // nothing standing on it. The fill runs now and the overlap test does the
+    // deciding, so what gets built is whatever reality left room for.
     if (f.free0 < 26 || f.free1 < 26) use = use === 'park' ? 'park' : 'carpark';
     b.use = use;
     b.open = use === 'park' || use === 'carpark';

@@ -425,6 +425,146 @@ export class ExplosionFX {
     }
   }
 
+  /**
+   * An air-dropped bomb going off.
+   *
+   * `detonate` is a shell: one ball, one light, a handful of sparks, and it is
+   * the right event for a 105 mm round landing on a parapet. Scaling the same
+   * thing up for eleven tonnes of high explosive gives a small blast drawn
+   * bigger — which is what "the damage is great and the visual is awful" was
+   * about. A bomb is a different *shape* of event, and it is built here out of
+   * the parts that actually make it read:
+   *
+   *  - a white flash, over in a tenth of a second, that blows the exposure;
+   *  - the ball, and then the roll a beat later, which is the fuel burning in
+   *    air after the detonation and is the part that looks enormous;
+   *  - a shock ring at the burst itself rather than only on the ground, because
+   *    a bomb that goes off forty metres up still has one;
+   *  - the base surge: a low, fast, wide ring of dust rolling *outward* along
+   *    the ground, which is what gives the eye the scale of it;
+   *  - ejecta — a flat spray of fragments thrown much further than the
+   *    fireball, and thrown *outward and down* rather than in a sphere.
+   *
+   * The masonry itself is thrown by the structure, not here: real stones with
+   * real bodies, so they land and stay landed. This is the part that has to
+   * arrive on the same frame as the flash, before any of them have moved.
+   */
+  strikeBlast(pos, power, opts = {}) {
+    const q = this.quality;
+    const low = q.name === 'low';
+    const scale = Math.pow(power, 0.72);
+    const radius = 5.2 * scale;
+    const groundY = opts.groundY ?? pos.y;
+    const high = pos.y - groundY;
+
+    // ── The flash. Short, colourless, and far brighter than anything else in
+    // the scene: the frame a bomb goes off in should be hard to look at.
+    const flash = this._freeLight();
+    flash.light.position.copy(pos);
+    flash.light.distance = radius * 26;
+    // Bright, but not so bright that the blast becomes a white disc with
+    // nothing in it: what wants to be visible is the *fire*, and a flash that
+    // blows the exposure for two seconds hides the thing it is announcing.
+    flash.peak = 1450 * scale * scale;
+    flash.life = 0.13;
+    flash.age = 0;
+
+    const core = this._freeFireball();
+    if (core) core.fire(pos, radius * 0.55, 0.15, 1.6);
+
+    const ball = this._freeFireball();
+    if (ball) ball.fire(pos, radius * 1.35, 0.62 + 0.22 * scale, 1.05 + scale * 0.14);
+
+    // ── The shock, at the burst and again on the ground under it.
+    const air = this._freeShock();
+    if (air) air.fire(pos, radius * 5.0, 0.5 + 0.1 * scale);
+    if (high < radius * 2.2) {
+      const sw = this._freeShock();
+      if (sw) {
+        const p = this._v.copy(pos);
+        p.y = groundY + 0.8;
+        sw.fire(p, radius * 7.5, 0.7 + 0.14 * scale);
+      }
+    }
+
+    // ── Fire, thrown out of the core rather than puffed round it.
+    const fireN = Math.round(THREE.MathUtils.clamp(34 * scale, 20, this._caps.fire) * (low ? 0.5 : 1));
+    for (let i = 0; i < fireN; i++) {
+      const dir = randomDir();
+      const sp = (14 + Math.random() * 30) * scale;
+      this.fire.spawn({
+        x: pos.x + dir.x * radius * 0.3,
+        y: pos.y + dir.y * radius * 0.3,
+        z: pos.z + dir.z * radius * 0.3,
+        vx: dir.x * sp, vy: dir.y * sp + 4.5 * scale, vz: dir.z * sp,
+        life: 0.4 + Math.random() * 0.6,
+        size0: radius * 0.4, size1: radius * (1.2 + Math.random() * 0.9),
+        color0: this._c.fireHot, color1: this._c.fireMid,
+        drag: 2.8, grav: 2.4, spin: (Math.random() - 0.5) * 3.4, alpha: 0.97,
+      });
+    }
+
+    // ── Ejecta. Flat and far: the fragments outrun the fireball by a long way,
+    // and they come off the burst in a disc rather than a ball.
+    const fragN = Math.round(THREE.MathUtils.clamp(70 * scale, 40, this._caps.sparks) * (low ? 0.45 : 1));
+    for (let i = 0; i < fragN; i++) {
+      const a = Math.random() * Math.PI * 2;
+      // Biased low — a ground burst throws its skirt outward, not upward.
+      const rise = Math.pow(Math.random(), 1.8) * 0.85 + 0.06;
+      const sp = (34 + Math.random() * 90) * scale;
+      this.sparks.spawn({
+        x: pos.x, y: pos.y, z: pos.z,
+        vx: Math.cos(a) * sp, vy: rise * sp * 0.75, vz: Math.sin(a) * sp,
+        life: 1.1 + Math.random() * 2.4,
+        size0: 0.5 * scale, size1: 0.08 * scale,
+        color0: this._c.spark, color1: this._c.sparkCold,
+        drag: 0.32, grav: -19.0, alpha: 1.0,
+      });
+    }
+
+    // ── The base surge: the ring that tells you how big it was.
+    const surgeN = Math.round(THREE.MathUtils.clamp(40 * scale, 22, this._caps.dust) * (low ? 0.5 : 1));
+    for (let i = 0; i < surgeN; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = (26 + Math.random() * 44) * scale;
+      this.dust.spawn({
+        x: pos.x + Math.cos(a) * radius * 0.4,
+        y: groundY + 0.6 + Math.random() * 2.0,
+        z: pos.z + Math.sin(a) * radius * 0.4,
+        vx: Math.cos(a) * sp, vy: 1.0 + Math.random() * 2.6, vz: Math.sin(a) * sp,
+        life: 3.4 + Math.random() * 3.6,
+        size0: 2.6 * scale, size1: (16 + Math.random() * 16) * scale,
+        color0: this._c.dust, color1: this._c.dustFade,
+        drag: 0.85, grav: 0.3, turb: 1.6,
+        spin: (Math.random() - 0.5) * 0.5, alpha: 0.6,
+      });
+    }
+
+    // ── Smoke, which is what is left thirty seconds later.
+    const smokeN = Math.round(THREE.MathUtils.clamp(34 * scale, 16, this._caps.smoke) * (low ? 0.45 : 1));
+    for (let i = 0; i < smokeN; i++) {
+      const dir = randomDir();
+      const sp = (5 + Math.random() * 13) * scale;
+      this.smoke.spawn({
+        x: pos.x + dir.x * radius * 0.4,
+        y: pos.y + dir.y * radius * 0.4,
+        z: pos.z + dir.z * radius * 0.4,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.7 + 7.0 * scale, vz: dir.z * sp,
+        life: 4.0 + Math.random() * 5.0 * scale,
+        size0: radius * 0.6, size1: radius * (2.6 + Math.random() * 2.2),
+        color0: this._c.smokeDark, color1: this._c.smokeLight,
+        drag: 1.0, grav: 1.2, turb: 3.0 * scale,
+        spin: (Math.random() - 0.5) * 0.8, alpha: 0.78,
+      });
+    }
+
+    // The second beat, always — a bomb has one whatever its size.
+    this._rolls.push({
+      t: 0.22, x: pos.x, y: pos.y, z: pos.z, scale: scale * 1.15,
+      ground: high < radius * 2.2, groundY,
+    });
+  }
+
   /** The second beat of a large blast: the fireball rolling out and up. */
   _roll(r) {
     const q = this.quality;
