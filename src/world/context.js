@@ -25,7 +25,7 @@ import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
 import { buildSurround } from './surround.js';
-import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
+import { buildStreetNetwork, buildStreetSurface, addStreetMarkings, buildDecks,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
   GRID_YAW, ROAD_CLASS, SURFACE_LIFT } from './streets.js';
 
@@ -957,6 +957,8 @@ export function buildContext(terrain, quality, opts = {}) {
   if (paved) group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
+  // And what holds the surveyed crossings up.
+  if (realNet) group.add(buildDecks(net, terrain, quality));
   // The river wall.
   //
   // Only for an invented river. This one walks north along a line of constant

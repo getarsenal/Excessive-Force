@@ -105,7 +105,7 @@ export function realNetwork(data, terrain, opts = {}) {
   }
 
   layDecks(edges, nodes, terrain);
-  dissolveThroughNodes(nodes, edges);
+  dissolveThroughNodes(nodes, edges, { surveyed: true });
 
   const net = {
     nodes, edges, blocks,
@@ -175,7 +175,16 @@ function layDecks(edges, nodes, terrain) {
   }
 
   for (const run of runs.values()) {
-    let deck = Math.max(run.bank, terrain.waterLevel + 6);
+    // Level with the road that joins it.
+    //
+    // Six metres over the water was a floor, and on the Thames — whose surface
+    // the DEM puts at 1.9 m and whose embankment stands at 5 — it is three
+    // metres *above* both banks. The deck then hung over the approach at each
+    // end and Westminster Bridge read as a slab of tarmac floating in the
+    // river, joined to nothing. A bridge is level with what it carries: it
+    // takes the higher bank, and only clears the water by three metres where
+    // there is no bank to take.
+    let deck = Math.max(run.bank, terrain.waterLevel + 3.0);
     if (run.wet > 400) {
       deck = Math.max(deck, terrain.waterLevel + Math.min(50, run.wet * 0.09));
     }

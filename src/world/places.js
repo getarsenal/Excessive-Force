@@ -67,12 +67,34 @@ export function buildPrecinct(props, terrain, rng, opts) {
   ].map(([u, v]) => toWorld(u, v));
 
   // Where a street points at the enclosure, leave a gap and mark it with piers.
+  //
+  // The biggest streets only, and not many of them. A generated plan puts a
+  // handful of junctions near an enclosure; a surveyed one puts fifty, and a
+  // gate at every one of them drew a paved walk from it to the middle of the
+  // square. From above that is a fan of pale scratches across the whole of
+  // Parliament Square — the same fault the Giza comment below describes, in a
+  // place that has streets dense enough to produce it on its own.
   const gates = [];
-  for (const n of (net?.nodes || [])) {
-    if (!n.links.length) continue;
-    const g = toGrid(n.x, n.z);
-    if (g.u < u0 - 70 || g.u > u1 + 70 || g.v < v0 - 70 || g.v > v1 + 70) continue;
-    gates.push({ x: n.x, z: n.z });
+  {
+    const near = [];
+    for (const n of (net?.nodes || [])) {
+      if (!n.links.length) continue;
+      const g = toGrid(n.x, n.z);
+      if (g.u < u0 - 70 || g.u > u1 + 70 || g.v < v0 - 70 || g.v > v1 + 70) continue;
+      let rank = 0;
+      for (const l of n.links) {
+        rank = Math.max(rank, l.edge.cls === 'avenue' ? 3 : l.edge.cls === 'street' ? 2 : 1);
+      }
+      near.push({ x: n.x, z: n.z, rank, arms: n.links.length });
+    }
+    // A gate is where something arrives: the widest road first, then the
+    // busiest junction, and never two within sixty metres of each other.
+    near.sort((a, b) => (b.rank - a.rank) || (b.arms - a.arms));
+    for (const c of near) {
+      if (gates.length >= 8) break;
+      if (gates.some((q) => Math.hypot(q.x - c.x, q.z - c.z) < 60)) continue;
+      gates.push({ x: c.x, z: c.z });
+    }
   }
   const atGate = (x, z) => gates.some((q) => Math.hypot(q.x - x, q.z - z) < 26);
 
@@ -207,7 +229,8 @@ export function buildPrecinct(props, terrain, rng, opts) {
     const centre = toWorld(cx, cz);
     const seen = [];
     for (const gt of gates) {
-      if (seen.some((s) => Math.hypot(s.x - gt.x, s.z - gt.z) < 40)) continue;
+      if (seen.length >= 4) break;
+      if (seen.some((s) => Math.hypot(s.x - gt.x, s.z - gt.z) < 70)) continue;
       seen.push(gt);
       const dx = centre.x - gt.x, dz = centre.z - gt.z;
       const len = Math.hypot(dx, dz);

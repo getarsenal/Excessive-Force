@@ -1669,8 +1669,26 @@ export class TestMenu {
         // bridge, every block used — which is where the bugs actually are and
         // which is checked identically either way.
         const surveyed = !!net.real;
-        assert(net.edges.length > (surveyed ? 30 : 150),
-          `only ${net.edges.length} streets in the whole city`);
+        if (surveyed) {
+          // Kilometres, not edges. An edge used to be one block of one street,
+          // so counting them was a fair measure of how much city there was;
+          // now the dissolve pass merges a road into one edge from end to end,
+          // and Corcovado's forty-two pieces became thirty whole roads without
+          // one metre of tarmac changing. What the level has to have is a road
+          // network, and a road network is measured in road.
+          let metres = 0;
+          for (const e of net.edges) {
+            for (let i = 0; i < e.pts.length - 1; i++) {
+              metres += Math.hypot(e.pts[i + 1].x - e.pts[i].x,
+                e.pts[i + 1].z - e.pts[i].z);
+            }
+          }
+          assert(metres > 3000,
+            `only ${(metres / 1000).toFixed(1)} km of road in the whole city`);
+        } else {
+          assert(net.edges.length > 150,
+            `only ${net.edges.length} streets in the whole city`);
+        }
 
         // Connected: junctions joined into one town, not a scatter of stubs.
         // Two components are expected — one per bank, joined by the bridge.
@@ -1690,12 +1708,34 @@ export class TestMenu {
         sizes.sort((a, b) => b - a);
         const linked = net.nodes.filter((n) => n.links.length).length;
         const inTwo = (sizes[0] || 0) + (sizes[1] || 0);
-        // A generated plan is one town on each bank. A real one is however
-        // many the water and the map edge cut it into — Sydney alone has four
-        // shores — so the test is that it is not confetti.
-        assert(inTwo / Math.max(1, linked) > (surveyed ? 0.55 : 0.9),
-          `the street network is in ${sizes.length} pieces; the two largest hold `
-          + `${inTwo} of ${linked} junctions`);
+        if (surveyed) {
+          // A generated plan is one town on each bank. A real one is in however
+          // many pieces the water and the edge of the map cut it into, and
+          // Sydney has four shores in it — so "the two largest hold nearly all
+          // of it" is a claim about a river city and not about a street plan.
+          // What must not happen is confetti: a network that is mostly
+          // two-junction fragments is one that has been shredded by the culls,
+          // and that is what this is for.
+          let crumbs = 0;
+          for (const sz of sizes) if (sz < 4) crumbs += sz;
+          if (linked >= 60) {
+            assert(crumbs / linked < 0.30,
+              `${crumbs} of ${linked} junctions are in fragments of three or `
+              + `fewer — the network is in ${sizes.length} pieces`);
+          } else {
+            // A proportion has no power over a graph this small: the Corcovado
+            // has one switchback road and thirty-three junctions on it, and
+            // three of them at a dead end is a tenth of the whole network. What
+            // it still has to have is a spine.
+            assert((sizes[0] || 0) >= 6,
+              `the biggest piece of the network is ${sizes[0] || 0} junctions `
+              + `out of ${linked}`);
+          }
+        } else {
+          assert(inTwo / Math.max(1, linked) > 0.9,
+            `the street network is in ${sizes.length} pieces; the two largest hold `
+            + `${inTwo} of ${linked} junctions`);
+        }
 
         // Straight: streets are ruled lines, and the variety comes from where
         // they are rather than from bending them. A map of gently wandering
@@ -1810,15 +1850,23 @@ export class TestMenu {
           `${stubs.length} of ${net.edges.length} streets are dead-end stubs `
           + 'that lead nowhere');
 
-        // No junction in the middle of a street.
+        // No paving at a node that is not a junction.
         //
         // A junction's paving is built from the kerb lines of the streets that
         // meet it, and for two streets running straight on there is no crossing
-        // point to build it from — so the pad pinched to a wedge at the node and
-        // the road appeared to narrow to nothing and open out again. Ten of them
-        // in a row along the embankment, which is a chain of exactly such nodes.
-        // Two arms running through is not a junction; it is a street, and the
-        // graph now says so.
+        // point to build it from — so the pad pinched to a wedge at the node,
+        // and the road appeared to narrow to nothing and open out again. Ten of
+        // them in a row along the embankment, which is a chain of exactly such
+        // nodes; five hundred of them across a surveyed London, which is what
+        // "the roads are absolutely botched" was.
+        //
+        // The graph says so twice now. The dissolve pass merges a node with two
+        // arms into the street it is in the middle of, and whatever survives
+        // that — a real ninety-degree corner — is given no pad at all, because
+        // a corner is drawn by letting the two ribbons overlap round the inside
+        // of the bend. So the invariant is not "no straight-through node
+        // exists", which was only ever a proxy: it is that nothing with two
+        // arms is paved as though it were a crossroads.
         const dirAt = (n, l) => {
           const pts = l.edge.pts;
           const p = l.at === 0 ? pts[1] : pts[pts.length - 2];
@@ -1829,18 +1877,11 @@ export class TestMenu {
         let through = 0;
         for (const n of net.nodes) {
           if (n.links.length !== 2) continue;
-          const a = dirAt(n, n.links[0]), b2 = dirAt(n, n.links[1]);
-          // Same class, and the second arm carries straight on from the first.
-          if (n.links[0].edge.cls !== n.links[1].edge.cls) continue;
-          if (n.links[0].edge.approach || n.links[1].edge.approach) continue;
-          // The dissolve pass will not merge a crossing into the street it
-          // meets, so neither does this.
-          if (n.links[0].edge.bank || n.links[1].edge.bank) continue;
-          if (-(a.x * b2.x + a.z * b2.z) > 0.998) through++;
+          if (padRadius(n) > 0) through++;
         }
         assert(through === 0,
-          `${through} junctions sit in the middle of a straight street, which is `
-          + 'where the paving pinches the road to a wedge');
+          `${through} nodes with two arms are paved as junctions, which is where `
+          + 'the paving pinches the road to a wedge');
 
         // Every junction's paving is a simple shape.
         //
@@ -1858,7 +1899,9 @@ export class TestMenu {
         // This asks the real builder, not a copy of it.
         let folded = 0, sprawled = 0, worstSweep = 360;
         for (const n of net.nodes) {
-          if (n.links.length < 2) continue;
+          // Three arms or more. Two is a corner and is not paved, so there is
+          // no outline for it to have.
+          if (n.links.length < 3) continue;
           const R = padRadius(n);
           for (const widthOf of [(a) => a.full, (a) => a.road]) {
             const ring = junctionRing(n, widthOf);
@@ -1895,6 +1938,7 @@ export class TestMenu {
         // the geometry above cannot be given a sensible answer for.
         let folds = 0, tightest = 0;
         for (const n of net.nodes) {
+          if (n.links.length < 3) continue;
           for (let i = 0; i < n.links.length; i++) {
             for (let j = i + 1; j < n.links.length; j++) {
               // The crossing is exempt: it arrives where the river lets it and

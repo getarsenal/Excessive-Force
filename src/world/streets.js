@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { valueNoise } from './terrain.js';
 
 /**
@@ -37,6 +38,9 @@ export const ROAD_CLASS = {
   street: { road: 8.8, pave: 3.2, kerb: 0.6, dashes: false, trees: false, lamp: 30 },
   mews: { road: 6.0, pave: 1.9, kerb: 0.45, dashes: false, trees: false, lamp: 46 },
 };
+
+/** Which class outranks which, for merging two pieces of the same road. */
+const KIND_RANK = { avenue: 3, street: 2, mews: 1 };
 
 export function halfWidth(cls) {
   const c = ROAD_CLASS[cls];
@@ -526,7 +530,15 @@ export function buildStreetNetwork(terrain, rng, opts) {
  * Runs after the blocks are cut, which need the grid's own links to find their
  * four sides, and before anything is drawn from the graph.
  */
-export function dissolveThroughNodes(nodes, edges) {
+/**
+ * @param {Array} nodes
+ * @param {Array} edges
+ * @param {object} opts `{ surveyed }` — a real street plan bends, and the
+ *        straightness this looks for is a property of the generator, not of
+ *        any actual road.
+ */
+export function dissolveThroughNodes(nodes, edges, opts = {}) {
+  const surveyed = !!opts.surveyed;
   const indexOf = new Map();
   const reindex = () => {
     indexOf.clear();
@@ -542,7 +554,11 @@ export function dissolveThroughNodes(nodes, edges) {
       const la = n.links[0], lb = n.links[1];
       const ea = la.edge, eb = lb.edge;
       if (ea === eb) continue;                       // a loop back to itself
-      if (ea.cls !== eb.cls) continue;               // a road changing class stops here
+      // A road changing class stops here — except on a surveyed plan, where a
+      // street becomes a service road for forty metres and then goes back to
+      // being a street, and the graph says so at every change. Splitting on
+      // that leaves a junction in the middle of a road.
+      if (ea.cls !== eb.cls && !surveyed) continue;
       if (ea.approach || eb.approach) continue;      // the bridge's own geometry
       if (!!ea.bank !== !!eb.bank) continue;
       const da = linkDir(n, la), db = linkDir(n, lb);
@@ -551,7 +567,20 @@ export function dissolveThroughNodes(nodes, edges) {
       // The embankment is allowed to be a curve; a street is not, and a street
       // merged across a real kink would fail the straightness test it exists to
       // satisfy.
-      if (straight < (ea.bank ? 0.86 : 0.998)) continue;
+      //
+      // Nought point nine nine eight is three and a half degrees, which is the
+      // right test for an invented city because its streets are ruled lines.
+      // It is the wrong test for a real one: a surveyed street carries a bend
+      // of a degree or two at nearly every node, so five hundred and
+      // twenty-eight of Westminster's nine hundred and forty-eight junctions
+      // survived this — and a junction pad at a two-arm node is built from the
+      // crossing of two parallel kerb lines, which has no crossing, so every
+      // one of them drew a wedge. That is what the roads looked like.
+      //
+      // A bend of up to thirty-five degrees is a bend in a street. Past that it
+      // is a corner, and a corner really is a junction with two arms.
+      const limit = surveyed ? 0.82 : (ea.bank ? 0.86 : 0.998);
+      if (straight < limit) continue;
 
       // Orient both so `ea` ends at n and `eb` leaves it.
       const aPts = la.at === 0 ? ea.pts.slice().reverse() : ea.pts.slice();
@@ -564,8 +593,18 @@ export function dissolveThroughNodes(nodes, edges) {
       for (let i = 0; i < pts.length - 1; i++) {
         len += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
       }
-      const e = { a: farA, b: farB, cls: ea.cls, pts, len };
+      // The bigger road wins the merged piece: a street that becomes a service
+      // lane for one block is a street with a narrow bit, not a service lane.
+      const cls = KIND_RANK[ea.cls] >= KIND_RANK[eb.cls] ? ea.cls : eb.cls;
+      const e = { a: farA, b: farB, cls, pts, len };
       if (ea.bank || eb.bank) e.bank = true;
+      // And `bridge`, which is not the same flag: `bank` says the road may
+      // curve and must not be straightened away, `bridge` says the surface
+      // follows the deck's own height and may be laid over water. Losing it in
+      // the merge meant a crossing made of two surveyed pieces got its deck and
+      // its parapet and no carriageway at all — the tarmac was culled for being
+      // over the river, which is where a bridge is.
+      if (ea.bridge || eb.bridge) e.bridge = true;
 
       // Swap the two old edges out of the graph.
       for (const k of [farA, farB]) {
@@ -845,17 +884,48 @@ function pointSeg(x, z, a, b) {
  * hole behind it that buildings and ground cover were also told to keep out of.
  */
 export function padRadius(node) {
-  if (node.links.length < 2) return 0;
+  // Two arms is a point in the middle of a street, not a junction — the pad is
+  // built from where neighbouring arms' kerb lines cross, and two arms that
+  // carry on through have no crossing. Trimming the ribbons back for one is how
+  // a road came to narrow to a wedge and open out again. The dissolve pass
+  // removes most of them; what is left is a corner, and a corner is drawn by
+  // letting the two ribbons overlap round the inside of the bend.
+  if (node.links.length < 3) return 0;
   let r = 6;
   for (const l of node.links) r = Math.max(r, halfWidth(l.edge.cls));
   return r;
 }
 
-/** Unit direction leaving `node` along one of its links. */
+/**
+ * Unit direction leaving `node` along one of its links.
+ *
+ * Measured over the first few metres of the road rather than to the polyline's
+ * next vertex, and that is not a refinement — it is the difference between a
+ * street plan and a mess.
+ *
+ * A generated street is two points, so the next vertex is the far end and the
+ * bearing is exact. A surveyed one is a traced polyline whose first vertex can
+ * be twenty centimetres from the junction, because the node was welded onto a
+ * grid and because a segment gets cut wherever a connector sits — and a bearing
+ * taken across twenty centimetres is *noise*. Everything that reads a junction
+ * reads this: the dissolve pass decides whether two arms carry straight on, the
+ * pad geometry builds its outline from where neighbouring arms' kerbs cross,
+ * the markings decide where a crossing goes. Given noise, four hundred and
+ * fifty of Westminster's straight-through nodes read as ninety-degree corners
+ * and kept their pads, and every pad built from noise drew a spike.
+ */
 function linkDir(node, link) {
   const pts = link.edge.pts;
-  const p = link.at === 0 ? pts[1] : pts[pts.length - 2];
-  const dx = p.x - node.x, dz = p.z - node.z;
+  const fwd = link.at === 0;
+  const n = pts.length;
+  let dx = 0, dz = 0;
+  for (let k = 1; k < n; k++) {
+    const p = pts[fwd ? k : n - 1 - k];
+    dx = p.x - node.x; dz = p.z - node.z;
+    // Far enough along to be a bearing rather than a rounding error, and not
+    // so far that a real bend in the road is averaged away.
+    if (dx * dx + dz * dz > 16) break;
+  }
   const d = Math.hypot(dx, dz) || 1;
   return { x: dx / d, z: dz / d };
 }
@@ -1099,9 +1169,9 @@ export function buildStreetSurface(net, terrain, quality) {
   //     by bearing from the node, clamped in radius, and stripped of anything
   //     that doubles back. A fan of it is then always a simple polygon.
   for (const n of net.nodes) {
-    // Two arms or more, or there is nothing here to pave: the ribbon runs to
-    // the node's own position and stops square.
-    if (n.links.length < 2) continue;
+    // Three arms or more, or there is nothing here to pave: with two the
+    // ribbons run through and meet each other.
+    if (n.links.length < 3) continue;
     const y = n.y + LIFT;
     // Star-shaped around the node, so a fan from the centre triangulates it.
     fan(junctionRing(n, (a) => a.full), n, y, PAVE, vert, dry);
@@ -1145,6 +1215,102 @@ function polylineLength(pts) {
     d += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
   }
   return d;
+}
+
+/**
+ * What holds a bridge up.
+ *
+ * The surveyed graph says where a crossing is and at what class; the deck is
+ * worked out from its banks. Nothing said what was under it, so every real
+ * bridge on every map was a ribbon of tarmac lying in the air over the water
+ * with a shadow on the river and no structure at all — which is what "some
+ * roads are floating with no supports" was.
+ *
+ * Piers to the bed at a spacing the class can span, an abutment where the deck
+ * meets each bank, and a parapet down both sides so the deck has an edge. It is
+ * not a cable-stayed anything; it is the shape every road bridge shares, and at
+ * the distance these are seen that is the whole of what reads.
+ */
+export function buildDecks(net, terrain, quality) {
+  const g = new THREE.Group();
+  g.name = 'decks';
+  const spans = net.edges.filter((e) => e.bridge || e.bank);
+  if (!spans.length) return g;
+
+  const piers = [];
+  const deckParts = [];
+  const rails = [];
+
+  for (const e of spans) {
+    const c = ROAD_CLASS[e.cls] || ROAD_CLASS.street;
+    const half = c.road / 2 + c.pave + c.kerb;
+    // A masonry arch spans about its own rise; a modern girder does more. Thirty
+    // metres is the honest middle and it is what the eye counts.
+    const SPACING = 30;
+    for (let i = 0; i < e.pts.length - 1; i++) {
+      const a = e.pts[i], b = e.pts[i + 1];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.2) continue;
+      const ry = Math.atan2(-dz, dx);
+      const y = ((a.y ?? 0) + (b.y ?? 0)) / 2;
+
+      // The deck itself: a slab under the carriageway, so it has a thickness
+      // seen from the side and from beneath.
+      deckParts.push(box(len + 0.6, 1.5, half * 2 + 0.8, (a.x + b.x) / 2,
+        y - 1.0, (a.z + b.z) / 2, ry));
+      // And a parapet down each side.
+      for (const sgn of [-1, 1]) {
+        const nx = -dz / len * sgn * (half + 0.2), nz = dx / len * sgn * (half + 0.2);
+        rails.push(box(len + 0.6, 1.1, 0.5, (a.x + b.x) / 2 + nx,
+          y + 0.55, (a.z + b.z) / 2 + nz, ry));
+      }
+
+      // Piers, where there is water or a drop under the deck.
+      const n = Math.max(1, Math.round(len / SPACING));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n;
+        const px = a.x + dx * t, pz = a.z + dz * t;
+        const gy = terrain.heightAt(px, pz);
+        const drop = y - 1.75 - gy;
+        if (drop < 1.0) continue;             // it is on the ground here
+        piers.push(box(6.2, drop, half * 1.1, px, gy + drop / 2, pz, ry));
+      }
+    }
+    // Abutments: the deck has to land on something at each end.
+    for (const k of [e.a, e.b]) {
+      const n2 = net.nodes[k];
+      if (!n2) continue;
+      const gy = terrain.heightAt(n2.x, n2.z);
+      const drop = (n2.y ?? gy) - 1.75 - gy;
+      if (drop < 1.2) continue;
+      piers.push(box(half * 2.2, drop + 1.0, 10, n2.x, gy + (drop + 1.0) / 2, n2.z, 0));
+    }
+  }
+
+  const shadows = quality.shadowMapSize > 0;
+  const add = (parts, colour, roughness) => {
+    if (!parts.length) return;
+    const mesh = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(parts, false),
+      new THREE.MeshStandardMaterial({ color: colour, roughness, metalness: 0.02 }),
+    );
+    mesh.castShadow = shadows;
+    mesh.receiveShadow = shadows;
+    mesh.frustumCulled = false;
+    g.add(mesh);
+  };
+  add(deckParts, 0x8b8377, 0.95);
+  add(piers, 0x8f8778, 0.96);
+  add(rails, 0xb6ae9c, 0.9);
+  return g;
+}
+
+function box(w, h, d, x, y, z, ry = 0) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  if (ry) geo.rotateY(ry);
+  geo.translate(x, y, z);
+  return geo;
 }
 
 function endWeight(i, last) {
