@@ -31,6 +31,7 @@ Usage:  python3 tools/bake_overture.py sydney
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -38,6 +39,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
 import pyarrow.fs as fs
@@ -126,6 +128,21 @@ def s3fs():
                            proxy_options=os.environ.get("HTTPS_PROXY", ""))
 
 
+# Where the pulled rows are kept between runs.
+#
+# A query against the bucket is fifteen to sixty seconds, a level makes five of
+# them, and a nine-level bake therefore spends the better part of half an hour
+# waiting on a release that is immutable — `2026-08-19.0` is the same data
+# tomorrow. Every adjustment to the mask, the dredge, the road classes or the
+# packing costs another one of those, and this session paid it eight times.
+#
+# The key is everything that decides the answer: release, theme, the square
+# asked for, and the columns. Change any of them and it misses and re-fetches,
+# which is the only correctness property a cache needs. `--fresh` bypasses it.
+CACHE = Path(os.environ.get("TT_OVERTURE_CACHE", "/tmp/tt-overture"))
+USE_CACHE = True
+
+
 def read_theme(sink, theme, type_, lat0, lon0, pad_lat, pad_lon, columns):
     """Every row of one Overture layer whose bbox touches the level's square.
 
@@ -133,13 +150,36 @@ def read_theme(sink, theme, type_, lat0, lon0, pad_lat, pad_lon, columns):
     that is the column the row-group statistics are kept for: it is what turns
     a quarter-terabyte scan into a handful of range reads.
     """
+    key = hashlib.sha1(json.dumps([
+        RELEASE, theme, type_, round(lat0, 6), round(lon0, 6),
+        round(pad_lat, 6), round(pad_lon, 6), sorted(columns),
+    ], sort_keys=True).encode()).hexdigest()[:20]
+    hit = CACHE / f"{theme}-{type_}-{key}.arrow"
+    if USE_CACHE and hit.exists():
+        try:
+            with pa.OSFile(str(hit), "rb") as fh:
+                return pa.ipc.open_file(fh).read_all()
+        except Exception:
+            hit.unlink(missing_ok=True)
+
     path = f"{BUCKET}/release/{RELEASE}/theme={theme}/type={type_}"
     dataset = ds.dataset(path, filesystem=sink, format="parquet")
     f = ((pc.field("bbox", "xmin") < lon0 + pad_lon)
          & (pc.field("bbox", "xmax") > lon0 - pad_lon)
          & (pc.field("bbox", "ymin") < lat0 + pad_lat)
          & (pc.field("bbox", "ymax") > lat0 - pad_lat))
-    return dataset.to_table(filter=f, columns=columns)
+    table = dataset.to_table(filter=f, columns=columns)
+    if USE_CACHE:
+        try:
+            CACHE.mkdir(parents=True, exist_ok=True)
+            tmp = hit.with_suffix(".part")
+            with pa.OSFile(str(tmp), "wb") as fh:
+                with pa.ipc.new_file(fh, table.schema) as w:
+                    w.write_table(table)
+            tmp.replace(hit)
+        except Exception as exc:      # a cache that cannot write is still a bake
+            print(f"  (could not cache {theme}/{type_}: {exc})")
+    return table
 
 
 def projector(lat0, lon0):
@@ -1102,6 +1142,88 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None):
     print(f"  wrote {mpath.name}, {hpath.name} ({nlo:.0f}..{nhi:.0f} m)")
 
 
+def verify(level_id, span, meta):
+    """Check the bake against itself before anyone looks at it.
+
+    Two of the worst hours of this project went on faults that every diagnostic
+    agreed with, because every diagnostic read the same wrong array. The mask
+    rasteriser had its vertical axis flipped against the heightmap's: the
+    coastline still looked like a coastline, the water was still the right
+    shape, the Opera House's own pixel was still dry — it was simply somebody
+    else's coastline, checked against a heightmap that was the right way up. It
+    took a re-bake, a render and a suite to see it, several times over.
+
+    These are the questions that would have answered it in twenty seconds, and
+    they are all about the *relationship* between files rather than about any
+    one of them. The last is the one that actually catches a flip, and the
+    reason is worth keeping: the dredge follows the mask, so a flipped mask
+    produces a heightmap dredged in the same flipped places, and the two agree
+    with each other perfectly. Only a third source settles it, and that is the
+    buildings — which come from the survey and know nothing about either. Put
+    the bug back and it reports two hundred and eighty-eight of five hundred and
+    ninety-four buildings standing in the harbour.
+    """
+    mpath = TERRAIN_DIR / f"{level_id}_mask.png"
+    hpath = TERRAIN_DIR / f"{level_id}_height.png"
+    if not mpath.exists() or not hpath.exists():
+        return
+    mask = np.asarray(Image.open(mpath).convert("RGB"), dtype=np.float64) / 255.0
+    hi = np.asarray(Image.open(hpath).convert("RGB"), dtype=np.float64)
+    lo, up = meta["minElevation"], meta["maxElevation"]
+    height = (hi[:, :, 0] * 256 + hi[:, :, 1]) / 65535.0 * (up - lo) + lo
+    wet = mask[:, :, 0] > 0.5
+    size = mask.shape[0]
+    bad = []
+
+    # 1. The monument is not in the water. It is the one pixel every level
+    #    depends on, and it is invariant under a vertical flip, so it is the
+    #    weakest of these and still worth asking.
+    if wet[size // 2, size // 2]:
+        bad.append("the level's own origin is under water")
+
+    if wet.any() and (~wet).any():
+        # 2. The mask and the heightmap agree about which way up they are.
+        #    Water is low ground; a flip makes the wet half of the map the high
+        #    half, and this is the check that catches it.
+        wet_mean = float(height[wet].mean())
+        dry_mean = float(height[~wet].mean())
+        if wet_mean >= dry_mean:
+            bad.append(f"water averages {wet_mean:.1f} m and land {dry_mean:.1f} m "
+                       "— the mask and the heightmap disagree about which way up "
+                       "they are")
+        # 3. And nothing wet stands above its own water surface.
+        surf = meta.get("waterSurface")
+        if surf is not None:
+            above = float((height[wet] > surf + 1.0).mean())
+            if above > 0.02:
+                bad.append(f"{above * 100:.0f}% of the water is above its own "
+                           "surface")
+
+    # 4. Where the survey says buildings are is where the mask says land is.
+    #    A flip puts nine tenths of the city in the river.
+    path = CITY_DIR / f"{level_id}.json"
+    if path.exists():
+        city = json.loads(path.read_text())
+        k = (size - 1) / (span * 2)
+        drowned = tried = 0
+        for b in city.get("buildings", []):
+            pts = b["pts"]
+            cx = sum(q[0] for q in pts) / len(pts)
+            cz = sum(q[1] for q in pts) / len(pts)
+            if abs(cx) > span or abs(cz) > span:
+                continue
+            tried += 1
+            if wet[int((span - cz) * k), int((cx + span) * k)]:
+                drowned += 1
+        if tried > 50 and drowned / tried > 0.25:
+            bad.append(f"{drowned} of {tried} surveyed buildings stand in the "
+                       "water")
+
+    for line in bad:
+        print(f"  !! {line}")
+    return not bad
+
+
 def bake(level_id):
     cfg = LEVELS[level_id]
     lat0, lon0, span = cfg["lat"], cfg["lon"], cfg["span"]
@@ -1125,15 +1247,18 @@ def bake(level_id):
     if mpath.exists():
         bake_mask(sink, level_id, lat0, lon0, span,
                   json.loads(mpath.read_text()), water if natural else [], roads)
+        verify(level_id, span, json.loads(mpath.read_text()))
     else:
         print("  (no terrain meta — run bake_terrain.py first)")
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
+    if "--fresh" in args:
+        USE_CACHE = False
     targets = list(LEVELS) if "--all" in args else [a for a in args if a in LEVELS]
     if not targets:
-        print("usage: bake_overture.py <level>... | --all")
+        print("usage: bake_overture.py <level>... | --all  [--fresh]")
         raise SystemExit(2)
     for t in targets:
         bake(t)

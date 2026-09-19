@@ -22,10 +22,20 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
 
 ```
 npx vite --port 5177 --strictPort &
-TT_URL='http://localhost:5177/?level=<id>' TT_TIER=low node tools/shot.mjs /tmp/out/<id> tools/suite.js
-python3 tools/report.py /tmp/out/<id>-console.txt      # expect 35 pass 0 fail
+sh tools/suiteall.sh <id>...            # expect "<id>: 35 pass 0 fail" per level
 npx vite build
 ```
+
+`suiteall.sh` runs three browsers at a time against the one dev server, which
+is what the box has cores for: all nine levels in seven minutes rather than
+twenty-one. `JOBS=1` for a clean timing, `TIER=high` for another tier. It sets
+`TT_SUITE=1`, which drops the three screenshots and the twelve seconds of
+settling between them — those exist so a human can look, and a regression run
+is not a human looking.
+
+Iterate on *one* level. A change to the masonry is a change to the masonry on
+every map, and finding that out costs seven minutes each time; find the fault
+on one level, fix the batch, then run the nine once.
 
 Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
 `chichen`, `pisa`, `sydney`, `moscow`, `rio`. Tiers: `low` (phones; the
@@ -46,6 +56,18 @@ buildings and street graph to `public/assets/city/<level>.json` and the
 coastline and land cover into `public/assets/terrain/<level>_mask.png`,
 dredging `<level>_height.png` underneath it so the two agree. It re-cuts
 the DEM first, so it is safe to re-run.
+
+Both halves are cached outside the repo — the DEM tiles in `/tmp/tt-tiles`,
+the Overture queries in `/tmp/tt-overture`, keyed by release, theme, square and
+columns. A release is immutable, so a re-bake after a change to the mask, the
+dredge or the packing is two seconds rather than a minute a level. `--fresh`
+bypasses it; deleting the directories costs one slow bake.
+
+Every bake ends by checking itself against its own other half: the origin is
+not under water, the wet half of the map is the low half, nothing wet stands
+above its own surface, and the surveyed buildings are on the surveyed land.
+That last one is the only one that catches a flipped mask, because the dredge
+follows the mask and the two agree with each other however wrong they are.
 
 The city file carries two sets. `buildings` is the playfield: outlines,
 heights, and what the game lays up, collides and deploys on. `outer` is

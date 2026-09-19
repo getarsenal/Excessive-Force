@@ -59,17 +59,36 @@ try {
   logs.push('[WARN] loading overlay never cleared');
 }
 
-await page.waitForTimeout(3500);
-await page.screenshot({ path: `${out}-01-initial.png` });
+// `TT_SUITE=1` is the regression run: it wants the scenario's answer and
+// nothing else. The three screenshots and the twelve and a half seconds of
+// settling between them exist so a human can look at what happened, and under
+// the software rasteriser a 1440x900 frame is most of a second — so on a
+// nine-level pass that is two minutes of rendering pictures nobody opens.
+const suiteOnly = process.env.TT_SUITE === '1';
+
+if (!suiteOnly) {
+  await page.waitForTimeout(3500);
+  await page.screenshot({ path: `${out}-01-initial.png` });
+}
 
 if (ready && scenarioPath && fs.existsSync(scenarioPath)) {
   const scenario = fs.readFileSync(scenarioPath, 'utf8');
   const results = await page.evaluate(scenario);
   logs.push(`[SCENARIO] ${JSON.stringify(results, null, 2)}`);
-  await page.waitForTimeout(260);
-  await page.screenshot({ path: `${out}-02-after.png` });
-  await page.waitForTimeout(9000);
-  await page.screenshot({ path: `${out}-03-settled.png` });
+  // And on its own, because the console log is not a data channel. Playwright
+  // delivers console events asynchronously, so messages the page emitted during
+  // *loading* can still be arriving when the scenario finishes — they then land
+  // between the result and the `[PERF]` line that the reader used as the end
+  // marker, and the reader chokes on them. It was masked by the twelve seconds
+  // of screenshot waits, which gave the queue time to drain; taking those out
+  // for the suite runs uncovered it on three levels in nine.
+  fs.writeFileSync(`${out}-result.json`, JSON.stringify(results));
+  if (!suiteOnly) {
+    await page.waitForTimeout(260);
+    await page.screenshot({ path: `${out}-02-after.png` });
+    await page.waitForTimeout(9000);
+    await page.screenshot({ path: `${out}-03-settled.png` });
+  }
 }
 
 const perf = ready ? await page.evaluate(() => document.getElementById('perf')?.textContent) : null;

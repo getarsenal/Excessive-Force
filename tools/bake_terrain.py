@@ -15,6 +15,7 @@ Usage:  python3 tools/bake_terrain.py westminster
 from __future__ import annotations
 
 import io
+import os
 import json
 import math
 import sys
@@ -234,12 +235,31 @@ def deg2tile(lat: float, lon: float, z: float) -> tuple[float, float]:
     return x, y
 
 
+# Where the fetched tiles are kept between runs.
+#
+# Terrarium's tiles are immutable — a z14 tile of Westminster is the same
+# quarter of a megabyte every time — and a nine-level bake pulls about fifty of
+# them. Re-fetching on every run is a minute per level of waiting for bytes
+# that have not changed since 2016, and a bake gets re-run every time anything
+# in the mask or the dredge is adjusted. Outside the repo, because it is a
+# cache: deleting it costs one slow bake and nothing else.
+TILE_CACHE = Path(os.environ.get("TT_TILE_CACHE", "/tmp/tt-tiles"))
+
+
 def fetch_tile(z: int, x: int, y: int) -> np.ndarray:
+    cached = TILE_CACHE / f"{z}_{x}_{y}.png"
+    if cached.exists():
+        try:
+            return np.asarray(Image.open(cached).convert("RGB")).astype(np.float64)
+        except Exception:
+            cached.unlink(missing_ok=True)
     url = TILE_URL.format(z=z, x=x, y=y)
     for attempt in range(4):
         try:
             raw = urllib.request.urlopen(url, timeout=40).read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
+            TILE_CACHE.mkdir(parents=True, exist_ok=True)
+            cached.write_bytes(raw)
             return np.asarray(img).astype(np.float64)
         except Exception:
             if attempt == 3:
