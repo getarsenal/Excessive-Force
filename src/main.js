@@ -7,7 +7,7 @@ import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
 import { Life } from './world/life.js';
-import { loadCity, buildCity } from './world/city.js';
+import { loadCity } from './world/city.js';
 import { buildFieldWorks } from './world/works.js';
 import { Structure } from './structure/structure.js';
 import {
@@ -185,44 +185,44 @@ async function boot() {
   // the precinct on the sides where there is nothing in the way.
   // Real OpenStreetMap footprints when they've been baked; otherwise the
   // hand-placed approximation, so the level still reads as a city either way.
-  let contextGroup = null;
+  //
+  // One world builder, given the real place when the real place has been
+  // baked. It used to be two: a generator that invented a city with roads,
+  // parks, trees, street furniture and a railway, or an extruder that laid out
+  // the true footprints on bare ground with none of it. Choosing between them
+  // meant choosing between a place that was right and a place that was alive.
+  // Now the footprints and the street plan go *into* the generator, so a baked
+  // level gets the real buildings on the real streets with everything else
+  // still built around them.
   const city = await loadCity(level.terrain);
-  const cityGroup = city
-    ? buildCity(city, terrain, quality, { excludeRadius: level.cityExcludeRadius })
-    : null;
-  if (cityGroup) {
-    engine.scene.add(cityGroup);
-    // Report the file's own provenance rather than assuming it is real data —
-    // a test fixture must never be mistaken for OpenStreetMap.
-    console.log(`[tumble] city: ${cityGroup.userData.built} of `
-      + `${cityGroup.userData.available} buildings — ${city.source}`);
-  } else {
-    contextGroup = buildContext(terrain, quality, {
-      landmarks, precinct: level.precinct, exclude: level.contextExclude,
-      // What is beyond the town. A level says where it is; the generator does
-      // not guess it from the terrain, because fields and forest look much the
-      // same to a heightmap and nothing like each other from the air.
-      hinterland: level.setting?.hinterland,
-      canopy: level.setting?.canopy,
-      canopyFrom: level.setting?.canopyFrom,
-      downtown: level.setting?.downtown,
-    });
-    engine.scene.add(contextGroup);
-    console.log(`[tumble] city: hand-placed approximation, `
-      + `${contextGroup.userData.plots.length} buildings, `
-      + `${contextGroup.userData.roofs.length} deployable roofs, `
-      + `${contextGroup.userData.detail?.canopy || 0} trees`
-      + ' (run tools/bake_buildings.py for real footprints)');
-  }
+  const contextGroup = buildContext(terrain, quality, {
+    landmarks, precinct: level.precinct, exclude: level.contextExclude,
+    city, cityExclude: level.cityExcludeRadius,
+    // What is beyond the town. A level says where it is; the generator does
+    // not guess it from the terrain, because fields and forest look much the
+    // same to a heightmap and nothing like each other from the air.
+    hinterland: level.setting?.hinterland,
+    canopy: level.setting?.canopy,
+    canopyFrom: level.setting?.canopyFrom,
+    downtown: level.setting?.downtown,
+  });
+  engine.scene.add(contextGroup);
+  const d = contextGroup.userData.detail || {};
+  console.log(`[tumble] city: ${d.plan} street plan, `
+    + `${contextGroup.userData.plots.length} buildings `
+    + `(${d.real || 0} surveyed), ${d.junctions} junctions, `
+    + `${contextGroup.userData.roofs.length} deployable roofs, `
+    + `${d.canopy || 0} trees`
+    + (city ? ` — ${city.source}` : ' (run tools/bake_overture.py for the real place)'));
 
   // The defence, laid round whichever set of buildings got built.
   const fieldWorks = buildFieldWorks(terrain, quality, {
     landmarks,
-    plots: (cityGroup || contextGroup)?.userData?.plots || [],
+    plots: contextGroup?.userData?.plots || [],
     // The street network and the frame it is laid on, so the belt is square to
     // the place rather than to the map, and so it knows where the roads are.
-    net: (cityGroup || contextGroup)?.userData?.network || null,
-    yaw: (cityGroup || contextGroup)?.userData?.gridYaw || 0,
+    net: contextGroup?.userData?.network || null,
+    yaw: contextGroup?.userData?.gridYaw || 0,
     exclude: level.contextExclude || level.cityExcludeRadius || 70,
   });
   engine.scene.add(fieldWorks.group);
@@ -238,9 +238,9 @@ async function boot() {
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   };
-  const life = (cityGroup || contextGroup)?.userData?.network
+  const life = contextGroup?.userData?.network
     ? new Life(engine.scene, terrain,
-      (cityGroup || contextGroup).userData.network, quality, lifeRng())
+      contextGroup.userData.network, quality, lifeRng())
     : null;
 
   await progress(44, 'quarrying stone');
@@ -361,7 +361,7 @@ async function boot() {
     }
   })();
   // Footprints, so a gun cannot be deployed inside a building.
-  battle.cityPlots = (cityGroup || contextGroup)?.userData?.plots || null;
+  battle.cityPlots = contextGroup?.userData?.plots || null;
 
   // Smoke the garrison cannot see through, and fires that burn on after a
   // heavy hit.
@@ -375,7 +375,7 @@ async function boot() {
 
   // Cloud shadows drifting over the ground and the town.
   cloudShadows(terrain.mesh.material, 0.30);
-  (cityGroup || contextGroup)?.traverse((o) => {
+  contextGroup?.traverse((o) => {
     if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !o.material.userData.clouded) {
       o.material.userData.clouded = true;
       cloudShadows(o.material, 0.26);
@@ -582,7 +582,7 @@ async function boot() {
   // ── Input: tap the structure to designate a target, tap the ground to
   // deploy the selected unit, tap one of your own guns to inspect it.
   const pick = (x, y, own = false) =>
-    picker.pick(x, y, structures, cityGroup || contextGroup, garrison, own ? battle.units : null);
+    picker.pick(x, y, structures, contextGroup, garrison, own ? battle.units : null);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -807,7 +807,7 @@ async function boot() {
 
   const testMenu = new TestMenu({
     battle, engine, physics, terrain, rig, quality, level, structures, water,
-    cityGroup: cityGroup || contextGroup, hud, picker, fx, garrison, governor,
+    cityGroup: contextGroup, hud, picker, fx, garrison, governor,
     life, fastForward,
     stats: () => ({ fps, physMs: +physMs.toFixed(2) }),
     shaderErrors: () => shaderLog,
@@ -872,7 +872,7 @@ async function boot() {
   Object.assign(window, {
     engine, physics, terrain, rig, battle, garrison, fx, quality, audio, level, life,
     structures, tower: primary, primary, picker, hud, water, testMenu, flags, unitCard,
-    cityGroup: cityGroup || contextGroup,
+    cityGroup: contextGroup,
     // Exposed so a console session or the headless harness can build the same
     // vectors the game does rather than duck-typing them.
     THREE,

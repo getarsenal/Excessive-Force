@@ -91,6 +91,14 @@ export class Terrain {
   }
 
   _computeWaterLevel() {
+    // A surveyed coastline brings its own answer, measured at the shoreline
+    // rather than guessed from the deepest point on the map. The guess below
+    // is right for a channel carved to a known depth and wrong for a harbour:
+    // Sydney's deepest sample is nine metres down, and five metres above that
+    // is three metres below the quay — the tide out across the whole map.
+    if (this.meta && typeof this.meta.waterSurface === 'number') {
+      return this.meta.waterSurface;
+    }
     // The river bed was carved to a known depth; put the surface a little above
     // the deepest carved point so the banks read correctly.
     let minWet = Infinity;
@@ -219,6 +227,9 @@ export class Terrain {
    * Westminster's is.
    */
   _repairRiver() {
+    // Nothing to repair when the coastline came off a survey: the mask is the
+    // real shoreline and the heightmap was dredged to agree with it.
+    if (this.meta && this.meta.coastline === 'surveyed') return;
     const n = this.size, N = n * n;
     const h = this.heights, mask = this.mask;
 
@@ -590,7 +601,11 @@ export class Terrain {
       // The edge is a few vertices wide whatever the grid: a threshold that
       // fell within one cell drew every patch as a hard-edged square.
       const soft = Math.min(0.24, 0.10 + cell * 0.018);
-      const green = THREE.MathUtils.smoothstep(patch, 0.20 - soft, 0.20 + soft) * 0.62;
+      // And they do not happen on the tarmac. Where the bake says hardstanding
+      // — a street, a yard, a built parcel — the ground is hardstanding, not a
+      // verge with a road drawn over the top of it.
+      const green = THREE.MathUtils.smoothstep(patch, 0.20 - soft, 0.20 + soft)
+        * 0.62 * (1 - THREE.MathUtils.clamp(m.road * 1.6, 0, 1));
       tmp2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
       tmp.lerp(tmp2, Math.max(green * (1 - m.water), m.park * 0.92));
 

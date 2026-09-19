@@ -526,7 +526,7 @@ export function buildStreetNetwork(terrain, rng, opts) {
  * Runs after the blocks are cut, which need the grid's own links to find their
  * four sides, and before anything is drawn from the graph.
  */
-function dissolveThroughNodes(nodes, edges) {
+export function dissolveThroughNodes(nodes, edges) {
   const indexOf = new Map();
   const reindex = () => {
     indexOf.clear();
@@ -753,7 +753,7 @@ function traceBank(terrain, reach) {
  * distance tests rather than a walk over the whole network. Every building
  * placement asks that question, several times.
  */
-function buildEdgeIndex(net) {
+export function buildEdgeIndex(net) {
   const CELL = 64;
   const map = new Map();
   const key = (cx, cz) => cx * 8192 + cz;
@@ -797,12 +797,31 @@ function buildEdgeIndex(net) {
     return best;
   };
   // Junction pads are wider than the streets that meet them.
+  //
+  // Indexed on the same grid as the carriageways. A generated plan has a
+  // couple of hundred junctions and a walk over all of them was free; a real
+  // one has a thousand, and this is asked several times per building, per
+  // ground quad and per tree — which is a hundred million distance tests and
+  // several seconds of load time, on the frame where nothing is on screen yet.
+  const pads = new Map();
+  for (const n of net.nodes) {
+    const r = padRadius(n);
+    if (r <= 0) continue;
+    const cx = Math.floor(n.x / CELL), cz = Math.floor(n.z / CELL);
+    const k = key(cx, cz);
+    let bucket = pads.get(k);
+    if (!bucket) pads.set(k, bucket = []);
+    bucket.push({ x: n.x, z: n.z, r });
+  }
   net.nodeClearance = (x, z) => {
+    const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     let best = Infinity;
-    for (const n of net.nodes) {
-      const d = Math.hypot(n.x - x, n.z - z);
-      if (d > 60) continue;
-      best = Math.min(best, d - padRadius(n));
+    for (let ax = cx - 1; ax <= cx + 1; ax++) {
+      for (let az = cz - 1; az <= cz + 1; az++) {
+        const bucket = pads.get(key(ax, az));
+        if (!bucket) continue;
+        for (const n of bucket) best = Math.min(best, Math.hypot(n.x - x, n.z - z) - n.r);
+      }
     }
     return best;
   };
@@ -1003,7 +1022,16 @@ export function buildStreetSurface(net, terrain, quality) {
       [c.road / 2 + c.pave, c.road / 2 + c.pave + c.kerb, KERB],
     ];
     const a = net.nodes[e.a], b = net.nodes[e.b];
-    const trimA = padRadius(a) * 0.98, trimB = padRadius(b) * 0.98;
+    // Never trim a street out of existence. The pad radius is a fixed number
+    // and a surveyed plan has junctions twenty metres apart — two pads at
+    // eleven metres eat the whole street, and five hundred of London's
+    // eight hundred roads were simply not drawn.
+    let trimA = padRadius(a) * 0.98, trimB = padRadius(b) * 0.98;
+    const run = polylineLength(e.pts);
+    if (trimA + trimB > run * 0.7) {
+      const k = (run * 0.7) / (trimA + trimB);
+      trimA *= k; trimB *= k;
+    }
     const line = trimPolyline(e.pts, trimA, trimB);
     if (line.length < 2) continue;
     // A bridge carries its own height and is allowed over the water. Its
@@ -1109,6 +1137,14 @@ export function buildStreetSurface(net, terrain, quality) {
   mesh.frustumCulled = false;
   mesh.name = 'streets';
   return mesh;
+}
+
+function polylineLength(pts) {
+  let d = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    d += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+  }
+  return d;
 }
 
 function endWeight(i, last) {
@@ -1475,8 +1511,16 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
     });
 
     // Street trees line the avenues. Nothing says "boulevard" faster.
-    if (c.trees) {
-      walkPolyline(line, 19 / dense, (x, z, dir) => {
+    //
+    // On a surveyed plan the ordinary streets get them too, thinner. Which of
+    // the world's roads land in our "avenue" bucket is the world's business,
+    // not ours: Agra's whole map holds a handful of them, so planting only
+    // there gives a city with thirteen trees in it, while the real place is
+    // lined with them along everything wider than a lane.
+    const treeEvery = c.trees ? 19 / dense
+      : (net.real && e.cls === 'street' ? 33 / dense : 0);
+    if (treeEvery > 0) {
+      walkPolyline(line, treeEvery, (x, z, dir) => {
         const side = rng() < 0.5 ? 1 : -1;
         const off = (c.road / 2 + c.pave * 0.5) * side;
         const px = x - dir.z * off, pz = z + dir.x * off;

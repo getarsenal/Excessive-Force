@@ -23,6 +23,7 @@ import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
   addRiverEdge, addRoofAndFrontage } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
+import { realNetwork, measureYaw } from './realstreets.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
   GRID_YAW, ROAD_CLASS, SURFACE_LIFT } from './streets.js';
@@ -49,6 +50,7 @@ export function buildContext(terrain, quality, opts = {}) {
   const plots = [];
 
   const reach = terrain.span * 0.94;
+  const span = terrain.span;
   const dense = quality.groundClutter ? 1.0 : 0.55;
   // The landmark's own precinct.
   //
@@ -71,7 +73,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // ── The bridge comes first, because the street network has to know where it
   // lands: a crossing with no road to it is the thing that made the old layout
   // read as scenery rather than as a place.
-  const bridge = bridgeLine(terrain, EXCLUDE);
+  let bridge = bridgeLine(terrain, EXCLUDE);
 
   /**
    * The civic set, placed by hand from the real map — Parliament Square, the
@@ -123,10 +125,55 @@ export function buildContext(terrain, quality, opts = {}) {
   const inPrecinct = (x, z) => precinct.some(
     (r) => Math.abs(x - r.x) < r.w / 2 && Math.abs(z - r.z) < r.d / 2);
 
-  const net = buildStreetNetwork(terrain, rng, {
+  /**
+   * The real place, when there is one on disk.
+   *
+   * `tools/bake_overture.py` writes a level's actual buildings and its actual
+   * street plan. Where that file exists the city is not approximated at all:
+   * the graph below is Sydney's or Moscow's own, and the buildings laid into it
+   * are the ones that are there. Where it does not, everything still works the
+   * way it always did — the generator invents a city, which is the right answer
+   * for a level nobody has baked yet.
+   */
+  const city = (opts.city && Array.isArray(opts.city.buildings)
+    && opts.city.buildings.length > 0) ? opts.city : null;
+  const realNet = city
+    ? realNetwork(city.roads, terrain, { exclude: EXCLUDE, reserved: precinct })
+    : null;
+
+  /**
+   * How far the surveyed buildings are held off the monument.
+   *
+   * Not the same radius as the streets. Parliament Square and Bridge Street run
+   * right up to the Elizabeth Tower and are half of what makes the place
+   * Westminster, so the road exclusion stays tight; the Palace of Westminster
+   * is a surveyed footprint standing exactly where the level's own masonry
+   * stands, so the building exclusion is the level's `cityExcludeRadius` and is
+   * much wider. On the Taj it is the whole charbagh.
+   */
+  const CITY_EXCLUDE = Math.max(EXCLUDE, opts.cityExclude || 0);
+
+  const net = realNet || buildStreetNetwork(terrain, rng, {
     pitch: 104, reach, exclude: EXCLUDE, bridge,
     reserved: [...CIVIC.slice(6, 10), ...precinct],
   });
+
+  /**
+   * The angle the place is laid out at.
+   *
+   * Declared for an invented city and measured for a real one: Westminster's
+   * grid is turned thirteen degrees because `GRID_YAW` says so, and Moscow's is
+   * turned however Moscow's is, which nobody gets to choose. Everything that
+   * squares itself to the town — the civic set, the precinct paving, the
+   * railway, the defensive belt — reads this rather than the constant.
+   */
+  const YAW = realNet ? measureYaw(realNet) : GRID_YAW;
+
+  // And a surveyed plan brings its own crossings. `bridgeLine` picks a place
+  // to throw a bridge across whatever water it finds, which is the right
+  // answer for an invented town on an invented river and a second, wrong
+  // Thames crossing beside the real Westminster Bridge.
+  if (realNet) bridge = null;
 
   // ── Where a building may and may not go.
   //
@@ -149,25 +196,47 @@ export function buildContext(terrain, quality, opts = {}) {
     return pts;
   };
 
-  /** Dry, well clear of the waterline, all the way round. */
-  const onDryLand = (pts) => {
+  /**
+   * Dry, well clear of the waterline, all the way round.
+   *
+   * The margin is what stops an invented building being placed so that it
+   * overhangs a bank the generator was never asked about. A surveyed building
+   * is already standing where it stands: the wharves at Wapping and the quay
+   * buildings at Circular Quay are built to the water's edge, and holding them
+   * four and a half metres back from a coastline our own DEM only knows to
+   * within a few metres deletes the waterfront on every harbour level. They
+   * still have to be on dry land — a building in the river is a building in
+   * the river — just not set back from it.
+   */
+  const onDryLand = (pts, margin = 4.5, freeboard = 1.6) => {
     for (const p of pts) {
       if (terrain.isWater(p.x, p.z)) return false;
-      if (terrain.heightAt(p.x, p.z) < terrain.waterLevel + 1.6) return false;
-      // And a margin outside the footprint, so nothing overhangs the bank.
-      for (let a = 0; a < 4; a++) {
+      if (terrain.heightAt(p.x, p.z) < terrain.waterLevel + freeboard) return false;
+      for (let a = 0; a < 4 && margin > 0; a++) {
         const th = (a / 4) * Math.PI * 2;
-        if (terrain.isWater(p.x + Math.cos(th) * 4.5, p.z + Math.sin(th) * 4.5)) return false;
+        if (terrain.isWater(p.x + Math.cos(th) * margin, p.z + Math.sin(th) * margin)) return false;
       }
     }
     return true;
   };
 
-  /** Clear of the carriageway, the pavement and the junction paving. */
-  const offStreet = (pts) => {
+  /**
+   * Clear of the carriageway, the pavement and the junction paving.
+   *
+   * An invented building is set back from an invented street and has to clear
+   * the whole reservation. A surveyed building is not set back from anything:
+   * it fronts directly onto the pavement, which is what a street *is* — and the
+   * pavement here is drawn by us, at a nominal width, from a centreline that is
+   * the survey's. Held to the full reservation, every terrace in London is
+   * refused for standing where London stands. So a surveyed footprint is only
+   * asked to keep out of the carriageway itself, with half a metre to spare,
+   * and the pavement it overlaps is pavement it is standing on.
+   */
+  const PAVEMENT = 4.6;
+  const offStreet = (pts, allow = 0) => {
     for (const p of pts) {
-      if (net.roadClearance(p.x, p.z) < 1.0) return false;
-      if (net.nodeClearance(p.x, p.z) < 1.0) return false;
+      if (net.roadClearance(p.x, p.z) + allow < 1.0) return false;
+      if (net.nodeClearance(p.x, p.z) + allow < 1.0) return false;
     }
     return true;
   };
@@ -199,12 +268,13 @@ export function buildContext(terrain, quality, opts = {}) {
    * separating-axis test is a dozen lines and lets a terrace sit nose to tail
    * the way a terrace should.
    */
-  const overlaps = (x, z, w, d, ry, gap = 1.2) => {
+  const overlaps = (x, z, w, d, ry, gap = 1.2, skip = null) => {
     const ca = Math.cos(ry), sa = Math.sin(ry);
     // Local axes of the candidate, in world space.
     const ux = { x: ca, z: -sa }, uz = { x: sa, z: ca };
     const hw = w / 2 + gap / 2, hd = d / 2 + gap / 2;
     for (const p of plots) {
+      if (skip && skip(p)) continue;
       // Cheap reject first: the circumscribed circles.
       const dx = p.x - x, dz = p.z - z;
       const rr = Math.hypot(hw, hd) + Math.hypot(p.w, p.d) / 2;
@@ -246,11 +316,15 @@ export function buildContext(terrain, quality, opts = {}) {
   const rejects = { water: 0, street: 0, bridge: 0, overlap: 0, placed: 0 };
   const block = (x, z, w, d, h, ry = 0, opts = {}) => {
     const pts = footprintPoints(x, z, w, d, ry);
-    if (!onDryLand(pts)) { rejects.water++; return false; }
-    if (!offStreet(pts)) { rejects.street++; return false; }
+    if (!onDryLand(pts, opts.margin ?? 4.5, opts.freeboard ?? 1.6)) {
+      rejects.water++; return false;
+    }
+    if (!offStreet(pts, opts.allow || 0)) { rejects.street++; return false; }
     if (!offBridge(pts)) { rejects.bridge++; return false; }
     if (!offLandmark(pts)) { rejects.landmark = (rejects.landmark || 0) + 1; return false; }
-    if (overlaps(x, z, w, d, ry)) { rejects.overlap++; return false; }
+    if (overlaps(x, z, w, d, ry, opts.gap ?? 1.2, opts.skip || null)) {
+      rejects.overlap++; return false;
+    }
     rejects.placed++;
     // Founded on the lowest corner, not on the middle.
     //
@@ -273,7 +347,7 @@ export function buildContext(terrain, quality, opts = {}) {
     // degrees — the whole building disappears into the hill and its roof comes
     // out level with the grass. Nobody builds a flat-roofed block on a cliff.
     // Leave the ground empty instead; there is a forest on it.
-    if (gHi - gLo > 10.0) return false;
+    if (gHi - gLo > 10.0) { rejects.slope = (rejects.slope || 0) + 1; return false; }
     const g = gLo - 0.3;
     const roll = rng();
     const pitched = roll < (opts.pitchChance ?? 0.42) && Math.min(w, d) < 26;
@@ -337,7 +411,7 @@ export function buildContext(terrain, quality, opts = {}) {
     const ca = Math.abs(Math.cos(ry)), sa = Math.abs(Math.sin(ry));
     plots.push({ x, z, w, d, h: bodyH, top, base: g, yaw: ry, flat: !pitched, pitched,
       ax: w * ca + d * sa, az: w * sa + d * ca,
-      front: opts.front || null });
+      real: !!opts.real, front: opts.front || null });
     return true;
   };
 
@@ -361,10 +435,217 @@ export function buildContext(terrain, quality, opts = {}) {
   // On Agra two of them stood inside the Taj's precinct wall. Anything within
   // the exclusion or inside a precinct is not built; on Westminster, where the
   // exclusion is 66 m and all of these sit further out, nothing changes.
-  for (const c of CIVIC) {
-    if (Math.hypot(c.x, c.z) < EXCLUDE + Math.max(c.w, c.d) / 2) continue;
-    if (inPrecinct(c.x, c.z)) continue;
-    block(c.x, c.z, c.w, c.d, c.h, GRID_YAW, { pitchChance: 0.1 });
+  if (!city) {
+    for (const c of CIVIC) {
+      if (Math.hypot(c.x, c.z) < EXCLUDE + Math.max(c.w, c.d) / 2) continue;
+      if (inPrecinct(c.x, c.z)) continue;
+      block(c.x, c.z, c.w, c.d, c.h, GRID_YAW, { pitchChance: 0.1 });
+    }
+  }
+
+  // ── The buildings that are actually there.
+  //
+  // A baked level does not get a generated city at all where reality has one.
+  // Every footprint is an outline surveyed off the ground, with a height off
+  // the building, and the shapes are what carry the place: Circular Quay's
+  // wedge of towers, the long ranges round Red Square, the courtyard blocks of
+  // the seventh arrondissement. None of those come out of a grid.
+  //
+  // Two ways of building one, chosen by the footprint itself. Most buildings
+  // really are rectangles, and a rectangle goes through `block()` — which gets
+  // it the plinth, the string course under the eaves, the pitched roof, the
+  // setback storey, and the entry in `plots` that the whole detail pass and the
+  // whole defence are laid out from. A footprint that is not a rectangle — a
+  // church, a terrace round a courtyard, a quay building following the water —
+  // is extruded as its own outline, because squaring it up would throw away the
+  // one thing it was worth fetching.
+  let realBuilt = 0, realShaped = 0;
+
+  /** The smallest rectangle containing a footprint: centre, size and bearing. */
+  const boundingRect = (pts) => {
+    let best = null;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const ex = b[0] - a[0], ez = b[1] - a[1];
+      const L = Math.hypot(ex, ez);
+      if (L < 0.4) continue;
+      const ux = ex / L, uz = ez / L;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (const q of pts) {
+        const u = q[0] * ux + q[1] * uz;
+        const v = -q[0] * uz + q[1] * ux;
+        if (u < u0) u0 = u; if (u > u1) u1 = u;
+        if (v < v0) v0 = v; if (v > v1) v1 = v;
+      }
+      const area = (u1 - u0) * (v1 - v0);
+      if (!best || area < best.area) best = { area, ux, uz, u0, u1, v0, v1 };
+    }
+    if (!best) return null;
+    const { ux, uz, u0, u1, v0, v1 } = best;
+    const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+    return {
+      x: cu * ux - cv * uz, z: cu * uz + cv * ux,
+      w: u1 - u0, d: v1 - v0,
+      // The rectangle's own +u axis, as the yaw `block()` takes.
+      //
+      // Which is not `atan2(uz, ux)`. A yaw here turns the width axis to
+      // (cos y, -sin y) — that is what `BoxGeometry` plus `rotateY` does, and
+      // what `footprintPoints` assumes — so the z term is negated. Without
+      // that the bearing comes out mirrored about the map's own axes: right
+      // for anything square to north, and wrong by twice its own angle for
+      // everything else, which is a city where the terraces cross their own
+      // streets at forty degrees and each one still looks individually
+      // plausible.
+      yaw: Math.atan2(-uz, ux),
+      area: best.area,
+    };
+  };
+
+  const polyArea = (pts) => {
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const q = pts[i], r = pts[(i + 1) % pts.length];
+      a += q[0] * r[1] - r[0] * q[1];
+    }
+    return Math.abs(a / 2);
+  };
+
+  /**
+   * A footprint built as its own outline.
+   *
+   * Same guards as `block()` — dry, off the road, off the landmark, clear of
+   * what is already there, not on a slope no building could stand on — because
+   * a surveyed footprint is still wrong when the DEM disagrees with it about
+   * where the bank is, and a quay building half in the harbour is worse than no
+   * quay building.
+   */
+  const shapeBuilding = (pts, rect, h) => {
+    const ring = pts.map((q) => ({ x: q[0], z: q[1] }));
+    // The outline *and* the rectangle it is registered as. Everything that
+    // reads `plots` later — the deployment rules, the picker, the field works,
+    // the tests — sees the rectangle, and the rectangle round an L-shaped
+    // building takes in the yard next door, which can be somebody's
+    // carriageway, somebody's river bank, or six feet lower than the building.
+    const box = footprintPoints(rect.x, rect.z, rect.w, rect.d, rect.yaw);
+    const all = ring.concat(box);
+    if (!onDryLand(all, 1.5, 0.7)) { rejects.water++; return false; }
+    if (!offStreet(all, PAVEMENT)) { rejects.street++; return false; }
+    if (!offBridge(ring)) { rejects.bridge++; return false; }
+    if (!offLandmark(ring)) { rejects.landmark = (rejects.landmark || 0) + 1; return false; }
+    // Surveyed buildings do not overlap each other — they are party walls in
+    // a terrace, and the rectangle round an L-shaped one takes in its
+    // neighbour's yard. They still have to clear whatever the generator put
+    // down, which is the landmark's own set and nothing else at this point.
+    if (overlaps(rect.x, rect.z, rect.w * 0.9, rect.d * 0.9, rect.yaw, 0.2,
+      (q) => q.real)) { rejects.overlap++; return false; }
+    let gLo = Infinity, gHi = -Infinity;
+    for (const q of all) {
+      const gp = terrain.heightAt(q.x, q.z);
+      if (gp < gLo) gLo = gp;
+      if (gp > gHi) gHi = gp;
+    }
+    if (gHi - gLo > 11.0) { rejects.slope = (rejects.slope || 0) + 1; return false; }
+    const fall = Math.min(8, gHi - gLo);
+    const g = gLo - 0.3;
+    const bodyH = h + fall + 0.3;
+
+    // The outline as a 2D shape. The extrusion runs along +Z and is then stood
+    // upright, so a world point (x, z) becomes a shape point (x, -z).
+    const shape = new THREE.Shape();
+    shape.moveTo(pts[0][0] - rect.x, -(pts[0][1] - rect.z));
+    for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0] - rect.x, -(pts[i][1] - rect.z));
+    shape.closePath();
+    let body;
+    try {
+      body = new THREE.ExtrudeGeometry(shape,
+        { depth: bodyH, bevelEnabled: false, curveSegments: 1 });
+    } catch {
+      return false;                       // a trace the triangulator refuses
+    }
+    body.rotateX(-Math.PI / 2);
+    // The extruder measures its UVs in metres, so a twenty-metre wall comes
+    // out with twenty tiles of a texture that is one window bay wide. The
+    // boxes get the same treatment from `scaleBoxUVs`; this is that, for a
+    // shape whose walls we did not lay out ourselves.
+    const uv = body.attributes.uv;
+    if (uv) {
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, uv.getX(i) / 3.5, uv.getY(i) / 3.5);
+      }
+    }
+    body.translate(rect.x, g, rect.z);
+    // Indexed, like every box in this merge. `mergeGeometries` refuses a batch
+    // that is half indexed and half not, and refuses it by returning null —
+    // which surfaces four frames later as a mesh with no geometry and a level
+    // that never finishes loading.
+    bodies.push(BufferGeometryUtils.mergeVertices(body));
+
+    // A cornice, inset the way the boxes' string course is, so an extruded
+    // building and a box building read as the same city.
+    try {
+      const cap = new THREE.ExtrudeGeometry(shape,
+        { depth: 1.2, bevelEnabled: false, curveSegments: 1 });
+      cap.rotateX(-Math.PI / 2);
+      cap.translate(rect.x, g + bodyH, rect.z);
+      roofs.push(BufferGeometryUtils.mergeVertices(cap));
+    } catch { /* the cap is optional */ }
+
+    const ca = Math.abs(Math.cos(rect.yaw)), sa = Math.abs(Math.sin(rect.yaw));
+    plots.push({
+      x: rect.x, z: rect.z, w: rect.w, d: rect.d, h: bodyH,
+      top: g + bodyH + 1.2, base: g, yaw: rect.yaw, flat: true, pitched: false, real: true,
+      ax: rect.w * ca + rect.d * sa, az: rect.w * sa + rect.d * ca,
+      front: null,
+    });
+    rejects.placed++;
+    return true;
+  };
+
+  if (city) {
+    // Largest first, so a budget that runs out loses the sheds rather than the
+    // towers. The baker sorts by outline complexity, which is not the same
+    // thing at all.
+    const list = city.buildings
+      .filter((b) => Array.isArray(b.pts) && b.pts.length >= 3)
+      .map((b) => ({ b, a: polyArea(b.pts) }))
+      .sort((p, q) => q.a - p.a);
+    // What the tier can afford. Higher than the invented city's count, not
+    // lower: a surveyed footprint is the cheapest building in the game — most
+    // go through the same box path and the shaped ones merge into the same two
+    // meshes — and a budget stopping at nine hundred leaves Westminster as a
+    // few streets of houses in a field, which the generated city never was.
+    const budget = { low: 700, medium: 1600, high: 2600, ultra: 4000 }[quality.name] ?? 1600;
+    for (const { b, a } of list) {
+      if (realBuilt + realShaped >= budget) { rejects.budget = (rejects.budget || 0) + 1; continue; }
+      if (a < 30) { rejects.tiny = (rejects.tiny || 0) + 1; continue; }
+      const rect = boundingRect(b.pts);
+      if (!rect) continue;
+      // The whole playfield, not the grid's inset. `reach` is where the
+      // invented street network stops so its outermost blocks still have a
+      // street on every side; a surveyed building has no such need, and
+      // holding it to 799 m of an 850 m map deleted six hundred of London's
+      // nineteen hundred buildings — every one of them at the edge, which is
+      // precisely where the city was looking empty.
+      if (Math.abs(rect.x) > span || Math.abs(rect.z) > span) { rejects.far = (rejects.far || 0) + 1; continue; }
+      if (Math.hypot(rect.x, rect.z) < CITY_EXCLUDE) { rejects.excl = (rejects.excl || 0) + 1; continue; }
+      if (Math.min(rect.w, rect.d) < 3.5) { rejects.thin = (rejects.thin || 0) + 1; continue; }
+      const h = Math.max(3.5, b.h || 12);
+      // How much of its own bounding rectangle the footprint actually fills.
+      // Over four fifths and it is a rectangle with the corners traced off,
+      // which is what most buildings are.
+      if (a > rect.area * 0.82) {
+        if (block(rect.x, rect.z, rect.w, rect.d, h, rect.yaw, {
+          // A real height is a real height: a pitched roof on top of it would
+          // make the building taller than the survey says it is. Only the
+          // small houses, whose heights are guessed anyway, get a roof pitch.
+          pitchChance: (b.real || h > 14 || Math.min(rect.w, rect.d) > 19) ? 0 : 0.5,
+          real: true, allow: PAVEMENT, gap: -0.8, skip: (q) => q.real,
+          margin: 1.5, freeboard: 0.7,
+        })) realBuilt++;
+      } else if (shapeBuilding(b.pts, rect, h)) {
+        realShaped++;
+      }
+    }
   }
 
   // ── The blocks the street network leaves behind.
@@ -405,11 +686,18 @@ export function buildContext(terrain, quality, opts = {}) {
     // So the choice here is between uses, never between building and not.
     const roll = rng();
     let use = 'terrace';
-    if (m.park > 0.40) use = 'park';
+    // A block the real city has already built on is a built block, whatever
+    // the dice say. Rolling a garden square over four surveyed office towers
+    // would lay lawn between them and then try to add a bandstand.
+    const occupied = city && plots.some((q) => Math.abs(q.x - b.x) < f.L1 / 2 + 4
+      && Math.abs(q.z - b.z) < f.L0 / 2 + 4);
+    if (occupied) use = 'terrace';
+    else if (m.park > 0.40) use = 'park';
     else if (roll < 0.09) use = 'park';
     else if (roll < 0.15) use = 'carpark';
     else if (roll < 0.25 && r > terrain.span * 0.42) use = 'works';
     else if (roll < 0.34 && r < terrain.span * 0.6) use = 'civic';
+    if (occupied) { b.use = use; b.open = false; continue; }
     if (f.free0 < 26 || f.free1 < 26) use = use === 'park' ? 'park' : 'carpark';
     b.use = use;
     b.open = use === 'park' || use === 'carpark';
@@ -418,7 +706,11 @@ export function buildContext(terrain, quality, opts = {}) {
     // out, so each one is given a programme — a market, a pitch, a graveyard, a
     // school, allotments, a builder's yard — and the detail pass lays out what
     // that actually looks like from the air.
-    if (b.open && use === 'park' && f.free0 > 34 && f.free1 > 34 && rng() < 0.72) {
+    // A market, a pitch, a graveyard, allotments. The gate used to be 34 m of
+    // free ground each way, which is a generated block and is bigger than most
+    // real ones: a surveyed plan's open blocks all came back below it and
+    // every square on the map was bare.
+    if (b.open && use === 'park' && f.free0 > 26 && f.free1 > 26) {
       b.programme = BLOCK_PROGRAMMES[Math.floor(rng() * BLOCK_PROGRAMMES.length)];
     }
     if (b.open) { squares++; continue; }        // the detail pass builds these
@@ -585,7 +877,17 @@ export function buildContext(terrain, quality, opts = {}) {
   if (paved) group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
-  group.add(buildEmbankment(terrain));
+  // The river wall.
+  //
+  // Only for an invented river. This one walks north along a line of constant
+  // x looking for the first wet pixel, which is a description of the Thames as
+  // it was typed into the terrain baker — two coordinates and a width — and not
+  // of any real coastline: given the surveyed Thames it walls the outside of
+  // the far bank in a row of scalloped slabs. The detail pass's own river edge
+  // sweeps both axes, finds the bank by stepping back to dry ground, and
+  // builds the parapet and balustrade as well, so on a surveyed map it is
+  // doing this job properly already.
+  if (!realNet) group.add(buildEmbankment(terrain));
   group.add(buildStreetDetail(terrain, quality, plots, net, rng));
 
   // ── The detail pass. Everything that makes the massing read as a place
@@ -595,7 +897,8 @@ export function buildContext(terrain, quality, opts = {}) {
   const detail = new THREE.Group();
   detail.name = 'citydetail';
   const counts = { terraces, squares, civics, works, yards,
-    junctions: net.nodes.length, streets: net.edges.length };
+    junctions: net.nodes.length, streets: net.edges.length,
+    real: realBuilt + realShaped, realShaped, plan: realNet ? 'surveyed' : 'generated' };
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
@@ -607,7 +910,7 @@ export function buildContext(terrain, quality, opts = {}) {
   Object.assign(counts, addStreetMarkings(props, net, terrain, rng, dense));
   Object.assign(counts, buildPrecinct(props, terrain, rng, {
     precinct: opts.precinct, radius: EXCLUDE - 4, net,
-    landmarks: opts.landmarks || [], yaw: GRID_YAW,
+    landmarks: opts.landmarks || [], yaw: YAW,
   }));
   // Forest inside the playfield as well as beyond it.
   //
@@ -667,15 +970,31 @@ export function buildContext(terrain, quality, opts = {}) {
   // Both passes count trees under the same name and the outskirts run second.
   counts.canopy = (counts.canopy || 0) + nearCanopy;
   Object.assign(counts, buildHorizon(props, terrain, rng));
-  Object.assign(counts, buildRailway(props, terrain, rng, { yaw: GRID_YAW, net }));
+  Object.assign(counts, buildRailway(props, terrain, rng, { yaw: YAW, net }));
   // Whatever each open block is for, laid out in the block's own frame.
+  // `openBig` is the number of open blocks with room for a programme in them,
+  // which is what "every open block is for something" has to be measured
+  // against: a surveyed plan's blocks are the ones its real streets enclose,
+  // and demanding four market squares of a town with two blocks in it is
+  // demanding a town that is not there.
   counts.programmes = 0;
+  counts.openBig = 0;
   for (const b of net.blocks) {
-    if (!b.programme) continue;
     const quad = blockInterior(b, 2.0);
     const fr = quadFrame(quad);
-    if (fr.w < 26 || fr.d < 26) continue;
-    if (terrain.isWater(fr.cx, fr.cz)) continue;
+    // One measure of "is there room in here", used both to count the blocks
+    // that ought to have a programme and to decide whether to lay one. They
+    // used to be two different measures — the block's free frontage and the
+    // block's interior quad — and the blocks that passed one and failed the
+    // other came out as bare ground in the middle of town.
+    const room = fr.w >= 20 && fr.d >= 20 && !terrain.isWater(fr.cx, fr.cz);
+    if (b.open && b.use === 'park' && room) {
+      counts.openBig++;
+      if (!b.programme) {
+        b.programme = BLOCK_PROGRAMMES[Math.floor(rng() * BLOCK_PROGRAMMES.length)];
+      }
+    }
+    if (!b.programme || !room) continue;
     Object.assign(counts, fillOpenBlock(props, terrain, rng, b.programme,
       { cx: fr.cx, cz: fr.cz, w: fr.w - 4, d: fr.d - 4, yaw: fr.yaw }));
     counts.programmes++;
@@ -695,7 +1014,7 @@ export function buildContext(terrain, quality, opts = {}) {
   group.userData.network = net;
   // The frame the whole place is laid out on. The field works read it so the
   // defence line is square to the streets it is dug beside.
-  group.userData.gridYaw = GRID_YAW;
+  group.userData.gridYaw = YAW;
   group.userData.layout = rejects;
   group.userData.bridge = bridge;
 

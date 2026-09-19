@@ -3,7 +3,7 @@
 without network access to Overpass.
 
 This is NOT real data and must never be committed to public/assets/city/ —
-`bake_buildings.py` is the only thing that should write there. It exists so the
+`bake_overture.py` is the only thing that should write there. It exists so the
 loader, the extruder and the facade UVs can be exercised in CI-like conditions.
 
 Usage:  python3 tools/make_city_fixture.py > /tmp/westminster.json

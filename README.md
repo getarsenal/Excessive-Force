@@ -116,16 +116,34 @@ are looking at, and one that falls very short goes in the Thames.
 
 ### The real city
 
-`tools/bake_buildings.py` pulls every building footprint around the site from
-OpenStreetMap and bakes it to `public/assets/city/<level>.json` — polygons in
-metres from the level origin, with heights from the `height` and
-`building:levels` tags. The game extrudes those at load time. Without the bake
-it falls back to a hand-placed approximation of Westminster, and says which one
-it used in the console.
+`tools/bake_overture.py` bakes the actual place. It reads the Overture Maps
+Foundation's GeoParquet — OpenStreetMap's buildings, water and roads, with
+Microsoft's and Google's ML-derived footprints filling the gaps — straight off
+its public S3 bucket, and writes four things per level:
+
+- **the buildings**, to `public/assets/city/<level>.json`: outlines in metres
+  from the level origin, with the heights the survey carries, and neighbours'
+  heights inferred for the roughly half that carry none;
+- **the street plan**, into the same file: Overture's own junction topology
+  welded back into a graph, with the blocks its streets enclose cut out of it
+  by a planar face walk. This is what the game builds its city *on* — the
+  twelve avenues off the Étoile, the wedge of Circular Quay, the ring roads
+  round the Kremlin;
+- **the coastline**, into `<level>_mask.png`, with `<level>_height.png`
+  dredged underneath it so the ground and the water agree about where the bank
+  is;
+- **the land cover**, so the parks are the parks and the built-up quarters
+  read as built-up rather than as a village standing in a meadow.
 
 ```bash
-python3 tools/bake_buildings.py westminster
+python3 tools/bake_overture.py westminster     # or --all
 ```
+
+Without a bake the level still builds: the generator invents a city, says so
+in the console, and everything else works the same way. There is one world
+builder either way — the real footprints and the real streets go *into* it, so
+a baked level gets the real place with all of the roads, parks, trees, street
+furniture and railways built around it.
 
 **Why not Google's Photorealistic 3D Tiles?** They are gorgeous and they are the
 wrong shape for this game. A photogrammetry tileset is one fused mesh: there are

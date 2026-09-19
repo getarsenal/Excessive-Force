@@ -776,7 +776,12 @@ export function fillOpenBlock(props, terrain, rng, kind, frame) {
 export function buildHorizon(props, terrain, rng) {
   const span = terrain.span;
   let towers = 0;
-  for (let k = 0; k < 190; k++) {
+  // Keep going until there is a skyline, rather than taking a fixed number of
+  // guesses at where one might go. On a river city nearly every guess lands on
+  // dry ground and the two are the same thing; on a harbour most of the ring
+  // is open sea, and a hundred and ninety tries came back with thirty-one
+  // towers — which from Bennelong Point is a horizon with gaps in it.
+  for (let k = 0; k < 1200 && towers < 150; k++) {
     const a = rng() * Math.PI * 2;
     const r = span * (1.9 + rng() * 1.5);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;

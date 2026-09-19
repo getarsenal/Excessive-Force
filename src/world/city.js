@@ -1,13 +1,13 @@
-import * as THREE from 'three';
-import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-
 /**
- * The real city, extruded from OpenStreetMap footprints.
+ * The real city, on disk.
  *
- * `tools/bake_buildings.py` writes one JSON per level containing every building
- * polygon around the site, in metres from the level origin, with heights from
- * the `height` / `building:levels` tags where they exist. This turns those
- * polygons into geometry.
+ * `tools/bake_overture.py` writes one JSON per level: every building polygon
+ * around the site in metres from the level origin, with the heights the survey
+ * carries, and the street graph they stand on. This loads it. What gets built
+ * out of it is `context.js`'s job, because a real city needs everything an
+ * invented one needs — roads, parks, trees, street furniture, a railway — and
+ * having two builders meant choosing between a place that was right and a place
+ * that was alive.
  *
  * The reason this is footprints rather than Google's Photorealistic 3D Tiles:
  * those tiles are one fused photogrammetry mesh with no separable buildings and
@@ -16,10 +16,9 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
  * builder the tower uses. Keeping the city as geometry we generate is what
  * leaves the door open to making it destructible on the same terms.
  *
- * If no baked file is present the game falls back to the hand-placed layout in
- * `context.js`, which approximates Westminster rather than reproducing it.
+ * The palettes live here because both the facades and the roofs are read by the
+ * generator, and a level with no baked file still has to be painted.
  */
-
 export async function loadCity(levelId) {
   try {
     const res = await fetch(`assets/city/${levelId}.json`);
@@ -73,190 +72,3 @@ export const ROOF_PALETTE = [
   0x7a6154, 0x856a5b,                                 // clay tile ×2
   0x4f6b63,                                           // oxidised copper ×1
 ];
-const PALETTE = FACADE_PALETTE;
-const ROOF = ROOF_PALETTE;
-
-/** Buildings kept, by quality tier. The baker sorts largest-first. */
-const BUDGET = { low: 320, medium: 700, high: 1200, ultra: 2000 };
-
-/**
- * @param {object} city    parsed output of bake_buildings.py
- * @param {object} terrain Terrain instance, for ground height and water
- * @param {object} quality tier
- * @param {object} opts    { excludeRadius } metres around the origin to leave clear
- */
-export function buildCity(city, terrain, quality, opts = {}) {
-  const group = new THREE.Group();
-  group.name = 'city';
-
-  const exclude = opts.excludeRadius ?? 70;
-  const span = terrain.span;
-  const budget = BUDGET[quality.name] ?? 700;
-  const rng = mulberry32(0x5eed1234);
-
-  const walls = [];
-  const roofs = [];
-  // Where each building ended up, in the same shape the procedural city
-  // reports: the field works are laid round these and do not care which of the
-  // two built them.
-  const plots = [];
-  let used = 0;
-
-  for (const b of city.buildings) {
-    if (used >= budget) break;
-
-    const pts = b.pts;
-    if (!pts || pts.length < 3) continue;
-
-    // Centroid, for siting and for the exclusion test.
-    let cx = 0, cz = 0;
-    for (const p of pts) { cx += p[0]; cz += p[1]; }
-    cx /= pts.length; cz /= pts.length;
-
-    if (Math.hypot(cx, cz) < exclude) continue;          // the landmark's own plot
-    if (Math.abs(cx) > span * 0.98 || Math.abs(cz) > span * 0.98) continue;
-    if (terrain.isWater(cx, cz)) continue;
-
-    // Build the outline as a 2D shape. The extrusion runs along +Z and is then
-    // stood upright, so a world point (x, z) becomes shape point (x, -z).
-    const shape = new THREE.Shape();
-    shape.moveTo(pts[0][0] - cx, -(pts[0][1] - cz));
-    for (let i = 1; i < pts.length; i++) {
-      shape.lineTo(pts[i][0] - cx, -(pts[i][1] - cz));
-    }
-    shape.closePath();
-
-    const height = Math.max(3, b.h || 12);
-    let geo;
-    try {
-      geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 1 });
-    } catch {
-      continue; // self-intersecting trace that the triangulator refuses
-    }
-    geo.rotateX(-Math.PI / 2);
-
-    const ground = terrain.heightAt(cx, cz);
-    geo.translate(cx, ground, cz);
-
-    tint(geo, PALETTE, rng);
-    walls.push(geo);
-
-    // A thin parapet slab reading as the roof line, inset slightly so it sits
-    // like a cornice rather than a lid.
-    try {
-      const cap = new THREE.ExtrudeGeometry(shape, { depth: 1.1, bevelEnabled: false, curveSegments: 1 });
-      cap.rotateX(-Math.PI / 2);
-      cap.translate(cx, ground + height, cz);
-      tint(cap, ROOF, rng);
-      roofs.push(cap);
-    } catch { /* cap is optional */ }
-
-    let w = 0, d = 0;
-    for (const q of pts) {
-      w = Math.max(w, Math.abs(q[0] - cx) * 2);
-      d = Math.max(d, Math.abs(q[1] - cz) * 2);
-    }
-    plots.push({ x: cx, z: cz, w, d, ax: w, az: d, h: height, base: ground, yaw: 0 });
-    used++;
-  }
-
-  if (walls.length === 0) return null;
-
-  const shadows = quality.shadowMapSize > 0;
-  const facade = makeFacadeTexture(64);
-  const lit = makeWindowEmissive(64);
-  for (const t of [facade, lit]) {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    // ExtrudeGeometry's default UV generator works in world units, so one
-    // texture tile per 3.5 m gives a consistent window bay at any footprint size.
-    t.repeat.set(1 / 3.5, 1 / 3.5);
-    t.anisotropy = quality.anisotropy;
-  }
-
-  const wallMat = new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.93, metalness: 0.01,
-    map: facade,
-    emissive: new THREE.Color(0xffd9a0),
-    emissiveMap: lit,
-    emissiveIntensity: 0.16,
-  });
-  const roofMat = new THREE.MeshStandardMaterial({
-    vertexColors: true, roughness: 0.82, metalness: 0.02,
-  });
-
-  const wallMesh = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(walls, false), wallMat);
-  wallMesh.castShadow = shadows;
-  wallMesh.receiveShadow = shadows;
-  group.add(wallMesh);
-
-  if (roofs.length) {
-    const roofMesh = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(roofs, false), roofMat);
-    roofMesh.castShadow = shadows;
-    roofMesh.receiveShadow = shadows;
-    group.add(roofMesh);
-  }
-
-  group.userData.built = used;
-  group.userData.available = city.buildings.length;
-  group.userData.plots = plots;
-  return group;
-}
-
-function tint(geo, palette, rng) {
-  const n = geo.attributes.position.count;
-  const c = new THREE.Color(palette[Math.floor(rng() * palette.length)]);
-  c.multiplyScalar(0.86 + rng() * 0.28);
-  const arr = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
-  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-}
-
-/** One window bay: a recessed opening in a stone field. */
-function makeFacadeTexture(size) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f2ece1';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  for (let y = 0; y < size; y += 8) ctx.fillRect(0, y, size, 1);
-
-  const m = size * 0.26;
-  const ww = size - m * 2;
-  const wh = size * 0.46;
-  const wy = size * 0.26;
-  ctx.fillStyle = '#cdc4b4'; ctx.fillRect(m - 2, wy - 2, ww + 4, wh + 4);
-  ctx.fillStyle = '#4d525c'; ctx.fillRect(m, wy, ww, wh);
-  ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(m, wy, ww, wh * 0.36);
-  ctx.fillStyle = '#b8ae9d';
-  ctx.fillRect(m + ww / 2 - 1, wy, 2, wh);
-  ctx.fillRect(m, wy + wh * 0.45, ww, 2);
-  ctx.fillStyle = '#e4dccd'; ctx.fillRect(m - 3, wy + wh, ww + 6, 3);
-
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function makeWindowEmissive(size) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, size, size);
-  const m = size * 0.26;
-  ctx.fillStyle = '#6a5230';
-  ctx.fillRect(m, size * 0.26, size - m * 2, size * 0.46);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-function mulberry32(a) {
-  return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}

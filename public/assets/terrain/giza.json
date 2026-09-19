@@ -9,5 +9,6 @@
   "maxElevation": 103.398,
   "metersPerDemPixel": 8.2763,
   "seaLevel": 17.04,
-  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed"
 }

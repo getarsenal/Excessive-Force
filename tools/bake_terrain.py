@@ -483,7 +483,16 @@ def flatten_pads(height: np.ndarray, pads: list, span: float) -> np.ndarray:
     return height
 
 
-def bake(level_id: str):
+def bake(level_id: str, natural_water: bool = False):
+    """Cut the level's heightmap and mask out of the DEM.
+
+    `natural_water` says a real coastline is coming: the hand-typed river or
+    sea in the level's config is then left out entirely rather than unioned
+    with the surveyed one. Two channels for the same river — one drawn from a
+    pair of typed coordinates, one traced off the real bank — make a Thames
+    twice as wide as the Thames, with a strip of dry ditch beside it where the
+    hand-drawn channel was dug and no water put in it.
+    """
     cfg = LEVELS[level_id]
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     print(f"Baking {level_id}: {cfg['name']}")
@@ -539,10 +548,10 @@ def bake(level_id: str):
     if "peak" in cfg:
         height = cut_peak(height, cfg["peak"], cfg["span"])
 
-    if "river" in cfg:
+    if "river" in cfg and not natural_water:
         height = carve_river(height, mask, cfg["river"], cfg["span"], sea)
 
-    if "sea" in cfg:
+    if "sea" in cfg and not natural_water:
         height = flood_sea(height, mask, cfg["sea"])
 
     # Parkland (St James's / Victoria Tower Gardens) — a soft blob west and

@@ -5,9 +5,11 @@
   "lon": 151.21526,
   "spanMeters": 850.0,
   "size": 512,
-  "minElevation": -18.908,
+  "minElevation": -8.908,
   "maxElevation": 48.762,
   "metersPerDemPixel": 3.9672,
   "seaLevel": -1.05,
-  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.398,
+  "coastline": "surveyed"
 }

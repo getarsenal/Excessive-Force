@@ -35,6 +35,27 @@ the software rasteriser; verify those at low.
 `node tools/loose.mjs <level> low` says *where* the loose stones are and
 `node tools/look.mjs /tmp/out/<id> <level>` gives three views plus the
 blind ranks — both are quicker than the whole suite while building.
+`sh tools/suiteall.sh <level>...` runs the suite over several levels and
+prints one line each.
+
+## The real world
+
+`tools/bake_overture.py <level>|--all` pulls the actual place out of the
+Overture Maps Foundation's GeoParquet on public S3 and writes the
+buildings and street graph to `public/assets/city/<level>.json` and the
+coastline and land cover into `public/assets/terrain/<level>_mask.png`,
+dredging `<level>_height.png` underneath it so the two agree. It re-cuts
+the DEM first, so it is safe to re-run.
+
+Egress: `s3.amazonaws.com` and `raw.githubusercontent.com` are allowed.
+Overpass, `tile.openstreetmap.org`, `basemaps.cartocdn.com` and
+`extensions.duckdb.org` are all 403 at the proxy — organisation policy,
+so report it rather than retrying. Needs `pyarrow`, `shapely`, `pillow`.
+
+There is one world builder. `buildContext` invents a city when no bake
+exists and lays the surveyed one on the surveyed streets when it does; it
+builds the roads, parks, trees, furniture and railway either way. The
+console line on load says which.
 
 ## Adding a map
 
@@ -49,4 +70,6 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/game/aircraft.js` air strikes · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
   `src/ui/` HUD, level select, stand-off, test panel ·
-  `tools/bake_terrain.py` the ground · `tools/shot.mjs` the harness.
+  `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
+  buildings, streets and coastline · `src/world/realstreets.js` the
+  surveyed graph · `tools/shot.mjs` the harness.

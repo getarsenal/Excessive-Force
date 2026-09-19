@@ -4,7 +4,7 @@ import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS } from '../game/levels.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveArc } from '../game/projectiles.js';
-import { junctionRing, padRadius } from '../world/streets.js';
+import { junctionRing, padRadius, halfWidth } from '../world/streets.js';
 
 /**
  * The test menu.
@@ -642,18 +642,45 @@ export class TestMenu {
    * Tries the four cardinal directions and takes the first whose sight line to
    * the top of the structure is clear of every *other* building on the level.
    */
-  _clearBearing(range) {
+  /**
+   * Every bearing with a clear line to the target, best first.
+   *
+   * The four cardinals, then the rest of the circle. Which of them has ground
+   * to stand on is the caller's problem, because the answer depends on how
+   * wide a search the caller is willing to make around it.
+   */
+  _clearBearings(range) {
     const c = this.ctx, b = c.battle, st = b.primary;
     const aim = new THREE.Vector3(st.origin.x, b.originGround + 40, st.origin.z);
     const others = c.structures.filter((s) => s !== st);
-    for (const a of [Math.PI, 0, Math.PI / 2, -Math.PI / 2]) {
+    const out = [];
+    const tries = [Math.PI, 0, Math.PI / 2, -Math.PI / 2];
+    for (let i = 1; i < 24; i++) tries.push((i / 24) * Math.PI * 2);
+    for (const a of tries) {
       const from = new THREE.Vector3(
         st.origin.x + Math.sin(a) * range, b.originGround + 3,
         st.origin.z + Math.cos(a) * range,
       );
-      if (lineOfSight(others, from, aim, 0, 0)) return a;
+      if (lineOfSight(others, from, aim, 0, 0)) out.push(a);
     }
-    return Math.PI;
+    return out.length ? out : [Math.PI];
+  }
+
+  /**
+   * Put `n` guns down somewhere they can see the target from.
+   *
+   * The bearings come back in preference order — the four cardinals first, so
+   * every level that already had an answer keeps it — and each is tried in
+   * turn until one takes a gun. The fall-through is what a headland needs: at
+   * Bennelong Point all four cardinals are harbour, and a test that took the
+   * first of them and stopped reported that there was nowhere to fire from.
+   */
+  spawnSomewhere(id, n, range) {
+    for (const a of this._clearBearings(range)) {
+      const placed = this.spawnAt(id, n, a, range);
+      if (placed > 0) return placed;
+    }
+    return 0;
   }
 
   /** Put `n` guns of one type on a bearing at a given range from the primary. */
@@ -1028,10 +1055,16 @@ export class TestMenu {
         // such a level it brings a battery that can.
         const massive = (c.level.traits || {}).topples === false;
         const placed = massive
-          ? this.spawnAt('m777', 4, this._clearBearing(260), 260)
-          : this.spawnAt('m119', 2, this._clearBearing(220), 220);
+          ? this.spawnSomewhere('m777', 4, 260)
+          : this.spawnSomewhere('m119', 2, 220);
         this.aimAt(0.35);
-        c.fastForward(massive ? 60 : 26);
+        // Long enough that the answer is about arrival rather than about a
+        // borderline damage roll. Twenty-six seconds is eight rounds of M119,
+        // and eight rounds of the lightest howitzer in the game into the side
+        // of the Taj's marble has always come back with two stones or three —
+        // a test that reads "did the shells get there" but passes or fails on
+        // whether the second one happened to bite.
+        c.fastForward(massive ? 60 : 44);
         const gone = sum(c.structures, (s) => s.destroyedCount) - before;
         const fired = b.shotsFired - shots0;
         assert(placed > 0, 'no firing position was available');
@@ -1428,12 +1461,33 @@ export class TestMenu {
         assert(streets, 'there is no street mesh');
         const pos = streets.geometry.attributes.position;
         const deckY = (city.userData.bridge?.deckTop ?? Infinity) - 1.5;
+        // Every crossing in the graph, as a corridor. A surveyed map has as
+        // many as the place has — Sydney's harbour carries three — and they
+        // are at three different heights, so one recorded deck level cannot
+        // exempt them. Where the road is allowed over the water is a question
+        // about *which road it is*, so it is answered geometrically.
+        const spans = [];
+        for (const e of (city.userData.network?.edges || [])) {
+          if (!e.bridge && !e.bank) continue;
+          for (let k = 0; k < e.pts.length - 1; k++) {
+            spans.push({ a: e.pts[k], b: e.pts[k + 1], r: halfWidth(e.cls) + 4 });
+          }
+        }
+        const onSpan = (x, z) => spans.some((sp) => {
+          const dx = sp.b.x - sp.a.x, dz = sp.b.z - sp.a.z;
+          const l2 = dx * dx + dz * dz;
+          let t = l2 > 0 ? ((x - sp.a.x) * dx + (z - sp.a.z) * dz) / l2 : 0;
+          t = Math.max(0, Math.min(1, t));
+          return Math.hypot(x - (sp.a.x + dx * t), z - (sp.a.z + dz * t)) < sp.r;
+        });
         let wet = 0, sampled = 0;
         for (let i = 0; i < pos.count; i += 97) {
           const x = pos.getX(i), z = pos.getZ(i);
           sampled++;
           if (pos.getY(i) > deckY) continue;            // up on the bridge
-          if (this.ctx.terrain.isWater(x, z)) wet++;
+          if (!this.ctx.terrain.isWater(x, z)) continue;
+          if (onSpan(x, z)) continue;                   // and this is a bridge
+          wet++;
         }
         assert(wet === 0,
           `${wet} of ${sampled} sampled road vertices are in the river`);
@@ -1466,6 +1520,14 @@ export class TestMenu {
         // A level with no river has no river wall, and no railed precinct or
         // statuary either where the monument stands in open desert.
         if (traits.river === false) { delete want.wall; delete want.railing; delete want.statues; }
+        // Programmes go in the blocks that were left open, so what is being
+        // asked is that an open block is *for* something — not that there are
+        // four of them. A surveyed plan has the blocks its streets enclose and
+        // the real city has built on most of them: Chichen Itza's jungle has
+        // two, and a demand for four market squares there is a demand for a
+        // town that is not there.
+        want.programmes = Math.min(4, d.openBig || 0);
+        if (!want.programmes) delete want.programmes;
         const thin = Object.entries(want).filter(([k, n]) => !(d[k] >= n));
         assert(thin.length === 0,
           `the map is missing: ${thin.map(([k, n]) => `${k} ${d[k] ?? 0}/${n}`).join(', ')}`);
@@ -1583,7 +1645,24 @@ export class TestMenu {
         const net = city?.userData?.network;
         const terrain = this.ctx.terrain;
         assert(net, 'the city was built without a street network');
-        assert(net.edges.length > 150,
+
+        // Two kinds of city, and they do not have the same invariants.
+        //
+        // An invented one has to *earn* the claim in this test's name: its
+        // streets are generated, so a straightness rule, a minimum count and a
+        // no-stubs rule are all real checks on real code. A surveyed one has
+        // no such freedom. Chichen Itza has forty-seven roads because Chichen
+        // Itza has forty-seven roads; Moscow's streets bend because Moscow's
+        // streets bend; and a cul-de-sac in Kirribilli is a cul-de-sac in
+        // Kirribilli. Asserting otherwise would not be testing the game, it
+        // would be testing whether the world had been drawn to our grid.
+        //
+        // What survives is everything about how the city sits on the plan —
+        // nothing in the carriageway, nothing in the river, nothing on the
+        // bridge, every block used — which is where the bugs actually are and
+        // which is checked identically either way.
+        const surveyed = !!net.real;
+        assert(net.edges.length > (surveyed ? 30 : 150),
           `only ${net.edges.length} streets in the whole city`);
 
         // Connected: junctions joined into one town, not a scatter of stubs.
@@ -1604,7 +1683,10 @@ export class TestMenu {
         sizes.sort((a, b) => b - a);
         const linked = net.nodes.filter((n) => n.links.length).length;
         const inTwo = (sizes[0] || 0) + (sizes[1] || 0);
-        assert(inTwo / Math.max(1, linked) > 0.9,
+        // A generated plan is one town on each bank. A real one is however
+        // many the water and the map edge cut it into — Sydney alone has four
+        // shores — so the test is that it is not confetti.
+        assert(inTwo / Math.max(1, linked) > (surveyed ? 0.55 : 0.9),
           `the street network is in ${sizes.length} pieces; the two largest hold `
           + `${inTwo} of ${linked} junctions`);
 
@@ -1613,6 +1695,7 @@ export class TestMenu {
         // roads reads as noise — nothing lines up and nothing points anywhere.
         let bent = 0;
         for (const e of net.edges) {
+          if (surveyed) break;                     // the survey decides, not us
           if (e.bank || e.approach) continue;      // these curve for a reason
           const a = e.pts[0], b = e.pts[e.pts.length - 1];
           const straight = Math.hypot(b.x - a.x, b.z - a.z);
@@ -1626,13 +1709,20 @@ export class TestMenu {
 
         // But the blocks they enclose are all different sizes: a grid at one
         // fixed pitch is the other way to make a city look machine-made.
+        // A surveyed mountain top has no blocks at all, because it has no
+        // streets enclosing anything: the Corcovado's road is a switchback up
+        // one side and there is nothing for it to go round.
         const spans = net.blocks.map((b) => Math.hypot(
           b.poly[1].x - b.poly[0].x, b.poly[1].z - b.poly[0].z));
         spans.sort((a, b) => a - b);
-        const lo = spans[Math.floor(spans.length * 0.1)];
-        const hi = spans[Math.floor(spans.length * 0.9)];
-        assert(hi > lo * 1.3,
-          `every block is the same size: ${lo.toFixed(0)}–${hi.toFixed(0)} m across`);
+        if (spans.length >= 6) {
+          const lo = spans[Math.floor(spans.length * 0.1)];
+          const hi = spans[Math.floor(spans.length * 0.9)];
+          assert(hi > lo * 1.3,
+            `every block is the same size: ${lo.toFixed(0)}–${hi.toFixed(0)} m across`);
+        } else {
+          assert(surveyed, `the generated city cut only ${spans.length} blocks`);
+        }
 
         // And every block is *for* something. Bare ground in the middle of a
         // city reads as a hole in the map.
@@ -1643,7 +1733,12 @@ export class TestMenu {
 
         // Nothing standing in the road, on any part of its footprint.
         const plots = city.userData.plots || [];
-        assert(plots.length > 300, `only ${plots.length} buildings in the city`);
+        // A generated city fills the map because it was told to. A surveyed
+        // one has as many buildings as the place has: El Castillo stands in
+        // jungle and the Corcovado is a mountain top, and demanding three
+        // hundred buildings of either is demanding a town that is not there.
+        assert(plots.length > (surveyed ? 60 : 300),
+          `only ${plots.length} buildings in the city`);
         let inRoad = 0, worstRoad = 0, wet2 = 0, onBridge = 0;
         const bridge = city.userData.bridge;
         for (const p of plots) {
@@ -1651,7 +1746,15 @@ export class TestMenu {
           for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0]]) {
             const x = p.x + (u * p.w / 2) * ca + (v * p.d / 2) * sa;
             const z = p.z - (u * p.w / 2) * sa + (v * p.d / 2) * ca;
-            const clear = Math.min(net.roadClearance(x, z), net.nodeClearance(x, z));
+            // The reservation on an invented plan is ours, so a building may
+            // not touch any of it. On a surveyed one the centreline is the
+            // survey's and the pavement either side of it is a nominal width
+            // we chose, while the building is where the building is — a
+            // terrace fronts the pavement, and the bounding box round an
+            // L-shaped one takes in the yard next door. What may not happen,
+            // either way, is a building standing in the carriageway.
+            const allow = surveyed ? 4.6 : 0;
+            const clear = Math.min(net.roadClearance(x, z), net.nodeClearance(x, z)) + allow;
             if (clear < 0) { inRoad++; worstRoad = Math.max(worstRoad, -clear); break; }
             if (terrain.isWater(x, z)
               || terrain.heightAt(x, z) < terrain.waterLevel + 0.6) { wet2++; break; }
@@ -1680,10 +1783,25 @@ export class TestMenu {
         // "too many disjointed streets" was. The exceptions are the two roads
         // that are supposed to end where they end: the bridge approach, at the
         // abutment, and the embankment, at the edge of the map.
+        // A real plan has real cul-de-sacs, and what is not allowed is a town
+        // made mostly of them. But most of a surveyed map's loose ends are not
+        // the survey's at all: a street is cut where it crosses the edge of the
+        // playfield and again where it would run through the monument's own
+        // ground, and both of those ends are ours. They are not evidence of
+        // anything, so they are not counted.
+        const edgeOfMap = terrain.span - 30;
+        const held = (c.level.contextExclude || 66) * 1.4;
+        const madeByUs = (k) => {
+          const n = net.nodes[k];
+          return Math.abs(n.x) > edgeOfMap || Math.abs(n.z) > edgeOfMap
+            || Math.hypot(n.x, n.z) < held;
+        };
+        const loose = (e, k) => net.nodes[k].links.length < 2 && !(surveyed && madeByUs(k));
         const stubs = net.edges.filter((e) => !e.approach && !e.bank
-          && (net.nodes[e.a].links.length < 2 || net.nodes[e.b].links.length < 2));
-        assert(stubs.length === 0,
-          `${stubs.length} streets are dead-end stubs that lead nowhere`);
+          && (loose(e, e.a) || loose(e, e.b)));
+        assert(surveyed ? stubs.length < net.edges.length * 0.30 : stubs.length === 0,
+          `${stubs.length} of ${net.edges.length} streets are dead-end stubs `
+          + 'that lead nowhere');
 
         // No junction in the middle of a street.
         //
@@ -1708,6 +1826,9 @@ export class TestMenu {
           // Same class, and the second arm carries straight on from the first.
           if (n.links[0].edge.cls !== n.links[1].edge.cls) continue;
           if (n.links[0].edge.approach || n.links[1].edge.approach) continue;
+          // The dissolve pass will not merge a crossing into the street it
+          // meets, so neither does this.
+          if (n.links[0].edge.bank || n.links[1].edge.bank) continue;
           if (-(a.x * b2.x + a.z * b2.z) > 0.998) through++;
         }
         assert(through === 0,
@@ -1779,7 +1900,12 @@ export class TestMenu {
             }
           }
         }
-        assert(folds === 0,
+        // On an invented plan this is a bug in the layout and there should be
+        // none of them. On a surveyed one it is a slip road, a service lane
+        // beside its own main road, or a dual carriageway's two halves meeting
+        // at one junction — all of which are really there — so the rule
+        // becomes that they are the exception rather than the plan.
+        assert(surveyed ? folds < net.nodes.length * 0.12 : folds === 0,
           `${folds} junctions have two streets leaving on the same bearing, the `
           + `worst ${(Math.acos(Math.min(1, tightest)) * 180 / Math.PI).toFixed(0)}° apart`);
 
@@ -1815,18 +1941,52 @@ export class TestMenu {
           if (o > quarter / 2) o -= quarter;
           return o;
         };
-        // The grid's own bearing, taken from the buildings themselves rather
-        // than from a constant, so this holds on any level.
-        const bearings = plots.map((p) => wrap(p.yaw || 0)).sort((a, b) => a - b);
-        const ref = bearings[bearings.length >> 1] || 0;
         let skew = 0, worstSkew = 0;
-        for (const p of plots) {
-          const off = Math.abs(wrap((p.yaw || 0) - ref));
-          if (off > 0.035) { skew++; worstSkew = Math.max(worstSkew, off); }
+        if (surveyed) {
+          // A real city has no single grid, and that is the point of it: the
+          // Marais and the Champ de Mars are forty degrees apart and both are
+          // correct, so "everything shares one bearing" is the wrong question.
+          // A surveyed building's bearing comes from its own outline, which
+          // means the thing that can actually go wrong is systematic — a
+          // convention mixed up, a quarter turn lost, a rotation applied twice
+          // — and that shows as the whole city sitting askew to its own
+          // streets. So the measure is the *typical* building against the
+          // nearest carriageway, which a quarter of huts standing off a track
+          // in the Yucatan cannot drag out of true.
+          const offs = [];
+          for (const p of plots) {
+            let best = Infinity, bearing = 0;
+            for (const sg of net.segs) {
+              const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
+              const d = Math.hypot(mx - p.x, mz - p.z);
+              if (d < best) {
+                best = d;
+                bearing = Math.atan2(sg.b.x - sg.a.x, sg.b.z - sg.a.z);
+              }
+            }
+            if (best > 90) continue;               // nothing to be square to
+            const off = Math.abs(wrap((p.yaw || 0) - bearing));
+            offs.push(off);
+            if (off > 0.22) { skew++; worstSkew = Math.max(worstSkew, off); }
+          }
+          offs.sort((a, b) => a - b);
+          const median = offs.length ? offs[offs.length >> 1] : 0;
+          assert(offs.length < 12 || median < 0.26,
+            `the typical building sits ${(median * 180 / Math.PI).toFixed(0)}° `
+            + `off the street it fronts (${skew} of ${offs.length} are askew)`);
+        } else {
+          // The grid's own bearing, taken from the buildings themselves rather
+          // than from a constant, so this holds on any level.
+          const bearings = plots.map((p) => wrap(p.yaw || 0)).sort((a, b) => a - b);
+          const ref = bearings[bearings.length >> 1] || 0;
+          for (const p of plots) {
+            const off = Math.abs(wrap((p.yaw || 0) - ref));
+            if (off > 0.035) { skew++; worstSkew = Math.max(worstSkew, off); }
+          }
+          assert(skew / Math.max(1, plots.length) < 0.06,
+            `${skew} of ${plots.length} buildings are out of line with the street `
+            + `grid, the worst by ${(worstSkew * 180 / Math.PI).toFixed(0)}°`);
         }
-        assert(skew / Math.max(1, plots.length) < 0.06,
-          `${skew} of ${plots.length} buildings are out of line with the street `
-          + `grid, the worst by ${(worstSkew * 180 / Math.PI).toFixed(0)}°`);
 
         // And none of them is off the ground. A box stood on the height of its
         // own centre hangs off the downhill end of any slope.
