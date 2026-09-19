@@ -167,15 +167,19 @@ export const LEVELS = {
     // Limestone shelf under a jungle canopy. The default London ground — brick
     // dust and parkland — reads as the Home Counties with a pyramid in them,
     // and the Yucatán is pale rock with very dark green growing out of it.
+    // Forest floor, not pale limestone. `urban` is the general ground colour
+    // and on a map that is jungle with a clearing in it the general ground is
+    // jungle — the green belongs here and not in the park channel of the mask,
+    // which is what tells the city generator a block is a park.
     palette: {
-      urban: new THREE.Color(0xbdb096),
-      urbanAlt: new THREE.Color(0xa79a80),
+      urban: new THREE.Color(0x5d6b3c),
+      urbanAlt: new THREE.Color(0x4c5931),
       park: new THREE.Color(0x3f5b30),
       parkAlt: new THREE.Color(0x4e6b34),
-      road: new THREE.Color(0x6a6152),
+      road: new THREE.Color(0x77705c),
       bank: new THREE.Color(0xc8bb9c),
       bed: new THREE.Color(0x55603f),
-      dry: new THREE.Color(0xd6cbb0),
+      dry: new THREE.Color(0x7a814d),
     },
     // The Great Plaza is open ground for two hundred metres in every
     // direction, and the Temple of the Warriors stands at the far side of it.
@@ -206,7 +210,11 @@ export const LEVELS = {
     // Forest to the horizon in every direction. There are no fields in the
     // Yucatan interior and no airfield: there is the site, the road, a village
     // on one side of it, and jungle.
-    setting: { hinterland: 'jungle', canopy: 2.5, canopyFrom: 235 },
+    setting: {
+      hinterland: 'jungle', canopy: 2.5, canopyFrom: 235,
+      // Humid, and green with it: the Yucatan's horizon is forest haze.
+      haze: { colour: 0xc6cbb0, density: 0.00031 },
+    },
     traits: { windows: false, river: false, topples: false },
     // A twentieth of Khufu, so nothing like Giza's factor — but still a solid
     // mass rather than a hollow tower.
@@ -264,6 +272,8 @@ export const LEVELS = {
       ground: 'lawn',
       ornament: 'none',
     },
+    // Tuscan summer: warm, dusty, and hazy over the plain.
+    setting: { haze: { colour: 0xd9cfb4, density: 0.00027 } },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
     brief: 'It is bent, not tilted. The overhang at the top is the part they corrected.',
@@ -320,6 +330,8 @@ export const LEVELS = {
     setting: {
       hinterland: 'harbour',
       downtown: { x: -470, z: 150, radius: 440, peak: 235 },
+      // Sea air: cool, and clear enough to see the far shore.
+      haze: { colour: 0xc3d0d8, density: 0.00019 },
     },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
@@ -369,6 +381,8 @@ export const LEVELS = {
       ground: 'paving',
       ornament: 'statues',
     },
+    // Cold northern light, and more of it than a river valley gets.
+    setting: { haze: { colour: 0xccd2d6, density: 0.00023 } },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
     brief: 'Nine churches that do not touch. The only thing they share is underneath them.',
@@ -383,15 +397,17 @@ export const LEVELS = {
     subtitle: 'Cristo Redentor · Corcovado',
     victory: 'He Put His Arms Down',
     // Tijuca rainforest on granite: almost nothing here is a built colour.
+    // Tijuca. Every square metre of this map that is not rock or road is
+    // rainforest, so the general ground colour is rainforest.
     palette: {
-      urban: new THREE.Color(0xa89b8a),
-      urbanAlt: new THREE.Color(0x8f8272),
+      urban: new THREE.Color(0x4e5c37),
+      urbanAlt: new THREE.Color(0x3f4c2c),
       park: new THREE.Color(0x2f4a24),
       parkAlt: new THREE.Color(0x3a5a29),
       road: new THREE.Color(0x6b655e),
-      bank: new THREE.Color(0x9a9083),
+      bank: new THREE.Color(0x8a8a6a),
       bed: new THREE.Color(0x35452c),
-      dry: new THREE.Color(0xb3a894),
+      dry: new THREE.Color(0x6d7546),
     },
     // Nothing is built on the summit and nothing is going to be. The numbers
     // are large because the summit is: it has to be level far enough out for a
@@ -426,7 +442,12 @@ export const LEVELS = {
     },
     // Tijuca, which is the largest urban rainforest in the world and covers
     // every slope on this map.
-    setting: { hinterland: 'forest', canopy: 2.6, canopyFrom: 92 },
+    setting: {
+      hinterland: 'forest', canopy: 2.6, canopyFrom: 92,
+      // Blue and thin. Seven hundred metres up you are over the haze looking
+      // down through it, not standing in it.
+      haze: { colour: 0xbcc9cf, density: 0.00013 },
+    },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
     brief: 'The arms are the whole silhouette and almost none of the building.',

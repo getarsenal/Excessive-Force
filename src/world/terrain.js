@@ -38,6 +38,7 @@ export class Terrain {
     this.cellSize = (this.span * 2) / (n - 1);
     this._relax();
     this.waterLevel = this._computeWaterLevel();
+    this.openSea = this._computeOpenSea();
     this._repairRiver();
     this.mesh = null;
     this.collider = null;
@@ -293,6 +294,98 @@ export class Terrain {
   }
 
   /**
+   * Is the country beyond the map sea rather than more country?
+   *
+   * Measured at the boundary: a river leaves through a gap in the edge, a
+   * harbour *is* the edge. Sydney is wet across a third of its boundary and
+   * the river machinery drew that as three channels running off into farmland,
+   * which is what the edge of Sydney Harbour is not.
+   */
+  _computeOpenSea() {
+    const n = this.size;
+    let wet = 0, total = 0;
+    for (let i = 0; i < n; i++) {
+      for (const idx of [i, (n - 1) * n + i, i * n, i * n + (n - 1)]) {
+        total++;
+        if (this.mask[idx * 3] > 0.5) wet++;
+      }
+    }
+    return total > 0 && wet / total > 0.25;
+  }
+
+  /**
+   * The height of the ground anywhere, including past the edge of the DEM.
+   *
+   * `heightAt` clamps, which extends the border height outward forever — and
+   * the surround was drawn as one flat frame at a single sample of that
+   * border. On a map with no relief at its edge the two agree and nobody ever
+   * noticed. On the Corcovado they disagree by three hundred metres: the
+   * frame sat at the height of the eastern edge and every tree placed out
+   * there sat at the height of the *nearest* edge, so two thousand of them
+   * hung in the air over the haze with nothing underneath.
+   *
+   * So there is one function for it, the surround is drawn from it, and
+   * anything placed out there stands on it. Past the map the relief keeps
+   * going and then settles toward a distant base — which is what distance
+   * looks like — and where the boundary is under water it stays under water.
+   */
+  surfaceAt(x, z) {
+    const s = this.span;
+    const out = Math.max(Math.abs(x) - s, Math.abs(z) - s);
+    const h = this.heightAt(x, z);
+    if (out <= 0) return h;
+    const t = Math.min(1, out / (s * 1.35));
+    // Not down to one level: two thirds of the way to a distant base, so the
+    // large-scale shape of the map's own edge is still there a long way out.
+    const base = Math.min(h, this.waterLevel + 14);
+    const fall = h + (base - h) * (t * t * (3 - 2 * t)) * 0.68;
+    // And hills, because the alternative is a table.
+    //
+    // Scaled by how much relief the map itself has, so a river city's surround
+    // stays as flat as the city is and a mountain's does not: the Corcovado is
+    // one peak of a range and the country round it was coming out as a desert
+    // pavement running to the fog.
+    if (this._farAmp === undefined) {
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < this.heights.length; i += 7) {
+        const v = this.heights[i];
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      this._farAmp = Math.max(3, Math.min(95, (hi - lo) * 0.11));
+    }
+    const ridge = valueNoise(x * 0.00062 + 11.3, z * 0.00062 - 4.7) * 2 - 1;
+    const grain = valueNoise(x * 0.0021 - 3.1, z * 0.0021 + 8.9) * 2 - 1;
+    const hill = (ridge * 0.72 + grain * 0.28) * this._farAmp;
+    const land = fall + hill * Math.min(1, out / (s * 0.45));
+    if (!this.openSea) return land;
+
+    // And the sea, where the map's boundary is under water.
+    //
+    // How wet the boundary is where this point leaves the map, smoothed along
+    // it: a single sample turns every wet run into a ribbon of sea through
+    // farmland, which is three rivers and not a harbour. Blended rather than
+    // switched, so the shore shelves into the water instead of leaving a
+    // rectangular plate of fields hanging over it. And the further out, the
+    // more of it is water — go far enough from a harbour in any direction and
+    // you are at sea, which is true enough and is the only way the horizon
+    // reads as a coast rather than as a county.
+    const cx = Math.max(-s, Math.min(s, x));
+    const cz = Math.max(-s, Math.min(s, z));
+    const along = Math.abs(x) - s > Math.abs(z) - s ? 'z' : 'x';
+    let wet = 0;
+    for (let k = -3; k <= 3; k++) {
+      const o = k * 95;
+      const px = along === 'x' ? Math.max(-s, Math.min(s, cx + o)) : cx;
+      const pz = along === 'z' ? Math.max(-s, Math.min(s, cz + o)) : cz;
+      if (this._maskWet(px, pz)) wet++;
+    }
+    const open = Math.min(1, out / (s * 2.4));
+    const k2 = THREE.MathUtils.smoothstep(wet / 7 + open * 0.55, 0.36, 0.64);
+    return land + ((this.waterLevel - 9) - land) * k2;
+  }
+
+  /**
    * Mask lookup: water / road / park coverage at world (x, z).
    *
    * Bilinear, not nearest. The mask is one sample every 3.5 m, and taking the
@@ -329,6 +422,11 @@ export class Terrain {
     // carved out to the horizon is water as far as anything that asks is
     // concerned, or the farms and the airfield get built in it.
     if (Math.abs(x) > this.span || Math.abs(z) > this.span) {
+      // Past the map a river is a channel and a harbour is everything. Asking
+      // only about the channel let the outskirts lay farmland, hedges and a
+      // railway embankment across Sydney Harbour, because as far as this
+      // function was concerned the open sea beyond the boundary was dry.
+      if (this.openSea) return this.surfaceAt(x, z) < this.waterLevel - 0.5;
       return this.inRiverTail(x, z, 30);
     }
     return this._maskWet(x, z);
@@ -614,7 +712,14 @@ export class Terrain {
     // everything else — which drew the reach as a bright sandy gash through
     // farmland.
     const chan = new Float32Array(ap.count);
-    {
+    // Every vertex sits on `surfaceAt`, so the surround continues the relief
+    // the map ends on instead of being one flat plate at one sample of it.
+    for (let i = 0; i < ap.count; i++) {
+      ap.setY(i, this.surfaceAt(ap.getX(i), ap.getZ(i)) - edge);
+    }
+    ap.needsUpdate = true;
+    // A harbour has no channel to carve: the whole of it is already water.
+    if (!this.openSea) {
       const tails = this.riverTails();
       const sunk = (this.waterLevel - edge) - 2.6;
       // The apron is ninety thousand vertices and the channel is a few hundred
@@ -665,7 +770,10 @@ export class Terrain {
         // grid is carved four metres deeper than the profile, fading to
         // nothing at the ribbon's outer edge, and the ribbon hides it.
         const under = 4 * (1 - THREE.MathUtils.smoothstep((best - half - 32) / 48, 0, 1));
-        ap.setY(i, sunk * k2 - under);
+        // The lower of the two: the channel cuts into the relief rather than
+        // replacing it, so a tail leaving a map with hills on it still runs
+        // downhill instead of jumping to one height.
+        ap.setY(i, Math.min(ap.getY(i), sunk * k2 - under));
         chan[i] = k2;
       }
       ap.needsUpdate = true;
@@ -682,7 +790,18 @@ export class Terrain {
       const rural = THREE.MathUtils.clamp(
         (Math.max(Math.abs(x), Math.abs(z)) - this.span) / (this.span * 3), 0, 1,
       );
-      at.lerp(at2, THREE.MathUtils.smoothstep(patch, 0.08, 0.28) * 0.62 + rural * 0.38);
+      // How green the country is. Fields and suburbs are half built colour;
+      // rainforest is not built at all, and the Yucatan and the Tijuca were
+      // both coming out the colour of a car park.
+      const wild = (this.hinterland === 'jungle' || this.hinterland === 'forest')
+        ? 0.86 : 0.38;
+      // Clamped. `Color.lerp` extrapolates past its target for an alpha over
+      // one, so the old weights adding to exactly 1.0 were load-bearing and
+      // did not look it: raising the rural share to 0.86 took the far country
+      // to an alpha of 1.48 and extrapolated the green straight through black,
+      // which is what turned the Tijuca into a pale grey plain.
+      at.lerp(at2, Math.min(1, THREE.MathUtils.smoothstep(patch, 0.08, 0.28) * 0.62
+        + rural * wild));
       const n2 = valueNoise(x * 0.055, z * 0.055) * 0.22 + broad * 0.16;
       at.multiplyScalar(0.80 + n2);
       // Down the channel: silt on the shore, riverbed under the water. The
@@ -691,6 +810,12 @@ export class Terrain {
       if (ch > 0) {
         at2.copy(P.bank).lerp(P.bed, THREE.MathUtils.smoothstep(ch, 0.55, 0.95));
         at.lerp(at2, THREE.MathUtils.smoothstep(ch, 0.04, 0.4));
+      }
+      // And the seabed, on a map whose surround is open water. Without this
+      // the harbour beyond the map is farmland with a sheet of water over it,
+      // which shows wherever the sheet is shallow or the sun is low.
+      if (this.openSea && this.surfaceAt(x, z) < this.waterLevel - 1) {
+        at.copy(P.bed);
       }
       return at;
     };
@@ -715,7 +840,7 @@ export class Terrain {
     // over the coarse frame, which is carved deeper underneath it, so the
     // bank you see is this one — a smooth shelf that follows the bends, not
     // the frame's staircase.
-    const ribbon = this._channelRibbon(edge, apronColour);
+    const ribbon = this.openSea ? null : this._channelRibbon(edge, apronColour);
     if (ribbon) ribbon.position.y = edge - 0.4;
 
     this.group = new THREE.Group();

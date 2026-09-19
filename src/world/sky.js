@@ -374,6 +374,40 @@ export function createWater(terrain, sunDirection, quality) {
     }
   }
 
+  // A harbour does not stop where the elevation data does either, and it does
+  // not leave through a gap: it *is* the edge. So on a map whose boundary is
+  // mostly wet, the sheet gets a ring round the whole playfield, out to where
+  // the surround ends — open water to the horizon instead of three rivers
+  // running off into farmland, which is what Sydney had.
+  //
+  // A ring and not a plane: a plane at the waterline over the whole map would
+  // be drawn across the point the Opera House stands on.
+  if (terrain.openSea) {
+    const S = terrain.span, OUT = S * 7;
+    const DIV = 26;
+    const ringAt = (u, r) => {
+      // Walk the square ring of radius r, u in [0, 4).
+      const side = Math.floor(u) % 4, f = u - Math.floor(u);
+      if (side === 0) return [-r + f * 2 * r, -r];
+      if (side === 1) return [r, -r + f * 2 * r];
+      if (side === 2) return [r - f * 2 * r, r];
+      return [-r, r - f * 2 * r];
+    };
+    const base = pos.length / 3;
+    for (let k = 0; k <= DIV * 4; k++) {
+      const u = (k % (DIV * 4)) / DIV;
+      for (const r of [S, OUT]) {
+        const [x, z] = ringAt(u, r);
+        pos.push(x, level, z);
+        depth.push(r > S ? 40 : Math.max(0, level - terrain.heightAt(x, z)));
+      }
+    }
+    for (let k = 0; k < DIV * 4; k++) {
+      const a = base + k * 2, b = a + 1, c = a + 2, d = a + 3;
+      index.push(a, c, d, a, d, b);
+    }
+  }
+
   // The river does not stop where the elevation data does.
   //
   // Everything above is built from the DEM's wet mask, so the sheet ends in two
@@ -388,7 +422,9 @@ export function createWater(terrain, sunDirection, quality) {
   // instead of ending on a hard line.
   {
     const COLS = [-1, -0.55, 0, 0.55, 1];
-    for (const tail of terrain.riverTails()) {
+    // A harbour has no tails: the ring above already covers everything out
+    // there, and laying strips down it as well drew three rivers across it.
+    for (const tail of terrain.openSea ? [] : terrain.riverTails()) {
       if (tail.length < 2) continue;
       // The tail's first point is inside the playfield (see `riverTails`), so
       // the strip overlaps the playfield's own sheet over the last stretch

@@ -140,6 +140,22 @@ async function boot() {
     terrain.levelPad((g.x0 + g.x1) / 2, (g.z0 + g.z1) / 2, r, 40, { park: green });
   }
 
+  // The surround needs to know what country it is in before it is drawn.
+  terrain.hinterland = level.setting?.hinterland || 'fields';
+
+  // The air, which is not the same everywhere either.
+  //
+  // One warm sand-coloured haze at one density was set for a London river
+  // valley and then used on a rainforest and a harbour: it is most of why the
+  // Tijuca read as a desert pavement, because at five kilometres four fifths
+  // of what you see out there is the fog's own colour and not the ground's.
+  // And a mountain is above most of the murk — the whole point of standing on
+  // one is that you can see a long way.
+  const haze = level.setting?.haze;
+  if (haze) {
+    if (haze.colour !== undefined) engine.scene.fog.color.setHex(haze.colour);
+    if (haze.density !== undefined) engine.scene.fog.density = haze.density;
+  }
   engine.scene.add(terrain.buildMesh());
   // The ground, kept by handle: anything resting on the terrain is settled for
   // good, and the freezing bookkeeping can stop worrying about it.

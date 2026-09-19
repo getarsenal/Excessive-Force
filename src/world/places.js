@@ -32,7 +32,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
   const net = opts.net;
   const yaw = opts.yaw || 0;
   const counts = { railing: 0, piers: 0, statues: 0, walks: 0, beds: 0 };
-  const gy = (x, z) => terrain.heightAt(x, z);
+  const gy = (x, z) => terrain.surfaceAt(x, z);
   const cu = Math.cos(yaw), su = Math.sin(yaw);
   // Grid space: the axes the plan is laid out on, so the enclosure is square to
   // the streets round it rather than square to the map.
@@ -337,7 +337,10 @@ export function buildOutskirts(props, terrain, rng, opts) {
   const patched = farmed || kind === 'harbour';
   const counts = { fields: 0, hedges: 0, barns: 0, runway: 0, hangars: 0,
     woods: 0, reservoir: 0, masts: 0, canopy: 0 };
-  const gy = (x, z) => terrain.heightAt(x, z);
+  // The surface out here, not the DEM clamped outward: past the map those two
+  // are the same number only on a map with no relief at its edge. See
+  // `Terrain.surfaceAt`.
+  const gy = (x, z) => terrain.surfaceAt(x, z);
 
   /** Is this patch dry, off the playfield, and level enough to build on? */
   //
@@ -572,7 +575,7 @@ export function fillOpenBlock(props, terrain, rng, kind, frame) {
   const { cx, cz, w, d, yaw } = frame;
   const cu = Math.cos(yaw), su = Math.sin(yaw);
   const put = (u, v) => ({ x: cx + u * cu + v * su, z: cz - u * su + v * cu });
-  const gy = (x, z) => terrain.heightAt(x, z);
+  const gy = (x, z) => terrain.surfaceAt(x, z);
   const n = {};
   const bump = (k) => { n[k] = (n[k] || 0) + 1; };
 
@@ -778,7 +781,7 @@ export function buildHorizon(props, terrain, rng) {
     const r = span * (1.9 + rng() * 1.5);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (terrain.isWater(x, z)) continue;
-    const g = terrain.heightAt(x, z);
+    const g = terrain.surfaceAt(x, z);
     if (!isFinite(g)) continue;
     // Clustered: a few districts of tall ones rather than an even sprinkle,
     // which is what a real skyline looks like from twenty kilometres.
@@ -840,7 +843,7 @@ export function buildRailway(props, terrain, rng, opts) {
   let deck = -Infinity;
   for (let t = -span; t <= span; t += 40) {
     const p = at(t);
-    deck = Math.max(deck, terrain.heightAt(p.x, p.z));
+    deck = Math.max(deck, terrain.surfaceAt(p.x, p.z));
   }
   deck += 5.5;
   if (!isFinite(deck)) return counts;
@@ -849,7 +852,7 @@ export function buildRailway(props, terrain, rng, opts) {
     const p = at(t);
     if (terrain.isWater(p.x, p.z)) continue;
     if (opts.net && opts.net.roadClearance(p.x, p.z) < 8) continue;
-    const g = terrain.heightAt(p.x, p.z);
+    const g = terrain.surfaceAt(p.x, p.z);
     // Ballast and two rails.
     props.add('dark', box(9.4, 1.0, 12.4, p.x, deck - 0.5, p.z, yaw), 0x615a50,
       0.88 + rng() * 0.2);
@@ -877,7 +880,7 @@ export function buildRailway(props, terrain, rng, opts) {
   for (let k = 0; k < 24 && !sp; k++) {
     const q = at((rng() - 0.5) * span * 1.6);
     if (terrain.isWater(q.x, q.z)) continue;
-    if (terrain.heightAt(q.x, q.z) < terrain.waterLevel + 1.5) continue;
+    if (terrain.surfaceAt(q.x, q.z) < terrain.waterLevel + 1.5) continue;
     sp = q;
   }
   if (sp) {

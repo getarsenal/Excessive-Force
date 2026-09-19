@@ -553,6 +553,11 @@ def bake(level_id: str):
         d = np.hypot(np.broadcast_to(gx, (size, size)) - ox,
                      np.broadcast_to(gy, (size, size)) - oy)
         mask[:, :, 2] = np.maximum(mask[:, :, 2], np.clip(1.0 - d / r, 0.0, 1.0))
+    # (A green floor under the whole map belongs in the level's palette and not
+    # here: the park channel is what tells the city generator a block is a
+    # park, so painting it everywhere is not "this ground is green", it is
+    # "this town is entirely parkland", and Chichen Itza came back with no
+    # buildings in it at all.)
     mask[:, :, 2] *= (1.0 - mask[:, :, 0])
 
     hmin, hmax = float(height.min()), float(height.max())
