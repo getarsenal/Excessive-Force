@@ -579,7 +579,8 @@ export function dissolveThroughNodes(nodes, edges, opts = {}) {
       //
       // A bend of up to thirty-five degrees is a bend in a street. Past that it
       // is a corner, and a corner really is a junction with two arms.
-      const limit = surveyed ? 0.82 : (ea.bank ? 0.86 : 0.998);
+      const limit = opts.limit !== undefined ? opts.limit
+        : surveyed ? 0.82 : (ea.bank ? 0.86 : 0.998);
       if (straight < limit) continue;
 
       // Orient both so `ea` ends at n and `eb` leaves it.
@@ -890,7 +891,15 @@ export function padRadius(node) {
   // a road came to narrow to a wedge and open out again. The dissolve pass
   // removes most of them; what is left is a corner, and a corner is drawn by
   // letting the two ribbons overlap round the inside of the bend.
-  if (node.links.length < 3) return 0;
+  if (node.links.length < 2) return 0;
+  if (node.links.length === 2) {
+    // A corner sharp enough that the kerbs do cross is paved like a junction:
+    // two ribbons overlapping round a sixty-degree bend leave a notch in the
+    // outside kerb, which is the ragged pavement at the foot of the bridge.
+    // Gentler than thirty degrees and it is a bend in the road, left alone.
+    const a = linkDir(node, node.links[0]), b = linkDir(node, node.links[1]);
+    if (-(a.x * b.x + a.z * b.z) > 0.866) return 0;
+  }
   let r = 6;
   for (const l of node.links) r = Math.max(r, halfWidth(l.edge.cls));
   return r;
@@ -1172,9 +1181,8 @@ export function buildStreetSurface(net, terrain, quality) {
   //     by bearing from the node, clamped in radius, and stripped of anything
   //     that doubles back. A fan of it is then always a simple polygon.
   for (const n of net.nodes) {
-    // Three arms or more, or there is nothing here to pave: with two the
-    // ribbons run through and meet each other.
-    if (n.links.length < 3) continue;
+    // Nothing to pave where the road simply carries on; `padRadius` says so.
+    if (padRadius(n) <= 0) continue;
     const y = n.y + LIFT;
     // Star-shaped around the node, so a fan from the centre triangulates it.
     fan(junctionRing(n, (a) => a.full), n, y, PAVE, vert, dry);
@@ -1530,7 +1538,7 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
       const dir = arm.dir;
       let clash = false;
       for (const d of done) {
-        if (d.x * dir.x + d.z * dir.z > 0.82) { clash = true; break; }   // within ~35°
+        if (d.x * dir.x + d.z * dir.z > 0.64) { clash = true; break; }   // within ~50°
       }
       if (clash) continue;
       done.push(dir);

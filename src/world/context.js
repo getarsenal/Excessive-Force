@@ -994,9 +994,15 @@ export function buildContext(terrain, quality, opts = {}) {
   // crossing and a centre line are two of the few things that read as a city
   // from directly above, and they cost a handful of flat quads.
   Object.assign(counts, addStreetMarkings(props, net, terrain, rng, dense));
+  // Square to the building, not to the street plan. An invented grid has one
+  // angle and the landmark was placed on it; a surveyed city has no single
+  // angle, `measureYaw` picks the commonest, and an enclosure turned to that
+  // round a palace built on the map's own axes is a fence at eleven degrees to
+  // the wall it stands in front of — with every tree, bed and statue at eleven
+  // degrees with it.
   Object.assign(counts, buildPrecinct(props, terrain, rng, {
     precinct: opts.precinct, radius: EXCLUDE - 4, net,
-    landmarks: opts.landmarks || [], yaw: YAW,
+    landmarks: opts.landmarks || [], yaw: realNet ? 0 : YAW,
   }));
   // Forest inside the playfield as well as beyond it.
   //
@@ -1073,7 +1079,13 @@ export function buildContext(terrain, quality, opts = {}) {
   counts.canopy = (counts.canopy || 0) + nearCanopy;
   Object.assign(counts, buildHorizon(props, terrain, rng,
     surround ? { beyond: 2.4 } : null));
-  Object.assign(counts, buildRailway(props, terrain, rng, { yaw: YAW, net }));
+  // An invented railway for an invented town. A surveyed city has the
+  // railways it has, and this one drew a viaduct across Parliament Square and
+  // past the foot of the clock tower — the brown line in every screenshot of
+  // the precinct, crossing real streets at whatever angle it happened to make.
+  if (!realNet) {
+    Object.assign(counts, buildRailway(props, terrain, rng, { yaw: YAW, net }));
+  }
   // Whatever each open block is for, laid out in the block's own frame.
   // `openBig` is the number of open blocks with room for a programme in them,
   // which is what "every open block is for something" has to be measured

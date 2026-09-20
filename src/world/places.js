@@ -224,49 +224,41 @@ export function buildPrecinct(props, terrain, rng, opts) {
         walk(a.x + dx * t, a.z + dz * t, len / n2, ang);
       }
     }
-    // From each gate, straight in to the building's foot.
+    // From the middle of each side, straight in to the building.
+    //
+    // Not from the gates. A gate is wherever the street plan happens to put a
+    // junction, and a walk from each of them to the centre is a fan of lines
+    // at whatever angles the streets made — which on Parliament Square was
+    // four pale scratches across the lawn, none of them square to anything.
+    // A square's walks are on its axes.
     const cx = (u0 + u1) / 2, cz = (v0 + v1) / 2;
-    const centre = toWorld(cx, cz);
-    const seen = [];
-    for (const gt of gates) {
-      if (seen.length >= 4) break;
-      if (seen.some((s) => Math.hypot(s.x - gt.x, s.z - gt.z) < 70)) continue;
-      seen.push(gt);
-      const dx = centre.x - gt.x, dz = centre.z - gt.z;
-      const len = Math.hypot(dx, dz);
-      if (len < 1) continue;
-      const ux = dx / len, uz = dz / len;
-      const ang = Math.atan2(ux, uz);
-      for (let t = 3; t < len; t += 5) {
-        const x = gt.x + ux * t, z = gt.z + uz * t;
-        if (!inside(x, z)) continue;
-        if (onLandmark(x, z)) break;
+    const axial = [
+      { u: cx, v: v0 + IN, du: 0, dv: 1 }, { u: cx, v: v1 - IN, du: 0, dv: -1 },
+      { u: u0 + IN, v: cz, du: 1, dv: 0 }, { u: u1 - IN, v: cz, du: -1, dv: 0 },
+    ];
+    for (const ax of axial) {
+      const start = toWorld(ax.u, ax.v);
+      const dir = toWorld(ax.du, ax.dv);
+      const ang = Math.atan2(dir.x, dir.z);
+      for (let t = 3; t < 600; t += 5) {
+        const x = start.x + dir.x * t, z = start.z + dir.z * t;
+        if (!inside(x, z) || onLandmark(x, z)) break;
         walk(x, z, 5, ang);
       }
     }
-    // Beds: a handful, round, dark earth with planting, and never on a walk.
-    for (let k = 0, tries = 0; k < 6 && tries < 40; tries++) {
-      const u = u0 + IN + 10 + rng() * (u1 - u0 - 2 * IN - 20);
-      const v = v0 + IN + 10 + rng() * (v1 - v0 - 2 * IN - 20);
+    // Beds: one in each corner of the perimeter walk, the same in every corner.
+    for (const [su, sv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const u = su < 0 ? u0 + IN + 11 : u1 - IN - 11;
+      const v = sv < 0 ? v0 + IN + 11 : v1 - IN - 11;
       const q = toWorld(u, v);
-      if (!clear(q.x, q.z)) continue;
-      const dg = centre.x - q.x, dgz = centre.z - q.z;
-      const onCross = seen.some((gt) => {
-        const ex = centre.x - gt.x, ez = centre.z - gt.z, el = Math.hypot(ex, ez);
-        const s = ((q.x - gt.x) * ex + (q.z - gt.z) * ez) / (el * el);
-        if (s < 0 || s > 1) return false;
-        const px = gt.x + ex * s, pz = gt.z + ez * s;
-        return Math.hypot(q.x - px, q.z - pz) < 6;
-      });
-      if (onCross || Math.hypot(dg, dgz) < 12) continue;
+      if (!clear(q.x, q.z) || !inside(q.x, q.z)) continue;
       const g = gy(q.x, q.z);
-      const r = 2.6 + rng() * 1.4;
+      const r = 3.2;
       props.add('stone', cyl(r + 0.4, r + 0.4, 0.3, 10, q.x, g + 0.2, q.z), 0xb9b09a, 0.95);
       props.add('dark', cyl(r, r, 0.4, 10, q.x, g + 0.3, q.z), 0x4b3627, 1);
       props.add('foliage', cyl(r * 0.55, r * 0.9, 0.9, 8, q.x, g + 0.85, q.z),
-        [0x7a3a5a, 0xa8474a, 0xc9a23a, 0x4e7a3a][Math.floor(rng() * 4)], 0.9 + rng() * 0.2);
+        0xa8474a, 0.9 + rng() * 0.2);
       counts.beds++;
-      k++;
     }
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length];
@@ -294,15 +286,36 @@ export function buildPrecinct(props, terrain, rng, opts) {
 
   // ── Ornament. A square with nothing to look at is a lawn with a fence round
   // it, and a statue on a plinth is the cheapest possible full stop.
-  const ornaments = spec.ornament === 'none' ? 0
-    : spec.ornament === 'pavilions' ? 4 : 8;
+  //
+  // At the head of each axial walk, one either side of it, so the eight of
+  // them mirror across both axes of the square. They used to be dropped at
+  // random inside the fence, and eight figures at random are eight defences
+  // at odd angles as far as a player looking down on them can tell.
+  const ornaments = spec.ornament === 'none' ? 0 : spec.ornament === 'pavilions' ? 4 : 8;
+  const spots = [];
+  if (spec.ground !== 'charbagh' && spec.ground !== 'sand') {
+    const cx2 = (u0 + u1) / 2, cz2 = (v0 + v1) / 2;
+    const IN2 = 14;
+    for (const [du, dv] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+      const u = cx2 + du * ((u1 - u0) / 2 - IN2), v = cz2 + dv * ((v1 - v0) / 2 - IN2);
+      // Flank the walk: sideways is the axis the walk does not run on.
+      const fu = dv !== 0 ? 1 : 0, fv = du !== 0 ? 1 : 0;
+      spots.push(toWorld(u + fu * 7, v + fv * 7), toWorld(u - fu * 7, v - fv * 7));
+    }
+  }
   for (let k = 0; k < ornaments; k++) {
     let placed = false;
     for (let tries = 0; tries < 20 && !placed; tries++) {
-      const u = u0 + 14 + rng() * (u1 - u0 - 28);
-      const v = v0 + 14 + rng() * (v1 - v0 - 28);
-      const q = toWorld(u, v);
-      if (!clear(q.x, q.z)) continue;
+      let q;
+      if (spots.length) {
+        q = spots.shift();
+        if (!q) break;
+      } else {
+        const u = u0 + 14 + rng() * (u1 - u0 - 28);
+        const v = v0 + 14 + rng() * (v1 - v0 - 28);
+        q = toWorld(u, v);
+      }
+      if (!clear(q.x, q.z) || !inside(q.x, q.z)) continue;
       const x = q.x, z = q.z, g = gy(x, z);
       if (spec.ornament === 'pavilions') {
         for (let c = 0; c < 8; c++) {
@@ -318,7 +331,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
         props.add('stone', box(2.0, 3.2, 2.0, x, g + 2.15, z, yaw), 0xa9a18c,
           0.92 + rng() * 0.12);
         props.add('stone', cyl(0.42, 0.58, 2.6, 8, x, g + 5.05, z), 0x9aa0a4, 1);
-        props.add('stone', box(1.5, 0.4, 0.9, x, g + 5.9, z, yaw + 0.3), 0x9aa0a4, 1);
+        props.add('stone', box(1.5, 0.4, 0.9, x, g + 5.9, z, yaw), 0x9aa0a4, 1);
       }
       counts.statues++;
       placed = true;

@@ -1534,6 +1534,8 @@ export class TestMenu {
         // A level with no river has no river wall, and no railed precinct or
         // statuary either where the monument stands in open desert.
         if (traits.river === false) { delete want.wall; delete want.railing; delete want.statues; }
+        // A surveyed city has the railways it has, and no invented one.
+        if (c.cityGroup?.userData?.network?.real) delete want.track;
         // Programmes go in the blocks that were left open, so what is being
         // asked is that an open block is *for* something — not that there are
         // four of them. A surveyed plan has the blocks its streets enclose and
@@ -1881,9 +1883,16 @@ export class TestMenu {
           const d = Math.hypot(dx, dz) || 1;
           return { x: dx / d, z: dz / d };
         };
+        // A two-arm node that carries straight on, or nearly so. A real corner
+        // — sharper than thirty degrees — is paved on purpose, because two
+        // ribbons overlapping round it leave a notch in the outside kerb; the
+        // wedge only ever came from paving between two arms whose kerbs are
+        // parallel and have no crossing.
         let through = 0;
         for (const n of net.nodes) {
           if (n.links.length !== 2) continue;
+          const a = dirAt(n, n.links[0]), b = dirAt(n, n.links[1]);
+          if (-(a.x * b.x + a.z * b.z) <= 0.866) continue;
           if (padRadius(n) > 0) through++;
         }
         assert(through === 0,

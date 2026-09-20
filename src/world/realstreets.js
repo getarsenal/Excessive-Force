@@ -175,22 +175,46 @@ export function realNetwork(data, terrain, opts = {}) {
   // One junction where the survey has a cluster of them, one road where it
   // has two carriageways. Before the bridges, because a bridge that lands on
   // a cluster should land on the junction the cluster becomes.
-  const welded = weldJunctions(nodes, edges);
-  dedupeEdges(nodes, edges, terrain);
+  // Twin carriageways whose junctions do not line up: put every junction of
+  // one onto the other, and the two become the same road. Welding again after
+  // each pass, because a snapped junction has moved.
+  let welded = 0, snapped = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    welded += weldJunctions(nodes, edges);
+    dedupeEdges(nodes, edges, terrain);
+    const n = snapNodesToRoads(nodes, edges, terrain);
+    snapped += n;
+    dedupeEdges(nodes, edges, terrain);
+    if (!n && pass > 0) break;
+  }
   landBridges(edges, nodes, terrain);
+  // Whole roads before loose ends. A surveyed road arrives in pieces of a few
+  // dozen metres, and a dead-end rule applied to pieces eats a long road one
+  // bite at a time from its open end; applied to the road it has become, it
+  // takes the stub and leaves the street. And loose ends before the ramps, so
+  // a stub about to go does not get an abutment built under it on the way.
+  dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
+  dedupeEdges(nodes, edges, terrain);
+  const ends = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
   const bridges = [];
   layDecks(edges, nodes, terrain, bridges);
-  dissolveThroughNodes(nodes, edges, { surveyed: true });
-  // Twin carriageways whose junctions did not line up become duplicates only
-  // once the dissolve has run the pieces together, so once more.
+  // Every bend that is not a junction is a bend in one road, whatever its
+  // angle: a corner is drawn by rounding the road, not by paving a junction
+  // with two arms.
+  dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
+  const more = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
+  ends.joined += more.joined; ends.pruned += more.pruned;
+  dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
+  dedupeEdges(nodes, edges, terrain);
+  smoothRoads(edges, terrain);
 
   const net = {
     nodes, edges, blocks, bridges,
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, bridges: bridges.length },
+      welded, snapped, ...ends, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -222,15 +246,19 @@ const RANK = { avenue: 3, street: 2, mews: 1 };
 function weldJunctions(nodes, edges) {
   const live = [];
   for (let i = 0; i < nodes.length; i++) if (nodes[i].links.length) live.push(i);
+  // Each junction's half-width: the widest road at it. Two junctions weld when
+  // they are closer than the sum of their half-widths, less a fifth — which is
+  // to say when their paving overlaps. Two avenues: eighteen metres.
   const reach = new Map();
   for (const i of live) {
     let r = 0;
     for (const l of nodes[i].links) r = Math.max(r, halfWidth(l.edge.cls));
-    reach.set(i, r * 1.15);
+    reach.set(i, r);
   }
+  const weldAt = (i, j) => (reach.get(i) + reach.get(j)) * 0.8;
   const parent = new Map(live.map((i) => [i, i]));
   const box = new Map(live.map((i) => [i, {
-    x0: nodes[i].x, x1: nodes[i].x, z0: nodes[i].z, z1: nodes[i].z, r: reach.get(i) }]));
+    x0: nodes[i].x, x1: nodes[i].x, z0: nodes[i].z, z1: nodes[i].z, r: reach.get(i) * 1.6 }]));
   const find = (k) => {
     while (parent.get(k) !== k) { parent.set(k, parent.get(parent.get(k))); k = parent.get(k); }
     return k;
@@ -256,7 +284,7 @@ function weldJunctions(nodes, edges) {
           if (j <= i) continue;
           const m = nodes[j];
           const d = Math.hypot(m.x - n.x, m.z - n.z);
-          if (d >= Math.max(reach.get(i), reach.get(j))) continue;
+          if (d >= weldAt(i, j)) continue;
           const ri = find(i), rj = find(j);
           if (ri === rj) continue;
           const A = box.get(ri), B = box.get(rj);
@@ -320,6 +348,255 @@ function weldJunctions(nodes, edges) {
   for (const e of kept) edges.push(e);
   relink(nodes, edges);
   return welds;
+}
+
+/**
+ * Put every junction that stands on a road onto that road.
+ *
+ * `weldJunctions` merges junctions that are on top of each other, and that
+ * takes care of a dual carriageway wherever both of its halves have a junction
+ * at the same place. Mostly they do not: a side street joins one carriageway
+ * and not the other, so one half has a node there and the other runs past it
+ * ten metres away, and the two halves never share a node to be merged at.
+ * From above that is two roads with a strip of pavement down the middle — the
+ * "medians" — on every main road in the city.
+ *
+ * The rule is the one the welding used, applied to a road instead of a node:
+ * a junction closer to a carriageway than the two of them are wide is *on*
+ * that carriageway. The road is split there and the split welded to the
+ * junction, so after a pass both halves of a dual carriageway have a node at
+ * every place either of them had one — and between consecutive nodes they are
+ * two roads joining the same two junctions, which `dedupeEdges` makes one.
+ */
+function snapNodesToRoads(nodes, edges, terrain) {
+  const CELL = 40;
+  const grid = new Map();
+  const key = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+  for (const e of edges) {
+    if (e.bank || e.approach) continue;
+    const cells = new Set();
+    for (const p of e.pts) cells.add(key(p.x, p.z));
+    for (let i = 0; i < e.pts.length - 1; i++) {
+      const a = e.pts[i], b = e.pts[i + 1];
+      cells.add(key((a.x + b.x) / 2, (a.z + b.z) / 2));
+    }
+    for (const k of cells) {
+      let list = grid.get(k);
+      if (!list) grid.set(k, list = []);
+      list.push(e);
+    }
+  }
+  const splits = new Map();          // edge -> [{ t, i, x, z, node }]
+  let snaps = 0;
+  for (let ni = 0; ni < nodes.length; ni++) {
+    const n = nodes[ni];
+    if (!n.links.length) continue;
+    if (n.links.some((l) => l.edge.bank || l.edge.approach)) continue;
+    let wn = 0;
+    for (const l of n.links) wn = Math.max(wn, halfWidth(l.edge.cls));
+    const gx = Math.floor(n.x / CELL), gz = Math.floor(n.z / CELL);
+    let best = null;
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        const list = grid.get(`${gx + a},${gz + b}`);
+        if (!list) continue;
+        for (const e of list) {
+          if (e.a === ni || e.b === ni) continue;
+          const reach = (wn + halfWidth(e.cls)) * 0.8;
+          for (let i = 0; i < e.pts.length - 1; i++) {
+            const p = e.pts[i], q = e.pts[i + 1];
+            const dx = q.x - p.x, dz = q.z - p.z;
+            const l2 = dx * dx + dz * dz;
+            if (l2 < 1) continue;
+            let t = ((n.x - p.x) * dx + (n.z - p.z) * dz) / l2;
+            if (t < 0 || t > 1) continue;
+            const x = p.x + dx * t, z = p.z + dz * t;
+            const d = Math.hypot(n.x - x, n.z - z);
+            if (d >= reach) continue;
+            // Not at the road's own ends: that is the welding's business.
+            if (Math.hypot(x - e.pts[0].x, z - e.pts[0].z) < reach * 0.6) continue;
+            const last = e.pts[e.pts.length - 1];
+            if (Math.hypot(x - last.x, z - last.z) < reach * 0.6) continue;
+            if (!best || d < best.d) best = { e, i, t, x, z, d };
+          }
+        }
+      }
+    }
+    if (!best) continue;
+    // The junction moves half way to the road; the road will be split to it.
+    n.x = (n.x + best.x) / 2; n.z = (n.z + best.z) / 2;
+    n.y = terrain.heightAt(n.x, n.z);
+    let list = splits.get(best.e);
+    if (!list) splits.set(best.e, list = []);
+    list.push({ i: best.i, t: best.t, node: ni });
+    snaps++;
+  }
+  if (!snaps) return 0;
+
+  // Cut each road at its splits, in order along it.
+  const out = [];
+  for (const e of edges) {
+    const list = splits.get(e);
+    if (!list) { out.push(e); continue; }
+    list.sort((p, q) => (p.i - q.i) || (p.t - q.t));
+    let from = e.a;
+    let pts = [e.pts[0]];
+    let li = 0;
+    for (let i = 0; i < e.pts.length - 1; i++) {
+      while (li < list.length && list[li].i === i) {
+        const sp = list[li++];
+        const node = nodes[sp.node];
+        pts.push({ x: node.x, z: node.z, y: node.y });
+        if (from !== sp.node && pts.length >= 2) {
+          out.push({ ...e, a: from, b: sp.node, pts });
+        }
+        from = sp.node;
+        pts = [{ x: node.x, z: node.z, y: node.y }];
+      }
+      pts.push(e.pts[i + 1]);
+    }
+    if (from !== e.b && pts.length >= 2) out.push({ ...e, a: from, b: e.b, pts });
+  }
+  edges.length = 0;
+  for (const e of out) edges.push(e);
+  relink(nodes, edges);
+  return snaps;
+}
+
+/**
+ * No road dies for no reason.
+ *
+ * A dead end on a surveyed plan is nearly always ours: a street cut where it
+ * ran into the water, or into the landmark's precinct, or a twin carriageway's
+ * slip lane left over from the welding. A real cul-de-sac is rare and, from
+ * the air, indistinguishable from a mistake — so it is treated as one. Each
+ * loose end looks ahead along its own bearing for a road to join; if one is
+ * there within seventy metres over ground it may cross, the road is carried on
+ * to it and joined. If not, the stub is taken out, and whatever that leaves
+ * loose is looked at again. A road that reaches the edge of the map is not a
+ * dead end — it leaves.
+ */
+function resolveDeadEnds(nodes, edges, terrain, opts) {
+  const span = terrain.span;
+  const EDGE = span - 60;
+  const clear = (x, z) => !terrain.isWater(x, z)
+    && !(opts.exclude > 0 && Math.hypot(x, z) < opts.exclude)
+    && !opts.inReserved(x, z);
+  let joined = 0, pruned = 0;
+  for (let pass = 0; pass < 6; pass++) {
+    let did = 0;
+    for (let ni = 0; ni < nodes.length; ni++) {
+      const n = nodes[ni];
+      if (n.links.length !== 1) continue;
+      if (Math.abs(n.x) > EDGE || Math.abs(n.z) > EDGE) continue;    // leaves the map
+      const l = n.links[0];
+      const e = l.edge;
+      if (e.bank || e.approach) continue;
+      // The heading the road was on when it stopped.
+      const pts = l.at === 0 ? e.pts : e.pts.slice().reverse();
+      let k = 1;
+      while (k < pts.length - 1 && Math.hypot(pts[k].x - n.x, pts[k].z - n.z) < 6) k++;
+      const back = pts[Math.min(k, pts.length - 1)];
+      let dx = n.x - back.x, dz = n.z - back.z;
+      const d = Math.hypot(dx, dz) || 1;
+      dx /= d; dz /= d;
+      // Ahead of it: the nearest road crossing a cone of forty degrees either
+      // side of the heading, within seventy metres.
+      let hit = null;
+      for (const f of edges) {
+        if (f === e || f.bank || f.approach) continue;
+        for (let i = 0; i < f.pts.length - 1; i++) {
+          const p = f.pts[i], q = f.pts[i + 1];
+          const c = raySegment(n.x, n.z, dx, dz, p, q);
+          if (!c || c.t > 70) continue;
+          if (!hit || c.t < hit.t) hit = { f, i, u: c.u, t: c.t, x: c.x, z: c.z };
+        }
+      }
+      if (hit) {
+        let ok = true;
+        for (let t = 4; t < hit.t; t += 4) {
+          if (!clear(n.x + dx * t, n.z + dz * t)) { ok = false; break; }
+        }
+        if (ok) {
+          // Join: split the road there and run the stub on to the split.
+          const f = hit.f;
+          const j = { x: hit.x, z: hit.z, y: terrain.heightAt(hit.x, hit.z) };
+          nodes.push({ x: j.x, z: j.z, y: j.y, links: [] });
+          const ji = nodes.length - 1;
+          const first = { ...f, a: f.a, b: ji, pts: [...f.pts.slice(0, hit.i + 1), { ...j }] };
+          const second = { ...f, a: ji, b: f.b, pts: [{ ...j }, ...f.pts.slice(hit.i + 1)] };
+          const idx = edges.indexOf(f);
+          edges.splice(idx, 1, first, second);
+          if (l.at === 0) { e.pts.unshift({ ...j }); e.a = ji; }
+          else { e.pts.push({ ...j }); e.b = ji; }
+          relink(nodes, edges);
+          joined++; did++;
+          continue;
+        }
+      }
+      // Nothing to join: the stub goes, if it is short enough to be a mistake.
+      let len = 0;
+      for (let i = 0; i < e.pts.length - 1; i++) {
+        len += Math.hypot(e.pts[i + 1].x - e.pts[i].x, e.pts[i + 1].z - e.pts[i].z);
+      }
+      if (len > 140) continue;
+      edges.splice(edges.indexOf(e), 1);
+      relink(nodes, edges);
+      pruned++; did++;
+    }
+    if (!did) break;
+  }
+  return { joined, pruned };
+}
+
+/** Where a ray from (x, z) along (dx, dz) crosses the segment p–q, if it does. */
+function raySegment(x, z, dx, dz, p, q) {
+  const ex = q.x - p.x, ez = q.z - p.z;
+  const den = dx * ez - dz * ex;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((p.x - x) * ez - (p.z - z) * ex) / den;
+  const u = ((p.x - x) * dz - (p.z - z) * dx) / den;
+  if (t < 0 || u < 0 || u > 1) return null;
+  return { t, u, x: x + dx * t, z: z + dz * t };
+}
+
+/**
+ * Round every bend.
+ *
+ * A surveyed polyline is a trace of the kerb, and the dissolve has just joined
+ * those traces through every corner in the city, so a road is now a chain of
+ * straight pieces with a kink at each vertex. Two rounds of corner-cutting —
+ * each vertex replaced by two, a quarter and three quarters of the way along
+ * the segments either side — turn the kinks into curves, and the ends are held
+ * fixed so a road still arrives at its junction where the junction is. Only
+ * where there is a bend: a vertex on a straight run is left alone, so a
+ * straight road is still two points and the mesh does not double for nothing.
+ */
+function smoothRoads(edges, terrain) {
+  for (const e of edges) {
+    if (e.bank || e.approach || e.bridge) continue;
+    let pts = e.pts;
+    if (pts.length < 3) continue;
+    for (let round = 0; round < 2; round++) {
+      const out = [pts[0]];
+      for (let i = 1; i < pts.length - 1; i++) {
+        const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+        const d1 = Math.hypot(b.x - a.x, b.z - a.z), d2 = Math.hypot(c.x - b.x, c.z - b.z);
+        if (d1 < 0.5 || d2 < 0.5) { out.push(b); continue; }
+        const dot = ((b.x - a.x) * (c.x - b.x) + (b.z - a.z) * (c.z - b.z)) / (d1 * d2);
+        if (dot > 0.995) { out.push(b); continue; }       // under six degrees: straight
+        // Cut the corner, but never more than eight metres back along either
+        // leg: a rounding is a kerb radius, not a new alignment.
+        const k1 = Math.min(0.25, 8 / d1), k2 = Math.min(0.25, 8 / d2);
+        out.push({ x: b.x - (b.x - a.x) * k1, z: b.z - (b.z - a.z) * k1 });
+        out.push({ x: b.x + (c.x - b.x) * k2, z: b.z + (c.z - b.z) * k2 });
+      }
+      out.push(pts[pts.length - 1]);
+      pts = out;
+    }
+    for (const p of pts) if (p.y === undefined) p.y = terrain.heightAt(p.x, p.z);
+    e.pts = pts;
+  }
 }
 
 /**

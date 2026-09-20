@@ -188,6 +188,13 @@ export class Terrain {
           const e = d <= radius ? 0 : (d - radius) / feather;
           const kp = 1 - THREE.MathUtils.smoothstep(e, 0.22 + wob, 0.42 + wob);
           this.mask[idx * 3 + 2] = Math.max(this.mask[idx * 3 + 2], kp);
+          // And not hardstanding under it. The bake paints every built parcel
+          // as a third of a road, and the Palace's own block is a built
+          // parcel, so the lawn stamped here was then greyed back to a yard
+          // by the colour pass — the mottled ground round the tower. A real
+          // street through the precinct is brighter than a parcel and is
+          // kept; the parcel tint goes.
+          if (kp > 0.5 && this.mask[idx * 3 + 1] < 0.5) this.mask[idx * 3 + 1] = 0;
         }
       }
     }

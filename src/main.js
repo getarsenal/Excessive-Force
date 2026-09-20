@@ -230,7 +230,11 @@ async function boot() {
     // The street network and the frame it is laid on, so the belt is square to
     // the place rather than to the map, and so it knows where the roads are.
     net: contextGroup?.userData?.network || null,
-    yaw: contextGroup?.userData?.gridYaw || 0,
+    // Square to the building on a surveyed map. The landmark stands on the
+    // map's own axes; the measured street angle is the commonest bearing in a
+    // plan that has no single one, and a belt turned to it crossed Parliament
+    // Square at eleven degrees to the Palace it was dug to defend.
+    yaw: contextGroup?.userData?.network?.real ? 0 : (contextGroup?.userData?.gridYaw || 0),
     exclude: level.contextExclude || level.cityExcludeRadius || 70,
   });
   engine.scene.add(fieldWorks.group);

@@ -87,24 +87,44 @@ is what the surround and the skyline are drawn over. Read the line it prints:
 that comes back at nought per cent has a bake that did not reach its own water,
 and the level will render as a field with a monument in it.
 
-Four things are then true of a new map without anyone having to build them, and
-they are the four that took the longest to get right on the first nine. Do not
-reimplement any of them; if one is wrong on a new map it is wrong on all nine:
+The street plan then goes through `src/world/realstreets.js`, and everything
+below is true of a new map without anyone having to build it. These are the
+things that took longest to get right on the first nine; do not reimplement
+any of them, and if one is wrong on a new map it is wrong on all nine:
 
   - **streets are cut, not deleted.** A carriageway that runs into the water or
     into the landmark's own precinct stops there and keeps the rest of itself.
     Deleting the whole edge takes an arm off the junction at each end, and the
     dissolve pass then straightens the junction out of existence.
-  - **bridges come ashore.** A surveyed crossing ends at whatever connector the
-    surveyor put nearest the bank, which is quite often a pixel the DEM calls
-    river. `landBridges` walks the dangling end on to dry ground and welds it to
-    the junction standing there.
+  - **one junction, one road.** A survey draws a dual carriageway as two roads
+    and their crossing as a cluster of four to nine junctions. Junctions whose
+    paving overlaps are welded into one (`weldJunctions`); a junction that
+    stands on another road is put onto it (`snapNodesToRoads`); two roads
+    between the same two junctions become one down the middle (`dedupeEdges`).
+    Parliament Square went from nine junctions to three that way.
+  - **bridges come ashore, and are bridges.** `landBridges` walks a dangling
+    wet end on to dry ground and welds it to the junction there; `layDecks`
+    straightens the run onto its chord, lifts it three metres over the bank,
+    ramps the roads at each landing and hands the line to `buildBridge` for
+    arches, piers, balustrade and lamps.
+  - **no dead ends.** Every bend that is not a junction is dissolved into one
+    road first, so a road is judged whole; then a loose end is carried on to
+    the road it was heading for if one is within seventy metres over clear
+    ground, and removed if not. Only a road that leaves the map keeps an open
+    end (`resolveDeadEnds`).
+  - **bends are curves.** `smoothRoads` rounds every vertex with two rounds of
+    corner-cutting, ends held fixed; a sharp two-arm corner is paved like a
+    junction so the outer kerb is not notched (`padRadius`).
   - **crossings are rationed.** A zebra goes where a main road is involved, on
-    two arms at most. Painting every arm of every three-way junction is what
-    turned London into a lattice of white ladders.
+    two arms at most and fifty degrees apart. Painting every arm of every
+    three-way junction is what turned London into a lattice of white ladders.
   - **the bank is one line.** The shoreline is sampled by four sweeps, pooled,
     thinned and chained into a single ordered run, and the embankment is laid
     along it with a walk behind the parapet.
+  - **the precinct is square to the building,** not to the street plan; its
+    walks run on its axes and its beds and statues mirror. No invented railway
+    on a surveyed map, and the bake's built-parcel tint is cleared under the
+    precinct lawn.
 It needs outbound network and **it does run in-session** — the tile host is
 reachable through the proxy and `pillow`/`numpy` are installed. (An earlier
 version of this page said it could not; it can, and five maps were baked
