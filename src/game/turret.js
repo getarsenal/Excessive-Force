@@ -83,22 +83,24 @@ export class CoastalTurret {
 
     // The apron: a flush concrete platform, flagged with the yellow lines the
     // photograph has, cracked and patched.
-    const apron = new THREE.Mesh(new THREE.CylinderGeometry(R * 2.3, R * 2.4, 0.5, 24), concrete);
-    apron.position.y = 0.05;
+    // Poured on the platform's edge: three metres deep, so where the ring falls
+    // away to the slope the apron shows a concrete face rather than hovering.
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.9, R * 2.0, 3.2, 24), concrete);
+    apron.position.y = 0.3 - 1.6;
     g.add(apron);
     const ring = new THREE.Mesh(new THREE.RingGeometry(R * 1.22, R * 1.32, 40), paint);
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.32;
     g.add(ring);
     for (const sgn of [-1, 1]) {
-      const line = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, R * 3.6), paint);
-      line.position.set(sgn * R * 1.75, 0.32, 0);
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, R * 3.0), paint);
+      line.position.set(sgn * R * 1.55, 0.32, 0);
       g.add(line);
     }
     for (let i = 0; i < 9; i++) {
       // Cracks: thin dark slivers across the apron.
       const len = 1.5 + rnd() * 4;
       const crack = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, len), cracked);
-      const a = rnd() * Math.PI * 2, r = R * (1.4 + rnd() * 0.85);
+      const a = rnd() * Math.PI * 2, r = R * (1.3 + rnd() * 0.55);
       crack.position.set(Math.cos(a) * r, 0.31, Math.sin(a) * r);
       crack.rotation.y = rnd() * Math.PI;
       g.add(crack);
@@ -106,7 +108,7 @@ export class CoastalTurret {
     // Two patched slabs, a shade off.
     for (let i = 0; i < 2; i++) {
       const patch = new THREE.Mesh(new THREE.BoxGeometry(2.4 + rnd() * 2, 0.06, 2 + rnd() * 2), cracked);
-      const a = rnd() * Math.PI * 2, r = R * (1.6 + rnd() * 0.6);
+      const a = rnd() * Math.PI * 2, r = R * (1.4 + rnd() * 0.4);
       patch.position.set(Math.cos(a) * r, 0.31, Math.sin(a) * r);
       patch.rotation.y = rnd() * Math.PI;
       g.add(patch);
@@ -169,7 +171,7 @@ export class CoastalTurret {
       while (d < -Math.PI) d += Math.PI * 2;
       return Math.abs(d);
     };
-    const bagR = R * 2.55;
+    const bagR = R * 2.15;
     for (let i = 0; i < 44; i++) {
       const a = (i / 44) * Math.PI * 2;
       const toFront = Math.PI - rearward(a);
@@ -185,7 +187,7 @@ export class CoastalTurret {
       }
     }
     // Barbed wire: posts with three strands, a gap at the rear.
-    const wireR = R * 3.1;
+    const wireR = R * 2.7;
     const POSTS = 14;
     const postAt = [];
     for (let i = 0; i < POSTS; i++) {
@@ -213,7 +215,7 @@ export class CoastalTurret {
     }
     // Broken concrete, half sunk, at odd angles.
     for (let i = 0; i < 7; i++) {
-      const a = rnd() * Math.PI * 2, r = R * (2.4 + rnd() * 0.9);
+      const a = rnd() * Math.PI * 2, r = R * (2.05 + rnd() * 0.75);
       if (rearward(a) < 0.3) continue;
       const w = 1.2 + rnd() * 2.2, h = 0.6 + rnd() * 0.9, d = 1.0 + rnd() * 1.8;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cracked);
@@ -225,7 +227,7 @@ export class CoastalTurret {
     // The way in: a steel hatch flush in the apron, crates beside it.
     {
       const a = front + Math.PI;
-      const hx = Math.cos(a) * R * 1.75, hz = Math.sin(a) * R * 1.75;
+      const hx = Math.cos(a) * R * 1.5, hz = Math.sin(a) * R * 1.5;
       const hatch = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.18, 2.2), dark);
       hatch.position.set(hx, 0.38, hz); hatch.rotation.y = -a;
       g.add(hatch);

@@ -469,7 +469,7 @@ export const LEVELS = {
     // the west axis, fifty-five metres out, the guns facing away from the
     // figure. It turns slowly, drops two shells at a time on the battery,
     // and three rounds in four glance off it. See `game/turret.js`.
-    turret: { x: -55, z: 0, yaw: -Math.PI / 2, scale: 1.4 },
+    turret: { x: -56, z: 0, yaw: -Math.PI / 2, scale: 1.25 },
     // The arms are scored and they are worth what they weigh, which is the
     // lesson: shoot them off and watch the bar barely move.
     scoreTags: ['statue', 'arms', 'pedestal'],

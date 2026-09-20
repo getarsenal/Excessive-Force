@@ -207,7 +207,7 @@ async function boot() {
     // The turret's emplacement, kept clear of the forest.
     clearings: level.turret
       ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
-        r: 5.2 * (level.turret.scale ?? 1.4) * 4.5 }]
+        r: 5.2 * (level.turret.scale ?? 1.4) * 4.2 }]
       : [],
     city, cityExclude: level.cityExcludeRadius,
     // What is beyond the town. A level says where it is; the generator does

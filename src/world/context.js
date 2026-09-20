@@ -1050,7 +1050,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // builds the parapet and balustrade as well, so on a surveyed map it is
   // doing this job properly already.
   if (!realNet) group.add(buildEmbankment(terrain));
-  group.add(buildStreetDetail(terrain, quality, plots, net, rng));
+  group.add(buildStreetDetail(terrain, quality, plots, net, rng, opts.clearings || []));
 
   // ── The detail pass. Everything that makes the massing read as a place
   // rather than as a diagram: street furniture on a rhythm, the parts of a
@@ -2071,7 +2071,7 @@ function mulberry32(a) {
  * here is merged into a handful of meshes, so the whole lot is a few draw calls
  * and none of it touches the physics world.
  */
-function buildStreetDetail(terrain, quality, plots, net, rng) {
+function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
   const g = new THREE.Group();
   g.name = 'detail';
   const shadows = quality.shadowMapSize > 0;
@@ -2093,6 +2093,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng) {
   const crowns = [];
   const treeAt = (x, z, scale) => {
     if (terrain.isWater(x, z)) return;
+    // Not on ground the level has given to something of its own.
+    if (clearings.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return;
     const y = terrain.heightAt(x, z);
     const h = (5 + rng() * 5) * scale;
     const conifer = rng() < 0.2;
