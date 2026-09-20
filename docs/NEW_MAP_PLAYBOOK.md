@@ -104,9 +104,18 @@ any of them, and if one is wrong on a new map it is wrong on all nine:
     Parliament Square went from nine junctions to three that way.
   - **bridges come ashore, and are bridges.** `landBridges` walks a dangling
     wet end on to dry ground and welds it to the junction there; `layDecks`
-    straightens the run onto its chord, lifts it three metres over the bank,
-    ramps the roads at each landing and hands the line to `buildBridge` for
-    arches, piers, balustrade and lamps.
+    cuts a welded run into chains at its junctions (the Cahill Expressway and
+    the Harbour Bridge share one and are not one bridge), straightens each
+    chain onto its chord, lifts it three metres over the bank — or on its
+    length past six hundred metres of water — ramps the roads at each landing
+    and hands the line to `buildBridge`: masonry arches, piers, balustrade and
+    lamps, or past six hundred metres a steel through-arch on granite pylons.
+  - **the waterfront is on the water.** On a harbour level, dry land the DEM
+    puts under the waterline is a quay and is lifted just over it
+    (`_liftQuays`); a surveyed footprint over the water but tied to the shore
+    is built as a wharf founded below the surface; the street test is on the
+    outline and on the roads on the ground, so a building can stand under an
+    elevated deck.
   - **no dead ends.** Every bend that is not a junction is dissolved into one
     road first, so a road is judged whole; then a loose end is carried on to
     the road it was heading for if one is within seventy metres over clear

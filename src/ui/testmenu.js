@@ -1809,8 +1809,14 @@ export class TestMenu {
             // terrace fronts the pavement, and the bounding box round an
             // L-shaped one takes in the yard next door. What may not happen,
             // either way, is a building standing in the carriageway.
-            const allow = surveyed ? 4.6 : 0;
-            const clear = Math.min(net.roadClearance(x, z), net.nodeClearance(x, z)) + allow;
+            // Judged the way the placer judged it: the rectangle round a
+            // surveyed footprint may overhang a carriageway by what the
+            // placer allowed its box (the pavement and five metres — it is
+            // not the building), and only the roads on the ground count,
+            // because a quay building under the Cahill Expressway's deck is
+            // where it is.
+            const allow = surveyed ? 4.6 + 5 : 0;
+            const clear = Math.min(net.roadClearance(x, z, surveyed), net.nodeClearance(x, z)) + allow;
             if (clear < 0) { inRoad++; worstRoad = Math.max(worstRoad, -clear); break; }
             if (terrain.isWater(x, z)
               || terrain.heightAt(x, z) < terrain.waterLevel + 0.6) { wet2++; break; }

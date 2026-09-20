@@ -809,14 +809,8 @@ function layDecks(edges, nodes, terrain, bridges) {
   for (const e of spans) {
     const key = find(e.a);
     let run = runs.get(key);
-    if (!run) runs.set(key, run = { edges: [], wet: 0, bank: -Infinity });
+    if (!run) runs.set(key, run = { edges: [] });
     run.edges.push(e);
-    for (let i = 0; i < e.pts.length - 1; i++) {
-      const p = e.pts[i], q = e.pts[i + 1];
-      const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2;
-      if (terrain.isWater(mx, mz)) run.wet += Math.hypot(q.x - p.x, q.z - p.z);
-      else run.bank = Math.max(run.bank, p.y, q.y);
-    }
   }
 
   for (const run of runs.values()) {
