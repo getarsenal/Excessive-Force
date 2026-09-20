@@ -163,6 +163,10 @@ export function buildPrecinct(props, terrain, rng, opts) {
     const g = toGrid(x, z);
     return g.u > u0 + 4 && g.u < u1 - 4 && g.v > v0 + 4 && g.v < v1 - 4;
   };
+  // Ground the level has given to something of its own — the turret's
+  // emplacement on the Corcovado stands inside this precinct's tree line.
+  const clearings = opts.clearings || [];
+  const cleared = (x, z) => clearings.some((c) => Math.hypot(x - c.x, z - c.z) < c.r);
 
   if (spec.ground === 'charbagh') {
     // Four quarters divided by raised walks, with a water channel down the
@@ -198,7 +202,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
     // and from a phone the whole square read as a patchwork quilt.
     const WALK = 3.4;
     const walk = (x, z, len, ang) => {
-      if (!clear(x, z)) return false;
+      if (!clear(x, z) || cleared(x, z)) return false;
       props.add('stone', box(WALK, 0.16, len + 0.1, x, gy(x, z) + 0.14, z, ang),
         0xc6bca2, 0.92 + rng() * 0.1);
       counts.walks++;
@@ -251,7 +255,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
       const u = su < 0 ? u0 + IN + 11 : u1 - IN - 11;
       const v = sv < 0 ? v0 + IN + 11 : v1 - IN - 11;
       const q = toWorld(u, v);
-      if (!clear(q.x, q.z) || !inside(q.x, q.z)) continue;
+      if (!clear(q.x, q.z) || !inside(q.x, q.z) || cleared(q.x, q.z)) continue;
       const g = gy(q.x, q.z);
       const r = 3.2;
       props.add('stone', cyl(r + 0.4, r + 0.4, 0.3, 10, q.x, g + 0.2, q.z), 0xb9b09a, 0.95);
@@ -273,7 +277,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
         const inV = g2.v > (v0 + v1) / 2 ? -7 : 7;
         const q = toWorld(g2.u + inU * 0.6, g2.v + inV * 0.6);
         x = q.x; z = q.z;
-        if (!clear(x, z) || !inside(x, z)) continue;
+        if (!clear(x, z) || !inside(x, z) || cleared(x, z)) continue;
         const gg = gy(x, z);
         const h = 10 + rng() * 5;
         props.add('dark', cyl(0.3, 0.45, h * 0.4, 5, x, gg + h * 0.2, z), 0x4a3c2e, 1);
@@ -315,7 +319,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
         const v = v0 + 14 + rng() * (v1 - v0 - 28);
         q = toWorld(u, v);
       }
-      if (!clear(q.x, q.z) || !inside(q.x, q.z)) continue;
+      if (!clear(q.x, q.z) || !inside(q.x, q.z) || cleared(q.x, q.z)) continue;
       const x = q.x, z = q.z, g = gy(x, z);
       if (spec.ornament === 'pavilions') {
         for (let c = 0; c < 8; c++) {
