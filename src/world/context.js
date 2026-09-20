@@ -606,17 +606,23 @@ export function buildContext(terrain, quality, opts = {}) {
     // down, which is the landmark's own set and nothing else at this point.
     if (overlaps(rect.x, rect.z, rect.w * 0.9, rect.d * 0.9, rect.yaw, 0.2,
       (q) => q.real)) { sv.overlap++; rejects.overlap++; return false; }
-    let gLo = Infinity, gHi = -Infinity;
+    // The slope a building may stand across is judged on its dry corners — a
+    // corner on the riverbed is not a slope, it is the river — but it is
+    // founded on the lowest corner it has, wet or dry, or it hangs over that
+    // corner. Eleven of Westminster's did, by two and a half metres, when the
+    // founding was taken from the dry corners only.
+    let gLo = Infinity, gHi = -Infinity, gAll = Infinity;
     for (const q of dryPts) {
       const gp = terrain.heightAt(q.x, q.z);
       if (gp < gLo) gLo = gp;
       if (gp > gHi) gHi = gp;
     }
+    for (const q of all) gAll = Math.min(gAll, terrain.heightAt(q.x, q.z));
     if (gHi - gLo > 11.0) { sv.slope++; rejects.slope = (rejects.slope || 0) + 1; return false; }
-    const fall = Math.min(8, gHi - gLo);
-    // Founded on its lowest dry ground — or, on the water, a metre and a half
-    // under the surface, so nothing shows between the wharf and the harbour.
-    const g = (wharf ? Math.min(gLo, terrain.waterLevel - 1.5) : gLo) - 0.3;
+    // Founded on its lowest ground — or, on the water, at least a metre and a
+    // half under the surface, so nothing shows between the wharf and the
+    // harbour.
+    const g = Math.min(gAll, wharf ? terrain.waterLevel - 1.5 : gAll) - 0.3;
     const bodyH = h + (gHi - g);
 
     // The outline as a 2D shape. The extrusion runs along +Z and is then stood
