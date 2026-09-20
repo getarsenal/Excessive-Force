@@ -245,9 +245,9 @@ export function buildContext(terrain, quality, opts = {}) {
    * and the pavement it overlaps is pavement it is standing on.
    */
   const PAVEMENT = 4.6;
-  const offStreet = (pts, allow = 0) => {
+  const offStreet = (pts, allow = 0, ground = false) => {
     for (const p of pts) {
-      if (net.roadClearance(p.x, p.z) + allow < 1.0) return false;
+      if (net.roadClearance(p.x, p.z, ground) + allow < 1.0) return false;
       if (net.nodeClearance(p.x, p.z) + allow < 1.0) return false;
     }
     return true;
@@ -540,26 +540,84 @@ export function buildContext(terrain, quality, opts = {}) {
     // carriageway, somebody's river bank, or six feet lower than the building.
     const box = footprintPoints(rect.x, rect.z, rect.w, rect.d, rect.yaw);
     const all = ring.concat(box);
-    if (!onDryLand(all, 0.8, 0.7)) { rejects.water++; return false; }
-    if (!offStreet(all, PAVEMENT)) { rejects.street++; return false; }
-    if (!offBridge(ring)) { rejects.bridge++; return false; }
-    if (!offLandmark(ring)) { rejects.landmark = (rejects.landmark || 0) + 1; return false; }
+    // Counted apart from the infill's refusals: a surveyed building that is
+    // not built is a piece of the real place missing, and the infill's
+    // thousand failed guesses swamp that number.
+    const sv = rejects.sv || (rejects.sv = { water: 0, street: 0, bridge: 0, landmark: 0, overlap: 0, slope: 0, wharf: 0 });
+    // The waterfront is allowed to be on the water.
+    //
+    // Sixty-one of Sydney's surveyed buildings — the ferry wharves at
+    // Circular Quay, the Overseas Passenger Terminal, the finger wharves at
+    // Walsh Bay — were refused for having a corner over the harbour, and a
+    // harbour city with no wharves is a headland with a city behind it. A
+    // footprint that is mostly on land is built, and where it stands over the
+    // water it is founded in the water, the way a wharf on a solid quay is:
+    // the walls run down past the surface. One that is mostly water is a
+    // jetty or a pontoon, and is not.
+    const isDry = (q) => !terrain.isWater(q.x, q.z)
+      && terrain.heightAt(q.x, q.z) >= terrain.waterLevel + 0.7;
+    const dryPts = all.filter(isDry);
+    // Mostly on land, or on the water but tied to the shore: a ferry wharf
+    // is a building standing wholly over the harbour a few metres off the
+    // quay, and there are six of them at Circular Quay. Anything wholly over
+    // water and further than that from any land is a pontoon, and is not.
+    const shoreNear = (q) => {
+      for (let a = 0; a < 8; a++) {
+        const th = (a / 8) * Math.PI * 2;
+        for (const r of [15, 30, 45]) {
+          if (isDry({ x: q.x + Math.cos(th) * r, z: q.z + Math.sin(th) * r })) return true;
+        }
+      }
+      return false;
+    };
+    if (dryPts.length < all.length * 0.3 && !ring.every(shoreNear)) {
+      sv.water++; rejects.water++; return false;
+    }
+    const wharf = dryPts.length < all.length;
+    if (!dryPts.length) {
+      // Nothing dry to found on: the quay's own level, taken from the shore.
+      for (const q of ring) {
+        for (let a = 0; a < 8 && !dryPts.length; a++) {
+          const th = (a / 8) * Math.PI * 2;
+          for (const r of [15, 30, 45]) {
+            const c = { x: q.x + Math.cos(th) * r, z: q.z + Math.sin(th) * r };
+            if (isDry(c)) { dryPts.push(c); break; }
+          }
+        }
+      }
+    }
+    if (wharf) sv.wharf++;
+    // The outline keeps off the carriageway; the rectangle it is registered
+    // as is allowed to overhang one. The rectangle round an L-shaped quay
+    // building takes in the yard next door, and the yard next door at
+    // Circular Quay is Alfred Street — thirty-four surveyed buildings were
+    // refused for a corner of a box that is not a building.
+    // And the roads on the ground only: the Cahill Expressway runs over the
+    // top of Circular Quay station and the shops along the quay, on a deck,
+    // and a surveyed building under a surveyed deck is where it is.
+    if (!offStreet(ring, PAVEMENT, true) || !offStreet(box, PAVEMENT + 5, true)) {
+      sv.street++; rejects.street++; return false;
+    }
+    if (!offBridge(ring)) { sv.bridge++; rejects.bridge++; return false; }
+    if (!offLandmark(ring)) { sv.landmark++; rejects.landmark = (rejects.landmark || 0) + 1; return false; }
     // Surveyed buildings do not overlap each other — they are party walls in
     // a terrace, and the rectangle round an L-shaped one takes in its
     // neighbour's yard. They still have to clear whatever the generator put
     // down, which is the landmark's own set and nothing else at this point.
     if (overlaps(rect.x, rect.z, rect.w * 0.9, rect.d * 0.9, rect.yaw, 0.2,
-      (q) => q.real)) { rejects.overlap++; return false; }
+      (q) => q.real)) { sv.overlap++; rejects.overlap++; return false; }
     let gLo = Infinity, gHi = -Infinity;
-    for (const q of all) {
+    for (const q of dryPts) {
       const gp = terrain.heightAt(q.x, q.z);
       if (gp < gLo) gLo = gp;
       if (gp > gHi) gHi = gp;
     }
-    if (gHi - gLo > 11.0) { rejects.slope = (rejects.slope || 0) + 1; return false; }
+    if (gHi - gLo > 11.0) { sv.slope++; rejects.slope = (rejects.slope || 0) + 1; return false; }
     const fall = Math.min(8, gHi - gLo);
-    const g = gLo - 0.3;
-    const bodyH = h + fall + 0.3;
+    // Founded on its lowest dry ground — or, on the water, a metre and a half
+    // under the surface, so nothing shows between the wharf and the harbour.
+    const g = (wharf ? Math.min(gLo, terrain.waterLevel - 1.5) : gLo) - 0.3;
+    const bodyH = h + (gHi - g);
 
     // The outline as a 2D shape. The extrusion runs along +Z and is then stood
     // upright, so a world point (x, z) becomes a shape point (x, -z).
@@ -1590,6 +1648,15 @@ function buildBridge(terrain, quality, line) {
     }
   }
 
+  // A real crossing is not a street with water under it. Past six hundred
+  // metres the masonry arches below would be a Roman aqueduct — thirty-metre
+  // arches on fifty-metre piers, forty of them across the harbour — and the
+  // Harbour Bridge is one steel arch. So a long span gets that instead.
+  if (len > 600) {
+    buildSteelArch(g, line, terrain, quality, DECK_W);
+    return g;
+  }
+
   // Piers down to the riverbed, with cutwaters and the arches between them.
   const pierMat = pierMatShared();
   const spanBits = [];
@@ -1713,6 +1780,127 @@ function buildBridge(terrain, quality, line) {
   spans.receiveShadow = quality.shadowMapSize > 0;
   g.add(spans);
   return g;
+}
+
+/**
+ * A steel through-arch over the wet middle of a long crossing.
+ *
+ * The Harbour Bridge, in the terms this game has: two parabolic ribs either
+ * side of the deck, springing from below it at a pair of granite pylons and
+ * rising a hundred-odd metres over the water, tied across to each other and
+ * hung to the deck on vertical hangers; slender piers under the approaches
+ * either side. Built as scenery — a run of boxes turned along the curve, which
+ * a landmark's stones cannot do — so it is not destructible, which is right:
+ * the level is the Opera House, and the bridge is the view.
+ *
+ * Sized off the crossing rather than off the real bridge. The arch goes over
+ * the widest stretch of water on the run and spans as much of it as it can;
+ * its rise is a sixth of its span, which is the real one's proportion.
+ */
+function buildSteelArch(g, line, terrain, quality, DECK_W) {
+  const { from, to, len, deckY } = line;
+  const shadows = quality.shadowMapSize > 0;
+  const dir = to.clone().sub(from).normalize();
+  const side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const at = (t) => from.clone().lerp(to, t);
+
+  // The water along the run.
+  let w0 = null, w1 = null;
+  for (let t = 0; t <= 1; t += 0.005) {
+    const p = at(t);
+    if (terrain.isWater(p.x, p.z)) { if (w0 === null) w0 = t; w1 = t; }
+  }
+  if (w0 === null) { w0 = 0.3; w1 = 0.7; }
+  const mid = (w0 + w1) / 2;
+  const SPAN = Math.min(560, Math.max(240, (w1 - w0) * len * 0.92));
+  const RISE = SPAN / 6;                  // over the deck, at the crown
+  const DROP = Math.min(28, deckY - terrain.waterLevel - 6);   // springing below the deck
+  const u0 = mid - SPAN / (2 * len), u1 = mid + SPAN / (2 * len);
+  const archY = (u) => deckY - DROP + (RISE + DROP) * (1 - (2 * u - 1) ** 2);
+  const OFF = DECK_W / 2 + 2.2;
+
+  const steelBits = [];
+  const put = (geo, pos, quat) => {
+    geo.applyMatrix4(new THREE.Matrix4().compose(pos, quat || new THREE.Quaternion(),
+      new THREE.Vector3(1, 1, 1)));
+    steelBits.push(geo);
+  };
+  const Z = new THREE.Vector3(0, 0, 1);
+
+  // The two ribs.
+  const N = 40;
+  const ribPts = [[], []];
+  for (const [si, sgn] of [[0, -1], [1, 1]]) {
+    for (let i = 0; i <= N; i++) {
+      const u = i / N;
+      const p = at(u0 + (u1 - u0) * u).addScaledVector(side, sgn * OFF);
+      p.y = archY(u);
+      ribPts[si].push(p);
+    }
+    for (let i = 0; i < N; i++) {
+      const a = ribPts[si][i], b = ribPts[si][i + 1];
+      const seg = b.clone().sub(a);
+      const L = seg.length();
+      const q = new THREE.Quaternion().setFromUnitVectors(Z, seg.clone().normalize());
+      put(new THREE.BoxGeometry(5.6, 6.4, L + 0.8), a.clone().lerp(b, 0.5), q);
+    }
+  }
+  // Ties across between the ribs, hangers down to the deck, and a lower chord
+  // for the middle third so the rib reads as a truss and not a pipe.
+  for (let i = 0; i <= N; i += 2) {
+    const a = ribPts[0][i], b = ribPts[1][i];
+    const seg = b.clone().sub(a);
+    const q = new THREE.Quaternion().setFromUnitVectors(Z, seg.clone().normalize());
+    put(new THREE.BoxGeometry(1.6, 1.6, seg.length()), a.clone().lerp(b, 0.5), q);
+    for (const p of [a, b]) {
+      const h = p.y - deckY;
+      if (h > 3) put(new THREE.BoxGeometry(0.9, h, 0.9), new THREE.Vector3(p.x, deckY + h / 2, p.z));
+    }
+  }
+  for (const si of [0, 1]) {
+    for (let i = 0; i < N; i++) {
+      const a = ribPts[si][i].clone(), b = ribPts[si][i + 1].clone();
+      a.y -= 11; b.y -= 11;
+      if (a.y < deckY + 4 || b.y < deckY + 4) continue;
+      const seg = b.clone().sub(a);
+      const q = new THREE.Quaternion().setFromUnitVectors(Z, seg.clone().normalize());
+      put(new THREE.BoxGeometry(3.2, 3.6, seg.length() + 0.6), a.clone().lerp(b, 0.5), q);
+      if (i % 2 === 0) put(new THREE.BoxGeometry(1.1, 11, 1.1), new THREE.Vector3(a.x, a.y + 5.5, a.z));
+    }
+  }
+  const steel = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(steelBits, false),
+    new THREE.MeshStandardMaterial({ color: 0x4b5057, roughness: 0.55, metalness: 0.45 }));
+  steel.castShadow = shadows; steel.receiveShadow = shadows;
+  g.add(steel);
+
+  // Pylons at each springing, a pair either side, and piers under the approaches.
+  const stone = [];
+  for (const u of [u0, u1]) {
+    for (const sgn of [-1, 1]) {
+      const p = at(u).addScaledVector(side, sgn * (OFF + 1.0));
+      const base = terrain.heightAt(p.x, p.z);
+      const top = deckY + RISE * 0.42;
+      stone.push(new THREE.BoxGeometry(13, top - base, 15).translate(p.x, (top + base) / 2, p.z));
+      stone.push(new THREE.BoxGeometry(15.5, 2.2, 17.5).translate(p.x, top - 8, p.z));
+    }
+  }
+  const PIER = 62;
+  for (const [ta, tb] of [[0.02, u0 - 0.02], [u1 + 0.02, 0.98]]) {
+    const n = Math.max(1, Math.round((tb - ta) * len / PIER));
+    for (let k = 0; k <= n; k++) {
+      const p = at(ta + (tb - ta) * (k / n));
+      const bed = terrain.heightAt(p.x, p.z);
+      const h = deckY - 1.0 - bed;
+      if (h < 1) continue;
+      const geo = new THREE.BoxGeometry(DECK_W * 0.36, h, 6.5);
+      geo.rotateY(Math.atan2(dir.x, dir.z));
+      geo.translate(p.x, bed + h / 2, p.z);
+      stone.push(geo);
+    }
+  }
+  const masonry = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(stone, false), pierMatShared());
+  masonry.castShadow = shadows; masonry.receiveShadow = shadows;
+  g.add(masonry);
 }
 
 /** Stone river wall along the near bank, so the ground doesn't just slope in. */

@@ -40,10 +40,9 @@ export const CAST = {
     rank: 'Mushir', name: 'Tarek El-Masry', nation: 'Egypt', side: 'right',
     colours: ['#ce1126', '#ffffff', '#000000'],
   },
-  // The second half of the campaign. Art not drawn yet: each of these points
-  // at a file that does not exist, and the stand-off falls back to the plate
-  // and the bubble without it, so the level plays and the slot is documented
-  // in `characters/manifest.json` for whoever draws them.
+  // The second half of the campaign. Drawn as a set in the first four's style
+  // — cigar, arms folded, the flag worn — and described in
+  // `characters/manifest.json`.
   mx: {
     id: 'mx', file: 'assets/characters/mx-general.png',
     rank: 'Gral. de División', name: 'Rodrigo Salazar-Quiroz', nation: 'Mexico',

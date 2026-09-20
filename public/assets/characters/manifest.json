@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. Art stored here, not yet wired into the game. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. The five second-half defenders (mx, it, ru, au, br) are slots only: the file named is not in this folder, and the stand-off falls back to the name plate and the flag-trimmed bubble until someone draws them.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. All ten are drawn: the five second-half defenders (mx, it, ru, au, br) arrived as a set in the same style as the first four — cigar, arms folded, flag worn as a cape or patch, national headgear.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -192,50 +192,45 @@
     "chichen": {
       "id": "mx-general",
       "file": "mx-general.png",
-      "status": "slot only — art not drawn",
       "nation": "Mexico",
       "defends": "El Castillo and the Temple of the Warriors",
-      "look": "General de division, service dress, kepi with the eagle-and-serpent, Mexican flag patch, aviators, arms folded, an obsidian-handled machete through the belt",
+      "look": "General in black charro dress with gold filigree, wide embroidered sombrero with the eagle-and-serpent, red bow, bandolier, silver-tooled holster and boots with spurs, Mexican flag patch, a serape in the flag's colours over one shoulder, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
     "pisa": {
       "id": "it-generale",
       "file": "it-generale.png",
-      "status": "slot only — art not drawn",
       "nation": "Italy",
       "defends": "The campanile, the Duomo and the Baptistery",
-      "look": "Generale, peaked cap with the crowned eagle, tricolore collar tabs, sunglasses, cigarette rather than cigar, arms folded, standing very slightly off plumb",
+      "look": "Generale in olive service dress, maroon paratrooper beret with the winged badge, red neckerchief, ITALIA shield patch, medals, sabre with a tricolore tassel, the tricolore worn as a cape, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
     "moscow": {
       "id": "ru-marshal",
       "file": "ru-marshal.png",
-      "status": "slot only — art not drawn",
       "nation": "Russia",
       "defends": "Saint Basil's Cathedral and the Kremlin wall",
-      "look": "Marshal, oversized peaked cap, greatcoat over a chestful of ribbon, white gloves, arms folded, snow on the shoulders",
+      "look": "Marshal in grey-green greatcoat with red piping and gold aigulettes, black fur hat with the double-headed eagle, fur-collared cape lined red, Russian flag patch, chestful of medals, holstered revolver and gilt sabre, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
     "sydney": {
       "id": "au-general",
       "file": "au-general.png",
-      "status": "slot only — art not drawn",
       "nation": "Australia",
       "defends": "The Opera House on Bennelong Point",
-      "look": "General, slouch hat with the rising-sun badge and one side pinned up, khaki, aviators, arms folded, salt spray on the lenses",
+      "look": "General in Australian camouflage, slouch hat with the rising-sun badge and one side pinned up, shemagh, AUSTRALIA name tape, flag patch, kangaroo tattoo reading AUSSIE AUSSIE AUSSIE, a can of VB in a kangaroo stubby holder on the belt, knife, the Australian flag worn as a cape, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
     "rio": {
       "id": "br-marechal",
       "file": "br-marechal.png",
-      "status": "slot only — art not drawn",
       "nation": "Brazil",
       "defends": "Christ the Redeemer on the Corcovado",
-      "look": "Marechal, white dress tunic with gold braid and the green-and-yellow sash, peaked cap, cigar, arms folded, cloud behind him rather than sky",
+      "look": "Marechal in dark green dress uniform heavy with gold cord and stars, peaked cap with the national arms, medals, gilt sabre, Brazilian flag patch and the flag worn as a cape, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     }

@@ -820,131 +820,169 @@ function layDecks(edges, nodes, terrain, bridges) {
   }
 
   for (const run of runs.values()) {
-    // Level with the road that joins it, and clear of the water under it.
-    //
-    // Three metres over the higher bank: enough for the arches to read from
-    // the river and for the deck to be a bridge rather than a causeway, and
-    // little enough that the ramps on the approach roads are a gentle rise
-    // rather than a hump. A span long enough to be a real crossing — past four
-    // hundred metres of open water — is lifted on its length instead: the
-    // Harbour Bridge carries its deck forty-nine metres up for half a
-    // kilometre, and laid low it cuts the harbour in two.
-    let deckTop = Math.max(run.bank + 3.0, terrain.waterLevel + 7.5);
-    // Six hundred, not four: Waterloo Bridge is four hundred and sixty metres
-    // of Thames and was being lifted forty-three metres into the air by a
-    // rule written for a harbour. Sydney's crossing is eleven hundred.
-    if (run.wet > 600) {
-      deckTop = Math.max(deckTop, terrain.waterLevel + Math.min(50, run.wet * 0.09));
-    }
-    const DECK_T = 1.8;
-
-    // Order the run end to end.
+    // A run is not a bridge: it is every piece of elevated road that touches
+    // another, and a survey flags the Cahill Expressway as a bridge the same
+    // as the Harbour Bridge it feeds. Welded, the two were one star of decks
+    // meeting at the map's edge, so the expressway along Circular Quay was
+    // lifted to the Harbour Bridge's forty-eight metres and neither could be
+    // straightened into a line. So the run is cut at its junctions into
+    // chains, and each chain is its own bridge: its own height from its own
+    // water and banks, its own straight line, its own arches.
     const degree = new Map();
+    const at = new Map();
     for (const e of run.edges) {
-      for (const k of [e.a, e.b]) degree.set(k, (degree.get(k) || 0) + 1);
+      for (const k of [e.a, e.b]) {
+        degree.set(k, (degree.get(k) || 0) + 1);
+        let list = at.get(k);
+        if (!list) at.set(k, list = []);
+        list.push(e);
+      }
     }
-    const ends = [...degree].filter(([, d]) => d === 1).map(([k]) => k);
-    let chain = null;
-    if (ends.length === 2) {
-      chain = [];
-      const left = new Set(run.edges);
-      let at = ends[0];
-      chain.push({ x: nodes[at].x, z: nodes[at].z, node: at });
-      while (left.size) {
-        const e = [...left].find((q) => q.a === at || q.b === at);
-        if (!e) { chain = null; break; }
-        left.delete(e);
-        const fwd = e.a === at;
-        const pts = fwd ? e.pts : e.pts.slice().reverse();
-        for (let i = 1; i < pts.length; i++) chain.push({ x: pts[i].x, z: pts[i].z });
-        at = fwd ? e.b : e.a;
-        chain[chain.length - 1].node = at;
+    const isStop = (k) => degree.get(k) !== 2;
+    const seen = new Set();
+    const chains = [];
+    const walk = (start, e) => {
+      // Follow from `start` along `e` through two-edge nodes to the next stop.
+      const chain = { edges: [], nodes: [start], pts: [] };
+      let node = start, edge = e;
+      for (;;) {
+        seen.add(edge);
+        const fwd = edge.a === node;
+        chain.edges.push({ e: edge, fwd });
+        const pts = fwd ? edge.pts : edge.pts.slice().reverse();
+        for (let i = chain.pts.length ? 1 : 0; i < pts.length; i++) chain.pts.push(pts[i]);
+        node = fwd ? edge.b : edge.a;
+        chain.nodes.push(node);
+        if (isStop(node) || node === start) break;
+        const next = at.get(node).find((q) => q !== edge);
+        if (!next || seen.has(next)) break;
+        edge = next;
+      }
+      chains.push(chain);
+    };
+    for (const [k, d] of degree) {
+      if (d === 2) continue;
+      for (const e of at.get(k)) if (!seen.has(e)) walk(k, e);
+    }
+    // A loop with no stop on it at all.
+    for (const e of run.edges) if (!seen.has(e)) walk(e.a, e);
+
+    const DECK_T = 1.8;
+    const nodeTop = new Map();
+    for (const chain of chains) {
+      let wet = 0, bank = -Infinity;
+      for (const { e } of chain.edges) {
+        for (let i = 0; i < e.pts.length - 1; i++) {
+          const p = e.pts[i], q = e.pts[i + 1];
+          const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2;
+          if (terrain.isWater(mx, mz)) wet += Math.hypot(q.x - p.x, q.z - p.z);
+          else bank = Math.max(bank, p.y, q.y);
+        }
+      }
+      if (!isFinite(bank)) bank = terrain.waterLevel;
+      // Level with the road that joins it, and clear of the water under it.
+      //
+      // Three metres over the higher bank: enough for the arches to read from
+      // the river and for the deck to be a bridge rather than a causeway, and
+      // little enough that the ramps on the approach roads are a gentle rise
+      // rather than a hump. A span long enough to be a real crossing — past
+      // six hundred metres of open water — is lifted on its length instead:
+      // the Harbour Bridge carries its deck forty-nine metres up for half a
+      // kilometre, and laid low it cuts the harbour in two. Six hundred, not
+      // four: Waterloo Bridge is four hundred and sixty metres of Thames.
+      let deckTop = Math.max(bank + 3.0, terrain.waterLevel + 7.5);
+      if (wet > 600) deckTop = Math.max(deckTop, terrain.waterLevel + Math.min(50, wet * 0.09));
+      chain.deckTop = deckTop;
+      chain.wet = wet;
+      for (const k of [chain.nodes[0], chain.nodes[chain.nodes.length - 1]]) {
+        nodeTop.set(k, Math.max(nodeTop.get(k) || -Infinity, deckTop));
       }
     }
 
-    // Straight enough to be one line, and standing on ground at both ends.
-    let line = null;
-    if (chain && chain.length >= 2) {
-      const A = chain[0], B = chain[chain.length - 1];
+    for (const chain of chains) {
+      const deckTop = chain.deckTop;
+      const A = chain.pts[0], B = chain.pts[chain.pts.length - 1];
       const dx = B.x - A.x, dz = B.z - A.z;
       const len = Math.hypot(dx, dz);
       let dev = 0;
-      for (const p of chain) {
+      for (const p of chain.pts) {
         dev = Math.max(dev, Math.abs((p.x - A.x) * -dz / (len || 1) + (p.z - A.z) * dx / (len || 1)));
       }
-      // Not required to be ashore at both ends: a crossing that leaves the map
-      // over the water is still a bridge, and a slab is not.
+      // Straight enough to be one line. A survey traces the kerb and the
+      // welded landing can put a twenty-metre kink in the last piece; onto
+      // the chord it goes, junctions along it included. A crossing that
+      // genuinely curves keeps its polyline and its flat deck.
+      let line = null;
       if (len > 40 && dev < len * 0.12) {
         const ux = dx / len, uz = dz / len;
-        // Every point onto the chord, junctions included.
         const onto = (p) => {
           const t = ((p.x - A.x) * ux + (p.z - A.z) * uz);
           p.x = A.x + ux * t; p.z = A.z + uz * t;
         };
-        for (const e of run.edges) for (const p of e.pts) onto(p);
-        for (const k of degree.keys()) onto(nodes[k]);
+        for (const { e } of chain.edges) for (const p of e.pts) onto(p);
+        for (let i = 1; i < chain.nodes.length - 1; i++) onto(nodes[chain.nodes[i]]);
         const from = new THREE.Vector3(A.x, 0, A.z), to = new THREE.Vector3(B.x, 0, B.z);
         line = {
           a: { x: A.x, z: A.z }, b: { x: B.x, z: B.z }, from, to, len,
           yaw: Math.atan2(dx, dz), out: { x: ux, z: uz },
-          deckY: deckTop - DECK_T / 2, deckT: DECK_T, deckTop,
+          deckY: deckTop - DECK_T / 2, deckT: DECK_T, deckTop, wet: chain.wet,
           profile: [{ x: A.x, z: A.z, y: deckTop }, { x: B.x, z: B.z, y: deckTop }],
           ramps: [], run: 46,
         };
-        for (const e of run.edges) e.arched = true;
+        for (const { e } of chain.edges) e.arched = true;
       }
-    }
-
-    for (const e of run.edges) {
-      for (const p of e.pts) p.y = deckTop;
+      for (const { e } of chain.edges) for (const p of e.pts) p.y = deckTop;
       // The pads at the junctions are laid at the node's height plus the lift,
       // so the node sits one lift under the running surface.
-      for (const k of [e.a, e.b]) if (nodes[k]) nodes[k].y = deckTop - SURFACE_LIFT;
-    }
+      for (const k of chain.nodes) {
+        const top = nodeTop.get(k) ?? deckTop;
+        if (nodes[k]) nodes[k].y = top - SURFACE_LIFT;
+      }
 
-    // The ramps: every ordinary road leaving a landing rises to the deck over
-    // its last forty-six metres, eased as t² so it leaves the ground flat and
-    // arrives level. The road carries the height itself, the same way the
-    // bridge does, so the structure built under it cannot disagree with it.
-    for (const k of degree.keys()) {
-      if (degree.get(k) !== 1) continue;
-      const landing = nodes[k];
-      for (const l of landing.links) {
-        const e = l.edge;
-        if (e.bank || e.approach) continue;
-        const fwd = l.at === 0;
-        const src = fwd ? e.pts : e.pts.slice().reverse();
-        let total = 0;
-        for (let i = 1; i < src.length; i++) {
-          total += Math.hypot(src[i].x - src[i - 1].x, src[i].z - src[i - 1].z);
-        }
-        const RUN = Math.min(46, total);
-        const ground = (p) => terrain.heightAt(p.x, p.z) + SURFACE_LIFT;
-        const ramp = [{ x: landing.x, z: landing.z, y: deckTop }];
-        let s = 0;
-        for (let i = 1; i < src.length; i++) {
-          const a = src[i - 1], b = src[i];
-          const d = Math.hypot(b.x - a.x, b.z - a.z);
-          if (s < RUN && s + d > RUN + 0.5) {
-            // The foot of the ramp, exactly where the road meets the ground.
-            const t = (RUN - s) / d;
-            const q = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
-            q.y = ground(q);
+      // The ramps: every ordinary road leaving a landing rises to the deck
+      // over its last forty-six metres, eased as t² so it leaves the ground
+      // flat and arrives level. The road carries the height itself, the same
+      // way the bridge does, so the structure built under it cannot disagree.
+      for (const k of [chain.nodes[0], chain.nodes[chain.nodes.length - 1]]) {
+        const landing = nodes[k];
+        if (!landing) continue;
+        for (const l of landing.links) {
+          const e = l.edge;
+          if (e.bank || e.approach) continue;
+          const fwd = l.at === 0;
+          const src = fwd ? e.pts : e.pts.slice().reverse();
+          let total = 0;
+          for (let i = 1; i < src.length; i++) {
+            total += Math.hypot(src[i].x - src[i - 1].x, src[i].z - src[i - 1].z);
+          }
+          const top = nodeTop.get(k) ?? deckTop;
+          const RUN = Math.min(46, total);
+          const ground = (p) => terrain.heightAt(p.x, p.z) + SURFACE_LIFT;
+          const ramp = [{ x: landing.x, z: landing.z, y: top }];
+          let s = 0;
+          for (let i = 1; i < src.length; i++) {
+            const a = src[i - 1], b = src[i];
+            const d = Math.hypot(b.x - a.x, b.z - a.z);
+            if (s < RUN && s + d > RUN + 0.5) {
+              const t = (RUN - s) / d;
+              const q = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+              q.y = ground(q);
+              ramp.push(q);
+            }
+            s += d;
+            const q = { x: b.x, z: b.z };
+            const g = ground(q);
+            const t = Math.min(1, s / RUN);
+            q.y = top + (g - top) * (t * t);
             ramp.push(q);
           }
-          s += d;
-          const q = { x: b.x, z: b.z };
-          const g = ground(q);
-          const t = Math.min(1, s / RUN);
-          q.y = deckTop + (g - deckTop) * (t * t);
-          ramp.push(q);
+          e.pts = fwd ? ramp : ramp.slice().reverse();
+          e.approach = true;
+          if (line) line.ramps.push({ pts: ramp, w: halfWidth(e.cls) * 2 });
         }
-        e.pts = fwd ? ramp : ramp.slice().reverse();
-        e.approach = true;
-        if (line) line.ramps.push({ pts: ramp, w: halfWidth(e.cls) * 2 });
       }
+      if (line) bridges.push(line);
     }
-    if (line) bridges.push(line);
   }
 }
 

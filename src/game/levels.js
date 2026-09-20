@@ -315,8 +315,13 @@ export const LEVELS = {
     },
     // Circular Quay is across the cove; nothing is built on the point but the
     // thing on the point.
-    cityExcludeRadius: 300,
-    contextExclude: 260,
+    // The Opera House's own footprint and the building keep-out round it are
+    // what hold the city off Bennelong Point. Three hundred metres on top of
+    // that left nothing standing within three hundred metres of the shells —
+    // Circular Quay East, the Toaster, the quay itself — and the harbour city
+    // read as a monument on a bare headland.
+    cityExcludeRadius: 160,
+    contextExclude: 160,
     // Three-quarter from the south-west, over Circular Quay. Square on to the
     // mouths every shell shows its glass at once and the building reads as a
     // row of tents; from here the two groups overlap and you get the flanks

@@ -57,6 +57,7 @@ export class Terrain {
     this._relax();
     this.waterLevel = this._computeWaterLevel();
     this.openSea = this._computeOpenSea();
+    if (this.openSea) this._liftQuays();
     this._repairRiver();
     this.mesh = null;
     this.collider = null;
@@ -199,6 +200,35 @@ export class Terrain {
       }
     }
     return level;
+  }
+
+  /**
+   * Dry land below the waterline is a quay, and a quay stands above the water.
+   *
+   * The DEM has Circular Quay at a metre and a half under the harbour it is
+   * built into: reclaimed ground, surveyed by a satellite that does not care,
+   * with the water's surface taken from the plateau the same satellite drew
+   * over the harbour. The mask says land, the height says under water, and
+   * every building on it — the ferry wharves, the Passenger Terminal, the
+   * Toaster — was refused for standing below the waterline. Seventy-five
+   * surveyed buildings within seven hundred metres of the Opera House.
+   *
+   * On a harbour level the honest reading is the mask's: if it is land, it is
+   * a quay, and a quay is a metre above the water or it is not a quay. Dry
+   * cells under the surface are brought up to just over it, nearly flat, so
+   * the waterfront stands where the water stops instead of under it.
+   */
+  _liftQuays() {
+    const n = this.size, h = this.heights, mask = this.mask;
+    const target = this.waterLevel + 0.9;
+    let lifted = 0;
+    for (let i = 0; i < n * n; i++) {
+      if (mask[i * 3] > 0.5) continue;
+      if (h[i] >= target) continue;
+      h[i] = target - (target - h[i]) * 0.12;
+      lifted++;
+    }
+    this.liftedQuays = lifted;
   }
 
   /** Separable box blur over the DEM grid, by prefix sums. */

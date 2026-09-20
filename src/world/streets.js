@@ -821,7 +821,9 @@ export function buildEdgeIndex(net) {
   }
   net.segs = segs;
   /** Distance from (x,z) to the nearest carriageway edge; negative if inside. */
-  net.roadClearance = (x, z) => {
+  // `ground` asks about the roads on the ground only: a building can stand
+  // under an elevated expressway, and Circular Quay does.
+  net.roadClearance = (x, z, ground = false) => {
     const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
     let best = Infinity;
     for (let ax = cx - 1; ax <= cx + 1; ax++) {
@@ -830,6 +832,7 @@ export function buildEdgeIndex(net) {
         if (!bucket) continue;
         for (const si of bucket) {
           const s = segs[si];
+          if (ground && s.edge && (s.edge.bridge || s.edge.approach)) continue;
           best = Math.min(best, pointSeg(x, z, s.a, s.b) - s.half);
         }
       }
