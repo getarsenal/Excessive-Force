@@ -10,6 +10,7 @@ import { Life } from './world/life.js';
 import { loadCity } from './world/city.js';
 import { buildCityBodies } from './world/citybodies.js';
 import { buildFieldWorks } from './world/works.js';
+import { CoastalTurret } from './game/turret.js';
 import { Structure } from './structure/structure.js';
 import {
   resolveStartLevel, recordResult, nextTarget, goToLevel,
@@ -346,9 +347,16 @@ async function boot() {
 
   let hud;
   const picker = new Picker(canvas, engine.camera, terrain);
+  // A coastal gun on the summit, where the level has one. Not a structure —
+  // a machine with a hit count — and not an objective.
+  const turret = level.turret
+    ? new CoastalTurret({ scene: engine.scene, physics, terrain, fx, audio,
+      x: origin.x + level.turret.x, z: origin.z + level.turret.z, yaw: level.turret.yaw ?? 0,
+      scale: level.turret.scale })
+    : null;
   const battle = new Battle({
     scene: engine.scene, camera: engine.camera, engine, physics, terrain,
-    structures, primary, garrison, fx, quality, groundY, audio, level,
+    structures, primary, garrison, fx, quality, groundY, audio, level, turret,
     onEvent: (kind, data) => handleEvent(kind, data),
   });
   // So a shell landing can scatter whatever was sitting on the roofs.

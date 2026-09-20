@@ -894,6 +894,35 @@ function layDecks(edges, nodes, terrain, bridges) {
     }
 
     for (const chain of chains) {
+      let chainLen = 0;
+      for (let i = 0; i < chain.pts.length - 1; i++) {
+        chainLen += Math.hypot(chain.pts[i + 1].x - chain.pts[i].x, chain.pts[i + 1].z - chain.pts[i].z);
+      }
+      // A viaduct over land follows the land. The Corcovado's rack railway
+      // and Agra's rail line are flagged as bridges for a kilometre each and
+      // cross no water at all; one flat deck at the highest ground along
+      // them stood forty metres over everything lower — a wall across the
+      // mountainside. A chain that is nearly all over land is laid three
+      // metres over the ground under each point instead, smoothed along its
+      // length so the deck rides the slope rather than every bump in it.
+      if (chain.wet < chainLen * 0.15 && chainLen > 120) {
+        const raw = chain.pts.map((p) => terrain.heightAt(p.x, p.z) + 3.0);
+        const sm = raw.map((_, i) => {
+          let sum = 0, n = 0;
+          for (let k = -3; k <= 3; k++) {
+            const j = i + k;
+            if (j < 0 || j >= raw.length) continue;
+            sum += raw[j]; n++;
+          }
+          return sum / n;
+        });
+        chain.pts.forEach((p, i) => { p.y = Math.max(sm[i], raw[i] - 4); });
+        for (const k of chain.nodes) {
+          const nd = nodes[k];
+          if (nd) nd.y = terrain.heightAt(nd.x, nd.z) + 3.0 - SURFACE_LIFT;
+        }
+        continue;
+      }
       const deckTop = chain.deckTop;
       const A = chain.pts[0], B = chain.pts[chain.pts.length - 1];
       const dx = B.x - A.x, dz = B.z - A.z;

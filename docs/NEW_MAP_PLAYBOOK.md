@@ -110,6 +110,18 @@ any of them, and if one is wrong on a new map it is wrong on all nine:
     length past six hundred metres of water — ramps the roads at each landing
     and hands the line to `buildBridge`: masonry arches, piers, balustrade and
     lamps, or past six hundred metres a steel through-arch on granite pylons.
+  - **a viaduct over land follows the land.** A chain flagged as a bridge that
+    crosses almost no water — the Corcovado's rack railway, Agra's rail line —
+    is laid three metres over the ground under each point, smoothed, not at
+    one flat height; one flat deck at its highest ground was a wall across
+    the mountainside.
+  - **the exclusion radius is not the precinct.** `cityExcludeRadius` is what
+    is left after the landmark's own footprint and the precinct margin have
+    kept the city off: on Pisa three hundred and thirty metres threw away
+    three hundred and four of the town's buildings and every street round the
+    Campo. Start from the precinct and add only what the real place has open.
+  - **the paving is the precinct's outline,** the landmarks' footprint with the
+    railings' margin and cut corners, on the building's axes — not a disc.
   - **the waterfront is on the water.** On a harbour level, dry land the DEM
     puts under the waterline is a quay and is lifted just over it
     (`_liftQuays`); a surveyed footprint over the water but tied to the shore
@@ -327,6 +339,16 @@ the inside the building really has, then ask what a shell uncovering it
 would do.
 
 ---
+
+### A gun that shoots back
+
+A level may carry `turret: { x, z, yaw, scale }` — a coastal mounting
+(`src/game/turret.js`) that turns slowly toward the nearest battery in range,
+drops two shells at a time on it in a high arc, deflects three friendly rounds
+in four off its dome and barrels (re-firing them along their new line), and is
+wrecked after sixteen that bite. It is a machine with a hit count and a
+kinematic body, not masonry, and not an objective. Rio has one on the summit
+ring fifty metres from the statue; give it flat ground and a clear arc.
 
 ## 4. Post the garrison
 

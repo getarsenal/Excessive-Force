@@ -1028,7 +1028,10 @@ export function buildContext(terrain, quality, opts = {}) {
   // bald plate. Where the precinct says its ground is lawn, garden or sand,
   // the ground is the ground.
   const paved = !['lawn', 'charbagh', 'sand'].includes(opts.precinct?.ground);
-  if (paved) group.add(buildForecourt(terrain, EXCLUDE, quality));
+  if (paved) {
+    group.add(buildForecourt(terrain, quality,
+      (opts.landmarks || []).filter((l) => !l.scenery), realNet ? 0 : YAW, EXCLUDE));
+  }
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
   // The surveyed crossings, built by the same hand: arches, piers, balustrade
@@ -1357,39 +1360,69 @@ function buildBlockGround(terrain, net, quality, inPrecinct) {
  * because a flat disc laid on anything but a billiard table buries one side of
  * itself and hangs in the air on the other.
  */
-function buildForecourt(terrain, radius, quality) {
+function buildForecourt(terrain, quality, landmarks, yaw, radius) {
+  // The paved ground is the precinct's own outline — the landmarks' combined
+  // footprint with the same margin the railings stand at, corners cut — laid
+  // out on the building's axes. It used to be a disc of radius `EXCLUDE`
+  // round the origin, which on Moscow was a two-hundred-and-forty-metre grey
+  // plate with the shading of its forty-eight wedges showing, sitting under a
+  // rectangular square with a rectangular ring of trees round it. Red Square
+  // is a rectangle; so is the paving now.
   const g = new THREE.Group();
   g.name = 'forecourt';
-  const RINGS = [0, 0.38, 0.7, 0.88, 1.0];
-  const SEGS = 48;
+  const cu = Math.cos(yaw), su = Math.sin(yaw);
+  const toGrid = (x, z) => ({ u: x * cu - z * su, v: x * su + z * cu });
+  const toWorld = (u, v) => ({ x: u * cu + v * su, z: -u * su + v * cu });
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const l of landmarks) {
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const q = toGrid(l.x + sx * l.w / 2, l.z + sz * l.d / 2);
+      u0 = Math.min(u0, q.u); u1 = Math.max(u1, q.u);
+      v0 = Math.min(v0, q.v); v1 = Math.max(v1, q.v);
+    }
+  }
+  if (!isFinite(u0)) { u0 = -radius; u1 = radius; v0 = -radius; v1 = radius; }
+  const PAD = 26;
+  u0 -= PAD; u1 += PAD; v0 -= PAD; v1 += PAD;
+  const CUT = Math.min(18, (u1 - u0) * 0.22, (v1 - v0) * 0.22);
+  const inside = (u, v) => {
+    if (u < u0 || u > u1 || v < v0 || v > v1) return false;
+    // The cut corners.
+    const du = Math.min(u - u0, u1 - u), dv = Math.min(v - v0, v1 - v);
+    return du + dv >= CUT;
+  };
+  const edgeDist = (u, v) => {
+    const d = Math.min(u - u0, u1 - u, v - v0, v1 - v);
+    const du = Math.min(u - u0, u1 - u), dv = Math.min(v - v0, v1 - v);
+    return Math.min(d, (du + dv - CUT) / Math.SQRT2);
+  };
+
   const pos = [];
   const col = [];
   const paving = new THREE.Color(0xb6ae9b);
   const edge = new THREE.Color(0x9a927f);
   const tmp = new THREE.Color();
-  const at = (r, th) => {
-    const x = Math.cos(th) * r * radius, z = Math.sin(th) * r * radius;
-    return { x, z, y: terrain.heightAt(x, z) + 0.16 };
-  };
-  const put = (p, t) => {
-    pos.push(p.x, p.y, p.z);
-    const j = 0.9 + 0.2 * valueNoise(p.x * 0.05, p.z * 0.05);
-    tmp.copy(paving).lerp(edge, t).multiplyScalar(j);
+  const STEP = 5;
+  const put = (u, v) => {
+    const w = toWorld(u, v);
+    pos.push(w.x, terrain.heightAt(w.x, w.z) + 0.16, w.z);
+    const j = 0.9 + 0.2 * valueNoise(w.x * 0.05, w.z * 0.05);
+    const t = THREE.MathUtils.clamp(1 - edgeDist(u, v) / 14, 0, 1);
+    tmp.copy(paving).lerp(edge, t * 0.8).multiplyScalar(j);
     col.push(tmp.r, tmp.g, tmp.b);
   };
-  for (let ri = 0; ri < RINGS.length - 1; ri++) {
-    const r0 = RINGS[ri], r1 = RINGS[ri + 1];
-    for (let s = 0; s < SEGS; s++) {
-      const th0 = (s / SEGS) * Math.PI * 2, th1 = ((s + 1) / SEGS) * Math.PI * 2;
-      // Nibble the outer edge so the forecourt is not a drawn-compass circle.
-      const wob = (t) => 1 - 0.06 * valueNoise(Math.cos(t) * 3.1, Math.sin(t) * 3.1);
-      const k0 = ri === RINGS.length - 2 ? wob(th0) : 1;
-      const k1 = ri === RINGS.length - 2 ? wob(th1) : 1;
-      const a = at(r0, th0), b = at(r1 * k0, th0), c = at(r1 * k1, th1), d = at(r0, th1);
-      put(a, r0); put(c, r1); put(b, r1);
-      put(a, r0); put(d, r0); put(c, r1);
+  for (let u = u0; u < u1; u += STEP) {
+    for (let v = v0; v < v1; v += STEP) {
+      const ua = u, ub = Math.min(u1, u + STEP), va = v, vb = Math.min(v1, v + STEP);
+      const cs = [[ua, va], [ub, va], [ub, vb], [ua, vb]].filter(([a, b]) => inside(a, b));
+      if (cs.length < 3) continue;
+      // A cell with all four corners in is two triangles; one cut by the
+      // corner chamfer is the triangle of what is left.
+      put(...cs[0]); put(...cs[1]); put(...cs[2]);
+      if (cs.length === 4) { put(...cs[0]); put(...cs[2]); put(...cs[3]); }
     }
   }
+  if (!pos.length) return g;
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));

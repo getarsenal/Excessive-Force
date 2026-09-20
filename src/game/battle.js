@@ -31,6 +31,7 @@ export class Battle {
     this.terrain = ctx.terrain;
     this.structures = ctx.structures;
     this.primary = ctx.primary;          // the structure that must come down
+    this.turret = ctx.turret || null;    // a coastal gun that shoots back, if the level has one
     this.garrison = ctx.garrison;
     // Scratch for the free-fire aim point, so picking a target does not
     // allocate a vector per gun per second.
@@ -1235,6 +1236,14 @@ export class Battle {
       return;
     }
 
+    // The turret first: three rounds in four glance off it and are re-fired
+    // along their new line, so a round that has been deflected has not
+    // arrived anywhere yet.
+    if (this.turret && hit.owner === this.turret) {
+      const r = this.turret.hit(hit, proj, this);
+      if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
+    }
+
     const power = w.power * this.powerScale;
     // The direction the round was travelling when it arrived, so the masonry
     // leaves the far side rather than puffing outward in a symmetric ball.
@@ -1388,6 +1397,7 @@ export class Battle {
     this.garrison.update(dt, this.units, shots, this.structures);
     this._pushTracers(shots);
     this.garrison.updateMortars(dt, this.projectiles, this.units);
+    if (this.turret) this.turret.update(dt, this.units, this.projectiles, this);
     this.garrison.sync();
     this.tracerFX.update(dt);
     this._updateRings(dt);

@@ -98,7 +98,11 @@ export const LEVELS = {
     victory: 'Taj Ma-Fall',
     // The complex is 2.2x life size: a 210 m terrace with a dome 141 m over
     // it. Everything framed around it moves out with it.
-    cityExcludeRadius: 420,   // keep OSM buildings off the charbagh
+    // The charbagh and the terrace are the landmarks' own footprint plus the
+    // precinct's margin now; the radius on top of it only has to keep Taj
+    // Ganj off the garden's south wall. Four hundred and twenty threw away
+    // sixty-seven of the town's buildings that stand outside the gate.
+    cityExcludeRadius: 320,
     contextExclude: 300,
     // From the garden, the way everyone has seen it: the charbagh in the
     // foreground and the Yamuna behind the dome.
@@ -197,8 +201,12 @@ export const LEVELS = {
     },
     // The Great Plaza is open ground for two hundred metres in every
     // direction, and the Temple of the Warriors stands at the far side of it.
-    cityExcludeRadius: 300,
-    contextExclude: 300,
+    // The other ruins — the Great Ball Court, El Caracol, the Nunnery — are
+    // surveyed as buildings and stand two to three hundred metres from El
+    // Castillo; as low stone boxes they read as what they are. Three hundred
+    // metres clear kept all twenty-six of them off the site.
+    cityExcludeRadius: 170,
+    contextExclude: 170,
     camera: { yaw: 0.72, pitch: 0.30, distance: 330, height: 66 },
     structures: (quality) => [
       { key: 'castillo', blocks: buildElCastillo(quality), primary: true,
@@ -259,8 +267,13 @@ export const LEVELS = {
     },
     // The Campo dei Miracoli is walled lawn from the Baptistery to the
     // Camposanto, and the city stops at the wall.
-    cityExcludeRadius: 330,
-    contextExclude: 300,
+    // The Campo dei Miracoli is a lawn with the town hard against three
+    // sides of it: the medieval wall to the north, houses on the south and
+    // east within sixty metres of the Duomo. Three hundred and thirty metres
+    // clear threw away three hundred and four of them and every street round
+    // the piazza, and the tower stood on a bare plain.
+    cityExcludeRadius: 150,
+    contextExclude: 150,
     camera: { yaw: -0.40, pitch: 0.26, distance: 300, height: 58 },
     structures: (quality) => [
       { key: 'campanile', blocks: buildCampanile(quality), primary: true,
@@ -377,8 +390,11 @@ export const LEVELS = {
       bed: new THREE.Color(0x475140),
       dry: new THREE.Color(0xa99c8e),
     },
-    cityExcludeRadius: 300,
-    contextExclude: 240,
+    // Red Square is three hundred and thirty metres long and GUM stands on
+    // the far side of it; two hundred and twenty keeps the square open and
+    // lets the city come to its edge.
+    cityExcludeRadius: 220,
+    contextExclude: 220,
     camera: { yaw: 1.10, pitch: 0.26, distance: 215, height: 48 },
     structures: (quality) => [
       { key: 'basils', blocks: buildSaintBasils(quality), primary: true,
@@ -447,6 +463,12 @@ export const LEVELS = {
     garrison: (g, origin, groundY) => {
       g.populateRedeemer(origin, groundY);
     },
+    // The Forte de Copacabana's twin 305 mm mounting, dug into the summit
+    // platform fifty metres from the statue — on the flat ring between the
+    // terraces and the platform's edge, clear of the garrison's own lines.
+    // It turns slowly, drops two shells at a time on the battery, and three
+    // rounds in four glance off it. See `game/turret.js`.
+    turret: { x: -38, z: 35, yaw: 2.4, scale: 1.9 },
     // The arms are scored and they are worth what they weigh, which is the
     // lesson: shoot them off and watch the bar barely move.
     scoreTags: ['statue', 'arms', 'pedestal'],
@@ -498,7 +520,11 @@ export const LEVELS = {
       bed: new THREE.Color(0x6a6b4a),
       dry: new THREE.Color(0xe0cda0),
     },
-    cityExcludeRadius: 460,
+    // The plateau stays open desert — that is the design — but the village
+    // of Nazlet el-Semman stands at its north-east edge four hundred metres
+    // from Khufu, and four hundred and sixty threw three hundred and eleven
+    // of its houses away. The streets and the sand keep the wider radius.
+    cityExcludeRadius: 380,
     contextExclude: 460,
     camera: { yaw: -0.55, pitch: 0.33, distance: 640, height: 130 },
     structures: (quality) => [

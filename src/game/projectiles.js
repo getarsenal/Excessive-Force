@@ -369,6 +369,7 @@ export class ProjectileManager {
 
       let hitPoint = null;
       let structureHit = false;
+      let owner = null;
 
       if (dist > 0.0001) {
         const dir = delta.clone().multiplyScalar(1 / dist);
@@ -380,6 +381,7 @@ export class ProjectileManager {
         if (res) {
           hitPoint = a.clone().addScaledVector(dir, Math.max(0, res.toi - 0.05));
           structureHit = true;
+          owner = res.owner || null;
         }
       }
 
@@ -397,7 +399,7 @@ export class ProjectileManager {
 
       if (hitPoint) {
         p.alive = false;
-        onHit({ point: hitPoint, proj: p, structureHit, groundHit: !structureHit });
+        onHit({ point: hitPoint, proj: p, structureHit, groundHit: !structureHit, owner });
         continue;
       }
 
