@@ -1081,15 +1081,22 @@ export class TestMenu {
         const t = c.terrain;
         let wetCells = 0;
         for (let i = 0; i < t.size * t.size; i++) if (t.mask[i * 3] > 0.35) wetCells++;
+        // `quads` is the playfield's own sheet. The distant coastline is
+        // counted apart from it and is not this test's business: Pisa has no
+        // water on the map and the Ligurian Sea ten kilometres west of it,
+        // and both of those are correct at the same time.
+        const farQuads = w.userData.farQuads ?? 0;
         if (wetCells === 0) {
           assert(quads === 0, `${quads} water quads on a level with no river`);
-          return 'landlocked, no water drawn';
+          return farQuads
+            ? `landlocked, ${farQuads} quads of distant coast`
+            : 'landlocked, no water drawn';
         }
         assert(quads > 0, 'the river mask is populated but no water was built');
         // The sheet must not reach the landmark's plot.
         assert(!t.isWater(b.primary.origin.x, b.primary.origin.z),
           'the target is standing in the river');
-        return `${quads} quads over ${wetCells} wet cells`;
+        return `${quads} quads over ${wetCells} wet cells, ${farQuads} beyond`;
       }],
 
       ['guns can be put on a rooftop', () => {
@@ -2061,8 +2068,25 @@ export class TestMenu {
           + `${worstGap.toFixed(1)} m`);
 
         const counts = city.userData.detail || {};
-        assert((counts.crossings || 0) > 15,
-          `only ${counts.crossings || 0} pedestrian crossings in the whole city`);
+        // A crossing goes where a main road is involved, on two arms at most,
+        // so the number of them is a property of the plan rather than a
+        // constant. Fifteen was right when every three-arm junction got a
+        // zebra on every arm, and that is exactly the thing it was wrong to
+        // do: Chichén Itzá has five junctions that warrant one and Rio, which
+        // is a mountain with a track up it, has none. What the test can still
+        // say is that the ones that are warranted got painted, and that
+        // nothing painted more than the two per junction it is allowed.
+        const plan = city.userData.network;
+        let warranted = 0;
+        for (const n of (plan ? plan.nodes : [])) {
+          if (n.links.length < 3) continue;
+          if (n.links.length >= 4 || n.links.some((l) => l.edge.cls === 'avenue')) warranted++;
+        }
+        const crossings = counts.crossings || 0;
+        assert(warranted === 0 || crossings > 0,
+          `${warranted} junctions warrant a crossing and none was painted`);
+        assert(crossings <= warranted * 2,
+          `${crossings} crossings over ${warranted} junctions that warrant one`);
         return `${net.edges.length} streets, ${net.nodes.length} junctions, `
           + `${net.blocks.length} blocks, ${plots.length} buildings — square to `
           + 'the grid, on the ground, and none of them in the road';

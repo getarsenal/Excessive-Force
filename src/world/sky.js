@@ -382,6 +382,14 @@ export function createWater(terrain, sunDirection, quality) {
   //
   // A ring and not a plane: a plane at the waterline over the whole map would
   // be drawn across the point the Opera House stands on.
+  // Everything above this line is the playfield's own water, and the count is
+  // taken here rather than at the end because the two are different claims.
+  // "Is there a sheet over the river" is about the map; the distant coast is
+  // about the country the map is in, and a level with no river of its own can
+  // quite correctly have four hundred quads of Mediterranean eleven kilometres
+  // away.
+  const nearQuads = index.length / 6;
+
   // ── The water that is really out there.
   //
   // Everything above is the playfield's own mask, and past the boundary the
@@ -524,6 +532,7 @@ export function createWater(terrain, sunDirection, quality) {
     empty.material.uniforms = { uTime: { value: 0 } };
     empty.visible = false;
     empty.userData.quads = 0;
+    empty.userData.farQuads = 0;
     return empty;
   }
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
@@ -566,6 +575,7 @@ export function createWater(terrain, sunDirection, quality) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 5;
   mesh.frustumCulled = false;
-  mesh.userData.quads = index.length / 6;
+  mesh.userData.quads = nearQuads;
+  mesh.userData.farQuads = index.length / 6 - nearQuads;
   return mesh;
 }
