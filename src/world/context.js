@@ -27,7 +27,7 @@ import { realNetwork, measureYaw } from './realstreets.js';
 import { buildSurround } from './surround.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings, buildDecks,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
-  GRID_YAW, ROAD_CLASS, SURFACE_LIFT } from './streets.js';
+  GRID_YAW, ROAD_CLASS, SURFACE_LIFT, bearingNear } from './streets.js';
 
 export function buildContext(terrain, quality, opts = {}) {
   const group = new THREE.Group();
@@ -884,15 +884,11 @@ export function buildContext(terrain, quality, opts = {}) {
     // The bearing of the nearest piece of carriageway, in the yaw convention
     // `block()` takes.
     const facing = (x, z) => {
-      let best = 900, ry = YAW;
-      for (const sg of net.segs) {
-        const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
-        const d = Math.abs(mx - x) + Math.abs(mz - z);
-        if (d >= best) continue;
-        best = d;
-        ry = Math.atan2(-(sg.b.z - sg.a.z), sg.b.x - sg.a.x);
-      }
-      return ry;
+      const near = bearingNear(net, x, z);
+      if (near.dist > 450) return YAW;
+      // `bearingNear` answers in atan2(dx, dz); `block()` wants the yaw that
+      // turns its width axis to (cos y, -sin y), which is a quarter turn off.
+      return near.bearing - Math.PI / 2;
     };
     // The heights around here, so an infill block belongs to its own quarter
     // rather than to a formula. Sampled off the surveyed plots, which are the

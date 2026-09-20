@@ -4,7 +4,7 @@ import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS } from '../game/levels.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveArc } from '../game/projectiles.js';
-import { junctionRing, padRadius, halfWidth } from '../world/streets.js';
+import { junctionRing, padRadius, halfWidth, bearingNear } from '../world/streets.js';
 
 /**
  * The test menu.
@@ -2022,15 +2022,10 @@ export class TestMenu {
           // in the Yucatan cannot drag out of true.
           const offs = [];
           for (const p of plots) {
-            let best = Infinity, bearing = 0;
-            for (const sg of net.segs) {
-              const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
-              const d = Math.hypot(mx - p.x, mz - p.z);
-              if (d < best) {
-                best = d;
-                bearing = Math.atan2(sg.b.x - sg.a.x, sg.b.z - sg.a.z);
-              }
-            }
+            // The road's bearing over a stretch, not the nearest two-metre
+            // piece of a rounded corner — the same measure the infill uses.
+            const near = bearingNear(net, p.x, p.z);
+            const best = near.dist, bearing = near.bearing;
             if (best > 90) continue;               // nothing to be square to
             const off = Math.abs(wrap((p.yaw || 0) - bearing));
             offs.push(off);

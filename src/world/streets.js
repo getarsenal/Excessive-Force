@@ -801,7 +801,7 @@ export function buildEdgeIndex(net) {
   for (const e of net.edges) {
     const half = halfWidth(e.cls);
     for (let i = 0; i < e.pts.length - 1; i++) {
-      segs.push({ a: e.pts[i], b: e.pts[i + 1], half, cls: e.cls });
+      segs.push({ a: e.pts[i], b: e.pts[i + 1], half, cls: e.cls, edge: e, i });
     }
   }
   for (let s = 0; s < segs.length; s++) {
@@ -865,6 +865,51 @@ export function buildEdgeIndex(net) {
     }
     return best;
   };
+}
+
+/**
+ * The bearing of the road nearest to (x, z), and how far away it is.
+ *
+ * Measured over a stretch of the road — the chord between the points `reach`
+ * metres either side of the nearest point — rather than from the one segment
+ * that happens to be closest. The roads are rounded now, and a rounded corner
+ * is a fan of short segments each pointing a little further round the bend:
+ * a building standing off that corner would take the bearing of whichever
+ * two-metre diagonal was nearest, and half of Chichén Itzá's huts came out
+ * seventeen degrees off the track they front. Over twenty-five metres the
+ * corner reads as the two streets it joins, which is what the building is
+ * square to. Returns `{ bearing, dist }`, bearing in the `atan2(dx, dz)`
+ * convention the callers already use.
+ */
+export function bearingNear(net, x, z, reach = 12) {
+  let best = Infinity, hit = null;
+  for (const sg of net.segs) {
+    const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
+    const d = Math.abs(mx - x) + Math.abs(mz - z);
+    if (d < best) { best = d; hit = sg; }
+  }
+  if (!hit) return { bearing: 0, dist: Infinity };
+  const pts = hit.edge ? hit.edge.pts : [hit.a, hit.b];
+  const i0 = hit.edge ? hit.i : 0;
+  // Walk back and forward along the polyline from the nearest segment.
+  const walk = (from, step) => {
+    let k = from, left = reach;
+    let p = pts[k];
+    while (true) {
+      const n = k + step;
+      if (n < 0 || n >= pts.length) return p;
+      const q = pts[n];
+      const d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d >= left) {
+        const t = left / (d || 1);
+        return { x: p.x + (q.x - p.x) * t, z: p.z + (q.z - p.z) * t };
+      }
+      left -= d; p = q; k = n;
+    }
+  };
+  const a = walk(i0, -1), b = walk(i0 + 1, 1);
+  const dist = Math.hypot((hit.a.x + hit.b.x) / 2 - x, (hit.a.z + hit.b.z) / 2 - z);
+  return { bearing: Math.atan2(b.x - a.x, b.z - a.z), dist };
 }
 
 function pointSeg(x, z, a, b) {
