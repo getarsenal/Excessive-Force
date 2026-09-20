@@ -30,11 +30,18 @@ export class PropSet {
     this.buckets = new Map();
   }
 
-  /** @param {string} key material bucket; `geo` is consumed. */
+  /**
+   * @param {string} key material bucket; `geo` is consumed.
+   *
+   * While `this.plot` is set, every piece added belongs to that building —
+   * its cornice, its parapet, its stoop, the tank on its roof — and burns
+   * with it.
+   */
   add(key, geo, colour, jitter = 1) {
     let b = this.buckets.get(key);
     if (!b) this.buckets.set(key, b = []);
     if (colour !== undefined) tint(geo, colour, jitter);
+    if (this.plot !== undefined) geo.userData.plot = this.plot;
     b.push(geo);
     return geo;
   }
@@ -44,8 +51,10 @@ export class PropSet {
     const shadows = this.quality.shadowMapSize > 0;
     for (const [key, geos] of this.buckets) {
       if (!geos.length) continue;
+      const ranges = plotRanges(geos);
       const merged = BufferGeometryUtils.mergeGeometries(geos, false);
       if (!merged) continue;
+      if (ranges.size) markBurnable(merged, ranges);
       const spec = materials[key] || {};
       const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
         vertexColors: true,
@@ -61,6 +70,7 @@ export class PropSet {
         polygonOffsetUnits: spec.offset ? -(spec.offsetLevel ?? 2) : 0,
       }));
       mesh.name = key;
+      if (ranges.size) { burnable(mesh.material); mesh.userData.plotRanges = ranges; }
       mesh.castShadow = shadows && spec.cast !== false;
       mesh.receiveShadow = shadows && spec.receive !== false;
       if (spec.renderOrder) mesh.renderOrder = spec.renderOrder;
@@ -69,6 +79,67 @@ export class PropSet {
       this.buckets.set(key, []);
     }
   }
+}
+
+/**
+ * Where each building's pieces end up in a merge, by vertex: the merge lays
+ * the geometries end to end in order, so this is a running count over the
+ * ones tagged with a plot.
+ */
+export function plotRanges(geos) {
+  const ranges = new Map();
+  let off = 0;
+  for (const g of geos) {
+    const n = g.attributes.position.count;
+    if (g.userData.plot !== undefined) {
+      let r = ranges.get(g.userData.plot);
+      if (!r) ranges.set(g.userData.plot, r = []);
+      r.push([off, n]);
+    }
+    off += n;
+  }
+  return ranges;
+}
+
+/** Give a merged geometry its burn channel: nothing has burnt yet. */
+export function markBurnable(merged) {
+  const burn = new THREE.BufferAttribute(new Float32Array(merged.attributes.position.count), 1);
+  burn.setUsage(THREE.DynamicDrawUsage);
+  merged.setAttribute('aBurn', burn);
+  return merged;
+}
+
+/**
+ * Teach a material to burn.
+ *
+ * `aBurn` is one on a gutted building and zero everywhere else. It takes the
+ * surface to soot and puts any emissive light out — the lit windows, which
+ * the vertex colour alone could never do: emissive light is added after the
+ * tint, and a burnt-out block with its windows still glowing is a block that
+ * is not burnt out.
+ */
+export function burnable(material) {
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev(shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aBurn;\nvarying float vBurn;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBurn = aBurn;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vBurn;')
+      .replace('#include <color_fragment>',
+        '#include <color_fragment>\n'
+        + 'if (vBurn > 0.0) {\n'
+        + '  float soot = 0.07 + 0.05 * fract(sin(dot(floor(gl_FragCoord.xy / 3.0), vec2(12.9898, 78.233))) * 43758.5453);\n'
+        + '  vec3 charred = vec3(soot * 1.15, soot * 0.98, soot * 0.88);\n'
+        + '  diffuseColor.rgb = mix(diffuseColor.rgb, charred, vBurn);\n'
+        + '}')
+      .replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= (1.0 - vBurn);');
+  };
+  const key = material.customProgramCacheKey ? material.customProgramCacheKey() : '';
+  material.customProgramCacheKey = () => `${key}|burnable`;
+  return material;
 }
 
 export function tint(geo, hex, jitter) {
@@ -204,6 +275,7 @@ export function addStreetFurniture(props, terrain, plots, rng, dense) {
 export function addBuildingDetail(props, terrain, plots, rng, dense) {
   let porches = 0, cornices = 0;
   for (const p of plots) {
+    props.plot = p.index;
     const gy = terrain.heightAt(p.x, p.z);
     const yaw = p.yaw || 0;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
@@ -298,6 +370,7 @@ export function addBuildingDetail(props, terrain, plots, rng, dense) {
         0x3b352e, 0.9 + rng() * 0.3);
     }
   }
+  props.plot = undefined;
   return { porches, cornices };
 }
 
@@ -310,6 +383,7 @@ export function addBuildingDetail(props, terrain, plots, rng, dense) {
 export function addRoofAndFrontage(props, terrain, plots, rng, dense) {
   let tanks = 0, awnings = 0, railings = 0, escapes = 0;
   for (const p of plots) {
+    props.plot = p.index;
     const gy = terrain.heightAt(p.x, p.z);
     const yaw = p.yaw || 0;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
@@ -386,6 +460,7 @@ export function addRoofAndFrontage(props, terrain, plots, rng, dense) {
       escapes++;
     }
   }
+  props.plot = undefined;
   return { tanks, awnings, railings, escapes };
 }
 

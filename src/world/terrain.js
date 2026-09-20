@@ -54,11 +54,18 @@ export class Terrain {
     }
 
     this.cellSize = (this.span * 2) / (n - 1);
+    this._closeParcels();
     this._relax();
     this.waterLevel = this._computeWaterLevel();
     this.openSea = this._computeOpenSea();
     if (this.openSea) this._liftQuays();
     this._repairRiver();
+    // Whether there is any water on the map at all. The flood line the
+    // builders keep above is meaningless without it: Pisa's sea level is a
+    // metre and a half above its own low streets, and the Arno is off the map.
+    let wet = 0;
+    for (let i = 0; i < n * n; i++) if (this.mask[i * 3] > 0.5) wet++;
+    this.hasWater = wet > 0;
     this.mesh = null;
     this.collider = null;
   }
@@ -107,6 +114,66 @@ export class Terrain {
       }
       h.set(tmp);
     }
+  }
+
+  /**
+   * Close the gaps in the built-up area.
+   *
+   * The bake paints every built parcel a third of a road, and in a city the
+   * survey has parcelled completely — London — that is one continuous tone
+   * under the buildings. Pisa's survey has not: the parcels are the ones
+   * somebody drew, with bare ground between them at the scale of a yard, so
+   * the town came out as a leopard skin of grey patches on tan, and the grey
+   * patches, being road-coloured, read as broken bits of street. A
+   * morphological closing over twenty-two metres fills the gaps between
+   * parcels and leaves the fields, which are wider than that, alone.
+   */
+  _closeParcels() {
+    const n = this.size;
+    const m = this.mask;
+    const r = Math.max(2, Math.round(22 / this.cellSize));
+    const built = new Uint8Array(n * n);
+    let any = 0;
+    for (let i = 0; i < n * n; i++) {
+      if (m[i * 3 + 1] > 0.15 && m[i * 3] < 0.5) { built[i] = 1; any++; }
+    }
+    if (!any) return;
+    // A square kernel, applied as two one-dimensional passes each way.
+    const pass = (src, dst, pick) => {
+      const tmp = new Uint8Array(n * n);
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          let v = src[j * n + i];
+          for (let k = 1; k <= r && v !== pick; k++) {
+            if (i - k >= 0 && src[j * n + i - k] === pick) v = pick;
+            else if (i + k < n && src[j * n + i + k] === pick) v = pick;
+          }
+          tmp[j * n + i] = v;
+        }
+      }
+      for (let j = 0; j < n; j++) {
+        for (let i = 0; i < n; i++) {
+          let v = tmp[j * n + i];
+          for (let k = 1; k <= r && v !== pick; k++) {
+            if (j - k >= 0 && tmp[(j - k) * n + i] === pick) v = pick;
+            else if (j + k < n && tmp[(j + k) * n + i] === pick) v = pick;
+          }
+          dst[j * n + i] = v;
+        }
+      }
+    };
+    const grown = new Uint8Array(n * n);
+    const closed = new Uint8Array(n * n);
+    pass(built, grown, 1);
+    pass(grown, closed, 0);
+    let filled = 0;
+    for (let i = 0; i < n * n; i++) {
+      if (closed[i] && !built[i] && m[i * 3] < 0.5 && m[i * 3 + 2] < 0.5) {
+        m[i * 3 + 1] = Math.max(m[i * 3 + 1], 0.33);
+        filled++;
+      }
+    }
+    this.parcelsClosed = filled;
   }
 
   _computeWaterLevel() {
@@ -711,7 +778,17 @@ export class Terrain {
       // Roads, straight from the bake mask — hard edges are exactly what a
       // noise-only ground lacks, and they give the eye something to measure
       // distance against.
-      tmp.lerp(P.road, THREE.MathUtils.clamp(m.road * 1.35, 0, 1) * 0.82);
+      //
+      // The streets are asphalt. The built parcels, which the bake paints at
+      // a third of a street, are not: they are yards, courts and the ground a
+      // house stands on, and painting them a third of the way to asphalt drew
+      // grey fragments between the buildings that read as bits of road going
+      // nowhere. They are the town's own ground, a shade duller than the open.
+      const asphalt = THREE.MathUtils.clamp((m.road - 0.45) / 0.45, 0, 1);
+      const yard = THREE.MathUtils.clamp(m.road / 0.34, 0, 1) * (1 - asphalt);
+      tmp2.copy(P.urbanAlt).lerp(P.road, 0.3);
+      tmp.lerp(tmp2, yard * 0.72);
+      tmp.lerp(P.road, asphalt * 0.82);
 
       // Then the water margin, which overrides everything.
       //
@@ -1344,12 +1421,21 @@ function makeGrainTexture(size) {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       // Wrapped sampling keeps the tile seamless.
+      //
+      // And warped. Value noise is a blob at every lattice point, and with
+      // half the amplitude in one octave at four blobs a tile — two metres
+      // apart on the ground — the tile was a grid of blobs, and the ground
+      // seen from above was a lattice: the "weird lines" over Pisa's plain,
+      // where there is nothing else to look at. Offsetting the sample by a
+      // second noise field tears the lattice into blotches, and spreading
+      // the amplitude over the octaves stops any one period showing.
+      const [wx, wy] = warp(x, y, size);
       let n = 0;
-      n += tileNoise(x, y, size, 4) * 0.5;
-      n += tileNoise(x, y, size, 9) * 0.27;
-      n += tileNoise(x, y, size, 19) * 0.15;
-      n += tileNoise(x, y, size, 41) * 0.08;
-      const v = Math.round(232 + (n - 0.5) * 96);
+      n += tileNoise(wx, wy, size, 5) * 0.3;
+      n += tileNoise(wx, wy, size, 11) * 0.3;
+      n += tileNoise(wx, wy, size, 23) * 0.25;
+      n += tileNoise(wx, wy, size, 47) * 0.15;
+      const v = Math.round(232 + (n - 0.5) * 88);
       const o = (y * size + x) * 4;
       img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.max(150, Math.min(255, v));
       img.data[o + 3] = 255;
@@ -1367,7 +1453,10 @@ function makeGrainNormal(size) {
   c.width = c.height = size;
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(size, size);
-  const h = (x, y) => tileNoise(x, y, size, 9) * 0.6 + tileNoise(x, y, size, 19) * 0.4;
+  const h = (x, y) => {
+    const [wx, wy] = warp(x, y, size);
+    return tileNoise(wx, wy, size, 11) * 0.55 + tileNoise(wx, wy, size, 23) * 0.45;
+  };
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = h((x + 1) % size, y) - h((x - 1 + size) % size, y);
@@ -1381,6 +1470,20 @@ function makeGrainNormal(size) {
   }
   ctx.putImageData(img, 0, 0);
   return new THREE.CanvasTexture(c);
+}
+
+/**
+ * The sample point, pushed about by a slower noise so the grain's own lattice
+ * never lines up. Both offsets are periodic in the tile, so the tile still
+ * wraps.
+ */
+function warp(x, y, size) {
+  const k = size * 0.09;
+  return [
+    x + (tileNoise(x, y, size, 3) - 0.5) * k + (tileNoise(x, y, size, 7) - 0.5) * k * 0.5,
+    y + (tileNoise(x + size * 0.37, y + size * 0.61, size, 3) - 0.5) * k
+      + (tileNoise(x + size * 0.11, y + size * 0.83, size, 7) - 0.5) * k * 0.5,
+  ];
 }
 
 /** Value noise on a wrapped lattice, so the result tiles without a seam. */

@@ -20,7 +20,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
-  addRiverEdge, addRoofAndFrontage } from './detail.js';
+  addRiverEdge, addRoofAndFrontage, burnable, plotRanges, markBurnable } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
@@ -40,6 +40,9 @@ export function buildContext(terrain, quality, opts = {}) {
   const push = (arr, geo, x, y, z, ry) => {
     if (ry) geo.rotateY(ry);
     geo.translate(x, y, z);
+    // Which building this piece belongs to, so the merge can find it again:
+    // a building is burnt by writing into its own range of the merged mesh.
+    if (arr === bodies || arr === roofs) geo.userData.plot = plots.length;
     arr.push(geo);
   };
 
@@ -223,7 +226,12 @@ export function buildContext(terrain, quality, opts = {}) {
   const onDryLand = (pts, margin = 4.5, freeboard = 1.6) => {
     for (const p of pts) {
       if (terrain.isWater(p.x, p.z)) return false;
-      if (terrain.heightAt(p.x, p.z) < terrain.waterLevel + freeboard) return false;
+      // The freeboard is a flood line, and a flood line needs water to flood
+      // from. Pisa has none on the map — the Arno is a kilometre south of it —
+      // and its sea level is a metre and a half above the plain's low ground,
+      // so a sixth of the town stood "under water" on a map with no water.
+      if (terrain.hasWater !== false
+          && terrain.heightAt(p.x, p.z) < terrain.waterLevel + freeboard) return false;
       for (let a = 0; a < 4 && margin > 0; a++) {
         const th = (a / 4) * Math.PI * 2;
         if (terrain.isWater(p.x + Math.cos(th) * margin, p.z + Math.sin(th) * margin)) return false;
@@ -555,7 +563,7 @@ export function buildContext(terrain, quality, opts = {}) {
     // the walls run down past the surface. One that is mostly water is a
     // jetty or a pontoon, and is not.
     const isDry = (q) => !terrain.isWater(q.x, q.z)
-      && terrain.heightAt(q.x, q.z) >= terrain.waterLevel + 0.7;
+      && (terrain.hasWater === false || terrain.heightAt(q.x, q.z) >= terrain.waterLevel + 0.7);
     const dryPts = all.filter(isDry);
     // Mostly on land, or on the water but tied to the shore: a ferry wharf
     // is a building standing wholly over the harbour a few metres off the
@@ -654,7 +662,9 @@ export function buildContext(terrain, quality, opts = {}) {
     // that is half indexed and half not, and refuses it by returning null —
     // which surfaces four frames later as a mesh with no geometry and a level
     // that never finishes loading.
-    bodies.push(BufferGeometryUtils.mergeVertices(body));
+    const bodyGeo = BufferGeometryUtils.mergeVertices(body);
+    bodyGeo.userData.plot = plots.length;
+    bodies.push(bodyGeo);
 
     // A cornice, inset the way the boxes' string course is, so an extruded
     // building and a box building read as the same city.
@@ -663,7 +673,9 @@ export function buildContext(terrain, quality, opts = {}) {
         { depth: 1.2, bevelEnabled: false, curveSegments: 1 });
       cap.rotateX(-Math.PI / 2);
       cap.translate(rect.x, g + bodyH, rect.z);
-      roofs.push(BufferGeometryUtils.mergeVertices(cap));
+      const capGeo = BufferGeometryUtils.mergeVertices(cap);
+      capGeo.userData.plot = plots.length;
+      roofs.push(capGeo);
     } catch { /* the cap is optional */ }
 
     const ca = Math.abs(Math.cos(rect.yaw)), sa = Math.abs(Math.sin(rect.yaw));
@@ -1017,8 +1029,13 @@ export function buildContext(terrain, quality, opts = {}) {
     vertexColors: true, roughness: 0.82, metalness: 0.02,
   });
 
-  if (bodies.length) group.add(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
-  if (roofs.length) group.add(mergeTinted(roofs, roofMat, ROOF, rng, quality));
+  burnable(bodyMat);
+  burnable(roofMat);
+  const cityMeshes = [];
+  if (bodies.length) cityMeshes.push(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
+  if (roofs.length) cityMeshes.push(mergeTinted(roofs, roofMat, ROOF, rng, quality));
+  for (const m of cityMeshes) group.add(m);
+  group.userData.cityMeshes = cityMeshes;
 
   group.add(buildBlockGround(terrain, net, quality, inPrecinct));
   // The paved forecourt is a Westminster thing — a stone apron in front of
@@ -1050,7 +1067,13 @@ export function buildContext(terrain, quality, opts = {}) {
   // builds the parapet and balustrade as well, so on a surveyed map it is
   // doing this job properly already.
   if (!realNet) group.add(buildEmbankment(terrain));
-  group.add(buildStreetDetail(terrain, quality, plots, net, rng, opts.clearings || []));
+  // Every building knows its own number from here on: the detail that is
+  // built onto it — cornice, stoop, roof plant — is tagged with it and burns
+  // with it.
+  plots.forEach((p, i) => { p.index = i; });
+  const streetDetail = buildStreetDetail(terrain, quality, plots, net, rng, opts.clearings || []);
+  group.add(streetDetail);
+  streetDetail.traverse((m) => { if (m.isMesh && m.userData.plotRanges) cityMeshes.push(m); });
 
   // ── The detail pass. Everything that makes the massing read as a place
   // rather than as a diagram: street furniture on a rhythm, the parts of a
@@ -1207,6 +1230,8 @@ export function buildContext(terrain, quality, opts = {}) {
     grime: { roughness: 0.99, cast: false, transparent: true, opacity: 0.34 },
   });
   group.add(detail);
+  // The pieces built onto the buildings burn with them.
+  detail.traverse((m) => { if (m.isMesh && m.userData.plotRanges) cityMeshes.push(m); });
   group.userData.detail = counts;
   group.userData.network = net;
   // The frame the whole place is laid out on. The field works read it so the
@@ -1254,12 +1279,16 @@ function mergeTinted(geos, material, palette, rng, quality) {
     for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   }
-  const merged = BufferGeometryUtils.mergeGeometries(geos, false);
+  // Where each building ends up in the merge, by vertex, so it can be burnt.
+  const ranges = plotRanges(geos);
+  const merged = markBurnable(BufferGeometryUtils.mergeGeometries(geos, false));
   const mesh = new THREE.Mesh(merged, material);
   mesh.castShadow = quality.shadowMapSize > 0;
   mesh.receiveShadow = quality.shadowMapSize > 0;
+  mesh.userData.plotRanges = ranges;
   return mesh;
 }
+
 
 /** The colour of each kind of block's own ground. */
 const BLOCK_SURFACE = {
@@ -2349,6 +2378,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
       stack.rotateY(p.yaw || 0);
       stack.translate(x, p.top + h / 2, z);
       tintOne(stack, 0x8d5a4a, 0.8 + rng() * 0.4);
+      stack.userData.plot = p.index;
       roofBits.push(stack);
     }
     // A lift overrun or stair head on the bigger blocks.
@@ -2359,14 +2389,17 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
       hut.translate(p.x + (rng() - 0.5) * (p.w - w - 3), p.top + h / 2,
         p.z + (rng() - 0.5) * (p.d - d - 3));
       tintOne(hut, 0x9a958c, 0.85 + rng() * 0.3);
+      hut.userData.plot = p.index;
       roofBits.push(hut);
     }
   }
   if (roofBits.length) {
+    const ranges = plotRanges(roofBits);
     const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(roofBits, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
+      markBurnable(BufferGeometryUtils.mergeGeometries(roofBits, false)),
+      burnable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })),
     );
+    mesh.userData.plotRanges = ranges;
     mesh.castShadow = shadows;
     mesh.receiveShadow = shadows;
     g.add(mesh);

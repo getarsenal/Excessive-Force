@@ -145,13 +145,30 @@ export class Picker {
     // Flat roofs are legitimate ground. A gun on one has sightlines the street
     // does not, and getting up there is a decision worth offering — so the city
     // is picked against as well, and an upward-facing hit on it is a rooftop.
-    let roof = null;
+    let roof = null, deck = null;
     if (city && city.visible) {
       const hits = this.raycaster.intersectObject(city, true);
       for (const h of hits) {
         if (!h.face) continue;
         this._n.copy(h.face.normal).transformDirection(h.object.matrixWorld);
         if (this._n.y < 0.85) continue;         // a wall, or the underside
+        // Most of what the city group has facing up is not a roof: it is a
+        // road deck, a pavement, a forecourt, a kerb — the ground, with a
+        // surface laid on it a hand's breadth above the heightfield. Calling
+        // that a rooftop sent it through the roof rules, which refused it for
+        // being level with the ground, and so a gun could stand in a field or
+        // on a roof but never in the street. Anything within three metres of
+        // the heightfield is ground, standing on whatever is laid over it.
+        const gy = this.terrain.heightAt(h.point.x, h.point.z);
+        if (h.point.y < gy + 3.0) {
+          deck = h.point.clone();
+          // A road or a pavement carries the unit at its own surface; a car
+          // roof or a bench does not.
+          if (deck.y - gy > 0.7) deck.y = gy;
+          deck.onDeck = true;
+          deck.deckDistance = h.distance;
+          break;
+        }
         roof = h.point.clone();
         roof.onRoof = true;
         roof.roofDistance = h.distance;
@@ -203,6 +220,11 @@ export class Picker {
     }
     if (roof && roof.roofDistance < groundDist) {
       return { kind: 'roof', point: roof, label: 'rooftop', structure: null, chunk: -1 };
+    }
+    // A deck is a hand's breadth above the heightfield, so the ray meets it a
+    // hair before the ground it lies on; either way it is the same tap.
+    if (deck && deck.deckDistance < groundDist + 1.5) {
+      return { kind: 'ground', point: deck, label: null, structure: null, chunk: -1 };
     }
     if (ground) return { kind: 'ground', point: ground, label: null, structure: null, chunk: -1 };
     return best;

@@ -211,6 +211,22 @@ that way.)
   and the ring test at 170 m, so the ground has to be level out to about
   250 m in the direction the guns come from. Offset the pad — a ridge rather
   than a cone — and the rim can still be close on the side the camera looks.
+- **A map with no water has no flood line.** The builders keep buildings a
+  freeboard above `waterLevel`, and on a map whose water is all off the edge
+  (Pisa: the Arno is a kilometre south) that level is the bake's sea level,
+  which sat a metre and a half above the plain's low streets — a sixth of
+  the town refused as "in the water". `terrain.hasWater` is false when the
+  playfield mask has no wet cell, and the freeboard test is skipped.
+- **Parcels come patchy.** The bake paints built parcels at a third of a
+  road, and where the survey has parcelled a town completely that is one
+  tone under the buildings. Where it has not (Pisa) the ground came out as a
+  leopard skin of grey patches on tan, and the grey read as bits of street.
+  `_closeParcels` closes gaps under twenty-two metres at load; the colour
+  pass paints parcels as the town's own duller ground, not as asphalt.
+- **Look at flat ground from straight above at low tier before shipping.**
+  The grain texture's value noise had one dominant octave two metres apart,
+  and on a flat pale plain that is a lattice. It is domain-warped now; any
+  new ground texture wants the same check.
 
 ---
 

@@ -1820,8 +1820,12 @@ export class TestMenu {
             if (clear < 0) { inRoad++; worstRoad = Math.max(worstRoad, -clear); break; }
             // A wharf stands over the water on purpose; anything else that
             // does has fallen in.
+            // And the flood line only where there is water to flood from:
+            // on a map with none, the "waterline" is the bake's sea level,
+            // which at Pisa runs above the plain's own streets.
             if (!p.wharf && (terrain.isWater(x, z)
-              || terrain.heightAt(x, z) < terrain.waterLevel + 0.6)) { wet2++; break; }
+              || (terrain.hasWater !== false
+                && terrain.heightAt(x, z) < terrain.waterLevel + 0.6))) { wet2++; break; }
             if (bridge) {
               const a = bridge.far.a, b = bridge.far.b;
               const dx = b.x - a.x, dz = b.z - a.z;

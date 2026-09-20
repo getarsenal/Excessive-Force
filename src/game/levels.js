@@ -272,8 +272,13 @@ export const LEVELS = {
     // east within sixty metres of the Duomo. Three hundred and thirty metres
     // clear threw away three hundred and four of them and every street round
     // the piazza, and the tower stood on a bare plain.
-    cityExcludeRadius: 150,
-    contextExclude: 150,
+    // And a hundred and fifty still cleared the east side, where the town
+    // stands within sixty metres of the tower — Via Santa Maria and the
+    // Arcivescovado — and left the streets to it ending in a bare ring. The
+    // landmarks' own footprints and the Campo's wall keep the lawn clear;
+    // this only needs to keep the tower's own fall clear.
+    cityExcludeRadius: 70,
+    contextExclude: 70,
     camera: { yaw: -0.40, pitch: 0.26, distance: 300, height: 58 },
     structures: (quality) => [
       { key: 'campanile', blocks: buildCampanile(quality), primary: true,

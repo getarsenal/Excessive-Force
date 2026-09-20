@@ -1683,6 +1683,14 @@ export class Garrison {
       this.losBlocked++;
       return false;
     }
+    // And the town is a wall too. The masonry's occupancy grid knows nothing
+    // of the city round it, so a machine gun in the clock stage fired through
+    // three streets of terraces at a battery parked behind them — buildings
+    // that stop the player's shells, and did not stop his bullets.
+    if (this.city && this.city.blocks(this._from, this._to)) {
+      this.losBlocked++;
+      return false;
+    }
     const clear = lineOfSight(
       structures || this.structures, this._from, this._to, skipFor(d), 0.5,
     );

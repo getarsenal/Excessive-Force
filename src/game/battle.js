@@ -578,7 +578,9 @@ export class Battle {
       this.spent += def.cost;
     }
 
-    const y = point.onRoof ? point.y : this.terrain.heightAt(point.x, point.z);
+    // A roof carries the unit at its own height, and so does a road deck or a
+    // pavement: a gun bedded at the heightfield under a road stands in it.
+    const y = (point.onRoof || point.onDeck) ? point.y : this.terrain.heightAt(point.x, point.z);
     const pos = new THREE.Vector3(point.x, y, point.z);
     pos.onRoof = point.onRoof === true;
 
@@ -1166,6 +1168,8 @@ export class Battle {
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 6.0;
     this._lastImpact = point.clone();
+    // Everything under the bomb burns.
+    if (this.cityFire) this.cityFire.blast(point, rMax * 0.8);
     this.fx.strikeBlast(point, w.fx, { groundY });
     // The column stands over the site for the rest of the level, and it is
     // the thing you see from across the map. A bomb earns a bigger one than a
@@ -1242,6 +1246,12 @@ export class Battle {
     if (this.turret && hit.owner === this.turret) {
       const r = this.turret.hit(hit, proj, this);
       if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
+    }
+    // A round that stopped against the town. The city's colliders have no
+    // owner, so a hit on nothing of the monument's and nothing of the
+    // turret's is asked of the buildings; the burst below still draws.
+    if (this.cityFire && !hit.structureHit && hit.owner == null) {
+      this.cityFire.hit(point, w);
     }
 
     const power = w.power * this.powerScale;

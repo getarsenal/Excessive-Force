@@ -29,6 +29,7 @@ import { TestMenu } from './ui/testmenu.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
+import { CityFire } from './game/cityfire.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
@@ -401,12 +402,16 @@ async function boot() {
   // The firing solution reads this: a gun in a street has to put the shell
   // over the roof in front of it rather than into it.
   battle.cityBlocker = cityBodies;
+  garrison.city = cityBodies;
 
   // Smoke the garrison cannot see through, and fires that burn on after a
   // heavy hit.
   battle.smokes = new SmokeScreens(fx);
   garrison.smokes = battle.smokes;
   battle.fires = new Fires(fx, quality);
+  // And the town burns. A shell that stops against a building guts it: the
+  // walls go to soot, the windows go dark, and the fire is on the roof.
+  battle.cityFire = new CityFire({ cityGroup: contextGroup, fx, fires: battle.fires, audio });
 
   // Flags on the landmarks, each standing on a stone and going with it.
   const flags = new Flags(engine.scene, quality);
