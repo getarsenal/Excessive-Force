@@ -63,6 +63,19 @@ columns. A release is immutable, so a re-bake after a change to the mask, the
 dredge or the packing is two seconds rather than a minute a level. `--fresh`
 bypasses it; deleting the directories costs one slow bake.
 
+The bake also writes `<level>_far.png`: the same Overture water, burned a
+second time over a square seven spans wide at forty metres to the pixel, with
+`farSpan` recorded in the terrain JSON. That is how far the surround apron and
+the skyline ring reach, and past the map edge the loader used to have only two
+answers — open sea everywhere if the boundary happened to be wet, dry country
+everywhere if it did not. Rio is the case that proves it: the level is the
+summit of the Corcovado, the Lagoa is two kilometres out and Botafogo three,
+both of them below you and in front of you the whole game, and the map had
+neither. `terrain._farWet` now answers for the distant water, `surfaceAt` sinks
+a bed under it, and `createWater` lays the sheet on it — at the level's own
+waterline, which for a mountain is sixty metres out and invisible, where a
+second waterline in the same picture would not be.
+
 Every bake ends by checking itself against its own other half: the origin is
 not under water, the wet half of the map is the low half, nothing wet stands
 above its own surface, and the surveyed buildings are on the surveyed land.

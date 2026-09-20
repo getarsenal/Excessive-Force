@@ -1,14 +1,16 @@
 {
-  "id": "giza",
-  "name": "Great Pyramids, Giza",
-  "lat": 29.97918,
-  "lon": 31.13417,
-  "spanMeters": 900.0,
-  "size": 512,
-  "minElevation": 9.191,
-  "maxElevation": 103.398,
-  "metersPerDemPixel": 8.2763,
-  "seaLevel": 17.04,
-  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
-  "coastline": "typed"
+ "id": "giza",
+ "name": "Great Pyramids, Giza",
+ "lat": 29.97918,
+ "lon": 31.13417,
+ "spanMeters": 900.0,
+ "size": 512,
+ "minElevation": 9.191,
+ "maxElevation": 103.398,
+ "metersPerDemPixel": 8.2763,
+ "seaLevel": 17.04,
+ "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+ "coastline": "typed",
+ "farSpan": 6300.0,
+ "farWater": 0.0061
 }

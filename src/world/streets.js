@@ -1496,17 +1496,32 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
   for (const n of net.nodes) {
     if (n.links.length < 3) continue;
     const y = n.y + SURFACE_LIFT;
-    // One crossing per direction, not one per street.
+    // A crossing is a thing a town council pays for, not a decoration.
     //
-    // A junction where two arms leave on nearly the same bearing — a bend with a
-    // side road, which this grid produces constantly — used to get a zebra on
-    // each, overlapping at a few degrees to one another. Two ladders of stripes
-    // crossing at a narrow angle is the fan of white marks in the screenshot.
+    // Every junction of three arms or more used to get a zebra on every arm
+    // whose carriageway was seven metres wide, which on a surveyed plan is
+    // nearly every junction and nearly every arm: a hundred and ninety-four
+    // junctions, five hundred-odd ladders of white paint, and London seen from
+    // above read as a lattice of crossings with a city faintly behind it. The
+    // markings were louder than the streets they were painted on.
+    //
+    // Two rules cut it to what a place actually has. A crossing goes where a
+    // main road is involved — an avenue arm, or four arms meeting — because
+    // that is where somebody has to be stopped to let somebody else over. And
+    // it goes on the two busiest arms at most, not on all five: a junction with
+    // a zebra on every approach is a pedestrianised square, and there are two
+    // of those in this city, not two hundred.
+    const hasMain = n.links.some((l) => l.edge.cls === 'avenue');
+    if (!hasMain && n.links.length < 4) continue;
+    const arms = n.links
+      .map((l) => ({ l, w: ROAD_CLASS[l.edge.cls].road, dir: linkDir(n, l) }))
+      .filter((a) => a.w >= 8)
+      .sort((a, b) => b.w - a.w);
     const done = [];
-    for (const l of n.links) {
-      const c = ROAD_CLASS[l.edge.cls];
-      if (c.road < 7) continue;
-      const dir = linkDir(n, l);
+    for (const arm of arms) {
+      if (done.length >= 2) break;
+      const c = ROAD_CLASS[arm.l.edge.cls];
+      const dir = arm.dir;
       let clash = false;
       for (const d of done) {
         if (d.x * dir.x + d.z * dir.z > 0.82) { clash = true; break; }   // within ~35°
@@ -1518,16 +1533,18 @@ export function addStreetMarkings(props, net, terrain, rng, dense = 1) {
       // Zebra: stripes across the carriageway, running with the road, and
       // strictly inside it — the last version spread them over the full road
       // width measured centre to centre, so the outer two overhung the kerb.
-      const usable = c.road - 1.8;
-      const stripes = Math.max(3, Math.round(usable / (dense > 0.8 ? 1.5 : 2.4)));
+      // Wider bars and fewer of them: at playing distance a fine comb of paint
+      // dissolves into a grey smear, and a real zebra is half stripe, half gap.
+      const usable = c.road - 2.2;
+      const stripes = Math.max(3, Math.round(usable / 2.6));
       for (let s = 0; s < stripes; s++) {
         const f = (s / (stripes - 1) - 0.5) * usable;
         paint(n.x + dir.x * r - dir.z * f, n.z + dir.z * r + dir.x * f,
-          0.55, 3.2, ry, white, y);
+          0.72, 2.6, ry, white, y);
       }
       counts.crossings++;
       // Stop line, on the far side of the crossing from the junction.
-      const sr = r + 2.9;
+      const sr = r + 2.6;
       paint(n.x + dir.x * sr, n.z + dir.z * sr, c.road - 1.0, 0.4, ry, white, y);
       counts.stopLines++;
     }

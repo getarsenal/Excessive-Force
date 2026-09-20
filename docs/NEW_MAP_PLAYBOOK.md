@@ -78,6 +78,33 @@ builder (see §4).
 
 Then `python3 tools/bake_terrain.py <id>`. It fetches AWS Terrarium
 tiles (no key), writes the three files, and prints the elevation range.
+
+Then `python3 tools/bake_overture.py <id>`, which is the one that matters. It
+re-cuts the DEM, pulls the buildings, the street graph and the real coastline,
+and writes `<id>_far.png` — the water for seven spans in every direction, which
+is what the surround and the skyline are drawn over. Read the line it prints:
+`far water: N polygons, X% of the K km square`. A coastal or riverside place
+that comes back at nought per cent has a bake that did not reach its own water,
+and the level will render as a field with a monument in it.
+
+Four things are then true of a new map without anyone having to build them, and
+they are the four that took the longest to get right on the first nine. Do not
+reimplement any of them; if one is wrong on a new map it is wrong on all nine:
+
+  - **streets are cut, not deleted.** A carriageway that runs into the water or
+    into the landmark's own precinct stops there and keeps the rest of itself.
+    Deleting the whole edge takes an arm off the junction at each end, and the
+    dissolve pass then straightens the junction out of existence.
+  - **bridges come ashore.** A surveyed crossing ends at whatever connector the
+    surveyor put nearest the bank, which is quite often a pixel the DEM calls
+    river. `landBridges` walks the dangling end on to dry ground and welds it to
+    the junction standing there.
+  - **crossings are rationed.** A zebra goes where a main road is involved, on
+    two arms at most. Painting every arm of every three-way junction is what
+    turned London into a lattice of white ladders.
+  - **the bank is one line.** The shoreline is sampled by four sweeps, pooled,
+    thinned and chained into a single ordered run, and the embankment is laid
+    along it with a walk behind the parapet.
 It needs outbound network and **it does run in-session** — the tile host is
 reachable through the proxy and `pillow`/`numpy` are installed. (An earlier
 version of this page said it could not; it can, and five maps were baked

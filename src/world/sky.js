@@ -382,6 +382,56 @@ export function createWater(terrain, sunDirection, quality) {
   //
   // A ring and not a plane: a plane at the waterline over the whole map would
   // be drawn across the point the Opera House stands on.
+  // ── The water that is really out there.
+  //
+  // Everything above is the playfield's own mask, and past the boundary the
+  // sheet used to have two options: a ring of open sea, if the edge of the map
+  // happened to be wet, or nothing at all. Rio got nothing at all, so the most
+  // photographed bay on earth was a grass field — the level is the summit of
+  // the Corcovado, the Lagoa is two kilometres away and Botafogo three, and
+  // both are below you and in front of you the whole time you are playing.
+  //
+  // With a far mask baked, the distant water is drawn where the survey says it
+  // is. It sits at the level's own waterline rather than at true sea level,
+  // which for a mountain map is sixty-odd metres out and invisible from seven
+  // hundred metres up; the alternative is a second waterline in the same
+  // picture, which is not.
+  if (terrain.farMask) {
+    const S = terrain.span, F = terrain.farSpan;
+    const DIV = 150;
+    const cellF = (F * 2) / DIV;
+    const fx = (i) => -F + i * cellF;
+    const fz = (j) => F - j * cellF;
+    const fIndex = new Int32Array((DIV + 1) * (DIV + 1)).fill(-1);
+    const fVert = (i, j) => {
+      const k = j * (DIV + 1) + i;
+      if (fIndex[k] >= 0) return fIndex[k];
+      const id = pos.length / 3;
+      pos.push(fx(i), level, fz(j));
+      depth.push(40);
+      fIndex[k] = id;
+      return id;
+    };
+    for (let j = 0; j < DIV; j++) {
+      for (let i = 0; i < DIV; i++) {
+        const x0 = fx(i), x1 = fx(i + 1), z0 = fz(j), z1 = fz(j + 1);
+        // The playfield draws its own, at its own resolution and with its own
+        // bed under it; a coarse quad laid across it would cover the map.
+        if (Math.max(x0, x1) > -S && Math.min(x0, x1) < S
+          && Math.max(z0, z1) > -S && Math.min(z0, z1) < S) continue;
+        let wetc = 0;
+        if (terrain._farWet(x0, z0)) wetc++;
+        if (terrain._farWet(x1, z0)) wetc++;
+        if (terrain._farWet(x1, z1)) wetc++;
+        if (terrain._farWet(x0, z1)) wetc++;
+        if (!wetc) continue;
+        const a = fVert(i, j), b = fVert(i + 1, j);
+        const c = fVert(i + 1, j + 1), d = fVert(i, j + 1);
+        index.push(a, c, d, a, b, c);
+      }
+    }
+  }
+
   if (terrain.openSea) {
     const S = terrain.span, OUT = S * 7;
     const DIV = 26;

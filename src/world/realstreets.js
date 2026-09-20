@@ -65,27 +65,93 @@ export function realNetwork(data, terrain, opts = {}) {
   const dry = (x, z) => !terrain.isWater(x, z)
     && terrain.heightAt(x, z) > terrain.waterLevel + 0.35;
 
+  /** Ground this level's game has taken for itself. */
+  const clear = (x, z) => !(exclude > 0 && Math.hypot(x, z) < exclude)
+    && !(reserved.length && inReserved(x, z));
+
+  /**
+   * Cut a street where it is not allowed to go. Do not delete it.
+   *
+   * This was three `continue`s: any carriageway with one point in the water,
+   * one point inside the landmark's precinct, or one point within the exclusion
+   * radius was thrown away whole. On a surveyed plan that is catastrophic and
+   * it is invisible in the count, because what is lost is never the whole road
+   * — it is the two hundred metres of Bridge Street that happen to pass the
+   * Palace, and the approach ramp that happens to start on a mask pixel the DEM
+   * calls river. Westminster came out with five hundred and sixty-one of nine
+   * hundred and forty-eight junctions joined to nothing at all, and a bridge
+   * whose western end was a dead stop standing in the Thames.
+   *
+   * A road that runs into somewhere it may not go stops there, which is what
+   * the comment at the top of this file always claimed happened. The longest
+   * usable stretch is kept and given its own end node, carried half a sample
+   * past the last good point so the tarmac reaches the bank rather than
+   * stopping short of it.
+   */
+  const keepRun = (pts, ok) => {
+    let best = null, i = 0;
+    while (i < pts.length) {
+      if (!ok[i]) { i++; continue; }
+      let j = i;
+      while (j + 1 < pts.length && ok[j + 1]) j++;
+      if (!best || j - i > best[1] - best[0]) best = [i, j];
+      i = j + 1;
+    }
+    return best;
+  };
+
   for (const e of data.edges) {
     if (!Array.isArray(e.pts) || e.pts.length < 2) continue;
     const pts = e.pts.map((p) => ({ x: p[0], z: p[1], y: terrain.heightAt(p[0], p[1]) }));
-    if (!e.bridge && !pts.every((p) => dry(p.x, p.z))) continue;
-    // A street through the middle of the landmark is a street through the
-    // middle of the landmark whoever surveyed it: the precinct is the game's,
-    // not the city's, and the monument is standing where the road was.
-    if (exclude > 0 && pts.some((p) => Math.hypot(p.x, p.z) < exclude)) continue;
-    if (reserved.length && pts.some((p) => inReserved(p.x, p.z))) continue;
-    const a = nodes[e.a], b = nodes[e.b];
-    if (!a || !b || a === b) continue;
-    const edge = { a: e.a, b: e.b, cls: e.cls || 'street', pts };
+    const ok = pts.map((p) => clear(p.x, p.z) && (e.bridge || dry(p.x, p.z)));
+    const run = keepRun(pts, ok);
+    if (!run) continue;
+    let [i0, i1] = run;
+    if (i1 - i0 < 1) continue;
+    let line = pts.slice(i0, i1 + 1);
+    // Reach out toward the ground that was refused, so the street ends at the
+    // water or the precinct wall rather than a sample short of it.
+    const reach = (from, toward) => {
+      const a = pts[from], b = pts[toward];
+      const x = a.x + (b.x - a.x) * 0.5, z = a.z + (b.z - a.z) * 0.5;
+      return { x, z, y: terrain.heightAt(x, z) };
+    };
+    if (i0 > 0) line = [reach(i0, i0 - 1), ...line];
+    if (i1 < pts.length - 1) line = [...line, reach(i1, i1 + 1)];
+    let len = 0;
+    for (let k = 0; k < line.length - 1; k++) {
+      len += Math.hypot(line[k + 1].x - line[k].x, line[k + 1].z - line[k].z);
+    }
+    // Only a *cut* stretch has to justify its length. A surveyed plan is full
+    // of six-metre carriageways between two junctions a car's length apart, and
+    // throwing those away takes an arm off the junction at each end — which
+    // turns a crossroads into a bend, and the dissolve pass then straightens
+    // the bend out of existence. Three hundred and seventy-three edges and a
+    // hundred junctions went that way.
+    const whole = i0 === 0 && i1 === pts.length - 1;
+    if (!whole && len < 11) continue;
+    // Whole stretches keep the surveyed junctions at each end; cut ones get a
+    // new node of their own, which is a dead end, which is what it is.
+    const cut = (idx, at) => {
+      const p = line[at];
+      nodes.push({ x: p.x, z: p.z, y: p.y, links: [] });
+      return nodes.length - 1;
+    };
+    const ai = i0 === 0 ? e.a : cut(e.a, 0);
+    const bi = i1 === pts.length - 1 ? e.b : cut(e.b, line.length - 1);
+    const a = nodes[ai], b = nodes[bi];
+    if (!a || !b || ai === bi) continue;
+    const edge = { a: ai, b: bi, cls: e.cls || 'street', pts: line };
     // Both flags, and they mean different things downstream: `bridge` is what
     // makes the road surface follow the deck's own height and lay tarmac over
     // water at all, and `bank` is what stops the dissolve pass straightening a
     // crossing into the street it meets.
     if (e.bridge) { edge.bridge = true; edge.bank = true; }
     edges.push(edge);
-    a.links.push({ other: e.b, edge, at: 0 });
-    b.links.push({ other: e.a, edge, at: 1 });
+    a.links.push({ other: bi, edge, at: 0 });
+    b.links.push({ other: ai, edge, at: 1 });
   }
+
   if (edges.length < 8) return null;
 
   // Blocks first: a block is found by asking whether its corners are linked,
@@ -104,6 +170,7 @@ export function realNetwork(data, terrain, opts = {}) {
     });
   }
 
+  landBridges(edges, nodes, terrain);
   layDecks(edges, nodes, terrain);
   dissolveThroughNodes(nodes, edges, { surveyed: true });
 
@@ -115,6 +182,92 @@ export function realNetwork(data, terrain, opts = {}) {
   };
   buildEdgeIndex(net);
   return net;
+}
+
+/**
+ * Bring every bridge ashore.
+ *
+ * A survey cuts a segment wherever another segment meets it, so the last piece
+ * of a crossing ends at whatever connector the surveyor put nearest the bank —
+ * and the DEM, which has never heard of the surveyor, quite often calls that
+ * point river. Westminster Bridge arrived as two hundred and sixty metres of
+ * carriageway whose western end was a node of degree one standing in the
+ * Thames: tarmac over open water, stopping dead, joined to nothing. From the
+ * air it is the single most obviously wrong thing on the map.
+ *
+ * So a dangling wet end walks on along its own bearing until it finds ground,
+ * and then looks for a street to be part of. Both halves matter. Reaching the
+ * bank stops the deck ending over the river; welding to the junction that is
+ * already there is what makes the bridge a road you can drive off, rather than
+ * a second road lying beside the first.
+ */
+function landBridges(edges, nodes, terrain) {
+  const dry = (x, z) => !terrain.isWater(x, z)
+    && terrain.heightAt(x, z) > terrain.waterLevel + 0.35;
+
+  for (const e of edges) {
+    if (!e.bridge) continue;
+    for (const end of [0, 1]) {
+      const key = end === 0 ? 'a' : 'b';
+      const node = nodes[e[key]];
+      if (!node || node.links.length !== 1) continue;      // already joined
+      const pts = e.pts;
+      const tip = end === 0 ? pts[0] : pts[pts.length - 1];
+      if (dry(tip.x, tip.z)) continue;                     // already ashore
+      // Measured over fifteen metres, not over whatever gap the surveyor left
+      // between the last two vertices. A polyline from a survey carries pairs
+      // of points a few centimetres apart, and a bearing taken across one of
+      // those is noise — the same mistake that turned four hundred and
+      // forty-seven of this city's junctions into false right angles.
+      let dx = 0, dz = 0;
+      for (let k = 1; k < pts.length; k++) {
+        const q = end === 0 ? pts[k] : pts[pts.length - 1 - k];
+        dx = tip.x - q.x; dz = tip.z - q.z;
+        if (dx * dx + dz * dz > 225) break;
+      }
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5) continue;
+      const ux = dx / d, uz = dz / d;
+      // Walk on until the ground comes up. Two hundred metres is further than
+      // any approach on any of these maps and short enough that a bridge
+      // pointing out to sea gives up rather than crossing the whole harbour.
+      let landed = null;
+      for (let t = 5; t <= 200; t += 5) {
+        const x = tip.x + ux * t, z = tip.z + uz * t;
+        if (Math.abs(x) > terrain.span || Math.abs(z) > terrain.span) break;
+        if (!dry(x, z)) continue;
+        // Ten metres clear of the waterline, so the abutment sits on the bank
+        // rather than in the shallows.
+        landed = { x: x + ux * 10, z: z + uz * 10 };
+        break;
+      }
+      if (!landed) continue;
+      landed.y = terrain.heightAt(landed.x, landed.z);
+      if (end === 0) pts.unshift(landed); else pts.push(landed);
+      node.x = landed.x; node.z = landed.z; node.y = landed.y;
+
+      // And join whatever is standing there. A junction within thirty-five
+      // metres of the abutment is the road the bridge carries on into.
+      let best = null, bd = 35 * 35;
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n === node || !n.links.length) continue;
+        if (Math.abs(n.y - landed.y) > 7) continue;
+        const q = (n.x - landed.x) ** 2 + (n.z - landed.z) ** 2;
+        if (q < bd) { bd = q; best = i; }
+      }
+      if (best === null) continue;
+      const host = nodes[best];
+      if (end === 0) pts[0] = { x: host.x, z: host.z, y: host.y };
+      else pts[pts.length - 1] = { x: host.x, z: host.z, y: host.y };
+      node.links.length = 0;
+      e[key] = best;
+      host.links.push({ other: end === 0 ? e.b : e.a, edge: e, at: end });
+      const far = nodes[end === 0 ? e.b : e.a];
+      const link = far && far.links.find((l) => l.edge === e);
+      if (link) link.other = best;
+    }
+  }
 }
 
 /**

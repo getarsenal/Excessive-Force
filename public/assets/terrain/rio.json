@@ -1,14 +1,16 @@
 {
-  "id": "rio",
-  "name": "Christ the Redeemer, Rio de Janeiro",
-  "lat": -22.95186,
-  "lon": -43.21054,
-  "spanMeters": 800.0,
-  "size": 512,
-  "minElevation": 19.333,
-  "maxElevation": 700.0,
-  "metersPerDemPixel": 4.3991,
-  "seaLevel": 65.937,
-  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
-  "coastline": "typed"
+ "id": "rio",
+ "name": "Christ the Redeemer, Rio de Janeiro",
+ "lat": -22.95186,
+ "lon": -43.21054,
+ "spanMeters": 800.0,
+ "size": 512,
+ "minElevation": 19.333,
+ "maxElevation": 700.0,
+ "metersPerDemPixel": 4.3991,
+ "seaLevel": 65.937,
+ "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+ "coastline": "typed",
+ "farSpan": 5600.0,
+ "farWater": 0.2723
 }

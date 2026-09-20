@@ -13,7 +13,7 @@ import * as THREE from 'three';
  */
 
 export class Terrain {
-  constructor(meta, heightData, maskData, quality) {
+  constructor(meta, heightData, maskData, quality, farData = null) {
     this.meta = meta;
     this.size = meta.size;
     this.span = meta.spanMeters;
@@ -33,6 +33,24 @@ export class Terrain {
       this.mask[i * 3] = maskData[i * 4] / 255;
       this.mask[i * 3 + 1] = maskData[i * 4 + 1] / 255;
       this.mask[i * 3 + 2] = maskData[i * 4 + 2] / 255;
+    }
+
+    // The distant coastline, if this level was baked with one.
+    //
+    // One byte a pixel over a square seven times the playfield: forty metres to
+    // the sample, which is a coarse thing to ask a shoreline to be and exactly
+    // right for one nobody gets within a kilometre of. What it buys is the
+    // difference between Rio de Janeiro and a hill in a field — the Lagoa,
+    // Botafogo Bay and the Atlantic are all two to four kilometres from the
+    // Corcovado, all of them in view from the statue's feet, and none of them
+    // was anywhere in the data the level loaded.
+    this.farSpan = meta.farSpan || 0;
+    this.farMask = null;
+    if (farData && this.farSpan) {
+      const fn = Math.round(Math.sqrt(farData.length / 4));
+      this.farSize = fn;
+      this.farMask = new Uint8Array(fn * fn);
+      for (let i = 0; i < fn * fn; i++) this.farMask[i] = farData[i * 4] > 127 ? 1 : 0;
     }
 
     this.cellSize = (this.span * 2) / (n - 1);
@@ -369,6 +387,29 @@ export class Terrain {
     const grain = valueNoise(x * 0.0021 - 3.1, z * 0.0021 + 8.9) * 2 - 1;
     const hill = (ridge * 0.72 + grain * 0.28) * this._farAmp;
     const land = fall + hill * Math.min(1, out / (s * 0.45));
+
+    // The surveyed coastline out here, where there is one.
+    //
+    // Taken before the open-sea guess below and in preference to it, because it
+    // is the real answer and that is an inference from how wet the boundary
+    // happens to be. Sunk rather than switched: the far mask is forty metres to
+    // the sample, so a hard step at its edge would draw every distant shore as
+    // a cliff. Nine samples over a hundred and twenty metres give a shelf.
+    if (this.farMask) {
+      let wetn = 0;
+      for (let a = -1; a <= 1; a++) {
+        for (let b = -1; b <= 1; b++) {
+          if (this._farWet(x + a * 60, z + b * 60)) wetn++;
+        }
+      }
+      if (wetn) {
+        const k = wetn / 9;
+        const bed = this.waterLevel - 11;
+        // Only ever downward. Inland of the shore the country keeps its own
+        // relief; over the water it is a bed.
+        return Math.min(land, land + (bed - land) * k);
+      }
+    }
     if (!this.openSea) return land;
 
     // And the sea, where the map's boundary is under water.
@@ -419,6 +460,19 @@ export class Terrain {
     return { water: lerp2(0), road: lerp2(1), park: lerp2(2) };
   }
 
+  /**
+   * Is this point sea, lake or river, according to the survey of the country
+   * beyond the map? False when the level carries no far mask.
+   */
+  _farWet(x, z) {
+    if (!this.farMask) return false;
+    const n = this.farSize, s = this.farSpan;
+    const u = Math.round((x + s) / (s * 2) * (n - 1));
+    const v = Math.round((s - z) / (s * 2) * (n - 1));
+    if (u < 0 || v < 0 || u > n - 1 || v > n - 1) return false;
+    return this.farMask[v * n + u] === 1;
+  }
+
   /** The wet mask, and nothing else: false everywhere off the DEM. */
   _maskWet(x, z) {
     const n = this.size;
@@ -437,6 +491,7 @@ export class Terrain {
       // only about the channel let the outskirts lay farmland, hedges and a
       // railway embankment across Sydney Harbour, because as far as this
       // function was concerned the open sea beyond the boundary was dry.
+      if (this._farWet(x, z)) return true;
       if (this.openSea) return this.surfaceAt(x, z) < this.waterLevel - 0.5;
       return this.inRiverTail(x, z, 30);
     }
@@ -1191,11 +1246,15 @@ export class Terrain {
 export async function loadTerrain(levelId, quality) {
   const base = `assets/terrain/${levelId}`;
   const meta = await fetch(`${base}.json`).then((r) => r.json());
-  const [height, mask] = await Promise.all([
+  const [height, mask, far] = await Promise.all([
     loadImageData(`${base}_height.png`),
     loadImageData(`${base}_mask.png`),
+    // The coastline of the country the level is standing in, out to seven
+    // spans. Optional: a level baked before this existed simply has none, and
+    // falls back to the edge-of-map guess it always used.
+    meta.farSpan ? loadImageData(`${base}_far.png`).catch(() => null) : null,
   ]);
-  return new Terrain(meta, height, mask, quality);
+  return new Terrain(meta, height, mask, quality, far);
 }
 
 /**

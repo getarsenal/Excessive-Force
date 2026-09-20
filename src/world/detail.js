@@ -403,12 +403,9 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
   const counts = { wall: 0, stairs: 0, balusters: 0, lamps: 0, rings: 0, moorings: 0 };
   const level = terrain.waterLevel;
   const ghats = opts.river === 'ghats';
-  // Where a bay has already been built, on a 9 m grid, so the two sweeps below
-  // do not both wall the same corner of the bank.
-  const built = new Set();
 
   /**
-   * Trace the bank, in order, as runs of points.
+   * Find the bank: every point on the map where dry ground meets water.
    *
    * `axis` 0 walks lines of constant z and finds the shoreline east and west;
    * `axis` 1 does the same the other way round. Both are needed: a scan of
@@ -416,81 +413,147 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
    * its length, which is why Agra used to get two tips of embankment and eight
    * hundred metres of bare edge between them.
    *
-   * A run breaks wherever the waterline jumps, because a jump is not a bank —
-   * it is the scan crossing the mouth of a dock, or finding a different body of
-   * water altogether, and joining the two points either side of it would build
-   * a wall straight across open water.
+   * The four sweeps are samples of one shoreline, not four shorelines, and that
+   * is the whole of what was wrong with this. Each sweep used to be laid as its
+   * own set of walls, with a nine-metre grid stopping a later sweep building
+   * where an earlier one had — so a stretch of bank the north-south sweep had
+   * sampled coarsely got its gaps *blocked* by the grid rather than filled by
+   * the east-west sweep, and the Thames came out as a row of disconnected slabs
+   * with the ground showing between them. The samples are pooled here instead,
+   * thinned once, and chained into a single ordered line below.
    */
-  const trace = (axis, dir) => {
+  const sweep = (axis, dir, out) => {
     const at = (along, across) => (axis === 0
       ? { x: across, z: along }
       : { x: along, z: across });
-    const runs = [];
-    let run = null;
-    for (let a = -span * 0.96; a < span * 0.96; a += step) {
+    for (let a = -span * 0.98; a < span * 0.98; a += step) {
       let found = null;
-      for (let t = 0; t < span * 1.9; t += 3) {
-        const c = dir > 0 ? -span * 0.96 + t : span * 0.96 - t;
+      for (let t = 0; t < span * 1.95; t += 3) {
+        const c = dir > 0 ? -span * 0.98 + t : span * 0.98 - t;
         const p = at(a, c);
         if (terrain.isWater(p.x, p.z)) { found = c; break; }
       }
+      if (found === null) continue;
       // Step back from the waterline until the ground is above the water,
       // rather than by a fixed metre and a half: the channel is cut with a
       // feathered shoulder, so the first few metres outside the wet mask are
       // still below the surface.
-      let across = null, gy = 0;
-      if (found !== null) {
-        for (let back = 1.6; back <= 26; back += 2.0) {
-          const c = found - dir * back;
-          const p = at(a, c);
-          const g = terrain.heightAt(p.x, p.z);
-          if (g >= level - 0.2) { across = c; gy = g; break; }
-        }
+      for (let back = 1.6; back <= 26; back += 2.0) {
+        const c = found - dir * back;
+        const p = at(a, c);
+        const g = terrain.heightAt(p.x, p.z);
+        if (g >= level - 0.2) { out.push({ x: p.x, z: p.z, gy: g }); break; }
       }
-      if (across === null) { run = null; continue; }
-      const w = at(a, across);
-      const pt = { x: w.x, z: w.z, gy, across, along: a };
-      if (run && Math.hypot(pt.x - run[run.length - 1].x, pt.z - run[run.length - 1].z) > step * 3) {
-        run = null;
-      }
-      if (!run) { run = []; runs.push(run); }
-      run.push(pt);
     }
-    return { runs, at };
   };
 
   /**
-   * Lay one traced run as a continuous wall.
+   * Thread the samples into one line along the bank.
    *
-   * The wall used to be built as an axis-aligned slab dropped at each sample,
-   * which is correct for a river that runs north and south and is a staircase
-   * for one that does not: on a surveyed coastline every piece sat square to
-   * the map while the bank ran across it at forty degrees, so the embankment
-   * came out as a broken line of steps with the ground showing through between
-   * them. Each piece now runs from one sample to the next, in that direction,
-   * long enough to meet its neighbours.
+   * Nearest-neighbour from each end, which is the right algorithm here for a
+   * reason worth stating: the points are already dense along a curve, so the
+   * nearest unused point is the next one along it, and the only way to be wrong
+   * is at a place where two stretches of bank pass close to each other — which
+   * on these maps is a river narrower than the sample spacing, and there isn't
+   * one. A chain stops when the nearest unused point is further off than a
+   * bank ever steps, and that break is a real break: the far side of a dock
+   * mouth, or a different body of water altogether.
    */
-  const lay = (run, dir, axis) => {
+  const chain = (pts) => {
+    const CELL = 16;
+    const grid = new Map();
+    const key = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    // Thin first: four sweeps put two or three samples on the same few metres
+    // of bank, and a chain that zig-zags between them is a chain of one-metre
+    // pieces at forty degrees to the shore.
+    const seen = new Set();
+    const pool = [];
+    for (const p of pts) {
+      const k = `${Math.round(p.x / 6)},${Math.round(p.z / 6)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      pool.push(p);
+    }
+    for (const p of pool) {
+      const k = key(p.x, p.z);
+      let b = grid.get(k);
+      if (!b) grid.set(k, b = []);
+      b.push(p);
+    }
+    const near = (p, max) => {
+      let best = null, bd = max * max;
+      const gx = Math.floor(p.x / CELL), gz = Math.floor(p.z / CELL);
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const b = grid.get(`${gx + i},${gz + j}`);
+          if (!b) continue;
+          for (const q of b) {
+            if (q.used) continue;
+            const d = (q.x - p.x) ** 2 + (q.z - p.z) ** 2;
+            if (d < bd) { bd = d; best = q; }
+          }
+        }
+      }
+      return best;
+    };
+    const REACH = step * 2.4;
+    const runs = [];
+    for (const seed of pool) {
+      if (seed.used) continue;
+      seed.used = true;
+      const run = [seed];
+      for (let dirn = 0; dirn < 2; dirn++) {
+        let head = run[dirn === 0 ? run.length - 1 : 0];
+        for (;;) {
+          const q = near(head, REACH);
+          if (!q) break;
+          q.used = true;
+          if (dirn === 0) run.push(q); else run.unshift(q);
+          head = q;
+        }
+      }
+      if (run.length >= 2) runs.push(run);
+    }
+    return runs;
+  };
+
+  /**
+   * Lay one chained run as a continuous embankment.
+   *
+   * Three things were broken here and all three came from the same place: the
+   * wall was built per *sample* rather than per *stretch*, on a grid that
+   * refused to build twice in the same nine metres. So a piece was dropped
+   * wherever two sweeps overlapped, the wall was laid square to the map rather
+   * than along the water, and there was nothing to walk on — just a parapet
+   * with grass behind it. What you saw from the Palace was a line of separate
+   * slabs with the bank showing through.
+   *
+   * Now: one piece per segment of the chain, no grid and nothing dropped, each
+   * piece turned to the segment it belongs to, with a paved walk behind the
+   * parapet running the whole way. The walk is the point. An embankment is a
+   * promenade with a wall on the river side of it, and the wall on its own is
+   * a retaining structure in a field.
+   */
+  const lay = (run) => {
     if (run.length < 2) return;
     for (let k = 0; k < run.length - 1; k++) {
       const p0 = run[k], p1 = run[k + 1];
       const dx = p1.x - p0.x, dz = p1.z - p0.z;
       const len = Math.hypot(dx, dz);
-      if (len < 0.5) continue;
+      if (len < 0.5 || len > step * 2.6) continue;
       const ux = dx / len, uz = dz / len;
       // `box` turns local +X to (cos ry, -sin ry), so this points the piece's
       // length along the bank.
       const ry = Math.atan2(-uz, ux);
-      // Toward the water: the sweep walked inward from the map edge, so the
-      // waterline is `dir` further along the across axis.
-      const nx = axis === 0 ? dir : 0;
-      const nz = axis === 0 ? 0 : dir;
       const cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2;
       const gy = (p0.gy + p1.gy) / 2;
-
-      const key = `${Math.round(cx / 9)},${Math.round(cz / 9)}`;
-      if (built.has(key)) continue;
-      built.add(key);
+      // Which side the water is on, asked of the water rather than inferred
+      // from which way the sweep happened to be walking. A chained bank turns
+      // through every bearing there is, and half of it would otherwise have
+      // its parapet on the river side and its pavement in the Thames.
+      let nx = -uz, nz = ux;
+      if (!terrain.isWater(cx + nx * 9, cz + nz * 9)) { nx = -nx; nz = -nz; }
+      if (!terrain.isWater(cx + nx * 9, cz + nz * 9)) continue;
 
       /** A box in the piece's own frame: `l` along the bank, `t` across it. */
       const piece = (kind, t, hgt, l, off, y, color, jitter) => {
@@ -504,10 +567,13 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
 
       const h = Math.max(1.0, gy - level + 1.6);
       const top = level - 1.6 + h;
-      piece('stone', 2.6, h, len + 1.2, 0, level - 1.6 + h / 2, 0x8f8778,
+      // Overlapped by a metre and a half at each end, so consecutive pieces
+      // meet through a bend instead of leaving a wedge of daylight at it.
+      const L = len + 3.0;
+      piece('stone', 2.6, h, L, 0, level - 1.6 + h / 2, 0x8f8778,
         0.86 + rng() * 0.2);
       // Coping: a paler cap along the top of the wall.
-      piece('stone', 3.0, 0.32, len + 1.2, 0, top + 0.16, 0xc3bba8,
+      piece('stone', 3.0, 0.32, L, 0, top + 0.16, 0xc3bba8,
         0.9 + rng() * 0.16);
       counts.wall++;
 
@@ -515,19 +581,25 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
         // The Yamuna side is steps down to the water, not a parapet: broad
         // shallow ghats running the length of the bank.
         for (let j = 0; j < 6; j++) {
-          piece('stone', 1.6, 0.34, len + 1.0, 1.6 + j * 1.5, top - j * 0.36,
+          piece('stone', 1.6, 0.34, L, 1.6 + j * 1.5, top - j * 0.36,
             0xb2a68d, 0.88 + rng() * 0.2);
         }
         counts.stairs++;
         continue;
       }
 
+      // ── The walk itself: six metres of paving behind the parapet, its
+      // surface flush with the coping and its far edge bedded into whatever
+      // the ground is doing, so there is no lip to trip the eye at either end.
+      piece('stone', 6.4, 0.9, L, -4.5, top - 0.29, 0xa9a290, 0.92 + rng() * 0.1);
+      counts.walk = (counts.walk || 0) + 1;
+
       // ── A parapet, and above it a stone balustrade: the thing that makes an
       // embankment read as an embankment from any distance is the *dotted*
       // line of light and shadow along its top, which a solid wall does not
       // give you.
-      piece('stone', 0.55, 0.36, len + 1.2, -0.9, top + 0.5, 0xbdb5a2, 0.94);
-      piece('stone', 0.55, 0.3, len + 1.2, -0.9, top + 1.42, 0xc7bfab, 0.94);
+      piece('stone', 0.55, 0.36, L, -0.9, top + 0.5, 0xbdb5a2, 0.94);
+      piece('stone', 0.55, 0.3, L, -0.9, top + 1.42, 0xc7bfab, 0.94);
       const bal = Math.max(3, Math.round(len / 1.1));
       for (let j = 0; j < bal; j++) {
         const sOff = -len / 2 + (j + 0.5) * (len / bal);
@@ -537,7 +609,7 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
       }
 
       // Sturgeon lamps along the parapet, and mooring rings below them.
-      if (k % 5 === 0) {
+      if (k % 6 === 0) {
         postAt('metal', 0.3, 0.42, 1.1, 8, 0, -0.9, top + 2.1, 0x2c3a3a, 1);
         postAt('metal', 0.1, 0.16, 4.6, 6, 0, -0.9, top + 4.7, 0x30403f, 1);
         piece('metal', 0.72, 0.9, 0.72, -0.9, top + 7.3, 0x283634, 1);
@@ -567,11 +639,10 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
     }
   };
 
+  const samples = [];
   for (const axis of [0, 1]) {
-    for (const dir of [1, -1]) {
-      const { runs } = trace(axis, dir);
-      for (const run of runs) lay(run, dir, axis);
-    }
+    for (const dir of [1, -1]) sweep(axis, dir, samples);
   }
+  for (const run of chain(samples)) lay(run);
   return counts;
 }

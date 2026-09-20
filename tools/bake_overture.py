@@ -976,6 +976,45 @@ def water_polys(sink, lat0, lon0, span):
                          to_local, m_lat, m_lon)
 
 
+# How far past the map the world is still drawn. The surround apron and the
+# skyline ring both run to seven spans, so that is how far the sea has to be
+# known: anything nearer is a coastline that stops in mid-air.
+FAR = 7.0
+FAR_SIZE = 320
+
+
+def bake_far_water(sink, level_id, lat0, lon0, span):
+    """The coastline of everything you can see, not just everything you can
+    shoot at.
+
+    The playfield mask stops at the boundary, and past it the world falls back
+    to guesswork: a map whose *edge* is wet is treated as open sea to the
+    horizon, and a map whose edge is dry is dry country to the horizon. That is
+    right for Sydney and right for London and completely wrong for Rio, where
+    the level is the summit of the Corcovado and the nearest water — the Lagoa,
+    Botafogo, the Atlantic — is two to four kilometres out. Every one of them is
+    in plain view from the statue's feet and none of them was on the map, so the
+    most recognisable harbour in the world was rendered as farmland.
+
+    So the real water is burned a second time over a square seven spans wide, at
+    forty-odd metres to the pixel, which is plenty for scenery you are never
+    closer than a kilometre to. The loader lays the distant sheet on it and
+    sinks the apron under it.
+    """
+    to_local, m_lat, m_lon = projector(lat0, lon0)
+    reach = span * FAR
+    polys = collect_polys(sink, "base", "water", lat0, lon0, reach,
+                          to_local, m_lat, m_lon)
+    w = np.clip(rasterise(polys, FAR_SIZE, reach), 0, 1)
+    w = close(w, 1)
+    img = Image.fromarray((w * 255).astype(np.uint8), mode="L")
+    img.save(TERRAIN_DIR / f"{level_id}_far.png")
+    frac = float((w > 0.5).mean())
+    print(f"  far water: {len(polys)} polygons, {frac * 100:.1f}% of "
+          f"{reach * 2 / 1000:.1f} km square")
+    return frac
+
+
 def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None):
     """Rewrite the water and green channels of the level's mask from real data,
     and cut the bed the new water needs.
@@ -1243,11 +1282,16 @@ def bake(level_id):
     bake_terrain.bake(level_id, natural_water=natural)
     roads = bake_roads(sink, level_id, lat0, lon0, span)
     bake_buildings(sink, level_id, cfg, lat0, lon0, span, roads)
+    far = bake_far_water(sink, level_id, lat0, lon0, span)
     mpath = TERRAIN_DIR / f"{level_id}.json"
     if mpath.exists():
         bake_mask(sink, level_id, lat0, lon0, span,
                   json.loads(mpath.read_text()), water if natural else [], roads)
-        verify(level_id, span, json.loads(mpath.read_text()))
+        meta = json.loads(mpath.read_text())
+        meta["farSpan"] = span * FAR
+        meta["farWater"] = round(far, 4)
+        mpath.write_text(json.dumps(meta, indent=2))
+        verify(level_id, span, meta)
     else:
         print("  (no terrain meta — run bake_terrain.py first)")
 
