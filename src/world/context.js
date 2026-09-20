@@ -666,6 +666,9 @@ export function buildContext(terrain, quality, opts = {}) {
       top: g + bodyH + 1.2, base: g, yaw: rect.yaw, flat: true, pitched: false, real: true,
       ax: rect.w * ca + rect.d * sa, az: rect.w * sa + rect.d * ca,
       front: null,
+      // Over the water on purpose: the deployment rules and the suite read
+      // this, so a ferry wharf is not a building that fell in the harbour.
+      wharf,
     });
     rejects.placed++;
     return true;

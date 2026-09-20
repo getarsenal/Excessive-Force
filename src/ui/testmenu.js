@@ -1818,8 +1818,10 @@ export class TestMenu {
             const allow = surveyed ? 4.6 + 5 : 0;
             const clear = Math.min(net.roadClearance(x, z, surveyed), net.nodeClearance(x, z)) + allow;
             if (clear < 0) { inRoad++; worstRoad = Math.max(worstRoad, -clear); break; }
-            if (terrain.isWater(x, z)
-              || terrain.heightAt(x, z) < terrain.waterLevel + 0.6) { wet2++; break; }
+            // A wharf stands over the water on purpose; anything else that
+            // does has fallen in.
+            if (!p.wharf && (terrain.isWater(x, z)
+              || terrain.heightAt(x, z) < terrain.waterLevel + 0.6)) { wet2++; break; }
             if (bridge) {
               const a = bridge.far.a, b = bridge.far.b;
               const dx = b.x - a.x, dz = b.z - a.z;
