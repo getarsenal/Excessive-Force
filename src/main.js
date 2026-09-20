@@ -411,7 +411,7 @@ async function boot() {
   battle.fires = new Fires(fx, quality);
   // And the town burns. A shell that stops against a building guts it: the
   // walls go to soot, the windows go dark, and the fire is on the roof.
-  battle.cityFire = new CityFire({ cityGroup: contextGroup, fx, fires: battle.fires, audio });
+  battle.cityFire = new CityFire({ cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene });
 
   // Flags on the landmarks, each standing on a stone and going with it.
   const flags = new Flags(engine.scene, quality);

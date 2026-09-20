@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildRuin } from './ruins.js';
 
 /**
  * The city burning.
@@ -30,9 +31,13 @@ export class CityFire {
    * @param {object} o.fires           Fires
    * @param {object} o.audio
    */
-  constructor({ cityGroup, fx, fires, audio }) {
+  constructor({ cityGroup, fx, fires, audio, scene }) {
     this.plots = (cityGroup && cityGroup.userData.plots) || [];
     this.meshes = (cityGroup && cityGroup.userData.cityMeshes) || [];
+    this.scene = scene || cityGroup;
+    this.ruins = new THREE.Group();
+    this.ruins.name = 'ruins';
+    this.scene.add(this.ruins);
     this.fx = fx;
     this.fires = fires;
     this.audio = audio;
@@ -141,33 +146,43 @@ export class CityFire {
   burn(p, quiet = 1) {
     p.burnt = true;
     this.burnt++;
+    // The building as it was goes: every piece of it — walls, roof, cornice,
+    // stoop, the tank on the roof — is folded to a point at its own base,
+    // where the rubble will cover it. What stands in its place is the shell.
     for (const m of this.meshes) {
       const ranges = m.userData.plotRanges && m.userData.plotRanges.get(p.index);
       if (!ranges) continue;
+      const pos = m.geometry.attributes.position;
       const a = m.geometry.attributes.aBurn;
-      if (!a) continue;
       for (const [start, count] of ranges) {
-        for (let i = start; i < start + count; i++) a.setX(i, 1);
+        for (let i = start; i < start + count; i++) {
+          pos.setXYZ(i, p.x, p.base - 0.5, p.z);
+          if (a) a.setX(i, 1);
+        }
       }
-      a.needsUpdate = true;
+      pos.needsUpdate = true;
+      if (a) a.needsUpdate = true;
     }
+    this.ruins.add(buildRuin(p, Math.random));
     const top = p.top ?? (p.base + p.h);
     const size = Math.hypot(p.w, p.d);
     if (this.fx) {
       // The charge goes off inside; the fireball comes out of the windows.
       this._v.set(p.x, p.base + Math.min(p.h, 40) * 0.55, p.z);
       this.fx.detonate(this._v, (1.8 + size * 0.03) * quiet, { ground: false });
-      this.fx.dustColumn(p.x, top, p.z, (0.45 + size * 0.012) * quiet);
+      this.fx.dustColumn(p.x, p.base + p.h * 0.5, p.z, (0.45 + size * 0.012) * quiet);
     }
     if (this.fires) {
-      // Fire along the roof: one for a house, several for a block.
+      // Fire in the shell: on the heap inside, one for a house, several for
+      // a block, and the smoke comes up through where the roof was.
       const n = Math.max(1, Math.min(4, Math.round(size / 20)));
       const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+      const heap = p.base + Math.min(3.2, 0.9 + p.h * 0.12) * 0.7;
       for (let i = 0; i < n; i++) {
-        const u = (n === 1 ? 0 : (i / (n - 1) - 0.5)) * p.w * 0.6;
-        const v = (Math.random() - 0.5) * p.d * 0.5;
+        const u = (n === 1 ? 0 : (i / (n - 1) - 0.5)) * p.w * 0.5;
+        const v = (Math.random() - 0.5) * p.d * 0.4;
         const fx = p.x + u * ca + v * sa, fz = p.z - u * sa + v * ca;
-        this.fires.ignite(fx, top - 0.4, fz, 1.4 + size * 0.02, 45 + size * 1.5);
+        this.fires.ignite(fx, heap, fz, 1.4 + size * 0.02, 45 + size * 1.5);
       }
     }
     if (this.audio) {
