@@ -464,11 +464,12 @@ export const LEVELS = {
       g.populateRedeemer(origin, groundY);
     },
     // The Forte de Copacabana's twin 305 mm mounting, dug into the summit
-    // platform fifty metres from the statue — on the flat ring between the
-    // terraces and the platform's edge, clear of the garrison's own lines.
-    // It turns slowly, drops two shells at a time on the battery, and three
-    // rounds in four glance off it. See `game/turret.js`.
-    turret: { x: -38, z: 35, yaw: 2.4, scale: 1.9 },
+    // platform behind the statue. The terraces are a square forty-one metres
+    // to a side, so the flat ring outside them is only on the axes; this is
+    // the west axis, fifty-five metres out, the guns facing away from the
+    // figure. It turns slowly, drops two shells at a time on the battery,
+    // and three rounds in four glance off it. See `game/turret.js`.
+    turret: { x: -55, z: 0, yaw: -Math.PI / 2, scale: 1.4 },
     // The arms are scored and they are worth what they weigh, which is the
     // lesson: shoot them off and watch the bar barely move.
     scoreTags: ['statue', 'arms', 'pedestal'],

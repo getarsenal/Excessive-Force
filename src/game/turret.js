@@ -33,21 +33,20 @@ export class CoastalTurret {
     this.terrain = terrain;
     this.fx = fx;
     this.audio = audio;
-    this.scale = opts.scale ?? 1.9;
+    this.scale = opts.scale ?? 1.4;
     const S = this.scale;
     this.R = 5.2 * S;                       // dome radius
     this.barrelL = 12.5 * S;
     this.barrelR = 0.45 * S;
     this.range = opts.range ?? 950;
     this.minRange = opts.minRange ?? 110;
-    this.turnRate = opts.turnRate ?? 0.32;   // rad/s
+    this.turnRate = opts.turnRate ?? 0.22;   // rad/s: a quarter turn in seven seconds
     this.rof = opts.rof ?? 10.5;
     this.hp = opts.hp ?? 16;
     this.hpMax = this.hp;
     this.alive = true;
     this.deflect = opts.deflect ?? 0.75;
     this.yaw = opts.yaw ?? 0;
-    this.pitch = 0.62;
     this.cooldown = 4.0;
     this.salvo = 0;                         // shells left in the current salvo
     this.salvoGap = 0;
@@ -58,68 +57,188 @@ export class CoastalTurret {
 
     const gy = terrain.heightAt(x, z);
     this.pos = new THREE.Vector3(x, gy, z);
-    this.domeCentre = new THREE.Vector3(x, gy + 1.0 * S, z);
+    // Dug in. The dome's centre is half a radius under the apron, so what
+    // shows is the cap — the photograph is a low steel hump on a paved
+    // platform with the guns coming out of its face at knee height, not a
+    // globe standing on a drum.
+    this.domeCentre = new THREE.Vector3(x, gy - 0.5 * this.R, z);
+    this.trunnionY = 0.85 * this.R;         // above the dome centre: just over the apron
+    this.pitchTarget = 0.25;
+    this.pitch = 0.25;
 
     // ── The mounting.
     const g = new THREE.Group();
     g.position.copy(this.pos);
     this.group = g;
+    const R = this.R;
     const concrete = new THREE.MeshStandardMaterial({ color: 0x9a9789, roughness: 0.95 });
+    const cracked = new THREE.MeshStandardMaterial({ color: 0x7e7b70, roughness: 0.97 });
     const steel = new THREE.MeshStandardMaterial({ color: 0x8e9498, roughness: 0.42, metalness: 0.55 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x3c3f42, roughness: 0.6, metalness: 0.4 });
     const paint = new THREE.MeshStandardMaterial({ color: 0xd8c23a, roughness: 0.7 });
+    const bag = new THREE.MeshStandardMaterial({ color: 0x6b6a4e, roughness: 1.0 });
+    const rust = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.9, metalness: 0.3 });
+    const timber = new THREE.MeshStandardMaterial({ color: 0x5a4a36, roughness: 0.95 });
+    const rnd = (() => { let t = 0x9e3779b9; return () => ((t = (t * 1664525 + 1013904223) >>> 0) / 4294967296); })();
 
-    // Base ring, sunk into the platform, with a yellow safety ring painted on.
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(this.R * 1.45, this.R * 1.55, 1.2 * S, 28), concrete);
-    ring.position.y = 0.6 * S - 0.2;
+    // The apron: a flush concrete platform, flagged with the yellow lines the
+    // photograph has, cracked and patched.
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(R * 2.3, R * 2.4, 0.5, 24), concrete);
+    apron.position.y = 0.05;
+    g.add(apron);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(R * 1.22, R * 1.32, 40), paint);
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.32;
     g.add(ring);
-    const mark = new THREE.Mesh(new THREE.RingGeometry(this.R * 1.2, this.R * 1.28, 32), paint);
-    mark.rotation.x = -Math.PI / 2;
-    mark.position.y = 1.2 * S - 0.18;
-    g.add(mark);
+    for (const sgn of [-1, 1]) {
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, R * 3.6), paint);
+      line.position.set(sgn * R * 1.75, 0.32, 0);
+      g.add(line);
+    }
+    for (let i = 0; i < 9; i++) {
+      // Cracks: thin dark slivers across the apron.
+      const len = 1.5 + rnd() * 4;
+      const crack = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, len), cracked);
+      const a = rnd() * Math.PI * 2, r = R * (1.4 + rnd() * 0.85);
+      crack.position.set(Math.cos(a) * r, 0.31, Math.sin(a) * r);
+      crack.rotation.y = rnd() * Math.PI;
+      g.add(crack);
+    }
+    // Two patched slabs, a shade off.
+    for (let i = 0; i < 2; i++) {
+      const patch = new THREE.Mesh(new THREE.BoxGeometry(2.4 + rnd() * 2, 0.06, 2 + rnd() * 2), cracked);
+      const a = rnd() * Math.PI * 2, r = R * (1.6 + rnd() * 0.6);
+      patch.position.set(Math.cos(a) * r, 0.31, Math.sin(a) * r);
+      patch.rotation.y = rnd() * Math.PI;
+      g.add(patch);
+    }
 
-    // The turret proper turns as one.
+    // The turret proper turns as one, on the sunk centre.
     const turret = new THREE.Group();
-    turret.position.y = 1.0 * S;
+    turret.position.y = this.domeCentre.y - gy;
     g.add(turret);
     this.turret = turret;
-    const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(this.R, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.52), steel);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), steel);
     turret.add(dome);
-    // A glacis ring where the dome meets the base.
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(this.R * 1.02, this.R * 1.1, 0.9 * S, 28), dark);
-    skirt.position.y = -0.1 * S;
-    turret.add(skirt);
+    // A seam ring round the cap where the armour plates meet.
+    const seam = new THREE.Mesh(new THREE.TorusGeometry(R * 0.86, 0.09, 6, 40), dark);
+    seam.rotation.x = Math.PI / 2; seam.position.y = R * 0.5;
+    turret.add(seam);
+    // The collar the dome turns in, flush with the apron.
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.06, R * 1.06, 0.35, 32), dark);
+    collar.position.y = 0.5 * R + 0.35;
+    turret.add(collar);
 
-    // Two guns, on a common trunnion so they elevate together.
+    // Two guns, on a common trunnion just over the apron, coming out of the
+    // dome's face.
     const trunnion = new THREE.Group();
-    trunnion.position.set(0, this.R * 0.28, 0);
+    trunnion.position.set(0, this.trunnionY, 0);
     turret.add(trunnion);
     this.trunnion = trunnion;
     this.barrels = [];
-    for (const s of [-1, 1]) {
+    const root = R * 0.42;                  // where the tube leaves the dome
+    for (const sgn of [-1, 1]) {
       const b = new THREE.Group();
-      b.position.x = s * this.R * 0.34;
+      b.position.x = sgn * R * 0.30;
       trunnion.add(b);
       const tube = new THREE.Mesh(
-        new THREE.CylinderGeometry(this.barrelR * 0.85, this.barrelR, this.barrelL, 14), dark);
+        new THREE.CylinderGeometry(this.barrelR * 0.82, this.barrelR, this.barrelL, 14), rust);
       tube.rotation.x = Math.PI / 2;
-      tube.position.z = this.barrelL / 2 + this.R * 0.55;
+      tube.position.z = root + this.barrelL / 2;
       b.add(tube);
-      const collar = new THREE.Mesh(
-        new THREE.CylinderGeometry(this.barrelR * 1.5, this.barrelR * 1.5, 1.6 * S, 14), steel);
-      collar.rotation.x = Math.PI / 2;
-      collar.position.z = this.R * 0.55 + 0.8 * S;
-      b.add(collar);
+      const shroud = new THREE.Mesh(
+        new THREE.CylinderGeometry(this.barrelR * 1.7, this.barrelR * 1.9, 2.2 * this.scale, 14), steel);
+      shroud.rotation.x = Math.PI / 2;
+      shroud.position.z = root + 1.1 * this.scale;
+      b.add(shroud);
       const muzzle = new THREE.Mesh(
-        new THREE.CylinderGeometry(this.barrelR * 1.15, this.barrelR * 1.15, 0.7 * S, 14), steel);
+        new THREE.CylinderGeometry(this.barrelR * 1.1, this.barrelR * 1.1, 0.6 * this.scale, 14), dark);
       muzzle.rotation.x = Math.PI / 2;
-      muzzle.position.z = this.R * 0.55 + this.barrelL - 0.35 * S;
+      muzzle.position.z = root + this.barrelL - 0.3 * this.scale;
       b.add(muzzle);
       this.barrels.push(b);
     }
-    for (const m of g.children) m.castShadow = m.receiveShadow = true;
-    turret.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+    this.barrelRoot = root;
+
+    // ── Dug in round it: a sandbag parapet on the sides and the rear, barbed
+    // wire outside that, broken concrete, an ammunition hatch and crates by
+    // the rear entrance. The front — the way the guns fire — is left open.
+    const front = this.yaw;                 // bearing the guns face at rest
+    const rearward = (a) => {
+      let d = a - (front + Math.PI);
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return Math.abs(d);
+    };
+    const bagR = R * 2.55;
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * Math.PI * 2;
+      const toFront = Math.PI - rearward(a);
+      if (toFront < 0.75) continue;                       // the embrasure
+      if (rearward(a) < 0.22) continue;                   // the way in
+      for (let row = 0; row < 2; row++) {
+        const rr = bagR + (row === 1 ? 0.15 : 0);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 0.55), bag);
+        m.position.set(Math.cos(a + row * 0.035) * rr, 0.5 + 0.21 + row * 0.4, Math.sin(a + row * 0.035) * rr);
+        m.rotation.y = -a + Math.PI / 2 + (rnd() - 0.5) * 0.15;
+        m.rotation.z = (rnd() - 0.5) * 0.08;
+        g.add(m);
+      }
+    }
+    // Barbed wire: posts with three strands, a gap at the rear.
+    const wireR = R * 3.1;
+    const POSTS = 14;
+    const postAt = [];
+    for (let i = 0; i < POSTS; i++) {
+      const a = (i / POSTS) * Math.PI * 2;
+      const p = new THREE.Vector3(Math.cos(a) * wireR, 0, Math.sin(a) * wireR);
+      p.y = terrain.heightAt(x + p.x, z + p.z) - gy;
+      postAt.push({ a, p, gap: rearward(a) < 0.25 });
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.5, 6), timber);
+      post.position.set(p.x, p.y + 0.75, p.z);
+      post.rotation.z = (rnd() - 0.5) * 0.12;
+      g.add(post);
+    }
+    for (let i = 0; i < POSTS; i++) {
+      const a = postAt[i], b = postAt[(i + 1) % POSTS];
+      if (a.gap || b.gap) continue;
+      for (const h of [0.45, 0.85, 1.3]) {
+        const seg = b.p.clone().sub(a.p);
+        const L = seg.length();
+        const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, L, 4), dark);
+        const mid = a.p.clone().lerp(b.p, 0.5);
+        wire.position.set(mid.x, mid.y + h - 0.04 * Math.sin(h), mid.z);
+        wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), seg.clone().normalize());
+        g.add(wire);
+      }
+    }
+    // Broken concrete, half sunk, at odd angles.
+    for (let i = 0; i < 7; i++) {
+      const a = rnd() * Math.PI * 2, r = R * (2.4 + rnd() * 0.9);
+      if (rearward(a) < 0.3) continue;
+      const w = 1.2 + rnd() * 2.2, h = 0.6 + rnd() * 0.9, d = 1.0 + rnd() * 1.8;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cracked);
+      const px = Math.cos(a) * r, pz = Math.sin(a) * r;
+      m.position.set(px, terrain.heightAt(x + px, z + pz) - gy + h * 0.25, pz);
+      m.rotation.set((rnd() - 0.5) * 0.5, rnd() * Math.PI, (rnd() - 0.5) * 0.5);
+      g.add(m);
+    }
+    // The way in: a steel hatch flush in the apron, crates beside it.
+    {
+      const a = front + Math.PI;
+      const hx = Math.cos(a) * R * 1.75, hz = Math.sin(a) * R * 1.75;
+      const hatch = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.18, 2.2), dark);
+      hatch.position.set(hx, 0.38, hz); hatch.rotation.y = -a;
+      g.add(hatch);
+      for (let i = 0; i < 5; i++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 0.7), bag);
+        const off = (i - 2) * 1.25;
+        crate.position.set(hx + Math.cos(a + Math.PI / 2) * off + Math.cos(a) * 2.6,
+          0.5 + 0.25 + (i === 2 ? 0.5 : 0), hz + Math.sin(a + Math.PI / 2) * off + Math.sin(a) * 2.6);
+        crate.rotation.y = -a + (rnd() - 0.5) * 0.3;
+        g.add(crate);
+      }
+    }
+    g.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
     scene.add(g);
 
     // ── The body. Kinematic, so the guns' colliders turn with the guns and a
@@ -129,13 +248,11 @@ export class CoastalTurret {
       .setTranslation(x, this.domeCentre.y, z);
     this.body = physics.world.createRigidBody(desc);
     physics.world.createCollider(rapier.ColliderDesc.ball(this.R).setFriction(0.3), this.body);
-    physics.world.createCollider(
-      rapier.ColliderDesc.cylinder(0.6 * S, this.R * 1.5).setTranslation(0, -0.6 * S, 0), this.body);
     this.barrelCols = [];
-    for (const s of [-1, 1]) {
+    for (const sgn of [-1, 1]) {
       const col = physics.world.createCollider(
         rapier.ColliderDesc.cuboid(this.barrelR * 1.3, this.barrelR * 1.3, this.barrelL / 2), this.body);
-      this.barrelCols.push({ col, s });
+      this.barrelCols.push({ col, s: sgn });
     }
     physics.owners.set(this.body.handle, this);
     this._placeColliders();
@@ -147,8 +264,8 @@ export class CoastalTurret {
     const pitchQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-this.pitch, 0, 0));
     for (const { col, s } of this.barrelCols) {
       // In the turret's frame: out along +z from the trunnion, elevated.
-      const local = new THREE.Vector3(s * this.R * 0.34, this.R * 0.28, 0);
-      const along = new THREE.Vector3(0, 0, this.R * 0.55 + this.barrelL / 2).applyQuaternion(pitchQ);
+      const local = new THREE.Vector3(s * this.R * 0.30, this.trunnionY, 0);
+      const along = new THREE.Vector3(0, 0, this.barrelRoot + this.barrelL / 2).applyQuaternion(pitchQ);
       local.add(along).applyQuaternion(q);
       const rot = q.clone().multiply(pitchQ);
       col.setTranslationWrtParent({ x: local.x, y: local.y, z: local.z });
@@ -159,18 +276,44 @@ export class CoastalTurret {
   /** Muzzle position of barrel `i` in world space. */
   muzzle(i) {
     const s = i === 0 ? -1 : 1;
-    const p = new THREE.Vector3(s * this.R * 0.34, this.R * 0.28, 0);
+    const p = new THREE.Vector3(s * this.R * 0.30, this.trunnionY, 0);
     const pitchQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-this.pitch, 0, 0));
-    p.add(new THREE.Vector3(0, 0, this.R * 0.55 + this.barrelL).applyQuaternion(pitchQ));
+    p.add(new THREE.Vector3(0, 0, this.barrelRoot + this.barrelL).applyQuaternion(pitchQ));
     p.applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.yaw, 0)));
     return p.add(this.domeCentre);
+  }
+
+  /** The direction the barrels point, in world space. */
+  barrelDir() {
+    const pitchQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-this.pitch, 0, 0));
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.yaw, 0));
+    return new THREE.Vector3(0, 0, 1).applyQuaternion(pitchQ).applyQuaternion(q);
+  }
+
+  /**
+   * The firing solution for a target from the guns as they are now: the
+   * bearing, the elevation and the speed. Just over the least speed that
+   * reaches, so the high solution is a proper arc — fifty, sixty degrees —
+   * that lands in ten seconds. At a fixed muzzle velocity the high solution
+   * for a target three hundred metres away was a seventy-seven-degree lob
+   * that took fifty seconds to come down, which is a firework, not a gun.
+   */
+  solution(aim) {
+    const from = this.muzzle(0).lerp(this.muzzle(1), 0.5);
+    const dx = aim.x - from.x, dz = aim.z - from.z, h = aim.y - from.y;
+    const d = Math.hypot(dx, dz);
+    const vMin = Math.sqrt(Math.max(1, 9.81 * (h + Math.hypot(h, d))));
+    const speed = Math.max(55, vMin * 1.18);
+    const vel = solveArc(from, aim, speed, 9.81, true);
+    if (!vel) return null;
+    return { yaw: Math.atan2(dx, dz), pitch: Math.atan2(vel.y, Math.hypot(vel.x, vel.z)), speed };
   }
 
   update(dt, units, projectiles, battle) {
     // Recoil settles whatever else is happening.
     for (let i = 0; i < 2; i++) {
       this.recoil[i] = Math.max(0, this.recoil[i] - dt * 2.4);
-      this.barrels[i].position.z = -this.recoil[i] * 1.4 * this.scale;
+      this.barrels[i].position.z = -this.recoil[i] * 1.3 * this.scale;
     }
     if (!this.alive) return;
 
@@ -184,22 +327,25 @@ export class CoastalTurret {
       if (d < bd) { bd = d; best = u; }
     }
     this.target = best;
+
+    // Both axes slew, slowly, to the solution — the mounting weighs what it
+    // weighs — and the guns fire only when they are pointing where the shell
+    // is going, so the round leaves the muzzle along the tube.
+    let wantYaw = this.yaw, wantPitch = 0.25;
     if (best) {
-      const want = Math.atan2(best.pos.x - this.pos.x, best.pos.z - this.pos.z);
-      let d = want - this.yaw;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      const step = Math.sign(d) * Math.min(Math.abs(d), this.turnRate * dt);
-      this.yaw += step;
-      this.onTarget = Math.abs(d) < 0.05;
-    } else {
-      this.onTarget = false;
-      // Nothing to shoot at: the guns come down to rest.
-      this.pitch += (0.38 - this.pitch) * Math.min(1, dt * 0.6);
+      const sol = this.solution(best.pos);
+      if (sol) { wantYaw = sol.yaw; wantPitch = THREE.MathUtils.clamp(sol.pitch, 0.12, 1.25); this._speed = sol.speed; }
     }
+    let dy = wantYaw - this.yaw;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    this.yaw += Math.sign(dy) * Math.min(Math.abs(dy), this.turnRate * dt);
+    const dp = wantPitch - this.pitch;
+    this.pitch += Math.sign(dp) * Math.min(Math.abs(dp), this.turnRate * 0.8 * dt);
+    this.onTarget = !!best && Math.abs(dy) < 0.04 && Math.abs(dp) < 0.03;
+
     this.turret.rotation.y = this.yaw;
     this.trunnion.rotation.x = -this.pitch;
-    this.body.setNextKinematicRotation(new THREE.Quaternion());   // the ball does not care
     this._placeColliders();
 
     this.cooldown -= dt;
@@ -219,33 +365,25 @@ export class CoastalTurret {
     this.salvo--;
     this.salvoGap = 0.45;
     if (this.salvo === 0) this.cooldown = this.rof * (0.85 + Math.random() * 0.3);
-    // Lead a little and scatter a little: a heavy gun suppresses a position.
-    const aim = target.pos.clone();
-    aim.x += (Math.random() - 0.5) * 9;
-    aim.z += (Math.random() - 0.5) * 9;
+    // Out of the tube, along the tube: the guns are already laid on the
+    // solution, so the shell is the solution's speed along the barrel's own
+    // line, with a little scatter — a heavy gun suppresses a position.
     const from = this.muzzle(i);
-    // Just over the least speed that reaches: the high solution at that
-    // speed is a proper arc — fifty, sixty degrees — that lands in ten
-    // seconds. At a fixed muzzle velocity the high solution for a target
-    // three hundred metres away was a seventy-seven-degree lob that took
-    // fifty seconds to come down, which is a firework, not a gun.
-    const dx = aim.x - from.x, dz = aim.z - from.z, h = aim.y - from.y;
-    const d = Math.hypot(dx, dz);
-    const vMin = Math.sqrt(Math.max(1, 9.81 * (h + Math.hypot(h, d))));
-    const SPEED = Math.max(55, vMin * 1.18);
-    const vel = solveArc(from, aim, SPEED, 9.81, true);
-    if (!vel) { this.salvo = 0; this.cooldown = 3; return; }
-    // Elevate the guns to the solution, so the tubes point where the shell goes.
-    const horiz = Math.hypot(vel.x, vel.z);
-    this.pitch = THREE.MathUtils.clamp(Math.atan2(vel.y, horiz), 0.15, 1.35);
+    const dir = this.barrelDir();
+    dir.x += (Math.random() - 0.5) * 0.02;
+    dir.z += (Math.random() - 0.5) * 0.02;
+    dir.normalize();
+    const speed = (this._speed || 120) * (0.995 + Math.random() * 0.01);
+    const vel = dir.clone().multiplyScalar(speed);
+    // Spawned a little past the muzzle, and owned by the mounting, so the
+    // first thing the round's ray finds is not the barrel it came out of.
     projectiles.fire({
-      pos: from, vel, gravity: 9.81, kind: 'arc', speed: SPEED,
+      pos: from.clone().addScaledVector(dir, 1.5), vel, gravity: 9.81, kind: 'arc', speed,
       warhead: { lethal: 2.4, radius: 24, power: 9000, fx: 2.6 },
-      owner: null, target: aim, trail: 1.3, hostile: true,
+      owner: this, target: target.pos.clone(), trail: 1.3, hostile: true,
     });
     this.recoil[i] = 1;
     this.fired++;
-    const dir = vel.clone().normalize();
     this.fx.muzzleFlash(from, dir, 4.5);
     this.fx.impactDust(from.x, from.y, from.z, 2.5);
     if (this.audio) this.audio.play('gun', from, { rate: 0.5, gain: 1.0, rolloff: 520 });
@@ -265,7 +403,7 @@ export class CoastalTurret {
     const axis = new THREE.Vector3(0, 0, 1).applyQuaternion(pitchQ).applyQuaternion(q);
     let bestN = null, bestD = Infinity;
     for (const s of [-1, 1]) {
-      const root = new THREE.Vector3(s * this.R * 0.34, this.R * 0.28, 0).applyQuaternion(q).add(this.domeCentre);
+      const root = new THREE.Vector3(s * this.R * 0.30, this.trunnionY, 0).applyQuaternion(q).add(this.domeCentre);
       const rel = point.clone().sub(root);
       const along = rel.dot(axis);
       const perp = rel.clone().addScaledVector(axis, -along);
@@ -316,10 +454,10 @@ export class CoastalTurret {
     this.alive = false;
     this.target = null;
     // The dome sinks and tilts, the guns droop.
-    this.turret.position.y -= 1.6 * this.scale;
-    this.turret.rotation.x = 0.26;
-    this.turret.rotation.z = -0.18;
-    this.pitch = -0.12;
+    this.turret.position.y -= 0.9 * this.scale;
+    this.turret.rotation.x = 0.22;
+    this.turret.rotation.z = -0.16;
+    this.pitch = -0.1;
     this.trunnion.rotation.x = -this.pitch;
     this.turret.traverse((m) => {
       if (m.isMesh && m.material) {

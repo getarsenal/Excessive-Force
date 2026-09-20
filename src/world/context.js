@@ -1101,6 +1101,10 @@ export function buildContext(terrain, quality, opts = {}) {
     const inner = opts.canopyFrom || EXCLUDE * 1.04;
     const near = (x, z) => plots.some((p) => Math.abs(x - p.x) < p.ax / 2 + 7
       && Math.abs(z - p.z) < p.az / 2 + 7);
+    // Ground a level has given to something of its own — the turret's
+    // emplacement on the Corcovado — is not forest.
+    const clearings = opts.clearings || [];
+    const cleared = (x, z) => clearings.some((c) => Math.hypot(x - c.x, z - c.z) < c.r);
     for (let gx = -reach; gx <= reach; gx += step) {
       for (let gz = -reach; gz <= reach; gz += step) {
         const x = gx + (rng() - 0.5) * step * 0.9;
@@ -1112,7 +1116,7 @@ export function buildContext(terrain, quality, opts = {}) {
         if (r < inner || r > reach) continue;
         if (terrain.isWater(x, z)) continue;
         if (net && net.roadClearance && net.roadClearance(x, z) < 9) continue;
-        if (near(x, z)) continue;
+        if (near(x, z) || cleared(x, z)) continue;
         if (rng() < 0.14) continue;
         const g = terrain.heightAt(x, z);
         if (g < terrain.waterLevel + 1.0) continue;

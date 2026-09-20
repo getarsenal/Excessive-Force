@@ -378,7 +378,9 @@ export class ProjectileManager {
           { x: dir.x, y: dir.y, z: dir.z },
           dist,
         );
-        if (res) {
+        // A round does not hit the thing that fired it: the turret's shells
+        // leave from inside its own barrel collider.
+        if (res && !(res.owner && res.owner === p.owner)) {
           hitPoint = a.clone().addScaledVector(dir, Math.max(0, res.toi - 0.05));
           structureHit = true;
           owner = res.owner || null;

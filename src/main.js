@@ -204,6 +204,11 @@ async function boot() {
   const city = await loadCity(level.terrain);
   const contextGroup = buildContext(terrain, quality, {
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
+    // The turret's emplacement, kept clear of the forest.
+    clearings: level.turret
+      ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
+        r: 5.2 * (level.turret.scale ?? 1.4) * 4.5 }]
+      : [],
     city, cityExclude: level.cityExcludeRadius,
     // What is beyond the town. A level says where it is; the generator does
     // not guess it from the terrain, because fields and forest look much the
@@ -234,7 +239,11 @@ async function boot() {
     // Nothing worth defending is dug in round: the belt goes round the
     // objectives, not round the scenery across the river.
     landmarks: landmarks.filter((l) => !l.scenery),
-    plots: contextGroup?.userData?.plots || [],
+    // And the turret's emplacement is ground already taken.
+    plots: (contextGroup?.userData?.plots || []).concat(level.turret
+      ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
+        w: 5.2 * (level.turret.scale ?? 1.4) * 7, d: 5.2 * (level.turret.scale ?? 1.4) * 7 }]
+      : []),
     // The street network and the frame it is laid on, so the belt is square to
     // the place rather than to the map, and so it knows where the roads are.
     net: contextGroup?.userData?.network || null,
