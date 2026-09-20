@@ -1,4 +1,6 @@
-import { buildEdgeIndex, dissolveThroughNodes, GRID_YAW } from './streets.js';
+import * as THREE from 'three';
+import { buildEdgeIndex, dissolveThroughNodes, halfWidth, GRID_YAW, SURFACE_LIFT }
+  from './streets.js';
 
 /**
  * The real street plan.
@@ -170,18 +172,227 @@ export function realNetwork(data, terrain, opts = {}) {
     });
   }
 
+  // One junction where the survey has a cluster of them, one road where it
+  // has two carriageways. Before the bridges, because a bridge that lands on
+  // a cluster should land on the junction the cluster becomes.
+  const welded = weldJunctions(nodes, edges);
+  dedupeEdges(nodes, edges, terrain);
   landBridges(edges, nodes, terrain);
-  layDecks(edges, nodes, terrain);
+  const bridges = [];
+  layDecks(edges, nodes, terrain, bridges);
   dissolveThroughNodes(nodes, edges, { surveyed: true });
+  // Twin carriageways whose junctions did not line up become duplicates only
+  // once the dissolve has run the pieces together, so once more.
+  dedupeEdges(nodes, edges, terrain);
 
   const net = {
-    nodes, edges, blocks,
+    nodes, edges, blocks, bridges,
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
-    debug: { source: 'overture', streets: edges.length, blocks: blocks.length },
+    debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
+      welded, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
+}
+
+const RANK = { avenue: 3, street: 2, mews: 1 };
+
+/**
+ * One junction where the survey has several.
+ *
+ * A survey draws a dual carriageway as two roads, one per direction, eight to
+ * eighteen metres apart, and draws the place where two of them cross as four
+ * junctions: each carriageway of one against each carriageway of the other,
+ * plus whatever slip lanes and pedestrian islands sit between. Parliament
+ * Square arrived as nine junctions inside a forty-metre patch, all of them
+ * avenues, each with its own twenty-three-metre paved pad — and nine pads in
+ * a forty-metre patch is one black blob. That blob is what the roads looked
+ * like from above, at every major crossing in the city.
+ *
+ * The rule is the one a draughtsman would use: two junctions closer together
+ * than the road is wide are one junction. Nodes are welded when they are
+ * within the widest road at either of them, and a weld is refused once the
+ * cluster it would make grows wider than two of those, so a line of
+ * connectors down a long street cannot chain into one node swallowing the
+ * street. The welded node stands at the cluster's centre, every road that
+ * met any member now meets it, and the roads that only ran between members
+ * — the ten-metre links across the central reservation — are gone.
+ */
+function weldJunctions(nodes, edges) {
+  const live = [];
+  for (let i = 0; i < nodes.length; i++) if (nodes[i].links.length) live.push(i);
+  const reach = new Map();
+  for (const i of live) {
+    let r = 0;
+    for (const l of nodes[i].links) r = Math.max(r, halfWidth(l.edge.cls));
+    reach.set(i, r * 1.15);
+  }
+  const parent = new Map(live.map((i) => [i, i]));
+  const box = new Map(live.map((i) => [i, {
+    x0: nodes[i].x, x1: nodes[i].x, z0: nodes[i].z, z1: nodes[i].z, r: reach.get(i) }]));
+  const find = (k) => {
+    while (parent.get(k) !== k) { parent.set(k, parent.get(parent.get(k))); k = parent.get(k); }
+    return k;
+  };
+  const CELL = 24;
+  const grid = new Map();
+  const key = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+  for (const i of live) {
+    const k = key(nodes[i].x, nodes[i].z);
+    let cell = grid.get(k);
+    if (!cell) grid.set(k, cell = []);
+    cell.push(i);
+  }
+  let welds = 0;
+  for (const i of live) {
+    const n = nodes[i];
+    const gx = Math.floor(n.x / CELL), gz = Math.floor(n.z / CELL);
+    for (let a = -1; a <= 1; a++) {
+      for (let b = -1; b <= 1; b++) {
+        const cell = grid.get(`${gx + a},${gz + b}`);
+        if (!cell) continue;
+        for (const j of cell) {
+          if (j <= i) continue;
+          const m = nodes[j];
+          const d = Math.hypot(m.x - n.x, m.z - n.z);
+          if (d >= Math.max(reach.get(i), reach.get(j))) continue;
+          const ri = find(i), rj = find(j);
+          if (ri === rj) continue;
+          const A = box.get(ri), B = box.get(rj);
+          const x0 = Math.min(A.x0, B.x0), x1 = Math.max(A.x1, B.x1);
+          const z0 = Math.min(A.z0, B.z0), z1 = Math.max(A.z1, B.z1);
+          const r = Math.max(A.r, B.r);
+          if (Math.max(x1 - x0, z1 - z0) > r * 2.2) continue;   // would swallow a street
+          const root = Math.min(ri, rj), other = Math.max(ri, rj);
+          parent.set(other, root);
+          box.set(root, { x0, x1, z0, z1, r });
+          welds++;
+        }
+      }
+    }
+  }
+  if (!welds) return 0;
+
+  // Where each cluster stands, and how big it is.
+  const members = new Map();
+  for (const i of live) {
+    const r = find(i);
+    let list = members.get(r);
+    if (!list) members.set(r, list = []);
+    list.push(i);
+  }
+  const radius = new Map();
+  for (const [r, list] of members) {
+    if (list.length < 2) continue;
+    let x = 0, z = 0, y = 0;
+    for (const i of list) { x += nodes[i].x; z += nodes[i].z; y += nodes[i].y; }
+    x /= list.length; z /= list.length; y /= list.length;
+    let far = 0;
+    for (const i of list) far = Math.max(far, Math.hypot(nodes[i].x - x, nodes[i].z - z));
+    const rep = nodes[r];
+    rep.x = x; rep.z = z; rep.y = y;
+    radius.set(r, far + 1.5);
+  }
+
+  // Re-point every road at the welded node and cut its first few metres back
+  // to it, so the carriageway leaves the junction's centre rather than jogging
+  // out to where its own connector used to be.
+  const kept = [];
+  for (const e of edges) {
+    const a = find(e.a), b = find(e.b);
+    if (a === b) continue;                    // ran between two members
+    e.a = a; e.b = b;
+    const trim = (pts, node, rad) => {
+      let k = 0;
+      while (k < pts.length - 1 && Math.hypot(pts[k].x - node.x, pts[k].z - node.z) < rad) k++;
+      return [{ x: node.x, z: node.z, y: node.y }, ...pts.slice(k)];
+    };
+    let pts = e.pts;
+    if (radius.has(a)) pts = trim(pts, nodes[a], radius.get(a));
+    if (radius.has(b)) pts = trim(pts.slice().reverse(), nodes[b], radius.get(b)).reverse();
+    if (pts.length < 2) pts = [{ x: nodes[a].x, z: nodes[a].z, y: nodes[a].y },
+      { x: nodes[b].x, z: nodes[b].z, y: nodes[b].y }];
+    e.pts = pts;
+    kept.push(e);
+  }
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return welds;
+}
+
+/**
+ * One road where the survey has two between the same pair of junctions.
+ *
+ * Once the junctions at each end of a dual carriageway have been welded, its
+ * two carriageways run between the same two nodes, and a street plan with two
+ * roads between the same two junctions is a street plan drawn twice. The
+ * wider of the two survives, laid along the average of the two lines — the
+ * middle of the central reservation, which is where the single road belongs.
+ */
+function dedupeEdges(nodes, edges, terrain) {
+  const seen = new Map();
+  const drop = new Set();
+  for (const e of edges) {
+    if (e.a === e.b) { drop.add(e); continue; }
+    const k = e.a < e.b ? `${e.a}|${e.b}` : `${e.b}|${e.a}`;
+    const o = seen.get(k);
+    if (!o) { seen.set(k, e); continue; }
+    const keep = (RANK[e.cls] || 0) > (RANK[o.cls] || 0) ? e : o;
+    const lose = keep === e ? o : e;
+    // Two ordinary streets average to the middle; anything carrying a height
+    // of its own — a bridge, a ramp — keeps its line.
+    if (!keep.bridge && !lose.bridge && !keep.approach && !lose.approach) {
+      keep.pts = averageLines(keep, lose, terrain);
+    }
+    if (lose.bridge) { keep.bridge = true; keep.bank = true; }
+    drop.add(lose);
+    seen.set(k, keep);
+  }
+  if (!drop.size) return 0;
+  const kept = edges.filter((e) => !drop.has(e));
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return drop.size;
+}
+
+/** The line midway between two roads joining the same two nodes. */
+function averageLines(p, q, terrain) {
+  const qp = q.a === p.a ? q.pts : q.pts.slice().reverse();
+  const n = Math.max(p.pts.length, qp.length, 2);
+  const resample = (pts) => {
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+    }
+    const L = cum[cum.length - 1] || 1;
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const s = (k / (n - 1)) * L;
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < s) i++;
+      const t = (s - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1);
+      out.push({ x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
+        z: pts[i - 1].z + (pts[i].z - pts[i - 1].z) * t });
+    }
+    return out;
+  };
+  const A = resample(p.pts), B = resample(qp);
+  return A.map((a, i) => {
+    const x = (a.x + B[i].x) / 2, z = (a.z + B[i].z) / 2;
+    return { x, z, y: terrain.heightAt(x, z) };
+  });
+}
+
+/** Rebuild every node's links from the edge list. */
+function relink(nodes, edges) {
+  for (const n of nodes) n.links = [];
+  for (const e of edges) {
+    nodes[e.a].links.push({ other: e.b, edge: e, at: 0 });
+    nodes[e.b].links.push({ other: e.a, edge: e, at: 1 });
+  }
 }
 
 /**
@@ -271,7 +482,7 @@ function landBridges(edges, nodes, terrain) {
 }
 
 /**
- * Put every bridge on a deck.
+ * Put every bridge on a deck — a real one.
  *
  * The survey says where a bridge is and says nothing about how high it is, and
  * the ground under it is the river bed — so a deck laid on the terrain is a
@@ -284,20 +495,24 @@ function landBridges(edges, nodes, terrain) {
  * anything flagged as a bridge, joined through the nodes it shares with another
  * bridge — and the run decides its own height.
  *
- * An ordinary crossing takes the higher of its two banks, six metres clear of
- * the water at worst: that is Westminster Bridge and every other street that
- * happens to have water under it. A long crossing cannot. It is not a street
- * with a river beneath it, it is a span, and a span is high or it is not
- * buildable: the Harbour Bridge carries its deck forty-nine metres over the
- * water for half a kilometre, and laid flat at six it reads as a causeway
- * cutting the harbour in two. Past four hundred metres of open water the deck
- * is lifted on the length of the crossing. That number is a guess where every
- * other number in this file is surveyed, and it is a better guess than the
- * causeway.
+ * Then it is made into the thing the invented city always had. That city's
+ * bridge — arches on slender piers, a balustrade with lamps along it, ramps
+ * easing the road up at each end — was switched off the moment a map had a
+ * surveyed plan, and a flat slab with a parapet was drawn in its place: from
+ * the river, a plank. Here the surveyed run is straightened onto its own chord
+ * (a survey traces the kerb line and the welded landing can put a twenty-metre
+ * kink in the last piece, which is what "the bridge comes down at a weird
+ * angle" was), lifted clear of the water, and handed to that same builder as a
+ * line it already knows how to build. The roads that meet it at each bank
+ * carry the ramps, so there is no seam where the bridge becomes the street.
+ *
+ * A run that cannot be straightened — a crossing that genuinely curves — keeps
+ * its polyline and its flat deck; nothing is built on a straight line the road
+ * does not follow.
  */
-function layDecks(edges, nodes, terrain) {
-  const bridges = edges.filter((e) => e.bank);
-  if (!bridges.length) return;
+function layDecks(edges, nodes, terrain, bridges) {
+  const spans = edges.filter((e) => e.bank);
+  if (!spans.length) return;
 
   // Weld the pieces: union-find over the nodes a bridge edge touches.
   const parent = new Map();
@@ -307,14 +522,14 @@ function layDecks(edges, nodes, terrain) {
     while (parent.get(k) !== r) { const n = parent.get(k); parent.set(k, r); k = n; }
     return r;
   };
-  for (const e of bridges) {
+  for (const e of spans) {
     for (const k of [e.a, e.b]) if (!parent.has(k)) parent.set(k, k);
     const ra = find(e.a), rb = find(e.b);
     if (ra !== rb) parent.set(ra, rb);
   }
 
   const runs = new Map();
-  for (const e of bridges) {
+  for (const e of spans) {
     const key = find(e.a);
     let run = runs.get(key);
     if (!run) runs.set(key, run = { edges: [], wet: 0, bank: -Infinity });
@@ -328,23 +543,131 @@ function layDecks(edges, nodes, terrain) {
   }
 
   for (const run of runs.values()) {
-    // Level with the road that joins it.
+    // Level with the road that joins it, and clear of the water under it.
     //
-    // Six metres over the water was a floor, and on the Thames — whose surface
-    // the DEM puts at 1.9 m and whose embankment stands at 5 — it is three
-    // metres *above* both banks. The deck then hung over the approach at each
-    // end and Westminster Bridge read as a slab of tarmac floating in the
-    // river, joined to nothing. A bridge is level with what it carries: it
-    // takes the higher bank, and only clears the water by three metres where
-    // there is no bank to take.
-    let deck = Math.max(run.bank, terrain.waterLevel + 3.0);
-    if (run.wet > 400) {
-      deck = Math.max(deck, terrain.waterLevel + Math.min(50, run.wet * 0.09));
+    // Three metres over the higher bank: enough for the arches to read from
+    // the river and for the deck to be a bridge rather than a causeway, and
+    // little enough that the ramps on the approach roads are a gentle rise
+    // rather than a hump. A span long enough to be a real crossing — past four
+    // hundred metres of open water — is lifted on its length instead: the
+    // Harbour Bridge carries its deck forty-nine metres up for half a
+    // kilometre, and laid low it cuts the harbour in two.
+    let deckTop = Math.max(run.bank + 3.0, terrain.waterLevel + 7.5);
+    // Six hundred, not four: Waterloo Bridge is four hundred and sixty metres
+    // of Thames and was being lifted forty-three metres into the air by a
+    // rule written for a harbour. Sydney's crossing is eleven hundred.
+    if (run.wet > 600) {
+      deckTop = Math.max(deckTop, terrain.waterLevel + Math.min(50, run.wet * 0.09));
     }
+    const DECK_T = 1.8;
+
+    // Order the run end to end.
+    const degree = new Map();
     for (const e of run.edges) {
-      for (const p of e.pts) p.y = deck;
-      for (const k of [e.a, e.b]) if (nodes[k]) nodes[k].y = deck;
+      for (const k of [e.a, e.b]) degree.set(k, (degree.get(k) || 0) + 1);
     }
+    const ends = [...degree].filter(([, d]) => d === 1).map(([k]) => k);
+    let chain = null;
+    if (ends.length === 2) {
+      chain = [];
+      const left = new Set(run.edges);
+      let at = ends[0];
+      chain.push({ x: nodes[at].x, z: nodes[at].z, node: at });
+      while (left.size) {
+        const e = [...left].find((q) => q.a === at || q.b === at);
+        if (!e) { chain = null; break; }
+        left.delete(e);
+        const fwd = e.a === at;
+        const pts = fwd ? e.pts : e.pts.slice().reverse();
+        for (let i = 1; i < pts.length; i++) chain.push({ x: pts[i].x, z: pts[i].z });
+        at = fwd ? e.b : e.a;
+        chain[chain.length - 1].node = at;
+      }
+    }
+
+    // Straight enough to be one line, and standing on ground at both ends.
+    let line = null;
+    if (chain && chain.length >= 2) {
+      const A = chain[0], B = chain[chain.length - 1];
+      const dx = B.x - A.x, dz = B.z - A.z;
+      const len = Math.hypot(dx, dz);
+      let dev = 0;
+      for (const p of chain) {
+        dev = Math.max(dev, Math.abs((p.x - A.x) * -dz / (len || 1) + (p.z - A.z) * dx / (len || 1)));
+      }
+      // Not required to be ashore at both ends: a crossing that leaves the map
+      // over the water is still a bridge, and a slab is not.
+      if (len > 40 && dev < len * 0.12) {
+        const ux = dx / len, uz = dz / len;
+        // Every point onto the chord, junctions included.
+        const onto = (p) => {
+          const t = ((p.x - A.x) * ux + (p.z - A.z) * uz);
+          p.x = A.x + ux * t; p.z = A.z + uz * t;
+        };
+        for (const e of run.edges) for (const p of e.pts) onto(p);
+        for (const k of degree.keys()) onto(nodes[k]);
+        const from = new THREE.Vector3(A.x, 0, A.z), to = new THREE.Vector3(B.x, 0, B.z);
+        line = {
+          a: { x: A.x, z: A.z }, b: { x: B.x, z: B.z }, from, to, len,
+          yaw: Math.atan2(dx, dz), out: { x: ux, z: uz },
+          deckY: deckTop - DECK_T / 2, deckT: DECK_T, deckTop,
+          profile: [{ x: A.x, z: A.z, y: deckTop }, { x: B.x, z: B.z, y: deckTop }],
+          ramps: [], run: 46,
+        };
+        for (const e of run.edges) e.arched = true;
+      }
+    }
+
+    for (const e of run.edges) {
+      for (const p of e.pts) p.y = deckTop;
+      // The pads at the junctions are laid at the node's height plus the lift,
+      // so the node sits one lift under the running surface.
+      for (const k of [e.a, e.b]) if (nodes[k]) nodes[k].y = deckTop - SURFACE_LIFT;
+    }
+
+    // The ramps: every ordinary road leaving a landing rises to the deck over
+    // its last forty-six metres, eased as t² so it leaves the ground flat and
+    // arrives level. The road carries the height itself, the same way the
+    // bridge does, so the structure built under it cannot disagree with it.
+    for (const k of degree.keys()) {
+      if (degree.get(k) !== 1) continue;
+      const landing = nodes[k];
+      for (const l of landing.links) {
+        const e = l.edge;
+        if (e.bank || e.approach) continue;
+        const fwd = l.at === 0;
+        const src = fwd ? e.pts : e.pts.slice().reverse();
+        let total = 0;
+        for (let i = 1; i < src.length; i++) {
+          total += Math.hypot(src[i].x - src[i - 1].x, src[i].z - src[i - 1].z);
+        }
+        const RUN = Math.min(46, total);
+        const ground = (p) => terrain.heightAt(p.x, p.z) + SURFACE_LIFT;
+        const ramp = [{ x: landing.x, z: landing.z, y: deckTop }];
+        let s = 0;
+        for (let i = 1; i < src.length; i++) {
+          const a = src[i - 1], b = src[i];
+          const d = Math.hypot(b.x - a.x, b.z - a.z);
+          if (s < RUN && s + d > RUN + 0.5) {
+            // The foot of the ramp, exactly where the road meets the ground.
+            const t = (RUN - s) / d;
+            const q = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+            q.y = ground(q);
+            ramp.push(q);
+          }
+          s += d;
+          const q = { x: b.x, z: b.z };
+          const g = ground(q);
+          const t = Math.min(1, s / RUN);
+          q.y = deckTop + (g - deckTop) * (t * t);
+          ramp.push(q);
+        }
+        e.pts = fwd ? ramp : ramp.slice().reverse();
+        e.approach = true;
+        if (line) line.ramps.push({ pts: ramp, w: halfWidth(e.cls) * 2 });
+      }
+    }
+    if (line) bridges.push(line);
   }
 }
 

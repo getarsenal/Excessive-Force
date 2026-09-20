@@ -957,7 +957,10 @@ export function buildContext(terrain, quality, opts = {}) {
   if (paved) group.add(buildForecourt(terrain, EXCLUDE, quality));
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
-  // And what holds the surveyed crossings up.
+  // The surveyed crossings, built by the same hand: arches, piers, balustrade
+  // and lamps on the real alignment. The flat slab is kept only for a run that
+  // could not be straightened onto one line.
+  for (const line of (net.bridges || [])) group.add(buildBridge(terrain, quality, line));
   if (realNet) group.add(buildDecks(net, terrain, quality));
   // The river wall.
   //
@@ -1117,6 +1120,7 @@ export function buildContext(terrain, quality, opts = {}) {
   group.userData.gridYaw = YAW;
   group.userData.layout = rejects;
   group.userData.bridge = bridge;
+  group.userData.bridges = net.bridges || [];
 
   // The flat roofs, for deployment. A gun on a roof has the sightlines the
   // ground does not, which is worth the climb.
@@ -1521,35 +1525,49 @@ function buildBridge(terrain, quality, line) {
   rails.castShadow = quality.shadowMapSize > 0;
   g.add(rails);
 
-  // ── The ramps, built straight from the profile the road is drawn on. Each
-  // pair of profile points becomes one box under that stretch of surface, with
-  // the wedge between it and the ground filled in as an abutment.
-  for (let i = 0; i < profile.length - 1; i++) {
-    const p0 = profile[i], p1 = profile[i + 1];
-    if (p0.y >= deckTop - 0.01 && p1.y >= deckTop - 0.01) continue;   // the deck
-    const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
-    if (segLen < 0.5) continue;
-    const cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2;
-    const top = (p0.y + p1.y) / 2;
-    const seg = new THREE.Mesh(
-      new THREE.BoxGeometry(DECK_W, DECK_T, segLen + 0.6), deckMat);
-    seg.position.set(cx, top - DECK_T / 2, cz);
-    seg.rotation.y = yaw;
-    seg.rotation.x = Math.atan2(p0.y - p1.y, segLen)
-      * (Math.sign((p1.x - p0.x) * Math.sin(yaw) + (p1.z - p0.z) * Math.cos(yaw)) || 1);
-    seg.receiveShadow = quality.shadowMapSize > 0;
-    g.add(seg);
+  // ── The ramps, built straight from the lines the road is drawn on. Each
+  // pair of points becomes one box under that stretch of surface, with the
+  // wedge between it and the ground filled in as an abutment.
+  //
+  // An invented bridge has one ramp at each end, in line with the deck, and
+  // both are part of its own profile. A surveyed one has a ramp on *every*
+  // road that leaves the landing, and those roads go where the city sends
+  // them — the Embankment turns along the river the moment it comes off the
+  // bridge — so each segment is turned to its own bearing rather than to the
+  // deck's, and tilted about its own axis rather than the world's.
+  const ramps = line.ramps ?? [{ pts: profile, w: DECK_W }];
+  for (const ramp of ramps) {
+    const rp = ramp.pts;
+    for (let i = 0; i < rp.length - 1; i++) {
+      const p0 = rp[i], p1 = rp[i + 1];
+      if (p0.y >= deckTop - 0.01 && p1.y >= deckTop - 0.01) continue;   // the deck
+      const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+      if (segLen < 0.5) continue;
+      const cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2;
+      const top = (p0.y + p1.y) / 2;
+      const ry = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+      const seg = new THREE.Mesh(
+        new THREE.BoxGeometry(ramp.w, DECK_T, segLen + 0.6), deckMat);
+      seg.position.set(cx, top - DECK_T / 2, cz);
+      seg.rotation.order = 'YXZ';
+      seg.rotation.y = ry;
+      seg.rotation.x = Math.atan2(p0.y - p1.y, segLen);
+      seg.receiveShadow = quality.shadowMapSize > 0;
+      g.add(seg);
 
-    const ground = terrain.heightAt(cx, cz);
-    const fillH = (top - DECK_T) - ground;
-    if (fillH > 0.4) {
-      const fill = new THREE.Mesh(
-        new THREE.BoxGeometry(DECK_W - 3, fillH, segLen * 0.98), pierMatShared(),
-      );
-      fill.position.set(cx, ground + fillH / 2, cz);
-      fill.rotation.y = yaw;
-      fill.receiveShadow = quality.shadowMapSize > 0;
-      g.add(fill);
+      const ground = terrain.heightAt(cx, cz);
+      const fillH = (top - DECK_T) - ground;
+      if (fillH > 0.4) {
+        // Narrower than the road it carries, so the abutment reads as a wall
+        // under the carriageway and not as a plaza beside it.
+        const fill = new THREE.Mesh(
+          new THREE.BoxGeometry(ramp.w * 0.72, fillH, segLen * 0.98), pierMatShared(),
+        );
+        fill.position.set(cx, ground + fillH / 2, cz);
+        fill.rotation.y = ry;
+        fill.receiveShadow = quality.shadowMapSize > 0;
+        g.add(fill);
+      }
     }
   }
 

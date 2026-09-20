@@ -1119,7 +1119,10 @@ export function buildStreetSurface(net, terrain, quality) {
       // seam, and two surfaces on exactly the same plane are two surfaces
       // that flicker against each other.
       const yAt = (pt, w) => {
-        if (e.bridge && pt.y !== undefined) return pt.y;
+        // A bridge carries its own height, and so does the ramp up to it:
+        // both were worked out once, together, and the structure is built
+        // under exactly this line.
+        if ((e.bridge || e.approach) && pt.y !== undefined) return pt.y;
         const g = terrain.heightAt(pt.x, pt.z) + LIFT;
         if (w <= 0) return g;
         return g * (1 - w) + w * ((pt.nearA ? a.y : b.y) + LIFT - 0.03);
@@ -1234,7 +1237,10 @@ function polylineLength(pts) {
 export function buildDecks(net, terrain, quality) {
   const g = new THREE.Group();
   g.name = 'decks';
-  const spans = net.edges.filter((e) => e.bridge || e.bank);
+  // Only the crossings that could not be made into a proper bridge — a run
+  // that genuinely curves, or one that never reaches a bank. Anything that
+  // could be straightened is built with arches by `buildBridge` instead.
+  const spans = net.edges.filter((e) => (e.bridge || e.bank) && !e.arched);
   if (!spans.length) return g;
 
   const piers = [];
