@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildElizabethTower, buildPalaceWing } from '../structure/landmarks/bigben.js';
+import { buildLondonEye } from '../structure/landmarks/eye.js';
 import { buildTajMahal, buildTajMosque } from '../structure/landmarks/tajmahal.js';
 import { buildEiffelTower, buildChaillotWing } from '../structure/landmarks/eiffel.js';
 import { buildElCastillo, buildTempleOfWarriors } from '../structure/landmarks/chichen.js';
@@ -40,15 +41,28 @@ export const LEVELS = {
     subtitle: 'Elizabeth Tower · Westminster',
     victory: 'London Ben has Fallen Down',
     // The tower is twice life size, so everything framed around it moves out
-    // with it: the camera sits back far enough to hold 192 m of masonry, and
-    // the city keeps clear of a palace with twice the footprint.
-    cityExcludeRadius: 150,
+    // with it: the camera sits back far enough to hold 192 m of masonry.
+    //
+    // The city does not keep a radius clear any more. The Palace's own
+    // footprint, with the precinct's margin, is what keeps the buildings off,
+    // and a hundred and fifty metres round the origin on top of that threw
+    // away seventeen of the twenty-four surveyed buildings within two hundred
+    // metres — Portcullis House, the Treasury's corner, St Margaret's — and
+    // left the tower standing in a paddock. Seventy is the tower's own
+    // forecourt, and nothing more.
+    cityExcludeRadius: 70,
     camera: { yaw: -0.78, pitch: 0.40, distance: 430, height: 84 },
     structures: (quality) => [
       { key: 'tower', blocks: buildElizabethTower(quality), primary: true,
         required: true, label: 'ELIZABETH TOWER' },
       { key: 'wing', blocks: buildPalaceWing(quality),
         required: true, label: 'PALACE WING' },
+      // Across the river, where it is. Scenery: it comes down if you shoot it
+      // and counts for nothing, and it gets no precinct, no garrison and no
+      // trench belt of its own. Founded on Jubilee Gardens with the hub out
+      // over the waterline, which is where the real one's is.
+      { key: 'eye', blocks: buildLondonEye(quality), required: false, scenery: true,
+        label: 'LONDON EYE', offset: { x: 404, z: -288 } },
     ],
     garrison: (g, origin, groundY) => {
       g.populateElizabethTower(origin, groundY);

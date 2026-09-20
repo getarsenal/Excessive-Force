@@ -368,6 +368,11 @@ floor, onto its top.
     { key, blocks: build...(quality), primary: true, required: true, label: 'UPPERCASE' },
     { key, blocks: ..., required: true, label },          // garrisoned → required
     { key, blocks: ..., label, offset: { x, z } },          // its own ground, elsewhere on the map
+    { key, blocks: ..., required: false, scenery: true, label, offset },
+    //  ↑ a landmark that is there for recognition, not for the bar: the London
+    //    Eye. It comes down if shot and counts for nothing; it gets no precinct,
+    //    no trench belt and no garrison, and its footprint is what touches the
+    //    ground (blocks under 12 m), not the whole silhouette.
   ],
   garrison: (g, origin, groundY, sites) => { g.populate...(origin, groundY); },
   scoreTags: [...],                    // if a plinth or raft outweighs the monument

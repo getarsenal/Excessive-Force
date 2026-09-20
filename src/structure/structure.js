@@ -1311,9 +1311,11 @@ export class Structure {
         color: 0xffffff,
         roughness: matId === MATERIALS.GLASS ? 0.12
           : matId === MATERIALS.IRON ? 0.52
-            : matId === MATERIALS.GILT ? 0.28 : 0.88,
+            : matId === MATERIALS.STEEL ? 0.42
+              : matId === MATERIALS.GILT ? 0.28 : 0.88,
         metalness: matId === MATERIALS.IRON ? 0.75
-          : matId === MATERIALS.GILT ? 0.9 : 0.02,
+          : matId === MATERIALS.STEEL ? 0.3
+            : matId === MATERIALS.GILT ? 0.9 : 0.02,
       });
       if (matId === MATERIALS.GLASS) {
         material.emissive = new THREE.Color(0xffeec2);

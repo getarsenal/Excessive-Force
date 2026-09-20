@@ -108,6 +108,11 @@ async function boot() {
     const off = sp.offset || { x: 0, z: 0 };
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const b of sp.blocks.blocks || sp.blocks) {
+      // Scenery's footprint is what touches the ground. The London Eye is a
+      // hundred and ninety metres across and stands on two feet and a plinth;
+      // a footprint taken from the whole wheel would level a disc of the
+      // South Bank the size of a stadium and keep every building off it.
+      if (sp.scenery && b.y - b.hy > 12) continue;
       const r = Math.max(b.hx, b.hz);
       if (b.x - r < x0) x0 = b.x - r;
       if (b.x + r > x1) x1 = b.x + r;
@@ -115,7 +120,7 @@ async function boot() {
       if (b.z + r > z1) z1 = b.z + r;
     }
     return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
-      w: x1 - x0, d: z1 - z0 };
+      w: x1 - x0, d: z1 - z0, scenery: !!sp.scenery };
   });
   // One pad per group of structures founded at the same point, not one per
   // structure. The Taj, its mosque and its jawab are all founded at the level
@@ -225,7 +230,9 @@ async function boot() {
 
   // The defence, laid round whichever set of buildings got built.
   const fieldWorks = buildFieldWorks(terrain, quality, {
-    landmarks,
+    // Nothing worth defending is dug in round: the belt goes round the
+    // objectives, not round the scenery across the river.
+    landmarks: landmarks.filter((l) => !l.scenery),
     plots: contextGroup?.userData?.plots || [],
     // The street network and the frame it is laid on, so the belt is square to
     // the place rather than to the map, and so it knows where the roads are.

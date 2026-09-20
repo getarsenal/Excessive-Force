@@ -125,6 +125,17 @@ export function buildContext(terrain, quality, opts = {}) {
   }));
   const inPrecinct = (x, z) => precinct.some(
     (r) => Math.abs(x - r.x) < r.w / 2 && Math.abs(z - r.z) < r.d / 2);
+  // Buildings keep further off than streets do: the precinct's railings stand
+  // twenty-six metres out from the building, and a house between the fence
+  // and the Palace is a house inside the fence. Scenery gets the same margin
+  // as its own footprint and no more.
+  const BUILDING_PAD = 30;
+  const plotKeepOut = (opts.landmarks || []).map((l) => {
+    const pad = l.scenery ? LANDMARK_PAD : BUILDING_PAD;
+    return { x: l.x, z: l.z, w: l.w + pad * 2, d: l.d + pad * 2 };
+  });
+  const inKeepOut = (x, z) => plotKeepOut.some(
+    (r) => Math.abs(x - r.x) < r.w / 2 && Math.abs(z - r.z) < r.d / 2);
 
   /**
    * The real place, when there is one on disk.
@@ -244,8 +255,8 @@ export function buildContext(terrain, quality, opts = {}) {
 
   /** Clear of the landmarks themselves. */
   const offLandmark = (pts) => {
-    if (!precinct.length) return true;
-    for (const p of pts) if (inPrecinct(p.x, p.z)) return false;
+    if (!plotKeepOut.length) return true;
+    for (const p of pts) if (inKeepOut(p.x, p.z)) return false;
     return true;
   };
 
@@ -998,7 +1009,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // degrees with it.
   Object.assign(counts, buildPrecinct(props, terrain, rng, {
     precinct: opts.precinct, radius: EXCLUDE - 4, net,
-    landmarks: opts.landmarks || [], yaw: realNet ? 0 : YAW,
+    landmarks: (opts.landmarks || []).filter((l) => !l.scenery), yaw: realNet ? 0 : YAW,
   }));
   // Forest inside the playfield as well as beyond it.
   //

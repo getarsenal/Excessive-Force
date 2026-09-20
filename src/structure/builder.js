@@ -29,6 +29,7 @@ export const MATERIALS = {
   RAILING: 13,   // ironwork nothing may rest on: balustrades and screens
   VERDE: 14,     // the grey-green stone of Pisan banding
   TILE: 15,      // glazed ceramic over a concrete rib: a shell vault
+  STEEL: 16,     // painted structural steel, white: the London Eye
 };
 
 /**
@@ -117,6 +118,9 @@ export const MATERIAL_PROPS = {
   // two metres beside them, split the posts' hundred meganewtons across
   // both, and the railing went first.
   [MATERIALS.RAILING]:   { density: 7.20, strength: 14.0, toughness: 260, color: 0x7b5f45, structural: false },
+  // White painted steel. As strong as the Eiffel's ironwork and painted the
+  // colour the Eye is painted; structural, because the wheel stands on it.
+  [MATERIALS.STEEL]:     { density: 7.85, strength: 14.0, toughness: 280, color: 0xeef1f3, structural: true },
 };
 
 
