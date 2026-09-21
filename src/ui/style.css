@@ -119,8 +119,10 @@ html, body {
 @media (max-width: 620px) {
   #topbar {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    row-gap: 7px; column-gap: 10px;
+    row-gap: 5px; column-gap: 10px;
+    padding-bottom: 6px;
   }
+  .tb-barlabel { display: none; }
   /* Explicitly placed, so the four readouts auto-fill the row above it. */
   .tb-center { grid-column: 1 / -1; grid-row: 2; }
   .tb-value { font-size: clamp(14px, 4.4vw, 19px); }
@@ -359,10 +361,10 @@ html, body {
 }
 .tc-modes button.on { border-color: var(--danger); color: var(--danger); background: rgba(232, 96, 76, 0.1); }
 #smoke-btn {
-  position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 104px);
-  background: var(--panel); border: 1px solid var(--edge); color: var(--text);
-  font-family: inherit; font-size: 9px; letter-spacing: 0.16em; padding: 6px 10px; cursor: pointer;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); z-index: 11;
+  position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 100px);
+  background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--text);
+  font-family: inherit; font-size: 8px; letter-spacing: 0.16em; padding: 4px 8px; cursor: pointer;
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); z-index: 11; opacity: 0.85;
 }
 #smoke-btn:hover { border-color: var(--edge-bright); }
 #smoke-btn.wait { color: var(--dim); }
@@ -370,14 +372,22 @@ html, body {
 #unit-card:not([hidden]) ~ #smoke-btn { display: none; }
 
 /* ── Menu ────────────────────────────────────────────────────────────── */
-#menu-btn {
-  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step) * 2); z-index: 20;
-  padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
-  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; cursor: pointer;
+/* The rail. Menu, clear view, sound and (in a dev build) the test panel sit
+   in one row under the readouts, small and quiet, so the view is the map and
+   not a column of buttons down each side of it. */
+#rail {
+  position: absolute; left: var(--ui-pad); top: var(--hud-top); z-index: 20;
+  display: flex; gap: 5px; align-items: center;
+}
+#rail button, #test-btn {
+  position: static;
+  padding: 4px 8px; font-size: 8px; letter-spacing: 0.16em; line-height: 1.2;
+  background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--dim);
+  font-family: inherit; cursor: pointer; opacity: 0.85;
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
-#menu-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+#rail button:hover, #test-btn:hover { border-color: var(--edge-bright); color: var(--text); opacity: 1; }
+#menu-btn { }
 #menu {
   position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
   background: rgba(5, 7, 10, 0.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -446,6 +456,9 @@ html, body {
 /* Off for the player, still written every frame so the headless harness and
    `?perf=1` can read it. */
 #perf { display: none; }
+/* The campaign map is in the menu; the loose corner button for it sat on
+   the FUNDS label. */
+#targets-btn { display: none; }
 #perf.on {
   display: block;
   position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
@@ -454,27 +467,12 @@ html, body {
   pointer-events: none; letter-spacing: 0.02em;
 }
 
-#sound-toggle {
-  position: absolute; right: var(--ui-pad); top: calc(var(--hud-top) + 8px); z-index: 20;
-  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
-  padding: 6px 10px; cursor: pointer;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
-}
-#sound-toggle:hover { border-color: var(--edge-bright); color: var(--text); }
 #sound-toggle.off { color: var(--danger); border-color: rgba(232, 96, 76, 0.4); }
 
 /* ── Clear view ──────────────────────────────────────────────────────────
    Everything off but the world. For watching a building come down without a
    readout in front of it, and for anyone filming one. */
-#clear-btn {
-  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step) * 3); z-index: 20;
-  padding: 6px 10px; font-size: 9px; letter-spacing: 0.18em;
-  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; cursor: pointer;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
-}
-#clear-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+
 #restore-btn {
   position: absolute; z-index: 30;
   left: 50%; transform: translateX(-50%);
@@ -492,13 +490,6 @@ html, body {
 body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 
 /* ── Test menu ───────────────────────────────────────────────────────── */
-#test-btn {
-  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px); z-index: 20;
-  background: var(--panel); border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 9px; letter-spacing: 0.18em;
-  padding: 6px 10px; cursor: pointer;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
-}
 #test-btn:hover { border-color: var(--edge-bright); color: var(--text); }
 #test-btn.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
 

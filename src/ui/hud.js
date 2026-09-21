@@ -97,7 +97,7 @@ export class HUD {
     if (this.el.sound) {
       this.el.sound.addEventListener('click', () => {
         this.soundOn = !this.soundOn;
-        this.el.sound.textContent = this.soundOn ? 'SOUND ON' : 'SOUND OFF';
+        this.el.sound.textContent = this.soundOn ? 'SOUND' : 'MUTED';
         this.el.sound.classList.toggle('off', !this.soundOn);
         this.onToggleSound(this.soundOn);
       });

@@ -892,7 +892,10 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
   m.position.x += s.dir.x * Math.cos(s.pitch) * s.speed * dt;
   m.position.z += s.dir.z * Math.cos(s.pitch) * s.speed * dt;
   m.position.y += Math.sin(s.pitch) * s.speed * dt;
-  m.rotation.set(-s.pitch, Math.atan2(s.dir.x, s.dir.z), -s.turnDir * s.bank, 'YXZ');
+  // Into the turn. A positive turn of the heading about +Y takes a nose on
+  // +Z toward -X, which from behind is the right; a positive roll about the
+  // nose drops the -X wing. Same sign, then, or it turns right banked left.
+  m.rotation.set(-s.pitch, Math.atan2(s.dir.x, s.dir.z), s.turnDir * s.bank, 'YXZ');
   s.life = past;
 };
 

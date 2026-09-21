@@ -489,8 +489,11 @@ export class Battle {
     if (onRoof && point.y < this.terrain.heightAt(point.x, point.z) + 4.0) {
       return { ok: false, reason: 'level with the ground' };
     }
+    // To the edge of the ground, near enough. Held to ninety-two percent of
+    // the span this refused half of what the play camera looks at from the
+    // Corcovado's summit, where everything is downhill and outward.
     const span = this.terrain.span;
-    if (Math.abs(point.x) > span * 0.92 || Math.abs(point.z) > span * 0.92) {
+    if (Math.abs(point.x) > span * 0.985 || Math.abs(point.z) > span * 0.985) {
       return { ok: false, reason: 'off map' };
     }
     // Keep clear of the structures themselves — measured against the ground

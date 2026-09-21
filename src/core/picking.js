@@ -169,6 +169,12 @@ export class Picker {
           deck.deckDistance = h.distance;
           break;
         }
+        // And it has to be a building's roof. Everything else in the city
+        // group with a face pointing up — a tree crown, a lamp head, a
+        // parapet coping — is not somewhere to stand, and a tap on it means
+        // the ground under it: the Corcovado's canopy was taking taps and
+        // putting howitzers thirty metres up in the trees.
+        if (!onPlot(h.point, city.userData.plots)) continue;
         roof = h.point.clone();
         roof.onRoof = true;
         roof.roofDistance = h.distance;
@@ -334,4 +340,17 @@ export class Picker {
     }
     return { samples: n, worst: +worst.toFixed(2), failures };
   }
+}
+
+/** Is this point on top of one of the city's buildings? */
+function onPlot(p, plots) {
+  if (!plots) return true;                 // no plots to check against: trust the hit
+  for (const b of plots) {
+    const top = b.top ?? (b.base + b.h);
+    if (p.y < top - 3.5 || p.y > top + 3.5) continue;
+    const dx = p.x - b.x, dz = p.z - b.z;
+    const ca = Math.cos(b.yaw || 0), sa = Math.sin(b.yaw || 0);
+    if (Math.abs(dx * ca - dz * sa) <= b.w / 2 + 1.2 && Math.abs(dx * sa + dz * ca) <= b.d / 2 + 1.2) return true;
+  }
+  return false;
 }

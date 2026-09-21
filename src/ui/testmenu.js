@@ -59,7 +59,7 @@ export class TestMenu {
     btn.id = 'test-btn';
     btn.textContent = 'TEST';
     btn.addEventListener('click', () => this.toggle());
-    document.getElementById('ui').appendChild(btn);
+    (document.getElementById('rail') || document.getElementById('ui')).appendChild(btn);
     this.btn = btn;
 
     const panel = document.createElement('div');

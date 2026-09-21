@@ -105,8 +105,13 @@
 
     <button id="smoke-btn" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
 
-    <button id="menu-btn">MENU</button>
-    <button id="clear-btn" title="Hide the interface and just watch">CLEAR VIEW</button>
+    <!-- The control rail: one quiet row under the readouts, not four
+         buttons scattered down both sides of the view. -->
+    <div id="rail">
+      <button id="menu-btn">MENU</button>
+      <button id="clear-btn" title="Hide the interface and just watch">VIEW</button>
+      <button id="sound-toggle">SOUND</button>
+    </div>
     <button id="restore-btn" hidden>SHOW UI</button>
     <div id="menu" hidden>
       <div class="menu-inner">
@@ -141,8 +146,6 @@
     <div id="perf"></div>
 
     <button id="targets-btn">MAP</button>
-
-    <button id="sound-toggle">SOUND ON</button>
 
     <!-- Kill feed -->
     <div id="feed"></div>
