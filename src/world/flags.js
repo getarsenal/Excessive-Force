@@ -7,6 +7,11 @@ import { PISA, axisAt as pisaAxisAt } from '../structure/landmarks/pisa.js';
 import { OPERA } from '../structure/landmarks/sydney.js';
 import { BASIL, KREMLIN } from '../structure/landmarks/moscow.js';
 import { REDEEMER } from '../structure/landmarks/rio.js';
+import { PARTHENON } from '../structure/landmarks/parthenon.js';
+import { SOPHIA } from '../structure/landmarks/hagiasophia.js';
+import { DOM } from '../structure/landmarks/cologne.js';
+import { HIMEJI } from '../structure/landmarks/himeji.js';
+import { BURJ } from '../structure/landmarks/burj.js';
 
 /**
  * Flags on the landmarks.
@@ -86,6 +91,13 @@ export const FLAG_SITES = {
       y: REDEEMER.terraces[0].h + 1.4, z: REDEEMER.terraces[0].half - 4.0,
       pattern: 'brazil', w: 9, h: 6, pole: 10 },
   ],
+  // The third five read their site from the builder's own constants, so a
+  // builder that moves its roof moves its flag.
+  athens: [{ key: 'parthenon', ...PARTHENON.flag, pattern: 'greece', w: 9, h: 6, pole: 9 }],
+  istanbul: [{ key: 'sophia', ...SOPHIA.flag, pattern: 'turkey', w: 9, h: 6, pole: 9 }],
+  cologne: [{ key: 'dom', ...DOM.flag, pattern: 'germany', w: 8, h: 5, pole: 9 }],
+  himeji: [{ key: 'keep', ...HIMEJI.flag, pattern: 'japan', w: 8, h: 5.5, pole: 9 }],
+  dubai: [{ key: 'burj', ...BURJ.flag, pattern: 'uae', w: 9, h: 4.5, pole: 9 }],
 };
 
 /** The cloth's pattern, drawn once into a small canvas. */
@@ -179,6 +191,34 @@ const PATTERNS = {
     ctx.fillStyle = '#c9a227';
     ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.11, 0, Math.PI * 2); ctx.fill();
   },
+};
+
+PATTERNS.greece = (ctx, w, h) => {
+  for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? '#f4f2ec' : '#0d5eaf'; ctx.fillRect(0, (h * i) / 9, w, h / 9 + 1); }
+  const q = (h * 5) / 9;
+  ctx.fillStyle = '#0d5eaf'; ctx.fillRect(0, 0, q, q);
+  ctx.fillStyle = '#f4f2ec'; ctx.fillRect(q * 0.4, 0, q * 0.2, q); ctx.fillRect(0, q * 0.4, q, q * 0.2);
+};
+PATTERNS.turkey = (ctx, w, h) => {
+  ctx.fillStyle = '#e30a17'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#f4f2ec'; ctx.beginPath(); ctx.arc(w * 0.38, h / 2, h * 0.25, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e30a17'; ctx.beginPath(); ctx.arc(w * 0.44, h / 2, h * 0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f4f2ec'; ctx.beginPath(); ctx.arc(w * 0.58, h / 2, h * 0.08, 0, Math.PI * 2); ctx.fill();
+};
+PATTERNS.germany = (ctx, w, h) => {
+  ctx.fillStyle = '#1c1c1c'; ctx.fillRect(0, 0, w, h / 3);
+  ctx.fillStyle = '#dd0000'; ctx.fillRect(0, h / 3, w, h / 3);
+  ctx.fillStyle = '#ffce00'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+};
+PATTERNS.japan = (ctx, w, h) => {
+  ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#bc002d'; ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.3, 0, Math.PI * 2); ctx.fill();
+};
+PATTERNS.uae = (ctx, w, h) => {
+  ctx.fillStyle = '#00732f'; ctx.fillRect(0, 0, w, h / 3);
+  ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, h / 3, w, h / 3);
+  ctx.fillStyle = '#1c1c1c'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+  ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, w / 4, h);
 };
 
 function patternTexture(name, w, h) {

@@ -45,7 +45,7 @@ import pyarrow.dataset as ds
 import pyarrow.fs as fs
 from PIL import Image
 from shapely import wkb
-from shapely.geometry import shape
+from shapely.geometry import shape, box as shapely_box
 from shapely.ops import transform as shapely_transform
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -900,15 +900,37 @@ def to_pixel(x, z, size, span):
 
 
 def rasterise(polys, size, span, value=1.0):
-    """Burn local-metre polygons into a size x size mask at world scale."""
+    """Burn local-metre polygons into a size x size mask at world scale.
+
+    A polygon is a ring of (x, z), or a `(ring, holes)` pair. A polygon with
+    holes is drawn on its own layer — the ring filled, the holes cleared — and
+    the layer is folded into the mask with a max, so a hole never erases a
+    neighbour that happens to lie inside it.
+    """
     from PIL import ImageDraw
     img = Image.new("F", (size, size), 0.0)
     draw = ImageDraw.Draw(img)
-    for pts in polys:
-        px = [to_pixel(x, z, size, span) for x, z in pts]
-        if len(px) >= 3:
+    layers = []
+    for poly in polys:
+        ring, holes = (poly if isinstance(poly, tuple) else (poly, ()))
+        px = [to_pixel(x, z, size, span) for x, z in ring]
+        if len(px) < 3:
+            continue
+        if not holes:
             draw.polygon(px, fill=value)
-    return np.asarray(img, dtype=np.float64)
+            continue
+        layer = Image.new("F", (size, size), 0.0)
+        ld = ImageDraw.Draw(layer)
+        ld.polygon(px, fill=value)
+        for hole in holes:
+            hp = [to_pixel(x, z, size, span) for x, z in hole]
+            if len(hp) >= 3:
+                ld.polygon(hp, fill=0.0)
+        layers.append(np.asarray(layer, dtype=np.float64))
+    out = np.asarray(img, dtype=np.float64)
+    for layer in layers:
+        out = np.maximum(out, layer)
+    return out
 
 
 def rasterise_lines(lines, size, span, widths):
@@ -933,6 +955,15 @@ def collect_polys(sink, theme, type_, lat0, lon0, span, to_local, m_lat, m_lon,
     except Exception as exc:                      # a theme a release may lack
         print(f"  ({theme}/{type_} unavailable: {exc})")
         return []
+    # Clipped to the square, and with their holes. Overture draws a sea as one
+    # polygon: the Arabian Sea is a single feature with five hundred and
+    # ninety-five interior rings, and the Persian Gulf another with thirteen
+    # hundred, and every one of those rings is a piece of coast — the land is
+    # the *hole*. Burning the exterior alone put the whole of Dubai under the
+    # Gulf. So each part is cut down to the square first, which turns a sea
+    # into the strip of it that is actually in view, and its holes come with
+    # it for the rasteriser to clear.
+    clip = shapely_box(-pad, -pad, pad, pad)
     polys = []
     for row in tab.to_pylist():
         if keep and not keep(row):
@@ -945,8 +976,18 @@ def collect_polys(sink, theme, type_, lat0, lon0, span, to_local, m_lat, m_lon,
         for part in parts:
             if part.geom_type != "Polygon":
                 continue
-            ring = shapely_transform(to_local, part.exterior)
-            polys.append(list(ring.coords))
+            local = shapely_transform(to_local, part)
+            try:
+                local = local.intersection(clip)
+            except Exception:
+                local = local.buffer(0).intersection(clip)
+            pieces = local.geoms if hasattr(local, "geoms") else [local]
+            for piece in pieces:
+                if piece.geom_type != "Polygon" or piece.is_empty:
+                    continue
+                ring = list(piece.exterior.coords)
+                holes = [list(h.coords) for h in piece.interiors if len(h.coords) >= 4]
+                polys.append((ring, holes) if holes else ring)
     return polys
 
 

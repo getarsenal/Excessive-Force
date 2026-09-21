@@ -234,5 +234,13 @@
       "pose": "arms folded — reads as refusal",
       "side": "right"
     }
+  },
+  "pending": {
+    "note": "The third five defenders. Slots wired in src/game/cast.js; no art yet. Same style as the first nine: cigar, arms folded, the flag worn, national headgear. RGBA cutout, about 1024x1536.",
+    "gr-strategos": "Greece. Strategos Aris Vlachopoulos. Greek army dress with the blue-and-white worn as a sash; a Spartan helmet crest would not be out of place.",
+    "tr-orgeneral": "Turkey. Orgeneral Selim Karabulut. Turkish general's cap, red-and-white star-and-crescent worn as a cape.",
+    "de-general": "Germany. General Friedrich von Steinhauer. Bundeswehr peaked cap, black-red-gold as a sash, monocle optional and probably irresistible.",
+    "jp-taisho": "Japan. Taishō Kenji Takamura. A kabuto-styled helmet over dress uniform, the rising sun on a cape.",
+    "ae-fariq": "United Arab Emirates. Fariq Awwal Saif bin Hamdan. Red-checked ghutra under a general's beret is too much; a beret with the agal, the flag as a sash, mirrored sunglasses."
   }
 }

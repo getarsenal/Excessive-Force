@@ -68,18 +68,47 @@ export const CAST = {
     rank: 'Marechal', name: 'Joaquim Duarte-Ribeiro', nation: 'Brazil',
     side: 'right', colours: ['#009739', '#fedd00', '#012169'],
   },
+  // The third five. Art pending: the file names are the slots, and the
+  // stand-off and the dossier both tolerate the picture being missing.
+  gr: {
+    id: 'gr', file: 'assets/characters/gr-strategos.png',
+    rank: 'Strategos', name: 'Aris Vlachopoulos', nation: 'Greece', side: 'right',
+    colours: ['#0d5eaf', '#ffffff', '#0d5eaf'],
+  },
+  tr: {
+    id: 'tr', file: 'assets/characters/tr-orgeneral.png',
+    rank: 'Orgeneral', name: 'Selim Karabulut', nation: 'Turkey', side: 'right',
+    colours: ['#e30a17', '#ffffff', '#e30a17'],
+  },
+  de: {
+    id: 'de', file: 'assets/characters/de-general.png',
+    rank: 'General', name: 'Friedrich von Steinhauer', nation: 'Germany', side: 'right',
+    colours: ['#000000', '#dd0000', '#ffce00'],
+  },
+  jp: {
+    id: 'jp', file: 'assets/characters/jp-taisho.png',
+    rank: 'Taishō', name: 'Kenji Takamura', nation: 'Japan', side: 'right',
+    colours: ['#ffffff', '#bc002d', '#ffffff'],
+  },
+  ae: {
+    id: 'ae', file: 'assets/characters/ae-fariq.png',
+    rank: 'Fariq Awwal', name: 'Saif bin Hamdan', nation: 'United Arab Emirates', side: 'right',
+    colours: ['#ff0000', '#00732f', '#000000'],
+  },
 };
 
 /** Which defender holds each level. */
 export const DEFENDER_OF = {
   westminster: 'uk', paris: 'fr', agra: 'in', giza: 'eg',
   chichen: 'mx', pisa: 'it', moscow: 'ru', sydney: 'au', rio: 'br',
+  athens: 'gr', istanbul: 'tr', cologne: 'de', himeji: 'jp', dubai: 'ae',
 };
 
 /**
  * The stand-off before each level: ultimatum, refusal, last word.
  *
- * All nine are the writer's. The defender's line is in his own language
+ * The first nine are the writer's; the third five are drafts in his register.
+ * The defender's line is in his own language
  * where the writer put it there; the General never understands a word of it,
  * which is the point.
  */
@@ -128,5 +157,33 @@ export const STANDOFF = {
     { who: 'us', line: "No way I'm climbing up that, I'm an officer I don't do PT!" },
     { who: 'br', line: 'Ele está de braços abertos há um século. Nem por você ele abaixa.' },
     { who: 'us', line: "Did anyone catch that? Me neither. Catch this amigo" },
+  ],
+  // ── The third five. Drafted in the writer's register — sarcastic, rude,
+  // and the General never understanding a word — and marked as drafts
+  // until the writer has been over them.
+  athens: [
+    { who: 'us', line: "Two and a half thousand years and you still haven't put the roof back on. Step aside, I'll finish the job." },
+    { who: 'gr', line: 'Πέρσες, Ρωμαίοι, Τούρκοι, Άγγλοι. Όλοι ήρθαν για τα μάρμαρα. Κανείς δεν έφυγε με ό,τι ήρθε.' },
+    { who: 'us', line: "No idea what that was, but it had 'marbles' in it. Boys, he's about to lose his." },
+  ],
+  istanbul: [
+    { who: 'us', line: "Church, mosque, museum, mosque. Make up your mind, 'cause in ten minutes it's a parking lot." },
+    { who: 'tr', line: 'Bin beş yüz yıl depremlere dayandı, Amerikalı. Sen bir hafta sonu dayanamazsın.' },
+    { who: 'us', line: "I caught 'earthquake' in there somewhere. Good. That's the plan, pal." },
+  ],
+  cologne: [
+    { who: 'us', line: "Six hundred years to build one church? That's not devotion, that's a union job. Watch how fast I do it." },
+    { who: 'de', line: 'Die Bomber haben es 1945 nicht geschafft, Amerikaner. Du mit deinen vier Kanonen schon gar nicht.' },
+    { who: 'us', line: "He said 'Amerikaner' like it was an insult. Fellas, show the man what the family business does." },
+  ],
+  himeji: [
+    { who: 'us', line: "A white castle. Adorable. I'm gonna want fries with that." },
+    { who: 'jp', line: '四百年、誰もこの城を落とせなかった。お前は靴も脱いでいない。' },
+    { who: 'us', line: "Did he just tell me to take my shoes off? Son, these boots stay on, and they're going through your front door." },
+  ],
+  dubai: [
+    { who: 'us', line: 'Eight hundred metres of glass in the middle of a desert. Somebody was compensating.' },
+    { who: 'ae', line: 'ثمانمئة متر يا أمريكي. مدافعك ما توصل نصّها.' },
+    { who: 'us', line: "Eight hundred? Fine. I'll take it in two payments." },
   ],
 };

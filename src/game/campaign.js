@@ -170,6 +170,83 @@ export const THEATRES = [
     unlocks: [],
     unlockLine: 'The board is clear',
   },
+  // ── The third five. Nothing new is released here either: the arsenal is
+  // complete by contract five, and these are the contracts it was for.
+  {
+    id: 'athens',
+    iso: 'GRC',
+    lx: -44, ly: 22,
+    city: 'ATHENS',
+    lon: 23.7266, lat: 37.9715,
+    no: 10,
+    title: 'MARBLE ORDER',
+    brief: 'Forty-six columns and a stone lintel across the top of every pair. '
+      + 'Nothing here is fixed to anything: the drums sit on the drums and the '
+      + 'beams sit on the capitals, and it has stood on friction for two and a '
+      + 'half thousand years. Take the columns from under a corner and the '
+      + 'corner comes down with the roof it carried.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
+    id: 'istanbul',
+    iso: 'TUR',
+    lx: 44, ly: -22,
+    city: 'ISTANBUL',
+    lon: 28.9801, lat: 41.0086,
+    no: 11,
+    title: 'HOLY WISDOM',
+    brief: 'A dome fifty metres up on four arches, and it has fallen in twice. '
+      + 'What holds it is not the arches but the half-domes and the buttresses '
+      + 'leaning in against them from outside; open one side and the thrust '
+      + 'has nowhere to go.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
+    id: 'cologne',
+    iso: 'DEU',
+    lx: 44, ly: -20,
+    city: 'COLOGNE',
+    lon: 6.9583, lat: 50.9413,
+    no: 12,
+    title: 'TWIN SPIRES',
+    brief: 'Two stone spires a hundred and fifty metres high, hollow, pierced, '
+      + 'and standing on nothing but their own piers. Gothic stone is stone '
+      + 'doing as little work as it can get away with: cut a pier and the '
+      + 'spire above it follows.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
+    id: 'himeji',
+    iso: 'JPN',
+    lx: 44, ly: 22,
+    city: 'HIMEJI',
+    lon: 134.6939, lat: 34.8394,
+    no: 13,
+    title: 'WHITE HERON',
+    brief: 'Six storeys of timber and plaster on a sloping stone base on a hill. '
+      + 'The base cannot be shot down; the keep on it can, and it is top-heavy '
+      + 'by design. It goes over the way you lean it.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
+    id: 'dubai',
+    iso: 'ARE',
+    lx: 46, ly: 20,
+    city: 'DUBAI',
+    lon: 55.2744, lat: 25.1972,
+    no: 14,
+    title: 'THE NEEDLE',
+    brief: 'Half a kilometre of concrete core and glass, stepping back as it '
+      + 'climbs. Everything above a setback stands on the setback under it; '
+      + 'take the core at one and the tower above it is a free body with a '
+      + 'long way to fall.',
+    unlocks: [],
+    unlockLine: 'The board is clear',
+  },
 ];
 
 /** The contract for a level id, if that level is one. */

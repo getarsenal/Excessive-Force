@@ -732,7 +732,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   border: 3px solid #14161a; border-radius: 20px;
   --pad-y: 15px; --pad-x: 18px;
   padding: var(--pad-y) var(--pad-x) calc(var(--pad-y) + 1px);
-  font-family: 'Oswald', 'Noto Naskh Arabic', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Oswald', 'Noto Naskh Arabic', 'Noto Sans JP', 'Segoe UI', system-ui, sans-serif;
   font-weight: 500; font-size: clamp(16px, 2.2vw, 26px); line-height: 1.28;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   opacity: 0; transform: scale(0.55);

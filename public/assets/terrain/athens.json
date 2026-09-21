@@ -1,0 +1,16 @@
+{
+  "id": "athens",
+  "name": "Parthenon, Athens",
+  "lat": 37.97153,
+  "lon": 23.72661,
+  "spanMeters": 800.0,
+  "size": 512,
+  "minElevation": 48.802,
+  "maxElevation": 156.0,
+  "metersPerDemPixel": 3.766,
+  "seaLevel": 63.522,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 5600.0,
+  "farWater": 0.0442
+}

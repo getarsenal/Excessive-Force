@@ -38,7 +38,8 @@ every map, and finding that out costs seven minutes each time; find the fault
 on one level, fix the batch, then run the nine once.
 
 Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
-`chichen`, `pisa`, `sydney`, `moscow`, `rio`. Tiers: `low` (phones; the
+`chichen`, `pisa`, `sydney`, `moscow`, `rio`, `athens`, `istanbul`,
+`cologne`, `himeji`, `dubai`. Tiers: `low` (phones; the
 grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out in
 the software rasteriser; verify those at low.
 

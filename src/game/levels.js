@@ -9,6 +9,11 @@ import { buildCampanile, buildDuomo, buildBaptistery }
 import { buildOperaHouse } from '../structure/landmarks/sydney.js';
 import { buildSaintBasils, buildKremlinWall } from '../structure/landmarks/moscow.js';
 import { buildRedeemer } from '../structure/landmarks/rio.js';
+import { buildParthenon, populateParthenon } from '../structure/landmarks/parthenon.js';
+import { buildHagiaSophia, populateHagiaSophia } from '../structure/landmarks/hagiasophia.js';
+import { buildCologneCathedral, populateCologneCathedral } from '../structure/landmarks/cologne.js';
+import { buildHimejiKeep, populateHimejiKeep } from '../structure/landmarks/himeji.js';
+import { buildBurjKhalifa, populateBurjKhalifa } from '../structure/landmarks/burj.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 
@@ -612,6 +617,184 @@ export const LEVELS = {
     // been played rather than measured.
     brief: 'Nothing here can topple. Open the casing and break what the chambers hang on.',
   },
+
+  // ── The third five. Each a new nation and a new structural problem.
+  athens: {
+    id: 'athens',
+    terrain: 'athens',
+    name: 'Parthenon, Athens',
+    place: 'The Acropolis, Athens',
+    target: 'PARTHENON',
+    subtitle: 'Parthenon · Acropolis',
+    victory: 'Ruined. Again.',
+    // Attic limestone and dust, dry olive scrub on the slopes, the city's
+    // pale concrete beyond. No water on the map.
+    palette: {
+      urban: new THREE.Color(0xc9bfa6),
+      urbanAlt: new THREE.Color(0xb3a58a),
+      park: new THREE.Color(0x6b7a44),
+      parkAlt: new THREE.Color(0x7f8a4a),
+      road: new THREE.Color(0x6a655d),
+      bank: new THREE.Color(0xc8bb98),
+      bed: new THREE.Color(0x5c6a58),
+      dry: new THREE.Color(0xd8cba6),
+    },
+    setting: { haze: { colour: 0xd8d3c4, density: 0.00021 } },
+    // The rock: the town stops at the foot of the slopes, which the survey
+    // already knows; this keeps the plateau itself clear.
+    cityExcludeRadius: 170,
+    contextExclude: 170,
+    // From the north-west, the way you arrive through the Propylaea.
+    camera: { yaw: 2.35, pitch: 0.30, distance: 380, height: 40 },
+    structures: (quality) => [
+      { key: 'parthenon', blocks: buildParthenon(quality), primary: true,
+        required: true, label: 'PARTHENON' },
+    ],
+    garrison: (g, origin, groundY) => { populateParthenon(g, origin, groundY); },
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: false, river: false, topples: true },
+    brief: 'Nothing is fixed to anything. The drums sit on the drums and the beams sit on the columns.',
+  },
+
+  istanbul: {
+    id: 'istanbul',
+    terrain: 'istanbul',
+    name: 'Hagia Sophia, Istanbul',
+    place: 'Sultanahmet, Istanbul',
+    target: 'HAGIA SOPHIA',
+    subtitle: 'Ayasofya · Sultanahmet',
+    victory: 'Holy Wisdom, Unholy Mess',
+    // Ochre render and red tile on the first hill, grey Byzantine stone, the
+    // Marmara a cold green-blue.
+    palette: {
+      urban: new THREE.Color(0xbfa98e),
+      urbanAlt: new THREE.Color(0xa88f72),
+      park: new THREE.Color(0x55703c),
+      parkAlt: new THREE.Color(0x66804a),
+      road: new THREE.Color(0x615c56),
+      bank: new THREE.Color(0xb5a789),
+      bed: new THREE.Color(0x2f4a4e),
+      dry: new THREE.Color(0xcdbd9f),
+    },
+    setting: { hinterland: 'harbour', haze: { colour: 0xcfd3d4, density: 0.00022 } },
+    cityExcludeRadius: 150,
+    contextExclude: 150,
+    // From Sultanahmet Square, the south-west, with the Marmara behind.
+    camera: { yaw: 2.30, pitch: 0.28, distance: 420, height: 60 },
+    structures: (quality) => [
+      { key: 'sophia', blocks: buildHagiaSophia(quality), primary: true,
+        required: true, label: 'HAGIA SOPHIA' },
+    ],
+    garrison: (g, origin, groundY) => { populateHagiaSophia(g, origin, groundY); },
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: false },
+    brief: 'The dome is held from outside. Open one side and the thrust has nowhere to go.',
+  },
+
+  cologne: {
+    id: 'cologne',
+    terrain: 'cologne',
+    name: 'Kölner Dom, Cologne',
+    place: 'Domplatte, Cologne',
+    target: 'THE CATHEDRAL',
+    subtitle: 'Kölner Dom · Domplatte',
+    victory: 'Dom and Dommer',
+    // Rhineland: slate roofs, pale grey stone, the Rhine a working green.
+    palette: {
+      urban: new THREE.Color(0xa9a49a),
+      urbanAlt: new THREE.Color(0x948d82),
+      park: new THREE.Color(0x466a33),
+      parkAlt: new THREE.Color(0x5b7f3c),
+      road: new THREE.Color(0x3a3c40),
+      bank: new THREE.Color(0xa89b7c),
+      bed: new THREE.Color(0x33473f),
+      dry: new THREE.Color(0xb9b096),
+    },
+    setting: { haze: { colour: 0xc8ccd0, density: 0.00024 } },
+    cityExcludeRadius: 120,
+    contextExclude: 120,
+    // From the Deutz bank, across the river: the postcard.
+    camera: { yaw: -1.35, pitch: 0.24, distance: 520, height: 90 },
+    structures: (quality) => [
+      { key: 'dom', blocks: buildCologneCathedral(quality), primary: true,
+        required: true, label: 'KÖLNER DOM' },
+    ],
+    garrison: (g, origin, groundY) => { populateCologneCathedral(g, origin, groundY); },
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: true, river: true, topples: true },
+    brief: 'Gothic stone does as little work as it can. Cut a pier and the spire above it follows.',
+  },
+
+  himeji: {
+    id: 'himeji',
+    terrain: 'himeji',
+    name: 'Himeji Castle, Himeji',
+    place: 'Himeyama, Himeji',
+    target: 'THE KEEP',
+    subtitle: 'White Heron Castle · Himeyama',
+    victory: 'Shogun Down',
+    // A castle town: grey tile, white plaster, pine and the moat's dark water.
+    palette: {
+      urban: new THREE.Color(0xb5ad9e),
+      urbanAlt: new THREE.Color(0x9d9486),
+      park: new THREE.Color(0x4e6d3a),
+      parkAlt: new THREE.Color(0x5f7d42),
+      road: new THREE.Color(0x55555a),
+      bank: new THREE.Color(0xb0a58a),
+      bed: new THREE.Color(0x3f5548),
+      dry: new THREE.Color(0xc3b89e),
+    },
+    setting: { haze: { colour: 0xd0d4cf, density: 0.00023 } },
+    // The castle grounds inside the inner moat; the town begins outside them.
+    cityExcludeRadius: 250,
+    contextExclude: 230,
+    // From the south, up Otemae-dori, which is the view the town is built on.
+    camera: { yaw: 0.10, pitch: 0.27, distance: 420, height: 70 },
+    structures: (quality) => [
+      { key: 'keep', blocks: buildHimejiKeep(quality), primary: true,
+        required: true, label: 'THE KEEP' },
+    ],
+    garrison: (g, origin, groundY) => { populateHimejiKeep(g, origin, groundY); },
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    brief: 'The stone base cannot be shot down. The keep on it is top-heavy by design.',
+  },
+
+  dubai: {
+    id: 'dubai',
+    terrain: 'dubai',
+    name: 'Burj Khalifa, Dubai',
+    place: 'Downtown Dubai',
+    target: 'BURJ KHALIFA',
+    subtitle: 'Burj Khalifa · Downtown Dubai',
+    victory: 'Burj Ka-Boom',
+    // Desert city: sand under everything, pale concrete, the lake a made
+    // blue, the roads black and new.
+    palette: {
+      urban: new THREE.Color(0xd2c4a6),
+      urbanAlt: new THREE.Color(0xbfae8c),
+      park: new THREE.Color(0x6f8a4c),
+      parkAlt: new THREE.Color(0x7f9a55),
+      road: new THREE.Color(0x4c4a48),
+      bank: new THREE.Color(0xdccaa2),
+      bed: new THREE.Color(0x3c6b73),
+      dry: new THREE.Color(0xe3d5b2),
+    },
+    setting: { haze: { colour: 0xe0d6c2, density: 0.00030 } },
+    cityExcludeRadius: 130,
+    contextExclude: 130,
+    // Far back and high: the tower is half a kilometre even at this scale.
+    camera: { yaw: 0.60, pitch: 0.22, distance: 900, height: 250 },
+    structures: (quality) => [
+      { key: 'burj', blocks: buildBurjKhalifa(quality), primary: true,
+        required: true, label: 'BURJ KHALIFA' },
+    ],
+    garrison: (g, origin, groundY) => { populateBurjKhalifa(g, origin, groundY); },
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 1,
+    brief: 'Everything above a setback stands on the setback under it. Take the core at one.',
+  },
 };
 
 export const DEFAULT_LEVEL = 'westminster';
@@ -624,7 +807,8 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio'];
+export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio',
+  'athens', 'istanbul', 'cologne', 'himeji', 'dubai'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -637,6 +821,11 @@ export const LEVEL_BLURB = {
   sydney: 'Fourteen shells on a headland with one road in. Arches, not walls.',
   moscow: 'Nine towers on one basement. No single cut wins; the basement is shared.',
   rio: 'Seven hundred metres up, and the part everyone shoots weighs nothing.',
+  athens: 'Forty-six columns and a lintel over every pair. Kick the columns out and the roof comes with them.',
+  istanbul: 'A dome fifty metres up on four arches, held from outside. Open one side and it thrusts out.',
+  cologne: 'Two hollow stone spires on their piers. Cut a pier and the spire above it follows.',
+  himeji: 'Six storeys of timber on a sloping stone base. The base stands; the keep goes over.',
+  dubai: 'Half a kilometre of concrete core and glass in setbacks. Everything above a cut is a free body.',
 };
 
 /** Ordered level records, for menus. */

@@ -1,0 +1,17 @@
+{
+  "id": "dubai",
+  "name": "Burj Khalifa, Dubai",
+  "lat": 25.19717,
+  "lon": 55.27437,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -18.428,
+  "maxElevation": 18.26,
+  "metersPerDemPixel": 4.3227,
+  "seaLevel": -2.833,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.622,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.2416
+}

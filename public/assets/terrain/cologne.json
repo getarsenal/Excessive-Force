@@ -1,0 +1,17 @@
+{
+  "id": "cologne",
+  "name": "Cologne Cathedral, Cologne",
+  "lat": 50.9413,
+  "lon": 6.95828,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 32.499,
+  "maxElevation": 66.965,
+  "metersPerDemPixel": 6.0205,
+  "seaLevel": 37.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 36.999,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0682
+}

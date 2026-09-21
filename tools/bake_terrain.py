@@ -197,6 +197,74 @@ LEVELS = {
             "fade": 70.0,
         },
     },
+    # ── The third five. Each a new nation and a new structural problem; see
+    # docs/NEW_MAP_PLAYBOOK.md §0.
+    # Athens: the Parthenon on the Acropolis rock, a limestone table seventy
+    # metres over the city. The pad is the plateau at its real height — the
+    # ring round a hilltop is the slope, and a median-levelled pad would have
+    # cut the rock down to it.
+    "athens": {
+        "name": "Parthenon, Athens",
+        "lat": 37.97153,
+        "lon": 23.72661,
+        "span": 800.0,
+        "zoom": 15,
+        "parks": [[-260, -140, 250], [-40, 220, 160]],
+        "flatten": [[-40, 10, [150, 75], 28, 156.0]],
+    },
+    # Istanbul: Hagia Sophia on the first hill of the old city, the Marmara
+    # to the south and the Golden Horn to the north. A coast, so `sea`.
+    "istanbul": {
+        "name": "Hagia Sophia, Istanbul",
+        "lat": 41.00858,
+        "lon": 28.98006,
+        "span": 900.0,
+        "zoom": 15,
+        "sea": {"level": 0.6, "depth": 10.0, "shore": 1.2},
+        "parks": [[360, 260, 230], [-160, -60, 120]],
+        "flatten": [[0, 0, [72, 62], 30]],
+    },
+    # Cologne: the cathedral two hundred and fifty metres from the left bank
+    # of the Rhine, which runs north past it, three hundred and forty metres
+    # wide. The polyline is a hint; the survey's water corrects it.
+    "cologne": {
+        "name": "Cologne Cathedral, Cologne",
+        "lat": 50.94130,
+        "lon": 6.95828,
+        "span": 900.0,
+        "zoom": 14,
+        "river": {
+            "width": 340.0,
+            "points": [[520, -900], [470, -500], [435, -100], [425, 300], [445, 700], [485, 900]],
+        },
+        "parks": [[760, 420, 260]],
+        "flatten": [[0, 0, [92, 62], 30]],
+    },
+    # Himeji: the keep on Himeyama, a forty-five metre hill in the plain, at
+    # its real height so the stone base the builder lays has a hilltop to
+    # stand on.
+    "himeji": {
+        "name": "Himeji Castle, Himeji",
+        "lat": 34.83942,
+        "lon": 134.69392,
+        "span": 800.0,
+        "zoom": 15,
+        "parks": [[0, -80, 330]],
+        "flatten": [[0, 0, 62, 26, 46.0]],
+    },
+    # Dubai: the Burj Khalifa in a city the DEM sees as roofs — `ceiling`
+    # flattens the towers the surface model brought with it — with its lake
+    # from the survey and the Gulf three kilometres off, in the far water.
+    "dubai": {
+        "name": "Burj Khalifa, Dubai",
+        "lat": 25.19717,
+        "lon": 55.27437,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 14.0,
+        "parks": [[-160, -110, 210]],
+        "flatten": [[0, 0, [110, 110], 40]],
+    },
     "giza": {
         "name": "Great Pyramids, Giza",
         "lat": 29.97918,

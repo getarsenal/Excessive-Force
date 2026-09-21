@@ -1,0 +1,17 @@
+{
+  "id": "istanbul",
+  "name": "Hagia Sophia, Istanbul",
+  "lat": 41.00858,
+  "lon": 28.98006,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -4.497,
+  "maxElevation": 63.848,
+  "metersPerDemPixel": 3.605,
+  "seaLevel": 0.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 0.003,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.4705
+}

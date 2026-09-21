@@ -1,0 +1,17 @@
+{
+  "id": "himeji",
+  "name": "Himeji Castle, Himeji",
+  "lat": 34.83942,
+  "lon": 134.69392,
+  "spanMeters": 800.0,
+  "size": 512,
+  "minElevation": 10.505,
+  "maxElevation": 47.753,
+  "metersPerDemPixel": 3.921,
+  "seaLevel": 13.946,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 15.005,
+  "coastline": "surveyed",
+  "farSpan": 5600.0,
+  "farWater": 0.05
+}
