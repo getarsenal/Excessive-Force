@@ -391,7 +391,9 @@ async function boot() {
   // at exactly the moment the player is watching the thing they just bought.
   (async () => {
     for (const u of UNITS) {
-      if (u.model === 'infantry') continue;
+      // Men are built, not loaded, and the aircraft are lofted in code: only
+      // the guns and vehicles have a file to warm.
+      if (u.model === 'infantry' || u.model === 'aircraft' || u.strike) continue;
       try {
         await battle.models.load(u.model, u.modelLength, { tint: u.tint });
       } catch (e) { console.warn(`[tumble] ${u.model} unavailable:`, e.message); }
@@ -445,9 +447,18 @@ async function boot() {
       if (battle.resumeAfterWin()) hud.feed('ASSAULT CONTINUES', 'big');
     },
     onPickTarget: async () => {
-      const { showWorldMap } = await import('./ui/worldmap.js');
-      const id = await showWorldMap({ current: level.id, canResume: true });
-      if (id && id !== level.id) goToLevel(id);
+      // The battle holds while the map is up: the menu that opened it has
+      // already un-paused, and a garrison does not wait for a player who is
+      // looking at the world.
+      const wasPaused = testMenu.paused;
+      testMenu.paused = true;
+      try {
+        const { showWorldMap } = await import('./ui/worldmap.js');
+        const id = await showWorldMap({ current: level.id, canResume: true });
+        if (id && id !== level.id) { goToLevel(id); return; }
+      } finally {
+        testMenu.paused = wasPaused;
+      }
       // Picking the level already in play, or backing out, just closes it.
     },
     onToggleSound: (on) => audio.setEnabled(on),
@@ -464,6 +475,8 @@ async function boot() {
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
   });
 
+  // The win is written to the campaign once, whichever report shows it.
+  let winRecorded = false;
   function handleEvent(kind, data) {
     switch (kind) {
       case 'bounty':
@@ -491,12 +504,14 @@ async function boot() {
         break;
       case 'deployed':
         hud.feed(`${data.def.name} ${battle.airlift ? 'ON THE GROUND' : 'DEPLOYED'}`, 'good');
-        battle.selectedUnitId = null;
-        hud.hidePrompt();
+        // With the airlift this arrives twenty seconds after the tap, and
+        // whatever the player has selected since is theirs to keep.
+        if (!battle.airlift) { battle.selectedUnitId = null; hud.hidePrompt(); }
         break;
       case 'queued':
+        // The card stays selected while the package is open: the message
+        // says place more, so placing more is one tap, not two.
         hud.feed(`${data.def.name} IN THE LIFT`, 'good');
-        battle.selectedUnitId = null;
         break;
       case 'package':
         if (data.first) hud.feed('LIFT PACKAGE OPEN — PLACE MORE, THEY FLY TOGETHER', '');
@@ -554,7 +569,7 @@ async function boot() {
           level.camera.distance * 1.3);
         setTimeout(() => {
           const sum = battle.summary();
-          recordResult(level.id, true, sum);
+          if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
           hud.showEnd('win', sum, { release: releaseNoteFor(level.id) });
@@ -564,7 +579,8 @@ async function boot() {
         hud.feed('NOTHING LEFT STANDING', 'big');
         setTimeout(() => {
           const sum = battle.summary();
-          recordResult(level.id, true, sum);
+          // One play is one result, however many reports it shows.
+          if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
           hud.showEnd('win', sum, {
@@ -798,6 +814,12 @@ async function boot() {
   });
 
   window.addEventListener('keydown', (e) => {
+    // Not with a modifier (Cmd-1 is a browser tab), not while typing in the
+    // test panel, and not under the map or the report.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+    if (battle.state !== 'playing' || document.body.classList.contains('ended')) return;
     if (e.code === 'Escape') {
       battle.selectedUnitId = null;
       hud.hidePrompt();
@@ -823,7 +845,6 @@ async function boot() {
 
   const firstPrompt = () => {
     hud.status(`${TAP} the tower to designate a target`, 4);
-    setTimeout(() => hud.hidePrompt(), 5200);
   };
   const uiEl = document.getElementById('ui');
   let standoff = null;

@@ -130,11 +130,8 @@ export async function resolveStartLevel() {
   const id = await showWorldMap({});
   if (loading) loading.style.display = '';
   try { localStorage.setItem(AUTOSTART_KEY, '1'); } catch { /* no storage */ }
-  // Chosen from the front door: no reload needed, this is the first boot.
-  if (id && LEVELS[id] && id !== DEFAULT_LEVEL) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('level', id);
-    window.history.replaceState({}, '', `?${params.toString()}`);
-  }
+  // Chosen from the front door: no reload needed, this is the first boot —
+  // and the address stays clean, so a reload comes back to the front door
+  // the way the rule above says it should, whichever contract this was.
   return LEVELS[id] || LEVELS[DEFAULT_LEVEL];
 }

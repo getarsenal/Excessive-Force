@@ -90,15 +90,30 @@ export class HUD {
     this.el.clearBtn?.addEventListener('click', () => this.setClearView(true));
     this.el.restoreBtn?.addEventListener('click', () => this.setClearView(false));
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyH') this.setClearView(!this.clearView);
+      // Not over the report or the menu: the clear-view rule hides them too,
+      // and left only the faint SHOW UI pill on a screen the player thought
+      // had frozen.
+      if (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.altKey
+          && !document.body.classList.contains('ended') && (!this.el.menu || this.el.menu.hidden)) {
+        this.setClearView(!this.clearView);
+      }
     });
     this.soundOn = true;
     this.el.sound = document.getElementById('sound-toggle');
+    // One place writes both labels, so the menu never says ON while the rail
+    // says MUTED.
+    this.syncSound = () => {
+      if (this.el.sound) {
+        this.el.sound.textContent = this.soundOn ? 'SOUND' : 'MUTED';
+        this.el.sound.classList.toggle('off', !this.soundOn);
+      }
+      const snd = this.el.menu && this.el.menu.querySelector('#menu-sound');
+      if (snd) snd.textContent = this.soundOn ? 'SOUND: ON' : 'SOUND: OFF';
+    };
     if (this.el.sound) {
       this.el.sound.addEventListener('click', () => {
         this.soundOn = !this.soundOn;
-        this.el.sound.textContent = this.soundOn ? 'SOUND' : 'MUTED';
-        this.el.sound.classList.toggle('off', !this.soundOn);
+        this.syncSound();
         this.onToggleSound(this.soundOn);
       });
     }
@@ -108,13 +123,14 @@ export class HUD {
       this.el.ecKeep.addEventListener('click', () => {
         this.el.endcard.hidden = true;
         document.body.classList.remove('ended');
+        // A pause pressed while the report was coming up would otherwise
+        // strand the resumed game frozen with no menu on screen.
+        if (this.el.menu) this.el.menu.hidden = true;
+        this.onPause(false);
         this.onKeepGoing();
       });
     }
     if (this.el.ecTargets) this.el.ecTargets.addEventListener('click', () => this.onPickTarget());
-    if (this.el.targetsBtn) {
-      this.el.targetsBtn.addEventListener('click', () => this.onPickTarget());
-    }
 
     this._promptTimer = 0;
     this._lastUnlocked = new Set();
@@ -186,7 +202,7 @@ export class HUD {
     const snd = menu.querySelector('#menu-sound');
     snd.addEventListener('click', () => {
       if (this.el.sound) this.el.sound.click();
-      snd.textContent = this.soundOn ? 'SOUND: ON' : 'SOUND: OFF';
+      else { this.soundOn = !this.soundOn; this.syncSound(); this.onToggleSound(this.soundOn); }
     });
     const opening = menu.querySelector('#menu-opening');
     if (opening) {
@@ -391,6 +407,12 @@ export class HUD {
   }
 
   feed(text, kind = '') {
+    // On a phone the feed is off, and UNIT LOST, ON TARGET, SOLD and the
+    // weapon releases were all feed-only: the lines that matter go to the
+    // status row there instead.
+    if ((kind === 'bad' || kind === 'big') && this.el.feed && getComputedStyle(this.el.feed).display === 'none') {
+      this.status(text.toLowerCase(), 3.5);
+    }
     const line = document.createElement('div');
     line.className = `feed-line ${kind}`;
     line.textContent = text;
@@ -416,7 +438,12 @@ export class HUD {
     for (const p of this._popups) p.age += dt;
     this._updateBadges();
 
-    if (this.el.tcModes) {
+    // Written on change only. Assigning the same string to textContent still
+    // replaces the node and dirties layout, sixty times a second, for a dozen
+    // readouts that change once a second at most.
+    const setText = (el, t) => { if (el && el.__t !== t) { el.__t = t; el.textContent = t; } };
+    if (this.el.tcModes && this._lastMode !== b.fireMode) {
+      this._lastMode = b.fireMode;
       this.el.tcModes.querySelectorAll('button').forEach((btn) => {
         btn.classList.toggle('on', btn.dataset.mode === b.fireMode);
       });
@@ -424,14 +451,14 @@ export class HUD {
     if (this.el.smokeBtn) {
       const cd = b.smokeCooldown;
       const canPay = b.freeBuild || b.money >= 120;
-      this.el.smokeBtn.textContent = cd > 0 ? `SMOKE ${Math.ceil(cd)}s` : 'SMOKE $120';
+      setText(this.el.smokeBtn, cd > 0 ? `SMOKE ${Math.ceil(cd)}s` : 'SMOKE $120');
       this.el.smokeBtn.classList.toggle('wait', cd > 0);
       this.el.smokeBtn.classList.toggle('unaffordable', cd <= 0 && !canPay);
       this.el.smokeBtn.hidden = !b.smokes;
     }
 
-    this.el.money.textContent = `$${Math.floor(b.money).toLocaleString()}`;
-    this.el.income.textContent = `$${b.income.toFixed(0)}/s`;
+    setText(this.el.money, `$${Math.floor(b.money).toLocaleString()}`);
+    setText(this.el.income, `$${b.income.toFixed(0)}/s`);
 
     // The bar is the whole job, not just the landmark. A level with a second
     // garrisoned building in it is not four fifths finished because the tower
@@ -440,9 +467,11 @@ export class HUD {
     const done = b.objectiveProgress;
     const integ = 1 - done;
     const pct = Math.round(done * 100);
-    this.el.integrity.style.width = `${Math.max(0, integ * 100)}%`;
-    this.el.integrityPct.textContent = `${pct}%`;
-    this.el.integrity.className = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}`;
+    const w = `${Math.max(0, integ * 100).toFixed(2)}%`;
+    if (this.el.integrity.__w !== w) { this.el.integrity.__w = w; this.el.integrity.style.width = w; }
+    setText(this.el.integrityPct, `${pct}%`);
+    const cls = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}`;
+    if (this.el.integrity.className !== cls) this.el.integrity.className = cls;
 
     // Per-objective breakdown, so "what is left to do" is never a guess. Only
     // drawn when there is more than one thing to bring down.
@@ -471,9 +500,9 @@ export class HUD {
     // it is the *only* one — the height barely moves while a tower goes four
     // degrees out of plumb. Worth its own readout.
     const lean = b.primary.leanDegrees;
-    this.el.height.textContent = lean > 0.15
+    setText(this.el.height, lean > 0.15
       ? `${h.toFixed(1)} m · ${lean.toFixed(1)}° OUT OF PLUMB`
-      : `${h.toFixed(1)} m standing`;
+      : `${h.toFixed(1)} m standing`);
     this.el.height.classList.toggle('leaning', lean > 0.15);
     if (lean > 1.2 && !this._leanWarned) {
       this._leanWarned = true;
@@ -481,14 +510,14 @@ export class HUD {
     }
     if (lean < 0.2) this._leanWarned = false;
 
-    this.el.defenders.textContent = String(b.garrison.aliveCount);
-    this.el.units.textContent = String(b.units.filter((u) => u.alive).length);
+    setText(this.el.defenders, String(b.garrison.aliveCount));
+    setText(this.el.units, String(b.units.filter((u) => u.alive).length));
 
     // Build bar state.
     for (const u of UNITS) {
       const card = this.cards.get(u.id);
       const unlocked = b.isUnlocked(u);
-      const affordable = b.money >= u.cost;
+      const affordable = b.freeBuild || b.money >= u.cost;
 
       card.classList.toggle('locked', !unlocked);
       card.classList.toggle('unaffordable', unlocked && !affordable);
@@ -501,7 +530,7 @@ export class HUD {
         // a promise the level cannot keep.
         if (b.isReleased && !b.isReleased(u)) {
           card.classList.add('sealed');
-          card.querySelector('.uc-lock').textContent = 'CONTRACT';
+          setText(card.querySelector('.uc-lock'), 'CONTRACT');
         } else {
           card.classList.remove('sealed');
           // Quoted on the bar's scale, not on its own.
@@ -515,14 +544,16 @@ export class HUD {
           const scale = b.level?.unlockScale ?? 1;
           const denom = Math.max(0.05, this._unlockDenom ?? 1);
           const at = Math.min(0.999, ((u.unlockFrac ?? 0) / scale) / denom);
-          card.querySelector('.uc-lock').textContent = `AT ${Math.max(1, Math.round(at * 100))}%`;
+          setText(card.querySelector('.uc-lock'), `AT ${Math.max(1, Math.round(at * 100))}%`);
         }
       } else if (!this._lastUnlocked.has(u.id)) {
         card.classList.remove('sealed');
         this._lastUnlocked.add(u.id);
-        this.feed(`${u.full} AVAILABLE`, 'big');
+        // What was open at the start is not news.
+        if (this._seeded) this.feed(`${u.full} AVAILABLE`, 'big');
       }
     }
+    this._seeded = true;
 
     // Target card. Shown whenever anything is engaging, since guns now pick
     // their own aim point when nothing has been designated — a silent card
@@ -530,13 +561,13 @@ export class HUD {
     const guns = b.gunsOnTarget;
     if (b.target || guns > 0) {
       this.el.targetcard.hidden = false;
-      this.el.tcSection.textContent = b.target
+      setText(this.el.tcSection, b.target
         ? (b.targetLabel || 'structure').toUpperCase()
-        : 'FREE FIRE';
-      this.el.tcHeight.textContent = b.target
+        : 'FREE FIRE');
+      setText(this.el.tcHeight, b.target
         ? `${(b.target.y - b.originGround).toFixed(1)} m`
-        : '—';
-      this.el.tcGuns.textContent = String(guns);
+        : '—');
+      setText(this.el.tcGuns, String(guns));
     } else {
       this.el.targetcard.hidden = true;
     }

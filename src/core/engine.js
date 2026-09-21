@@ -135,7 +135,6 @@ export class Engine {
     // three times the precision.
     this.camera = new THREE.PerspectiveCamera(52, 1, 3.5, 6000);
 
-    this.clock = new THREE.Clock();
     // Dies in well under a second: a thump, not a rumble that carries on.
     this.shake = { amount: 0, decay: 5.0 };
     this._shakeVec = new THREE.Vector2();

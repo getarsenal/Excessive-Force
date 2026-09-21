@@ -279,6 +279,38 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       p.lead.setAttribute('y2', ly.toFixed(1));
       // A pin that has been panned off the edge stops taking taps.
       p.g.classList.toggle('off', px < -40 || px > view.w + 40 || py < -40 || py > view.h + 40);
+      p._lx = lx; p._ly = ly; p._px = px; p._py = py;
+    }
+    // Labels off one another. Fitted to a phone, Europe is forty points wide
+    // and six contracts' names land on top of each other; the later contract
+    // gives way, down if there is room and up if there is not, and its
+    // leader line follows. Two passes settle a stack of three.
+    const boxes = pins.map((p) => { try { const b = p.text.getBBox(); return b && b.width ? b : null; } catch { return null; } });
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < pins.length; i++) {
+        for (let j = i + 1; j < pins.length; j++) {
+          const a = boxes[i], c = boxes[j];
+          if (!a || !c) continue;
+          const ox = Math.min(a.x + a.width, c.x + c.width) - Math.max(a.x, c.x);
+          const oy = Math.min(a.y + a.height, c.y + c.height) - Math.max(a.y, c.y);
+          if (ox <= 2 || oy <= 2) continue;
+          const q = pins[j];
+          const down = c.y + c.height + oy + 6 < view.h - 10;
+          q._ly += (down ? 1 : -1) * (oy + 6);
+          q.text.setAttribute('y', q._ly.toFixed(1));
+          try { boxes[j] = q.text.getBBox(); } catch { /* keep */ }
+        }
+      }
+    }
+    for (let i = 0; i < pins.length; i++) {
+      const p = pins[i], bb = boxes[i];
+      if (!bb) continue;
+      p.box.setAttribute('x', (bb.x - 6).toFixed(1));
+      p.box.setAttribute('y', (bb.y - 5).toFixed(1));
+      p.box.setAttribute('width', (bb.width + 12).toFixed(1));
+      p.box.setAttribute('height', (bb.height + 10).toFixed(1));
+      p.lead.setAttribute('x2', p._lx.toFixed(1));
+      p.lead.setAttribute('y2', p._ly.toFixed(1));
     }
   };
 
@@ -392,9 +424,10 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   const opening = state.list.find((t) => t.id === current) || state.next || state.list[0];
   if (opening) select(opening.id, { move: false });
 
-  if (burning) {
+  const burnT = burning ? byIso.get(burning) : null;
+  if (burnT) {
     // Go and look at it first, then light it.
-    glideTo(x(byIso.get(burning).lon), y(byIso.get(burning).lat), Math.max(kFit * 3.2, view.k));
+    glideTo(x(burnT.lon), y(burnT.lat), Math.max(kFit * 3.2, view.k));
     setTimeout(() => {
       burnCountry(root, burning, 2600).then(() => {
         markBurnSeen(burning);

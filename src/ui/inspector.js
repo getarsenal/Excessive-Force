@@ -62,7 +62,7 @@ export function attachUnitTips(hud, battle) {
   const tip = document.createElement('div');
   tip.id = 'unit-tip';
   tip.hidden = true;
-  document.body.appendChild(tip);
+  (document.getElementById('ui') || document.body).appendChild(tip);
 
   let holdTimer = 0;
   const show = (card) => {
@@ -87,9 +87,14 @@ export function attachUnitTips(hud, battle) {
     card.addEventListener('pointerdown', (e) => {
       if (e.pointerType !== 'touch') return;
       clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => show(card), 380);
+      holdTimer = setTimeout(() => { card.__held = true; show(card); }, 380);
     });
-    for (const ev of ['pointerup', 'pointercancel']) card.addEventListener(ev, hide);
+    for (const ev of ['pointerup', 'pointercancel']) card.addEventListener(ev, () => { clearTimeout(holdTimer); hide(); });
+    // Reading a weapon's stats is not choosing it: the click that follows a
+    // long press is swallowed.
+    card.addEventListener('click', (e) => {
+      if (card.__held) { card.__held = false; e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
   }
   return { show, hide, el: tip };
 }
@@ -118,7 +123,9 @@ export class UnitCard {
         <button id="uc2-sell">SELL</button>
         <button id="uc2-close">CLOSE</button>
       </div>`;
-    document.body.appendChild(el);
+    // Inside #ui, so a clear view and the end-of-level report hide it with
+    // everything else.
+    (document.getElementById('ui') || document.body).appendChild(el);
     this.el = el;
     this.q = (id) => el.querySelector(`#${id}`);
     this.q('uc2-close').addEventListener('click', () => this.hide());

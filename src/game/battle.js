@@ -48,7 +48,7 @@ export class Battle {
 
     this.models = new ModelLibrary();
     // The airlift. A placed unit is flown in, not conjured: the tap opens a
-    // package, anything placed in the next ten seconds joins it, and when it
+    // package, anything placed in the next eight seconds joins it, and when it
     // closes the whole package goes out as one formation. Off for the
     // harness, which places a battery and expects it to be there.
     this.airlift = true;
@@ -170,7 +170,7 @@ export class Battle {
   static get SMOKE_COST() { return 120; }
 
   placeSmoke() {
-    if (!this.smokes) return false;
+    if (!this.smokes || this.state !== 'playing') return false;
     if (this.smokeCooldown > 0) { this.onEvent('smokewait', this.smokeCooldown); return false; }
     if (!this.freeBuild && this.money < Battle.SMOKE_COST) {
       this.onEvent('poor', { cost: Battle.SMOKE_COST });
@@ -199,7 +199,8 @@ export class Battle {
   /** Sell a placed unit back for half its price. */
   sellUnit(unit) {
     if (!unit || !unit.alive) return false;
-    const refund = Math.round(unit.def.cost * 0.5);
+    // Nothing was charged in free build, so nothing comes back.
+    const refund = this.freeBuild ? 0 : Math.round(unit.def.cost * 0.5);
     this.money += refund;
     this.spent -= refund;
     unit.alive = false;
@@ -614,7 +615,7 @@ export class Battle {
     if (def.model !== 'infantry') {
       // The vehicle or gun is loaded now, so it is on the platform when the
       // ramp opens rather than appearing on the ground.
-      this._attachModel({ def, group: drop.group, alive: true, drop }).catch((e) => console.warn('model load failed', e));
+      drop.loading = this._attachModel({ def, group: drop.group, alive: true, drop }).catch((e) => console.warn('model load failed', e));
     }
     drop.marker = this._dropMarker(pos);
     this.pending.push(drop);
@@ -758,6 +759,10 @@ export class Battle {
     if (drop && drop.model) {
       unit.model = drop.model;
       unit.model.rotation.y = def.modelYaw ?? 0;
+    } else if (drop && drop.loading) {
+      // Still on its way from the cache: it lands in this group when it
+      // arrives, and starting a second load would put two in it.
+      drop.loading.then(() => { if (unit.alive && drop.model && !unit.model) unit.model = drop.model; });
     } else {
       this._attachModel(unit).catch((e) => console.warn('model load failed', e));
     }
@@ -1517,7 +1522,18 @@ export class Battle {
   // ────────────────────────────────────────────────────────────────── loop ──
 
   update(dt) {
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing') {
+      // The fight is over; the sky is not. Transports still in the air fly
+      // on and their loads come down, rounds in flight land, the fires burn
+      // and the smoke drifts — under the collapse and behind the report,
+      // rather than freezing in mid-air the moment the bar filled.
+      this.air.update(dt);
+      this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
+      if (this.smokes) this.smokes.update(dt);
+      if (this.fires) this.fires.update(dt);
+      if (this.tracerFX) this.tracerFX.update(dt);
+      return;
+    }
     this.elapsed += dt;
     if (this.package) {
       const left = this.package.closesAt - this.elapsed;
@@ -1718,10 +1734,14 @@ export class Battle {
 
     // Loss: nothing deployed, nothing in flight, and not enough money for the
     // cheapest thing that could still make progress.
+    // Nothing in the lift either: a package waiting to fly is a battery
+    // waiting to arrive, and the sorties only exist once it has launched.
     const liveUnits = this.units.filter((u) => u.alive).length;
-    const cheapest = Math.min(...UNITS.filter((u) => this.isUnlocked(u) && !u.strike).map((u) => u.cost));
+    const costs = UNITS.filter((u) => this.isUnlocked(u) && !u.strike).map((u) => u.cost);
+    const cheapest = costs.length ? Math.min(...costs) : Infinity;
     if (liveUnits === 0 && this.projectiles.inFlight === 0 && this.air.active === 0
-        && this.money < cheapest) {
+        && this.pending.length === 0 && !this.package
+        && Number.isFinite(cheapest) && this.money < cheapest) {
       this.state = 'lost';
       this.onEvent('lose', this.summary());
     }

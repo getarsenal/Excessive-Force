@@ -271,22 +271,7 @@ html, body {
   background: rgba(6, 8, 11, 0.86); color: var(--warn); text-align: center; padding: 4px 2px;
 }
 .uc-lock::before { content: '\1F512'; font-size: 8px; filter: grayscale(1); }
-.unit-card:not(.locked) /* What the bar is, said once, because a bar with ticks on it and a percentage
-   beside it is three different things and the player was left to guess which.
-   The number on a locked card is now quoted on this bar's scale, so "AT 12 %"
-   means the mark at 12 % along here. */
-.tb-barlabel {
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--dim);
-  opacity: 0.75;
-  margin: 2px 0 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.uc-lock { display: none; }
+.unit-card:not(.locked) .uc-lock { display: none; }
 .uc-key {
   position: absolute; top: 2px; right: 4px; font-size: 8px; color: var(--dim);
   border: 1px solid var(--edge); padding: 0 3px; line-height: 11px;
@@ -328,7 +313,7 @@ html, body {
 .uc2-buttons { display: flex; gap: 4px; margin-top: 8px; }
 .uc2-buttons button {
   flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 9px; letter-spacing: 0.12em; padding: 5px 2px; cursor: pointer;
+  font-family: inherit; font-size: 10px; letter-spacing: 0.12em; padding: 0 2px; min-height: 30px; cursor: pointer;
 }
 .uc2-buttons button:hover { border-color: var(--edge-bright); color: var(--text); }
 #uc2-sell:hover { border-color: var(--warn); color: var(--warn); }
@@ -357,13 +342,13 @@ html, body {
 .tc-modes { display: flex; gap: 3px; margin-top: 7px; }
 .tc-modes button {
   flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 8.5px; letter-spacing: 0.12em; padding: 4px 0; cursor: pointer;
+  font-family: inherit; font-size: 9.5px; letter-spacing: 0.12em; padding: 0; min-height: 30px; cursor: pointer;
 }
 .tc-modes button.on { border-color: var(--danger); color: var(--danger); background: rgba(232, 96, 76, 0.1); }
 #smoke-btn {
   position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 100px);
   background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--text);
-  font-family: inherit; font-size: 8px; letter-spacing: 0.16em; padding: 4px 8px; cursor: pointer;
+  font-family: inherit; font-size: 9px; letter-spacing: 0.16em; padding: 0 10px; min-height: 30px; cursor: pointer;
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); z-index: 11; opacity: 0.85;
 }
 #smoke-btn:hover { border-color: var(--edge-bright); }
@@ -381,7 +366,8 @@ html, body {
 }
 #rail button, #test-btn {
   position: static;
-  padding: 4px 8px; font-size: 8px; letter-spacing: 0.16em; line-height: 1.2;
+  /* Small to look at, big enough to hit: a thumb needs thirty points. */
+  padding: 0 10px; min-height: 30px; font-size: 9px; letter-spacing: 0.16em; line-height: 1.2;
   background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; cursor: pointer; opacity: 0.85;
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
@@ -411,13 +397,14 @@ html, body {
 
 /* ── Status line ─────────────────────────────────────────────────────── */
 #status {
-  /* The row under the rail, so it never sits on the rail's buttons. */
-  position: absolute; left: 50%; transform: translateX(-50%);
-  top: calc(var(--hud-top) + 30px);
-  font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+  /* The row under the rail, at the rail's left: never on its buttons, and
+     never under the target card, which lives on the right. */
+  position: absolute; left: var(--ui-pad);
+  top: calc(var(--hud-top) + 38px);
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--dim); background: rgba(10, 13, 17, 0.45); padding: 3px 10px;
   pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 15;
-  max-width: 70vw; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 60vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #status.on { opacity: 1; }
 
@@ -460,7 +447,7 @@ html, body {
   margin-top: 8px; width: 100%; background: transparent;
   border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; font-size: 10px; letter-spacing: 0.16em;
-  padding: 5px; cursor: pointer;
+  padding: 0; min-height: 30px; cursor: pointer;
 }
 #tc-clear:hover { border-color: var(--danger); color: var(--danger); }
 
@@ -611,6 +598,7 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 }
 .feed-line {
   font-size: 11px; letter-spacing: 0.06em; padding: 3px 9px;
+  max-width: 100%; box-sizing: border-box; white-space: normal; text-align: right;
   background: rgba(10, 13, 17, 0.78); border-left: 2px solid var(--dim);
   animation: feedIn 0.22s ease;
 }
@@ -663,6 +651,9 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 }
 .ec-btn.primary:hover { background: #ef7c42; border-color: #ef7c42; }
 .ec-btn.quiet { border-color: var(--edge); color: var(--dim); font-size: 11px; min-height: 40px; }
+/* The next target's name can be long — THE OPERA HOUSE — and a 320-point
+   screen has room for it on two lines but not on one. */
+#ec-next { white-space: normal; letter-spacing: 0.12em; line-height: 1.3; }
 
 /* The report is the only thing on screen while it is up. Everything in the
    battle interface — the target readout, the fire modes, SMOKE, the prompt —
@@ -692,7 +683,9 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   #testmenu { top: calc(var(--hud-top) + 8px + var(--rail-step)); max-height: calc(100vh - var(--hud-top) - 130px); }
 }
 @media (max-height: 480px) {
-  #targetcard { display: none; }
+  /* Smaller, not gone: with the card gone there was no way to clear a
+     designated target or change the fire mode on a phone held sideways. */
+  #targetcard { transform: scale(0.82); transform-origin: top right; }
   #testmenu { max-height: calc(100vh - 130px); }
 }
 
@@ -783,7 +776,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 @keyframes soBlink { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 .so-skip {
   position: absolute; top: calc(7vh + 12px); right: 14px;
-  padding: 7px 14px; font-family: inherit; font-size: 10px; letter-spacing: 0.24em;
+  padding: 0 14px; min-height: 34px; font-family: inherit; font-size: 10px; letter-spacing: 0.24em;
   background: rgba(14, 17, 21, 0.7); border: 1px solid var(--edge-bright); color: var(--text);
   cursor: pointer; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
@@ -1168,6 +1161,9 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   .wm-stage { height: clamp(300px, 42vh, 460px); }
   .wm-doss-brief { font-size: 12.5px; }
   .wm-hint { display: none; }
+  /* Bottom left, where the pan hint was: on a phone the south-east corner
+     is where Rio's and Sydney's labels end up. */
+  .wm-zoom { right: auto; left: 8px; }
 }
 
 /* What closing a contract bought, on the after-action card. */
@@ -1188,19 +1184,4 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 /* A weapon the campaign has not released yet is not coming however much of
    this building falls, so it says so rather than quoting a percentage. */
 .unit-card.sealed { opacity: 0.4; }
-.unit-card.sealed /* What the bar is, said once, because a bar with ticks on it and a percentage
-   beside it is three different things and the player was left to guess which.
-   The number on a locked card is now quoted on this bar's scale, so "AT 12 %"
-   means the mark at 12 % along here. */
-.tb-barlabel {
-  font-size: 8px;
-  letter-spacing: 0.2em;
-  color: var(--dim);
-  opacity: 0.75;
-  margin: 2px 0 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.uc-lock { color: #d08a52; letter-spacing: 0.14em; }
+.unit-card.sealed .uc-lock { color: #d08a52; letter-spacing: 0.14em; }
