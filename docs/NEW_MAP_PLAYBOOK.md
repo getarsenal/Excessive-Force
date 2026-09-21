@@ -1,26 +1,35 @@
 # New map playbook
 
-How to add a landmark to Excessive Force, written after four of them:
-the Elizabeth Tower, the Taj Mahal, the Eiffel Tower and the Giza plateau.
-Everything below is what the code actually does today, not what it was
-meant to do. When the two drift, fix the code or fix this file.
+How to add a landmark to Excessive Force, written after nine of them:
+the Elizabeth Tower, the Eiffel Tower, the Taj Mahal, the Giza plateau,
+El Castillo, the Leaning Tower, the Opera House, Saint Basil's and the
+Redeemer. Everything below is what the code actually does today, not what
+it was meant to do. When the two drift, fix the code or fix this file.
 
-A map is: a real place baked into a heightmap, a masonry model of the
-landmark laid up stone by stone, a garrison posted on it, a level record
-that ties them together, and the trimmings that make it read as *that*
-place rather than as a monument on a plate. The engine is generic. Adding
-a map touches these files and nothing else:
+A map is: a real place baked into a heightmap and a city file, a masonry
+model of the landmark laid up stone by stone, a garrison posted on it, a
+level record that ties them together, a contract on the campaign map, and
+the trimmings that make it read as *that* place rather than as a monument
+on a plate. The engine is generic. Adding a map touches these files and
+nothing else; `node tools/mapcheck.mjs <id>` asserts that every one of
+them has its entry, and is the first thing to run when a level is "done":
 
 | File | What goes in it |
 |---|---|
-| `tools/bake_terrain.py` | The place: lat/lon, river polyline, parks, pads to flatten. Run it once to bake `public/assets/terrain/<id>_{height,mask}.png` + `<id>.json`. |
-| `src/structure/landmarks/<name>.js` | The masonry. One exported builder per structure, returning a `BlockList`. |
-| `src/game/defenders.js` | `populate<Name>(origin, groundY)`: where the garrison stands. |
-| `src/game/levels.js` | The level record: camera, structures, garrison, precinct, win rules, blurbs. Add the id to `LEVEL_ORDER` and `LEVEL_BLURB`. |
-| `src/world/flags.js` | `FLAG_SITES[id]`: where the flag flies, and a pattern for the nation if it is a new one. |
+| `tools/bake_terrain.py` | The place: lat/lon, span, zoom, and the ground's corrections — river polyline, parks, flatten pads, `sea`, `ceiling`, `peak`. |
+| `tools/bake_overture.py` | Nothing per level, unless the ground is wild (forest, jungle, desert scrub): then the id goes in `WILD_COVER` so the survey's land cover is kept instead of the town's. |
+| `public/assets/terrain/<id>_{height,mask,far}.png`, `<id>.json` | Written by the bakes. Committed. |
+| `public/assets/city/<id>.json` | Written by the Overture bake: the surveyed buildings, streets and the surround. Committed. Never a synthetic fixture. |
+| `src/structure/landmarks/<name>.js` | The masonry. One exported builder per structure, returning a `BlockList`; the constants in one exported object. |
+| `src/game/defenders.js` | `populate<Name>(origin, groundY)`: where the garrison stands, read from the builder's constants. |
+| `src/game/levels.js` | The level record: camera, structures, garrison, precinct, palette, setting, traits, win rules, blurbs. Add the id to `LEVEL_ORDER` and `LEVEL_BLURB`. |
+| `src/game/campaign.js` | The contract in `THEATRES`: number, ISO code, city, lon/lat, title, brief, what closing it releases. **Without this the level is not on the campaign map and cannot be reached in order.** |
+| `src/world/flags.js` | `FLAG_SITES[id]`: where the flag flies, and a `PATTERNS` function for the nation if it is a new one. |
 | `src/game/cast.js` | `CAST.<nation>`, `DEFENDER_OF[id]`, `STANDOFF[id]`: the defending officer and the three-line stand-off. |
 | `public/assets/characters/<nation>-<rank>.png` | The officer's cutout, RGBA, roughly 1024×1536, and a line in `manifest.json`. |
-| `src/ui/levelselect.js` | Nothing, if the level record is complete. |
+| `public/assets/recon/<id>.jpg` | The dossier photograph on the campaign map, rendered by `node tools/recon.mjs <id>`. |
+| `docs/SCRIPTS.md` | The stand-off lines by country, for the writer. |
+| `src/ui/levelselect.js`, `src/ui/worldmap.js` | Nothing. Both read the records. |
 
 The rest of this file is the order to do them in, the traps at each step,
 and how to know when you are done.
@@ -73,8 +82,20 @@ builder (see §4).
     "ceiling": 42.0,             # cap the DEM where it is really a city's roofs
     # pad: [east, north, radius | [rx, rz], feather, height?]
     "flatten": [[east, north, 44, 30, 690.0], ...],
+    # a summit, cut as a landform with firing steps (Rio) — see below
+    "peak": {
+        "height": 700.0,         # the summit's elevation
+        "top": 66.0,             # radius of the level platform the landmark stands on
+        "slope": 1.6,            # metres of fall per metre between shelves
+        "shelves": [[96.0, 40.0], [152.0, 62.0], [246.0, 70.0]],   # [inner radius, width]
+        "fade": 70.0,            # blend back into the DEM past the last shelf
+    },
 },
 ```
+
+Use `river` *or* `sea`, not both; `peak` replaces `flatten` for the summit
+it cuts. Omit every key the place does not need — a plain city on a river
+is `lat, lon, span, zoom, river, parks`.
 
 Then `python3 tools/bake_terrain.py <id>`. It fetches AWS Terrarium
 tiles (no key), writes the three files, and prints the elevation range.
@@ -86,6 +107,25 @@ is what the surround and the skyline are drawn over. Read the line it prints:
 `far water: N polygons, X% of the K km square`. A coastal or riverside place
 that comes back at nought per cent has a bake that did not reach its own water,
 and the level will render as a field with a monument in it.
+
+Every bake ends by checking itself against its own other half: the origin is
+not under water, the wet half of the map is the low half, nothing wet stands
+above its own surface, and the surveyed buildings are on the surveyed land.
+A bake that fails one of those prints why; the last one is the only check
+that catches a flipped mask, because the dredge follows the mask and the two
+agree with each other however wrong they are.
+
+Both bakes are cached outside the repo — the DEM tiles in `/tmp/tt-tiles`,
+the Overture queries in `/tmp/tt-overture` — so a re-bake after a change to
+the config is seconds, not a minute a level. `--fresh` bypasses the cache.
+Egress: `s3.amazonaws.com` is open; Overpass and the tile servers are 403 at
+the proxy, by policy — report it, do not retry.
+
+If the place is wild — rainforest, jungle, desert scrub, anything where the
+survey's land cover is the truth and a town's parcels are not — add the id
+to `WILD_COVER` in `bake_overture.py` before baking. Rio and Chichén are in
+it. Without it the bake paints the built-parcel tint and the game lays a
+town's ground under the trees.
 
 The street plan then goes through `src/world/realstreets.js`, and everything
 below is true of a new map without anyone having to build it. These are the
@@ -204,6 +244,15 @@ that way.)
   across, which at z14 is twelve DEM pixels, most of which the smoothing
   hands to the harbour — the point is simply not there. Corcovado at z14 is
   a hill with its top rounded off.
+- **`peak` is a landform and a level design at once.** A real summit at
+  DEM resolution is a hill with its top rounded off, and a statue on it has
+  nowhere for a gun to stand. `cut_peak` carves the summit to a level
+  platform of radius `top` and rings of level shelf below it, each one a
+  firing step, the ground falling at `slope` between them, the radii
+  wobbled by bearing so the benches wander like weathered rock. Anything
+  the level puts on the mountain — the Rio turret is on `shelves[0]` — is
+  placed by reading those numbers, not by guessing; probe
+  `terrain.heightAt` around the ring before choosing the spot.
 - **The guns have to have somewhere to stand.** This is the constraint that
   decides the shape of a summit. A howitzer below a rise puts its shell into
   the rise: on the Corcovado cut to its true platform, ten rounds went out
@@ -358,13 +407,22 @@ would do.
 
 ### A gun that shoots back
 
-A level may carry `turret: { x, z, yaw, scale }` — a coastal mounting
-(`src/game/turret.js`) that turns slowly toward the nearest battery in range,
-drops two shells at a time on it in a high arc, deflects three friendly rounds
-in four off its dome and barrels (re-firing them along their new line), and is
-wrecked after sixteen that bite. It is a machine with a hit count and a
-kinematic body, not masonry, and not an objective. Rio has one on the summit
-ring fifty metres from the statue; give it flat ground and a clear arc.
+A level may carry `turret: { x, z, yaw, scale, minRange }` — a coastal
+mounting (`src/game/turret.js`) that turns slowly toward the nearest battery
+in range, drops two shells at a time on it in a high arc, deflects three
+friendly rounds in four off its dome and barrels (re-firing them along their
+new line), and is wrecked after sixteen that bite. It is a machine with a hit
+count and a kinematic body, not masonry, and not an objective. The forest
+clearing and the deploy exclusion follow its position on their own.
+
+Give it its own ground. Rio's stood on the summit platform fifty-five metres
+from the pedestal once and read as a piece of the monument; it is on the
+first bench now, forty metres below the terraces and a hundred and thirty
+out, in a clearing of its own. Flat ground under the whole wire ring (about
+2.7 × dome radius, 17 m at scale 1.25), a clear arc, and `yaw` facing away
+from the landmark. `minRange` is the radius inside which it will not fire:
+sixty metres when the batteries can stand above it, more when it is on the
+same platform as the guns.
 
 ## 4. Post the garrison
 
@@ -425,12 +483,18 @@ floor, onto its top.
   scoreTags: [...],                    // if a plinth or raft outweighs the monument
   precinct: { boundary, ground, ornament, river, obelisk, pier },
   palette: { urban, urbanAlt, park, parkAlt, road, bank, bed, dry },   // if not a temperate river city
+  setting: { hinterland, canopy, canopyFrom, haze },   // what is beyond the town; see below
   traits: { windows, river, topples }, // what the suite must NOT assert here
   unlockScale,                         // for very massive monuments
+  turret: { x, z, yaw, scale, minRange },   // a gun that shoots back (§3), if the place has one
   win / winSecondary,                  // only if the defaults are wrong
   brief: 'One line: what the player has to find out.',
 },
 ```
+
+Copy the nearest existing entry and change every field; a field left as the
+neighbour's is the commonest way a new map ships with London's palette or
+Paris's camera.
 
 Add the id to `LEVEL_ORDER` (easiest first; nothing is locked) and a
 line to `LEVEL_BLURB`.
@@ -468,6 +532,52 @@ line to `LEVEL_BLURB`.
 - **`palette`**: the default ground is London (brick dust, parkland, wet
   silt). Giza needed sand. Anywhere not a temperate river city needs its
   own eight colours.
+- **`setting`** is what lies beyond the surveyed town, and what the
+  outskirts may do. `hinterland` is `'forest'` (Rio) or `'jungle'`
+  (Chichén) for a canopy that closes in past `canopyFrom` metres at a
+  density of `canopy` (2.5 is a wall of trees), `'harbour'` for Sydney;
+  omit it for a city, where fields and hedgerows take over past the
+  buildings. `haze: { colour, density }` is the fog — thin and blue seven
+  hundred metres up, thick and warm over a desert. Every level that is not
+  a temperate river city sets both `palette` and `setting`.
+- **`victory`, `subtitle`, `target`, `place`** are the end card's pun, the
+  level select's second line, the target card's uppercase name and the
+  dossier's place line. Write all four; the campaign map and the level
+  select read them and an empty one shows.
+
+### 5b. The campaign record
+
+`src/game/campaign.js`, `THEATRES`: one contract per level, in campaign
+order. The Campaign HQ map draws its pin, label, dossier and burn from this
+record and nothing else, and `campaignState()` walks it to decide what is
+open. A level in `LEVELS` but not here is unreachable in the campaign.
+
+```js
+{
+  id: '<id>',                  // the level id
+  iso: 'BRA',                  // ISO 3166-1 alpha-3; must exist in public/assets/world.json (`i`)
+  lx: 46, ly: 24,              // label offset from the pin, map pixels; move it off the coast
+  city: 'RIO DE JANEIRO',      // the label
+  lon: -43.2105, lat: -22.9519,
+  no: 9,                       // the contract number: its index in LEVEL_ORDER + 1
+  title: 'OPEN ARMS',          // two or three words, uppercase
+  brief: 'Three or four sentences: the structural problem, plainly.',
+  unlocks: ['m142'],           // unit ids released on close, or []
+  unlockLine: 'HIMARS released',   // or 'Nothing new — you have it all'
+},
+```
+
+- **The order is `LEVEL_ORDER`.** `campaignState()` opens the next id in
+  that array when the previous is won. Keep `no` equal to the position.
+- **`iso`** picks the country that burns when the contract closes. The
+  atlas (`public/assets/world.json`) is a list of `{ n, i, p }` — name,
+  ISO3, path — and a country not in it gets no land to burn. Check it.
+- **The unlock chain is a decision, not a default.** Contracts 1–5 each
+  release a unit (`m109`, `f15`, `m142`, `m270`, `b1`); 6–9 release
+  nothing, and the dossier says so. A tenth contract at the end of the
+  chain releases nothing unless a unit is moved or added. A unit with a
+  rendered icon (`IMAGE_ICONS` in `src/ui/icons.js`) shows it on the
+  dossier's release panel.
 
 ---
 
@@ -478,12 +588,27 @@ line to `LEVEL_BLURB`.
   nation needs a `PATTERNS` function: they are drawn on a canvas, twenty
   lines each.
 - **Stand-off** (`src/game/cast.js`, `src/ui/standoff.js`): a `CAST`
-  entry (file, name, side `right`, three flag colours for the bubble
-  trim), `DEFENDER_OF[id]`, and `STANDOFF[id]` — three beats, US /
-  defender / US, verbatim from the writer. Non-Latin lines lay out on
-  their own (`dir="auto"`); the font request includes an Arabic face and
-  would need another for a new script. The officer's art is a cutout PNG
-  under `public/assets/characters/`, catalogued in `manifest.json`.
+  entry (id, file, rank in the nation's own usage, an invented name,
+  nation, side `right`, three flag colours for the bubble trim and the
+  dossier's stripe), `DEFENDER_OF[id]`, and `STANDOFF[id]` — three beats,
+  US / defender / US, verbatim from the writer, and mirrored into
+  `docs/SCRIPTS.md`. The bubble wraps at 44vw or 520px and is sized from
+  the whole line before it types, so a hundred characters is fine; past
+  that it crowds the figure on a phone. Non-Latin lines lay out on their
+  own (`dir="auto"`); the font request includes an Arabic face and would
+  need another for a new script. The officer's art is a cutout PNG under
+  `public/assets/characters/<nation>-<rank>.png`, RGBA with the figure cut
+  out and a soft dark halo in the alpha, about 1024×1536, catalogued in
+  `manifest.json` (look, pose, side). If the art is not given, wire the
+  file name anyway and say in the manifest that the slot is empty; the
+  stand-off and the dossier both tolerate a missing image.
+- **Recon photograph** (`tools/recon.mjs`): `node tools/recon.mjs <id>`
+  with the dev server up renders the level from its own opening camera to
+  `public/assets/recon/<id>.jpg`, 1280×720, for the dossier on the
+  campaign map. Re-run it whenever the camera or the landmark changes
+  enough to show. The dossier hides the figure if the file is missing, so
+  a missing photo is a blank panel, not an error — which is why `mapcheck`
+  looks for it.
 - **Victory line**: the pun on the end card (`victory`). The card widens
   its title automatically past sixteen characters.
 - **Blurb and brief**: one line each. The blurb is what kind of problem
@@ -493,27 +618,42 @@ line to `LEVEL_BLURB`.
 
 ## 7. Verify, then ship
 
-The harness drives the real game in headless Chromium. From the repo:
+First the wiring, because it is the cheapest check and the one a person
+forgets:
+
+```
+node tools/mapcheck.mjs <id>          # every file and table has its entry
+```
+
+It reads the level, campaign, cast, flag and blurb tables, and looks for
+the terrain, city, portrait and recon files. It does not judge the map; it
+says whether the map is *connected*. A missing campaign record or a
+portrait path with a typo is the class of fault it exists for.
+
+Then the harness, which drives the real game in headless Chromium:
 
 ```
 npx vite --port 5177 --strictPort &                      # dev server
-TT_URL='http://localhost:5177/?level=<id>' TT_TIER=low \
-  node tools/shot.mjs /tmp/out/<id>-low tools/suite.js   # the whole suite
-python3 tools/report.py /tmp/out/<id>-low-console.txt    # pass/fail summary
+sh tools/suiteall.sh <id>                                # expect "<id>: 35 pass 0 fail"
+TIER=high sh tools/suiteall.sh <id>                      # another tier
 ```
 
-`TT_TIER` is `low | medium | high | ultra`; `TT_INTRO=1` keeps the
-stand-off (the suite turns it off). A scenario file is any JS expression
-evaluated in the page; it may return a Promise. Screenshots land beside
-the console log. Useful handles on `window`: `battle`, `primary`,
-`structures`, `terrain`, `rig`, `garrison`, `testMenu`, `standoff`,
-`__fastForward(seconds)`, `__runTests()`.
+`suiteall.sh` runs the whole suite (`tools/suite.js` through
+`tools/shot.mjs`) at low tier against the dev server, several levels at a
+time when given several ids, and prints one line each. It sets `TT_SUITE=1`,
+which drops the screenshots and the settling pauses a human would want.
+For one scenario by hand: `TT_URL='http://localhost:5177/?level=<id>'
+TT_TIER=low node tools/shot.mjs /tmp/out/<id> <scenario.js>`; the scenario
+is any JS expression evaluated in the page, and may return a Promise.
+Useful handles on `window`: `battle`, `primary`, `structures`, `terrain`,
+`rig`, `garrison`, `testMenu`, `standoff`, `__fastForward(seconds)`,
+`__runTests()`.
 
 Two probes worth reaching for before the whole suite:
 
 ```
-node tools/loose.mjs <id> low      # where the loose stones are, not how many
-node tools/look.mjs /tmp/out/<id> <id>   # three views, plus the blind ranks
+node tools/loose.mjs <id> low             # where the loose stones are, not how many
+node tools/look.mjs /tmp/out/<id> <id>    # three views, plus the blind ranks
 ```
 
 `loose.mjs` prints each detached stone's section, height, distance from the
@@ -529,20 +669,34 @@ Rules of the harness, learned the hard way:
 - Never edit a source file or run a heavy probe while a suite is in
   flight. Vite's reload corrupts the run and a concurrent probe caused a
   flaky Agra failure.
+- Three browsers on one software rasteriser is what the box has cores
+  for. A single test dropping under that load and passing alone
+  (`JOBS=1`) is load, not a bug; the same test dropping twice is a bug.
 - Probe the ground with `window.primary.groundY`, not `window.groundY`.
 - The software rasteriser renders at about a frame a second, so
   wall-clock waits advance almost no game time. Use `__fastForward`.
-- A level is done when the suite is 35 pass 0 fail at low tier, the
-  production build (`npx vite build`) is clean, and you have *looked* at
-  it: the opening camera, the precinct from close in, both banks of the
-  river, the mouths where it leaves the map, and one collapse.
+- Giza at high and Paris at ultra time out in the rasteriser; verify those
+  at low.
+- Iterate on *one* level. A change to the masonry or the streets is a
+  change on every map, and the nine take seven minutes; find the fault on
+  one, fix it, then run the nine once.
+- Scratch probes live under `tools/` (Playwright resolves from the repo)
+  and are deleted before the commit.
 
-Ship: commit to `claude/landmark-destruction-game-4gxy06`, fast-forward
-`main` (`git push origin <branch>:main`), and confirm the "Deploy to
-GitHub Pages" run is green. The remote stays on the old repo URL
-(`getarsenal/Excessive-Force`). The repo has been renamed twice —
-Tumble-Town, then this — and pushes to the current name work; if a
-credential ever fails, the old URL redirects.
+A level is done when `mapcheck` is clean, the suite is 35 pass 0 fail at
+low tier, the production build (`npx vite build`) is clean, and you have
+*looked* at it: the opening camera, the precinct from close in, both banks
+of the river or the whole shore, the mouths where the water leaves the map,
+the recon photo, the dossier on the campaign map, the stand-off with the
+longest line, and one collapse. The first pass should get the map ninety
+per cent of the way; the last ten is someone looking at those pictures and
+saying what is wrong.
+
+Ship: commit to the branch the session names, fast-forward `main`
+(`git push origin <branch>:main`), and confirm the "Deploy to GitHub Pages"
+run is green (poll `actions/runs?branch=main&per_page=1` for the commit's
+`completed success`). The remote is `getarsenal/Excessive-Force`; the repo
+has been renamed twice and pushes to the current name work.
 
 ---
 
@@ -553,15 +707,22 @@ following, in this order, each verified before the next:
 
 1. The kind of problem, the scale, and the twist — stated in one
    paragraph before any code.
-2. Terrain baked and committed; the river and any pads checked in-game.
+2. Terrain and city baked and committed (both bakes; `WILD_COVER` if the
+   ground is wild); the water, the far water line and any pads checked
+   in-game.
 3. The builder, with the model standing loose-stone-free at every tier
    and going over (or not, by design) when undercut.
-4. Interiors and the trick.
+4. Interiors and the trick; a turret if the place has a gun.
 5. The garrison, within the blind baseline, anchored to the stone.
-6. The level record, with camera, precinct, palette, traits and win rules.
-7. Flag, officer, stand-off script (ask the writer for the lines if they
-   are not given; draft one option and mark it as a draft).
-8. Suite green at low tier, build clean, screenshots looked at, deployed.
+6. The level record, with camera, precinct, palette, setting, traits and
+   win rules; `LEVEL_ORDER` and `LEVEL_BLURB`.
+7. The campaign record in `THEATRES`, with the ISO code checked against
+   the atlas and the unlock chain decided.
+8. Flag, officer, stand-off script (ask the writer for the lines if they
+   are not given; draft one option and mark it as a draft), the recon
+   photograph, `docs/SCRIPTS.md`.
+9. `mapcheck` clean, suite green at low tier, build clean, the pictures
+   in §7 looked at, deployed, deploy run green.
 
 The first four maps needed no engine change at all, and that was worth
 saying. The second five needed six, and every one of them was the engine

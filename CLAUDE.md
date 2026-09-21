@@ -42,7 +42,9 @@ Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
 grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out in
 the software rasteriser; verify those at low.
 
-`node tools/loose.mjs <level> low` says *where* the loose stones are and
+`node tools/mapcheck.mjs <level>` says whether a level is wired everywhere
+it has to be (tables, bakes, contract, portrait, recon) before the suite is
+worth running. `node tools/loose.mjs <level> low` says *where* the loose stones are and
 `node tools/look.mjs /tmp/out/<id> <level>` gives three views plus the
 blind ranks — both are quicker than the whole suite while building.
 `sh tools/suiteall.sh <level>...` runs the suite over several levels and
