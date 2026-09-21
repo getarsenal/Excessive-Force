@@ -692,6 +692,9 @@ export const LEVELS = {
         required: true, label: 'HAGIA SOPHIA' },
     ],
     garrison: (g, origin, groundY) => { populateHagiaSophia(g, origin, groundY); },
+    // The dome, the half-domes and what holds them; the aisles and the raft
+    // are the base and would swamp the bar.
+    scoreTags: ['dome', 'halfdomes', 'arches', 'piers', 'buttresses', 'minarets'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: false },
     brief: 'The dome is held from outside. Open one side and the thrust has nowhere to go.',
