@@ -942,11 +942,14 @@ export class Garrison {
         origin.z + nz * (C.templeHalf - 1.2)), Math.atan2(nx, nz), 7,
       { cover: 'window' });
     }
-    // Mortars behind the temple's own walls.
+    // Mortars on the upper platform's corners, outside the temple. They were
+    // inside it, behind its walls, firing up through its own roof; a mortar
+    // needs sky over the pit, and the corners of a platform of half nineteen
+    // round a temple of half thirteen are the one part of it that has any.
     for (const [sx, sz] of [[1, 1], [-1, -1]]) {
       this.place('mortar', new THREE.Vector3(
-        origin.x + sx * C.templeHalf * 0.5, groundY + C.platform + 0.6,
-        origin.z + sz * C.templeHalf * 0.5), 0, 8, { cover: 'roof' });
+        origin.x + sx * (C.platHalf - 2.4), groundY + C.platform + 0.6,
+        origin.z + sz * (C.platHalf - 2.4)), 0, 8, { cover: 'roof' });
     }
     // The chamber inside the older pyramid. Nothing can reach these two until
     // the outer casing and then the inner one are off the top of them, which is
@@ -1295,32 +1298,50 @@ export class Garrison {
    */
   populateRedeemer(origin, groundY) {
     const R = REDEEMER;
+    // The terraces are squares, and the men walk their edges as squares. On a
+    // circle the men on the middle terrace stood inside the top terrace's
+    // footprint near the diagonals — a circle of radius twenty-six passes
+    // under a square of half twenty — and one mortar crew was laid up inside
+    // the stone with the pedestal over its head, which is why that crew never
+    // found an arc that cleared.
+    const onSquare = (half, u) => {
+      // u in [0, 1) round the perimeter, from the +x side, anticlockwise seen
+      // from above; the facing is the side's outward normal.
+      const side = Math.floor(u * 4), f = u * 4 - side, w = (f * 2 - 1) * half;
+      return [
+        { x: half, z: w, face: Math.atan2(1, 0) },
+        { x: -w, z: half, face: Math.atan2(0, 1) },
+        { x: -half, z: -w, face: Math.atan2(-1, 0) },
+        { x: w, z: -half, face: Math.atan2(0, -1) },
+      ][side];
+    };
     R.terraces.forEach((t, k) => {
       const n = [14, 10, 6][k];
       const deck = t.y + t.h + 1.6;
       for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2 + k * 0.3;
-        const r = t.half - 2.6;
-        const p = new THREE.Vector3(origin.x + Math.cos(a) * r,
-          groundY + deck, origin.z + Math.sin(a) * r);
+        const q = onSquare(t.half - 2.6, ((i + 0.5) / n + k * 0.05) % 1);
+        const p = new THREE.Vector3(origin.x + q.x, groundY + deck, origin.z + q.z);
         // The lowest terrace takes the anti-tank and the machine guns, because
         // it is the one the road arrives at; the top one takes the long
         // weapons, because from there nothing on this mountain is out of
         // range.
         const type = k === 0 ? (i % 3 === 0 ? 'at' : 'mg')
           : k === 1 ? (i % 3 === 0 ? 'mg' : 'rifleman') : 'sniper';
-        this.place(type, p, Math.atan2(Math.cos(a), Math.sin(a)), 7,
-          { cover: k === 0 ? 'window' : 'roof' });
+        this.place(type, p, q.face, 7, { cover: k === 0 ? 'window' : 'roof' });
       }
     });
-    // Mortars on the middle terrace, behind its parapet.
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2 + 1.2;
+    // Mortars on the middle terrace, in its corners, which are the one part
+    // of that deck with nothing over them: the arms run along x, so the
+    // corners are outside their span, and the top terrace is a square of
+    // half twenty inside a deck of half twenty-nine.
+    {
       const t = R.terraces[1];
-      this.place('mortar', new THREE.Vector3(
-        origin.x + Math.cos(a) * (t.half - 6.0),
-        groundY + t.y + t.h + 1.6, origin.z + Math.sin(a) * (t.half - 6.0)),
-      0, 8, { cover: 'roof' });
+      const c = t.half - 4.0;
+      for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1]]) {
+        this.place('mortar', new THREE.Vector3(
+          origin.x + sx * c, groundY + t.y + t.h + 1.6, origin.z + sz * c),
+        0, 8, { cover: 'roof' });
+      }
     }
     // And two in the chapel inside the pedestal, which is the one room on this
     // mountain with a roof on it.
@@ -1857,9 +1878,9 @@ export class Garrison {
       aim.z += (Math.random() - 0.5) * spread;
       aim.y = best.pos.y;
 
-      const sh = d.def.shell;
-      const sol = solveBallistic(d.muzzle, aim, sh.speed, sh.gravity, 14.0);
+      const sol = this.mortarSolution(d, aim);
       if (!sol) { d.cooldown = 1.4; continue; }
+      const sh = d.def.shell;
 
       projectiles.fire({
         pos: d.muzzle, vel: sol.vel, gravity: sh.gravity, kind: 'arc',
@@ -1871,6 +1892,49 @@ export class Garrison {
       this.mortarsFired++;
       if (this.onMortarFire) this.onMortarFire(d);
     }
+  }
+
+  /**
+   * The mortar's firing solution, or null if there is none that clears the
+   * masonry it is standing under.
+   *
+   * A mortar shoots over everything, and the solver used to take that at its
+   * word: on the Corcovado the section behind the middle terrace's parapet put
+   * its rounds into the statue's arm twenty metres over its own head, and the
+   * player watched the garrison shell the monument for him. The arc is walked
+   * against the structures now; the solver takes the first charge whose loft
+   * clears, and a crew with no clear arc at all holds its fire.
+   */
+  mortarSolution(d, aim) {
+    const sh = d.def.shell;
+    const clear = (vel) => this._arcClear(d.muzzle, vel, sh.gravity);
+    const sol = solveBallistic(d.muzzle, aim, sh.speed, sh.gravity, 14.0, clear);
+    // The solver hands back its best guess even when nothing clears; a mortar
+    // does not fire that one.
+    return sol && clear(sol.vel) ? sol : null;
+  }
+
+  /** Does a shell on this arc get out from under the masonry it starts in? */
+  _arcClear(from, vel, gravity) {
+    const a = this._arcA || (this._arcA = new THREE.Vector3());
+    const b = this._arcB || (this._arcB = new THREE.Vector3());
+    // Up to the apex and down to the launch height again: what is over the
+    // crew is the question, not what is at the target.
+    const flight = Math.min(14, Math.max(0.2, (2 * Math.max(0, vel.y)) / gravity));
+    const steps = 14;
+    // The walk starts a little way up the arc rather than at the muzzle. The
+    // occupancy grid is two-metre cells and the muzzle is a metre over the
+    // deck the crew stands on, inside the deck's own cell; a leg that begins
+    // there is blocked before the shell has left the pit, whatever is over it.
+    const t0 = Math.min(flight * 0.5, 2.6 / Math.max(1, vel.y));
+    a.set(from.x + vel.x * t0, from.y + vel.y * t0 - 0.5 * gravity * t0 * t0, from.z + vel.z * t0);
+    for (let i = 1; i <= steps; i++) {
+      const t = t0 + ((flight - t0) * i) / steps;
+      b.set(from.x + vel.x * t, from.y + vel.y * t - 0.5 * gravity * t * t, from.z + vel.z * t);
+      if (!lineOfSight(this.structures, a, b, 0, 0)) return false;
+      a.copy(b);
+    }
+    return true;
   }
 
   /**

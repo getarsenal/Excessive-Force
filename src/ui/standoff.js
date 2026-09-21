@@ -102,6 +102,7 @@ export class Standoff {
     };
     this.camT = 0;
     this.camLen = 3.4;
+    this.rig.keysLocked = true;
     this._applyCam(0);
   }
 
@@ -146,8 +147,9 @@ export class Standoff {
     this.done = true;
     this.root.classList.add('out');
     window.removeEventListener('keydown', this._onKey);
-    // Land the camera exactly where the level wants it.
+    // Land the camera exactly where the level wants it, and hand the keys back.
     this._applyCam(1);
+    this.rig.keysLocked = false;
     setTimeout(() => { this.root.remove(); this.onDone(); }, BEAT.exit * 1000);
   }
 

@@ -429,8 +429,13 @@ export const LEVELS = {
     ],
     garrison: (g, origin, groundY, sites) => {
       g.populateSaintBasils(origin, groundY);
+      // At the wall's own origin, a hundred and fifty metres west. Passed
+      // (0, 0) once, and the wall's whole garrison was laid at the cathedral:
+      // the twenty men on the rampart found no stone there and were dropped,
+      // and one mortar crew snapped into the central church and fired up
+      // through its tent roof.
       const k = sites && sites.kremlin;
-      if (k) g.populateKremlinWall({ x: 0, y: k.groundY, z: 0 }, k.groundY);
+      if (k) g.populateKremlinWall({ x: k.origin.x, y: k.groundY, z: k.origin.z }, k.groundY);
     },
     // Scored on the churches and on the basement they all stand on — the
     // gallery, the piers and the vaults are the building here as much as the

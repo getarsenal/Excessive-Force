@@ -463,6 +463,7 @@ export class CameraRig {
     }, { passive: false });
 
     this._keys = new Set();
+    this.keysLocked = false;             // a cutscene owns the camera
     window.addEventListener('keydown', (e) => this._keys.add(e.code));
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
 
@@ -602,9 +603,11 @@ export class CameraRig {
   }
 
   update(dt, shakeVec) {
-    // Keyboard pan for desktop.
+    // Keyboard pan for desktop. Not while something else is flying the
+    // camera: the stand-off glides onto the level's opening view, and a hand
+    // resting on W during it dragged the target off the monument.
     const k = this._keys;
-    if (k.size) {
+    if (k.size && !this.keysLocked) {
       const speed = this.distance * 0.9 * dt;
       const { fx, fz, rx, rz } = this._basis();
       let fwd = 0, strafe = 0;
