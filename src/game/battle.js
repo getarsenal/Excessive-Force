@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
+
+/** How long a lift package stays open after the first unit is placed. */
+const LIFT_WINDOW = 8;
 import {
   solveArc, solveBallistic, solveBoosted, solveDirect, ProjectileManager, ROCKET_BOOST,
 } from './projectiles.js';
@@ -44,6 +47,13 @@ export class Battle {
     this.onEvent = ctx.onEvent || (() => {});
 
     this.models = new ModelLibrary();
+    // The airlift. A placed unit is flown in, not conjured: the tap opens a
+    // package, anything placed in the next ten seconds joins it, and when it
+    // closes the whole package goes out as one formation. Off for the
+    // harness, which places a battery and expects it to be there.
+    this.airlift = true;
+    this.package = null;
+    this.pending = [];
     this.projectiles = new ProjectileManager(this.scene, this.physics, this.quality);
 
     this.money = START_MONEY;
@@ -502,6 +512,9 @@ export class Battle {
       if (!u.alive) continue;
       if (u.pos.distanceTo(point) < 7) return { ok: false, reason: 'occupied' };
     }
+    for (const d of this.pending) {
+      if (d.pos.distanceTo(point) < 7) return { ok: false, reason: 'drop zone taken' };
+    }
     // A launcher has a near limit and this is where the player finds out.
     // Its rocket cannot come down closer than the motor carries it, so one
     // parked against the building it is meant to shell has no shot at all —
@@ -583,7 +596,86 @@ export class Battle {
     const y = (point.onRoof || point.onDeck) ? point.y : this.terrain.heightAt(point.x, point.z);
     const pos = new THREE.Vector3(point.x, y, point.z);
     pos.onRoof = point.onRoof === true;
+    pos.onDeck = point.onDeck === true;
 
+    if (!this.airlift) return this._spawn(def, pos);
+
+    // Into the lift. The spot is held, the money is spent, and the unit
+    // arrives when the aircraft gets here.
+    const aim = this.target || new THREE.Vector3(this.primary.origin.x, y, this.primary.origin.z);
+    const drop = {
+      def, pos, yaw: Math.atan2(aim.x - pos.x, aim.z - pos.z),
+      group: new THREE.Group(), model: null, marker: null,
+      figure: (k) => makeInfantryMesh(k === 0 ? 0x4a5340 : 0x3f4738),
+    };
+    if (def.model !== 'infantry') {
+      // The vehicle or gun is loaded now, so it is on the platform when the
+      // ramp opens rather than appearing on the ground.
+      this._attachModel({ def, group: drop.group, alive: true, drop }).catch((e) => console.warn('model load failed', e));
+    }
+    drop.marker = this._dropMarker(pos);
+    this.pending.push(drop);
+    if (!this.package) {
+      this.package = { closesAt: this.elapsed + LIFT_WINDOW, drops: [], tick: -1 };
+      this.onEvent('package', { count: 1, wait: LIFT_WINDOW, first: true });
+    } else {
+      this.onEvent('package', { count: this.package.drops.length + 1, wait: this.package.closesAt - this.elapsed, first: false });
+    }
+    this.package.drops.push(drop);
+    this.onEvent('queued', { def, count: this.package.drops.length });
+    return drop;
+  }
+
+  /** The ring on the ground where a drop is coming down. */
+  _dropMarker(pos) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(2.4, 3.1, 28),
+      new THREE.MeshBasicMaterial({ color: 0x8fd6ff, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(pos.x, pos.y + 0.25, pos.z);
+    ring.renderOrder = 3;
+    this.scene.add(ring);
+    this.pulse(pos, 0x8fd6ff, 9, true);
+    return ring;
+  }
+
+  /** The package closes: everything in it goes out on one lift. */
+  _launch() {
+    const drops = this.package.drops;
+    this.package = null;
+    // Low over the drop, unless the monument stands close enough to the
+    // run to be flown through: the tower's height is only the ceiling for a
+    // drop near the tower.
+    for (const d of drops) {
+      d.ceiling = 0;
+      for (const st of this.structures) {
+        const f = st.footprint;
+        if (!f) continue;
+        const dx = Math.max(f.x0 - d.pos.x, 0, d.pos.x - f.x1);
+        const dz = Math.max(f.z0 - d.pos.z, 0, d.pos.z - f.z1);
+        if (Math.hypot(dx, dz) < 220) d.ceiling = Math.max(d.ceiling, st.standingHeight());
+      }
+    }
+    const eta = this.air.deliver(drops, 0, (d) => this._land(d));
+    this.onEvent('lift', { count: drops.length, eta });
+  }
+
+  /** A drop is on the ground: it becomes the unit. */
+  _land(d) {
+    this.pending = this.pending.filter((x) => x !== d);
+    if (d.marker) { this.scene.remove(d.marker); d.marker = null; }
+    // The load that came down the platform is the unit's own model; it
+    // leaves the platform for the ground it landed on.
+    if (d.group.parent) d.group.removeFromParent();
+    d.group.position.set(0, 0, 0);
+    d.group.rotation.set(0, 0, 0);
+    this._spawn(d.def, d.pos, d);
+  }
+
+  /** The unit itself, on the ground, setting up. */
+  _spawn(def, pos, drop = null) {
+    const y = pos.y;
     const unit = {
       def, pos,
       health: def.health, maxHealth: def.health,
@@ -593,7 +685,7 @@ export class Battle {
       cooldown: 0,
       salvoLeft: 0,
       salvoTimer: 0,
-      group: new THREE.Group(),
+      group: drop ? drop.group : new THREE.Group(),
       onRoof: pos.onRoof,
       yaw: 0,
       kills: 0,
@@ -612,8 +704,14 @@ export class Battle {
     unit.yaw = Math.atan2(aim.x - pos.x, aim.z - pos.z);
     unit.group.rotation.y = unit.yaw;
 
-    // Model loads asynchronously; the unit is playable in the meantime.
-    this._attachModel(unit).catch((e) => console.warn('model load failed', e));
+    // Model loads asynchronously; the unit is playable in the meantime. A
+    // unit that came down the lift brought its model with it.
+    if (drop && drop.model) {
+      unit.model = drop.model;
+      unit.model.rotation.y = def.modelYaw ?? 0;
+    } else {
+      this._attachModel(unit).catch((e) => console.warn('model load failed', e));
+    }
     this.onEvent('deployed', unit);
     return unit;
   }
@@ -638,6 +736,7 @@ export class Battle {
     inst.rotation.y = def.modelYaw ?? 0;
     unit.group.add(inst);
     unit.model = inst;
+    if (unit.drop) unit.drop.model = inst;
   }
 
   removeUnit(unit) {
@@ -1362,6 +1461,15 @@ export class Battle {
   update(dt) {
     if (this.state !== 'playing') return;
     this.elapsed += dt;
+    if (this.package) {
+      const left = this.package.closesAt - this.elapsed;
+      const tick = Math.ceil(left);
+      if (tick !== this.package.tick && left > 0) {
+        this.package.tick = tick;
+        this.onEvent('packagetick', { left: tick, count: this.package.drops.length });
+      }
+      if (left <= 0) this._launch();
+    }
     this.money += this.income * dt;
 
     this._aimAge += dt;

@@ -626,11 +626,12 @@ export class TestMenu {
       // threshold the tier normally unlocks at.
       const money = b.money;
       const unlock = b.unlockAll;
-      b.unlockAll = true;
+      const lift = b.airlift;
+      b.unlockAll = true; b.airlift = false;
       b.money = Math.max(b.money, def.cost);
       b.deploy(id, p);
       b.money = money;
-      b.unlockAll = unlock;
+      b.unlockAll = unlock; b.airlift = lift;
       placed++;
     }
     return placed;
@@ -698,11 +699,11 @@ export class TestMenu {
       );
       p.y = c.terrain.heightAt(p.x, p.z);
       if (!b.validPlacement(p).ok) continue;
-      const money = b.money, unlock = b.unlockAll;
-      b.unlockAll = true;
+      const money = b.money, unlock = b.unlockAll, lift = b.airlift;
+      b.unlockAll = true; b.airlift = false;
       b.money = Math.max(b.money, UNITS_BY_ID[id].cost);
       b.deploy(id, p);
-      b.money = money; b.unlockAll = unlock;
+      b.money = money; b.unlockAll = unlock; b.airlift = lift;
       placed++;
     }
     return placed;
@@ -717,6 +718,10 @@ export class TestMenu {
       b.scene.remove(u.group);
     }
     b.units.length = 0;
+    for (const d of b.pending) if (d.marker) b.scene.remove(d.marker);
+    b.pending.length = 0;
+    b.package = null;
+    if (b.air && b.air.abortLifts) b.air.abortLifts();
   }
 
   camera(pitch, distance) {
@@ -1114,10 +1119,10 @@ export class TestMenu {
           tested++;
           if (!b.validPlacement(hit.point).ok) continue;
           const before = b.units.length;
-          const money = b.money, unlock = b.unlockAll;
-          b.unlockAll = true; b.money = 1e6;
+          const money = b.money, unlock = b.unlockAll, lift = b.airlift;
+          b.unlockAll = true; b.money = 1e6; b.airlift = false;
           b.deploy('m119', hit.point);
-          b.money = money; b.unlockAll = unlock;
+          b.money = money; b.unlockAll = unlock; b.airlift = lift;
           if (b.units.length > before) {
             const u = b.units[b.units.length - 1];
             assert(u.onRoof, 'the unit was not flagged as being on a roof');
@@ -2835,6 +2840,8 @@ export class TestMenu {
 
   /** Synchronous variant, for the headless harness. */
   runTestsSync() {
+    // The harness places a battery and expects it there: no airlift.
+    this.ctx.battle.airlift = false;
     const out = [];
     let pass = 0, fail = 0;
     for (const [name, fn] of this.tests()) {

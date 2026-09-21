@@ -110,8 +110,9 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 - `src/game/levels.js` level records · `src/structure/landmarks/` the
   masonry · `src/structure/builder.js` the block vocabulary ·
   `src/structure/structure.js` support solver, collapse, damage ·
-  `src/game/battle.js` units, targeting, impacts, win rules ·
-  `src/game/aircraft.js` air strikes · `src/game/defenders.js` the
+  `src/game/battle.js` units, targeting, impacts, win rules, the lift
+  package · `src/game/aircraft.js` air strikes and the airlift (the C-130,
+  the parachutes) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
   `src/ui/` HUD, level select, stand-off, test panel ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real

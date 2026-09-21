@@ -490,9 +490,23 @@ async function boot() {
         hud.feed(`${data.unit.def.name} SOLD  +$${data.refund}`, '');
         break;
       case 'deployed':
-        hud.feed(`${data.def.name} DEPLOYED`, 'good');
+        hud.feed(`${data.def.name} ${battle.airlift ? 'ON THE GROUND' : 'DEPLOYED'}`, 'good');
         battle.selectedUnitId = null;
         hud.hidePrompt();
+        break;
+      case 'queued':
+        hud.feed(`${data.def.name} IN THE LIFT`, 'good');
+        battle.selectedUnitId = null;
+        break;
+      case 'package':
+        if (data.first) hud.feed('LIFT PACKAGE OPEN — PLACE MORE, THEY FLY TOGETHER', '');
+        break;
+      case 'packagetick':
+        hud.showPrompt(`wheels up in ${data.left} s · ${data.count} in the lift`, '');
+        break;
+      case 'lift':
+        hud.hidePrompt();
+        hud.feed(`C-130 LIFT INBOUND · ${data.count} DROP${data.count > 1 ? 'S' : ''} · ${Math.round(data.eta)} s`, 'big');
         break;
       case 'strike':
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');

@@ -443,6 +443,7 @@ export class AirWing {
     for (const s of this.sorties) {
       s.t += dt;
       const m = s.model;
+      if (s.lift) this._updateLift(s, dt);
       // Straight and level, then a climbing turn away once past the target.
       if (s.t > s.pullUpAt) {
         s.climb = Math.min(1, s.climb + dt * 0.5);
@@ -457,7 +458,7 @@ export class AirWing {
       m.rotation.z = s.climb * 0.5;
 
       // Let go.
-      if (!s.released && s.t >= s.releaseAt) {
+      if (!s.released && s.t >= s.releaseAt && !s.lift) {
         s.released = true;
         const bomb = m.getObjectByName('bomb');
         if (bomb) bomb.visible = false;
@@ -485,14 +486,19 @@ export class AirWing {
         const d = this.camera.position.distanceTo(m.position);
         if (d < 2400) {
           this.audio.play('rocket', m.position, {
-            rate: s.def.aircraft.kind === 'lancer' ? 0.42 : 0.55, gain: 0.55, rolloff: 1400,
+            rate: s.lift ? 0.36 : s.def.aircraft.kind === 'lancer' ? 0.42 : 0.55,
+            gain: s.lift ? 0.4 : 0.55, rolloff: 1400,
           });
         }
       }
 
-      // Gone once it is well past and climbing away.
+      // Gone once it is well past and climbing away — and, for a transport,
+      // once its load is down and the canopies are gone.
       s.life = s.t - s.pullUpAt;
-      if (s.life > 14 || m.position.y > s.alt + 1600) s.done = true;
+      if (s.life > 14 || m.position.y > s.alt + 1600) {
+        if (!s.lift || (s.lift.landed && !s.lift.chutes.length)) s.done = true;
+        else if (s.life > 14) m.visible = false;
+      }
     }
     for (const s of this.sorties) {
       if (s.done) this.scene.remove(s.model);
@@ -500,5 +506,322 @@ export class AirWing {
     this.sorties = this.sorties.filter((s) => !s.done);
   }
 
+  /** The transport's own business on the run: props, the stick, the chutes. */
+  _updateLift(s, dt) {
+    const L = s.lift;
+    for (const p of s.model.children) if (p.name === 'prop') p.rotation.z += 38 * dt;
+    if (L.out < L.toGo && s.t >= s.releaseAt && s.t >= L.nextAt) this._release(s);
+    if (!L.landed && L.out > 0 && this._updateChutes(s, dt)) {
+      L.landed = true;
+      L.drop.landedAt = s.t;
+      if (L.onLand) L.onLand(L.drop);
+    } else if (!L.landed && L.out > 0) {
+      this._collapse(L, dt);
+    }
+    if (L.landed) this._collapse(L, dt);
+  }
+
   get active() { return this.sorties.length; }
 }
+
+// ─────────────────────────────────────────────────────────── the airlift ──
+
+/**
+ * C-130 Hercules. 29.8 m long, 40.4 m span, nose along +Z, ramp down.
+ *
+ * The transport the battery arrives in. Where the Eagle is a silhouette of
+ * tails and intakes, the Hercules is a fat straight tube under a straight
+ * wing with four turboprops on it and a tail that sweeps up to a tall fin —
+ * and, on a drop run, the ramp open under the tail. Built the way the other
+ * two are: lofted body, surfaces for the wing and tail, cylinders for the
+ * nacelles. The props are spun by the sortie.
+ */
+export function makeHercules() {
+  const g = new THREE.Group();
+  const grey = new THREE.MeshStandardMaterial({ color: 0x6d7378, roughness: 0.7, metalness: 0.25 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.5, metalness: 0.5 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.9 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1f2a36, roughness: 0.18, metalness: 0.8 });
+
+  // The body: radome, the flight deck stepping up to the full tube, the tube,
+  // and the upsweep to the tail where the ramp is.
+  g.add(part(loft([
+    { z: 14.9, w: 0.12, h: 0.12, y: 0.15, n: 2.0 },
+    { z: 13.7, w: 2.30, h: 2.30, y: 0.15, n: 2.2 },
+    { z: 12.0, w: 3.70, h: 3.80, y: 0.02, n: 2.6 },
+    { z: 9.8, w: 4.30, h: 4.40, n: 3.0 },
+    { z: 3.0, w: 4.30, h: 4.40, n: 3.2 },
+    { z: -4.5, w: 4.30, h: 4.40, n: 3.2 },
+    { z: -7.5, w: 4.00, h: 3.60, y: 0.55, n: 3.0 },
+    { z: -10.5, w: 3.10, h: 2.40, y: 1.45, n: 2.7 },
+    { z: -13.2, w: 1.80, h: 1.30, y: 2.25, n: 2.3 },
+    { z: -14.9, w: 0.50, h: 0.40, y: 2.60, n: 2.0 },
+  ], 14), grey, 0, 0, 0));
+  // Flight deck glazing: the wrap of windows over the nose.
+  g.add(part(new THREE.BoxGeometry(3.3, 0.7, 1.6), glass, 0, 1.25, 11.9));
+  // The open cargo hold, and the ramp down under the tail.
+  g.add(part(new THREE.BoxGeometry(3.2, 2.5, 1.2), black, 0, 0.25, -7.6));
+  const ramp = part(new THREE.BoxGeometry(3.3, 0.24, 4.4), grey, 0, -1.55, -9.6);
+  ramp.rotation.x = -0.42;
+  g.add(ramp);
+  // Main gear pods down both sides of the belly.
+  for (const s of [-1, 1]) g.add(part(new THREE.BoxGeometry(1.1, 1.3, 6.8), grey, s * 2.55, -1.55, 1.0, 0, 0, 0));
+
+  // The wing: high, straight, a little dihedral, over the middle of the tube.
+  const wing = surface({ span: 20.2, root: 4.9, tip: 2.7, sweep: 0.7, thick: 0.72, dihedral: 0.045 });
+  pair(g, wing, grey, 2.0, 1.95, 3.1);
+  g.add(part(new THREE.BoxGeometry(4.6, 0.75, 4.9), grey, 0, 1.95, 0.65));
+  // Four turboprops: nacelle forward of the leading edge, prop on the nose.
+  for (const x of [-10.6, -5.1, 5.1, 10.6]) {
+    g.add(part(loft([
+      { z: 5.0, w: 1.10, h: 1.10, n: 2.2 },
+      { z: 3.6, w: 1.55, h: 1.65, y: -0.05, n: 2.6 },
+      { z: 0.0, w: 1.55, h: 1.65, y: -0.05, n: 2.8 },
+      { z: -2.6, w: 1.05, h: 1.35, y: 0.05, n: 2.6 },
+    ], 10), grey, x, 1.35, 0));
+    const prop = new THREE.Group();
+    prop.add(part(new THREE.CylinderGeometry(0.28, 0.32, 0.6, 10).rotateX(Math.PI / 2), dark, 0, 0, 0.3));
+    for (let k = 0; k < 4; k++) {
+      const blade = part(new THREE.BoxGeometry(0.28, 2.05, 0.06), black, 0, 1.02, 0.25);
+      const holder = new THREE.Group();
+      holder.add(blade);
+      holder.rotation.z = (k / 4) * Math.PI * 2;
+      prop.add(holder);
+    }
+    // The disc a spinning prop reads as at any distance.
+    const disc = part(new THREE.CylinderGeometry(2.05, 2.05, 0.05, 20).rotateX(Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0x1c1e20, transparent: true, opacity: 0.28, depthWrite: false }), 0, 0, 0.25);
+    prop.add(disc);
+    prop.position.set(x, 1.35, 5.1);
+    prop.name = 'prop';
+    g.add(prop);
+  }
+
+  // The tail: a tall fin on the upswept tail, and the tailplane at its foot.
+  const fin = surface({ span: 7.0, root: 6.4, tip: 2.9, sweep: 3.6, thick: 0.5 });
+  const finMesh = new THREE.Mesh(fin, grey);
+  finMesh.position.set(0, 2.5, -9.9);
+  finMesh.rotation.z = Math.PI / 2;
+  finMesh.castShadow = true;
+  g.add(finMesh);
+  const tail = surface({ span: 8.0, root: 3.4, tip: 1.7, sweep: 1.3, thick: 0.42 });
+  pair(g, tail, grey, 0.5, 2.7, -11.8);
+  g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+  return g;
+}
+
+/** A parachute canopy: a dome, open below, with its rigging to the load. */
+function makeCanopy(radius, colour, loadY, loadHalf = 0.35) {
+  const g = new THREE.Group();
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.52),
+    // Lit a little from within: the underside of a canopy is what the
+    // player mostly sees, and a dome shaded only by the sun is black there.
+    new THREE.MeshStandardMaterial({ color: colour, roughness: 0.95, side: THREE.DoubleSide,
+      emissive: new THREE.Color(colour), emissiveIntensity: 0.38, transparent: true }),
+  );
+  dome.position.y = -radius * 0.12;
+  dome.castShadow = true;
+  g.add(dome);
+  // Rigging lines from the skirt to the load's corners.
+  const pts = [];
+  const rimY = dome.position.y + radius * Math.cos(Math.PI * 0.52);
+  const rimR = radius * Math.sin(Math.PI * 0.52);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    pts.push(new THREE.Vector3(Math.cos(a) * rimR, rimY, Math.sin(a) * rimR));
+    pts.push(new THREE.Vector3(Math.cos(a) * loadHalf, loadY, Math.sin(a) * loadHalf));
+  }
+  const lines = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xd8d4c8, transparent: true, opacity: 0.8 }),
+  );
+  g.add(lines);
+  g.userData.dome = dome;
+  return g;
+}
+
+/**
+ * The airlift.
+ *
+ * The battery does not appear where the player taps: it is flown in. A
+ * package of drops goes out as a formation of Hercules, one aircraft a drop,
+ * in from behind the camera the way the strike aircraft come, and each puts
+ * its load out of the ramp short of its own point. Infantry come down as a
+ * stick of men under their own canopies; a gun or a vehicle comes down on
+ * a platform under a cluster of four. The chutes steer onto the point —
+ * the player paid for that placement — and on touchdown the canopies
+ * collapse and the load becomes the unit, whose setup starts there.
+ *
+ * Nothing in the air can be hit, and nothing on the ground can hit it.
+ */
+const LIFT = { speed: 95, height: 88, clearance: 40, runIn: 720, spacing: 82, stagger: 0.9 };
+const CHUTE = { troopRate: 7.6, cargoRate: 7.0, freeFall: 1.0, open: 0.5, stick: 0.36 };
+
+AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
+  const n = drops.length;
+  let eta = 0;
+  drops.forEach((d, i) => {
+    const target = d.pos.clone();
+    const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+    const dl = Math.hypot(dx, dz) || 1;
+    const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    const alt = Math.max(target.y + LIFT.height, (d.ceiling ?? ceiling) + LIFT.clearance);
+    const model = makeHercules();
+    // Formation: each aircraft off to its own side of the camera's line and
+    // a little behind the last, then aimed through its own drop point.
+    const lateral = (i - (n - 1) / 2) * LIFT.spacing + 30;
+    const behind = LIFT.runIn + i * LIFT.stagger * LIFT.speed;
+    model.position.copy(target).addScaledVector(dir, -behind).addScaledVector(side, lateral);
+    dir.set(target.x - model.position.x, 0, target.z - model.position.z).normalize();
+    side.set(-dir.z, 0, dir.x);
+    model.rotation.y = Math.atan2(dir.x, dir.z);
+    model.position.y = alt;
+    model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
+    this.scene.add(model);
+    const runLen = Math.hypot(target.x - model.position.x, target.z - model.position.z);
+    const troops = d.def.model === 'infantry';
+    const rate = troops ? CHUTE.troopRate : CHUTE.cargoRate;
+    const fall = CHUTE.freeFall + (alt - target.y - 9.81 * CHUTE.freeFall * CHUTE.freeFall * 0.5) / rate;
+    // Out of the ramp early enough that what the stick carries forward
+    // brings it over the point: a second and a bit of the run.
+    const lead = 1.3 + (troops ? (d.def.crew - 1) * CHUTE.stick * 0.5 : 0);
+    const s = {
+      def: d.def, model, dir, side, alt, target, speed: LIFT.speed, t: 0,
+      releaseAt: runLen / LIFT.speed - lead,
+      pullUpAt: runLen / LIFT.speed + 2.5,
+      climb: 0, roar: 0, life: 0, released: true, fall, flak: 0,
+      lift: { drop: d, onLand, chutes: [], out: 0, toGo: troops ? Math.max(1, d.def.crew) : 1, nextAt: 0, rate, troops },
+    };
+    this.sorties.push(s);
+    eta = Math.max(eta, s.releaseAt + fall);
+  });
+  return eta;
+};
+
+/** Put the next load out of the ramp. */
+AirWing.prototype._release = function _release(s) {
+  const L = s.lift, d = L.drop, m = s.model;
+  const k = L.out++;
+  const g = new THREE.Group();
+  let load, canopies = [], landAt;
+  if (L.troops) {
+    // A man under a round canopy, the figure the unit will be built from.
+    load = d.figure ? d.figure(k) : new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.7, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x4a5340 }));
+    load.position.y = 0;
+    g.add(load);
+    const c = makeCanopy(3.4, 0x76835c, 1.6, 0.3);
+    c.position.y = 6.2;
+    g.add(c);
+    canopies.push(c);
+    // Where he lands: the crew's own offsets round the point.
+    landAt = d.pos.clone();
+    landAt.x += (k - 0.5) * 1.3; landAt.z += (k % 2) * 0.7;
+    if (!d.pos.onRoof && !d.pos.onDeck) landAt.y = this.terrain.heightAt(landAt.x, landAt.z);
+  } else {
+    // A platform with the load lashed to it, under four canopies.
+    const size = Math.max(4, (d.def.modelLength || 6) * 0.85);
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(size * 0.8, 0.35, size * 1.15),
+      new THREE.MeshStandardMaterial({ color: 0x4c4a44, roughness: 0.9 }));
+    platform.position.y = 0.17;
+    g.add(platform);
+    load = d.group || new THREE.Group();
+    load.position.set(0, 0.35, 0);
+    load.rotation.y = d.yaw || 0;
+    g.add(load);
+    const R = 5.6;
+    for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const c = makeCanopy(R, 0xd9d3c2, -8.5 + 0.35, size * 0.4);
+      c.position.set(ox * 3.3, 9.6, oz * 3.6);
+      g.add(c);
+      canopies.push(c);
+    }
+    landAt = d.pos.clone();
+  }
+  for (const c of canopies) c.scale.setScalar(0.12);
+  g.position.copy(m.position);
+  g.position.y -= 2.2;
+  g.position.addScaledVector(s.dir, -9);
+  g.rotation.y = m.rotation.y;
+  this.scene.add(g);
+  L.chutes.push({
+    g, load, canopies, landAt, landY: landAt.y,
+    vel: new THREE.Vector3(s.dir.x * s.speed * 0.9, -1.5, s.dir.z * s.speed * 0.9),
+    t: 0, phase: 'free', sway: Math.random() * Math.PI * 2, rate: L.rate,
+  });
+  L.nextAt = s.t + CHUTE.stick;
+};
+
+/** Fly the chutes down. Returns true when this sortie's load is all on the ground. */
+AirWing.prototype._updateChutes = function _updateChutes(s, dt) {
+  const L = s.lift;
+  let landed = 0;
+  for (const c of L.chutes) {
+    c.t += dt;
+    if (c.phase === 'landed') { landed++; continue; }
+    if (c.phase === 'free' && c.t > CHUTE.freeFall) c.phase = 'open';
+    const p = c.g.position;
+    if (c.phase === 'free') {
+      c.vel.y -= 9.81 * dt;
+      c.vel.x -= c.vel.x * 0.9 * dt; c.vel.z -= c.vel.z * 0.9 * dt;
+    } else {
+      // The canopy fills, the fall is caught, the forward speed bleeds off,
+      // and from there it steers onto the point: whatever is left to cover,
+      // over the time left to cover it in.
+      const open = Math.min(1, (c.t - CHUTE.freeFall) / CHUTE.open);
+      for (const k of c.canopies) k.scale.setScalar(0.12 + 0.88 * open);
+      const want = -c.rate;
+      c.vel.y += (want - c.vel.y) * Math.min(1, dt * 4.5);
+      const left = Math.max(0.6, (p.y - c.landY) / c.rate);
+      const sx = (c.landAt.x - p.x) / left, sz = (c.landAt.z - p.z) / left;
+      const cap = 14;
+      const sm = Math.hypot(sx, sz);
+      const k = sm > cap ? cap / sm : 1;
+      c.vel.x += (sx * k - c.vel.x) * Math.min(1, dt * 2.2);
+      c.vel.z += (sz * k - c.vel.z) * Math.min(1, dt * 2.2);
+      // A little swing under the canopy.
+      const sw = Math.sin(c.t * 1.7 + c.sway) * 0.08 * open;
+      c.g.rotation.x = sw; c.g.rotation.z = Math.cos(c.t * 1.3 + c.sway) * 0.06 * open;
+    }
+    p.addScaledVector(c.vel, dt);
+    if (p.y <= c.landY) {
+      p.y = c.landY;
+      c.phase = 'landed';
+      c.g.rotation.set(0, c.g.rotation.y, 0);
+      c.landedAt = c.t;
+      landed++;
+      if (this.fx && this.quality.name !== 'low') this.fx.impactDust(p.x, p.y, p.z, L.troops ? 0.4 : 1.6);
+    }
+  }
+  return landed === L.toGo && L.out === L.toGo;
+};
+
+/** Let the canopies fall over the load and take them away. */
+AirWing.prototype._collapse = function _collapse(L, dt) {
+  let live = 0;
+  for (const c of L.chutes) {
+    if (c.phase !== 'landed') { live++; continue; }
+    const k = Math.min(1, (c.t - c.landedAt) / 1.0);
+    for (const cn of c.canopies) {
+      cn.scale.set(1 + k * 0.45, Math.max(0.03, 1 - k * 1.3), 1 + k * 0.45);
+      cn.position.y *= (1 - Math.min(1, dt * 4.0));
+      if (cn.userData.dome) cn.userData.dome.material.opacity = 1 - k * 0.6;
+    }
+    if (k >= 1) { this.scene.remove(c.g); c.gone = true; } else live++;
+  }
+  L.chutes = L.chutes.filter((c) => !c.gone);
+  return live;
+};
+
+/** Everything in the air, brought down and forgotten: the harness resets. */
+AirWing.prototype.abortLifts = function abortLifts() {
+  for (const s of this.sorties) {
+    if (!s.lift) continue;
+    for (const c of s.lift.chutes) this.scene.remove(c.g);
+    this.scene.remove(s.model);
+    s.done = true;
+  }
+  this.sorties = this.sorties.filter((s) => !s.done);
+};
