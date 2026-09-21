@@ -125,7 +125,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   const sorties = Object.values(progress).reduce((a, r) => a + (r.runs || 0), 0);
   const strip = state.list.map((t) => {
     const cls = t.down ? 'done' : (t === state.next ? 'next' : (t.open ? 'open' : 'locked'));
-    return `<span class="wm-seg ${cls}" data-level="${t.id}" title="${t.city}">0${t.no}</span>`;
+    return `<span class="wm-seg ${cls}" data-level="${t.id}" title="${t.city}">${String(t.no).padStart(2, '0')}</span>`;
   }).join('');
   root.innerHTML = `
     <div class="wm-inner">
@@ -246,7 +246,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       box: el('rect', { class: 'wm-hit', rx: 4 }),
       text: el('text', { class: 'wm-city' }),
     };
-    parts.text.textContent = `0${t.no} ${t.city}`;
+    parts.text.textContent = `${String(t.no).padStart(2, '0')} ${t.city}`;
     g.append(parts.lead, parts.halo, parts.dot, parts.hit, parts.box, parts.text);
     pinG.appendChild(g);
     return { t, g, ...parts };
@@ -277,8 +277,25 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
 
   const layout = () => {
     cam.setAttribute('transform', `translate(${view.tx.toFixed(2)} ${view.ty.toFixed(2)}) scale(${view.k.toFixed(5)})`);
-    for (const p of pins) {
-      const px = sx(x(p.t.lon)), py = sy(y(p.t.lat));
+    // Fitted to the screen, fourteen contracts' names do not fit over Europe
+    // whatever the collision pass does with them. Until the map is zoomed in
+    // or the contract is picked, a sealed one shows its number and nothing
+    // else; the open and closed ones keep their names, which are the ones a
+    // player is looking for.
+    // "Crowded" is measured on screen, not read off the zoom: the nearest
+    // other pin within ninety pixels.
+    const at = pins.map((p) => [sx(x(p.t.lon)), sy(y(p.t.lat))]);
+    for (let i = 0; i < pins.length; i++) {
+      const p = pins[i];
+      let near = Infinity;
+      for (let j = 0; j < pins.length; j++) {
+        if (j !== i) near = Math.min(near, Math.hypot(at[i][0] - at[j][0], at[i][1] - at[j][1]));
+      }
+      const num = String(p.t.no).padStart(2, '0');
+      const terse = near < 90 && !p.t.open && !p.t.down && !p.g.classList.contains('sel');
+      const want = terse ? num : `${num} ${p.t.city}`;
+      if (p.text.textContent !== want) p.text.textContent = want;
+      const [px, py] = at[i];
       // The label is pushed off its pin, and then pulled back on if the push
       // has run it over the edge. Measured rather than estimated: working out
       // where the end of "01 LONDON" is from its character count was wrong by a
@@ -438,7 +455,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     panel.innerHTML = `
       <div class="wm-doss ${status}">
         <div class="wm-doss-top">
-          <div class="wm-doss-no">CONTRACT 0${t.no} <span class="wm-doss-file">· ${t.iso} · ${t.city}</span></div>
+          <div class="wm-doss-no">CONTRACT ${String(t.no).padStart(2, '0')} <span class="wm-doss-file">· ${t.iso} · ${t.city}</span></div>
           <div class="wm-stamp">${stamp}</div>
         </div>
         <div class="wm-doss-grid">
@@ -491,6 +508,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     for (const p of lands.querySelectorAll('.wm-target')) {
       p.classList.toggle('sel', p.getAttribute('data-iso') === t.iso);
     }
+    layout();
     show(t);
     if (move) {
       glideTo(x(t.lon), y(t.lat), Math.max(view.k, kFit * 2.4));

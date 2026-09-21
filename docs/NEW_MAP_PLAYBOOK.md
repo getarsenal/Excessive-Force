@@ -26,7 +26,7 @@ them has its entry, and is the first thing to run when a level is "done":
 | `src/game/campaign.js` | The contract in `THEATRES`: number, ISO code, city, lon/lat, title, brief, what closing it releases. **Without this the level is not on the campaign map and cannot be reached in order.** |
 | `src/world/flags.js` | `FLAG_SITES[id]`: where the flag flies, and a `PATTERNS` function for the nation if it is a new one. |
 | `src/game/cast.js` | `CAST.<nation>`, `DEFENDER_OF[id]`, `STANDOFF[id]`: the defending officer and the three-line stand-off. |
-| `public/assets/characters/<nation>-<rank>.png` | The officer's cutout, RGBA, roughly 1024×1536, and a line in `manifest.json`. |
+| `public/assets/characters/<nation>-<rank>.png` | The officer's cutout, RGBA, roughly 1024×1536, and a line in `manifest.json`. Wire the file name before the art exists; `mapcheck` notes a missing portrait rather than failing on it. |
 | `public/assets/recon/<id>.jpg` | The dossier photograph on the campaign map, rendered by `node tools/recon.mjs <id>`. |
 | `docs/SCRIPTS.md` | The stand-off lines by country, for the writer. |
 | `src/ui/levelselect.js`, `src/ui/worldmap.js` | Nothing. Both read the records. |
@@ -260,6 +260,16 @@ that way.)
   and the ring test at 170 m, so the ground has to be level out to about
   250 m in the direction the guns come from. Offset the pad — a ridge rather
   than a cone — and the rim can still be close on the side the camera looks.
+- **A sea is one polygon and the land is its holes.** Overture draws the
+  Arabian Sea as a single feature with five hundred and ninety-five interior
+  rings and the Persian Gulf with thirteen hundred, and every ring is a
+  piece of coast. Burning exterior rings alone put the whole of Dubai under
+  the Gulf — origin wet, six hundred and ten of six hundred and ten
+  buildings in the water, which is the flipped-mask signature with nothing
+  flipped. `collect_polys` now clips every part to the square and hands the
+  rasteriser its holes to clear. Any new coastal bake whose self-check
+  reports the origin under water: look at the water polygons' interiors
+  before anything else.
 - **A map with no water has no flood line.** The builders keep buildings a
   freeboard above `waterLevel`, and on a map whose water is all off the edge
   (Pisa: the Arno is a kilometre south) that level is the bake's sea level,
@@ -699,6 +709,25 @@ run is green (poll `actions/runs?branch=main&per_page=1` for the commit's
 has been renamed twice and pushes to the current name work.
 
 ---
+
+### Several maps at once
+
+The third five were built in parallel, one landmark per worktree, and the
+shape of that is worth keeping. The skeleton first, in the main checkout:
+bakes, level records with one placeholder block each, contracts, cast,
+scripts, flags, manifest slots — everything in the file table except the
+masonry — committed and pushed to the branch, not to `main`. Then a
+worktree per map (`git worktree add /home/user/wt-<id> -b wt/<id>`, with
+`node_modules` symlinked from the main checkout), each with its own dev
+server on its own port, and every tool told about it: `TT_PORT=<port>` and
+`OUT=/tmp/out-<id>`. The builder edits its own module and, if it must, its
+own level record, and nothing else, so the five branches merge without a
+conflict. The garrison lives in the landmark module as
+`populate<Name>(g, origin, groundY)` for the same reason — five people
+adding methods to `defenders.js` at once would not merge. The box has cores
+for three browsers in total, so each builder runs one at a time and none
+while its own suite is up. `docs/THIRD_FIVE.md` is the brief that was
+handed over, and is the model for the next batch.
 
 ## 8. The request, and what it turns into
 

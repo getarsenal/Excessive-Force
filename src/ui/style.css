@@ -995,7 +995,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 }
 .wm-sub { font-size: 10px; letter-spacing: 0.26em; color: #e06c34; margin-top: 4px; }
 .wm-ledger { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.wm-strip { display: flex; gap: 4px; }
+.wm-strip { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(14 * 34px); }
 .wm-seg {
   width: 30px; height: 22px; display: grid; place-items: center;
   font-size: 9px; letter-spacing: 0.08em; font-weight: 700;
@@ -1248,6 +1248,10 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .wm-free.on .wm-sw::after { left: 14px; background: #e06c34; }
 
 @media (max-width: 620px) {
+  /* Fourteen lamps do not fit a phone in one row; two rows of seven do. */
+  .wm-strip { max-width: calc(7 * 34px); justify-content: center; }
+  .wm-ledger { align-items: center; }
+
   .wm-inner { gap: 9px; }
   .wm-stage { height: clamp(300px, 42vh, 460px); }
   .wm-doss-brief { font-size: 12.5px; }
