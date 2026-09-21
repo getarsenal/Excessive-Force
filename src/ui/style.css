@@ -409,6 +409,18 @@ html, body {
   #unit-card { width: 160px; }
 }
 
+/* ── Status line ─────────────────────────────────────────────────────── */
+#status {
+  /* The row under the rail, so it never sits on the rail's buttons. */
+  position: absolute; left: 50%; transform: translateX(-50%);
+  top: calc(var(--hud-top) + 30px);
+  font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--dim); background: rgba(10, 13, 17, 0.45); padding: 3px 10px;
+  pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 15;
+  max-width: 70vw; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#status.on { opacity: 1; }
+
 /* ── Prompt ──────────────────────────────────────────────────────────── */
 #prompt {
   /* Clear above the smoke button rather than level with it, and allowed to

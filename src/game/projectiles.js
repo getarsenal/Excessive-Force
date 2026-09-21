@@ -124,7 +124,15 @@ export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5,
  * never drift apart: a solution computed against one set of numbers and flown
  * against another is precisely the bug this pair of constants exists to stop.
  */
-export const ROCKET_BOOST = { time: 0.85, accel: 95 };
+// A second and a half of motor at forty metres a second squared: sixty
+// metres a second added after the rail, so the rocket leaves slow and is
+// visibly still gathering speed a hundred metres out, which is what a rocket
+// looks like and a shell does not. The total is the ceiling on how steep a
+// shot can be: the minimum-energy speed at a kilometre is about a hundred,
+// and whatever the motor adds is speed the rail cannot have. Ninety-odd
+// left nothing on the rail for any lofted shot under thirteen hundred
+// metres, and the launchers held fire at the ranges they exist for.
+export const ROCKET_BOOST = { time: 1.5, accel: 40 };
 
 /** The slowest a rocket can usefully leave the rail. Below this it is a prop. */
 const MIN_LAUNCH = 18;
@@ -177,25 +185,59 @@ function flyBoosted(from, vel, gravity, targetY) {
  * told so and holds its fire, which is what a real battery does with a target
  * inside its minimum range.
  */
-export function solveBoosted(from, to, maxSpeed, gravity, maxFlight = 9.0) {
+export function solveBoosted(from, to, maxSpeed, gravity, maxFlight = 9.0, clear = null) {
   const dv = ROCKET_BOOST.accel * ROCKET_BOOST.time;
-  const aim = { x: to.x, y: to.y, z: to.z };
-  let out = null;
-  for (let pass = 0; pass < 4; pass++) {
-    const sol = solveBallistic(from, aim, maxSpeed, gravity, maxFlight);
-    if (!sol) return null;
-    const speed = Math.hypot(sol.vel.x, sol.vel.y, sol.vel.z);
-    const launch = speed - dv;
-    if (launch < MIN_LAUNCH) return null;          // inside minimum range
-    const vel = sol.vel.clone().multiplyScalar(launch / speed);
-    const land = flyBoosted(from, vel, gravity, to.y);
-    if (!land) return null;
-    out = vel;
-    const ex = land.x - to.x, ez = land.z - to.z;
-    if (Math.hypot(ex, ez) < 2) break;
-    aim.x -= ex; aim.z -= ez;
+  const dx = to.x - from.x, dz = to.z - from.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 1) return null;
+  const ux = dx / d, uz = dz / d;
+  const hi = maxSpeed - dv;
+  if (hi <= MIN_LAUNCH) return null;
+  // The launch, at an elevation and a speed.
+  const vel = (v, th) => new THREE.Vector3(ux * Math.cos(th) * v, Math.sin(th) * v, uz * Math.cos(th) * v);
+  // Where the boosted rocket comes down, as a distance along the line.
+  const reach = (v, th) => {
+    const land = flyBoosted(from, vel(v, th), gravity, to.y);
+    if (land) return { d: (land.x - from.x) * ux + (land.z - from.z) * uz, t: land.t };
+    // No landing: either the rocket never climbed to the target's height —
+    // too slow, count it as short — or it was still up after forty seconds
+    // — too fast, count it as long. Both are the same bisection told which
+    // way to go. (Judging by the boosted speed, not the launch speed.)
+    const vy = Math.sin(th) * (v + dv);
+    const apex = from.y + (vy * vy) / (2 * gravity);
+    return { d: apex < to.y ? -Infinity : Infinity, t: Infinity };
+  };
+  // For a given elevation the range grows with the launch speed, so the speed
+  // that lands on the point is a bisection. The elevations are tried from the
+  // flattest up: the first that has the point inside its window is the
+  // quickest rocket that can be laid on it. The old walk-back — take the
+  // flat ballistic solution, fly it boosted, move the aim by the overshoot —
+  // moved the aim to inside minimum range on any shot the flat solution
+  // overshot by more than the range, which was every shot past eight
+  // hundred metres, and the launchers held fire at the very ranges they
+  // exist for.
+  // Flattest first; the steep ones are for when something is in the way, and
+  // `clear` is the caller's terrain-and-masonry test on the boosted flight.
+  const angles = [0.07, 0.12, 0.2, 0.3, 0.42, 0.56, 0.72, 0.88, 1.02, 1.12];
+  for (const th of angles) {
+    const lo = reach(MIN_LAUNCH, th), up = reach(hi, th);
+    if (lo.d > d + 2) continue;          // even the slowest launch overshoots at this elevation
+    if (up.d < d - 2) continue;          // out of range at this elevation
+    let a = MIN_LAUNCH, b = hi;
+    for (let k = 0; k < 22; k++) {
+      const m = (a + b) / 2;
+      const r = reach(m, th);
+      if (r.d < d) a = m; else b = m;
+    }
+    const v = (a + b) / 2;
+    const r = reach(v, th);
+    if (Math.abs(r.d - d) > 4) continue;
+    if (r.t > maxFlight * 1.6) continue;
+    const out = vel(v, th);
+    if (clear && !clear(vel(v + dv, th))) continue;
+    return out;
   }
-  return out;
+  return null;
 }
 
 /** Flat-ish direct fire: aim straight, with a small lead for the drop. */
@@ -427,3 +469,6 @@ export class ProjectileManager {
 
   get inFlight() { return this.list.length; }
 }
+
+// For the harness and a console session: the rocket solve, to hand.
+if (typeof window !== 'undefined') Object.assign(window, { __solveBoosted: solveBoosted, __flyBoosted: flyBoosted, __ROCKET_BOOST: ROCKET_BOOST });

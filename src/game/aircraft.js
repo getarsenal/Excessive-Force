@@ -651,7 +651,7 @@ function makeCanopy(radius, colour, loadY, loadHalf = 0.35) {
  *
  * Nothing in the air can be hit, and nothing on the ground can hit it.
  */
-const LIFT = { speed: 95, height: 88, clearance: 40, runIn: 720, spacing: 82, stagger: 0.9, perAircraft: 6, cluster: 150 };
+const LIFT = { speed: 95, height: 112, clearance: 45, runIn: 720, spacing: 82, stagger: 0.9, perAircraft: 6, cluster: 150 };
 const CHUTE = { troopRate: 7.6, cargoRate: 7.0, freeFall: 1.0, open: 0.5, stick: 0.36 };
 
 /**
@@ -678,7 +678,10 @@ function loadAircraft(drops) {
   return groups;
 }
 
-AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
+AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlong = null) {
+  // What stands under a line across the map: the monument, the town. The
+  // battle answers it; the aircraft fly over it.
+  this.ceilingAlong = ceilingAlong || (() => -Infinity);
   // The towed guns come under Chinooks; everything else goes out of a
   // Hercules.
   const guns = drops.filter((d) => d.def.tier === 'GUN');
@@ -697,8 +700,6 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
     const dl = Math.hypot(dx, dz) || 1;
     const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const ceil = group.reduce((a, d) => Math.max(a, d.ceiling ?? ceiling), 0);
-    const alt = Math.max(target.y + LIFT.height, ceil + LIFT.clearance);
     const model = makeHercules();
     // Formation: each aircraft off to its own side of the camera's line and
     // a little behind the last, then aimed through its own group.
@@ -708,6 +709,13 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
     dir.set(target.x - model.position.x, 0, target.z - model.position.z).normalize();
     side.set(-dir.z, 0, dir.x);
     model.rotation.y = Math.atan2(dir.x, dir.z);
+    // High enough for the whole run, and the stretch past it: the Hercules
+    // flew through the Great Pyramid because the drop was clear of it and
+    // the run was not.
+    const ex = target.x + dir.x * 700, ez = target.z + dir.z * 700;
+    const ceil = Math.max(group.reduce((a, d) => Math.max(a, d.ceiling ?? ceiling), 0),
+      this.ceilingAlong(model.position.x, model.position.z, ex, ez));
+    const alt = Math.max(target.y + LIFT.height, ceil + LIFT.clearance);
     model.position.y = alt;
     model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
@@ -719,14 +727,18 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
       const troops = d.def.model === 'infantry';
       const rate = troops ? CHUTE.troopRate : CHUTE.cargoRate;
       const along = (d.pos.x - target.x) * dir.x + (d.pos.z - target.z) * dir.z;
-      const lead = 1.3 + (troops ? (d.def.crew - 1) * CHUTE.stick * 0.5 : 0);
+      const lead = troops ? 1.0 : 1.3;
       const fall = CHUTE.freeFall + (alt - d.pos.y - 9.81 * CHUTE.freeFall * CHUTE.freeFall * 0.5) / rate;
       return { drop: d, releaseAt: overAt + along / LIFT.speed - lead, troops, rate, fall,
         chutes: [], out: 0, toGo: troops ? Math.max(1, d.def.crew) : 1, nextAt: 0, landed: false };
     }).sort((a, b) => a.releaseAt - b.releaseAt);
-    for (let k = 1; k < loads.length; k++) {
-      const gap = loads[k - 1].releaseAt + loads[k - 1].toGo * CHUTE.stick + 0.3;
-      if (loads[k].releaseAt < gap) loads[k].releaseAt = gap;
+    // Spaced a stick apart — by bringing the earlier loads forward, never by
+    // holding the later ones past their point. A man let go a hundred metres
+    // past his drop zone has to fly the whole way back under the canopy, and
+    // that is where the sticks that landed far from the ring came from.
+    for (let k = loads.length - 2; k >= 0; k--) {
+      const gap = loads[k + 1].releaseAt - 0.45;
+      if (loads[k].releaseAt > gap) loads[k].releaseAt = gap;
     }
     const last = loads[loads.length - 1];
     const s = {
@@ -747,6 +759,16 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
 
 /** Put the next load out of the ramp. */
 AirWing.prototype._release = function _release(s, L) {
+  if (L.troops) {
+    // The team goes out together, side by side off the ramp, so both men
+    // come down on the same point at the same time.
+    while (L.out < L.toGo) this._releaseOne(s, L);
+    return;
+  }
+  this._releaseOne(s, L);
+};
+
+AirWing.prototype._releaseOne = function _releaseOne(s, L) {
   const d = L.drop, m = s.model;
   const k = L.out++;
   const g = new THREE.Group();
@@ -774,7 +796,10 @@ AirWing.prototype._release = function _release(s, L) {
     g.add(platform);
     load = d.group || new THREE.Group();
     load.position.set(0, 0.35, 0);
-    load.rotation.y = d.yaw || 0;
+    // Facing the way it will stand: the platform turns with the aircraft's
+    // heading, so the load's own turn is the difference, or a Paladin came
+    // down backwards and swung round on landing.
+    load.rotation.y = (d.yaw || 0) - m.rotation.y;
     g.add(load);
     const R = size > 8 ? 6.2 : 5.6;
     const spots = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
@@ -798,6 +823,7 @@ AirWing.prototype._release = function _release(s, L) {
   g.position.copy(m.position);
   g.position.y -= 2.2;
   g.position.addScaledVector(s.dir, -9);
+  if (L.troops) g.position.addScaledVector(s.side, (k - (L.toGo - 1) / 2) * 2.6);
   g.rotation.y = m.rotation.y;
   this.scene.add(g);
   L.chutes.push({
@@ -818,7 +844,7 @@ AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
     const p = c.g.position;
     if (c.phase === 'free') {
       c.vel.y -= 9.81 * dt;
-      c.vel.x -= c.vel.x * 0.9 * dt; c.vel.z -= c.vel.z * 0.9 * dt;
+      c.vel.x -= c.vel.x * 1.4 * dt; c.vel.z -= c.vel.z * 1.4 * dt;
     } else {
       // The canopy fills, the fall is caught, the forward speed bleeds off,
       // and from there it steers onto the point: whatever is left to cover,
@@ -828,13 +854,18 @@ AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
       if (c.g.userData.drogue) c.g.userData.drogue.scale.setScalar(Math.max(0.01, 1 - open));
       const want = -c.rate;
       c.vel.y += (want - c.vel.y) * Math.min(1, dt * 4.5);
-      const left = Math.max(0.6, (p.y - c.landY) / c.rate);
+      c.vel.x -= c.vel.x * 1.6 * dt; c.vel.z -= c.vel.z * 1.6 * dt;
+      // Onto the point: what is left to cover over the time left to cover
+      // it, a little ahead of that so the last metres are not a dash, and
+      // with enough reach that the last man out of a full stick still gets
+      // there. The player paid for the placement.
+      const left = Math.max(0.5, (p.y - c.landY) / c.rate * 0.85);
       const sx = (c.landAt.x - p.x) / left, sz = (c.landAt.z - p.z) / left;
-      const cap = 14;
+      const cap = 21;
       const sm = Math.hypot(sx, sz);
       const k = sm > cap ? cap / sm : 1;
-      c.vel.x += (sx * k - c.vel.x) * Math.min(1, dt * 2.2);
-      c.vel.z += (sz * k - c.vel.z) * Math.min(1, dt * 2.2);
+      c.vel.x += (sx * k - c.vel.x) * Math.min(1, dt * 3.2);
+      c.vel.z += (sz * k - c.vel.z) * Math.min(1, dt * 3.2);
       // A little swing under the canopy.
       const sw = Math.sin(c.t * 1.7 + c.sway) * 0.08 * open;
       c.g.rotation.x = sw; c.g.rotation.z = Math.cos(c.t * 1.3 + c.sway) * 0.06 * open;
@@ -901,6 +932,13 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
     const turning = past < 7.5;
     wantBank = turning ? 0.36 : 0;
     wantPitch = 0.085;
+    // Whatever stands ahead on the way out, climb over it.
+    s.lookAhead = (s.lookAhead || 0) - dt;
+    if (s.lookAhead <= 0) {
+      s.lookAhead = 0.4;
+      s.needAlt = this.ceilingAlong(m.position.x, m.position.z, m.position.x + s.dir.x * 520, m.position.z + s.dir.z * 520) + LIFT.clearance;
+    }
+    if (s.needAlt > m.position.y) wantPitch = THREE.MathUtils.clamp((s.needAlt - m.position.y) / 45, 0.085, 0.34);
     if (turning) {
       const rate = 0.16 * s.bank / 0.36;
       const a = rate * dt * s.turnDir;
@@ -1018,7 +1056,8 @@ AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formatio
     model.position.copy(target).addScaledVector(dir, -behind).addScaledVector(side, lateral);
     dir.set(target.x - model.position.x, 0, target.z - model.position.z).normalize();
     model.rotation.y = Math.atan2(dir.x, dir.z);
-    const cruise = Math.max(target.y + HELI.height, (d.ceiling ?? 0) + 24);
+    const cruise = Math.max(target.y + HELI.height, (d.ceiling ?? 0) + 24,
+      this.ceilingAlong(model.position.x, model.position.z, target.x, target.z) + 24);
     model.position.y = cruise;
     this.scene.add(model);
     // The load, on its sling.
@@ -1034,7 +1073,7 @@ AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formatio
     const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
       new THREE.LineBasicMaterial({ color: 0x3a3a38 }));
     sling.add(lines);
-    sling.rotation.y = d.yaw || 0;
+    sling.rotation.y = model.rotation.y;
     this.scene.add(sling);
     const dist0 = Math.hypot(target.x - model.position.x, target.z - model.position.z);
     const s = {
@@ -1066,9 +1105,17 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
     const ux = dist > 0.01 ? dx / dist : s.dir.x, uz = dist > 0.01 ? dz / dist : s.dir.z;
     H.vel.x += (ux * want - H.vel.x) * Math.min(1, dt * 1.6);
     H.vel.z += (uz * want - H.vel.z) * Math.min(1, dt * 1.6);
-    // Down from cruise to the hover height over the last stretch.
+    // Down from cruise to the hover height over the last stretch — but not
+    // through whatever stands between here and there.
     const k = THREE.MathUtils.clamp((dist - 30) / 260, 0, 1);
     wantAlt = gy + HELI.hover + (H.cruise - gy - HELI.hover) * k;
+    H.look = (H.look || 0) - dt;
+    if (H.look <= 0) {
+      H.look = 0.4;
+      const reach = Math.min(dist, 220);
+      H.need = this.ceilingAlong(m.position.x, m.position.z, m.position.x + ux0(H) * reach, m.position.z + uz0(H) * reach) + 22;
+    }
+    if (dist > 45 && H.need > wantAlt) wantAlt = H.need;
     if (dist < 1.2 && speedBefore < 1.8) { H.phase = 'hover'; H.hold = 0; }
   } else if (H.phase === 'hover') {
     H.vel.multiplyScalar(Math.max(0, 1 - dt * 3));
@@ -1097,7 +1144,14 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
     if (H.hold > 1.3) { H.phase = 'away'; s.pullUpAt = s.t; s.turnDir = 1; }
   } else if (H.phase === 'away') {
     const past = s.t - s.pullUpAt;
-    const want = Math.min(HELI.speed, 4 + past * 6);
+    // Up first, then away: the climb-out has to clear the town it is in.
+    H.look = (H.look || 0) - dt;
+    if (H.look <= 0) {
+      H.look = 0.4;
+      H.need = this.ceilingAlong(m.position.x, m.position.z, m.position.x + s.dir.x * 360, m.position.z + s.dir.z * 360) + 26;
+    }
+    const clear = m.position.y >= H.need - 4;
+    const want = clear ? Math.min(HELI.speed, 4 + past * 6) : Math.min(8, 2 + past * 2);
     if (past > 3 && past < 11) {
       const a = 0.14 * dt * s.turnDir;
       const x = s.dir.x * Math.cos(a) - s.dir.z * Math.sin(a);
@@ -1106,13 +1160,14 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
     }
     H.vel.x += (s.dir.x * want - H.vel.x) * Math.min(1, dt * 1.2);
     H.vel.z += (s.dir.z * want - H.vel.z) * Math.min(1, dt * 1.2);
-    wantAlt = m.position.y + Math.min(6, 1.5 + past * 0.8) * dt;
+    wantAlt = m.position.y + (clear ? Math.min(6, 1.5 + past * 0.8) : 9) * dt;
     s.life = past;
   }
 
   m.position.x += H.vel.x * dt;
   m.position.z += H.vel.z * dt;
-  m.position.y += (wantAlt - m.position.y) * Math.min(1, dt * 2.4);
+  if (H.phase === 'away' || H.phase === 'lower') m.position.y = wantAlt;
+  else m.position.y += (wantAlt - m.position.y) * Math.min(1, dt * 2.4);
   // Attitude: nose down to accelerate, up to slow, a little roll into a turn,
   // and the heading follows the motion once there is any.
   const speed = Math.hypot(H.vel.x, H.vel.z);
@@ -1128,6 +1183,8 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
   if (!H.released) {
     m.updateMatrixWorld(true);
     const hook = this._v.set(0, -1.5, -0.5).applyMatrix4(m.matrixWorld);
+    // The gun hangs along the line of flight, barrel forward.
+    H.sling.rotation.y = H.yaw;
     H.sling.position.set(hook.x - H.vel.x * 0.09, hook.y - HELI.sling, hook.z - H.vel.z * 0.09);
     H.sling.rotation.z = THREE.MathUtils.clamp(H.vel.x * 0.006, -0.25, 0.25);
     H.sling.rotation.x = THREE.MathUtils.clamp(-H.vel.z * 0.006, -0.25, 0.25);
@@ -1139,3 +1196,6 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
   }
   if (H.phase === 'away' && s.life > 26) s.done = true;
 };
+
+function ux0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.x / l : Math.sin(H.yaw); }
+function uz0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.z / l : Math.cos(H.yaw); }

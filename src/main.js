@@ -430,8 +430,8 @@ async function boot() {
     onSelect: (id) => {
       battle.selectUnit(id);
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike) hud.showPrompt(`${TAP} the target to call the strike`);
-      else hud.showPrompt(`${TAP} the ground to deploy`);
+      else if (UNITS_BY_ID[id].strike) hud.status(`${TAP} the target to call the strike`, 4);
+      else hud.status(`${TAP} the ground to deploy`, 4);
     },
     onClearTarget: () => battle.clearTarget(),
     // Through `goToLevel` rather than a bare reload: the level is no longer in
@@ -502,7 +502,7 @@ async function boot() {
         if (data.first) hud.feed('LIFT PACKAGE OPEN — PLACE MORE, THEY FLY TOGETHER', '');
         break;
       case 'packagetick':
-        hud.showPrompt(`wheels up in ${data.left} s · ${data.count} in the lift`, '');
+        hud.status(`lift · ${data.count} unit${data.count > 1 ? 's' : ''} · wheels up in ${data.left} s`, 1.6);
         break;
       case 'lift':
         hud.hidePrompt();
@@ -511,6 +511,7 @@ async function boot() {
           if (data.hercs) parts.push(`${data.hercs}× C-130`);
           if (data.helis) parts.push(`${data.helis}× CHINOOK`);
           hud.feed(`${parts.join(' + ') || 'LIFT'} INBOUND · ${data.count} UNIT${data.count > 1 ? 'S' : ''} · ${Math.round(data.eta)} s`, 'big');
+          hud.status(`${parts.join(' + ') || 'lift'} inbound · ${Math.round(data.eta)} s`, 5);
         }
         break;
       case 'strike':
@@ -814,14 +815,14 @@ async function boot() {
     if (n >= 1 && n <= 11) {
       const id = [...hud.cards.keys()][n - 1];
       if (id && battle.selectUnit(id)) {
-        hud.showPrompt(UNITS_BY_ID[id].strike
-          ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`);
+        hud.status(UNITS_BY_ID[id].strike
+          ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
       }
     }
   });
 
   const firstPrompt = () => {
-    hud.showPrompt(`${TAP} the tower to designate a target`);
+    hud.status(`${TAP} the tower to designate a target`, 4);
     setTimeout(() => hud.hidePrompt(), 5200);
   };
   const uiEl = document.getElementById('ui');

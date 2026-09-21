@@ -361,6 +361,23 @@ export class HUD {
     this.el.buildbar.appendChild(frag);
   }
 
+  /**
+   * The quiet line under the readouts: what the lift is doing, what a tap
+   * would do. Not the prompt band over the middle of the map, which is for
+   * the things that need answering.
+   */
+  status(text, life = 3.5) {
+    if (!this.el.status) {
+      const el = document.createElement('div');
+      el.id = 'status';
+      document.getElementById('ui').appendChild(el);
+      this.el.status = el;
+    }
+    this.el.status.textContent = text;
+    this.el.status.classList.add('on');
+    this._statusTimer = life;
+  }
+
   showPrompt(text, kind = '') {
     this.el.prompt.textContent = text;
     this.el.prompt.className = kind;
@@ -388,6 +405,10 @@ export class HUD {
   update(dt) {
     const b = this.battle;
 
+    if (this._statusTimer > 0) {
+      this._statusTimer -= dt;
+      if (this._statusTimer <= 0 && this.el.status) this.el.status.classList.remove('on');
+    }
     if (this._promptTimer > 0) {
       this._promptTimer -= dt;
       if (this._promptTimer <= 0) this.hidePrompt();

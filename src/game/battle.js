@@ -660,8 +660,54 @@ export class Battle {
         if (Math.hypot(dx, dz) < 220) d.ceiling = Math.max(d.ceiling, st.standingHeight());
       }
     }
-    const eta = this.air.deliver(drops, 0, (d) => this._land(d));
+    const eta = this.air.deliver(drops, 0, (d) => this._land(d),
+      (ax, az, bx, bz) => this.ceilingAlong(ax, az, bx, bz));
     this.onEvent('lift', { count: drops.length, eta, ...(this.air.lastLift || {}) });
+  }
+
+  /**
+   * The highest thing standing under a line across the map: the monument's
+   * standing height where the line passes near its footprint, the town's
+   * roofs where it passes over them. The aircraft fly above it.
+   */
+  ceilingAlong(ax, az, bx, bz) {
+    let top = -Infinity;
+    const dx = bx - ax, dz = bz - az;
+    const L2 = dx * dx + dz * dz || 1;
+    const distTo = (x, z) => {
+      const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / L2, 0, 1);
+      return Math.hypot(ax + dx * t - x, az + dz * t - z);
+    };
+    for (const st of this.structures) {
+      const f = st.footprint;
+      if (!f) continue;
+      const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
+      const r = Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2 + 70;
+      if (distTo(cx, cz) < r) top = Math.max(top, st.standingHeight());
+    }
+    const cf = this.cityFire;
+    if (cf && cf.plots.length) {
+      const len = Math.sqrt(L2);
+      const steps = Math.max(1, Math.ceil(len / cf.CELL));
+      const seen = new Set();
+      for (let i = 0; i <= steps; i++) {
+        const x = ax + dx * (i / steps), z = az + dz * (i / steps);
+        const cx = Math.floor(x / cf.CELL), cz = Math.floor(z / cf.CELL);
+        for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+          const b = cf.grid.get((cx + ox) * 8192 + (cz + oz));
+          if (!b) continue;
+          for (const k of b) {
+            if (seen.has(k)) continue;
+            seen.add(k);
+            const p = cf.plots[k];
+            const t = p.top ?? (p.base + p.h);
+            if (t <= top) continue;
+            if (distTo(p.x, p.z) < Math.hypot(p.w, p.d) / 2 + 30) top = t;
+          }
+        }
+      }
+    }
+    return top;
   }
 
   /** A drop is on the ground: it becomes the unit. */
@@ -962,7 +1008,7 @@ export class Battle {
         // The minimum-energy solver picks the charge a real crew would.
         const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0,
           (v) => this._trajectoryClear(from, v, p.gravity));
-        if (!lofted && !low) return false;
+        if (!lofted && !low) { unit.hold = 'no clear arc'; return false; }
         vel = lofted ? lofted.vel : low;
       }
     } else if (p.kind === 'rocket') {
@@ -977,19 +1023,19 @@ export class Battle {
       // clearance is tested against the speed the rocket will actually be
       // doing once the motor has finished with it, not the speed it leaves
       // the rail at, or every shot reads as blocked by the ground in front.
-      vel = solveBoosted(from, aim, p.speed, p.gravity, 9.0);
-      if (vel) {
-        const flown = vel.clone().setLength(vel.length() + ROCKET_BOOST.accel * ROCKET_BOOST.time);
-        if (!this._trajectoryClear(from, flown, p.gravity)) {
-          // Up and over, on the longer time of flight an arcing rocket takes.
-          vel = solveBoosted(from, aim, p.speed, p.gravity, 20.0) || vel;
-        }
-      }
-      if (!vel) return false;
+      // Every elevation from the flattest up, each tested for clearance on
+      // the flight the motor actually gives it: the first that is clear and
+      // lands is the quickest rocket that can be laid on the point. Past
+      // the flight budget if it has to be; blind if there is nothing else.
+      const clear = (v) => this._trajectoryClear(from, v, p.gravity);
+      vel = solveBoosted(from, aim, p.speed, p.gravity, 9.0, clear)
+        || solveBoosted(from, aim, p.speed, p.gravity, 20.0, clear)
+        || solveBoosted(from, aim, p.speed, p.gravity, 20.0);
+      if (!vel) { unit.hold = 'inside minimum range'; return false; }
     } else if (p.kind === 'arc') {
       const sol = solveBallistic(from, aim, p.speed, p.gravity, 9.0,
         (v) => this._trajectoryClear(from, v, p.gravity));
-      if (!sol) return false; // genuinely out of range
+      if (!sol) { unit.hold = 'out of range'; return false; }
       vel = sol.vel;
     } else if (p.kind === 'topattack') {
       vel = new THREE.Vector3(0, p.speed, 0);
@@ -1014,9 +1060,10 @@ export class Battle {
           { x: vel.x / len, y: vel.y / len, z: vel.z / len },
           2.6, null, this.physics.cityBody,
         );
-        if (blocked) return false;
+        if (blocked) { unit.hold = 'muzzle blocked'; return false; }
       }
     }
+    unit.hold = null;
 
     this.projectiles.fire({
       pos: from, vel, gravity: p.gravity, kind: p.kind, speed: p.speed,
@@ -1025,6 +1072,14 @@ export class Battle {
 
     const dir = vel.clone().normalize();
     this.fx.muzzleFlash(from, dir, def.warhead.fx);
+    if (p.kind === 'rocket') {
+      // A rocket leaves a launcher, not a barrel: the blast goes out of the
+      // back, and the round itself only starts to move.
+      const back = dir.clone().negate();
+      this.fx.muzzleFlash(from.clone().addScaledVector(back, 2.2), back, def.warhead.fx * 1.1);
+      this.fx.impactDust(from.x + back.x * 6, from.y - 1.2, from.z + back.z * 6, 1.6);
+      this.fx.impactDust(from.x + back.x * 3, from.y - 1.2, from.z + back.z * 3, 1.0);
+    }
     if (this.audio) {
       const p = def.projectile;
       const heavy = def.warhead.fx;
