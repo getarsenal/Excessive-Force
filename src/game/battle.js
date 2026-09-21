@@ -661,15 +661,15 @@ export class Battle {
       }
     }
     const eta = this.air.deliver(drops, 0, (d) => this._land(d));
-    this.onEvent('lift', { count: drops.length, eta });
+    this.onEvent('lift', { count: drops.length, eta, ...(this.air.lastLift || {}) });
   }
 
   /** A drop is on the ground: it becomes the unit. */
   _land(d) {
     this.pending = this.pending.filter((x) => x !== d);
     if (d.marker) { this.scene.remove(d.marker); d.marker = null; }
-    // The load that came down the platform is the unit's own model; it
-    // leaves the platform for the ground it landed on.
+    // The load that came down the platform or the sling is the unit's own
+    // model; it leaves them for the ground it landed on.
     if (d.group.parent) d.group.removeFromParent();
     d.group.position.set(0, 0, 0);
     d.group.rotation.set(0, 0, 0);

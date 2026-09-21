@@ -506,7 +506,12 @@ async function boot() {
         break;
       case 'lift':
         hud.hidePrompt();
-        hud.feed(`C-130 LIFT INBOUND · ${data.count} DROP${data.count > 1 ? 'S' : ''} · ${Math.round(data.eta)} s`, 'big');
+        {
+          const parts = [];
+          if (data.hercs) parts.push(`${data.hercs}× C-130`);
+          if (data.helis) parts.push(`${data.helis}× CHINOOK`);
+          hud.feed(`${parts.join(' + ') || 'LIFT'} INBOUND · ${data.count} UNIT${data.count > 1 ? 'S' : ''} · ${Math.round(data.eta)} s`, 'big');
+        }
         break;
       case 'strike':
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');

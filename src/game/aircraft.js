@@ -445,6 +445,8 @@ export class AirWing {
       const m = s.model;
       if (s.lift) {
         this._updateLift(s, dt);
+      } else if (s.heli) {
+        this._updateHeli(s, dt);
       } else {
         // Straight and level, then a climbing turn away once past the target.
         if (s.t > s.pullUpAt) {
@@ -461,7 +463,7 @@ export class AirWing {
       }
 
       // Let go.
-      if (!s.released && s.t >= s.releaseAt && !s.lift) {
+      if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli) {
         s.released = true;
         const bomb = m.getObjectByName('bomb');
         if (bomb) bomb.visible = false;
@@ -489,22 +491,27 @@ export class AirWing {
         const d = this.camera.position.distanceTo(m.position);
         if (d < 2400) {
           this.audio.play('rocket', m.position, {
-            rate: s.lift ? 0.36 : s.def.aircraft.kind === 'lancer' ? 0.42 : 0.55,
-            gain: s.lift ? 0.4 : 0.55, rolloff: 1400,
+            rate: s.heli ? 0.3 : s.lift ? 0.36 : s.def.aircraft.kind === 'lancer' ? 0.42 : 0.55,
+            gain: s.heli ? 0.42 : s.lift ? 0.4 : 0.55, rolloff: s.heli ? 900 : 1400,
           });
         }
       }
 
       // Gone once it is well past and climbing away — and, for a transport,
       // once its loads are down and the canopies are gone.
-      if (!s.lift) s.life = s.t - s.pullUpAt;
+      if (!s.lift && !s.heli) s.life = s.t - s.pullUpAt;
       if (s.lift) {
         if (s.life > 22 && s.lift.allDown) s.done = true;
         else if (s.life > 30) m.visible = false;
+      } else if (s.heli) {
+        // Ends itself.
       } else if (s.life > 14 || m.position.y > s.alt + 1600) s.done = true;
     }
     for (const s of this.sorties) {
-      if (s.done) this.scene.remove(s.model);
+      if (s.done) {
+        this.scene.remove(s.model);
+        if (s.heli) this.scene.remove(s.heli.sling);
+      }
     }
     this.sorties = this.sorties.filter((s) => !s.done);
   }
@@ -672,9 +679,14 @@ function loadAircraft(drops) {
 }
 
 AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
-  const groups = loadAircraft(drops);
+  // The towed guns come under Chinooks; everything else goes out of a
+  // Hercules.
+  const guns = drops.filter((d) => d.def.tier === 'GUN');
+  const rest = drops.filter((d) => d.def.tier !== 'GUN');
+  const groups = loadAircraft(rest);
   const n = groups.length;
-  let eta = 0;
+  let eta = guns.length ? this._deliverHelis(guns, onLand, n) : 0;
+  this.lastLift = { hercs: n, helis: guns.length };
   groups.forEach((group, i) => {
     // The run goes through the middle of the group, in from behind the camera.
     const target = new THREE.Vector3(
@@ -764,13 +776,22 @@ AirWing.prototype._release = function _release(s, L) {
     load.position.set(0, 0.35, 0);
     load.rotation.y = d.yaw || 0;
     g.add(load);
-    const R = 5.6;
-    for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const R = size > 8 ? 6.2 : 5.6;
+    const spots = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+    if (size > 8) spots.push([0, 0]);
+    for (const [ox, oz] of spots) {
       const c = makeCanopy(R, 0xd9d3c2, -8.5 + 0.35, size * 0.4);
-      c.position.set(ox * 3.3, 9.6, oz * 3.6);
+      c.position.set(ox * 3.4, 9.6 + (ox === 0 && oz === 0 ? 2.2 : 0), oz * 3.8);
       g.add(c);
       canopies.push(c);
     }
+    // The extraction chute that pulled the platform out of the ramp,
+    // streaming behind it until the mains take over.
+    const drogue = makeCanopy(2.3, 0xc9c2ae, 0, 0.3);
+    drogue.rotation.x = Math.PI / 2;
+    drogue.position.set(0, 1.6, -size * 0.9);
+    g.add(drogue);
+    g.userData.drogue = drogue;
     landAt = d.pos.clone();
   }
   for (const c of canopies) c.scale.setScalar(0.12);
@@ -804,6 +825,7 @@ AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
       // over the time left to cover it in.
       const open = Math.min(1, (c.t - CHUTE.freeFall) / CHUTE.open);
       for (const k of c.canopies) k.scale.setScalar(0.12 + 0.88 * open);
+      if (c.g.userData.drogue) c.g.userData.drogue.scale.setScalar(Math.max(0.01, 1 - open));
       const want = -c.rate;
       c.vel.y += (want - c.vel.y) * Math.min(1, dt * 4.5);
       const left = Math.max(0.6, (p.y - c.landY) / c.rate);
@@ -902,10 +924,218 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
 /** Everything in the air, brought down and forgotten: the harness resets. */
 AirWing.prototype.abortLifts = function abortLifts() {
   for (const s of this.sorties) {
-    if (!s.lift) continue;
-    for (const L of s.lift.loads) for (const c of L.chutes) this.scene.remove(c.g);
+    if (!s.lift && !s.heli) continue;
+    if (s.lift) for (const L of s.lift.loads) for (const c of L.chutes) this.scene.remove(c.g);
+    if (s.heli) this.scene.remove(s.heli.sling);
     this.scene.remove(s.model);
     s.done = true;
   }
   this.sorties = this.sorties.filter((s) => !s.done);
+};
+
+// ─────────────────────────────────────────────────────────── the Chinook ──
+
+/**
+ * CH-47 Chinook. 15.5 m fuselage, two 18.3 m rotors, nose along +Z.
+ *
+ * The towed guns come in under one. A Chinook is a box with a rotor at each
+ * end — the tall rear pylon and the short front one are the whole
+ * silhouette — and sponsons down the sides where the fuel is. The rotors
+ * turn opposite ways, as they do, and the sortie spins them.
+ */
+export function makeChinook() {
+  const g = new THREE.Group();
+  const olive = new THREE.MeshStandardMaterial({ color: 0x4a5443, roughness: 0.78, metalness: 0.2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.55, metalness: 0.45 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1f2a36, roughness: 0.18, metalness: 0.8 });
+
+  g.add(part(loft([
+    { z: 7.7, w: 0.6, h: 0.6, y: 0.1, n: 2.6 },
+    { z: 6.7, w: 2.7, h: 2.4, y: 0.05, n: 3.0 },
+    { z: 5.3, w: 3.7, h: 2.9, n: 3.6 },
+    { z: -5.4, w: 3.7, h: 2.9, n: 3.7 },
+    { z: -7.0, w: 3.3, h: 2.6, y: 0.25, n: 3.4 },
+    { z: -7.8, w: 2.6, h: 1.4, y: 0.75, n: 3.0 },
+  ], 12), olive, 0, 0, 0));
+  g.add(part(new THREE.BoxGeometry(3.0, 0.9, 1.4), glass, 0, 0.85, 6.3));
+  // Sponsons.
+  for (const s of [-1, 1]) g.add(part(new THREE.BoxGeometry(0.95, 1.0, 9.4), olive, s * 2.25, -0.95, -0.6));
+  // Pylons: the short one over the cockpit, the tall one at the tail.
+  g.add(part(new THREE.BoxGeometry(1.7, 1.1, 2.8), olive, 0, 1.95, 4.4));
+  g.add(part(loft([
+    { z: -4.4, w: 2.4, h: 0.4, y: 1.6, n: 3.5 },
+    { z: -5.6, w: 2.4, h: 2.8, y: 2.8, n: 3.6 },
+    { z: -7.4, w: 2.2, h: 3.4, y: 3.2, n: 3.4 },
+    { z: -8.2, w: 1.4, h: 2.4, y: 3.6, n: 3.0 },
+  ], 10), olive, 0, 0, 0));
+  // Rotors: three blades and the disc they read as, at each end.
+  const rotor = (y, z, name) => {
+    const r = new THREE.Group();
+    r.add(part(new THREE.CylinderGeometry(0.45, 0.5, 0.5, 10), dark, 0, 0, 0));
+    for (let k = 0; k < 3; k++) {
+      const holder = new THREE.Group();
+      holder.add(part(new THREE.BoxGeometry(9.0, 0.08, 0.55), dark, 4.6, 0.1, 0));
+      holder.rotation.y = (k / 3) * Math.PI * 2;
+      r.add(holder);
+    }
+    r.add(part(new THREE.CylinderGeometry(9.15, 9.15, 0.04, 26),
+      new THREE.MeshBasicMaterial({ color: 0x1c1e20, transparent: true, opacity: 0.2, depthWrite: false }), 0, 0.1, 0));
+    r.position.set(0, y, z);
+    r.name = name;
+    g.add(r);
+  };
+  rotor(2.75, 4.4, 'rotorA');
+  rotor(5.0, -6.6, 'rotorB');
+  // Gear.
+  for (const [x, z] of [[-1.6, 5.4], [1.6, 5.4], [-1.9, -4.6], [1.9, -4.6]]) {
+    g.add(part(new THREE.BoxGeometry(0.3, 0.9, 0.3), dark, x, -1.85, z));
+    g.add(part(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 10).rotateZ(Math.PI / 2), dark, x, -2.3, z));
+  }
+  g.traverse((m) => { if (m.isMesh) m.frustumCulled = false; m.castShadow = true; });
+  return g;
+}
+
+const HELI = { speed: 56, height: 62, runIn: 640, hover: 17, sling: 11.5, lower: 1.7, spacing: 70, stagger: 1.6 };
+
+/**
+ * Send the towed guns in under Chinooks: one gun a helicopter, in trail.
+ * The gun hangs on a sling under the hook, its model already on it. The
+ * helicopter comes in fast, flares and slows over the last two hundred
+ * metres, settles into a hover over the point, lowers until the gun is on
+ * the ground, lets go, and climbs away.
+ */
+AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formationIndex = 0) {
+  let eta = 0;
+  drops.forEach((d, i) => {
+    const target = d.pos.clone();
+    const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+    const dl = Math.hypot(dx, dz) || 1;
+    const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    const model = makeChinook();
+    const lateral = -40 - (i + formationIndex) * 26;
+    const behind = HELI.runIn + i * HELI.stagger * HELI.speed;
+    model.position.copy(target).addScaledVector(dir, -behind).addScaledVector(side, lateral);
+    dir.set(target.x - model.position.x, 0, target.z - model.position.z).normalize();
+    model.rotation.y = Math.atan2(dir.x, dir.z);
+    const cruise = Math.max(target.y + HELI.height, (d.ceiling ?? 0) + 24);
+    model.position.y = cruise;
+    this.scene.add(model);
+    // The load, on its sling.
+    const sling = new THREE.Group();
+    const load = d.group || new THREE.Group();
+    load.position.set(0, 0, 0);
+    load.rotation.y = 0;
+    sling.add(load);
+    const pts = [];
+    for (const [ox, oz] of [[-1.4, -1.6], [1.4, -1.6], [-1.4, 1.6], [1.4, 1.6]]) {
+      pts.push(new THREE.Vector3(0, HELI.sling, 0), new THREE.Vector3(ox, 1.4, oz));
+    }
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x3a3a38 }));
+    sling.add(lines);
+    sling.rotation.y = d.yaw || 0;
+    this.scene.add(sling);
+    const dist0 = Math.hypot(target.x - model.position.x, target.z - model.position.z);
+    const s = {
+      def: d.def, model, dir, side, alt: cruise, target, speed: HELI.speed, t: 0, roar: 0, life: 0,
+      released: true, flak: 0, bank: 0, pitch: 0, turnDir: 1,
+      heli: { drop: d, onLand, sling, lines, phase: 'approach', hold: 0, wash: 0, cruise, vel: new THREE.Vector3(dir.x * HELI.speed, 0, dir.z * HELI.speed), yaw: model.rotation.y },
+    };
+    this.sorties.push(s);
+    // Roughly: the run at speed less the slow-down, a hover, the lowering.
+    eta = Math.max(eta, dist0 / HELI.speed + 6 + (HELI.hover - HELI.sling) / HELI.lower + 3);
+  });
+  return eta;
+};
+
+AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
+  const H = s.heli, m = s.model, d = H.drop;
+  const ra = m.getObjectByName('rotorA'), rb = m.getObjectByName('rotorB');
+  if (ra) ra.rotation.y += 22 * dt;
+  if (rb) rb.rotation.y -= 22 * dt;
+  const tx = s.target.x, tz = s.target.z, gy = s.target.y;
+  const dx = tx - m.position.x, dz = tz - m.position.z;
+  const dist = Math.hypot(dx, dz);
+  let wantAlt = m.position.y;
+  let speedBefore = Math.hypot(H.vel.x, H.vel.z);
+
+  if (H.phase === 'approach') {
+    // Slow to arrive: the speed it should have for the distance left.
+    const want = Math.min(HELI.speed, Math.max(1.5, dist / 3.6));
+    const ux = dist > 0.01 ? dx / dist : s.dir.x, uz = dist > 0.01 ? dz / dist : s.dir.z;
+    H.vel.x += (ux * want - H.vel.x) * Math.min(1, dt * 1.6);
+    H.vel.z += (uz * want - H.vel.z) * Math.min(1, dt * 1.6);
+    // Down from cruise to the hover height over the last stretch.
+    const k = THREE.MathUtils.clamp((dist - 30) / 260, 0, 1);
+    wantAlt = gy + HELI.hover + (H.cruise - gy - HELI.hover) * k;
+    if (dist < 1.2 && speedBefore < 1.8) { H.phase = 'hover'; H.hold = 0; }
+  } else if (H.phase === 'hover') {
+    H.vel.multiplyScalar(Math.max(0, 1 - dt * 3));
+    wantAlt = gy + HELI.hover;
+    H.hold += dt;
+    if (H.hold > 0.9) { H.phase = 'lower'; }
+  } else if (H.phase === 'lower') {
+    H.vel.set(0, 0, 0);
+    // Until the load is on the ground: the hook is a metre and a half under
+    // the belly, the sling below that, the load's own base at its origin.
+    // Stepped directly, not eased: eased toward a target a step away it
+    // crept down at a fraction of the rate and never arrived.
+    m.position.y -= HELI.lower * dt;
+    wantAlt = m.position.y;
+    if (m.position.y - 1.5 - HELI.sling <= gy) {
+      m.position.y = wantAlt = gy + 1.5 + HELI.sling;
+      H.phase = 'hold'; H.hold = 0;
+      // Let go: the load is the unit now.
+      H.sling.remove(H.lines);
+      if (H.onLand) H.onLand(d);
+      H.released = true;
+    }
+  } else if (H.phase === 'hold') {
+    H.hold += dt;
+    wantAlt = m.position.y;
+    if (H.hold > 1.3) { H.phase = 'away'; s.pullUpAt = s.t; s.turnDir = 1; }
+  } else if (H.phase === 'away') {
+    const past = s.t - s.pullUpAt;
+    const want = Math.min(HELI.speed, 4 + past * 6);
+    if (past > 3 && past < 11) {
+      const a = 0.14 * dt * s.turnDir;
+      const x = s.dir.x * Math.cos(a) - s.dir.z * Math.sin(a);
+      const z = s.dir.x * Math.sin(a) + s.dir.z * Math.cos(a);
+      s.dir.set(x, 0, z);
+    }
+    H.vel.x += (s.dir.x * want - H.vel.x) * Math.min(1, dt * 1.2);
+    H.vel.z += (s.dir.z * want - H.vel.z) * Math.min(1, dt * 1.2);
+    wantAlt = m.position.y + Math.min(6, 1.5 + past * 0.8) * dt;
+    s.life = past;
+  }
+
+  m.position.x += H.vel.x * dt;
+  m.position.z += H.vel.z * dt;
+  m.position.y += (wantAlt - m.position.y) * Math.min(1, dt * 2.4);
+  // Attitude: nose down to accelerate, up to slow, a little roll into a turn,
+  // and the heading follows the motion once there is any.
+  const speed = Math.hypot(H.vel.x, H.vel.z);
+  const accel = (speed - speedBefore) / Math.max(dt, 1e-3);
+  const wantPitch = THREE.MathUtils.clamp(-accel * 0.03 - speed * 0.0025, -0.2, 0.2);
+  s.pitch += (wantPitch - s.pitch) * Math.min(1, dt * 2.0);
+  if (speed > 2) H.yaw = Math.atan2(H.vel.x, H.vel.z);
+  const wantBank = H.phase === 'away' && s.life > 3 && s.life < 11 ? 0.22 : 0;
+  s.bank += (wantBank - s.bank) * Math.min(1, dt * 1.4);
+  m.rotation.set(s.pitch, H.yaw, s.turnDir * s.bank, 'YXZ');
+
+  // The load, hanging from the hook, trailing the motion a little.
+  if (!H.released) {
+    m.updateMatrixWorld(true);
+    const hook = this._v.set(0, -1.5, -0.5).applyMatrix4(m.matrixWorld);
+    H.sling.position.set(hook.x - H.vel.x * 0.09, hook.y - HELI.sling, hook.z - H.vel.z * 0.09);
+    H.sling.rotation.z = THREE.MathUtils.clamp(H.vel.x * 0.006, -0.25, 0.25);
+    H.sling.rotation.x = THREE.MathUtils.clamp(-H.vel.z * 0.006, -0.25, 0.25);
+  }
+  // Rotor wash on the ground under a low hover.
+  if (this.fx && this.quality.name !== 'low' && m.position.y - gy < 32 && dist < 40) {
+    H.wash -= dt;
+    if (H.wash <= 0) { H.wash = 0.22; this.fx.impactDust(tx + (Math.random() - 0.5) * 8, gy, tz + (Math.random() - 0.5) * 8, 0.45); }
+  }
+  if (H.phase === 'away' && s.life > 26) s.done = true;
 };
