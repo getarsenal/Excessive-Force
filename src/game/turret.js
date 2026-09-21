@@ -3,7 +3,7 @@ import { solveArc } from './projectiles.js';
 
 /**
  * A coastal gun turret: the twin 305 mm mounting at the Forte de Copacabana,
- * dug into the summit beside the statue.
+ * on its own bench below the summit, behind the statue.
  *
  * It is the one thing on the map that shoots *back* with real weight. The
  * garrison's mortars harass a battery; this puts two shells the size of a man
@@ -57,12 +57,13 @@ export class CoastalTurret {
 
     const gy = terrain.heightAt(x, z);
     this.pos = new THREE.Vector3(x, gy, z);
-    // Dug in. The dome's centre is half a radius under the apron, so what
-    // shows is the cap — the photograph is a low steel hump on a paved
-    // platform with the guns coming out of its face at knee height, not a
-    // globe standing on a drum.
-    this.domeCentre = new THREE.Vector3(x, gy - 0.5 * this.R, z);
-    this.trunnionY = 0.85 * this.R;         // above the dome centre: just over the apron
+    // On a barbette. The dome's centre sits a little under the apron, so
+    // what shows is most of the sphere — a steel turret standing in its
+    // concrete ring, the way the Copacabana mounting does — and the guns
+    // come out of its face at chest height. It was sunk half a radius once,
+    // and read from the summit as a hump the ground had swallowed.
+    this.domeCentre = new THREE.Vector3(x, gy - 0.12 * this.R, z);
+    this.trunnionY = 0.55 * this.R;         // above the dome centre: chest height over the apron
     this.pitchTarget = 0.25;
     this.pitch = 0.25;
 
@@ -83,10 +84,10 @@ export class CoastalTurret {
 
     // The apron: a flush concrete platform, flagged with the yellow lines the
     // photograph has, cracked and patched.
-    // Poured on the platform's edge: three metres deep, so where the ring falls
-    // away to the slope the apron shows a concrete face rather than hovering.
-    const apron = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.9, R * 2.0, 3.2, 24), concrete);
-    apron.position.y = 0.3 - 1.6;
+    // Poured on a bench cut into the mountain: four metres deep, so where the
+    // bench falls away the apron shows a concrete face rather than hovering.
+    const apron = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.9, R * 2.0, 4.4, 24), concrete);
+    apron.position.y = 0.3 - 2.2;
     g.add(apron);
     const ring = new THREE.Mesh(new THREE.RingGeometry(R * 1.22, R * 1.32, 40), paint);
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.32;
@@ -125,19 +126,24 @@ export class CoastalTurret {
     const seam = new THREE.Mesh(new THREE.TorusGeometry(R * 0.86, 0.09, 6, 40), dark);
     seam.rotation.x = Math.PI / 2; seam.position.y = R * 0.5;
     turret.add(seam);
-    // The collar the dome turns in, flush with the apron.
+    // The collar the dome turns in, standing on the apron.
     const collar = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.06, R * 1.06, 0.35, 32), dark);
-    collar.position.y = 0.5 * R + 0.35;
+    collar.position.y = 0.12 * R + 0.3 + 0.175;
     turret.add(collar);
 
-    // Two guns, on a common trunnion just over the apron, coming out of the
-    // dome's face.
+    // Two guns, on a common trunnion inside the dome, coming out of its face.
+    // The tube starts *behind* the trunnion, inside the sphere, so however
+    // far the guns are elevated the steel leaves the dome through the dome
+    // — begun on the surface, at full elevation the breech end rose clear of
+    // the cap and the barrels hung in the air over it. Where the tube passes
+    // through the plate it wears a sleeve long enough to cover the exit at
+    // every elevation from level to seventy degrees.
     const trunnion = new THREE.Group();
     trunnion.position.set(0, this.trunnionY, 0);
     turret.add(trunnion);
     this.trunnion = trunnion;
     this.barrels = [];
-    const root = R * 0.42;                  // where the tube leaves the dome
+    const root = -R * 0.2;                  // the breech end, inside the dome
     for (const sgn of [-1, 1]) {
       const b = new THREE.Group();
       b.position.x = sgn * R * 0.30;
@@ -148,9 +154,9 @@ export class CoastalTurret {
       tube.position.z = root + this.barrelL / 2;
       b.add(tube);
       const shroud = new THREE.Mesh(
-        new THREE.CylinderGeometry(this.barrelR * 1.7, this.barrelR * 1.9, 2.2 * this.scale, 14), steel);
+        new THREE.CylinderGeometry(this.barrelR * 1.7, this.barrelR * 1.9, R * 0.62, 14), steel);
       shroud.rotation.x = Math.PI / 2;
-      shroud.position.z = root + 1.1 * this.scale;
+      shroud.position.z = R * 0.66;
       b.add(shroud);
       const muzzle = new THREE.Mesh(
         new THREE.CylinderGeometry(this.barrelR * 1.1, this.barrelR * 1.1, 0.6 * this.scale, 14), dark);
@@ -180,7 +186,11 @@ export class CoastalTurret {
       for (let row = 0; row < 2; row++) {
         const rr = bagR + (row === 1 ? 0.15 : 0);
         const m = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.42, 0.55), bag);
-        m.position.set(Math.cos(a + row * 0.035) * rr, 0.5 + 0.21 + row * 0.4, Math.sin(a + row * 0.035) * rr);
+        const bx = Math.cos(a + row * 0.035) * rr, bz = Math.sin(a + row * 0.035) * rr;
+        // On the ground, whatever the ground does: the bench the mounting
+        // stands on wanders a metre or two across the ring.
+        const by = Math.max(0.3, terrain.heightAt(x + bx, z + bz) - gy);
+        m.position.set(bx, by + 0.21 + row * 0.4, bz);
         m.rotation.y = -a + Math.PI / 2 + (rnd() - 0.5) * 0.15;
         m.rotation.z = (rnd() - 0.5) * 0.08;
         g.add(m);

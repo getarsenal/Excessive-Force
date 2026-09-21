@@ -362,7 +362,7 @@ async function boot() {
   const turret = level.turret
     ? new CoastalTurret({ scene: engine.scene, physics, terrain, fx, audio,
       x: origin.x + level.turret.x, z: origin.z + level.turret.z, yaw: level.turret.yaw ?? 0,
-      scale: level.turret.scale })
+      scale: level.turret.scale, minRange: level.turret.minRange })
     : null;
   const battle = new Battle({
     scene: engine.scene, camera: engine.camera, engine, physics, terrain,
