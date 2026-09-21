@@ -394,6 +394,11 @@ export class AirWing {
     const drop = alt - target.y;
     const rel = solveRelease(drop, a.speed, p.gravity, p.drag || 0);
     const model = def.aircraft.kind === 'lancer' ? makeLancer() : makeEagle();
+    // Yaw first, then pitch about the aircraft's own lateral axis, then roll
+    // about its nose. In the default order the pitch is about the world's x
+    // axis, which is nose-up flying north, a roll flying east and nose-down
+    // flying south — the jets climbing away with their noses on the ground.
+    model.rotation.order = 'YXZ';
     // The start is pushed off the camera's line; the run is then re-aimed
     // from there straight through the target, so the bomb still lands on
     // it and the aircraft crosses it at a slight angle to the view.
@@ -1177,7 +1182,9 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
   if (speed > 2) H.yaw = Math.atan2(H.vel.x, H.vel.z);
   const wantBank = H.phase === 'away' && s.life > 3 && s.life < 11 ? 0.22 : 0;
   s.bank += (wantBank - s.bank) * Math.min(1, dt * 1.4);
-  m.rotation.set(s.pitch, H.yaw, s.turnDir * s.bank, 'YXZ');
+  // Nose down to go, up to stop: in YXZ a positive x is nose down, and the
+  // pitch here is positive when the helicopter is slowing.
+  m.rotation.set(-s.pitch, H.yaw, s.turnDir * s.bank, 'YXZ');
 
   // The load, hanging from the hook, trailing the motion a little.
   if (!H.released) {
