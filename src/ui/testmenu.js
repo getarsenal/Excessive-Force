@@ -1152,11 +1152,20 @@ export class TestMenu {
           pt.y = t.heightAt(pt.x, pt.z);
           assert(!b.validPlacement(pt).ok, 'a gun may be placed inside a building');
         }
-        const good = new THREE.Vector3(o.x + 150, 0, o.z + 150);
-        good.y = t.heightAt(good.x, good.z);
-        if (!t.isWater(good.x, good.z)) {
-          assert(b.validPlacement(good).ok, 'open ground 210 m out was rejected');
+        // Open ground two hundred and ten metres out, on some bearing. One
+        // fixed point to the south-east held for eleven maps by geography and
+        // then landed in Cologne's old town; what the rule has to accept is
+        // open dry ground at battery range, wherever the town leaves some.
+        let accepted = false, tried = 0;
+        for (let k = 0; k < 16 && !accepted; k++) {
+          const a = (k / 16) * Math.PI * 2 + 0.4;
+          const good = new THREE.Vector3(o.x + Math.sin(a) * 212, 0, o.z + Math.cos(a) * 212);
+          good.y = t.heightAt(good.x, good.z);
+          if (t.isWater(good.x, good.z)) continue;
+          tried++;
+          if (b.validPlacement(good).ok) accepted = true;
         }
+        assert(accepted || tried === 0, 'open ground 210 m out was rejected on every bearing');
         return 'inside the target, inside a building, off-map and water all rejected';
       }],
 

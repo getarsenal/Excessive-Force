@@ -244,6 +244,13 @@ that way.)
   across, which at z14 is twelve DEM pixels, most of which the smoothing
   hands to the harbour — the point is simply not there. Corcovado at z14 is
   a hill with its top rounded off.
+- **`groundLevel: 'bake'` on a hilltop.** The game levels its own pad under
+  each structure group at load, to the median of a ring round the footprint
+  (`terrain.levelPad`). Round a two-hundred-metre building on the Acropolis
+  that ring runs down the slopes on every side, and the median dug the
+  plateau down twenty-eight metres. A level whose bake already cut the
+  ground says so in its record, and the pad is levelled to the origin's
+  height instead. Athens and Himeji set it; any summit map should.
 - **`peak` is a landform and a level design at once.** A real summit at
   DEM resolution is a hill with its top rounded off, and a statue on it has
   nowhere for a gun to stand. `cut_peak` carves the summit to a level
@@ -253,6 +260,11 @@ that way.)
   the level puts on the mountain — the Rio turret is on `shelves[0]` — is
   placed by reading those numbers, not by guessing; probe
   `terrain.heightAt` around the ring before choosing the spot.
+- **A battery under a cliff lofts.** The trajectory check used to skip its
+  first sample as "the muzzle's own ground", which on a slope is a fifth of a
+  low arc's flight: the suite's guns under the Acropolis fired half their
+  rounds into the rock face with the check looking away. It skips eight
+  metres from the gun now, measured, and the solver takes the high arc.
 - **The guns have to have somewhere to stand.** This is the constraint that
   decides the shape of a summit. A howitzer below a rise puts its shell into
   the rise: on the Corcovado cut to its true platform, ten rounds went out
@@ -313,8 +325,38 @@ opening is masonry never laid). Materials in `MATERIALS`; the structural
 ones carry load, `GLASS`/`GILT`/`RAILING` carry only themselves.
 
 Block size comes from the quality tier. Fewer, bigger stones on a phone;
-the builders take `quality` and derive `stone` from it. Two rules that
+the builders take `quality` and derive `stone` from it. The rules that
 bit us:
+
+- **Set `B.joint = JOINT / scale` in a builder that scales.** The block
+  list lays every stone with a 3 cm joint and scales it with the building,
+  and the solver's contact tolerance is 7.5 cm: at two and a half times
+  life every course joint sits exactly on the tolerance and stands or falls
+  on floating-point noise — the Himeji keep's first storey came apart at one
+  tier and held at another on nothing else. The property keeps the joint
+  3 cm in the world. The nine before it do not set it and are left alone.
+- **Equal courses, never a sliver.** `while (y < top) { h = min(course, top -
+  y) }` leaves a remainder course a few centimetres tall under every roof
+  slab, and that sliver's joints are the fragile ones. Divide the height
+  into `round(h / course)` equal courses instead; every new builder has a
+  `courses()` helper for it.
+- **Openings stay a stone and a half off a corner.** A loophole that cut the
+  corner stone out left the corner pier above it standing on nothing, and
+  the eave over that went with it.
+- **A stone the guns cannot bite is not a stone.** One stone per column drum
+  at three times life was ninety cubic metres of marble, three times any
+  stone on the Taj; the suite put fourteen rounds into the colonnade and
+  destroyed nothing. Health goes as volume to the 0.62: keep a stone's world
+  volume within about twice the Taj's facing stones (about 25 m³), and
+  quarter anything bigger.
+- **Count the stones before the first load.** `node -e` can import a
+  builder and build it with `{ blockScale: 1.55 }` in a second; the Cologne
+  draft was forty thousand at the Taj's grain and fifteen at its own. Ten to
+  fifteen thousand at low is the range the nine live in.
+- **A man's floor is one stone.** The footing test removes the stones under
+  a man and expects him to fall; a man standing on three layers of slab has
+  two more under him, and a slab ten metres across has no centre within
+  reach of anyone. Pave a platform in one course of stones a man's width.
 
 - **The hole a shell makes must be the same size at every tier.** The
   blast weights each stone by the fraction of it enclosed, so a coarse

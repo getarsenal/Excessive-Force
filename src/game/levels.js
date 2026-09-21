@@ -717,16 +717,25 @@ export const LEVELS = {
       dry: new THREE.Color(0xb9b096),
     },
     setting: { haze: { colour: 0xc8ccd0, density: 0.00024 } },
-    cityExcludeRadius: 120,
-    contextExclude: 120,
-    // From the Deutz bank, across the river: the postcard.
-    camera: { yaw: -1.35, pitch: 0.24, distance: 520, height: 90 },
+    // From the south-west, up at the two spires with the nave running away
+    // behind them. The origin is the south tower (see the builder), so the
+    // camera looks at the west front, not the middle of the roof.
+    camera: { yaw: -2.30, pitch: 0.22, distance: 560, height: 110 },
     structures: (quality) => [
       { key: 'dom', blocks: buildCologneCathedral(quality), primary: true,
         required: true, label: 'KÖLNER DOM' },
     ],
     garrison: (g, origin, groundY) => { populateCologneCathedral(g, origin, groundY); },
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // Scored on the building, not the raft it stands on.
+    scoreTags: ['southspire', 'northspire', 'westfront', 'nave', 'transept', 'choir', 'crossing', 'apse', 'buttresses'],
+    // The cathedral runs a hundred and ninety metres east of its origin; the
+    // radius keeps the Domplatte and the station forecourt clear round the
+    // towers, and the footprint keeps the town off the rest.
+    cityExcludeRadius: 150,
+    contextExclude: 150,
+    // The Domplatte: paved, railed at its edge, with the statuary a cathedral
+    // square has.
+    precinct: { boundary: 'railings', ground: 'sand', ornament: 'statues' },
     traits: { windows: true, river: true, topples: true },
     brief: 'Gothic stone does as little work as it can. Cut a pier and the spire above it follows.',
   },
