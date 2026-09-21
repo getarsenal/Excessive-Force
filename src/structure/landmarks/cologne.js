@@ -349,8 +349,10 @@ export function populateCologneCathedral(g, origin, groundY) {
   for (const sg of [-1, 1]) {
     g.place('at', new THREE.Vector3(origin.x + cx, groundY + 1.0, origin.z + D.axisZ + sg * (D.transeptHalf - 3.0)), sg > 0 ? 0 : Math.PI, 7, { cover: 'arcade' });
   }
-  // Mortars on the aisle roofs, between the buttresses.
-  for (const [x, sg] of [[D.naveX0 + D.bay * 1.5, -1], [D.naveX0 + D.bay * 3.5, 1], [D.crossX1 + D.bay * 1.5, -1]]) {
-    g.place('mortar', new THREE.Vector3(origin.x + x, groundY + D.aisleH + 2.0, origin.z + D.axisZ + sg * (D.aisleHalf - 4.0)), 0, 8, { cover: 'roof' });
+  // Mortars in the open: pits on the Domplatte before the west front and
+  // behind the apse. On the aisle roofs, under the flyers and against the
+  // clerestory, no arc cleared and the section never fired.
+  for (const [x, z] of [[-D.towerW / 2 - 14, D.axisZ + 16], [-D.towerW / 2 - 14, D.axisZ - 16], [D.choirX1 + D.clereHalf + 18, D.axisZ]]) {
+    g.place('mortar', new THREE.Vector3(origin.x + x, groundY + 0.4, origin.z + z), 0, 22, { cover: 'ground', emplaced: true, sandbags: true });
   }
 }
