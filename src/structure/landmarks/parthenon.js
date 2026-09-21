@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BlockList, MATERIALS as M } from '../builder.js';
+import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
 
 /**
  * The Parthenon, built from its real dimensions.
@@ -86,6 +86,7 @@ function peristyle() {
 
 export function buildParthenon(quality) {
   const B = new BlockList();
+  B.joint = JOINT / S;                     // a 3 cm joint in the world, not 3 cm times the scale
   const s = quality.blockScale * STONE_FINENESS;
   const stone = 1.15 * s;
   const course = 0.95 * s;

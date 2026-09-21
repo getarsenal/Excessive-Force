@@ -135,16 +135,29 @@ export const MATERIAL_PROPS = {
  * bug is invisible in the geometry and only shows up as a building collapsing
  * on the first frame.
  */
-const JOINT = 0.015;
-function shrink(half) {
-  return Math.max(half - JOINT, half * 0.6);
-}
+export const JOINT = 0.015;
 
 export class BlockList {
   constructor() {
     /** flat block records: {x,y,z, hx,hy,hz, ry, mat, tag} */
     this.blocks = [];
     this.tagRanges = {};
+    /**
+     * Half the joint a stone is laid with, in the builder's own metres.
+     *
+     * A builder that writes at real size and scales up afterwards should set
+     * this to `JOINT / scale`, so the joint is 3 cm in the world and not
+     * 3 cm times the scale: at two and a half times life the plain joint is
+     * 7.5 cm, which is exactly the solver's contact tolerance, and whether a
+     * course stands on the one below then depends on floating-point noise —
+     * the Himeji keep's first storey came apart at one tier and not another
+     * on that alone.
+     */
+    this.joint = JOINT;
+  }
+
+  shrink(half) {
+    return Math.max(half - this.joint, half * 0.6);
   }
 
   get length() { return this.blocks.length; }
@@ -238,7 +251,7 @@ export class BlockList {
         const t = (i + 0.5) / n;
         const x = xFrom + t * span;
         const e = relief ? Math.max(0, relief(x, zCentre + out * zHalf)) : 0;
-        this.add(x, yc, zCentre + out * e / 2, shrink(len / 2), shrink(halfH), zHalf + e / 2, mat);
+        this.add(x, yc, zCentre + out * e / 2, this.shrink(len / 2), this.shrink(halfH), zHalf + e / 2, mat);
       }
     };
     const alongZ = (xCentre, xHalf, out, zFrom, zTo) => {
@@ -250,7 +263,7 @@ export class BlockList {
         const t = (i + 0.5) / n;
         const z = zFrom + t * span;
         const e = relief ? Math.max(0, relief(xCentre + out * xHalf, z)) : 0;
-        this.add(xCentre + out * e / 2, yc, z, xHalf + e / 2, shrink(halfH), shrink(len / 2), mat);
+        this.add(xCentre + out * e / 2, yc, z, xHalf + e / 2, this.shrink(halfH), this.shrink(len / 2), mat);
       }
     };
 
@@ -320,7 +333,7 @@ export class BlockList {
             cx - w / 2 + (i + 0.5) * sx,
             cy - h / 2 + (j + 0.5) * sy,
             cz - d / 2 + (k + 0.5) * sz,
-            shrink(sx / 2), shrink(sy / 2), shrink(sz / 2), mat,
+            this.shrink(sx / 2), this.shrink(sy / 2), this.shrink(sz / 2), mat,
           );
         }
       }
@@ -349,9 +362,9 @@ export class BlockList {
       // the next — which is what a rusticated ring looks like anyway.
       const ins = (i % 2) * 0.07;
       if (axis === 'x') {
-        this.add(cx + bx, cy + by, cz, shrink(segLen / 2) - ins, shrink(thickness / 2) - ins, depth / 2 - ins, mat, 0);
+        this.add(cx + bx, cy + by, cz, this.shrink(segLen / 2) - ins, this.shrink(thickness / 2) - ins, depth / 2 - ins, mat, 0);
       } else {
-        this.add(cx, cy + by, cz + bx, depth / 2 - ins, shrink(thickness / 2) - ins, shrink(segLen / 2) - ins, mat, 0);
+        this.add(cx, cy + by, cz + bx, depth / 2 - ins, this.shrink(thickness / 2) - ins, this.shrink(segLen / 2) - ins, mat, 0);
       }
     }
   }
@@ -434,7 +447,7 @@ export class BlockList {
         const e = relief ? Math.max(0, relief(sx + nx * wall / 2, sz + nz * wall / 2)) : 0;
         this.add(
           sx + nx * e / 2, yc, sz + nz * e / 2,
-          shrink(wall / 2) + e / 2, shrink(halfH), shrink(seg / 2), mat, ry,
+          this.shrink(wall / 2) + e / 2, this.shrink(halfH), this.shrink(seg / 2), mat, ry,
         );
       }
     }

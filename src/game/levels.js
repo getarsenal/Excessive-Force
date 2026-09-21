@@ -762,6 +762,8 @@ export const LEVELS = {
         required: true, label: 'THE KEEP' },
     ],
     garrison: (g, origin, groundY) => { populateHimejiKeep(g, origin, groundY); },
+    // The stone bases are the ground, near enough, and are not the target.
+    scoreTags: ['keep', 'westkeep', 'corridor'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
     brief: 'The stone base cannot be shot down. The keep on it is top-heavy by design.',
