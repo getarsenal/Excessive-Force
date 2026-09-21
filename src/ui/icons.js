@@ -285,8 +285,19 @@ const BODY = {
     <path d="M55 15.8 l4.4 1.2 l-4.4 1.2 Z" fill="${C.heat}"/>`,
 };
 
-/** Inline SVG markup for a unit id, or null if it has no icon. */
+/**
+ * The units with a real picture: the guns, the vehicles and the two aircraft
+ * are rendered from the game's own models by `tools/icons.mjs`, so the card
+ * shows exactly what lands. The infantry teams keep the drawn pictograms
+ * until there is art for them.
+ */
+export const IMAGE_ICONS = new Set(['m119', 'm777', 'm109', 'm270', 'm142', 'f15', 'b1']);
+
+/** Inline markup for a unit id, or null if it has no icon. */
 export function unitIcon(id) {
+  if (IMAGE_ICONS.has(id)) {
+    return `<img class="uc-img" src="assets/icons/${id}.png" alt="" width="512" height="320" draggable="false">`;
+  }
   const body = BODY[id];
   if (!body) return null;
   return `<svg class="uc-svg" viewBox="0 0 64 40" width="64" height="40"

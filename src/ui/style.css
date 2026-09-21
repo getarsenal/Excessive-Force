@@ -225,9 +225,13 @@ html, body {
 .unit-card.unaffordable .uc-cost { color: var(--danger); }
 
 .uc-icon {
-  height: 36px; display: flex; align-items: center; justify-content: center;
+  height: 40px; display: flex; align-items: center; justify-content: center;
   margin-bottom: 2px;
 }
+/* A rendered model fills the slot; it is a photograph of the thing, not a
+   glyph, so it gets the whole width and keeps its shape. */
+.uc-icon .uc-img { width: 100%; height: 100%; object-fit: contain; pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55)); }
 /* Scaled up from the 40x24 drawing box rather than drawn larger, so one set of
    coordinates serves both the card and any future bigger use of the same art. */
 .uc-svg {
