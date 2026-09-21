@@ -443,19 +443,22 @@ export class AirWing {
     for (const s of this.sorties) {
       s.t += dt;
       const m = s.model;
-      if (s.lift) this._updateLift(s, dt);
-      // Straight and level, then a climbing turn away once past the target.
-      if (s.t > s.pullUpAt) {
-        s.climb = Math.min(1, s.climb + dt * 0.5);
+      if (s.lift) {
+        this._updateLift(s, dt);
+      } else {
+        // Straight and level, then a climbing turn away once past the target.
+        if (s.t > s.pullUpAt) {
+          s.climb = Math.min(1, s.climb + dt * 0.5);
+        }
+        const pitch = s.climb * 0.42;
+        const vx = s.dir.x * Math.cos(pitch), vz = s.dir.z * Math.cos(pitch), vy = Math.sin(pitch);
+        m.position.x += vx * s.speed * dt;
+        m.position.z += vz * s.speed * dt;
+        m.position.y += vy * s.speed * dt;
+        m.rotation.x = -pitch;
+        // A little bank into the pull-up so it reads as a turn, not a lift.
+        m.rotation.z = s.climb * 0.5;
       }
-      const pitch = s.climb * 0.42;
-      const vx = s.dir.x * Math.cos(pitch), vz = s.dir.z * Math.cos(pitch), vy = Math.sin(pitch);
-      m.position.x += vx * s.speed * dt;
-      m.position.z += vz * s.speed * dt;
-      m.position.y += vy * s.speed * dt;
-      m.rotation.x = -pitch;
-      // A little bank into the pull-up so it reads as a turn, not a lift.
-      m.rotation.z = s.climb * 0.5;
 
       // Let go.
       if (!s.released && s.t >= s.releaseAt && !s.lift) {
@@ -493,12 +496,12 @@ export class AirWing {
       }
 
       // Gone once it is well past and climbing away — and, for a transport,
-      // once its load is down and the canopies are gone.
-      s.life = s.t - s.pullUpAt;
-      if (s.life > 14 || m.position.y > s.alt + 1600) {
-        if (!s.lift || (s.lift.landed && !s.lift.chutes.length)) s.done = true;
-        else if (s.life > 14) m.visible = false;
-      }
+      // once its loads are down and the canopies are gone.
+      if (!s.lift) s.life = s.t - s.pullUpAt;
+      if (s.lift) {
+        if (s.life > 22 && s.lift.allDown) s.done = true;
+        else if (s.life > 30) m.visible = false;
+      } else if (s.life > 14 || m.position.y > s.alt + 1600) s.done = true;
     }
     for (const s of this.sorties) {
       if (s.done) this.scene.remove(s.model);
@@ -506,20 +509,6 @@ export class AirWing {
     this.sorties = this.sorties.filter((s) => !s.done);
   }
 
-  /** The transport's own business on the run: props, the stick, the chutes. */
-  _updateLift(s, dt) {
-    const L = s.lift;
-    for (const p of s.model.children) if (p.name === 'prop') p.rotation.z += 38 * dt;
-    if (L.out < L.toGo && s.t >= s.releaseAt && s.t >= L.nextAt) this._release(s);
-    if (!L.landed && L.out > 0 && this._updateChutes(s, dt)) {
-      L.landed = true;
-      L.drop.landedAt = s.t;
-      if (L.onLand) L.onLand(L.drop);
-    } else if (!L.landed && L.out > 0) {
-      this._collapse(L, dt);
-    }
-    if (L.landed) this._collapse(L, dt);
-  }
 
   get active() { return this.sorties.length; }
 }
@@ -655,22 +644,52 @@ function makeCanopy(radius, colour, loadY, loadHalf = 0.35) {
  *
  * Nothing in the air can be hit, and nothing on the ground can hit it.
  */
-const LIFT = { speed: 95, height: 88, clearance: 40, runIn: 720, spacing: 82, stagger: 0.9 };
+const LIFT = { speed: 95, height: 88, clearance: 40, runIn: 720, spacing: 82, stagger: 0.9, perAircraft: 6, cluster: 150 };
 const CHUTE = { troopRate: 7.6, cargoRate: 7.0, freeFall: 1.0, open: 0.5, stick: 0.36 };
 
+/**
+ * Load the package onto aircraft. Drops close together go out of the same
+ * ramp on one run, in the order the run reaches them; a package spread
+ * across the map takes as many aircraft as it needs, no more.
+ */
+function loadAircraft(drops) {
+  const left = drops.slice();
+  const groups = [];
+  while (left.length) {
+    const g = [left.shift()];
+    const c = { x: g[0].pos.x, z: g[0].pos.z };
+    for (let i = 0; i < left.length && g.length < LIFT.perAircraft;) {
+      const d = left[i];
+      if (Math.hypot(d.pos.x - c.x, d.pos.z - c.z) < LIFT.cluster) {
+        g.push(d); left.splice(i, 1);
+        c.x = g.reduce((a, q) => a + q.pos.x, 0) / g.length;
+        c.z = g.reduce((a, q) => a + q.pos.z, 0) / g.length;
+      } else i++;
+    }
+    groups.push(g);
+  }
+  return groups;
+}
+
 AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
-  const n = drops.length;
+  const groups = loadAircraft(drops);
+  const n = groups.length;
   let eta = 0;
-  drops.forEach((d, i) => {
-    const target = d.pos.clone();
+  groups.forEach((group, i) => {
+    // The run goes through the middle of the group, in from behind the camera.
+    const target = new THREE.Vector3(
+      group.reduce((a, d) => a + d.pos.x, 0) / group.length, 0,
+      group.reduce((a, d) => a + d.pos.z, 0) / group.length);
+    target.y = group.reduce((a, d) => Math.max(a, d.pos.y), -Infinity);
     const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
     const dl = Math.hypot(dx, dz) || 1;
     const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const alt = Math.max(target.y + LIFT.height, (d.ceiling ?? ceiling) + LIFT.clearance);
+    const ceil = group.reduce((a, d) => Math.max(a, d.ceiling ?? ceiling), 0);
+    const alt = Math.max(target.y + LIFT.height, ceil + LIFT.clearance);
     const model = makeHercules();
     // Formation: each aircraft off to its own side of the camera's line and
-    // a little behind the last, then aimed through its own drop point.
+    // a little behind the last, then aimed through its own group.
     const lateral = (i - (n - 1) / 2) * LIFT.spacing + 30;
     const behind = LIFT.runIn + i * LIFT.stagger * LIFT.speed;
     model.position.copy(target).addScaledVector(dir, -behind).addScaledVector(side, lateral);
@@ -681,28 +700,42 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand) {
     model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
     const runLen = Math.hypot(target.x - model.position.x, target.z - model.position.z);
-    const troops = d.def.model === 'infantry';
-    const rate = troops ? CHUTE.troopRate : CHUTE.cargoRate;
-    const fall = CHUTE.freeFall + (alt - target.y - 9.81 * CHUTE.freeFall * CHUTE.freeFall * 0.5) / rate;
-    // Out of the ramp early enough that what the stick carries forward
-    // brings it over the point: a second and a bit of the run.
-    const lead = 1.3 + (troops ? (d.def.crew - 1) * CHUTE.stick * 0.5 : 0);
+    const overAt = runLen / LIFT.speed;
+    // Each load goes out where the run passes its point, in that order, a
+    // stick's spacing apart at least; the chutes steer the rest of the way.
+    const loads = group.map((d) => {
+      const troops = d.def.model === 'infantry';
+      const rate = troops ? CHUTE.troopRate : CHUTE.cargoRate;
+      const along = (d.pos.x - target.x) * dir.x + (d.pos.z - target.z) * dir.z;
+      const lead = 1.3 + (troops ? (d.def.crew - 1) * CHUTE.stick * 0.5 : 0);
+      const fall = CHUTE.freeFall + (alt - d.pos.y - 9.81 * CHUTE.freeFall * CHUTE.freeFall * 0.5) / rate;
+      return { drop: d, releaseAt: overAt + along / LIFT.speed - lead, troops, rate, fall,
+        chutes: [], out: 0, toGo: troops ? Math.max(1, d.def.crew) : 1, nextAt: 0, landed: false };
+    }).sort((a, b) => a.releaseAt - b.releaseAt);
+    for (let k = 1; k < loads.length; k++) {
+      const gap = loads[k - 1].releaseAt + loads[k - 1].toGo * CHUTE.stick + 0.3;
+      if (loads[k].releaseAt < gap) loads[k].releaseAt = gap;
+    }
+    const last = loads[loads.length - 1];
     const s = {
-      def: d.def, model, dir, side, alt, target, speed: LIFT.speed, t: 0,
-      releaseAt: runLen / LIFT.speed - lead,
-      pullUpAt: runLen / LIFT.speed + 2.5,
-      climb: 0, roar: 0, life: 0, released: true, fall, flak: 0,
-      lift: { drop: d, onLand, chutes: [], out: 0, toGo: troops ? Math.max(1, d.def.crew) : 1, nextAt: 0, rate, troops },
+      def: group[0].def, model, dir, side, alt, target, speed: LIFT.speed, t: 0,
+      releaseAt: loads[0].releaseAt,
+      pullUpAt: last.releaseAt + last.toGo * CHUTE.stick + 2.0,
+      climb: 0, roar: 0, life: 0, released: true, flak: 0, turn: 0, bank: 0, pitch: 0,
+      // Away from the camera's side of the line, so the turn opens the view
+      // rather than crossing it.
+      turnDir: lateral >= 0 ? 1 : -1,
+      lift: { loads, onLand },
     };
     this.sorties.push(s);
-    eta = Math.max(eta, s.releaseAt + fall);
+    for (const L of loads) eta = Math.max(eta, L.releaseAt + L.fall);
   });
   return eta;
 };
 
 /** Put the next load out of the ramp. */
-AirWing.prototype._release = function _release(s) {
-  const L = s.lift, d = L.drop, m = s.model;
+AirWing.prototype._release = function _release(s, L) {
+  const d = L.drop, m = s.model;
   const k = L.out++;
   const g = new THREE.Group();
   let load, canopies = [], landAt;
@@ -754,13 +787,12 @@ AirWing.prototype._release = function _release(s) {
   L.nextAt = s.t + CHUTE.stick;
 };
 
-/** Fly the chutes down. Returns true when this sortie's load is all on the ground. */
-AirWing.prototype._updateChutes = function _updateChutes(s, dt) {
-  const L = s.lift;
+/** Fly one load's chutes down. Returns true when all of it is on the ground. */
+AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
   let landed = 0;
   for (const c of L.chutes) {
-    c.t += dt;
     if (c.phase === 'landed') { landed++; continue; }
+    c.t += dt;
     if (c.phase === 'free' && c.t > CHUTE.freeFall) c.phase = 'open';
     const p = c.g.position;
     if (c.phase === 'free') {
@@ -800,26 +832,75 @@ AirWing.prototype._updateChutes = function _updateChutes(s, dt) {
 
 /** Let the canopies fall over the load and take them away. */
 AirWing.prototype._collapse = function _collapse(L, dt) {
-  let live = 0;
   for (const c of L.chutes) {
-    if (c.phase !== 'landed') { live++; continue; }
+    if (c.phase !== 'landed') continue;
+    // The clock keeps running on the ground: the canopy has a second to
+    // fall, and the chute is forgotten after it. (It used to stop with the
+    // descent, and the collapsed canopies stayed on the ground for ever.)
+    c.t += dt;
     const k = Math.min(1, (c.t - c.landedAt) / 1.0);
     for (const cn of c.canopies) {
       cn.scale.set(1 + k * 0.45, Math.max(0.03, 1 - k * 1.3), 1 + k * 0.45);
       cn.position.y *= (1 - Math.min(1, dt * 4.0));
       if (cn.userData.dome) cn.userData.dome.material.opacity = 1 - k * 0.6;
     }
-    if (k >= 1) { this.scene.remove(c.g); c.gone = true; } else live++;
+    if (k >= 1) { this.scene.remove(c.g); c.gone = true; }
   }
   L.chutes = L.chutes.filter((c) => !c.gone);
-  return live;
+};
+
+/**
+ * The transport's own business on the run: props, the sticks, the chutes,
+ * and after the last load a proper departure — a gentle climbing turn away
+ * from the camera's side that levels out, not the jet's pull-up held for
+ * ever. A Hercules does not leave a drop zone at twenty-four degrees nose
+ * up with thirty degrees of bank on.
+ */
+AirWing.prototype._updateLift = function _updateLift(s, dt) {
+  const m = s.model;
+  for (const p of m.children) if (p.name === 'prop') p.rotation.z += 38 * dt;
+  let allDown = true;
+  for (const L of s.lift.loads) {
+    if (L.out < L.toGo && s.t >= L.releaseAt && s.t >= L.nextAt) this._release(s, L);
+    if (L.out > 0 && !L.landed && this._updateChutes(L, dt)) {
+      L.landed = true;
+      if (s.lift.onLand) s.lift.onLand(L.drop);
+    }
+    if (L.out > 0) this._collapse(L, dt);
+    if (!L.landed || L.chutes.length) allDown = false;
+  }
+  s.lift.allDown = allDown;
+
+  // Flight. Straight and level on the run; past the last load, ease into a
+  // turn away and a shallow climb, hold the turn a while, roll out.
+  const past = s.t - s.pullUpAt;
+  let wantBank = 0, wantPitch = 0;
+  if (past > 0) {
+    const turning = past < 7.5;
+    wantBank = turning ? 0.36 : 0;
+    wantPitch = 0.085;
+    if (turning) {
+      const rate = 0.16 * s.bank / 0.36;
+      const a = rate * dt * s.turnDir;
+      const x = s.dir.x * Math.cos(a) - s.dir.z * Math.sin(a);
+      const z = s.dir.x * Math.sin(a) + s.dir.z * Math.cos(a);
+      s.dir.set(x, 0, z);
+    }
+  }
+  s.bank += (wantBank - s.bank) * Math.min(1, dt * 1.1);
+  s.pitch += (wantPitch - s.pitch) * Math.min(1, dt * 0.8);
+  m.position.x += s.dir.x * Math.cos(s.pitch) * s.speed * dt;
+  m.position.z += s.dir.z * Math.cos(s.pitch) * s.speed * dt;
+  m.position.y += Math.sin(s.pitch) * s.speed * dt;
+  m.rotation.set(-s.pitch, Math.atan2(s.dir.x, s.dir.z), -s.turnDir * s.bank, 'YXZ');
+  s.life = past;
 };
 
 /** Everything in the air, brought down and forgotten: the harness resets. */
 AirWing.prototype.abortLifts = function abortLifts() {
   for (const s of this.sorties) {
     if (!s.lift) continue;
-    for (const c of s.lift.chutes) this.scene.remove(c.g);
+    for (const L of s.lift.loads) for (const c of L.chutes) this.scene.remove(c.g);
     this.scene.remove(s.model);
     s.done = true;
   }
