@@ -3,6 +3,19 @@ import { loadProgress } from './levelselect.js';
 import {
   campaignState, objectivesFor, freeDeploy, setFreeDeploy, pendingBurn, markBurnSeen,
 } from '../game/campaign.js';
+import { CAST, DEFENDER_OF } from '../game/cast.js';
+import { IMAGE_ICONS } from './icons.js';
+import { UNITS_BY_ID } from '../game/units.js';
+
+/** 51.4994, -0.1246 → 51°29′58″N 0°07′29″W, the way a target folder has it. */
+const dms = (lat, lon) => {
+  const one = (v, pos, neg) => {
+    const a = Math.abs(v);
+    const d = Math.floor(a), m = Math.floor((a - d) * 60), sec = Math.round(((a - d) * 60 - m) * 60);
+    return `${d}°${String(m).padStart(2, '0')}′${String(sec).padStart(2, '0')}″${v >= 0 ? pos : neg}`;
+  };
+  return `${one(lat, 'N', 'S')} ${one(lon, 'E', 'W')}`;
+};
 
 /**
  * The map.
@@ -106,12 +119,32 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
 
   const root = document.createElement('div');
   root.id = 'worldmap';
+  // The ledger across the top: every contract as a lamp, and the campaign's
+  // running totals from the record.
+  const tonnage = Object.values(progress).reduce((a, r) => a + (r.bestScore || 0), 0);
+  const sorties = Object.values(progress).reduce((a, r) => a + (r.runs || 0), 0);
+  const strip = state.list.map((t) => {
+    const cls = t.down ? 'done' : (t === state.next ? 'next' : (t.open ? 'open' : 'locked'));
+    return `<span class="wm-seg ${cls}" data-level="${t.id}" title="${t.city}">0${t.no}</span>`;
+  }).join('');
   root.innerHTML = `
     <div class="wm-inner">
       <div class="wm-head">
-        <img class="wm-logo" src="./logo-512.png" alt="" width="512" height="512">
-        <div class="wm-title">EXCESSIVE FORCE</div>
-        <div class="wm-sub">${state.done} OF ${state.total} CONTRACTS CLOSED</div>
+        <div class="wm-brand">
+          <img class="wm-logo" src="./logo-512.png" alt="" width="512" height="512">
+          <div>
+            <div class="wm-title">EXCESSIVE FORCE</div>
+            <div class="wm-sub">CAMPAIGN HQ · OPERATIONS</div>
+          </div>
+        </div>
+        <div class="wm-ledger">
+          <div class="wm-strip" aria-label="Contracts">${strip}</div>
+          <div class="wm-tally">
+            <span><b>${state.done}</b> of ${state.total} contracts closed</span>
+            <span><b>${Math.round(tonnage).toLocaleString()} t</b> masonry down</span>
+            <span><b>${sorties}</b> sortie${sorties === 1 ? '' : 's'} flown</span>
+          </div>
+        </div>
       </div>
       <div class="wm-stage">
         <svg class="wm-svg" role="application" aria-label="Campaign map"></svg>
@@ -124,8 +157,8 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       </div>
       <div class="wm-panel"></div>
       <div class="wm-foot">
-        <button class="wm-free${state.free ? ' on' : ''}" id="wm-free" type="button">
-          FREE DEPLOY${state.free ? ' · ON' : ''}</button>
+        <button class="wm-free${state.free ? ' on' : ''}" id="wm-free" type="button" aria-pressed="${state.free ? 'true' : 'false'}">
+          <span class="wm-sw"></span>FREE DEPLOY <em>${state.free ? 'ON · every contract open' : 'OFF · contracts in order'}</em></button>
         ${canResume ? '<button class="wm-back" id="wm-back" type="button">BACK TO THE MATCH</button>' : ''}
       </div>
     </div>`;
@@ -387,23 +420,64 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       const met = o.key === 'primary' ? t.down : !!t.met[o.key];
       return `<li class="${met ? 'met' : ''}">${o.label}</li>`;
     }).join('');
-    const stats = rec.runs
-      ? `<div class="wm-stats"><span>Best ${Math.round(rec.bestScore || 0).toLocaleString()} t</span>`
-        + `<span>${fmtTime(rec.bestTime)}</span>`
-        + `<span>${rec.runs} attempt${rec.runs > 1 ? 's' : ''}</span></div>`
-      : '';
+    const record = rec.runs
+      ? `<div class="wm-rec">
+           <div><span>Best</span><b>${Math.round(rec.bestScore || 0).toLocaleString()} t</b></div>
+           <div><span>Time</span><b>${fmtTime(rec.bestTime)}</b></div>
+           <div><span>Attempts</span><b>${rec.runs}</b></div>
+         </div>`
+      : '<div class="wm-rec none">NO ATTEMPTS ON RECORD</div>';
+    const lv = LEVELS[t.id] || {};
+    const status = t.down ? 'closed' : (t.open ? 'active' : 'sealed');
+    const stamp = t.down ? 'CLOSED' : (t.open ? 'ACTIVE' : 'SEALED');
+    const cmdr = CAST[DEFENDER_OF[t.id]];
+    const unlockId = t.unlocks && t.unlocks[0];
+    const unlockIcon = unlockId && IMAGE_ICONS.has(unlockId)
+      ? `<img class="wm-rel-icon" src="assets/icons/${unlockId}.png" alt="">` : '';
+    const unlockName = unlockId && UNITS_BY_ID[unlockId] ? UNITS_BY_ID[unlockId].full : '';
     panel.innerHTML = `
-      <div class="wm-doss">
-        <div class="wm-doss-no">CONTRACT 0${t.no}</div>
-        <div class="wm-doss-target">${LEVELS[t.id]?.target || t.title}</div>
-        <div class="wm-doss-place">${LEVELS[t.id]?.place || t.city}</div>
-        <p class="wm-doss-brief">${t.brief}</p>
-        <ul class="wm-doss-obj">${objectives}</ul>
-        ${stats}
-        <div class="wm-doss-go">
-          ${t.open
-    ? `<button class="wm-go" data-level="${t.id}" type="button">${t.down ? 'RETURN' : 'DEPLOY'}</button>`
+      <div class="wm-doss ${status}">
+        <div class="wm-doss-top">
+          <div class="wm-doss-no">CONTRACT 0${t.no} <span class="wm-doss-file">· ${t.iso} · ${t.city}</span></div>
+          <div class="wm-stamp">${stamp}</div>
+        </div>
+        <div class="wm-doss-grid">
+          <div class="wm-doss-main">
+            <div class="wm-doss-target">${lv.target || t.title}</div>
+            <div class="wm-doss-place">${lv.place || t.city} <span class="wm-coord">${dms(t.lat, t.lon)}</span></div>
+            <p class="wm-doss-brief">${t.brief}</p>
+            <div class="wm-doss-cols">
+              <div>
+                <div class="wm-k">Objectives</div>
+                <ul class="wm-doss-obj">${objectives}</ul>
+              </div>
+              <div>
+                <div class="wm-k">Record</div>
+                ${record}
+              </div>
+            </div>
+            ${t.unlockLine ? `<div class="wm-release">${unlockIcon}<div><div class="wm-k">On close</div><div class="wm-rel-line">${t.unlockLine}</div>${unlockName ? `<div class="wm-rel-sub">${unlockName}</div>` : ''}</div></div>` : ''}
+            <div class="wm-doss-go">
+              ${t.open
+    ? `<button class="wm-go" data-level="${t.id}" type="button">${t.down ? 'RETURN TO THE THEATRE' : 'DEPLOY'}</button>`
     : '<div class="wm-sealed">SEALED — CLOSE THE CONTRACT BEFORE IT</div>'}
+            </div>
+          </div>
+          <aside class="wm-doss-side">
+            <figure class="wm-recon">
+              <img src="assets/recon/${t.id}.jpg" alt="" loading="lazy" onerror="this.closest('figure').hidden = true">
+              <figcaption>RECON · ${(lv.target || t.title).toUpperCase()}</figcaption>
+            </figure>
+            ${cmdr ? `<div class="wm-cmdr">
+              <img class="wm-cmdr-img" src="${cmdr.file}" alt="" loading="lazy">
+              <div class="wm-cmdr-text">
+                <div class="wm-k">Opposing commander</div>
+                <div class="wm-cmdr-name">${cmdr.rank} ${cmdr.name}</div>
+                <div class="wm-cmdr-nation">${cmdr.nation}</div>
+                <div class="wm-flag" style="--a:${cmdr.colours[0]};--b:${cmdr.colours[1]};--c:${cmdr.colours[2]}"></div>
+              </div>
+            </div>` : ''}
+          </aside>
         </div>
       </div>`;
   };
@@ -418,7 +492,17 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       p.classList.toggle('sel', p.getAttribute('data-iso') === t.iso);
     }
     show(t);
-    if (move) glideTo(x(t.lon), y(t.lat), Math.max(view.k, kFit * 2.4));
+    if (move) {
+      glideTo(x(t.lon), y(t.lat), Math.max(view.k, kFit * 2.4));
+      // Bring the whole dossier on screen when it fits: on a desktop the map
+      // takes the top of the page and the DEPLOY button would otherwise sit
+      // just under the fold. On a phone it is taller than the screen, and
+      // scrolling to it would take the map away from the finger that tapped.
+      const doss = panel.querySelector('.wm-doss');
+      if (doss && doss.offsetHeight < root.clientHeight * 0.8) {
+        doss.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
   };
 
   const opening = state.list.find((t) => t.id === current) || state.next || state.list[0];
@@ -556,6 +640,9 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       const go = e.target.closest('.wm-go');
       if (go) finish(go.getAttribute('data-level'));
     });
+    for (const seg of root.querySelectorAll('.wm-seg')) {
+      seg.addEventListener('click', () => select(seg.dataset.level));
+    }
     root.querySelector('#wm-free')?.addEventListener('click', () => {
       // Kept because the campaign order is the point and testing it is not: a
       // player who wants to go straight back to the Taj can, and the map says

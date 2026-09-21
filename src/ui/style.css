@@ -978,16 +978,36 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   flex-direction: column;
   gap: 12px;
 }
-.wm-head { text-align: center; }
-.wm-logo { width: 48px; height: 48px; opacity: 0.9; }
+/* The operations bar: the brand at the left, the ledger at the right — every
+   contract as a lamp, and the campaign's running totals. */
+.wm-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  padding: 6px 2px 2px;
+}
+.wm-brand { display: flex; align-items: center; gap: 12px; }
+.wm-logo { width: 46px; height: 46px; opacity: 0.92; }
 .wm-title {
-  font-size: clamp(20px, 4.6vw, 34px);
-  letter-spacing: 0.16em;
+  font-size: clamp(18px, 3.4vw, 26px);
+  letter-spacing: 0.18em;
   font-weight: 700;
   color: #e8eef6;
-  margin-top: 2px;
+  line-height: 1.05;
 }
-.wm-sub { font-size: 11px; letter-spacing: 0.22em; color: #6f8299; margin-top: 3px; }
+.wm-sub { font-size: 10px; letter-spacing: 0.26em; color: #e06c34; margin-top: 4px; }
+.wm-ledger { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.wm-strip { display: flex; gap: 4px; }
+.wm-seg {
+  width: 30px; height: 22px; display: grid; place-items: center;
+  font-size: 9px; letter-spacing: 0.08em; font-weight: 700;
+  border: 1px solid #23303d; border-radius: 3px; color: #46586b; background: #0b1119;
+  cursor: pointer; user-select: none;
+}
+.wm-seg.done { color: #0b0f16; background: #e06c34; border-color: #e06c34; }
+.wm-seg.next { color: #ffd9c0; border-color: #e06c34; box-shadow: inset 0 0 0 1px rgba(224, 108, 52, 0.35); animation: wm-lamp 1.6s ease-in-out infinite; }
+.wm-seg.open { color: #b7c6d8; border-color: #3b4b5d; }
+@keyframes wm-lamp { 0%, 100% { background: #0b1119; } 50% { background: #2a1a12; } }
+.wm-tally { display: flex; gap: 14px; font-size: 10px; letter-spacing: 0.14em; color: #6f8299; text-transform: uppercase; flex-wrap: wrap; justify-content: flex-end; }
+.wm-tally b { color: #e8eef6; font-weight: 700; margin-right: 4px; font-variant-numeric: tabular-nums; }
 
 .wm-stage {
   position: relative;
@@ -1091,26 +1111,54 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   pointer-events: none;
 }
 
-/* The dossier. */
+/* The contract file. A dark operations panel with the filing marks of a
+   folder: the number and stamp across the top, the target and its
+   coordinates, the brief, then objectives and record side by side, what the
+   close releases, and the order. The photograph and the man holding the
+   place sit down the right. */
 .wm-panel { min-height: 1px; }
 .wm-doss {
+  position: relative;
   border: 1px solid #1d2836;
-  border-left: 3px solid #e06c34;
   border-radius: 8px;
-  background: #0e141c;
-  padding: 14px 16px;
+  background:
+    linear-gradient(rgba(224, 108, 52, 0.05), transparent 38%),
+    repeating-linear-gradient(0deg, transparent 0 23px, rgba(140, 170, 200, 0.035) 23px 24px),
+    repeating-linear-gradient(90deg, transparent 0 23px, rgba(140, 170, 200, 0.035) 23px 24px),
+    #0e141c;
+  padding: 12px 16px 16px;
+  overflow: hidden;
 }
+.wm-doss::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #e06c34;
+}
+.wm-doss.sealed::before { background: #3b4b5d; }
+.wm-doss.closed::before { background: #8fbf5a; }
+.wm-doss-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .wm-doss-no { font-size: 10px; letter-spacing: 0.26em; color: #e06c34; }
+.wm-doss-file { color: #46586b; letter-spacing: 0.16em; }
+.wm-stamp {
+  font-size: 11px; letter-spacing: 0.3em; font-weight: 700; padding: 3px 9px 2px 11px;
+  border: 2px solid #e06c34; color: #e06c34; border-radius: 3px; transform: rotate(-4deg);
+  opacity: 0.9; user-select: none;
+}
+.wm-doss.closed .wm-stamp { border-color: #8fbf5a; color: #8fbf5a; }
+.wm-doss.sealed .wm-stamp { border-color: #3b4b5d; color: #64758a; }
+.wm-doss-grid { display: grid; grid-template-columns: minmax(0, 1fr) 272px; gap: 18px; margin-top: 8px; align-items: start; }
 .wm-doss-target {
-  font-size: clamp(17px, 3.6vw, 24px);
+  font-size: clamp(20px, 4vw, 28px);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: #e8eef6;
-  margin-top: 3px;
+  margin-top: 2px;
+  line-height: 1.1;
 }
-.wm-doss-place { font-size: 12px; letter-spacing: 0.1em; color: #7d8ea1; margin-top: 1px; }
-.wm-doss-brief { margin: 10px 0 0; color: #9fb0c2; font-size: 13px; line-height: 1.5; max-width: 62ch; }
-.wm-doss-obj { margin: 10px 0 0; padding: 0; list-style: none; }
+.wm-doss-place { font-size: 12px; letter-spacing: 0.1em; color: #7d8ea1; margin-top: 4px; }
+.wm-coord { color: #46586b; font-variant-numeric: tabular-nums; margin-left: 8px; letter-spacing: 0.06em; }
+.wm-doss-brief { margin: 10px 0 0; color: #9fb0c2; font-size: 13px; line-height: 1.55; max-width: 62ch; }
+.wm-k { font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase; color: #6f8299; margin-bottom: 6px; }
+.wm-doss-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.wm-doss-obj { margin: 0; padding: 0; list-style: none; }
 .wm-doss-obj li {
   font-size: 12px;
   color: #7d8ea1;
@@ -1127,8 +1175,19 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 }
 .wm-doss-obj li.met { color: #cfe0b8; }
 .wm-doss-obj li.met::before { background: #8fbf5a; border-color: #8fbf5a; }
-.wm-stats { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #6f8299; letter-spacing: 0.08em; }
-.wm-doss-go { margin-top: 12px; }
+.wm-doss-obj li.met::after {
+  content: ''; position: absolute; left: 6px; top: 7px; width: 3px; height: 6px;
+  border: solid #0b0f16; border-width: 0 2px 2px 0; transform: rotate(40deg);
+}
+.wm-rec div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed #1d2836; }
+.wm-rec span { color: #7d8ea1; letter-spacing: 0.08em; }
+.wm-rec b { color: #e8eef6; font-variant-numeric: tabular-nums; }
+.wm-rec.none { font-size: 10px; letter-spacing: 0.18em; color: #46586b; padding-top: 6px; }
+.wm-release { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 8px 10px; border: 1px dashed #2b3a4a; border-radius: 6px; background: rgba(10, 16, 24, 0.5); }
+.wm-rel-icon { width: 84px; height: 52px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); flex: none; }
+.wm-rel-line { font-size: 12px; color: #cfe0b8; letter-spacing: 0.04em; }
+.wm-rel-sub { font-size: 10px; color: #6f8299; letter-spacing: 0.1em; margin-top: 2px; }
+.wm-doss-go { margin-top: 14px; }
 .wm-go {
   font: inherit;
   font-size: 13px;
@@ -1143,7 +1202,28 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   min-height: 44px;
 }
 .wm-go:active { transform: translateY(1px); }
+.wm-doss.closed .wm-go { background: transparent; color: #cfe0b8; border: 1px solid #5a7a3a; }
 .wm-sealed { font-size: 11px; letter-spacing: 0.18em; color: #64758a; }
+
+/* The right-hand column: the photograph and the man. */
+.wm-doss-side { display: flex; flex-direction: column; gap: 12px; }
+.wm-recon { margin: 0; position: relative; border: 1px solid #23303d; border-radius: 6px; overflow: hidden; background: #070c13; }
+.wm-recon img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; filter: saturate(0.85) contrast(1.05); }
+.wm-recon::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.wm-recon figcaption {
+  position: absolute; left: 0; bottom: 0; right: 0; padding: 4px 8px;
+  font-size: 9px; letter-spacing: 0.22em; color: #ffd9c0; background: linear-gradient(transparent, rgba(6, 8, 11, 0.85));
+}
+.wm-cmdr { display: flex; gap: 12px; align-items: center; padding: 8px; border: 1px solid #1d2836; border-radius: 6px; background: rgba(10, 16, 24, 0.5); }
+.wm-cmdr-img { width: 64px; height: 64px; border-radius: 6px; object-fit: cover; object-position: 50% 6%; background: #0b1119; border: 1px solid #23303d; flex: none; }
+.wm-cmdr-text { min-width: 0; }
+.wm-cmdr-name { font-size: 12.5px; font-weight: 700; color: #e8eef6; letter-spacing: 0.03em; }
+.wm-cmdr-nation { font-size: 10px; letter-spacing: 0.18em; color: #7d8ea1; text-transform: uppercase; margin-top: 2px; }
+.wm-flag { height: 3px; margin-top: 6px; border-radius: 2px; background: linear-gradient(90deg, var(--a) 0 33%, var(--b) 33% 66%, var(--c) 66%); opacity: 0.85; }
 
 .wm-foot { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .wm-free, .wm-back {
@@ -1157,14 +1237,29 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   padding: 9px 16px;
   cursor: pointer;
   min-height: 40px;
+  display: inline-flex; align-items: center; gap: 10px;
 }
+.wm-free em { font-style: normal; color: #46586b; letter-spacing: 0.08em; font-size: 10px; }
+.wm-sw { width: 26px; height: 14px; border-radius: 7px; border: 1px solid #3b4b5d; position: relative; flex: none; background: #0b1119; }
+.wm-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 8px; height: 8px; border-radius: 50%; background: #46586b; transition: left 0.15s ease, background 0.15s ease; }
 .wm-free.on { color: #e06c34; border-color: #4a3325; }
+.wm-free.on em { color: #a8613c; }
+.wm-free.on .wm-sw { border-color: #e06c34; }
+.wm-free.on .wm-sw::after { left: 14px; background: #e06c34; }
 
 @media (max-width: 620px) {
   .wm-inner { gap: 9px; }
   .wm-stage { height: clamp(300px, 42vh, 460px); }
   .wm-doss-brief { font-size: 12.5px; }
   .wm-hint { display: none; }
+  .wm-head { justify-content: center; }
+  .wm-ledger { align-items: center; width: 100%; }
+  .wm-tally { justify-content: center; gap: 10px; }
+  .wm-doss-grid { grid-template-columns: 1fr; gap: 12px; }
+  .wm-doss-side { order: -1; }
+  .wm-doss-cols { grid-template-columns: 1fr; gap: 10px; }
+  .wm-coord { display: block; margin: 2px 0 0; }
+  .wm-stamp { font-size: 10px; }
   /* Bottom left, where the pan hint was: on a phone the south-east corner
      is where Rio's and Sydney's labels end up. */
   .wm-zoom { right: auto; left: 8px; }
