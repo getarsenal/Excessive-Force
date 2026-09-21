@@ -22,12 +22,12 @@ export const CAST = {
   },
   uk: {
     id: 'uk', file: 'assets/characters/uk-field-marshal.png',
-    rank: 'F.M.', name: 'Sir Aubrey Pell', nation: 'United Kingdom', side: 'right',
+    rank: 'F.M.', name: 'Sir Reginald Pomp', nation: 'United Kingdom', side: 'right',
     colours: ['#c8102e', '#ffffff', '#012169'],
   },
   fr: {
     id: 'fr', file: 'assets/characters/fr-marshal.png',
-    rank: 'Maréchal', name: 'Gaspard Thibault', nation: 'France', side: 'right',
+    rank: 'Maréchal', name: 'Gaspard DeRetreat', nation: 'France', side: 'right',
     colours: ['#0055a4', '#ffffff', '#ef4135'],
   },
   in: {
@@ -50,7 +50,7 @@ export const CAST = {
   },
   it: {
     id: 'it', file: 'assets/characters/it-generale.png',
-    rank: 'Generale', name: 'Ottavio Brambilla', nation: 'Italy', side: 'right',
+    rank: 'Generale', name: 'Ottavio Bambino', nation: 'Italy', side: 'right',
     colours: ['#008c45', '#ffffff', '#cd212a'],
   },
   ru: {
@@ -79,23 +79,24 @@ export const DEFENDER_OF = {
 /**
  * The stand-off before each level: ultimatum, refusal, last word.
  *
- * The defender's line is in his own language where the writer put it there;
- * the General never understands a word of it, which is the point.
+ * All nine are the writer's. The defender's line is in his own language
+ * where the writer put it there; the General never understands a word of it,
+ * which is the point.
  */
 export const STANDOFF = {
   westminster: [
     { who: 'us', line: 'Give it up you limey bastard' },
     { who: 'uk', line: 'God save the queen, and your soul' },
-    { who: 'us', line: "Thank god, I was worried we dragged this ordnance across the Atlantic for nothing!" },
+    { who: 'us', line: "Thank god, I was worried we dragged all this damn ordnance across the Atlantic for nothing!" },
   ],
   paris: [
     { who: 'us', line: 'Surrender or die Frenchie' },
     { who: 'fr', line: "Va t'étouffer avec une baguette" },
-    { who: 'us', line: "All I heard was baguette, and that's all I need" },
+    { who: 'us', line: "All I heard was baguette, and that's all I need, buckle up butter cup" },
   ],
   agra: [
-    { who: 'us', line: 'Nice tomb. Vacate the premises before I add to the occupancy.' },
-    { who: 'in', line: 'Twenty thousand men built this in twenty-two years. You have four guns and a hangover.' },
+    { who: 'us', line: 'Heck of an Urn ya got there, now scram before we turn one grave into 500' },
+    { who: 'in', line: 'Twenty thousand men built this in twenty-two years. You will die outside these walls like so many others' },
     { who: 'us', line: 'Twenty-two years? Give me twenty-two minutes.' },
   ],
   giza: [
@@ -103,33 +104,29 @@ export const STANDOFF = {
     { who: 'eg', line: 'اطلع الهرم ده وهاتك يا طفل يا تخين' },
     { who: 'us', line: "I don't speak Sanskrit habibi, but I get the gist. Someone get me some damn water and a lot of bombs" },
   ],
-  // ── Drafts. The five below are written here rather than handed over by the
-  // writer, and are marked as such in `characters/manifest.json`. Same shape
-  // as the rest: ultimatum, refusal in his own language, and a last word from
-  // a man who did not understand a syllable of it.
   chichen: [
-    { who: 'us', line: 'Step aside, chief. We do not negotiate with calendars.' },
+    { who: 'us', line: "Step aside, chief. You might be on the wrong calendar, but it's reckoning day" },
     { who: 'mx', line: 'Llevas mil años tarde. Esto ya lo enterramos una vez y lo volvimos a construir encima.' },
-    { who: 'us', line: 'Built it twice, huh? Well hell, that is half my work done for me.' },
+    { who: 'us', line: "No dice bro-chacho, it's pain-30 and I'm on the clock" },
   ],
   pisa: [
-    { who: 'us', line: 'That thing is already falling over. Save us both the ammunition.' },
-    { who: 'it', line: "Pende da ottocento anni, americano. Tu non duri otto minuti in questo sole." },
-    { who: 'us', line: 'Eight hundred years of leaning. Let us call it a running start.' },
+    { who: 'us', line: "That's one un-impressive specimen of an engineering failure, let me finish what gravity started" },
+    { who: 'it', line: 'Pende da ottocento anni, americano. Tu non duri otto minuti in questo sole.' },
+    { who: 'us', line: 'Yeah yeah, cappuccino cappuccino pasta BOOM BABY' },
   ],
   moscow: [
-    { who: 'us', line: 'Nine churches. I brought enough for ten.' },
+    { who: 'us', line: 'The USSR is gone Comrade, no need for hostilities, just let me level this dump and we can all go home' },
     { who: 'ru', line: 'Иван ослепил зодчего, чтобы он не построил второго. Тебе глаза оставим — смотри.' },
-    { who: 'us', line: 'I did not catch a word of that, but he sounded real confident about it.' },
+    { who: 'us', line: "Let me stop ya right there Ivan, it ain't January and I'm not the mustache man, prepare to be boarded" },
   ],
   sydney: [
-    { who: 'us', line: 'You are on a point with water on three sides. Where exactly are you going?' },
+    { who: 'us', line: "Now this has to be the dumbest looking monument to mediocrity I've ever seen" },
     { who: 'au', line: 'Mate, you have got one road in and we have got the whole harbour. Take your shot.' },
-    { who: 'us', line: 'Finally, one of them speaks English. Does not make him right.' },
+    { who: 'us', line: 'Finally, one of em speaks American! Better hit the dunny mate before ya soil them fancy slacks' },
   ],
   rio: [
-    { who: 'us', line: 'Seven hundred metres up with no road out. Walk down or be carried.' },
+    { who: 'us', line: "No way I'm climbing up that, I'm an officer I don't do PT!" },
     { who: 'br', line: 'Ele está de braços abertos há um século. Nem por você ele abaixa.' },
-    { who: 'us', line: 'Arms out like that? Son, that is not a welcome, that is a target.' },
+    { who: 'us', line: "Did anyone catch that? Me neither. Catch this amigo" },
   ],
 };

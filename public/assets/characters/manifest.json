@@ -10,7 +10,7 @@
     "side": "left"
   },
   "scripts": {
-    "note": "The stand-off before each level: three beats, player / defender / player. Lines verbatim from the writer for the first four levels; the Taj alternate and the five second-half levels (chichen, pisa, moscow, sydney, rio) are drafted here and are marked as drafts in src/game/cast.js.",
+    "note": "The stand-off before each level: three beats, player / defender / player. All nine levels' lines are the writer's, verbatim, in src/game/cast.js.",
     "westminster": [
       {
         "who": "us",
