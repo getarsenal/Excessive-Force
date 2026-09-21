@@ -131,6 +131,26 @@ export const LEVELS = {
       ornament: 'pavilions',      // chattris on the terrace corners
       river: 'ghats',             // steps down to the Yamuna
     },
+    // The Yamuna floodplain in the dry season. Agra is dust: the town's
+    // ground is a warm ochre, the roads are grey under a film of it, the
+    // Yamuna runs low between broad pale sandbanks over a muddy bed, and the
+    // only strong green on the map is the watered garden. It had London's
+    // ground — brick-dust paving, deep grass, black asphalt, a cold green
+    // riverbed — for six maps.
+    palette: {
+      urban: new THREE.Color(0xc4ad82),
+      urbanAlt: new THREE.Color(0xab9366),
+      park: new THREE.Color(0x5c6e38),
+      parkAlt: new THREE.Color(0x71803f),
+      road: new THREE.Color(0x5a544a),
+      bank: new THREE.Color(0xd8caa4),
+      bed: new THREE.Color(0x5e6247),
+      dry: new THREE.Color(0xdccb9e),
+    },
+    setting: {
+      // Hot, dusty and low: the haze is warm and sits on the plain.
+      haze: { colour: 0xd6c9ae, density: 0.00026 },
+    },
     brief: 'The dome stands on four piers. Shelling the shell only makes holes.',
   },
 
