@@ -210,7 +210,11 @@ LEVELS = {
         "span": 800.0,
         "zoom": 15,
         "parks": [[-260, -140, 250], [-40, 220, 160]],
-        "flatten": [[-40, 10, [150, 75], 28, 156.0]],
+        # Wide enough that the whole stylobate — two hundred and eight metres
+        # long, built — stands on the flat: with the pad centred forty metres
+        # west, the east end was on the feather and the ground there rose into
+        # the paving.
+        "flatten": [[-12, 6, [158, 72], 22, 156.0]],
     },
     # Istanbul: Hagia Sophia on the first hill of the old city, the Marmara
     # to the south and the Golden Horn to the north. A coast, so `sea`.
@@ -238,7 +242,10 @@ LEVELS = {
             "points": [[520, -900], [470, -500], [435, -100], [425, 300], [445, 700], [485, 900]],
         },
         "parks": [[760, 420, 260]],
-        "flatten": [[0, 0, [92, 62], 30]],
+        # The level's origin is the south tower, not the plan's centre (see
+        # the builder for why), so the pad is centred on the plan: sixty-four
+        # metres east and twenty-one north of the origin, in the game's frame.
+        "flatten": [[64, 21, [82, 52], 30]],
     },
     # Himeji: the keep on Himeyama, a forty-five metre hill in the plain, at
     # its real height so the stone base the builder lays has a hilltop to

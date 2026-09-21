@@ -145,7 +145,12 @@ async function boot() {
   const green = ['lawn', 'charbagh'].includes(level.precinct?.ground);
   for (const g of pads.values()) {
     const r = Math.max(g.x1 - g.x0, g.z1 - g.z0) * 0.5 + 8;
-    terrain.levelPad((g.x0 + g.x1) / 2, (g.z0 + g.z1) / 2, r, 40, { park: green });
+    const cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2;
+    // `groundLevel: 'bake'` — the bake's `flatten` pad already cut the ground
+    // to its real height, so the pad is levelled to that and not to the
+    // median of whatever the ring round it happens to be standing on.
+    const lvl = level.groundLevel === 'bake' ? terrain.heightAt(cx, cz) : undefined;
+    terrain.levelPad(cx, cz, r, 40, { park: green, level: lvl });
   }
 
   // The surround needs to know what country it is in before it is drawn.

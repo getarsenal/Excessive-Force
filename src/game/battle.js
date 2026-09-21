@@ -1143,9 +1143,13 @@ export class Battle {
       // mountain firing at something above it never discovered that its flat
       // trajectory went into the hillside forty metres in front of the muzzle:
       // it fired, the shell detonated at its own feet, and nothing up the hill
-      // was ever touched. The first tenth is skipped because the muzzle is
-      // standing on the ground by definition.
-      if (i > 1 && this.terrain) {
+      // was ever touched. The first few metres are skipped because the muzzle
+      // is standing on the ground by definition — metres from the gun, not
+      // samples: skipping the first sample of twelve was a fifth of a low
+      // arc's flight, and a battery posted on the slope under the Acropolis
+      // fired half its rounds into the rock face thirty metres in front of it
+      // with the check looking the other way.
+      if (this.terrain && Math.hypot(bpt.x - from.x, bpt.z - from.z) > 8) {
         const g = this.terrain.heightAt(bpt.x, bpt.z);
         if (bpt.y < g + 1.5) return false;
       }

@@ -231,7 +231,13 @@ export class Terrain {
     }
     if (!ring.length) return null;
     ring.sort((a, b) => a - b);
-    const level = ring[ring.length >> 1];
+    // The ring's median is the right target on a plain and the wrong one on a
+    // hilltop: round a two-hundred-metre building on the Acropolis the ring
+    // runs down the slopes on every side, and levelling to its median dug the
+    // rock down twenty-eight metres and set the temple in a pit. A level whose
+    // bake has already cut the ground says so, and the pad is levelled to the
+    // height the bake gave the origin.
+    const level = Number.isFinite(opts.level) ? opts.level : ring[ring.length >> 1];
 
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {

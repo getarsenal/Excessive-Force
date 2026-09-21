@@ -643,6 +643,9 @@ export const LEVELS = {
     // The rock: the town stops at the foot of the slopes, which the survey
     // already knows; this keeps the plateau itself clear.
     cityExcludeRadius: 170,
+    // The bake cut the plateau to its real 156 m; the game's own pad must
+    // level to that and not to the slopes round it.
+    groundLevel: 'bake',
     contextExclude: 170,
     // From the north-west, the way you arrive through the Propylaea.
     camera: { yaw: 2.35, pitch: 0.30, distance: 380, height: 40 },
@@ -651,6 +654,9 @@ export const LEVELS = {
         required: true, label: 'PARTHENON' },
     ],
     garrison: (g, origin, groundY) => { populateParthenon(g, origin, groundY); },
+    // The krepis is a solid platform three steps high and it is not the
+    // monument; scored on what stands on it.
+    scoreTags: ['columns', 'entablature', 'pediment', 'cella'],
     precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
     traits: { windows: false, river: false, topples: true },
     brief: 'Nothing is fixed to anything. The drums sit on the drums and the beams sit on the columns.',
@@ -747,6 +753,7 @@ export const LEVELS = {
     setting: { haze: { colour: 0xd0d4cf, density: 0.00023 } },
     // The castle grounds inside the inner moat; the town begins outside them.
     cityExcludeRadius: 250,
+    groundLevel: 'bake',
     contextExclude: 230,
     // From the south, up Otemae-dori, which is the view the town is built on.
     camera: { yaw: 0.10, pitch: 0.27, distance: 420, height: 70 },
