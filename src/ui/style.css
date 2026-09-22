@@ -218,23 +218,51 @@ html, body {
   display: flex; gap: 14px; justify-content: center; align-items: flex-end;
   padding: 0 var(--ui-pad); z-index: 16; pointer-events: none;
 }
+/* The button is the badge.
+   Each face is a rendered disc with its symbol and its word already on it, so
+   there is no border to draw, no panel behind it and no text to lay out — the
+   art is the whole control. They come in at four different sizes on four
+   different canvases, so the build step that produced `dock/*.png` cropped
+   each one tight to its own disc and resampled them all to the same square:
+   what makes four badges look like a set is that the circles are the same
+   circle, not that the files are the same size. Sixty-four pixels rather than
+   the old fifty-six, because the word is inside the disc now and at 56 it was
+   five pixels tall. */
 .dock-btn {
   pointer-events: auto;
-  width: 56px; height: 56px; flex: 0 0 auto;
+  width: 64px; height: 64px; flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border-radius: 50%; cursor: pointer; padding: 0;
-  background: rgba(10, 13, 17, 0.68); border: 1px solid var(--edge); color: var(--dim);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  transition: border-color 0.14s, color 0.14s, transform 0.14s, background 0.14s;
+  background: none; border: 0; color: var(--dim);
+  background-size: 100% 100%; background-repeat: no-repeat;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.55));
+  transition: filter 0.14s, transform 0.14s;
 }
-.dock-btn:hover { border-color: var(--edge-bright); color: var(--text); }
-.dock-btn.open { border-color: var(--accent); color: var(--text); background: rgba(35, 62, 96, 0.8); }
+#dock-units { background-image: url(./dock/units.png); }
+#dock-orders { background-image: url(./dock/orders.png); }
+#dock-view { background-image: url(./dock/view.png); }
+#dock-menu { background-image: url(./dock/menu.png); }
+/* Nothing of the markup shows through a badge: the label under it is for a
+   screen reader and for the armed state below. */
+.dock-btn .db-icon, .dock-btn .db-label { display: none; }
+.dock-btn:hover { filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.55)) brightness(1.14); }
+.dock-btn.open {
+  filter: drop-shadow(0 0 7px rgba(88, 166, 255, 0.75)) brightness(1.2);
+}
 .dock-btn:active { transform: scale(0.94); }
 /* Armed: the button wears the thing it is holding. With the drawer shut this
-   is the only place the choice is visible, so it cannot be subtle. */
-.dock-btn.armed { border-color: var(--accent); color: var(--accent); }
-.dock-btn.armed .db-label { color: var(--accent); }
-.db-icon { display: flex; align-items: center; justify-content: center; height: 22px; }
+   is the only place the choice is visible, so it cannot be subtle — and a
+   badge that says UNITS is exactly the wrong thing to be showing, so the art
+   comes off and the disc goes back to being a frame round the weapon. */
+#dock-units.armed {
+  background-image: none;
+  background: rgba(10, 13, 17, 0.68); border: 1px solid var(--accent); color: var(--accent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  filter: none;
+}
+#dock-units.armed .db-icon { display: flex; }
+#dock-units.armed .db-label { display: block; color: var(--accent); }
+.db-icon { align-items: center; justify-content: center; height: 22px; }
 .db-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .db-icon img, .db-icon canvas { max-width: 30px; max-height: 22px; object-fit: contain; }
 .db-label { font-size: 7.5px; letter-spacing: 0.13em; line-height: 1; }
@@ -248,7 +276,7 @@ html, body {
 /* ── The drawers ─────────────────────────────────────────────────────── */
 #drawers {
   position: absolute; left: 0; right: 0;
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 66px);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 74px);
   z-index: 15; pointer-events: none;
 }
 .drawer {

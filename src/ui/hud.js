@@ -295,9 +295,9 @@ export class HUD {
     if (label) label.textContent = u ? u.name : 'UNITS';
     if (this._dockIconId === (u ? u.id : null)) return;
     this._dockIconId = u ? u.id : null;
-    icon.innerHTML = u
-      ? (unitIcon(u.id) || '')
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.2h16M6.4 19.2v-6.6h4.2v6.6M13.4 19.2V8.4h4.2v10.8M4.6 12.6 8.5 9.6l3.9 3M12.6 8.4 15.5 4.8l3 3.6"/></svg>';
+    // Nothing when nothing is armed: the badge underneath is the picture then,
+    // and a second drawing behind it would only be something to go wrong.
+    icon.innerHTML = u ? (unitIcon(u.id) || '') : '';
   }
 
   /**
