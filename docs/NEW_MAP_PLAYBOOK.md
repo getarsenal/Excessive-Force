@@ -441,6 +441,46 @@ menu (TEST button) or the harness, the checks that matter:
   touching neighbour that is already standing — bounded to a twentieth of
   the structure, so it can never rescue a floating plate. If a new landmark
   has something held out horizontally, that is what keeps it on.
+- **A stone's local +z runs along its course; local +x is its thickness.**
+  That is the convention `polyRing` lays to and the one every yawed stone
+  has to follow, so a wall running in the direction `(ux, uz)` is yawed
+  `Math.atan2(ux, uz)` — not by the angle of the thing it belongs to. The
+  Burj's wing walls were yawed by the wing's own bearing, which is a quarter
+  turn off, and came out as rows of separate planks lying across the wing
+  with the running bond overlapping nothing.
+- **Bond the parts to each other, not merely near each other.** A wing wall
+  that starts at the face of the core it braces never touches it: the core
+  falls away to either side of the wing's centre line, so both long walls
+  pass it at arm's length. Run them *into* the core until they cross its
+  inner face. The support walk is a graph of stones that overlap, and
+  "obviously attached" is not one of its rules.
+- **A weaker course is a fuse.** Anything drawn as a band — a floor line, a
+  string course, a plinth — must not be a *weaker* stone in the load path,
+  or the whole wall stands at that band's capacity and sheds it with nobody
+  firing. Draw the band as ornament standing proud of the wall, a fraction
+  of a course deep, so the course above lands on the wall and not on it.
+- **Ordinary concrete does not reach five hundred metres, here or anywhere.**
+  `CONCRETE` is set against a 96 m tower that puts 2.3 MPa on its lowest
+  course. A supertall puts eleven, and its floors and setbacks concentrate
+  that. `CURTAIN` is the high-strength mix for exactly this, and the walls
+  should still thicken toward the foot. The collapse a tall building is
+  supposed to have is loss of support at a cut, never crushing at rest.
+- **How tall it is decides whether it can fall.** Breaking up happens on the
+  ground, and the suite gives a collapse a few seconds after the tower is
+  down. A half-kilometre is ten seconds of free fall on its own, so the
+  wreck was still in the air when the biggest landed piece was measured and
+  the whole thing scored as one welded column. If the undercut test reports
+  a slab of thousands, the building is too tall for the time, not too
+  strong — scale it.
+- **A man's floor is one stone, and nothing may be level with his boots.**
+  The footing check removes the stones whose centres are 0.2 to 3.2 m under
+  a defender and then asks a 2 m occupancy grid whether anything is left.
+  A surface of thin courses that overlap each other vertically leaves stone
+  0.13 m under his feet — too high to be removed, quite enough to keep the
+  cell full — and the floor goes while the man stands on the hole. Give him
+  one thick course to stand on, air under it, and no masonry within about
+  two metres at his own level. The Parthenon's krepis and the Burj's terrace
+  are both this lesson.
 
 ---
 
