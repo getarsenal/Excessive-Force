@@ -2519,6 +2519,38 @@ export class TestMenu {
         return `${drawn} stones drawn, the biggest ${biggest.toFixed(1)} m across`;
       })],
 
+      ['putting the strike sight away leaves the guns their aim', () => {
+        // The freeze a player photographed, with the panel naming it:
+        // `null is not an object (evaluating 'this._aimPoint.copy')`, thrown
+        // from `_updateUnits`.
+        //
+        // `_aimPoint` is a scratch vector, allocated once so that laying a
+        // gun on a defender costs nothing per frame. The air-strike sight
+        // borrowed the same field to remember where it was pointing, and on
+        // the way out put a null in it — so the next gun that picked a
+        // defender called `.copy` on nothing, threw before the frame reached
+        // the draw, and went on throwing for the rest of the level. Heavy
+        // bombing and a live garrison is exactly the shape of the game that
+        // gets there, which is why no probe that only fired guns found it.
+        const b2 = c.battle;
+        const strike = UNITS.find((u) => u.strike);
+        assert(!!strike, 'there is no strike unit to point with');
+        const S = b2.primary;
+        b2.showStrikeAim(
+          new THREE.Vector3(S.origin.x, S.groundY + 20, S.origin.z), strike);
+        b2.hideStrikeAim();
+        assert(b2._aimPoint && typeof b2._aimPoint.copy === 'function',
+          'the sight took the guns\' scratch aim vector away with it');
+
+        // And the path that uses it still runs. A gun, a garrison, and a few
+        // seconds: if the aim picker throws, this test carries the throw.
+        this.clearUnits();
+        const placed = this.spawnSomewhere('m777', 2, 150);
+        this.ctx.fastForward(4);
+        this.clearUnits();
+        return `sight shown and put away, ${placed} guns laid on after it`;
+      }],
+
       ['the objective figures count the same way as the bar', () => {
         // Two numbers, side by side, in opposite directions.
         //

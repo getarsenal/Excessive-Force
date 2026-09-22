@@ -38,7 +38,17 @@ export class Battle {
     this.garrison = ctx.garrison;
     // Scratch for the free-fire aim point, so picking a target does not
     // allocate a vector per gun per second.
+    //
+    // It is scratch and it is never null. The strike sight briefly borrowed
+    // this field to remember where it was pointing, and put a null back in it
+    // on the way out — so the first gun afterwards that laid on a defender
+    // called `.copy` on nothing, threw, and went on throwing every frame for
+    // the rest of the level. A player's fault panel named it: `null is not an
+    // object (evaluating 'this._aimPoint.copy')`, in `_updateUnits`. The
+    // sight keeps its own field below.
     this._aimPoint = new THREE.Vector3();
+    // Where the air-strike sight is pointing, or null when it is put away.
+    this._strikeAt = null;
     this.fx = ctx.fx;
     this.quality = ctx.quality;
     this.engine = ctx.engine;
@@ -396,12 +406,12 @@ export class Battle {
     const beam = this.strikeReticle.getObjectByName('beam');
     if (beam) { beam.scale.set(1 / r * 4, r * 0.9, 1 / r * 4); }
     this.strikeReticle.visible = true;
-    this._aimPoint = point;
+    this._strikeAt = point;
   }
 
   hideStrikeAim() {
     if (this.strikeReticle) this.strikeReticle.visible = false;
-    this._aimPoint = null;
+    this._strikeAt = null;
   }
 
   _setupGhost() {
