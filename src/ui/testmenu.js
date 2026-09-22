@@ -808,6 +808,19 @@ export class TestMenu {
     const scale = b.reloadScale;
     const cooldowns = new Map();
     for (const u of b.units) cooldowns.set(u, u.cooldown);
+    // And the battle stays solvent while it is held.
+    //
+    // A battle with nothing alive, nothing in flight and less than the
+    // cheapest unit in the bank is declared *lost* — and by this point in the
+    // suite the garrison has usually killed everything the earlier tests
+    // deployed, so the only thing keeping the level running is the money
+    // coming in for masonry brought down. Silencing the battery stops that
+    // income, which is this helper's own doing, so this helper is what has to
+    // answer for it. A lost battle stops updating, and every test after it
+    // reads a frozen world: no income, no defenders standing, nothing.
+    const costs = UNITS.filter((u) => !u.strike).map((u) => u.cost);
+    const floor = (costs.length ? Math.min(...costs) : 0) * 4;
+    if (b.money < floor) b.money = floor;
     b.reloadScale = 1e6;
     try {
       return fn();
@@ -1040,7 +1053,7 @@ export class TestMenu {
         // broken the ten tests after it to make a point about one.
         const g = b.garrison;
         const flak = g.defenders.filter((d) => d.alive && d.def.flak);
-        const money = b.money, unlock = b.unlockAll, free = b.freeBuild;
+        const unlock = b.unlockAll, free = b.freeBuild;
         b.unlockAll = true; b.freeBuild = true;
         const away = new THREE.Vector3(
           b.primary.origin.x + 900, b.originGround, b.primary.origin.z + 900);
@@ -1060,10 +1073,11 @@ export class TestMenu {
           // aircraft is pushed so high that the throw is longer than the run
           // in and it releases on the first tick.
           sortie.releaseAt = Infinity;
-          // Five seconds, not ten: the guns open up inside the first second
-          // and a burst of twelve is over in two, so the extra five bought
-          // nothing but more of the battle running underneath the test.
-          for (let k = 0; k < 20; k++) c.fastForward(0.25);
+          // Three seconds. The guns open up inside the first and a burst of
+          // twelve is over in two, so everything longer buys nothing but more
+          // of the battle running underneath the test — and a test that runs
+          // the clock is a test that changes what every test after it sees.
+          for (let k = 0; k < 12; k++) c.fastForward(0.25);
           const shots = g.airShots - before;
           b.air.sorties = b.air.sorties.filter((x) => x !== sortie);
           b.scene.remove(sortie.model);
@@ -1106,7 +1120,17 @@ export class TestMenu {
           return `${flak.length} gun(s), ${live.shots} rounds up, ${live.sortie.hits} hits, `
             + (live.sortie.aborted ? 'aircraft driven off' : `bomb walked ${live.sortie.jink.toFixed(0)} m`);
         } finally {
-          b.money = money; b.unlockAll = unlock; b.freeBuild = free;
+          // The money is *not* put back, and that is deliberate. Free build
+          // is on, so the strike costs nothing and there is nothing to undo —
+          // and restoring the figure throws away the income earned while the
+          // test ran. That matters more than it sounds: the suite spends its
+          // funds deploying guns, the garrison kills them, and a battle with
+          // nothing alive and less than the cheapest unit in the bank is a
+          // battle the rules declare lost. Handing back ten seconds' income
+          // was enough to tip Himeji over that line, and a lost battle stops
+          // updating — so the economy test two tests later saw no income and
+          // the footing test saw a garrison standing on nothing.
+          b.unlockAll = unlock; b.freeBuild = free;
         }
       })],
 
@@ -1620,8 +1644,13 @@ export class TestMenu {
           assert(P.burnt || (P.scorch || 0) > 0,
             'the building took the round without a mark on it');
           const first = P.dmg;
+          // One round goes the whole way through the projectile path, because
+          // that is where the bug was. The rest go straight to the town,
+          // because what they are asking about is the threshold and each real
+          // round costs two seconds of everybody else's battle.
+          const at = new THREE.Vector3(P.x, P.base + Math.min(P.h, 30) * 0.6, P.z);
           let rounds = 1;
-          while (!P.burnt && rounds < 6) { drop(); rounds++; }
+          while (!P.burnt && rounds < 8) { b.cityFire.hit(at, w); rounds++; }
           assert(P.burnt, `${rounds} rounds into one building and it is still whole`);
           return `${P.w.toFixed(0)}x${P.d.toFixed(0)}x${P.h.toFixed(0)} m block: `
             + `${first.toFixed(0)} damage on the first round, gutted on ${rounds}`;
