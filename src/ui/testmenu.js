@@ -2519,6 +2519,68 @@ export class TestMenu {
         return `${drawn} stones drawn, the biggest ${biggest.toFixed(1)} m across`;
       })],
 
+      ['the objective figures count the same way as the bar', () => {
+        // Two numbers, side by side, in opposite directions.
+        //
+        // The bar counts the job done, nought upward. The chips under it used
+        // to print integrity — ELIZABETH TOWER 100% for a tower nobody had
+        // touched — so the first two figures a player reads are a 0% and a
+        // 100% describing the same untouched building, neither of them
+        // labelled. Both now say how far along the job is, and both end at
+        // the same end.
+        const b2 = c.battle;
+        for (const o of b2.objectives) {
+          const share = b2.objectiveShare(o);
+          assert(share >= 0 && share <= 1, `a share outside nought to one: ${share}`);
+          if (o.structure.monumentIntegrity > 0.999) {
+            assert(share < 0.01,
+              `an untouched objective reads ${Math.round(share * 100)}% of the way down`);
+          }
+        }
+        c.hud.update(0);
+        const chips = [...document.querySelectorAll('#hud-objectives .obj b')]
+          .map((e2) => e2.textContent.trim());
+        if (b2.objectives.length >= 2) {
+          assert(chips.length === b2.objectives.length,
+            `${chips.length} chips for ${b2.objectives.length} objectives`);
+          for (let i = 0; i < chips.length; i++) {
+            const o = b2.objectives[i];
+            const want = b2.objectiveDone(o)
+              ? 'DOWN' : `${Math.round(b2.objectiveShare(o) * 100)}%`;
+            assert(chips[i] === want,
+              `the chip says ${chips[i]} where the bar's own arithmetic says ${want}`);
+          }
+        }
+        return `${b2.objectives.length} objectives, ${chips.length} printed`;
+      }],
+
+      ['the dock puts an armed weapon away', () => {
+        // With something armed every tap on the map spends money, and Escape
+        // was the only way out of it — which a phone does not have. The touch
+        // route was to open the drawer, find the card already lit and tap it
+        // again: two taps and a model of the state, to undo a decision the
+        // player had already changed their mind about.
+        const b2 = c.battle, hud = c.hud;
+        const btn = document.getElementById('dock-units');
+        assert(!!btn, 'there is no units button on the dock');
+        const was = b2.selectedUnitId;
+        const id = [...hud.cards.keys()].find((k) => b2.isUnlocked(UNITS_BY_ID[k]));
+        assert(!!id, 'nothing in the build bar is unlocked');
+        hud.setDrawer(null);
+        b2.selectedUnitId = null;
+        assert(b2.selectUnit(id) && b2.selectedUnitId === id, `${id} would not arm`);
+        btn.click();
+        assert(b2.selectedUnitId === null, 'the weapon is still in hand');
+        assert(hud.openDrawer !== 'units',
+          'putting the weapon away also opened the drawer over the map');
+        btn.click();
+        assert(hud.openDrawer === 'units',
+          'with nothing armed the button no longer opens the drawer');
+        hud.setDrawer(null);
+        b2.selectedUnitId = was;
+        return 'armed, put away in one tap, drawer on the next';
+      }],
+
       ['the governor sheds shading before stones', () => {
         // A player's diagnostics, taken on a level that was crawling: physics
         // 0.06 ms, no bodies simulated, twenty-nine frames a second — and a

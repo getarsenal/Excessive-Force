@@ -21,6 +21,8 @@ export class HUD {
     this.onSelect = opts.onSelect || (() => {});
     this.onClearTarget = opts.onClearTarget || (() => {});
     this.onRestart = opts.onRestart || (() => {});
+    // Returns whether it actually had anything to put away.
+    this.onDisarm = opts.onDisarm || (() => false);
     this.onToggleSound = opts.onToggleSound || (() => {});
     this.onNextTarget = opts.onNextTarget || (() => {});
     this.onKeepGoing = opts.onKeepGoing || (() => {});
@@ -273,7 +275,21 @@ export class HUD {
     this.closeDrawer = () => { if (this.openDrawer) this.setDrawer(null); };
 
     for (const btn of document.querySelectorAll('.dock-btn[data-drawer]')) {
-      btn.addEventListener('click', () => this.setDrawer(btn.dataset.drawer));
+      btn.addEventListener('click', () => {
+        // Put the weapon down first.
+        //
+        // With something armed, every tap on the map spends money, and the
+        // only way out of that was the Escape key — which a phone does not
+        // have. The touch route was: open the drawer, find the card that is
+        // already lit, tap it again. Two taps and a model of the state, to
+        // undo something the player had already decided against. The button
+        // is wearing the weapon's own icon and name by then, so tapping it to
+        // put that weapon away is the reading it already suggests; the drawer
+        // is one more tap, where it was before.
+        if (btn.dataset.drawer === 'units' && this.openDrawer !== 'units'
+          && this.onDisarm()) return;
+        this.setDrawer(btn.dataset.drawer);
+      });
     }
     if (this.el.ordersModes) {
       this.el.ordersModes.querySelectorAll('button').forEach((btn) => {
@@ -617,12 +633,16 @@ export class HUD {
         this.el.objectives.hidden = false;
         // Keyed on the done state too: a wing brought down by height goes to
         // DOWN while its mass reading has not moved.
-        const sig = objs.map((o) => `${o.label}:${Math.round(o.structure.monumentIntegrity * 100)}:${b.objectiveDone(o) ? 1 : 0}`).join('|');
+        // The same direction as the bar above it. These used to print
+        // integrity — ELIZABETH TOWER 100% for a tower nobody had touched,
+        // immediately under a bar reading 0% — so the two numbers a player
+        // sees first ran opposite ways with nothing to say which was which.
+        const sig = objs.map((o) => `${o.label}:${Math.round(b.objectiveShare(o) * 100)}`).join('|');
         if (sig !== this._objSig) {
           this._objSig = sig;
           this.el.objectives.innerHTML = objs.map((o) => {
             const ok = b.objectiveDone(o);
-            const p = Math.round(o.structure.monumentIntegrity * 100);
+            const p = Math.round(b.objectiveShare(o) * 100);
             return `<span class="obj${ok ? ' done' : ''}">${o.label}
               <b>${ok ? 'DOWN' : `${p}%`}</b></span>`;
           }).join('');

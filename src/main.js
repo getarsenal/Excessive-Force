@@ -444,6 +444,14 @@ async function boot() {
       else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
     onClearTarget: () => battle.clearTarget(),
+    onDisarm: () => {
+      if (!battle.selectedUnitId) return false;
+      battle.selectedUnitId = null;
+      hud.hidePrompt();
+      endAiming();
+      hud.status('weapon put away', 1.6);
+      return true;
+    },
     // Through `goToLevel` rather than a bare reload: the level is no longer in
     // the address bar by the time anyone can press this, so a reload would
     // land on the map.

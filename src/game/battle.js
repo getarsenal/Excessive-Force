@@ -1909,18 +1909,30 @@ export class Battle {
   }
 
   /** 0..1 across every objective, weighted by how much masonry each is. */
+  /**
+   * How far one objective has come towards its own line, nought to one.
+   *
+   * Lifted out of the bar's own arithmetic so that the readout beside the bar
+   * can say the same kind of number the bar does. It used to print integrity
+   * instead — a hundred per cent for a building nobody had touched — which
+   * sat directly under a bar reading nought per cent and counted the other
+   * way. Two figures, side by side, in opposite directions, neither labelled.
+   * A finished objective is finished, whichever rule finished it: one brought
+   * down by height counts in full, whatever its mass reads.
+   */
+  objectiveShare(o) {
+    if (this.objectiveDone(o)) return 1;
+    const need = 1 - o.win.integrity;
+    return Math.max(0, Math.min(1,
+      (1 - o.structure.monumentIntegrity) / Math.max(0.01, need)));
+  }
+
   get objectiveProgress() {
     let done = 0, total = 0;
     for (const o of this.objectives) {
       const w = o.structure.totalMass;
       total += w;
-      // How far this one has come, as a fraction of what it takes to finish it.
-      // A finished objective is finished, whichever rule finished it: one
-      // brought down by height counts in full, whatever its mass reads.
-      if (this.objectiveDone(o)) { done += w; continue; }
-      const integ = o.structure.monumentIntegrity;
-      const need = 1 - o.win.integrity;
-      done += w * Math.max(0, Math.min(1, (1 - integ) / Math.max(0.01, need)));
+      done += w * this.objectiveShare(o);
     }
     return total > 0 ? done / total : 0;
   }
