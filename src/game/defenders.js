@@ -37,21 +37,38 @@ import { REDEEMER } from '../structure/landmarks/rio.js';
  * is for.
  */
 
+/**
+ * How far this weapon reaches at that kind of target.
+ *
+ * An airframe and a canopy are different problems: the first is a fast thing
+ * a long way off that a laid gun tracks, the second is a man at two hundred
+ * metres. Only the flak has the first envelope at all.
+ */
+function airReach(def, kind) {
+  return kind === 'aircraft' ? (def.airRange || def.range) : def.range;
+}
+
 export const DEFENDER_TYPES = {
   rifleman: {
     key: 'rifleman', look: 'rifleman',
     name: 'Rifleman', health: 42, damage: 3.4, rof: 1.15, range: 230,
     accuracy: 0.5, colour: 0x6b5a3e, threat: 1, eye: 1.25,
+    // A rifle cannot touch an aeroplane and every army in history has fired
+    // at descending parachutes with one anyway. One man is nearly nothing;
+    // a garrison of them over a drop zone is not.
+    air: 'chute', airDamage: 1.6,
   },
   mg: {
     key: 'mg', look: 'mg',
     name: 'MG Nest', health: 78, damage: 2.4, rof: 0.11, burst: 7, burstGap: 2.6,
     range: 330, accuracy: 0.38, colour: 0x54452f, threat: 3, eye: 0.95,
+    air: 'chute', airDamage: 3.0,
   },
   sniper: {
     key: 'sniper', look: 'sniper',
     name: 'Sniper', health: 34, damage: 17, rof: 4.2, range: 430,
     accuracy: 0.72, colour: 0x3e4634, threat: 4, eye: 1.1,
+    air: 'chute', airDamage: 9,
   },
   at: {
     key: 'at', look: 'at',
@@ -87,6 +104,22 @@ export const DEFENDER_TYPES = {
     name: 'AA Gun', health: 120, damage: 6.2, rof: 0.15, burst: 12, burstGap: 3.6,
     range: 470, accuracy: 0.4, colour: 0x515a3c, threat: 7, eye: 1.15,
     emplaced: true, flak: true,
+    // The only thing on the map that can reach an aeroplane, and it drops
+    // everything on the ground to do it: a crew with a strike coming over is
+    // not shooting at a howitzer eight hundred metres away.
+    //
+    // `airRange` is a slant range against an airframe, and it has to be long.
+    // A strike aircraft crosses at two hundred and forty metres up and lets
+    // its bomb go a kilometre and a half short of the aim point — the whole
+    // run from the moment it is visible to the moment the bomb is gone is
+    // four seconds. A gun that could only reach its own four hundred and
+    // seventy metres would open fire on an empty aeroplane every time. Two
+    // and a half kilometres is also simply what a modern radar-laid light
+    // gun does: the Gepard engages to three and a half.
+    //
+    // A canopy is a different problem and uses the ordinary `range`. There is
+    // no such thing as shooting a parachutist at two kilometres.
+    air: 'all', airDamage: 14, airRange: 2400,
   },
   /**
    * A forward observer.
@@ -399,6 +432,9 @@ export class Garrison {
     this.losChecks = 0;
     this.losBlocked = 0;
     this.mortarsFired = 0;
+    // Rounds sent at something in the air, and how many of them told.
+    this.airShots = 0;
+    this.airHits = 0;
 
     const shadows = quality.shadowMapSize > 0;
     const mk = (geo, colour, max) => {
@@ -539,6 +575,8 @@ export class Garrison {
       alive: true,
       cooldown: Math.random() * def.rof,
       burstLeft: 0,
+      // Which canopy out of a stick this crew tends to pick. See `_acquireAir`.
+      airSeed: Math.random(),
       target: null,
       blocked: false,
       muzzle: snapped.clone().add(new THREE.Vector3(0, def.eye ?? 1.25, 0)),
@@ -1776,7 +1814,7 @@ export class Garrison {
    * Indirect-fire crews are skipped here — they run in `updateMortars`, which
    * puts a real shell in the air rather than resolving a hit instantly.
    */
-  update(dt, playerUnits, shots, structures) {
+  update(dt, playerUnits, shots, structures, air = null) {
     this.time += dt;
     if (!this.fireEnabled) return;
     for (const d of this.defenders) {
@@ -1785,6 +1823,14 @@ export class Garrison {
       if (d.cooldown > 0) continue;
       // Head down: nothing until the shelling stops.
       if (d.suppressed > this.time) { d.cooldown = 0.3; continue; }
+
+      // The sky first. Everything a crew can shoot at on the ground will
+      // still be there in ten seconds; an aeroplane on its run will not, and
+      // neither will a man under a canopy. A gun that can reach up takes the
+      // air target and lets the ground wait — which is also the only reason
+      // the player's own guns get a quiet moment during a drop.
+      const sky = this._acquireAir(d, air, structures);
+      if (sky) { this._shootAir(d, sky, shots); continue; }
 
       const best = this._acquire(d, playerUnits, structures);
       if (!best) { d.cooldown = 0.4; continue; }
@@ -1808,6 +1854,81 @@ export class Garrison {
       } else {
         d.cooldown = d.def.rof * (0.8 + Math.random() * 0.4);
       }
+    }
+  }
+
+  /**
+   * What this crew would rather be shooting at, overhead.
+   *
+   * `air` is the list `AirWing.airTargets` fills — aircraft on a run and
+   * canopies on the way down. A crew engages what its weapon can reach:
+   * `air: 'all'` is the flak, which can touch an airframe, and `air: 'chute'`
+   * is everything with a barrel and a sight, which cannot touch an airframe
+   * and can certainly hit a man hanging under a canopy at two hundred metres.
+   *
+   * Line of sight is checked for a canopy and not for an aeroplane. That is
+   * the one asymmetry here and it is the right one: a canopy comes down past
+   * the building and can genuinely be masked by it, and an aircraft crossing
+   * overhead is visible to everything in the open regardless of what is
+   * between it and the crew at ground level.
+   */
+  _acquireAir(d, air, structures) {
+    if (!air || !air.length) return null;
+    const mode = d.def.air;
+    if (!mode) return null;
+    let best = null, bestScore = Infinity;
+    for (const t of air) {
+      if (t.kind === 'aircraft' && mode !== 'all') continue;
+      const reach = airReach(d.def, t.kind);
+      const dx = t.pos.x - d.muzzle.x, dy = t.pos.y - d.muzzle.y, dz = t.pos.z - d.muzzle.z;
+      if (dy < 1.0) continue;                       // on the ground, or below him
+      const d2 = dx * dx + dy * dy + dz * dz;       // slant range, not map range
+      if (d2 > reach * reach) continue;
+      // An aeroplane is the prize where a crew can hurt one: it is carrying
+      // the thing that flattens the objective, and it will be gone in seconds.
+      //
+      // Canopies are shared out rather than taken strictly nearest-first. Two
+      // hundred rifles all laying on whichever man happens to be closest
+      // destroys a stick one at a time, from the top, every time — the whole
+      // drop comes apart in the same order and nobody in it survives. The
+      // bias is stable per crew and per canopy, so a man is not passed from
+      // gun to gun frame by frame; it simply means different crews have
+      // picked different men out of the same sky.
+      const spread = t.kind === 'chute' ? 1 + 1.6 * (((d.airSeed + t.seed) * 1.0) % 1) : 1;
+      const score = d2 * (t.kind === 'aircraft' ? 0.35 : spread);
+      if (score >= bestScore) continue;
+      if (t.kind === 'chute' && structures
+          && !lineOfSight(structures, d.muzzle, t.pos, 1.2, 0.0)) continue;
+      best = t; bestScore = score;
+    }
+    return best;
+  }
+
+  /**
+   * Shoot at it, and record the shot for the tracer pass.
+   *
+   * The shot carries the air target rather than a ground unit, and the damage
+   * is applied by the battle — the garrison knows how to hit an aeroplane and
+   * nothing whatever about what being hit does to one.
+   */
+  _shootAir(d, t, shots) {
+    const reach = airReach(d.def, t.kind);
+    const dist = Math.sqrt(
+      (t.pos.x - d.muzzle.x) ** 2 + (t.pos.y - d.muzzle.y) ** 2 + (t.pos.z - d.muzzle.z) ** 2);
+    // Deflection. A jet crossing at two hundred and forty knots is a hard
+    // shot and a canopy is very nearly a stationary one.
+    const lead = t.kind === 'aircraft' ? 0.5 : 0.78;
+    const hit = Math.random() < d.def.accuracy * (1 - 0.55 * (dist / reach)) * lead;
+    const damage = (d.def.airDamage || d.def.damage) * this.damageScale;
+    shots.push({ from: d.muzzle, to: t.pos, hit, damage, unit: null, defender: d, air: t });
+    if (hit) this.airHits++;
+    this.airShots++;
+    d.facing = Math.atan2(t.pos.x - d.pos.x, t.pos.z - d.pos.z);
+    if (d.def.burst) {
+      d.burstLeft = d.burstLeft > 0 ? d.burstLeft - 1 : d.def.burst;
+      d.cooldown = d.burstLeft > 0 ? d.def.rof : d.def.burstGap;
+    } else {
+      d.cooldown = d.def.rof * (0.8 + Math.random() * 0.4);
     }
   }
 

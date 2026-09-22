@@ -541,9 +541,28 @@ async function boot() {
         break;
       case 'flak':
         // Said before the INBOUND line, so the player reads "under fire" and
-        // then watches the bomb miss, rather than wondering afterwards why it
-        // did.
-        hud.feed(`FLAK OVER TARGET · ${data.guns} GUN${data.guns > 1 ? 'S' : ''} — RUN SPOILED`, 'bad');
+        // then watches what the guns do about it, rather than wondering
+        // afterwards why the bomb went wide. It is a warning, not a verdict:
+        // the pits are still there to be shot at while the aircraft runs in.
+        hud.feed(`FLAK OVER TARGET · ${data.guns} GUN${data.guns > 1 ? 'S' : ''}`, 'warn');
+        break;
+      case 'underfire':
+        hud.feed(`${data.def.name} TAKING FIRE ON THE RUN`, 'bad');
+        break;
+      case 'aborted':
+        hud.feed(`${data.def.name} DRIVEN OFF — NO DROP`, 'bad');
+        break;
+      case 'transporthit':
+        hud.feed('TRANSPORT HIT — STICKS DUMPED SHORT', 'bad');
+        break;
+      case 'canopy':
+        hud.feed(data.troops ? `CANOPY SHOT OUT — ${data.def.name}` : `LOAD STREAMING — ${data.def.name}`, 'bad');
+        break;
+      case 'droplost':
+        hud.feed(`${data.def.name} LOST ON THE DROP`, 'bad');
+        break;
+      case 'dropmauled':
+        hud.feed(`${data.def.name} DOWN HARD · ${Math.round(data.health * 100)}%`, 'bad');
         break;
       case 'strikehit':
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');

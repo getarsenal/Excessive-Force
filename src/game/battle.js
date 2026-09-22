@@ -109,6 +109,10 @@ export class Battle {
       scene: this.scene, quality: this.quality, terrain: this.terrain,
       projectiles: this.projectiles, fx: this.fx, audio: this.audio, camera: this.camera,
     });
+    // What the flak did, said out loud. The air wing raises these where the
+    // flying consequence happens, because that is the only place that knows
+    // a pilot has turned for home or a canopy has come apart.
+    this.air.onAirEvent = (kind, data) => this.onEvent(kind, data);
     this._setupHealthBars();
     this._setupTargetMarker();
     this._setupGhost();
@@ -569,14 +573,16 @@ export class Battle {
     // Aim at the ground under the point if it is in the open, or at the
     // masonry itself: the bomb goes off where it first meets something.
     const ceiling = this.structures.reduce((a, st) => Math.max(a, st.standingHeight()), at.y);
-    // Who is shooting back at it. Flak does not stop the aircraft; it stops
-    // the bomb landing where the player pointed, which is the difference
-    // between an air strike and a very expensive button.
+    // Who is shooting back at it. This is a warning now, not a verdict: what
+    // the run is worth is settled in the air, by the rounds that actually go
+    // into the aircraft between here and the release. Saying so before the
+    // aircraft arrives gives the player the few seconds he needs to put
+    // something on those pits first, which is the whole point of them.
     const flak = this.garrison ? this.garrison.flakOver(at, 120) : 0;
     const sortie = this.air.call(def, at, ceiling, { flak });
     this.shotsFired++;
     this.selectedUnitId = null;
-    if (sortie.harried) this.onEvent('flak', { def, guns: flak });
+    if (flak > 0) this.onEvent('flak', { def, guns: flak });
     this.onEvent('strike', { def, point: at, eta: sortie.releaseAt + sortie.fall });
     return sortie;
   }
@@ -715,12 +721,26 @@ export class Battle {
   _land(d) {
     this.pending = this.pending.filter((x) => x !== d);
     if (d.marker) { this.scene.remove(d.marker); d.marker = null; }
+    // Nothing got out of it. A stick whose canopies were all shot away does
+    // not become a unit, and the player is told rather than left counting.
+    if (d.lost) {
+      if (d.group.parent) d.group.removeFromParent();
+      this.onEvent('droplost', { def: d.def });
+      return;
+    }
     // The load that came down the platform or the sling is the unit's own
     // model; it leaves them for the ground it landed on.
     if (d.group.parent) d.group.removeFromParent();
     d.group.position.set(0, 0, 0);
     d.group.rotation.set(0, 0, 0);
-    this._spawn(d.def, d.pos, d);
+    const unit = this._spawn(d.def, d.pos, d);
+    // It arrived, and it arrived hurt: men lost on the way down, or a load
+    // that came in under a streaming canopy.
+    if (unit && d.arrivalHealth !== undefined && d.arrivalHealth < 1) {
+      unit.health = Math.max(1, Math.round(unit.maxHealth * d.arrivalHealth));
+      this.onEvent('dropmauled', { def: d.def, health: unit.health / unit.maxHealth });
+    }
+    return unit;
   }
 
   /** The unit itself, on the ground, setting up. */
@@ -1590,8 +1610,15 @@ export class Battle {
       this.onEvent('crushed', lost);
     }
     const shots = [];
-    this.garrison.update(dt, this.units, shots, this.structures);
+    // What of the player's is in the air this tick, for the crews that can
+    // reach up. Filled into one array the battle owns rather than a new one
+    // every frame, and empty on all but the few seconds a sortie is running.
+    const air = this.air ? this.air.airTargets(this._air || (this._air = [])) : null;
+    this.garrison.update(dt, this.units, shots, this.structures, air);
     this._pushTracers(shots);
+    // The garrison decides what it hit; the air wing decides what that does
+    // to an aeroplane or a canopy. Neither needs to know the other's business.
+    for (const sh of shots) if (sh.air && sh.hit) this.air.hitAir(sh.air, sh.damage);
     this.garrison.updateMortars(dt, this.projectiles, this.units);
     if (this.turret) this.turret.update(dt, this.units, this.projectiles, this);
     this.garrison.sync();

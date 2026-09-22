@@ -422,26 +422,108 @@ export class AirWing {
       // Until the garrison had guns that could reach up, the two most expensive
       // cards in the arsenal were also the two safest: the aircraft flew
       // through a defended objective as though the airspace were empty and put
-      // its bomb exactly where it was told to. Each gun still shooting over the
-      // target is one roll at spoiling the run — a pilot jinking through
-      // tracer, which does not stop the bomb, it stops the bomb landing where
-      // he meant it to. Killing the flak first is therefore worth doing, and
-      // that is the whole point of it being there.
+      // its bomb exactly where it was told to.
+      //
+      // It used to be a single roll taken before the aircraft was even in the
+      // air — count the guns, spoil the run or do not. That was the right
+      // effect arrived at the wrong way: the guns that decided it were the
+      // ones near the aim point rather than the ones the run actually passed
+      // over, nothing was drawn, and shooting one of them down between the
+      // call and the release changed nothing. Now the aircraft flies through
+      // real tracer from real crews and carries what it has been hit with:
+      // every point of damage walks the bomb further off the point the player
+      // marked, and a pilot who has taken enough of it leaves without
+      // dropping at all. Killing the flak first is worth doing, and now it is
+      // worth doing *while the aircraft is on its run*.
       flak: opts.flak || 0,
+      hp: AIRFRAME.jet, hits: 0, jink: 0,
+      // Which way the bomb walks. Fixed at the start, so a run that takes fire
+      // all the way in does not wander: it goes further off the same way.
+      jinkAt: Math.random() * Math.PI * 2,
     };
-    if (s.flak > 0) {
-      const spoil = 1 - Math.pow(0.72, s.flak);
-      if (Math.random() < spoil) {
-        s.harried = 22 + 26 * Math.random() * Math.min(1, s.flak / 3);
-        const ang = Math.random() * Math.PI * 2;
-        s.target.x += Math.cos(ang) * s.harried;
-        s.target.z += Math.sin(ang) * s.harried;
-        // Off early rather than off late: a pilot under fire releases sooner.
-        s.releaseAt = Math.max(0.2, s.releaseAt - (0.25 + Math.random() * 0.5));
-      }
-    }
     this.sorties.push(s);
     return s;
+  }
+
+  /**
+   * Everything of the player's that is in the air and can be shot at.
+   *
+   * Filled into a caller-owned array rather than allocating one a frame: the
+   * garrison asks for this every tick of every battle.
+   */
+  airTargets(out = []) {
+    out.length = 0;
+    for (const s of this.sorties) {
+      if (s.done || s.gone) continue;
+      // The airframe itself. A jet that has already pulled up and is climbing
+      // out is left alone — the shooting is about the run, and tracer chasing
+      // a dot at three thousand metres is noise.
+      if (!(s.climb > 0.9)) {
+        out.push({ kind: 'aircraft', sortie: s, pos: s.model.position,
+          transport: !!(s.lift || s.heli) });
+      }
+      if (!s.lift) continue;
+      for (const L of s.lift.loads) {
+        for (const c of L.chutes) {
+          if (c.phase === 'landed' || c.dead) continue;
+          out.push({ kind: 'chute', sortie: s, load: L, chute: c, pos: c.g.position, seed: c.seed });
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * A round has gone into something in the air.
+   *
+   * The garrison does the shooting and the deciding; this does the flying
+   * consequences, which is the only half of it the aircraft knows about.
+   */
+  hitAir(t, damage) {
+    if (!t) return;
+    if (t.kind === 'chute') return this._hitChute(t, damage);
+    const s = t.sortie;
+    if (s.hp === undefined) return;
+    s.hits++;
+    s.hp -= damage;
+    if (s.lift || s.heli) {
+      // A transport does not abort — it is already over the drop zone and the
+      // load is no use to anybody still in the aeroplane. It dumps the rest of
+      // the sticks where it is and turns away, and the men come down wherever
+      // that puts them.
+      if (s.hp <= 0 && !s.dumping) {
+        s.dumping = true;
+        s.smoking = true;
+        if (this.onAirEvent) this.onAirEvent('transporthit', { def: s.def });
+      }
+      return;
+    }
+    if (s.released) { if (s.hp <= 0) s.smoking = true; return; }
+    // Still carrying. The bomb walks off the point, and a pilot who has taken
+    // enough goes home with it.
+    s.jink += damage * JINK_PER_HP;
+    if (s.hits === 1 && this.onAirEvent) this.onAirEvent('underfire', { def: s.def });
+    if (s.hp <= 0 && !s.aborted) {
+      s.aborted = true;
+      s.smoking = true;
+      s.pullUpAt = Math.min(s.pullUpAt, s.t);
+      if (this.onAirEvent) this.onAirEvent('aborted', { def: s.def });
+    }
+  }
+
+  /** A canopy takes a burst. Enough of them and it stops being a canopy. */
+  _hitChute(t, damage) {
+    const c = t.chute;
+    if (c.dead || c.streaming) return;
+    c.hp -= damage;
+    if (c.hp > 0) return;
+    c.streaming = true;
+    // A man whose canopy has gone does not survive the ground. A platform
+    // does: it lands hard, and whatever was lashed to it gets up damaged.
+    c.dead = t.load.troops;
+    if (this.onAirEvent) {
+      this.onAirEvent('canopy', { def: t.load.drop.def, troops: t.load.troops });
+    }
   }
 
   update(dt) {
@@ -467,9 +549,21 @@ export class AirWing {
         m.rotation.z = s.climb * 0.5;
       }
 
+      // Driven off: the bomb stays on the rail and the aircraft goes home.
+      if (s.aborted && !s.released) s.released = true;
+
       // Let go.
       if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli) {
         s.released = true;
+        // Where it actually goes. The aim point walks off by what the pilot
+        // has been hit with on the way in, and a pilot under fire lets go
+        // early rather than late, so the error is short of the mark as often
+        // as it is wide of it.
+        if (s.jink > 0) {
+          s.harried = s.jink;
+          s.target.x += Math.cos(s.jinkAt) * s.jink;
+          s.target.z += Math.sin(s.jinkAt) * s.jink;
+        }
         const bomb = m.getObjectByName('bomb');
         if (bomb) bomb.visible = false;
         const p = s.def.projectile;
@@ -488,7 +582,13 @@ export class AirWing {
       if (this.fx && this.quality.name !== 'low') {
         this._v.copy(m.position).addScaledVector(s.dir, -10);
         this._v.y -= 0.5;
-        this.fx.trail(this._v, 1.6);
+        // An aircraft that has been hit trails properly, so a player who was
+        // looking somewhere else can still read what happened to his strike.
+        this.fx.trail(this._v, s.smoking ? 5.0 : 1.6);
+        if (s.smoking) {
+          this._v.copy(m.position).addScaledVector(s.dir, -22);
+          this.fx.trail(this._v, 3.4);
+        }
       }
       s.roar -= dt;
       if (s.roar <= 0 && this.audio) {
@@ -660,6 +760,28 @@ const LIFT = { speed: 95, height: 112, clearance: 45, runIn: 720, spacing: 82, s
 const CHUTE = { troopRate: 7.6, cargoRate: 7.0, freeFall: 1.0, open: 0.5, stick: 0.36 };
 
 /**
+ * What it takes to hurt something in the air.
+ *
+ * These are not hit points in the sense the ground units have them: nothing
+ * up here is meant to be killed outright by a lucky burst. They are how long
+ * a thing can stay in a cone of tracer before the pilot stops flying the run
+ * he was briefed and starts flying away from the guns — which is what air
+ * defence has always actually done, and is the effect worth modelling.
+ *
+ * A jet crossing at two hundred and forty knots is in range for a few
+ * seconds and its number is small to match. A transport is slower, lower and
+ * straighter, and has to stay that way until the last man is off the ramp,
+ * so it is tougher and still the one that suffers. A canopy is a canopy: it
+ * takes a while to shoot away with small arms, and no time at all under flak.
+ */
+const AIRFRAME = { jet: 100, transport: 220, heli: 170 };
+const CANOPY = { troop: 195, cargo: 340 };
+/** How far off a bomb goes, in metres, per point of damage taken before release. */
+const JINK_PER_HP = 0.55;
+/** A streaming canopy: no steering, and down at this rate instead of its own. */
+const STREAM_RATE = 23;
+
+/**
  * Load the package onto aircraft. Drops close together go out of the same
  * ramp on one run, in the order the run reaches them; a package spread
  * across the map takes as many aircraft as it needs, no more.
@@ -751,6 +873,7 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlon
       releaseAt: loads[0].releaseAt,
       pullUpAt: last.releaseAt + last.toGo * CHUTE.stick + 2.0,
       climb: 0, roar: 0, life: 0, released: true, flak: 0, turn: 0, bank: 0, pitch: 0,
+      hp: AIRFRAME.transport, hits: 0,
       // Away from the camera's side of the line, so the turn opens the view
       // rather than crossing it.
       turnDir: lateral >= 0 ? 1 : -1,
@@ -835,18 +958,56 @@ AirWing.prototype._releaseOne = function _releaseOne(s, L) {
     g, load, canopies, landAt, landY: landAt.y,
     vel: new THREE.Vector3(s.dir.x * s.speed * 0.9, -1.5, s.dir.z * s.speed * 0.9),
     t: 0, phase: 'free', sway: Math.random() * Math.PI * 2, rate: L.rate,
+    hp: L.troops ? CANOPY.troop : CANOPY.cargo, seed: Math.random(),
   });
   L.nextAt = s.t + CHUTE.stick;
 };
 
-/** Fly one load's chutes down. Returns true when all of it is on the ground. */
+/**
+ * Fly one load's chutes down. Returns true when all of it is on the ground.
+ *
+ * The tally is kept on the load rather than counted out of `L.chutes` each
+ * tick, because that list is not the load: `_collapse` takes a canopy out of
+ * it a second after it lands. That was harmless while every man of a stick
+ * came down together at the same seven and a half metres a second. A canopy
+ * that has been shot away falls at three times that, so the man who was hit
+ * is on the ground and swept up long before his partner — and a count of
+ * what was still in the list could never reach the size of the stick again.
+ * The load hung in `pending` for the rest of the battle and the unit it was
+ * carrying never arrived.
+ */
 AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
-  let landed = 0;
+  const touch = (c) => {
+    c.phase = 'landed';
+    c.landedAt = c.t;
+    L.down = (L.down || 0) + 1;
+    if (c.dead) L.deadMen = (L.deadMen || 0) + 1;
+    if (c.streaming) L.streamed = (L.streamed || 0) + 1;
+  };
   for (const c of L.chutes) {
-    if (c.phase === 'landed') { landed++; continue; }
+    if (c.phase === 'landed') continue;
     c.t += dt;
     if (c.phase === 'free' && c.t > CHUTE.freeFall) c.phase = 'open';
     const p = c.g.position;
+    if (c.streaming) {
+      // Shot away. The canopy is a rag over his head, there is no steering
+      // any more, and the only question left is how hard the ground is.
+      for (const k of c.canopies) {
+        k.scale.set(Math.max(0.06, k.scale.x - dt * 1.8), Math.max(0.06, k.scale.y - dt * 2.4), 1);
+      }
+      c.vel.y += (-STREAM_RATE - c.vel.y) * Math.min(1, dt * 2.2);
+      c.vel.x -= c.vel.x * 0.9 * dt;
+      c.vel.z -= c.vel.z * 0.9 * dt;
+      c.g.rotation.x = Math.sin(c.t * 5.0) * 0.5;
+      c.g.rotation.z = Math.cos(c.t * 4.1) * 0.45;
+      p.addScaledVector(c.vel, dt);
+      if (p.y <= c.landY) {
+        p.y = c.landY;
+        touch(c);
+        if (this.fx) this.fx.impactDust(p.x, p.y, p.z, L.troops ? 1.1 : 2.6);
+      }
+      continue;
+    }
     if (c.phase === 'free') {
       c.vel.y -= 9.81 * dt;
       c.vel.x -= c.vel.x * 1.4 * dt; c.vel.z -= c.vel.z * 1.4 * dt;
@@ -878,14 +1039,12 @@ AirWing.prototype._updateChutes = function _updateChutes(L, dt) {
     p.addScaledVector(c.vel, dt);
     if (p.y <= c.landY) {
       p.y = c.landY;
-      c.phase = 'landed';
       c.g.rotation.set(0, c.g.rotation.y, 0);
-      c.landedAt = c.t;
-      landed++;
+      touch(c);
       if (this.fx && this.quality.name !== 'low') this.fx.impactDust(p.x, p.y, p.z, L.troops ? 0.4 : 1.6);
     }
   }
-  return landed === L.toGo && L.out === L.toGo;
+  return (L.down || 0) >= L.toGo && L.out === L.toGo;
 };
 
 /** Let the canopies fall over the load and take them away. */
@@ -919,9 +1078,26 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
   for (const p of m.children) if (p.name === 'prop') p.rotation.z += 38 * dt;
   let allDown = true;
   for (const L of s.lift.loads) {
+    // Hit hard enough: everything still on board goes now, wherever the
+    // aeroplane happens to be. A stick dumped short has the whole descent to
+    // fly back to its mark and generally cannot, which is the cost.
+    if (s.dumping && !L.dumped && L.out < L.toGo) {
+      L.dumped = true;
+      L.releaseAt = Math.min(L.releaseAt, s.t);
+      L.nextAt = Math.min(L.nextAt, s.t);
+    }
     if (L.out < L.toGo && s.t >= L.releaseAt && s.t >= L.nextAt) this._release(s, L);
     if (L.out > 0 && !L.landed && this._updateChutes(L, dt)) {
       L.landed = true;
+      // How it arrives. A load whose canopies were shot away comes in hard;
+      // a stick that lost men arrives short-handed; a stick that lost all of
+      // them does not arrive at all.
+      const dead = L.deadMen || 0;
+      const streamed = L.streamed || 0;
+      L.drop.lost = L.troops && dead >= L.toGo;
+      L.drop.arrivalHealth = L.troops
+        ? Math.max(0.2, 1 - dead / Math.max(1, L.toGo))
+        : (streamed ? 0.45 : 1);
       if (s.lift.onLand) s.lift.onLand(L.drop);
     }
     if (L.out > 0) this._collapse(L, dt);
@@ -1084,6 +1260,7 @@ AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formatio
     const s = {
       def: d.def, model, dir, side, alt: cruise, target, speed: HELI.speed, t: 0, roar: 0, life: 0,
       released: true, flak: 0, bank: 0, pitch: 0, turnDir: 1,
+      hp: AIRFRAME.heli, hits: 0,
       heli: { drop: d, onLand, sling, lines, phase: 'approach', hold: 0, wash: 0, cruise, vel: new THREE.Vector3(dir.x * HELI.speed, 0, dir.z * HELI.speed), yaw: model.rotation.y },
     };
     this.sorties.push(s);

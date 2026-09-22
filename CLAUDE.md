@@ -22,13 +22,13 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
 
 ```
 npx vite --port 5177 --strictPort &
-sh tools/suiteall.sh <id>...            # expect "<id>: 35 pass 0 fail" per level
+sh tools/suiteall.sh <id>...            # expect "<id>: 36 pass 0 fail" per level
 npx vite build
 ```
 
 `suiteall.sh` runs three browsers at a time against the one dev server, which
-is what the box has cores for: all nine levels in seven minutes rather than
-twenty-one. `JOBS=1` for a clean timing, `TIER=high` for another tier. It sets
+is what the box has cores for: all fourteen levels in eleven minutes rather
+than thirty-three. `JOBS=1` for a clean timing, `TIER=high` for another tier. It sets
 `TT_SUITE=1`, which drops the three screenshots and the twelve seconds of
 settling between them — those exist so a human can look, and a regression run
 is not a human looking.
@@ -115,7 +115,7 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift
   package · `src/game/aircraft.js` air strikes and the airlift (the C-130,
-  the parachutes) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
+  the parachutes, what the flak does to both) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
   `src/ui/` HUD, level select, stand-off, test panel ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real

@@ -990,6 +990,85 @@ export class TestMenu {
         return `${fired} bombs`;
       }],
 
+      ['the garrison shoots at what is in the air', () => {
+        // The claim: an aircraft over a defended objective is flown through
+        // real tracer from real crews, and killing those crews stops it.
+        //
+        // The run is deliberately aimed well away from the monument. The flak
+        // reaches two and a half kilometres and the masonry is what every
+        // other test in this file is about, so the bomb goes into open country
+        // and the assertions are all about who shot at the aeroplane on the
+        // way. A test that flattens the objective to prove the guns work has
+        // broken the ten tests after it to make a point about one.
+        const g = b.garrison;
+        const flak = g.defenders.filter((d) => d.alive && d.def.flak);
+        const money = b.money, unlock = b.unlockAll, free = b.freeBuild;
+        b.unlockAll = true; b.freeBuild = true;
+        const away = new THREE.Vector3(
+          b.primary.origin.x + 900, b.originGround, b.primary.origin.z + 900);
+        const runOne = () => {
+          const before = g.airShots;
+          const sortie = b.callStrike('f15', away);
+          if (!sortie) return { shots: 0, sortie: null };
+          // It flies the run carrying its bomb and never lets go, and is then
+          // lifted off the board by hand. The flak has had the whole approach
+          // to shoot at it and nothing has been dropped on anybody — leaving
+          // the sortie to finish would put a five-hundred-pounder into the
+          // town, and the tests after this one are entitled to the town they
+          // were written against.
+          //
+          // Held rather than stopped short, because how long the run is before
+          // the bomb goes is a matter of geometry: over the Great Pyramid the
+          // aircraft is pushed so high that the throw is longer than the run
+          // in and it releases on the first tick.
+          sortie.releaseAt = Infinity;
+          for (let k = 0; k < 40; k++) c.fastForward(0.25);
+          const shots = g.airShots - before;
+          b.air.sorties = b.air.sorties.filter((x) => x !== sortie);
+          b.scene.remove(sortie.model);
+          return { shots, sortie };
+        };
+        try {
+          if (!flak.length) {
+            // Nothing on this level can reach an aeroplane, and saying so is
+            // not the same as failing — the flak pits are sited by the field
+            // works and a cramped objective gets none.
+            const armed = g.defenders.filter((d) => d.alive && d.def.air).length;
+            assert(armed > 0, 'nothing in the garrison can engage anything in the air');
+            const r = runOne();
+            assert(r.sortie, 'no sortie: the strike could not be called');
+            assert(r.shots === 0, `${r.shots} rounds at an aircraft from a garrison with no flak`);
+            return `no flak here: ${armed} can still engage canopies`;
+          }
+          const live = runOne();
+          assert(live.sortie, 'no sortie: the strike could not be called');
+          assert(live.shots > 0,
+            `${flak.length} live flak gun(s) and not one round at the aircraft`);
+          assert(live.sortie.hits === 0 || live.sortie.jink > 0,
+            `${live.sortie.hits} hits on the run and the bomb still goes where it was told`);
+          // `released` means "has nothing left to drop", and being driven off
+          // is one way to have nothing left: over the pyramids the flak turns
+          // the aircraft round inside ten seconds. What must not happen is a
+          // bomb actually leaving the rail, and `releaseAt` held at infinity
+          // is what guarantees that.
+          assert(live.sortie.aborted || !live.sortie.released,
+            'the run let a bomb go that the test meant it to carry');
+
+          // And with the pits silenced, nothing goes up. This is the half that
+          // matters: the whole reason to shoot the flak out first.
+          const health = flak.map((d) => d.health);
+          for (const d of flak) { d.alive = false; }
+          const dead = runOne();
+          for (let i = 0; i < flak.length; i++) { flak[i].alive = true; flak[i].health = health[i]; }
+          assert(dead.shots === 0,
+            `${dead.shots} rounds at the aircraft with every flak gun dead`);
+          return `${flak.length} gun(s), ${live.shots} rounds up, ${live.sortie.hits} hits, `
+            + (live.sortie.aborted ? 'aircraft driven off' : `bomb walked ${live.sortie.jink.toFixed(0)} m`);
+        } finally {
+          b.money = money; b.unlockAll = unlock; b.freeBuild = free;
+        }
+      }],
+
       ['friendly units fire without a designated target', () => this._calm(() => {
         const hadTarget = b.target ? b.target.clone() : null;
         const label = b.targetLabel;
