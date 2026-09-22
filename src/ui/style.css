@@ -200,13 +200,104 @@ html, body {
 .objectives .obj.done b { color: var(--money); }
 
 /* ── Build bar ───────────────────────────────────────────────────────── */
-#buildbar {
+/* ── The dock ────────────────────────────────────────────────────────── */
+/*
+ * Four round buttons, and drawers that glide up out of them.
+ *
+ * The bottom of the screen used to carry eleven unit cards standing open for
+ * the whole battle, a floating SMOKE button over them and a rail of three
+ * more under the readouts. On a phone that is most of the lower third, always
+ * there, over the part of the map the player is actually looking at — and
+ * nine of those eleven cards are locked for most of a level. Now the shut
+ * state is four buttons about seventy pixels tall, and anything you want a
+ * list for arrives when you ask for it and leaves when you tap the map.
+ */
+#dock {
   position: absolute; left: 0; right: 0;
   bottom: max(8px, env(safe-area-inset-bottom));
+  display: flex; gap: 14px; justify-content: center; align-items: flex-end;
+  padding: 0 var(--ui-pad); z-index: 16; pointer-events: none;
+}
+.dock-btn {
+  pointer-events: auto;
+  width: 56px; height: 56px; flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border-radius: 50%; cursor: pointer; padding: 0;
+  background: rgba(10, 13, 17, 0.68); border: 1px solid var(--edge); color: var(--dim);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.14s, color 0.14s, transform 0.14s, background 0.14s;
+}
+.dock-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+.dock-btn.open { border-color: var(--accent); color: var(--text); background: rgba(35, 62, 96, 0.8); }
+.dock-btn:active { transform: scale(0.94); }
+/* Armed: the button wears the thing it is holding. With the drawer shut this
+   is the only place the choice is visible, so it cannot be subtle. */
+.dock-btn.armed { border-color: var(--accent); color: var(--accent); }
+.dock-btn.armed .db-label { color: var(--accent); }
+.db-icon { display: flex; align-items: center; justify-content: center; height: 22px; }
+.db-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.db-icon img, .db-icon canvas { max-width: 30px; max-height: 22px; object-fit: contain; }
+.db-label { font-size: 7.5px; letter-spacing: 0.13em; line-height: 1; }
+/* A dot for a drawer with something waiting in it. */
+.dock-btn .db-dot {
+  position: absolute; top: 7px; right: 9px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent);
+}
+.dock-btn { position: relative; }
+
+/* ── The drawers ─────────────────────────────────────────────────────── */
+#drawers {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 66px);
+  z-index: 15; pointer-events: none;
+}
+.drawer {
+  pointer-events: auto;
+  /* Out of the dock and back into it: up from below with a little scale, so
+     it reads as coming out of the button rather than sliding in from
+     nowhere. `hidden` is removed for the whole of both transitions, which is
+     what `_setupDock` is doing with its two frames. */
+  transform: translateY(18px) scale(0.97); opacity: 0;
+  transform-origin: bottom center;
+  transition: transform 0.19s cubic-bezier(0.22, 0.9, 0.3, 1), opacity 0.15s ease;
+}
+.drawer.on { transform: translateY(0) scale(1); opacity: 1; }
+.drawer[hidden] { display: none; }
+.dr-title {
+  font-size: 8.5px; letter-spacing: 0.22em; color: var(--dim);
+  text-align: center; margin-bottom: 6px;
+}
+#drawer-orders {
+  width: min(360px, calc(100vw - var(--ui-pad) * 2)); margin: 0 auto;
+  background: var(--panel); border: 1px solid var(--edge); padding: 9px 10px 10px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+/* The unit drawer gets a tray of its own rather than eleven cards floating
+   loose over the map — and a top and bottom border, so a row that scrolls
+   sideways reads as one strip with more of itself off the edge. */
+#drawer-units {
+  background: rgba(10, 13, 17, 0.62);
+  border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge);
+  padding: 8px 0 7px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.dr-row { display: flex; gap: 5px; margin-top: 5px; }
+.dr-row button {
+  flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
+  font-family: inherit; font-size: 9.5px; letter-spacing: 0.13em;
+  padding: 0; min-height: 34px; cursor: pointer;
+}
+.dr-row button:hover { border-color: var(--edge-bright); color: var(--text); }
+.dr-row button.on { border-color: var(--danger); color: var(--danger); background: rgba(232, 96, 76, 0.1); }
+.dr-row button.wait { color: var(--dim); opacity: 0.6; }
+.dr-row button.unaffordable { color: var(--danger); }
+
+#buildbar {
   display: flex; gap: 6px; padding: 0 var(--ui-pad);
-  overflow-x: auto; overflow-y: hidden;
+  overflow-x: auto; overflow-y: visible;
   scrollbar-width: none;
   justify-content: safe center;
+  align-items: stretch;
 }
 #buildbar::-webkit-scrollbar { display: none; }
 
@@ -343,41 +434,20 @@ html, body {
 }
 
 /* ── Fire modes, smoke ───────────────────────────────────────────────── */
-.tc-modes { display: flex; gap: 3px; margin-top: 7px; }
-.tc-modes button {
-  flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 9.5px; letter-spacing: 0.12em; padding: 0; min-height: 30px; cursor: pointer;
-}
-.tc-modes button.on { border-color: var(--danger); color: var(--danger); background: rgba(232, 96, 76, 0.1); }
-#smoke-btn {
-  position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 100px);
-  background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--text);
-  font-family: inherit; font-size: 9px; letter-spacing: 0.16em; padding: 0 10px; min-height: 30px; cursor: pointer;
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); z-index: 11; opacity: 0.85;
-}
-#smoke-btn:hover { border-color: var(--edge-bright); }
-#smoke-btn.wait { color: var(--dim); }
-#smoke-btn.unaffordable { color: var(--danger); }
-#unit-card:not([hidden]) ~ #smoke-btn { display: none; }
-
 /* ── Menu ────────────────────────────────────────────────────────────── */
-/* The rail. Menu, clear view, sound and (in a dev build) the test panel sit
-   in one row under the readouts, small and quiet, so the view is the map and
-   not a column of buttons down each side of it. */
-#rail {
+/* The test panel's own button. MENU, VIEW and SOUND used to share a rail with
+   it under the readouts; the first two are dock buttons now and sound is in
+   the pause menu, so this is the only thing left up here — and in a dev build
+   at that. */
+#test-btn {
   position: absolute; left: var(--ui-pad); top: var(--hud-top); z-index: 20;
-  display: flex; gap: 5px; align-items: center;
-}
-#rail button, #test-btn {
-  position: static;
   /* Small to look at, big enough to hit: a thumb needs thirty points. */
   padding: 0 10px; min-height: 30px; font-size: 9px; letter-spacing: 0.16em; line-height: 1.2;
   background: rgba(10, 13, 17, 0.55); border: 1px solid var(--edge); color: var(--dim);
   font-family: inherit; cursor: pointer; opacity: 0.85;
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
-#rail button:hover, #test-btn:hover { border-color: var(--edge-bright); color: var(--text); opacity: 1; }
-#menu-btn { }
+#test-btn:hover { border-color: var(--edge-bright); color: var(--text); opacity: 1; }
 #menu {
   position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
   background: rgba(5, 7, 10, 0.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
@@ -470,21 +540,12 @@ html, body {
 #targetcard.collapsed .tc-caret { transform: rotate(-90deg); }
 #targetcard.collapsed .tc-full { display: none; }
 #targetcard.collapsed .tc-brief { display: flex; }
-#targetcard.collapsed .tc-row,
-#targetcard.collapsed .tc-modes,
-#targetcard.collapsed #tc-clear { display: none; }
+#targetcard.collapsed .tc-row { display: none; }
 .tc-row {
   display: flex; justify-content: space-between; font-size: 11px;
   padding: 2px 0; color: var(--dim);
 }
 .tc-row b { color: var(--text); font-weight: 600; }
-#tc-clear {
-  margin-top: 8px; width: 100%; background: transparent;
-  border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 10px; letter-spacing: 0.16em;
-  padding: 0; min-height: 30px; cursor: pointer;
-}
-#tc-clear:hover { border-color: var(--danger); color: var(--danger); }
 
 /* ── Perf ────────────────────────────────────────────────────────────── */
 /* Off for the player, still written every frame so the headless harness and

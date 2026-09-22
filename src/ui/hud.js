@@ -1,4 +1,4 @@
-import { UNITS } from '../game/units.js';
+import { UNITS, UNITS_BY_ID } from '../game/units.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
 import { openingEnabled, setOpeningEnabled } from './opening.js';
@@ -49,7 +49,6 @@ export class HUD {
       tcSection: document.getElementById('tc-section'),
       tcHeight: document.getElementById('tc-height'),
       tcGuns: document.getElementById('tc-guns'),
-      tcClear: document.getElementById('tc-clear'),
       tcToggle: document.getElementById('tc-toggle'),
       tcBriefSection: document.getElementById('tc-brief-section'),
       tcBriefGuns: document.getElementById('tc-brief-guns'),
@@ -65,9 +64,16 @@ export class HUD {
       ecTargets: document.getElementById('ec-targets'),
       targetsBtn: document.getElementById('targets-btn'),
       ticks: document.getElementById('hud-ticks'),
-      tcModes: document.getElementById('tc-modes'),
-      smokeBtn: document.getElementById('smoke-btn'),
-      menuBtn: document.getElementById('menu-btn'),
+      smokeBtn: document.getElementById('orders-smoke'),
+      dock: document.getElementById('dock'),
+      dockUnits: document.getElementById('dock-units'),
+      dockUnitsIcon: document.getElementById('dock-units-icon'),
+      dockOrders: document.getElementById('dock-orders'),
+      dockView: document.getElementById('dock-view'),
+      dockMenu: document.getElementById('dock-menu'),
+      ordersClear: document.getElementById('orders-clear'),
+      ordersModes: document.getElementById('orders-modes'),
+      menuBtn: document.getElementById('dock-menu'),
       menu: document.getElementById('menu'),
     };
 
@@ -78,13 +84,14 @@ export class HUD {
     this.cards = new Map();
     this._buildBar();
 
-    this.el.tcClear.addEventListener('click', () => this.onClearTarget());
+    if (this.el.ordersClear) this.el.ordersClear.addEventListener('click', () => this.onClearTarget());
     this._setupTargetCard();
+    this._setupDock();
 
     // Clear view: the whole interface off, for watching rather than playing.
     // The way back is a single dim pill at the bottom — present enough to
     // find, faint enough not to be in the shot.
-    this.el.clearBtn = document.getElementById('clear-btn');
+    this.el.clearBtn = document.getElementById('dock-view');
     this.el.restoreBtn = document.getElementById('restore-btn');
     this.setClearView = (on) => {
       this.clearView = !!on;
@@ -219,12 +226,87 @@ export class HUD {
     });
   }
 
+  /**
+   * The dock: what opens, what closes it, and what the buttons say.
+   *
+   * One drawer at a time, and tapping the map closes whichever is open —
+   * `closeDrawer` is called from the canvas handler in `main.js`, which also
+   * swallows that tap so a player dismissing a drawer does not also plant a
+   * howitzer under it.
+   *
+   * The two frames around `hidden` are the animation. A node that is
+   * `display: none` has no transition to run from, so it has to be in the
+   * layout for one frame at the closed transform before the open class goes
+   * on; coming back, the class comes off and `hidden` waits for the
+   * transition to finish. Without that the drawer simply appears.
+   */
+  _setupDock() {
+    this.drawers = new Map();
+    for (const el of document.querySelectorAll('.drawer')) {
+      this.drawers.set(el.id.replace('drawer-', ''), el);
+    }
+    this.openDrawer = null;
+    this._drawerTimer = 0;
+
+    this.setDrawer = (name) => {
+      const next = name && this.openDrawer === name ? null : name;
+      for (const [key, el] of this.drawers) {
+        const on = key === next;
+        const btn = document.getElementById(`dock-${key}`);
+        if (btn) btn.classList.toggle('open', on);
+        if (on) {
+          el.hidden = false;
+          // Two frames: one to land in the layout closed, one to open.
+          requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+        } else if (!el.hidden) {
+          el.classList.remove('on');
+          const hide = () => { if (!el.classList.contains('on')) el.hidden = true; };
+          setTimeout(hide, 220);
+        }
+      }
+      this.openDrawer = next;
+    };
+    this.closeDrawer = () => { if (this.openDrawer) this.setDrawer(null); };
+
+    for (const btn of document.querySelectorAll('.dock-btn[data-drawer]')) {
+      btn.addEventListener('click', () => this.setDrawer(btn.dataset.drawer));
+    }
+    if (this.el.ordersModes) {
+      this.el.ordersModes.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => this.onFireMode(btn.dataset.mode));
+      });
+    }
+  }
+
+  /**
+   * What the UNITS button is holding.
+   *
+   * With the drawer shut this is the only place the armed weapon shows, so it
+   * wears the unit's own icon and its name — a player who has just picked a
+   * Paladin and closed the drawer to look at the map must not have to reopen
+   * it to find out what a tap is about to cost them.
+   */
+  syncDock(id) {
+    const btn = this.el.dockUnits, icon = this.el.dockUnitsIcon;
+    if (!btn || !icon) return;
+    const u = id ? UNITS_BY_ID[id] : null;
+    btn.classList.toggle('armed', !!u);
+    const label = btn.querySelector('.db-label');
+    if (label) label.textContent = u ? u.name : 'UNITS';
+    if (this._dockIconId === (u ? u.id : null)) return;
+    this._dockIconId = u ? u.id : null;
+    icon.innerHTML = u
+      ? (unitIcon(u.id) || '')
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.2h16M6.4 19.2v-6.6h4.2v6.6M13.4 19.2V8.4h4.2v10.8M4.6 12.6 8.5 9.6l3.9 3M12.6 8.4 15.5 4.8l3 3.6"/></svg>';
+  }
+
+  /**
+   * The fire modes and smoke sit in the ORDERS drawer now, not on the target
+   * card. They were on the card because the card was the only panel there
+   * was; with the dock they belong with the other things a player *does*,
+   * and the card goes back to being what it is called — a readout.
+   */
   _setupModes() {
-    const el = this.el.tcModes;
-    if (!el) return;
-    el.querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => this.onFireMode(btn.dataset.mode));
-    });
     if (this.el.smokeBtn) this.el.smokeBtn.addEventListener('click', () => this.onSmoke());
   }
 
@@ -482,9 +564,9 @@ export class HUD {
     // replaces the node and dirties layout, sixty times a second, for a dozen
     // readouts that change once a second at most.
     const setText = (el, t) => { if (el && el.__t !== t) { el.__t = t; el.textContent = t; } };
-    if (this.el.tcModes && this._lastMode !== b.fireMode) {
-      this._lastMode = b.fireMode;
-      this.el.tcModes.querySelectorAll('button').forEach((btn) => {
+    if (this.el.ordersModes && this._lastOrdersMode !== b.fireMode) {
+      this._lastOrdersMode = b.fireMode;
+      this.el.ordersModes.querySelectorAll('button').forEach((btn) => {
         btn.classList.toggle('on', btn.dataset.mode === b.fireMode);
       });
     }
@@ -552,6 +634,13 @@ export class HUD {
 
     setText(this.el.defenders, String(b.garrison.aliveCount));
     setText(this.el.units, String(b.units.filter((u) => u.alive).length));
+
+    // What the dock is holding, and whether the ORDERS drawer has anything
+    // worth opening for.
+    this.syncDock(b.selectedUnitId);
+    if (this.el.dockOrders) {
+      this.el.dockOrders.classList.toggle('armed', !!b.target);
+    }
 
     // Build bar state.
     for (const u of UNITS) {

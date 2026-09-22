@@ -383,7 +383,13 @@ export class CameraRig {
       this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this._pointers.size === 1) {
         this._moved = 0;
-        this._dragMode = (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'orbit';
+        // One finger belongs to the weapon while one is armed: a drag lays a
+        // line of guns or walks the strike reticle over the ground, and
+        // orbiting the camera with it would fight the gesture the whole way.
+        // Two fingers always belong to the camera, so the view is never
+        // actually locked — see `dragLocked` on the rig, set by `main.js`.
+        this._dragMode = this.dragLocked ? null
+          : (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'orbit';
       } else if (this._pointers.size === 2) {
         this._dragMode = 'twofinger';
         this._lastPinch = this._pinchDistance();
@@ -464,6 +470,7 @@ export class CameraRig {
 
     this._keys = new Set();
     this.keysLocked = false;             // a cutscene owns the camera
+    this.dragLocked = false;             // an armed weapon owns one-finger drags
     window.addEventListener('keydown', (e) => this._keys.add(e.code));
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
 

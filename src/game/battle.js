@@ -116,6 +116,7 @@ export class Battle {
     this._setupHealthBars();
     this._setupTargetMarker();
     this._setupGhost();
+    this._setupStrikeReticle();
     this._setupConfirmRing();
     this._setupEmplacements();
   }
@@ -305,6 +306,104 @@ export class Battle {
     this.scene.add(g);
   }
 
+  /**
+   * The strike reticle.
+   *
+   * An air strike used to be aimed with nothing at all: the ghost and the
+   * range ring are both switched off for a strike unit, so the player tapped
+   * a bare map and found out where the bomb was going when it arrived. What
+   * goes here instead is a proper sight — and it is built flat, on the
+   * ground plane, so it lies on the terrain and tracks across it as the
+   * finger moves rather than floating as a billboard in front of it.
+   *
+   * It is sized to the warhead. The outer ring is the blast radius of the
+   * thing being called, which for the MOAB is a hundred and ten metres, so
+   * the reticle is big because the weapon is: the player can see, before
+   * paying, exactly how much of the map is inside it.
+   */
+  _setupStrikeReticle() {
+    const g = new THREE.Group();
+    const mat = (opacity, colour = 0xff4d38) => new THREE.MeshBasicMaterial({
+      color: colour, transparent: true, opacity, depthWrite: false, depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const flat = (geo) => { geo.rotateX(-Math.PI / 2); return geo; };
+
+    // The blast edge, and a heavier inner ring at the lethal core.
+    const rim = new THREE.Mesh(flat(new THREE.RingGeometry(0.965, 1.0, 96)), mat(0.85));
+    const core = new THREE.Mesh(flat(new THREE.RingGeometry(0.3, 0.325, 64)), mat(0.5));
+    g.add(rim, core);
+
+    // Four brackets on the rim, at the diagonals, and the spinner they ride
+    // on. A sight that turns reads as a thing that is tracking.
+    const spin = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const a0 = i * (Math.PI / 2) + Math.PI / 4 - 0.17;
+      // Thin: the whole sight scales with the warhead, and a bracket a
+      // fifteenth of the radius across is a sixteen-metre orange slab on the
+      // MOAB's hundred and ten.
+      const arc = new THREE.Mesh(flat(new THREE.RingGeometry(0.945, 1.02, 28, 1, a0, 0.34)), mat(0.95));
+      spin.add(arc);
+    }
+    spin.name = 'spin';
+    g.add(spin);
+
+    // The crosshair: four ticks in from the rim with a gap in the middle, so
+    // what is under the aim point stays visible.
+    for (let i = 0; i < 4; i++) {
+      const a = i * (Math.PI / 2);
+      const bar = new THREE.Mesh(flat(new THREE.PlaneGeometry(0.34, 0.022)), mat(0.8));
+      bar.position.set(Math.cos(a) * 0.62, 0, Math.sin(a) * 0.62);
+      bar.rotation.y = -a;
+      g.add(bar);
+    }
+
+    // The aim point itself, and a column of light standing on it so the
+    // reticle is findable when the camera is low and the ground is busy.
+    const dot = new THREE.Mesh(flat(new THREE.CircleGeometry(0.055, 20)), mat(0.95));
+    dot.name = 'dot';
+    g.add(dot);
+    const beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.05, 2.4, 8, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xff4d38, transparent: true, opacity: 0.17,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      }),
+    );
+    beam.position.y = 1.2;
+    beam.name = 'beam';
+    g.add(beam);
+
+    g.visible = false;
+    g.renderOrder = 24;
+    this.strikeReticle = g;
+    this.scene.add(g);
+  }
+
+  /**
+   * Put the reticle on a point, at the size of the warhead it is calling.
+   *
+   * The group is built at unit radius and scaled, so the one object serves an
+   * F-15's forty metres and a MOAB's hundred and ten. Height is left alone in
+   * the scale so the column does not become a searchlight on the big one.
+   */
+  showStrikeAim(point, def) {
+    if (!this.strikeReticle) return;
+    if (!point || !def) { this.strikeReticle.visible = false; return; }
+    const r = Math.max(14, (def.warhead && def.warhead.radius) || 30);
+    this.strikeReticle.position.set(point.x, point.y + 0.45, point.z);
+    this.strikeReticle.scale.set(r, 1, r);
+    const beam = this.strikeReticle.getObjectByName('beam');
+    if (beam) { beam.scale.set(1 / r * 4, r * 0.9, 1 / r * 4); }
+    this.strikeReticle.visible = true;
+    this._aimPoint = point;
+  }
+
+  hideStrikeAim() {
+    if (this.strikeReticle) this.strikeReticle.visible = false;
+    this._aimPoint = null;
+  }
+
   _setupGhost() {
     const g = new THREE.Mesh(
       new THREE.CylinderGeometry(4, 4, 0.35, 24),
@@ -327,6 +426,89 @@ export class Battle {
     rangeRing.renderOrder = 18;
     this.rangeRing = rangeRing;
     this.scene.add(rangeRing);
+  }
+
+  /**
+   * Where a drag would put a line of guns.
+   *
+   * A battery is several guns in a row and placing it was several taps, each
+   * one an open drawer, a card, a tap on the ground and a wait. Pressing on
+   * the map and pulling gives the whole line at once: the points are spaced
+   * far enough apart to clear each other's exclusion — the placement rule
+   * refuses anything within seven metres of a standing unit, so anything
+   * tighter than that would lay a line that mostly refuses itself — and each
+   * one is coloured by whether it would actually take.
+   *
+   * Returns the points, so the caller can deploy exactly what was drawn
+   * rather than working it out a second time and getting a different answer.
+   */
+  linePlacements(from, to, def, maxCount = 14) {
+    const out = [];
+    if (!from || !def) return out;
+    const gap = Math.max(11, (def.modelLength || 6) * 1.6);
+    const dx = to.x - from.x, dz = to.z - from.z;
+    const len = Math.hypot(dx, dz);
+    // How many will fit, how many are wanted, and how many can be paid for.
+    let n = Math.min(maxCount, 1 + Math.floor(len / gap));
+    if (!this.freeBuild && def.cost > 0) {
+      n = Math.min(n, Math.max(1, Math.floor(this.money / def.cost)));
+    }
+    const ux = len > 0.001 ? dx / len : 0, uz = len > 0.001 ? dz / len : 0;
+    // Spread the line evenly over what was actually drawn rather than
+    // stamping at the nominal gap and leaving a tail: a drag that asks for
+    // four gets four, from the finger down to the finger up.
+    const step = n > 1 ? Math.min(len / (n - 1), gap * 2.4) : 0;
+    for (let i = 0; i < n; i++) {
+      const x = from.x + ux * step * i;
+      const z = from.z + uz * step * i;
+      const p = new THREE.Vector3(x, this.terrain.heightAt(x, z), z);
+      // A line drawn across a roof is a line on the ground beside it: the
+      // roof flag belongs to the picked point, not to the metres after it.
+      if (i === 0 && from.onRoof) { p.y = from.y; p.onRoof = true; }
+      p.ok = this.validPlacement(p, def).ok;
+      // And not on top of one already in this line.
+      if (p.ok) {
+        for (const q of out) {
+          if (Math.hypot(q.x - p.x, q.z - p.z) < 7.2) { p.ok = false; break; }
+        }
+      }
+      out.push(p);
+    }
+    return out;
+  }
+
+  /**
+   * Draw that line. A pool of flat discs, because a drag re-draws it sixty
+   * times a second and building geometry per frame is how a preview becomes
+   * a stutter.
+   */
+  showLine(points, def) {
+    if (!this._lineGhosts) {
+      this._lineGhosts = [];
+      const geo = new THREE.CylinderGeometry(4, 4, 0.35, 20);
+      for (let i = 0; i < 16; i++) {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          color: 0x58a6ff, transparent: true, opacity: 0.42, depthWrite: false,
+        }));
+        m.visible = false;
+        m.renderOrder = 17;
+        this._lineGhosts.push(m);
+        this.scene.add(m);
+      }
+    }
+    for (let i = 0; i < this._lineGhosts.length; i++) {
+      const g = this._lineGhosts[i];
+      const p = points && points[i];
+      if (!p) { g.visible = false; continue; }
+      g.position.set(p.x, p.y + 0.25, p.z);
+      g.material.color.setHex(p.ok ? 0x6fd08c : 0xe8604c);
+      g.visible = true;
+    }
+  }
+
+  hideLine() {
+    if (!this._lineGhosts) return;
+    for (const g of this._lineGhosts) g.visible = false;
   }
 
   /**
@@ -1646,6 +1828,18 @@ export class Battle {
       this.targetMarker.rotation.y += dt * 0.7;
       this.targetMarker.children[0].rotation.x = Math.PI / 2;
       this.targetMarker.children[1].rotation.x = Math.PI / 2;
+    }
+    // The strike sight: the brackets turn and the aim point breathes, so a
+    // reticle sitting still over a static piece of ground still reads as
+    // something that is looking at it.
+    if (this.strikeReticle && this.strikeReticle.visible) {
+      const spin = this.strikeReticle.getObjectByName('spin');
+      if (spin) spin.rotation.y -= dt * 0.9;
+      const dot = this.strikeReticle.getObjectByName('dot');
+      if (dot) {
+        const k = 1 + Math.sin(this.elapsed * 6.0) * 0.28;
+        dot.scale.set(k, 1, k);
+      }
     }
 
     this._checkEnd();

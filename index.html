@@ -83,8 +83,48 @@
       </div>
     </header>
 
-    <!-- Unit purchase bar -->
-    <nav id="buildbar"></nav>
+    <!-- The dock.
+         Four round buttons and two drawers that glide up out of them. The
+         bar used to be eleven unit cards standing open across the bottom of
+         the screen for the whole battle, with SMOKE floating over them and a
+         rail of three more buttons up under the readouts — most of a phone's
+         lower third, permanently, over the part of the map a player is
+         actually looking at. -->
+    <div id="drawers">
+      <section class="drawer" id="drawer-units" hidden>
+        <nav id="buildbar"></nav>
+      </section>
+      <section class="drawer" id="drawer-orders" hidden>
+        <div class="dr-title">ORDERS</div>
+        <div class="dr-row" id="orders-modes">
+          <button data-mode="point" title="Every gun converges on the point">POINT</button>
+          <button data-mode="area" title="The sheaf is walked over the area around it">AREA</button>
+          <button data-mode="delay" title="Shells burst inside the stone, not on it">DELAY</button>
+        </div>
+        <div class="dr-row">
+          <button id="orders-smoke" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
+          <button id="orders-clear" title="Let the guns pick their own aim point">CLEAR TARGET</button>
+        </div>
+      </section>
+    </div>
+    <div id="dock">
+      <button class="dock-btn" id="dock-units" data-drawer="units" title="Units">
+        <span class="db-icon" id="dock-units-icon"></span>
+        <span class="db-label">UNITS</span>
+      </button>
+      <button class="dock-btn" id="dock-orders" data-drawer="orders" title="Orders">
+        <span class="db-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg></span>
+        <span class="db-label">ORDERS</span>
+      </button>
+      <button class="dock-btn" id="dock-view" title="Hide the interface and just watch">
+        <span class="db-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.6 12S5.6 5.2 12 5.2 22.4 12 22.4 12 18.4 18.8 12 18.8 1.6 12 1.6 12Z"/><circle cx="12" cy="12" r="3.1"/></svg></span>
+        <span class="db-label">VIEW</span>
+      </button>
+      <button class="dock-btn" id="dock-menu" title="Pause">
+        <span class="db-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 6.5h17M3.5 12h17M3.5 17.5h17"/></svg></span>
+        <span class="db-label">MENU</span>
+      </button>
+    </div>
 
     <!-- Contextual prompt -->
     <div id="prompt" hidden></div>
@@ -100,23 +140,11 @@
       <div class="tc-row"><span>Section</span><b id="tc-section">—</b></div>
       <div class="tc-row"><span>Height</span><b id="tc-height">—</b></div>
       <div class="tc-row"><span>Guns on target</span><b id="tc-guns">0</b></div>
-      <div class="tc-modes" id="tc-modes">
-        <button data-mode="point" title="Every gun converges on the point">POINT</button>
-        <button data-mode="area" title="The sheaf is walked over the area around it">AREA</button>
-        <button data-mode="delay" title="Shells burst inside the stone, not on it">DELAY</button>
-      </div>
-      <button id="tc-clear">CLEAR</button>
     </div>
 
-    <button id="smoke-btn" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
-
-    <!-- The control rail: one quiet row under the readouts, not four
-         buttons scattered down both sides of the view. -->
-    <div id="rail">
-      <button id="menu-btn">MENU</button>
-      <button id="clear-btn" title="Hide the interface and just watch">VIEW</button>
-      <button id="sound-toggle">SOUND</button>
-    </div>
+    <!-- Sound lives in the pause menu now; the rail it used to share with
+         MENU and VIEW is gone, and those two are buttons on the dock. -->
+    <button id="sound-toggle" hidden></button>
     <button id="restore-btn" hidden>SHOW UI</button>
     <div id="menu" hidden>
       <div class="menu-inner">

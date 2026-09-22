@@ -436,9 +436,12 @@ async function boot() {
   hud = new HUD(battle, {
     onSelect: (id) => {
       battle.selectUnit(id);
+      // The drawer's job is done the moment something is picked out of it, and
+      // what the player wants next is the map it was standing over.
+      if (battle.selectedUnitId) hud.closeDrawer();
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike) hud.status(`${TAP} the target to call the strike`, 4);
-      else hud.status(`${TAP} the ground to deploy`, 4);
+      else if (UNITS_BY_ID[id].strike) hud.status('drag to aim the strike', 4);
+      else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
     onClearTarget: () => battle.clearTarget(),
     // Through `goToLevel` rather than a bare reload: the level is no longer in
@@ -762,13 +765,83 @@ async function boot() {
   window.addEventListener('blur', forgetPointers);
   canvas.addEventListener('pointercancel', (e) => livePointers.delete(e.pointerId));
 
+  /**
+   * The gesture in progress, when a weapon is armed.
+   *
+   * With something selected, one finger on the map belongs to the weapon
+   * rather than to the camera: a drag lays a line of guns, or walks the
+   * strike sight across the ground. Two fingers still orbit and pinch, so
+   * the view is never actually taken away — `rig.dragLocked` is what makes
+   * that split, and it is set from here every frame the selection changes.
+   */
+  let aiming = null;
+  const armedDef = () => (battle.selectedUnitId ? UNITS_BY_ID[battle.selectedUnitId] : null);
+  const endAiming = () => {
+    aiming = null;
+    battle.hideLine();
+    battle.hideStrikeAim();
+    battle.ghost.visible = false;
+    battle.rangeRing.visible = false;
+  };
+
   canvas.addEventListener('pointerdown', (e) => {
     livePointers.add(e.pointerId);
     hud.ripple(e.clientX, e.clientY, battle.selectedUnitId ? 'deploy' : 'aim');
+    // A tap that dismisses a drawer is a dismissal and nothing else. Letting
+    // it through would plant a gun under the panel the player was closing.
+    if (hud.openDrawer) { hud.closeDrawer(); aiming = { swallow: true }; return; }
+    if (battle.state !== 'playing') return;
+    const def = armedDef();
+    if (!def || livePointers.size > 1) return;
+    const hit = pick(e.clientX, e.clientY, !!def.strike);
+    if (!hit) return;
+    if (def.strike) {
+      const at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
+      aiming = { kind: 'strike', def, at };
+      battle.showStrikeAim(at, def);
+    } else if (hit.kind === 'ground' || hit.kind === 'roof') {
+      aiming = { kind: 'line', def, from: hit.point.clone(), points: [hit.point.clone()] };
+      aiming.from.onRoof = hit.kind === 'roof';
+    }
   });
 
   canvas.addEventListener('pointerup', (e) => {
     if (!livePointers.delete(e.pointerId)) return;
+    // The armed gestures resolve themselves and end the tap here: a line of
+    // guns goes down, or the strike goes in at whatever the sight was on.
+    if (aiming) {
+      const a = aiming;
+      aiming = null;
+      if (a.swallow) return;
+      if (a.kind === 'strike') {
+        battle.hideStrikeAim();
+        if (battle.state === 'playing') battle.callStrike(battle.selectedUnitId, a.at);
+        return;
+      }
+      if (a.kind === 'line') {
+        battle.hideLine();
+        battle.rangeRing.visible = false;
+        battle.ghost.visible = false;
+        if (battle.state !== 'playing') return;
+        const pts = a.points.length > 1 ? a.points : [a.from];
+        let placed = 0;
+        for (const p of pts) {
+          if (pts.length > 1 && !p.ok) continue;
+          const before = battle.units.length + battle.pending.length;
+          battle.deploy(battle.selectedUnitId, p);
+          if (battle.units.length + battle.pending.length > before) {
+            placed++;
+            battle.pulse(p, 0x6fd08c, 14);
+          } else if (pts.length === 1) {
+            battle.pulse(p, 0xe8604c, 14);
+          }
+        }
+        if (pts.length > 1 && placed > 1) {
+          hud.feed(`${placed} × ${a.def.name} EMPLACED`, '');
+        }
+        return;
+      }
+    }
     if (rig.wasDrag) return;
     if (battle.state !== 'playing') return;
     const strike = !!(battle.selectedUnitId && UNITS_BY_ID[battle.selectedUnitId].strike);
@@ -816,26 +889,70 @@ async function boot() {
     }
   });
 
-  // Hover preview for the deployment footprint (desktop only).
   canvas.addEventListener('pointermove', (e) => {
-    if (!battle.selectedUnitId || e.pointerType === 'touch'
-        || UNITS_BY_ID[battle.selectedUnitId].strike) {
-      battle.ghost.visible = false;
-      battle.rangeRing.visible = false;
+    // A gesture in progress owns the preview, on any input: this is the drag
+    // that lays the line and the drag that walks the strike sight, and it is
+    // the only way either of them exists on a touch screen.
+    if (aiming && !aiming.swallow) {
+      if (livePointers.size > 1) { endAiming(); return; }
+      const hit = pick(e.clientX, e.clientY, aiming.kind === 'strike');
+      if (!hit) return;
+      if (aiming.kind === 'strike') {
+        aiming.at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
+        battle.showStrikeAim(aiming.at, aiming.def);
+        return;
+      }
+      if (hit.kind !== 'ground' && hit.kind !== 'roof') return;
+      aiming.points = battle.linePlacements(aiming.from, hit.point, aiming.def);
+      if (aiming.points.length > 1) {
+        battle.showLine(aiming.points, aiming.def);
+        battle.ghost.visible = false;
+        battle.rangeRing.visible = false;
+        const n = aiming.points.filter((p) => p.ok).length;
+        hud.status(`${n} × ${aiming.def.name} · $${(n * aiming.def.cost).toLocaleString()}`, 1.2);
+      } else {
+        battle.hideLine();
+        const ok = battle.validPlacement(hit.point, aiming.def).ok;
+        battle.ghost.position.copy(hit.point).setY(hit.point.y + 0.25);
+        battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
+        battle.ghost.visible = true;
+        battle.showRange(hit.point, aiming.def);
+      }
       return;
     }
-    const hit = pick(e.clientX, e.clientY);
+
+    // Hover preview for the deployment footprint (desktop only).
+    if (!battle.selectedUnitId || e.pointerType === 'touch') {
+      battle.ghost.visible = false;
+      battle.rangeRing.visible = false;
+      battle.hideStrikeAim();
+      return;
+    }
+    const def = UNITS_BY_ID[battle.selectedUnitId];
+    const hit = pick(e.clientX, e.clientY, !!def.strike);
+    if (def.strike) {
+      // The sight follows the mouse over the ground, at the size of the
+      // warhead it would call, so the cost of a tap is visible before it.
+      battle.ghost.visible = false;
+      battle.rangeRing.visible = false;
+      if (!hit) { battle.hideStrikeAim(); return; }
+      battle.showStrikeAim(hit.kind === 'defender' ? hit.defender.pos : hit.point, def);
+      return;
+    }
+    battle.hideStrikeAim();
     if (!hit || (hit.kind !== 'ground' && hit.kind !== 'roof')) {
       battle.ghost.visible = false;
       battle.rangeRing.visible = false;
       return;
     }
-    const ok = battle.validPlacement(hit.point, UNITS_BY_ID[battle.selectedUnitId]).ok;
+    const ok = battle.validPlacement(hit.point, def).ok;
     battle.ghost.position.copy(hit.point).setY(hit.point.y + 0.25);
     battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
     battle.ghost.visible = true;
-    battle.showRange(hit.point, UNITS_BY_ID[battle.selectedUnitId]);
+    battle.showRange(hit.point, def);
   });
+
+  canvas.addEventListener('pointercancel', () => { if (aiming) endAiming(); });
 
   window.addEventListener('keydown', (e) => {
     // Not with a modifier (Cmd-1 is a browser tab), not while typing in the
@@ -847,8 +964,8 @@ async function boot() {
     if (e.code === 'Escape') {
       battle.selectedUnitId = null;
       hud.hidePrompt();
-      battle.ghost.visible = false;
-      battle.rangeRing.visible = false;
+      hud.closeDrawer();
+      endAiming();
     }
     // Number keys pick the corresponding slot in the build bar. The bar runs
     // to eleven cards and prints the number on each one, so 0 and - carry the
@@ -1007,6 +1124,11 @@ async function boot() {
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     hud.update(rawDt);
+    // One finger belongs to the weapon while one is armed. Set here rather
+    // than in the selection handler because a unit can be deselected from
+    // half a dozen places — a keypress, a deploy, a win — and a camera left
+    // locked after one of them is a camera that has stopped working.
+    rig.dragLocked = !!battle.selectedUnitId && battle.state === 'playing';
     unitCard.update();
     testMenu.update(rawDt);
     flags.update(rawDt);
