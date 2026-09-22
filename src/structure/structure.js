@@ -1630,12 +1630,38 @@ export class Structure {
       // exactly one does.
       const lethalR = lethal * (props.lethalScale ?? 1);
       const lethalFrac = Math.max(0, Math.min(1, (lethalR - d) / (2 * hAvg) + 0.5));
-      if (lethalFrac >= 0.6) {
+      // And on this material, a blast only deletes what it could also have
+      // broken.
+      //
+      // The shortcut exists so that a shell does not have to chew through a
+      // stone it has obviously destroyed, and for ordinary masonry that is
+      // both true and cheap. Against several metres of reinforced concrete it
+      // is neither: an 84 mm rocket carrying eleven hundred of power removed a
+      // fourteen-thousand-point stone because it happened to be the stone it
+      // touched. Forty AT4 teams cost two and a half thousand dollars, fire
+      // eleven rounds a second between them, and took the tower down in three
+      // minutes — against a weapon whose own description is "barely scratches
+      // stone". Where a material asks for it, the blast now has to out-power
+      // what is left of the stone; below that it does damage like anything
+      // else, and thirteen rockets do what one used to.
+      const canBreak = !props.mustBreak || power * enclosed >= this.health[i];
+      if (lethalFrac >= 0.6 && canBreak) {
         destroyed.push(i);
         continue;
       }
 
-      this.health[i] -= power * falloff * enclosed;
+      // What a warhead too small for the job actually achieves.
+      //
+      // A shaped charge or a light shell against metres of reinforced concrete
+      // spalls the face and stops; it does not bore through at a proportional
+      // rate just because it was fired enough times. Without a floor under
+      // that, forty AT4 teams — two and a half thousand dollars, eleven rounds
+      // a second between them — simply ground the Burj's foundation levels
+      // away, which is both wrong and the cheapest strategy in the game. Only
+      // a material that names a threshold has one; everything else takes the
+      // full bite as it always did.
+      const bite = props.minPower && power < props.minPower ? power * 0.06 : power;
+      this.health[i] -= bite * falloff * enclosed;
       if (this.health[i] <= 0) {
         destroyed.push(i);
       } else {

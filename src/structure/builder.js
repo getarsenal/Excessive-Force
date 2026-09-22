@@ -166,8 +166,8 @@ export const MATERIAL_PROPS = {
   // say: how far the *deleting* part of a blast reaches into this particular
   // stuff. Every other material is at the reference and unaffected — the one
   // entry that carries it is this one.
-  [MATERIALS.RAFT]:      { density: 2.30, strength: 3.80, toughness: 620, color: 0x9fb6c6,
-    structural: true, lethalScale: 0.35, span: 5.0 },
+  [MATERIALS.RAFT]:      { density: 2.30, strength: 3.80, toughness: 210, color: 0x9fb6c6,
+    structural: true, lethalScale: 0.35, span: 5.0, mustBreak: true, minPower: 6000 },
 };
 
 
