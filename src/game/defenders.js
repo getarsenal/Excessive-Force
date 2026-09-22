@@ -900,7 +900,7 @@ export class Garrison {
    * less than the crews on the galleries, and if something has to go without,
    * it should be the far end of the line rather than the top of the tower.
    */
-  populateFieldWorks(posts, groundY = 0) {
+  populateFieldWorks(posts) {
     if (!posts || !posts.length) return 0;
     // Guns first, then the line, each from the objective outward.
     //
@@ -914,7 +914,19 @@ export class Garrison {
     const ordered = posts.slice().sort((a, b) => rank(a) - rank(b));
     let placed = 0;
     for (const w of ordered) {
-      const p = new THREE.Vector3(w.x, Math.max(w.y, groundY - 40), w.z);
+      // The post's own height, and nothing else.
+      //
+      // There was a floor here — no lower than forty metres under the
+      // objective's ground — put in as a guard against a nonsense y. On a flat
+      // level it never bites, which is why it survived. On a hill it is
+      // catastrophic: the Acropolis stands at a hundred and fifty-six and the
+      // town at its foot at eighty, so every trench and gun pit in the town
+      // was lifted to a hundred and sixteen and stood thirty-five metres in
+      // the air. The guard was never needed — `buildFieldWorks` samples the
+      // terrain at each post's own position and stores that — and the
+      // objective's ground is no guide at all to the ground two hundred
+      // metres away and seventy metres down.
+      const p = new THREE.Vector3(w.x, w.y, w.z);
       if (this.place(w.type, p, w.yaw, 4, {
         cover: w.kind === 'pit' ? 'ground' : 'trench',
         sandbags: w.kind === 'trench',

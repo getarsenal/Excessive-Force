@@ -346,7 +346,7 @@ async function boot() {
   // has to go unmanned it should be the far end of the line rather than the
   // top of the tower.
   {
-    const manned = garrison.populateFieldWorks(fieldWorks.posts, groundY);
+    const manned = garrison.populateFieldWorks(fieldWorks.posts);
     console.log(`[tumble] field works: ${fieldWorks.counts.trenchBays} bays, `
       + `${fieldWorks.counts.gunPits} gun pits, `
       + `${manned} of ${fieldWorks.posts.length} positions manned`);

@@ -26,16 +26,18 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * nothing to stand on. Steel for the spire.
  */
 
-// Two fifths of life size, and the reason is the collapse rather than the
-// look. At six tenths the tower stood four hundred and ninety-five metres,
-// which is ten seconds of free fall from the tip: undercut it and the wreck
-// is still in the air when anybody looks at it, and the section that has not
-// landed yet cannot break up, because breaking up happens on the ground. It
-// came down as one welded column of four thousand seven hundred stones. At
-// three hundred and thirty it is still half again the Eiffel and the tallest
-// thing in the campaign, and it falls inside the time a collapse is given.
-const S = 0.4;
-const STONE_FINENESS = 2.4;      // coarse: a third of a kilometre of tower on a phone
+// Four fifths of life size: six hundred and sixty metres, twice the Eiffel and
+// twice anything else in the campaign.
+//
+// It is as tall as the collapse can carry, and the collapse is what fixes the
+// number. Breaking up happens on the ground; a wreck still in the air is one
+// welded column, and at six hundred and sixty the tip is eleven and a half
+// seconds of free fall from the deck. It was two fifths, which was chosen
+// when the tower came down as a four-thousand-stone slab at six tenths — the
+// difference is that the stones are coarser now, so the same height is far
+// fewer bodies for the fragmenter to get through.
+const S = 0.8;
+const STONE_FINENESS = 2.4;      // coarse: two thirds of a kilometre of tower on a phone
 
 // Real metres, scaled once at the end.
 const CORE_R = 13.5, CORE_WALL = 3.6;
@@ -207,8 +209,13 @@ export function buildBurjKhalifa(quality) {
         // Where the wing steps back, a floor across the new end.
         if (L < prevL - 0.5) {
           const fend = CORE_R - 1.0 + prevL;
+          // A little proud of the wall above it at both ends. The course that
+          // lands on this floor is laid on its own segment grid, which moves
+          // when the wing shortens, so at a fine tier the first stone of the
+          // new course could sit just past the edge of the floor it is meant
+          // to be standing on.
           floor(ux * (WING_IN + fend) / 2, uz * (WING_IN + fend) / 2,
-            WING_W / 2, (fend - WING_IN) / 2 + 0.5, y - 0.35, 0.35);
+            WING_W / 2, (fend - WING_IN) / 2 + 1.6, y - 0.35, 0.35);
           prevL = L;
         }
         // The two long walls and the end wall of the bar, as yawed stones.

@@ -804,8 +804,8 @@ export const LEVELS = {
     setting: { haze: { colour: 0xe0d6c2, density: 0.00030 } },
     cityExcludeRadius: 130,
     contextExclude: 130,
-    // Far back and high: the tower is a third of a kilometre even at this scale.
-    camera: { yaw: 0.60, pitch: 0.22, distance: 680, height: 185 },
+    // Far back and high: the tower is two thirds of a kilometre.
+    camera: { yaw: 0.60, pitch: 0.26, distance: 1250, height: 350 },
     structures: (quality) => [
       { key: 'burj', blocks: buildBurjKhalifa(quality), primary: true,
         required: true, label: 'BURJ KHALIFA' },
