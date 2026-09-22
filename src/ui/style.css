@@ -438,10 +438,41 @@ html, body {
   background: var(--panel); border: 1px solid var(--edge); z-index: 19;
   padding: 9px 11px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
+/* The header is the collapse control. A readout this size sits over a third
+   of a phone's view, and the three numbers on it are worth a glance rather
+   than a permanent panel — so the whole title row is a button, and collapsed
+   the card is one line carrying the two things that matter while the guns
+   are firing: what they are on and how many of them are. */
 .tc-title {
-  font-size: 9px; letter-spacing: 0.2em; color: var(--danger);
-  text-transform: uppercase; margin-bottom: 7px;
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  /* Tighter than the other small caps in here, because the caret now takes a
+     bite out of a 142px card and DESIGNATED TARGET wrapped onto two lines. */
+  font-family: inherit; font-size: 9px; letter-spacing: 0.13em; color: var(--danger);
+  text-transform: uppercase; margin: 0 0 7px; padding: 2px 0;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  min-height: 22px;                    /* a thumb can find it */
 }
+.tc-caret {
+  width: 0; height: 0; flex: none;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 0.12s ease;
+}
+.tc-full { flex: 1; white-space: nowrap; }
+.tc-brief { display: none; flex: 1; justify-content: space-between; gap: 8px; }
+.tc-brief b { color: var(--text); font-weight: 600; letter-spacing: 0.08em; }
+.tc-brief i {
+  font-style: normal; color: var(--dim); letter-spacing: 0.08em;
+}
+
+#targetcard.collapsed { padding-bottom: 6px; }
+#targetcard.collapsed .tc-title { margin-bottom: 0; }
+#targetcard.collapsed .tc-caret { transform: rotate(-90deg); }
+#targetcard.collapsed .tc-full { display: none; }
+#targetcard.collapsed .tc-brief { display: flex; }
+#targetcard.collapsed .tc-row,
+#targetcard.collapsed .tc-modes,
+#targetcard.collapsed #tc-clear { display: none; }
 .tc-row {
   display: flex; justify-content: space-between; font-size: 11px;
   padding: 2px 0; color: var(--dim);

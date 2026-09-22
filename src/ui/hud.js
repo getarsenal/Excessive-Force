@@ -50,6 +50,9 @@ export class HUD {
       tcHeight: document.getElementById('tc-height'),
       tcGuns: document.getElementById('tc-guns'),
       tcClear: document.getElementById('tc-clear'),
+      tcToggle: document.getElementById('tc-toggle'),
+      tcBriefSection: document.getElementById('tc-brief-section'),
+      tcBriefGuns: document.getElementById('tc-brief-guns'),
       feed: document.getElementById('feed'),
       endcard: document.getElementById('endcard'),
       ecTitle: document.getElementById('ec-title'),
@@ -76,6 +79,7 @@ export class HUD {
     this._buildBar();
 
     this.el.tcClear.addEventListener('click', () => this.onClearTarget());
+    this._setupTargetCard();
 
     // Clear view: the whole interface off, for watching rather than playing.
     // The way back is a single dim pill at the bottom — present enough to
@@ -177,6 +181,42 @@ export class HUD {
       t.title = `${u.name} unlocks`;
       el.appendChild(t);
     }
+  }
+
+  /**
+   * The target readout folds away.
+   *
+   * Expanded it is a title, three rows, three fire-mode buttons and CLEAR,
+   * which is a sixth of a phone's screen standing over the city for the whole
+   * battle — and most of it is settled once: the fire mode is chosen early
+   * and rarely changed. Collapsed it keeps the two figures worth watching
+   * while the guns are firing, the section they are on and how many are on
+   * it, in one line.
+   *
+   * It starts folded on a narrow screen and open on a wide one, because that
+   * is where the complaint is and where the room is; after that the player's
+   * own choice is remembered and neither default applies again.
+   */
+  _setupTargetCard() {
+    const card = this.el.targetcard, btn = this.el.tcToggle;
+    if (!card || !btn) return;
+    let open = null;
+    try {
+      const v = localStorage.getItem('tt.tcard');
+      if (v === '0' || v === '1') open = v === '1';
+    } catch { /* private mode */ }
+    if (open === null) open = !window.matchMedia('(max-width: 560px)').matches;
+    const apply = () => {
+      card.classList.toggle('collapsed', !open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.title = open ? 'Collapse the target readout' : 'Expand the target readout';
+    };
+    apply();
+    btn.addEventListener('click', () => {
+      open = !open;
+      apply();
+      try { localStorage.setItem('tt.tcard', open ? '1' : '0'); } catch { /* private mode */ }
+    });
   }
 
   _setupModes() {
@@ -568,6 +608,11 @@ export class HUD {
         ? `${(b.target.y - b.originGround).toFixed(1)} m`
         : '—');
       setText(this.el.tcGuns, String(guns));
+      // The folded line says the same thing in half the words.
+      setText(this.el.tcBriefSection, b.target
+        ? (b.targetLabel || 'structure').toUpperCase()
+        : 'FREE FIRE');
+      setText(this.el.tcBriefGuns, `${guns} GUN${guns === 1 ? '' : 'S'}`);
     } else {
       this.el.targetcard.hidden = true;
     }

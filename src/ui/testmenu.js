@@ -784,6 +784,44 @@ export class TestMenu {
    * and the next test's guns are dead before they finish setting up. Isolating
    * the conditions is what makes each assertion about the thing it names.
    */
+  /**
+   * Run something with the player's battery holding its fire, and hand the
+   * battery back exactly as it was.
+   *
+   * Tests that have to run the clock — watching flak shoot at an aeroplane,
+   * dropping shells into the town by hand — run it for everything else too,
+   * and by that point in the suite there are guns on the ground with a target
+   * designated. Twenty seconds of that finishes a level: at Himeji the keep
+   * came down inside a test that was not about the keep, the battle recorded
+   * a win, and two tests that had already passed failed on the way back,
+   * because a won battle stops accruing income and a demolished keep has
+   * nobody standing on it.
+   *
+   * The reload scale alone is not enough, and that is the subtle half. It is
+   * read when a gun fires and written into that gun's cooldown, so raising it
+   * silences the battery for a million seconds and lowering it again does
+   * nothing at all to the cooldowns already written. The next test asked why
+   * no rounds went out in fourteen seconds. So the cooldowns are put back too.
+   */
+  _holdFire(fn) {
+    const b = this.ctx.battle;
+    const scale = b.reloadScale;
+    const cooldowns = new Map();
+    for (const u of b.units) cooldowns.set(u, u.cooldown);
+    b.reloadScale = 1e6;
+    try {
+      return fn();
+    } finally {
+      b.reloadScale = scale;
+      for (const [u, cd] of cooldowns) if (b.units.includes(u)) u.cooldown = cd;
+      // Anything deployed while it was held has never fired and has a fresh
+      // cooldown of its own; give it a real one rather than a million.
+      for (const u of b.units) {
+        if (!cooldowns.has(u) && u.cooldown > 1e5) u.cooldown = 0;
+      }
+    }
+  }
+
   _calm(fn) {
     const b = this.ctx.battle;
     const fire = b.garrison.fireEnabled;
@@ -990,7 +1028,7 @@ export class TestMenu {
         return `${fired} bombs`;
       }],
 
-      ['the garrison shoots at what is in the air', () => {
+      ['the garrison shoots at what is in the air', () => this._holdFire(() => {
         // The claim: an aircraft over a defended objective is flown through
         // real tracer from real crews, and killing those crews stops it.
         //
@@ -1022,7 +1060,10 @@ export class TestMenu {
           // aircraft is pushed so high that the throw is longer than the run
           // in and it releases on the first tick.
           sortie.releaseAt = Infinity;
-          for (let k = 0; k < 40; k++) c.fastForward(0.25);
+          // Five seconds, not ten: the guns open up inside the first second
+          // and a burst of twelve is over in two, so the extra five bought
+          // nothing but more of the battle running underneath the test.
+          for (let k = 0; k < 20; k++) c.fastForward(0.25);
           const shots = g.airShots - before;
           b.air.sorties = b.air.sorties.filter((x) => x !== sortie);
           b.scene.remove(sortie.model);
@@ -1067,7 +1108,7 @@ export class TestMenu {
         } finally {
           b.money = money; b.unlockAll = unlock; b.freeBuild = free;
         }
-      }],
+      })],
 
       ['friendly units fire without a designated target', () => this._calm(() => {
         const hadTarget = b.target ? b.target.clone() : null;
@@ -1535,6 +1576,57 @@ export class TestMenu {
           `${unsupported()} defenders left hanging in the air with no masonry beneath them`);
         return `${removed} stones pulled, ${before - after} fell, none left floating`;
       })],
+
+      ['a shell that hits the town damages the town', () => {
+        // The bug this guards against, which shipped and stayed shipped: the
+        // town's boxes are colliders in the same physics world as the
+        // monument, so a round that stopped against a terrace came back from
+        // the ray cast as `structureHit` — and the test that decided whether
+        // to tell the town about it asked for `!structureHit`. A building
+        // registered a hit only when the shell missed it and fell in the
+        // street beside it. Whole blocks absorbed a battery's allotment and
+        // came out of it without a mark.
+        const cf = b.cityFire;
+        if (!cf || !cf.plots.length) return 'no surveyed town on this level';
+        const O = b.primary.origin;
+        // The nearest building of any size clear of the objective. No upper
+        // bound on the distance: the pyramids stand in desert and Nazlet
+        // El-Samman is most of a kilometre away, so a band chosen to mean
+        // "a plausible overshoot" in Moscow means "no town at all" at Giza.
+        const near = cf.plots
+          .filter((p) => !p.burnt && p.h > 6)
+          .map((p) => ({ p, d: Math.hypot(p.x - O.x, p.z - O.z) }))
+          .filter((r) => r.d > 120)
+          .sort((x, y) => x.d - y.d);
+        assert(near.length > 0, 'no town building at all stands clear of the objective');
+        const P = near[0].p;
+        const w = { lethal: 2.6, radius: 8.4, power: 8200, fx: 1.8, kinetic: 0.7 };
+        const drop = () => {
+          b.projectiles.fire({
+            pos: new THREE.Vector3(P.x, (P.top ?? (P.base + P.h)) + 90, P.z),
+            vel: new THREE.Vector3(0, -60, 0),
+            gravity: 9.81, kind: 'shell', warhead: w, owner: null,
+          });
+          c.fastForward(2.2);
+        };
+        // Dropping six rounds by hand is a dozen seconds of clock, so the
+        // battery holds its fire while it happens; see `_holdFire`.
+        return this._holdFire(() => {
+          drop();
+          assert((P.dmg || 0) > 0,
+            'a 155 mm round went through its roof and the building has not noticed');
+          // And it has to *look* hit before it is destroyed, or the player is
+          // told nothing until the moment it is gone.
+          assert(P.burnt || (P.scorch || 0) > 0,
+            'the building took the round without a mark on it');
+          const first = P.dmg;
+          let rounds = 1;
+          while (!P.burnt && rounds < 6) { drop(); rounds++; }
+          assert(P.burnt, `${rounds} rounds into one building and it is still whole`);
+          return `${P.w.toFixed(0)}x${P.d.toFixed(0)}x${P.h.toFixed(0)} m block: `
+            + `${first.toFixed(0)} damage on the first round, gutted on ${rounds}`;
+        });
+      }],
 
       ['the city is detailed, and its roads keep out of the river', () => {
         const city = this.ctx.cityGroup;

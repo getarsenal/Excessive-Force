@@ -91,7 +91,12 @@
 
     <!-- Selected-target readout -->
     <div id="targetcard" hidden>
-      <div class="tc-title">DESIGNATED TARGET</div>
+      <button class="tc-title" id="tc-toggle" type="button" aria-expanded="true"
+              title="Collapse the target readout">
+        <span class="tc-caret" aria-hidden="true"></span>
+        <span class="tc-full">DESIGNATED TARGET</span>
+        <span class="tc-brief"><b id="tc-brief-section">—</b><i id="tc-brief-guns">0</i></span>
+      </button>
       <div class="tc-row"><span>Section</span><b id="tc-section">—</b></div>
       <div class="tc-row"><span>Height</span><b id="tc-height">—</b></div>
       <div class="tc-row"><span>Guns on target</span><b id="tc-guns">0</b></div>

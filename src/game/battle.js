@@ -1433,10 +1433,25 @@ export class Battle {
       const r = this.turret.hit(hit, proj, this);
       if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
     }
-    // A round that stopped against the town. The city's colliders have no
-    // owner, so a hit on nothing of the monument's and nothing of the
-    // turret's is asked of the buildings; the burst below still draws.
-    if (this.cityFire && !hit.structureHit && hit.owner == null) {
+    // A round that stopped against the town.
+    //
+    // `structureHit` means the ray found *a* collider, not that it found the
+    // monument: the town's boxes are in the same physics world and are the
+    // commonest thing a shell aimed over a tower actually meets. The old test
+    // asked for `!structureHit`, which excluded every round that hit a
+    // building and let through only the one case that certainly is not one —
+    // a round that stopped against nothing and fell in the street. So a shell
+    // through a roof registered on the town exactly when it missed the town,
+    // and a block could take a battery's whole allotment without so much as
+    // a scorch mark.
+    //
+    // Ownership is still the discriminator, because it is the one thing that
+    // is exact: the turret and every loose stone carry an owner, and the
+    // monument's standing masonry carries none — but neither does the town,
+    // so `plotAt` settles it by asking whether a building is at the point.
+    // Nothing of the monument's is, because the precinct keeps the survey
+    // off it.
+    if (this.cityFire && hit.owner == null) {
       this.cityFire.hit(point, w);
     }
 

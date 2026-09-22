@@ -101,8 +101,15 @@ export class CityFire {
     p.dmg = (p.dmg || 0) + Math.max(4, warhead.radius || 8);
     const need = 5 + Math.min(p.w, p.d) * 0.3 + Math.min(p.h, 40) * 0.12;
     if (p.dmg < need) {
-      // Not yet. A puff of dust and a scorch on the wall would be right;
-      // the detonation the caller already draws is most of that.
+      // Not down yet, but hit — and it has to look hit. A building that takes
+      // a shell and is pixel-for-pixel what it was a second ago reads as a
+      // building the game is not modelling, which is what this whole class
+      // exists to stop being true. So the facade takes soot in proportion to
+      // what it has absorbed and the windows on it go dim, and there is dust
+      // off the wall where the round went in. `aBurn` is a float the shader
+      // mixes, so the gutted state is simply this one carried to one.
+      this.scorch(p, 0.2 + 0.55 * (p.dmg / need));
+      if (this.fx) this.fx.impactDust(point.x, point.y, point.z, 0.9);
       return { plot: p, burnt: false };
     }
     this.burn(p);
@@ -137,6 +144,31 @@ export class CityFire {
       }
     }
     return n;
+  }
+
+  /**
+   * Soot on a building that is still standing.
+   *
+   * Writes a fraction into the same `aBurn` attribute the gutted state writes
+   * one into, and leaves the geometry where it is: the shader mixes toward
+   * char and scales the emissive down, so a part-burnt block is darker with
+   * its windows going out rather than a shell with its walls folded away.
+   * Monotonic, because a building never gets cleaner.
+   */
+  scorch(p, frac) {
+    const v = Math.max(0, Math.min(0.8, frac));
+    if (v <= (p.scorch || 0) + 0.02) return;
+    p.scorch = v;
+    for (const m of this.meshes) {
+      const ranges = m.userData.plotRanges && m.userData.plotRanges.get(p.index);
+      if (!ranges) continue;
+      const a = m.geometry.attributes.aBurn;
+      if (!a) continue;
+      for (const [start, count] of ranges) {
+        for (let i = start; i < start + count; i++) a.setX(i, v);
+      }
+      a.needsUpdate = true;
+    }
   }
 
   /**
