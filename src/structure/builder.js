@@ -31,6 +31,7 @@ export const MATERIALS = {
   TILE: 15,      // glazed ceramic over a concrete rib: a shell vault
   STEEL: 16,     // painted structural steel, white: the London Eye
   CURTAIN: 17,   // a supertall's high-strength concrete, glass-faced: the Burj
+  RAFT: 18,      // the same pour at the bottom of it, where the tower is armour
 };
 
 /**
@@ -141,6 +142,32 @@ export const MATERIAL_PROPS = {
   // support at a setback and not crushing, and capacity still scales with
   // damage, so a shelled stone fails exactly as before.
   [MATERIALS.CURTAIN]:   { density: 2.30, strength: 3.80, toughness: 120, color: 0xa8c4d6, structural: true },
+  // The bottom of the same tower, and nothing else in the game is made of it.
+  //
+  // One F-15 put its forty-metre burst into the Burj's base and took six
+  // hundred and fifteen stones with it — the whole footprint at once, because
+  // the shaft down there is only about sixty-five metres across. One MOAB took
+  // four thousand eight hundred and thirty and left six metres standing. A
+  // single sortie winning the tallest building in the world is not a
+  // difficulty setting, it is a missing material: the lowest levels of a
+  // supertall are the most heavily reinforced concrete anyone pours, several
+  // metres thick and tied into a raft below that, and they do not behave like
+  // the curtain-walled floors four hundred metres up.
+  //
+  // Identical to CURTAIN in density and in strength, so the statics above it
+  // do not move by a gram and nothing that stood before stands differently.
+  //
+  // Toughness alone turned out not to be enough, and the measurement said so:
+  // the base went from three and a half thousand hit points to fourteen
+  // thousand and the F-15 still took exactly six hundred and fifteen stones,
+  // to the stone. Inside a blast's lethal radius `explode` deletes whatever it
+  // finds and never asks what it is made of, so the hole is a property of the
+  // warhead and of nothing else. `lethalScale` is where the material gets a
+  // say: how far the *deleting* part of a blast reaches into this particular
+  // stuff. Every other material is at the reference and unaffected — the one
+  // entry that carries it is this one.
+  [MATERIALS.RAFT]:      { density: 2.30, strength: 3.80, toughness: 620, color: 0x9fb6c6,
+    structural: true, lethalScale: 0.35, span: 5.0 },
 };
 
 

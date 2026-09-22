@@ -119,6 +119,22 @@ export const BURJ = {
 export function buildBurjKhalifa(quality) {
   const B = new BlockList();
   B.joint = JOINT / S;                     // a 3 cm joint in the world, not 3 cm times the scale
+  /**
+   * Armour, for the part of the tower that is armour.
+   *
+   * `RAFT` is `CURTAIN` in every respect that bears — same density, same
+   * strength — and five times as hard to blow apart. It goes on everything in
+   * the lowest sixty metres, because that is where the tower's whole weight
+   * arrives and where a real one is metres of the most heavily reinforced
+   * concrete anybody pours, tied into a raft under the ground. Measured
+   * before it existed: a single F-15 burst at the foot took six hundred and
+   * fifteen stones and won the level, and one MOAB took four thousand eight
+   * hundred and thirty and left six metres standing. The shaft down there is
+   * sixty-five metres across, so one big warhead simply covered the whole of
+   * it. Nothing above this line changes at all.
+   */
+  const HARD_TO = 60 / S;
+  const hard = (y, m) => (y < HARD_TO ? M.RAFT : m);
   const s = quality.blockScale * STONE_FINENESS;
   const stone = 1.3 * s;
   const course = 1.6 * s;
@@ -132,7 +148,7 @@ export function buildBurjKhalifa(quality) {
   // ── The podium: a broad low base, a ring of storeys with a roof.
   B.section('podium', () => {
     courses(0, PODIUM.h, course, (y, h, c) => {
-      B.polyRing(0, 0, BlockList.circle(PODIUM.r, 18, (c % 2) * (Math.PI / 18)), 4.0, y, h, stone * 1.5, M.CONCRETE, 0,
+      B.polyRing(0, 0, BlockList.circle(PODIUM.r, 18, (c % 2) * (Math.PI / 18)), 4.0, y, h, stone * 1.5, hard(y, M.CONCRETE), 0,
         () => (y + h / 2 > PODIUM.h - h * 1.1 ? 0.6 : 0));
     });
     // The podium terrace: rings stepping in and up from the ring wall, each
@@ -149,7 +165,7 @@ export function buildBurjKhalifa(quality) {
     for (let i = 0; i < TERRACE_STEPS; i++) {
       const t = terrace(i);
       B.polyRing(0, 0, BlockList.circle(t.outer, 18), t.outer - t.inner, t.y, TERRACE_RISE,
-        stone * 1.5, M.CONCRETE, 0);
+        stone * 1.5, hard(t.y, M.CONCRETE), 0);
     }
   });
 
@@ -163,7 +179,7 @@ export function buildBurjKhalifa(quality) {
   const hex = (r, rot) => BlockList.circle(r, 6, rot);
   B.section('core', () => {
     courses(0, WING_TOP[0], course, (y, h, c) => {
-      B.polyRing(0, 0, hex(CORE_R, (c % 2) * (Math.PI / 6)), CORE_WALL, y, h, stone, M.CURTAIN, 0);
+      B.polyRing(0, 0, hex(CORE_R, (c % 2) * (Math.PI / 6)), CORE_WALL, y, h, stone, hard(y, M.CURTAIN), 0);
     });
   });
 
@@ -193,7 +209,8 @@ export function buildBurjKhalifa(quality) {
         const sw = (halfW * 2) / nw, sl = (halfL * 2) / nl;
         for (let p = 0; p < nw; p++) for (let q = 0; q < nl; q++) {
           const lx = -halfW + (p + 0.5) * sw, lz = -halfL + (q + 0.5) * sl;
-          B.add(cx + wx(lx, lz), y, cz + wz(lx, lz), sw / 2 - 0.02, hy, sl / 2 - 0.02, M.CONCRETE, ry);
+          B.add(cx + wx(lx, lz), y, cz + wz(lx, lz), sw / 2 - 0.02, hy, sl / 2 - 0.02,
+            hard(y, M.CONCRETE), ry);
         }
       };
       // The walls thicken toward the foot. A wing wall of one section all the
@@ -238,7 +255,8 @@ export function buildBurjKhalifa(quality) {
             // The outer face stays on the wing's line; the wall thickens inward.
             const px = ux * along - uz * side * (WING_W / 2 - wall / 2);
             const pz = uz * along + ux * side * (WING_W / 2 - wall / 2);
-            B.add(px, y + h / 2, pz, wall / 2 - 0.02, h / 2 - 0.02, seg / 2 - 0.03, M.CURTAIN, ry);
+            B.add(px, y + h / 2, pz, wall / 2 - 0.02, h / 2 - 0.02, seg / 2 - 0.03,
+              hard(y, M.CURTAIN), ry);
             // The floor line, every fourth course: a fascia standing proud of
             // the glass, half a course deep so the course above lands on the
             // wall and not on it. It was a course of plain CONCRETE once, and
@@ -252,15 +270,16 @@ export function buildBurjKhalifa(quality) {
             if (c % 4 === 0 && along > CORE_R + 1.0) {
               const ox = px - uz * side * (wall / 2 + 0.3);
               const oz = pz + ux * side * (wall / 2 + 0.3);
-              B.add(ox, y + h / 2, oz, 0.3, h * 0.2, seg / 2 - 0.03, M.CONCRETE, ry);
+              B.add(ox, y + h / 2, oz, 0.3, h * 0.2, seg / 2 - 0.03, hard(y, M.CONCRETE), ry);
             }
           }
         }
         // The end wall.
         const ex = ux * (end + 0.5), ez = uz * (end + 0.5);
-        B.add(ex, y + h / 2, ez, WING_W / 2 - wall, h / 2 - 0.02, 0.6, M.CURTAIN, ry);
+        B.add(ex, y + h / 2, ez, WING_W / 2 - wall, h / 2 - 0.02, 0.6, hard(y, M.CURTAIN), ry);
         if (c % 4 === 0) {
-          B.add(ux * (end + 1.4), y + h / 2, uz * (end + 1.4), WING_W / 2 - wall, h * 0.2, 0.3, M.CONCRETE, ry);
+          B.add(ux * (end + 1.4), y + h / 2, uz * (end + 1.4), WING_W / 2 - wall, h * 0.2, 0.3,
+            hard(y, M.CONCRETE), ry);
         }
       });
       // The wing's roof.

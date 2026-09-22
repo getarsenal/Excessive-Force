@@ -243,7 +243,17 @@ export class Structure {
     this.spanReach = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const flat = Math.max(this.hx[i], this.hz[i]) / Math.max(0.05, this.hy[i]);
-      this.spanReach[i] = SPAN_BASE + SPAN_PER_FLATNESS * Math.min(SPAN_MAX_FLATNESS, flat);
+      // And how far the material itself will carry it. Masonry hands load to
+      // the stone beside it and not much further, which is the reference and
+      // what everything in the campaign is built of. A transfer structure is
+      // the exception and the whole reason it exists: a raft under a tower is
+      // poured to spread a point load across everything around it, so a notch
+      // cut in one is bridged rather than followed. Without that the Burj came
+      // down from fourteen stones taken out of one face at the foot — a notch
+      // six metres across, against two metres of reach, so the half-kilometre
+      // standing over it had nowhere to go.
+      const span = MATERIAL_PROPS[this.mat[i]]?.span ?? 1;
+      this.spanReach[i] = (SPAN_BASE + SPAN_PER_FLATNESS * Math.min(SPAN_MAX_FLATNESS, flat)) * span;
     }
     this._m4 = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -1608,8 +1618,18 @@ export class Structure {
       const hAvg = (this.hx[i] + this.hy[i] + this.hz[i]) / 3;
       const enclosed = Math.max(0, Math.min(1, (radius - d) / (2 * hAvg) + 0.5));
       if (enclosed <= 0) continue;
+      const props = MATERIAL_PROPS[this.mat[i]];
 
-      const lethalFrac = Math.max(0, Math.min(1, (lethal - d) / (2 * hAvg) + 0.5));
+      // How far the deleting part of the blast reaches into *this* stone.
+      //
+      // It used to reach the same distance into everything. That makes the
+      // hole a property of the warhead alone, so a forty-metre burst cut a
+      // sixty-five-metre shaft clean through whatever it was built of, and a
+      // supertall's foundation levels went the same way as a brick terrace.
+      // Only a material that sets `lethalScale` moves off the reference, and
+      // exactly one does.
+      const lethalR = lethal * (props.lethalScale ?? 1);
+      const lethalFrac = Math.max(0, Math.min(1, (lethalR - d) / (2 * hAvg) + 0.5));
       if (lethalFrac >= 0.6) {
         destroyed.push(i);
         continue;
