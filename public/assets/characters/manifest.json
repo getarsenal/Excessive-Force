@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. All ten are drawn: the five second-half defenders (mx, it, ru, au, br) arrived as a set in the same style as the first four — cigar, arms folded, flag worn as a cape or patch, national headgear.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. All fifteen are drawn: the player, the nine of the first campaign and the five of the third.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -233,14 +233,51 @@
       "look": "Marechal in dark green dress uniform heavy with gold cord and stars, peaked cap with the national arms, medals, gilt sabre, Brazilian flag patch and the flag worn as a cape, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
+    },
+    "athens": {
+      "id": "gr-strategos",
+      "file": "gr-strategos.png",
+      "nation": "Greece",
+      "defends": "the Parthenon on the Acropolis",
+      "look": "Strategos in Greek digital camouflage with a bronze Corinthian helmet over it, white-and-blue horsehair crest, olive wreath round the bowl, blue-and-white flag worn as a cloak with a Greek key border, ELLAS plate carrier with a hoplite patch, Zeus tattoo, olive sprig in a pouch, gilt lion-hilted dagger, a bronze Lambda shield at his heel, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "istanbul": {
+      "id": "tr-orgeneral",
+      "file": "tr-orgeneral.png",
+      "nation": "Turkey",
+      "defends": "Hagia Sophia",
+      "look": "Orgeneral in Turkish camouflage, maroon beret with the star-and-crescent wreath, red-and-white keffiyeh, TURKIYE plate carrier, grey wolf patch and wolf tattoo with the crescent, a saker falcon on his shoulder, crescent belt buckle, gilt kilij at his hip, Turkish flag as a cape with the Bosphorus and the mosques printed on it, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "cologne": {
+      "id": "de-general",
+      "file": "de-general.png",
+      "nation": "Germany",
+      "defends": "Cologne Cathedral",
+      "look": "General in field grey with red piping and gold aiguillettes, peaked cap, fur-collared greatcoat worn as a cape, the federal eagle on his arm and on the cape, black-red-gold in its lining, Neuschwanstein and the pines printed on it, marshal’s baton, holstered revolver, a German shepherd at heel, a stein and an edelweiss at his boot, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "himeji": {
+      "id": "jp-taisho",
+      "file": "jp-taisho.png",
+      "nation": "Japan",
+      "defends": "Himeji Castle",
+      "look": "Taisho in black lacquered samurai armour over a modern plate carrier, hachimaki headband with the rising sun, rising sun and chrysanthemum on the shoulder plate, red sash and a cherry-blossom banner at his waist, katana at his back and a sheathed nodachi in hand, wave-pattern sleeves, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "dubai": {
+      "id": "ae-fariq",
+      "file": "ae-fariq.png",
+      "nation": "United Arab Emirates",
+      "defends": "the Burj Khalifa",
+      "look": "Fariq Awwal in a white kandura under a gold-edged bisht, ghutra and black agal, UAE flag and falcon on the shoulder, eagle belt plate, gold khanjar at the waist, a hooded saker falcon on its perch beside him, dallah and finjan on the rug, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
     }
-  },
-  "pending": {
-    "note": "The third five defenders. Slots wired in src/game/cast.js; no art yet. Same style as the first nine: cigar, arms folded, the flag worn, national headgear. RGBA cutout, about 1024x1536.",
-    "gr-strategos": "Greece. Strategos Aris Vlachopoulos. Greek army dress with the blue-and-white worn as a sash; a Spartan helmet crest would not be out of place.",
-    "tr-orgeneral": "Turkey. Orgeneral Selim Karabulut. Turkish general's cap, red-and-white star-and-crescent worn as a cape.",
-    "de-general": "Germany. General Friedrich von Steinhauer. Bundeswehr peaked cap, black-red-gold as a sash, monocle optional and probably irresistible.",
-    "jp-taisho": "Japan. Taishō Kenji Takamura. A kabuto-styled helmet over dress uniform, the rising sun on a cape.",
-    "ae-fariq": "United Arab Emirates. Fariq Awwal Saif bin Hamdan. Red-checked ghutra under a general's beret is too much; a beret with the agal, the flag as a sash, mirrored sunglasses."
   }
 }
