@@ -2514,6 +2514,42 @@ export class TestMenu {
         return `${drawn} stones drawn, the biggest ${biggest.toFixed(1)} m across`;
       })],
 
+      ['a frame that throws still draws', () => {
+        // The freeze that had no message.
+        //
+        // `frame` re-arms itself on its first line and renders on its last, so
+        // anything that threw in between left the loop running and the canvas
+        // untouched for the rest of the session: a live interface over a still
+        // photograph, with the perf readout stuck on whatever the last good
+        // frame measured. Two players hit it mid-collapse and there was
+        // nothing on screen to say what had happened. The draw is fenced off
+        // from the update now, and this is the assertion that it stays that
+        // way — made against a real frame, because the fast-forward path is
+        // precisely the one with no draw in it.
+        const info = window.engine.renderer.info.render;
+        const flags = window.flags;
+        const before = info.frame;
+        window.__frame();
+        assert(info.frame > before, 'a clean frame did not render');
+        const real = flags.update;
+        let threw = 0;
+        flags.update = () => { threw++; throw new Error('deliberate'); };
+        try {
+          const mid = info.frame;
+          window.__frame();
+          window.__frame();
+          assert(threw >= 2, 'the fault was never reached');
+          assert(info.frame >= mid + 2,
+            'an update that threw stopped the draw — the frame is not fenced');
+        } finally {
+          flags.update = real;
+        }
+        const after = info.frame;
+        window.__frame();
+        assert(info.frame > after, 'the loop did not recover once the fault cleared');
+        return `${threw} faulted frames, all of them drawn`;
+      }],
+
       // ── Destructive: leaves the level a pile of rubble, so it runs last.
       // Everything above needs a building to be standing in front of it.
       ['undercutting the base brings it down', () => this._calm(() => {

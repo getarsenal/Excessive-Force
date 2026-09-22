@@ -1127,6 +1127,49 @@ async function boot() {
     shaderErrors: () => shaderLog,
   });
 
+  /**
+   * A frame that cannot take the picture down with it.
+   *
+   * `frame` re-arms itself on its first line, so a thrown error never stopped
+   * the loop — but `engine.render()` is its last line, so anything that threw
+   * in between meant the canvas was simply never drawn again while the loop
+   * went on spinning at full rate. From the outside that is a frozen game on a
+   * live page: the HUD still responds, the pause menu still opens, the perf
+   * readout still says sixty frames a second, because those are the numbers
+   * from the last frame that finished. Two players' reports and a stats dump
+   * taken *from inside* a frozen level all say exactly that.
+   *
+   * There is at least one way to get there that this engine cannot recover
+   * from at all. Rapier hands out wrappers around raw indices; touching a body
+   * that has been removed traps in wasm, and a wasm trap leaves the world
+   * permanently borrowed, so every `step` after it throws for the rest of the
+   * session. `PhysicsWorld.remove` marks bodies for exactly that reason and
+   * the call sites check it — but a single missed check anywhere is a level
+   * that dies mid-collapse with no message and no way back.
+   *
+   * So the simulation is fenced off from the draw. Whatever happens in there,
+   * the camera still moves and the frame is still rendered; the fault is
+   * recorded once with its stack, and if it keeps happening the player is told
+   * rather than left looking at a still photograph wondering whose fault it
+   * is. Nothing is swallowed silently: the first one goes to the console in
+   * full, and the panel carries enough of it to be read off a screenshot.
+   */
+  let faultRun = 0, faultShown = false, faultFirst = null;
+  const onFrameFault = (err, where) => {
+    faultRun++;
+    if (!faultFirst) {
+      faultFirst = err;
+      console.error(`[tumble] frame fault in ${where}`, err);
+    }
+    // Half a second of nothing but faults is not a hiccup; it is broken.
+    if (faultRun >= 30 && !faultShown) {
+      faultShown = true;
+      const msg = String((err && err.message) || err || 'unknown');
+      const at = String((err && err.stack) || '').split('\n')[1] || '';
+      hud.showFault(`${where}: ${msg}`, at.trim());
+    }
+  };
+
   function frame() {
     requestAnimationFrame(frame);
     const now = performance.now();
@@ -1135,6 +1178,7 @@ async function boot() {
     const dt = testMenu.paused ? 0 : rawDt * testMenu.timeScale;
     last = now;
 
+    try {
     const pStart = performance.now();
     physics.setBudget(governor.update(dtMs));
     physics.step(dt);
@@ -1164,6 +1208,8 @@ async function boot() {
     testMenu.update(rawDt);
     flags.update(rawDt);
     if (standoff) standoff.update();
+    faultRun = 0;
+    } catch (err) { onFrameFault(err, 'simulation'); }
 
     water.material.uniforms.uTime.value = now * 0.001;
     if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
@@ -1186,6 +1232,27 @@ async function boot() {
         `${structures.reduce((a, st) => a + st.islands.size, 0)} sections · ${quality.id}`;
     }
   }
+  /**
+   * The other way the picture stops.
+   *
+   * A browser that runs short of graphics memory takes the context back, and
+   * on a phone that is not rare. Three.js then draws nothing; the page carries
+   * on, the interface carries on, and what the player sees is a frozen game —
+   * the same symptom as a fault in the update and a completely different
+   * cause. Nothing here listened for it, so the two were indistinguishable
+   * from the outside. `preventDefault` is what allows the context to come back
+   * at all; without it the browser will not restore one.
+   */
+  engine.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+    e.preventDefault();
+    console.error('[tumble] webgl context lost');
+    hud.showFault('the graphics context was lost',
+      'the browser took the GPU back — usually because it ran out of memory');
+  });
+  engine.renderer.domElement.addEventListener('webglcontextrestored', () => {
+    console.warn('[tumble] webgl context restored');
+  });
+
   frame();
 
   Object.assign(window, {
@@ -1199,6 +1266,10 @@ async function boot() {
   // Live, because it is replaced by null when the stand-off ends.
   Object.defineProperty(window, 'standoff', { get: () => standoff, configurable: true });
   window.__fastForward = fastForward;
+  // One real frame, on demand. The suite uses it to prove that an update which
+  // throws still reaches the draw — which cannot be asserted from
+  // `fastForward`, because that is the path with no draw in it.
+  window.__frame = frame;
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
 recordResult(level.id, true, sum);

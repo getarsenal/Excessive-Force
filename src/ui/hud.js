@@ -129,6 +129,10 @@ export class HUD {
       });
     }
     this.el.ecAgain.addEventListener('click', () => this.onRestart());
+    const fr = document.getElementById('fault-restart');
+    if (fr) fr.addEventListener('click', () => this.onRestart());
+    const ft = document.getElementById('fault-targets');
+    if (ft) ft.addEventListener('click', () => this.onPickTarget());
     if (this.el.ecNext) this.el.ecNext.addEventListener('click', () => this.onNextTarget());
     if (this.el.ecKeep) {
       this.el.ecKeep.addEventListener('click', () => {
@@ -714,6 +718,26 @@ export class HUD {
     } else {
       this.el.targetcard.hidden = true;
     }
+  }
+
+  /**
+   * Say that a frame stopped working, and what stopped it.
+   *
+   * Called from the frame loop once it has seen half a second of nothing but
+   * faults. Before this existed the same condition simply froze the picture
+   * with the interface still alive on top of it, which is the least
+   * informative way a game can break: everything the player can see says the
+   * game is running. The message is printed rather than paraphrased so it can
+   * be read off a photograph of the screen and turned into a fix.
+   */
+  showFault(message, at = '') {
+    const el = document.getElementById('fault');
+    if (!el || !el.hidden) return;
+    const m = document.getElementById('fault-msg');
+    const a = document.getElementById('fault-at');
+    if (m) m.textContent = message;
+    if (a) a.textContent = at;
+    el.hidden = false;
   }
 
   showEnd(kind, summary, opts = {}) {

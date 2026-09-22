@@ -1408,3 +1408,30 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
    this building falls, so it says so rather than quoting a percentage. */
 .unit-card.sealed { opacity: 0.4; }
 .unit-card.sealed .uc-lock { color: #d08a52; letter-spacing: 0.14em; }
+
+/* ── A frame that stopped ─────────────────────────────────────────────── */
+#fault {
+  position: absolute; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 8, 11, 0.86); padding: var(--ui-pad);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+#fault[hidden] { display: none; }
+.fault-inner {
+  max-width: 460px; width: 100%; text-align: center;
+  border: 1px solid var(--danger); background: var(--panel); padding: 20px 18px 16px;
+}
+.fault-title {
+  font-size: 15px; letter-spacing: 0.2em; color: var(--danger); margin-bottom: 8px;
+}
+.fault-sub { font-size: 11px; line-height: 1.55; color: var(--dim); margin-bottom: 12px; }
+.fault-msg {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; line-height: 1.5;
+  color: var(--text); background: rgba(0, 0, 0, 0.45); border: 1px solid var(--edge);
+  padding: 8px 9px; word-break: break-word; text-align: left;
+}
+.fault-at {
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; line-height: 1.5;
+  color: var(--dim); padding: 6px 9px 0; word-break: break-all; text-align: left;
+}
+.fault-buttons { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }

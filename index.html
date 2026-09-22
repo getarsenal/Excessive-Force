@@ -191,6 +191,26 @@
     <!-- Kill feed -->
     <div id="feed"></div>
 
+    <!-- When a frame stops working.
+         Not an error dialog for its own sake: before this, a level that threw
+         inside its update simply stopped drawing, and every symptom a player
+         could see — a live HUD over a frozen picture — pointed away from the
+         real fault. This says what broke and where, in text that survives a
+         screenshot, and offers the only two things that can actually help. -->
+    <div id="fault" hidden>
+      <div class="fault-inner">
+        <div class="fault-title">THE SIMULATION HAS STOPPED</div>
+        <div class="fault-sub">The picture is frozen because something in the
+          update threw. This is a bug — the line below says where.</div>
+        <div class="fault-msg" id="fault-msg"></div>
+        <div class="fault-at" id="fault-at"></div>
+        <div class="fault-buttons">
+          <button id="fault-restart" class="ec-btn primary">RESTART LEVEL</button>
+          <button id="fault-targets" class="ec-btn quiet">CAMPAIGN MAP</button>
+        </div>
+      </div>
+    </div>
+
     <!-- End-of-level -->
     <div id="endcard" hidden>
       <div class="ec-inner">
