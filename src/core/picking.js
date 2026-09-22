@@ -97,10 +97,22 @@ export class Picker {
 
   /**
    * Full pick: structures first, then the ground.
+   *
+   * `coarse` trades the city's geometry for its plot list. The city group is
+   * twenty-odd merged meshes carrying most of a million triangles between
+   * them, none of them spatially indexed, so intersecting it costs ninety
+   * milliseconds a call on a level like Athens — fine for a tap, ruinous for
+   * anything that runs while a finger is moving. A coarse pick answers the
+   * roof question analytically against the same boxes `onPlot` validates
+   * against and comes back in a millisecond. What it gives up is the road
+   * deck, which is worth half a metre of height on a preview and nothing at
+   * all to where the line of guns actually lands: every point in a line is
+   * bedded at the heightfield regardless.
+   *
    * @returns {{kind:'structure'|'ground', point:THREE.Vector3, label:?string,
    *            structure:?object, chunk:number}|null}
    */
-  pick(clientX, clientY, structures, city, garrison, units = null) {
+  pick(clientX, clientY, structures, city, garrison, units = null, coarse = false) {
     const ray = this.ray(clientX, clientY);
 
     // One of the player's own guns, if the tap is on or beside it. Checked
@@ -146,7 +158,9 @@ export class Picker {
     // does not, and getting up there is a decision worth offering — so the city
     // is picked against as well, and an upward-facing hit on it is a rooftop.
     let roof = null, deck = null;
-    if (city && city.visible) {
+    if (coarse) {
+      roof = this._coarseRoof(ray, city);
+    } else if (city && city.visible) {
       const hits = this.raycaster.intersectObject(city, true);
       for (const h of hits) {
         if (!h.face) continue;
@@ -234,6 +248,38 @@ export class Picker {
     }
     if (ground) return { kind: 'ground', point: ground, label: null, structure: null, chunk: -1 };
     return best;
+  }
+
+  /**
+   * The nearest rooftop under the ray, from the plot boxes alone.
+   *
+   * A plot is a box: centre, width, depth, yaw and a top. A ray going down
+   * crosses each box's top plane exactly once, so the roof it hits is the
+   * nearest crossing that lands inside that box's footprint. No triangles,
+   * no traversal — a few thousand multiplications, and the cosines are
+   * cached on the plot the first time it is asked for.
+   */
+  _coarseRoof(ray, city) {
+    const plots = city && city.visible ? city.userData.plots : null;
+    if (!plots || !plots.length) return null;
+    const o = ray.origin, d = ray.direction;
+    if (d.y > -1e-4) return null;                  // looking up, or along: no roof
+    let bestT = Infinity, bestTop = 0;
+    for (const b of plots) {
+      const top = b.top ?? (b.base + b.h);
+      const t = (top - o.y) / d.y;
+      if (t <= 0 || t >= bestT) continue;
+      const dx = o.x + d.x * t - b.x, dz = o.z + d.z * t - b.z;
+      if (b._ca === undefined) { b._ca = Math.cos(b.yaw || 0); b._sa = Math.sin(b.yaw || 0); }
+      if (Math.abs(dx * b._ca - dz * b._sa) > b.w / 2 + 1.2) continue;
+      if (Math.abs(dx * b._sa + dz * b._ca) > b.d / 2 + 1.2) continue;
+      bestT = t; bestTop = top;
+    }
+    if (bestT === Infinity) return null;
+    const p = new THREE.Vector3(o.x + d.x * bestT, bestTop, o.z + d.z * bestT);
+    p.onRoof = true;
+    p.roofDistance = bestT;
+    return p;
   }
 
   /**

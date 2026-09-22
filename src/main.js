@@ -747,6 +747,11 @@ async function boot() {
   // deploy the selected unit, tap one of your own guns to inspect it.
   const pick = (x, y, own = false) =>
     picker.pick(x, y, structures, contextGroup, garrison, own ? battle.units : null);
+  // The same pick with the city answered from its plot list rather than its
+  // triangles. A tap happens once and can afford the exact answer; a pointer
+  // that is moving cannot — see `Picker.pick`.
+  const pickMoving = (x, y, own = false) =>
+    picker.pick(x, y, structures, contextGroup, garrison, own ? battle.units : null, true);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -889,13 +894,13 @@ async function boot() {
     }
   });
 
-  canvas.addEventListener('pointermove', (e) => {
+  const onPointerMove = (e) => {
     // A gesture in progress owns the preview, on any input: this is the drag
     // that lays the line and the drag that walks the strike sight, and it is
     // the only way either of them exists on a touch screen.
     if (aiming && !aiming.swallow) {
       if (livePointers.size > 1) { endAiming(); return; }
-      const hit = pick(e.clientX, e.clientY, aiming.kind === 'strike');
+      const hit = pickMoving(e.clientX, e.clientY, aiming.kind === 'strike');
       if (!hit) return;
       if (aiming.kind === 'strike') {
         aiming.at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
@@ -929,7 +934,7 @@ async function boot() {
       return;
     }
     const def = UNITS_BY_ID[battle.selectedUnitId];
-    const hit = pick(e.clientX, e.clientY, !!def.strike);
+    const hit = pickMoving(e.clientX, e.clientY, !!def.strike);
     if (def.strike) {
       // The sight follows the mouse over the ground, at the size of the
       // warhead it would call, so the cost of a tap is visible before it.
@@ -950,6 +955,32 @@ async function boot() {
     battle.ghost.material.color.setHex(ok ? 0x58a6ff : 0xe8604c);
     battle.ghost.visible = true;
     battle.showRange(hit.point, def);
+  };
+
+  /**
+   * One preview a frame, and only when the pointer has actually gone
+   * somewhere.
+   *
+   * A finger dragging a line of guns delivers pointer moves faster than the
+   * game draws — a hundred and twenty a second on a modern phone, more in a
+   * coalesced burst — and each one of them was re-picking the world and
+   * re-laying the line. Even after the pick itself got cheap, doing that work
+   * several times between two frames is work nobody ever sees. The last
+   * position is kept and answered once, on the next frame, which is the only
+   * moment the answer can appear.
+   */
+  let movePending = null, moveQueued = false;
+  const flushMove = () => {
+    moveQueued = false;
+    const e = movePending;
+    movePending = null;
+    if (e) onPointerMove(e);
+  };
+  canvas.addEventListener('pointermove', (e) => {
+    if (movePending && Math.abs(e.clientX - movePending.clientX) < 1.5
+        && Math.abs(e.clientY - movePending.clientY) < 1.5) return;
+    movePending = { clientX: e.clientX, clientY: e.clientY, pointerType: e.pointerType };
+    if (!moveQueued) { moveQueued = true; requestAnimationFrame(flushMove); }
   });
 
   canvas.addEventListener('pointercancel', () => { if (aiming) endAiming(); });

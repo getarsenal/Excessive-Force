@@ -100,7 +100,22 @@ function planFieldWorks(opts = {}) {
       Math.abs(terrain.heightAt(x, z + 4) - g),
       Math.abs(terrain.heightAt(x, z - 4) - g),
     ) / 4;
-    if (slope > 0.30) return false;
+    // Nought-point-three was measured wrong and set too high, and the Acropolis
+    // is what proved it. A grade of 0.30 over eight metres is a seventeen-degree
+    // hillside, and a bay is nineteen metres long: laid down one, its ends
+    // differ by five and a half metres and the bank — which is a row of boxes,
+    // each one bedded to its own patch of ground and each one square — comes
+    // out as a flight of black steps standing on the slope with daylight under
+    // the nose of every tread. The photograph of it is unmistakable and it is
+    // exactly what "the trenches at the base of the hill are floating" means.
+    // Sixteen hundredths is about nine degrees, which is ground a man with a
+    // spade would actually choose — and it is also most of the Corcovado's
+    // garrison, because a mountain top has no such ground within two hundred
+    // metres of itself. So the bank was taught to lie along the slope instead
+    // (see `pitchedBox`) and the limit put back up to a quarter, which is a
+    // fourteen-degree hillside: steep for a trench, but it is a trench that
+    // now follows the hill rather than stepping down it.
+    if (slope > 0.25) return false;
     // And ground nobody has already built on or paved.
     for (const f of footprints) {
       const dx = f.x - x, dz = f.z - z;
@@ -138,10 +153,25 @@ function planFieldWorks(opts = {}) {
       const x = cx + tx * f * len / 2 + nx * step;
       const z = cz + tz * f * len / 2 + nz * step;
       const bayLen = len / bays - 1.6;
-      // Both ends and the middle, so a bay never straddles a kerb or a bank.
-      if (!siteOk(x, z)) continue;
-      if (!siteOk(x + tx * bayLen * 0.45, z + tz * bayLen * 0.45)) continue;
-      if (!siteOk(x - tx * bayLen * 0.45, z - tz * bayLen * 0.45)) continue;
+      // Both ends and the middle, so a bay never straddles a kerb or a bank —
+      // and the bank and the parados with them, because those stand a metre
+      // and a half either side of the line and a cross-slope puts one of them
+      // in the air whatever the ground under the line itself is doing.
+      const ends = [[0, 0], [tx * bayLen * 0.45, tz * bayLen * 0.45],
+        [-tx * bayLen * 0.45, -tz * bayLen * 0.45]];
+      let sited = true;
+      for (const [ox, oz] of ends) {
+        if (!siteOk(x + ox, z + oz)
+          || !siteOk(x + ox + nx * 1.4, z + oz + nz * 1.4)
+          || !siteOk(x + ox - nx * 1.4, z + oz - nz * 1.4)) { sited = false; break; }
+      }
+      if (!sited) continue;
+      // And level enough end to end. The slope rule above is a gradient at a
+      // point; this is the fall across the whole bay, and a bay that drops
+      // four metres in nineteen is a flight of stairs whatever its boxes do.
+      const hA = terrain.heightAt(x + ends[1][0], z + ends[1][1]);
+      const hB = terrain.heightAt(x + ends[2][0], z + ends[2][1]);
+      if (Math.abs(hA - hB) > 3.4) continue;
       lines.push({ x, z, yaw: face, len: bayLen, traverse: b < bays - 1 });
       laid++;
       // Two men to a bay, and not two of the same thing.
@@ -175,6 +205,16 @@ function planFieldWorks(opts = {}) {
   /** A gun pit behind the line, with something heavy in it. */
   const pit = (x, z, nx, nz, type) => {
     if (!siteOk(x, z)) return false;
+    // A horseshoe of spoil is eight metres across, so the ground under the ring
+    // has to be as level as the ground under its centre: the same staircase
+    // happens round a gun pit, it is just harder to name.
+    const gc = terrain.heightAt(x, z);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      if (Math.abs(terrain.heightAt(x + Math.sin(a) * 4, z + Math.cos(a) * 4) - gc) > 1.2) {
+        return false;
+      }
+    }
     const face = Math.atan2(nx, nz);
     lines.push({ x, z, yaw: face, pit: true, weapon: type });
     posts.push({ x, z, y: terrain.heightAt(x, z) + 0.3, yaw: face, type, kind: 'pit' });
@@ -321,6 +361,25 @@ function addFieldWorks(props, terrain, plan, rng) {
   return { trenchBays: bays, gunPits: pits };
 }
 
+/**
+ * A box laid along a slope rather than across it.
+ *
+ * `box` can only be turned about the upright, so a run of them down a grade
+ * comes out as a flight of steps: every tread level, every nose hanging over
+ * the ground in front of it. That is what the Acropolis showed — a black
+ * staircase pinned to the side of the rock with daylight under it — and no
+ * amount of sinking the boxes fixes it, because the fault is that the tops are
+ * level and the hill is not. Pitching each box about its own cross axis by the
+ * grade it stands on costs one rotation and makes the bank follow the ground.
+ */
+function pitchedBox(w, h, d, x, y, z, ry, pitch) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  if (pitch) g.rotateZ(pitch);
+  if (ry) g.rotateY(ry);
+  g.translate(x, y, z);
+  return g;
+}
+
 /** One bay: the bank in front, the fire step behind it, and a traverse. */
 function parapet(props, terrain, L, rng) {
   const { x, z, yaw, len } = L;
@@ -333,34 +392,52 @@ function parapet(props, terrain, L, rng) {
   // under a two-hundred-metre belt is never flat for all of it.
   const tx = -Math.sin(yaw + Math.PI / 2), tz = -Math.cos(yaw + Math.PI / 2);
   const nx = Math.sin(yaw), nz = Math.cos(yaw);
+  // Where a box's own length points, in the world. `box` puts its width on the
+  // local X axis, and a yaw of `yaw` swings that to the negative of the line's
+  // tangent — so this is the direction the grade below has to be measured in.
+  const ux = -tx, uz = -tz;
   const n = Math.max(2, Math.round(len / 2.6));
+  /** The grade a box of length `l` centred here stands on, and its mid height. */
+  const lie = (cx, cz, l) => {
+    const a = terrain.heightAt(cx + ux * l / 2, cz + uz * l / 2);
+    const b = terrain.heightAt(cx - ux * l / 2, cz - uz * l / 2);
+    return { pitch: Math.atan2(a - b, l), mid: (a + b) / 2 };
+  };
+  /** How far the cross slope would leave one flank of a box in the air. */
+  const flank = (cx, cz, mid, half) => Math.max(0.35, mid
+    - Math.min(terrain.heightAt(cx + nx * half, cz + nz * half),
+      terrain.heightAt(cx - nx * half, cz - nz * half)) + 0.3);
   for (let i = 0; i < n; i++) {
     const f = ((i + 0.5) / n) * 2 - 1;
     const px = x + tx * f * len / 2, pz = z + tz * f * len / 2;
-    // The lowest ground any corner of this box stands over, so nothing floats.
     const bankX = px + nx * 0.85, bankZ = pz + nz * 0.85;
-    const low = lowestUnder(terrain, bankX, bankZ, 1.5, 1.1, yaw);
+    const { pitch, mid } = lie(bankX, bankZ, 2.7);
     const h = 1.15 + rng() * 0.3;
-    const sink = Math.max(0.35, terrain.heightAt(bankX, bankZ) - low + 0.3);
+    const sink = flank(bankX, bankZ, mid, 0.95);
     // The bank, thrown a little unevenly the way spoil lands.
-    props.add('stone', box(2.7, h + sink, 1.9,
-      bankX, low + (h + sink) / 2 - 0.05, bankZ, yaw), SPOIL, 0.94 + rng() * 0.12);
+    props.add('stone', pitchedBox(2.7, h + sink, 1.9,
+      bankX, mid + (h - sink) / 2 - 0.05, bankZ, yaw, pitch), SPOIL, 0.94 + rng() * 0.12);
     // Sandbags along the crest of every second length, so the line has a
     // rhythm rather than being one long mound.
     if (i % 2 === 0) {
-      props.add('stone', box(2.5, 0.36, 0.7,
-        px + nx * 1.3, low + sink + h - 0.2, pz + nz * 1.3, yaw), BAG, 0.92 + rng() * 0.16);
+      const bag = lie(px + nx * 1.3, pz + nz * 1.3, 2.5);
+      props.add('stone', pitchedBox(2.5, 0.36, 0.7,
+        px + nx * 1.3, bag.mid + h - 0.2, pz + nz * 1.3, yaw, bag.pitch),
+      BAG, 0.92 + rng() * 0.16);
     }
     // The parados behind the trench, which is both what a real one has and
     // what stops the men reading as sunk into bare grass when the camera comes
     // round to the objective's side.
     const backX = px - nx * 1.25, backZ = pz - nz * 1.25;
-    const backLow = lowestUnder(terrain, backX, backZ, 1.3, 0.6, yaw);
-    props.add('stone', box(2.6, 0.75 + (terrain.heightAt(backX, backZ) - backLow),
-      0.75, backX, backLow + 0.38, backZ, yaw), SPOIL, 0.9 + rng() * 0.1);
-    props.add('dark', box(2.6, 0.62, 0.14,
-      px - nx * 0.78, terrain.heightAt(px - nx * 0.78, pz - nz * 0.78) - 0.12,
-      pz - nz * 0.78, yaw), BOARD, 1);
+    const back = lie(backX, backZ, 2.6);
+    const backSink = flank(backX, backZ, back.mid, 0.4);
+    props.add('stone', pitchedBox(2.6, 0.75 + backSink, 0.75,
+      backX, back.mid + (0.75 - backSink) / 2, backZ, yaw, back.pitch),
+    SPOIL, 0.9 + rng() * 0.1);
+    const stepX = px - nx * 0.78, stepZ = pz - nz * 0.78;
+    const step = lie(stepX, stepZ, 2.6);
+    props.add('dark', pitchedBox(2.6, 0.62, 0.14,
+      stepX, step.mid - 0.12, stepZ, yaw, step.pitch), BOARD, 1);
   }
   if (L.traverse) {
     const ex = x + tx * (len / 2 + 0.9), ez = z + tz * (len / 2 + 0.9);

@@ -511,8 +511,14 @@ export class HUD {
       document.getElementById('ui').appendChild(el);
       this.el.status = el;
     }
-    this.el.status.textContent = text;
-    this.el.status.classList.add('on');
+    // Re-writing the same line is a layout for nothing, and this is called
+    // from a drag: the count under a line of guns holds steady for most of
+    // it. The clock is still pushed out — the line is still there.
+    if (text !== this._statusText) {
+      this._statusText = text;
+      this.el.status.textContent = text;
+      this.el.status.classList.add('on');
+    }
     this._statusTimer = life;
   }
 
@@ -551,7 +557,10 @@ export class HUD {
 
     if (this._statusTimer > 0) {
       this._statusTimer -= dt;
-      if (this._statusTimer <= 0 && this.el.status) this.el.status.classList.remove('on');
+      if (this._statusTimer <= 0 && this.el.status) {
+        this.el.status.classList.remove('on');
+        this._statusText = null;        // so the same line can be shown again
+      }
     }
     if (this._promptTimer > 0) {
       this._promptTimer -= dt;
