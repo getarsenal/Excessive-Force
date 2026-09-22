@@ -105,7 +105,11 @@ export class Engine {
       logarithmicDepthBuffer: logDepth,
     });
     this.logDepth = logDepth;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatioCap));
+    // What the governor is allowed to turn down. The tier sets the ceiling;
+    // `renderScale` is the multiplier on top of it, and it is the only lever
+    // in the engine whose cost is quadratic in what it saves.
+    this.renderScale = 1;
+    this.renderer.setPixelRatio(this._pixelRatio());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.26;
@@ -248,6 +252,49 @@ export class Engine {
       this.composer.addPass(new SMAAPass(size.x, size.y));
     }
     this.composer.addPass(new OutputPass());
+  }
+
+  _pixelRatio() {
+    return Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * this.renderScale;
+  }
+
+  /**
+   * Draw fewer pixels.
+   *
+   * A phone that cannot hold the frame is nearly always short of fragments,
+   * not of anything else: at a cap of two on a modern handset the game is
+   * shading something over a megapixel through a bloom chain and a shadow map
+   * every frame, and the cost of all of it scales with the square of this
+   * number. Two thirds of the pixel ratio is a little under half the work, and
+   * on a screen this dense it is very hard to see. That is the first thing to
+   * give up and the last thing anyone notices.
+   */
+  setRenderScale(f) {
+    const next = Math.max(0.5, Math.min(1, f));
+    if (Math.abs(next - this.renderScale) < 0.01) return false;
+    this.renderScale = next;
+    this.renderer.setPixelRatio(this._pixelRatio());
+    this._onResize();
+    return true;
+  }
+
+  /** Bloom off. Two full-screen passes at the drawing buffer's own size. */
+  setBloom(on) {
+    if (!this.bloom || this.bloom.enabled === on) return false;
+    this.bloom.enabled = on;
+    return true;
+  }
+
+  /**
+   * Real-time shadows off — a whole second pass over the scene, from the sun.
+   * Last, because the city is mostly shadow: this is the one a player sees.
+   */
+  setShadows(on) {
+    if (this.renderer.shadowMap.enabled === on) return false;
+    this.renderer.shadowMap.enabled = on;
+    this.sun.castShadow = on && this.quality.shadowMapSize > 0;
+    this.scene.traverse((o) => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+    return true;
   }
 
   _onResize() {

@@ -1067,7 +1067,7 @@ async function boot() {
   uiEl.hidden = false;
   if (!standoff) firstPrompt();
 
-  const governor = new AdaptiveGovernor(quality);
+  const governor = new AdaptiveGovernor(quality, engine);
   const perfEl = document.getElementById('perf');
   // Kept up to date either way — the harness reads its text — but only shown
   // when asked for.
@@ -1229,7 +1229,8 @@ async function boot() {
         `${fps} fps · phys ${physMs.toFixed(1)}ms · ${physics.awakeCount} awake / ` +
         `${physics.dynamicSet.size} sim · ` +
         `${structures.reduce((a, st) => a + st.destroyedCount, 0)} stones gone · ` +
-        `${structures.reduce((a, st) => a + st.islands.size, 0)} sections · ${quality.id}`;
+        `${structures.reduce((a, st) => a + st.islands.size, 0)} sections · ${quality.id}` +
+        ` · shed: ${governor.shed}`;
     }
   }
   /**

@@ -179,14 +179,67 @@ export const QUALITY_IDS = Object.keys(TIERS);
  * instead of stuttering through the best moment in the game.
  */
 export class AdaptiveGovernor {
-  constructor(quality) {
+  constructor(quality, engine = null) {
     this.quality = quality;
+    this.engine = engine;
     this.baseBudget = quality.activeBodies;
     this.budget = quality.activeBodies;
     this.samples = [];
     this.cooldown = 0;
+    this.stage = 0;
   }
 
+  /**
+   * What each rung costs the picture, cheapest-looking first.
+   *
+   * The order is the whole design. Pixel ratio goes before bloom and bloom
+   * before shadows, because that is the order of how much each one saves per
+   * unit of how much it shows — and every rung above zero saves more than
+   * emptying the body budget does.
+   */
+  static STAGES = [
+    { scale: 1, bloom: true, shadows: true, says: 'full' },
+    { scale: 0.82, bloom: true, shadows: true, says: 'fewer pixels' },
+    { scale: 0.68, bloom: true, shadows: true, says: 'fewer pixels' },
+    { scale: 0.68, bloom: false, shadows: true, says: 'no bloom' },
+    { scale: 0.6, bloom: false, shadows: false, says: 'no bloom, no shadows' },
+  ];
+
+  _apply() {
+    const e = this.engine;
+    if (!e) return;
+    const s = AdaptiveGovernor.STAGES[this.stage];
+    e.setRenderScale(s.scale);
+    e.setBloom(s.bloom);
+    e.setShadows(s.shadows);
+  }
+
+  /** What it has given up, for the diagnostics panel. */
+  get shed() {
+    const s = AdaptiveGovernor.STAGES[this.stage];
+    return this.stage === 0 && this.budget >= this.baseBudget
+      ? 'nothing'
+      : `${s.says} · ${this.budget} bodies`;
+  }
+
+  /**
+   * Shed the render cost first, and the simulation last.
+   *
+   * This used to own one lever — the body budget — and pulled it whenever the
+   * frame ran long. On a phone that is very nearly always the wrong lever. A
+   * player's own diagnostics, taken on a level that was crawling, read: 0.06
+   * milliseconds of physics, no bodies simulated at all, twenty-nine frames a
+   * second, and a body budget cut from eleven hundred to its hard floor of a
+   * hundred and eighty. The governor had spent everything it had throttling
+   * the one thing that was costing nothing, while a megapixel of shading, a
+   * bloom chain and a shadow map went untouched — and then a section of the
+   * building let go, the frame went past a third of a second, and the game
+   * read as frozen.
+   *
+   * So the ladder above comes first and the body budget comes after it. The
+   * budget still moves, because a thousand loose stones genuinely is work, but
+   * it is no longer asked to pay for a bill it did not run up.
+   */
   update(dtMs) {
     this.samples.push(dtMs);
     if (this.samples.length < 45) return this.budget;
@@ -197,12 +250,31 @@ export class AdaptiveGovernor {
 
     if (this.cooldown > 0) { this.cooldown--; return this.budget; }
 
-    if (p80 > 26 && this.budget > 180) {
-      this.budget = Math.max(180, Math.floor(this.budget * 0.75));
-      this.cooldown = 2;
-    } else if (p80 < 15 && this.budget < this.baseBudget) {
-      this.budget = Math.min(this.baseBudget, Math.floor(this.budget * 1.15) + 20);
-      this.cooldown = 1;
+    const last = AdaptiveGovernor.STAGES.length - 1;
+    if (p80 > 26) {
+      // Down a rung of shading; only once there are none left does the
+      // simulation start paying.
+      if (this.engine && this.stage < last) {
+        this.stage++;
+        this._apply();
+        // Two rounds to settle: changing the drawing buffer costs a frame of
+        // its own, and measuring that frame would read as another failure.
+        this.cooldown = 3;
+      } else if (this.budget > 180) {
+        this.budget = Math.max(180, Math.floor(this.budget * 0.75));
+        this.cooldown = 2;
+      }
+    } else if (p80 < 15) {
+      // Up again, simulation first: giving the stones back is what the player
+      // came for, and it is the cheaper of the two to undo if it was wrong.
+      if (this.budget < this.baseBudget) {
+        this.budget = Math.min(this.baseBudget, Math.floor(this.budget * 1.15) + 20);
+        this.cooldown = 1;
+      } else if (this.engine && this.stage > 0) {
+        this.stage--;
+        this._apply();
+        this.cooldown = 4;
+      }
     }
     return this.budget;
   }

@@ -207,6 +207,10 @@ export class TestMenu {
     this._stat(diag, 'Awake bodies', () => c.physics.awakeCount);
     this._stat(diag, 'Simulated bodies', () => c.physics.dynamicSet.size);
     this._stat(diag, 'Body budget', () => c.physics.activeBudget);
+    // What the governor has turned down to hold the frame. Without this the
+    // panel showed a body budget scraping its floor and gave no hint that the
+    // reason was a bill the simulation had not run up.
+    this._stat(diag, 'Quality shed', () => (c.governor ? c.governor.shed : '—'));
     this._stat(diag, 'Stones destroyed', () => sum(c.structures, (s) => s.destroyedCount));
     this._stat(diag, 'Loose sections', () => sum(c.structures, (s) => s.islands.size));
     this._stat(diag, 'Out of plumb', () => `${b.primary.leanDegrees.toFixed(2)}°`);
@@ -771,6 +775,7 @@ export class TestMenu {
       losChecks: b.garrison.losChecks,
       losBlocked: b.garrison.losBlocked,
       waterQuads: c.water.userData.quads ?? 0,
+      shed: c.governor ? c.governor.shed : null,
     };
   }
 
@@ -2513,6 +2518,45 @@ export class TestMenu {
           + `a map ${span.toFixed(0)} m across`);
         return `${drawn} stones drawn, the biggest ${biggest.toFixed(1)} m across`;
       })],
+
+      ['the governor sheds shading before stones', () => {
+        // A player's diagnostics, taken on a level that was crawling: physics
+        // 0.06 ms, no bodies simulated, twenty-nine frames a second — and a
+        // body budget cut from eleven hundred to its floor. The governor had
+        // spent its entire authority throttling the one thing costing nothing
+        // while a megapixel of shading went untouched. The order it pulls its
+        // levers in is the fix, so the order is what this asserts.
+        //
+        // Against a governor of its own with a counterfeit engine, because the
+        // real one is drawing this panel.
+        const Gov = c.governor.constructor;
+        const seen = { scale: 1, bloom: true, shadows: true };
+        const fake = {
+          setRenderScale: (f) => { seen.scale = f; return true; },
+          setBloom: (on) => { seen.bloom = on; return true; },
+          setShadows: (on) => { seen.shadows = on; return true; },
+        };
+        const g = new Gov({ activeBodies: 1100 }, fake);
+        const spell = (ms, rounds) => {
+          for (let r = 0; r < rounds; r++) for (let i = 0; i < 45; i++) g.update(ms);
+        };
+
+        spell(40, 2);
+        assert(seen.scale < 1, 'a long frame shed nothing at all');
+        assert(g.budget === 1100,
+          `the body budget was cut before any shading was: ${g.budget}`);
+
+        spell(40, 60);
+        assert(!seen.bloom && !seen.shadows, 'the ladder never emptied under load');
+        assert(g.budget < 1100,
+          'with nothing left to turn down, the body budget still never moved');
+
+        spell(8, 90);
+        assert(g.budget === 1100, `the stones never came back: ${g.budget}`);
+        assert(seen.scale === 1 && seen.bloom && seen.shadows,
+          `the shading never came back: ${JSON.stringify(seen)}`);
+        return 'sheds pixels, then bloom, then shadows, then stones';
+      }],
 
       ['a frame that throws still draws', () => {
         // The freeze that had no message.
