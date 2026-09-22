@@ -804,13 +804,15 @@ export const LEVELS = {
     setting: { haze: { colour: 0xe0d6c2, density: 0.00030 } },
     cityExcludeRadius: 130,
     contextExclude: 130,
-    // Far back and high: the tower is half a kilometre even at this scale.
-    camera: { yaw: 0.60, pitch: 0.22, distance: 900, height: 250 },
+    // Far back and high: the tower is a third of a kilometre even at this scale.
+    camera: { yaw: 0.60, pitch: 0.22, distance: 680, height: 185 },
     structures: (quality) => [
       { key: 'burj', blocks: buildBurjKhalifa(quality), primary: true,
         required: true, label: 'BURJ KHALIFA' },
     ],
     garrison: (g, origin, groundY) => { populateBurjKhalifa(g, origin, groundY); },
+    // The tower, not the podium round its foot.
+    scoreTags: ['core', 'wings', 'spire'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 1,

@@ -30,6 +30,7 @@ export const MATERIALS = {
   VERDE: 14,     // the grey-green stone of Pisan banding
   TILE: 15,      // glazed ceramic over a concrete rib: a shell vault
   STEEL: 16,     // painted structural steel, white: the London Eye
+  CURTAIN: 17,   // a supertall's high-strength concrete, glass-faced: the Burj
 };
 
 /**
@@ -121,6 +122,25 @@ export const MATERIAL_PROPS = {
   // White painted steel. As strong as the Eiffel's ironwork and painted the
   // colour the Eye is painted; structural, because the wheel stands on it.
   [MATERIALS.STEEL]:     { density: 7.85, strength: 14.0, toughness: 280, color: 0xeef1f3, structural: true },
+  // What a supertall is actually made of: the high-strength concrete of its
+  // core and its wing walls, coloured as the glass hung on the outside of it,
+  // because GLASS in this game carries nothing and a tower skinned in it
+  // would have nothing to stand on. Blue and pale on purpose: the per-stone
+  // jitter and the grade push it toward grey, and grey is what a half-
+  // kilometre of concrete already looks like.
+  //
+  // Two and a half times CONCRETE's strength, and for the reason the real
+  // tower has it. CONCRETE here is an ordinary mix, set against a ninety-six
+  // metre tower that puts 2.3 MPa on its lowest course. Half a kilometre of
+  // the same puts eleven, the floors and the setbacks concentrate it, and the
+  // wing walls came out standing at exactly their capacity — a tower that
+  // crushes itself on the first frame with nobody firing. A building that
+  // tall is not built of ordinary concrete anywhere in the world: the Burj is
+  // C80, roughly this ratio over the C30 the rest of the campaign is made of.
+  // The collapse it is supposed to have is still there, because it is loss of
+  // support at a setback and not crushing, and capacity still scales with
+  // damage, so a shelled stone fails exactly as before.
+  [MATERIALS.CURTAIN]:   { density: 2.30, strength: 3.80, toughness: 120, color: 0xa8c4d6, structural: true },
 };
 
 
