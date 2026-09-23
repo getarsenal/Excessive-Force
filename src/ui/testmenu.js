@@ -1253,6 +1253,43 @@ export class TestMenu {
         return `${quads} quads over ${wetCells} wet cells, ${farQuads} beyond`;
       }],
 
+      ['zooming in brings the view down to the ground', () => {
+        // Dubai opens three hundred and fifty metres up, because the tower is
+        // six hundred and sixty. Nothing ever lowered the focus again, so
+        // pinching all the way in left the camera hanging over the city
+        // looking at the middle of the shaft, with the ground it was trying to
+        // reach three hundred metres below and the pan dragging a plane in the
+        // sky. Zoom carries the eye down with it now, and back up again.
+        const r = c.rig;
+        const keep = {
+          dd: r.desiredDistance, d: r.distance,
+          dt: r.desiredTarget.clone(), t: r.target.clone(),
+        };
+        try {
+          const g = c.terrain.heightAt(0, 0);
+          r.desiredDistance = r.distance = 800;
+          r.desiredTarget.set(0, g + 350, 0);
+          // Twenty pinch steps, a tenth of the distance.
+          for (let k = 0; k < 20; k++) r._zoom(0.891);
+          const inD = r.desiredDistance;
+          const inAbove = r.desiredTarget.y - c.terrain.heightAt(r.desiredTarget.x, r.desiredTarget.z);
+          assert(inD < 120, `twenty pinch steps only reached ${inD.toFixed(0)} m`);
+          assert(inAbove < inD * 1.2,
+            `zoomed in to ${inD.toFixed(0)} m and the focus is still `
+            + `${inAbove.toFixed(0)} m over the ground`);
+          // And it is reversible: a gesture that cannot be undone is worse
+          // than one that does nothing.
+          for (let k = 0; k < 20; k++) r._zoom(1 / 0.891);
+          const outAbove = r.desiredTarget.y - c.terrain.heightAt(r.desiredTarget.x, r.desiredTarget.z);
+          assert(Math.abs(outAbove - 350) < 25,
+            `zoomed back out and the eye is at ${outAbove.toFixed(0)} m, not 350`);
+          return `800 m / 350 m up → ${inD.toFixed(0)} m / ${inAbove.toFixed(0)} m up, and back`;
+        } finally {
+          r.desiredDistance = keep.dd; r.distance = keep.d;
+          r.desiredTarget.copy(keep.dt); r.target.copy(keep.t);
+        }
+      }],
+
       ['guns can be put on a rooftop', () => {
         const city = c.cityGroup;
         const roofs = city && city.userData ? city.userData.roofs : null;

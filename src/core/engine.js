@@ -390,7 +390,9 @@ export class CameraRig {
 
     this.distance = opts.distance ?? 260;
     this.desiredDistance = this.distance;
-    this.minDistance = 35;
+    // Close enough to stand among the guns. Thirty-five metres is a camera
+    // that can never get below the eaves of the town it is fighting in.
+    this.minDistance = 16;
     this.maxDistance = 900;
 
     this.yaw = opts.yaw ?? -0.7;
@@ -464,12 +466,7 @@ export class CameraRig {
         this._lastCentroid = c;
 
         const d = this._pinchDistance();
-        if (this._lastPinch > 0 && d > 0) {
-          this.desiredDistance = clamp(
-            this.desiredDistance * (this._lastPinch / d),
-            this.minDistance, this.maxDistance,
-          );
-        }
+        if (this._lastPinch > 0 && d > 0) this._zoom(this._lastPinch / d);
         this._lastPinch = d;
         return;
       }
@@ -509,10 +506,7 @@ export class CameraRig {
     dom.addEventListener('wheel', (e) => {
       if (!this.enabled) return;
       e.preventDefault();
-      this.desiredDistance = clamp(
-        this.desiredDistance * (1 + Math.sign(e.deltaY) * 0.12),
-        this.minDistance, this.maxDistance,
-      );
+      this._zoom(1 + Math.sign(e.deltaY) * 0.12);
     }, { passive: false });
 
     this._keys = new Set();
@@ -566,6 +560,34 @@ export class CameraRig {
     dom.addEventListener('touchcancel', settle);
   }
 
+  /**
+   * Zoom, and come down with it.
+   *
+   * The focus point carries a height, and nothing ever lowered it. Dubai opens
+   * three hundred and fifty metres up — it has to, the tower is six hundred and
+   * sixty — so pinching all the way in left the camera hanging at three hundred
+   * and fifty metres over the city looking at the middle of the shaft, with the
+   * ground it was trying to reach a further three hundred below. Panning then
+   * drags the horizontal plane through the focus, which at that height is a
+   * plane in the sky: the streets slide past at a rate that has nothing to do
+   * with the finger, and getting down to them is not possible at all.
+   *
+   * So the height above the ground scales with the distance. Halve the zoom and
+   * the focus comes half way down; pull back out and it rises again by the same
+   * factor, because a gesture that cannot be undone is worse than one that does
+   * nothing. Dubai's opening view pinched to a tenth is thirty-five metres over
+   * the plaza, which is where the guns go.
+   */
+  _zoom(factor) {
+    const d0 = this.desiredDistance;
+    const d1 = clamp(d0 * factor, this.minDistance, this.maxDistance);
+    if (!(d1 > 0) || d1 === d0) return;
+    const g = this.groundHeight(this.desiredTarget.x, this.desiredTarget.z);
+    const above = clamp((this.desiredTarget.y - g) * (d1 / d0), 2, this.maxDistance * 0.8);
+    this.desiredTarget.y = g + above;
+    this.desiredDistance = d1;
+  }
+
   _pinchDistance() {
     const [a, b] = [...this._pointers.values()];
     if (!a || !b) return 0;
@@ -610,7 +632,14 @@ export class CameraRig {
     if (Math.abs(v.y) < 1e-6) return null;
     const t = (this.target.y - this.camera.position.y) / v.y;
     if (t <= 0 || !isFinite(t)) return null;
-    return out.copy(this.camera.position).addScaledVector(v, t);
+    out.copy(this.camera.position).addScaledVector(v, t);
+    // A ray that grazes the plane meets it a mile away, and the difference
+    // between two such hits is enormous: near the horizon a two-pixel drag
+    // threw the map a hundred metres and the camera was impossible to place.
+    // Past six times the camera's own distance the answer is not usable, and
+    // the trigonometric estimate below is both bounded and roughly right.
+    if (out.distanceTo(this.camera.position) > this.distance * 6) return null;
+    return out;
   }
 
   /**
@@ -675,6 +704,18 @@ export class CameraRig {
       }
       if (k.has('KeyQ')) this.desiredYaw += dt * 1.1;
       if (k.has('KeyE')) this.desiredYaw -= dt * 1.1;
+      // Up and down the building. Orbiting changes where the camera stands,
+      // never what it is looking at, so without this the only way to raise the
+      // eye to a roof four hundred metres up was to zoom out until the whole
+      // level was in shot.
+      const lift = (k.has('KeyR') ? 1 : 0) - (k.has('KeyF') ? 1 : 0);
+      if (lift) {
+        const g = this.groundHeight(this.desiredTarget.x, this.desiredTarget.z);
+        this.desiredTarget.y = clamp(
+          this.desiredTarget.y + lift * this.distance * 0.7 * dt,
+          g + 2, g + this.maxDistance * 0.8,
+        );
+      }
     }
 
     const a = 1 - Math.pow(0.0016, dt);
