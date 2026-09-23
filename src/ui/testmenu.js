@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { UNITS, UNITS_BY_ID } from '../game/units.js';
+import { UNITS, UNITS_BY_ID, makeInfantryMesh } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS } from '../game/levels.js';
 import { lineOfSight } from '../structure/occupancy.js';
@@ -1298,6 +1298,47 @@ export class TestMenu {
         assert(!t.isWater(b.primary.origin.x, b.primary.origin.z),
           'the target is standing in the river');
         return `${quads} quads over ${wetCells} wet cells, ${farQuads} beyond`;
+      }],
+
+      ['each infantry team carries its own weapon', () => {
+        // Four of the eleven cards in the build bar are infantry, they differ
+        // by a factor of five in what they cost, and every one of them was two
+        // identical men with the same anonymous tube: there was no way to look
+        // at the ground and know what was standing on it.
+        const inf = UNITS.filter((u) => u.model === 'infantry');
+        assert(inf.length >= 4, `${inf.length} infantry types`);
+        const seen = new Map();
+        const box = new THREE.Box3(), size = new THREE.Vector3();
+        for (const def of inf) {
+          const m = makeInfantryMesh(0x4a5340, { weapon: def.id, role: 'gunner' });
+          box.setFromObject(m);
+          box.getSize(size);
+          // Silhouette and colour, which is what the player has to go on.
+          let tube = 0;
+          m.traverse((o) => { if (o.material && o.material.color) tube = Math.max(tube, o.material.color.getHex()); });
+          const sig = `${m.children.length}|${size.x.toFixed(2)}x${size.y.toFixed(2)}|${tube}`;
+          assert(!seen.has(sig),
+            `${def.id} and ${seen.get(sig)} are the same figure — ${sig}`);
+          seen.set(sig, def.id);
+        }
+        // And the unit that gets deployed really carries it.
+        const keep = { money: b.money, unlock: b.unlockAll, lift: b.airlift, free: b.freeBuild };
+        try {
+          b.unlockAll = true; b.money = 1e6; b.freeBuild = true; b.airlift = false;
+          this.clearUnits();
+          const n = this.spawnSomewhere('javelin', 1, 200);
+          assert(n > 0, 'nowhere to put a javelin team');
+          const u = b.units[b.units.length - 1];
+          const kit = [];
+          u.group.traverse((o) => { if (o.userData && o.userData.weapon) kit.push(o.userData.weapon); });
+          assert(kit.length >= 2 && kit.every((w) => w === 'javelin'),
+            `a javelin team is carrying ${kit.join(', ') || 'nothing'}`);
+        } finally {
+          this.clearUnits();
+          b.money = keep.money; b.unlockAll = keep.unlock;
+          b.airlift = keep.lift; b.freeBuild = keep.free;
+        }
+        return `${seen.size} distinct teams`;
       }],
 
       ['the lift does not climb over the objective to reach the drop', () => {

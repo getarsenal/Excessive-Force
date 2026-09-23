@@ -296,31 +296,169 @@ export class ModelLibrary {
 }
 
 /** A crude but readable stand-in soldier, built from boxes. */
-export function makeInfantryMesh(colour = 0x4a5340) {
+/**
+ * A man, and what he is carrying.
+ *
+ * Every infantry team was two identical figures with the same anonymous tube
+ * on the shoulder, so a line of AT4s and a line of Javelins were the same
+ * picture: there was no way to look at the ground and know what was on it,
+ * which is a problem when four of the eleven cards in the build bar are
+ * infantry and they differ by a factor of three in what they cost and do.
+ *
+ * They are still two men. What changes is the kit, and it is drawn to read as
+ * a silhouette rather than as detail — at the distance this game is played at
+ * a green man is a green man, and what carries is the shape against the sky:
+ *
+ *   AT4       one thin disposable tube, the other man watching through glasses
+ *   GUSTAF    a fat tube with the venturi cone flared behind the shoulder
+ *   RPG-32    a short tube with the warhead bulging out in front of it
+ *   JAVELIN   a square box on the shoulder and the command unit under it,
+ *             fired from the knee
+ *
+ * `weapon` is the unit's own id, so a new launcher gets a silhouette by being
+ * added to the table below rather than by threading anything new through.
+ */
+export function makeInfantryMesh(colour = 0x4a5340, opts = {}) {
+  const weapon = typeof opts === 'string' ? opts : (opts.weapon || null);
+  const role = (typeof opts === 'object' && opts.role) || 'gunner';
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.92, metalness: 0.02 });
   const skin = new THREE.MeshStandardMaterial({ color: 0x8d6a4f, roughness: 0.85 });
+  // The launcher's own colour, because shape stops carrying at forty metres
+  // and a tone does not: the AT4's olive fibreglass, the Gustaf's grey alloy,
+  // the RPG's brown composite, the Javelin's pale green case.
+  const TUBE = { at4: 0x3b4230, gustaf: 0x6a6f63, rpg32: 0x4a3a2a, javelin: 0x8b9382 };
+  const steel = new THREE.MeshStandardMaterial({
+    color: TUBE[weapon] ?? 0x33382c, roughness: 0.7 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x24261f, roughness: 0.6, metalness: 0.15 });
+  const parts = [];
+
+  // The Javelin is shot off the knee: a low, wide shape next to a standing
+  // man, which is the strongest silhouette cue any of them has.
+  const kneeling = weapon === 'javelin' && role === 'gunner';
+  const rise = kneeling ? 0.38 : 0;
 
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.72, 0.3), mat);
-  torso.position.y = 1.12;
+  torso.position.y = 1.12 - rise;
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), skin);
-  head.position.y = 1.63;
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.175, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.58), mat);
-  helmet.position.y = 1.66;
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.78, 0.2), mat);
-  legL.position.set(-0.13, 0.39, 0);
-  const legR = legL.clone(); legR.position.x = 0.13;
-  const tube = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, 1.0, 7),
-    new THREE.MeshStandardMaterial({ color: 0x33382c, roughness: 0.7 }),
-  );
-  tube.rotation.z = Math.PI / 2;
-  tube.rotation.y = 0.16;
-  tube.position.set(0.1, 1.34, 0.2);
+  head.position.y = 1.63 - rise;
+  const helmet = new THREE.Mesh(
+    new THREE.SphereGeometry(0.175, 8, 5, 0, Math.PI * 2, 0, Math.PI * 0.58), mat);
+  helmet.position.y = 1.66 - rise;
+  parts.push(torso, head, helmet);
 
-  for (const m of [torso, head, helmet, legL, legR, tube]) {
-    m.castShadow = true;
-    g.add(m);
+  if (kneeling) {
+    // One knee down, the other up under the elbow. The thigh of the kneeling
+    // leg has to be there or the shin reads as a plank lying on the grass
+    // beside a man with no legs.
+    const thighDown = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.46), mat);
+    thighDown.position.set(-0.13, 0.42, -0.06);
+    const shin = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.5), mat);
+    shin.position.set(-0.13, 0.12, -0.18);
+    const knee = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.3, 0.2), mat);
+    knee.position.set(-0.13, 0.32, 0.12);
+    const thighUp = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.44, 0.2), mat);
+    thighUp.position.set(0.13, 0.46, 0.14);
+    const shinUp = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.46, 0.2), mat);
+    shinUp.position.set(0.13, 0.23, 0.3);
+    parts.push(thighDown, shin, knee, thighUp, shinUp);
+  } else {
+    const legL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.78, 0.2), mat);
+    legL.position.set(-0.13, 0.39, 0);
+    const legR = legL.clone(); legR.position.x = 0.13;
+    parts.push(legL, legR);
   }
+
+  // ── What he is holding.
+  const shoulder = 1.34 - rise;
+  const tube = (r, len, m, y = shoulder, z = 0.2, x = 0.1) => {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 8), m);
+    t.rotation.z = Math.PI / 2;
+    t.rotation.y = 0.16;
+    t.position.set(x, y, z);
+    return t;
+  };
+
+  if (role !== 'gunner') {
+    // The second man. He is not a copy of the first: he is watching, or he is
+    // holding the next round, and either reads as a team rather than as two
+    // riflemen standing near each other.
+    if (weapon === 'at4' || weapon === 'javelin') {
+      // Glasses up at his eyes, held there: two barrels and the arms angled
+      // up to them. A single wide bar across the chest — which is what this
+      // was — reads as a plank through the man, not as a man observing.
+      for (const sx of [-0.075, 0.075]) {
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.2, 7), dark);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(sx, 1.6 - rise, 0.21);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.1), mat);
+        arm.position.set(sx * 2.4, 1.38 - rise, 0.14);
+        arm.rotation.x = -0.5;
+        arm.rotation.z = sx > 0 ? -0.35 : 0.35;
+        parts.push(barrel, arm);
+      }
+    } else {
+      // The next round, up on his shoulder: a rocket thick enough to be one.
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.52, 8), steel);
+      body.rotation.z = Math.PI / 2;
+      body.rotation.y = -0.4;
+      body.position.set(-0.04, 1.2 - rise, 0.24);
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.115, 0.26, 8), dark);
+      nose.rotation.z = -Math.PI / 2;
+      nose.rotation.y = -0.4;
+      nose.position.set(0.32, 1.2 - rise, 0.13);
+      const hands = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.1), mat);
+      hands.rotation.y = -0.4;
+      hands.position.set(-0.02, 1.08 - rise, 0.2);
+      parts.push(body, nose, hands);
+    }
+  } else if (weapon === 'gustaf') {
+    // Fat tube, and the venturi flared out behind the shoulder — the one
+    // shape no other launcher here has.
+    parts.push(tube(0.095, 1.15, steel));
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.26, 8, 1, true), steel);
+    cone.rotation.z = Math.PI / 2;
+    cone.rotation.y = 0.16;
+    cone.position.set(-0.5, shoulder - 0.01, 0.12);
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.08), dark);
+    sight.position.set(0.05, shoulder + 0.14, 0.22);
+    parts.push(cone, sight);
+  } else if (weapon === 'rpg32') {
+    // Short tube, and the warhead standing out in front of it.
+    parts.push(tube(0.1, 0.86, steel, shoulder, 0.2, 0.02));
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), dark);
+    bulb.position.set(0.5, shoulder + 0.02, 0.27);
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 8), dark);
+    nose.rotation.z = -Math.PI / 2;
+    nose.position.set(0.72, shoulder + 0.03, 0.3);
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.1), dark);
+    grip.position.set(0.02, shoulder - 0.19, 0.22);
+    parts.push(bulb, nose, grip);
+  } else if (weapon === 'javelin') {
+    // A box, not a tube, and the command launch unit slung under it.
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.26, 0.26), steel);
+    box.rotation.y = 0.16;
+    box.position.set(0.12, shoulder + 0.06, 0.22);
+    const clu = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.24, 0.2), dark);
+    clu.rotation.y = 0.16;
+    clu.position.set(-0.04, shoulder - 0.16, 0.26);
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), skin);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0.12, shoulder - 0.14, 0.37);
+    parts.push(box, clu, lens);
+  } else {
+    // The AT4, and anything that has not asked for a shape of its own: one
+    // thin disposable tube, which is what the old mesh drew for everybody.
+    parts.push(tube(0.07, 1.0, steel));
+    if (weapon === 'at4') {
+      const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.05), dark);
+      sight.position.set(0.16, shoulder + 0.11, 0.2);
+      parts.push(sight);
+    }
+  }
+
+  for (const m of parts) { m.castShadow = true; g.add(m); }
+  g.userData.weapon = weapon || 'none';
+  g.userData.role = role;
   return g;
 }

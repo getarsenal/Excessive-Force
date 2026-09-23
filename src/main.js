@@ -46,6 +46,28 @@ function progress(pct, msg) {
 }
 
 async function boot() {
+  // A regression run is reproducible, so its randomness is too.
+  //
+  // Everything else about the suite is now identical from one run to the next
+  // — the clock is held, the governor is frozen, the tests are one synchronous
+  // call — and one test still flipped. The stream is what was left: the game
+  // draws on `Math.random` during the frames between the level loading and the
+  // suite starting, and how many of those there are is a property of the
+  // machine. A seeded generator is as varied as the real one and asks the same
+  // questions in the same order every time, which is the whole point of a
+  // regression run.
+  try {
+    if (localStorage.getItem('tt.suite') === '1') {
+      let seed = 0x9e3779b9;
+      Math.random = () => {
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+  } catch { /* private mode */ }
+
   const quality = detectQuality();
   console.log('[tumble] quality', quality.id, '· wasm simd', quality.simd,
     '· body budget', quality.activeBodies);

@@ -808,7 +808,8 @@ export class Battle {
     const drop = {
       def, pos, yaw: Math.atan2(aim.x - pos.x, aim.z - pos.z),
       group: new THREE.Group(), model: null, marker: null,
-      figure: (k) => makeInfantryMesh(k === 0 ? 0x4a5340 : 0x3f4738),
+      figure: (k) => makeInfantryMesh(k === 0 ? 0x4a5340 : 0x3f4738,
+        { weapon: def.id, role: k === 0 ? 'gunner' : 'second' }),
     };
     if (def.model !== 'infantry') {
       // The vehicle or gun is loaded now, so it is on the platform when the
@@ -985,9 +986,12 @@ export class Battle {
   async _attachModel(unit) {
     const def = unit.def;
     if (def.model === 'infantry') {
-      // A fire team: two figures, offset so they read as a crew at distance.
+      // A fire team: the gunner and his number two, carrying this unit's own
+      // weapon, so a line of AT4s and a line of Javelins are not the same
+      // picture on the ground.
       for (let i = 0; i < 2; i++) {
-        const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738);
+        const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738,
+          { weapon: def.id, role: i === 0 ? 'gunner' : 'second' });
         m.position.set((i - 0.5) * 1.3, 0, (i % 2) * 0.7);
         m.rotation.y = (Math.random() - 0.5) * 0.3;
         unit.group.add(m);
