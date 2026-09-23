@@ -551,11 +551,38 @@ export class TestMenu {
     }
     if (!isFinite(lo)) return st.origin.clone();
     const want = lo + (hi - lo) * frac;
-    let best = -1, bestD = Infinity;
+    let bestD = Infinity;
     for (let i = 0; i < st.count; i++) {
       if (!standing(i)) continue;
-      const d = Math.abs(st.py[i] - want);
-      if (d < bestD) { bestD = d; best = i; }
+      bestD = Math.min(bestD, Math.abs(st.py[i] - want));
+    }
+    if (!isFinite(bestD)) return st.origin.clone();
+
+    // Of the stones at that height, the one a gun can actually see.
+    //
+    // This used to take the first stone it found at the wanted height, so the
+    // build order chose the aim point — and the Burj's core is laid before its
+    // wings. "Aim at thirty-five per cent of the tower" was therefore a round
+    // detonating eleven metres from the axis, in the middle of the one
+    // material in the game a howitzer is deliberately not able to break, and
+    // the test that used it passed only when the arc happened to clip a wing
+    // on the way in. A player taps a face; so does this.
+    const guns = this.ctx.battle.units.filter((u) => u.alive);
+    const band = bestD + 2.0;
+    let best = -1, score = -Infinity;
+    for (let i = 0; i < st.count; i++) {
+      if (!standing(i)) continue;
+      if (Math.abs(st.py[i] - want) > band) continue;
+      let s;
+      if (guns.length) {
+        s = -Infinity;
+        for (const u of guns) {
+          s = Math.max(s, -Math.hypot(st.px[i] - u.pos.x, st.pz[i] - u.pos.z));
+        }
+      } else {
+        s = Math.hypot(st.px[i] - st.origin.x, st.pz[i] - st.origin.z);
+      }
+      if (s > score) { score = s; best = i; }
     }
     if (best < 0) return st.origin.clone();
     return new THREE.Vector3(st.px[best], st.py[best], st.pz[best]);
@@ -1477,16 +1504,15 @@ export class TestMenu {
       }],
 
       ['the collapse gets a beat of slow motion', () => {
-        const before = this.timeScale;
-        this.dramaticPause(1.2, 0.4);
-        this.update(0.1);
-        assert(this.timeScale < before, 'time did not slow');
-        // And it comes back on its own rather than leaving the game in
-        // permanent slow motion, which is exactly the bug worth guarding.
-        for (let i = 0; i < 40; i++) this.update(0.05);
-        assert(Math.abs(this.timeScale - before) < 1e-6,
-          `time scale stuck at ${this.timeScale}`);
-        return 'slows, then restores itself';
+        // The beat owns the clock, and refuses to take it from a pause — so
+        // this test has to hold the clock itself while it drives the
+        // mechanism. A regression run starts the level paused, and a test of
+        // how time behaves cannot be run on a game where time is not running.
+        const wasPaused = this.paused;
+        this.paused = false;
+        try {
+          return this._slowMotionBeat();
+        } finally { this.paused = wasPaused; }
       }],
 
       ['click feedback exists', () => {
@@ -3350,6 +3376,20 @@ export class TestMenu {
    * "how fast is the game running" is the only way the tuning slider and the
    * collapse beat can coexist without fighting each other.
    */
+  /** The slow-motion beat, driven by hand: it slows, then restores itself. */
+  _slowMotionBeat() {
+    const before = this.timeScale;
+    this.dramaticPause(1.2, 0.4);
+    this.update(0.1);
+    assert(this.timeScale < before, 'time did not slow');
+    // And it comes back on its own rather than leaving the game in permanent
+    // slow motion, which is exactly the bug worth guarding.
+    for (let i = 0; i < 40; i++) this.update(0.05);
+    assert(Math.abs(this.timeScale - before) < 1e-6,
+      `time scale stuck at ${this.timeScale}`);
+    return 'slows, then restores itself';
+  }
+
   dramaticPause(seconds, scale) {
     if (this.paused) return;
     this._drama = { left: seconds, total: seconds, scale, from: this.timeScale };

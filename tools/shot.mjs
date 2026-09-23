@@ -21,7 +21,7 @@ const browser = await chromium.launch({
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // Force a quality tier so tests can check what a desktop actually gets; the
 // software rasteriser here would otherwise always be detected as "low".
-await page.addInitScript(([tier, intro, opening]) => {
+await page.addInitScript(([tier, intro, opening, suite]) => {
   try {
     localStorage.setItem('tt.quality', tier);
     // Skip the target-select screen. A fresh browser profile has never chosen
@@ -34,9 +34,14 @@ await page.addInitScript(([tier, intro, opening]) => {
     // The opening waits on a tap by design — it has to, to unlock audio — so
     // a harness run would sit on the gate for ever. TT_OPENING=1 to see it.
     localStorage.setItem('tt.opening', opening);
+    // And a regression run starts from a board nothing has happened on yet:
+    // the page holds the clock until a test asks for time. See `tt.suite` in
+    // main.js for why.
+    localStorage.setItem('tt.suite', suite);
   } catch { /* private mode */ }
 }, [process.env.TT_TIER || 'high', process.env.TT_INTRO === '1' ? '1' : '0',
-    process.env.TT_OPENING === '1' ? '1' : '0']);
+    process.env.TT_OPENING === '1' ? '1' : '0',
+    process.env.TT_SUITE === '1' ? '1' : '0']);
 
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));

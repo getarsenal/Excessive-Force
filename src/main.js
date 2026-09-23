@@ -1141,6 +1141,26 @@ async function boot() {
   });
 
   /**
+   * A regression run starts from a board nothing has happened on yet.
+   *
+   * The harness waits for the loading overlay to clear and then runs the whole
+   * suite in one synchronous call — but between those two moments the real
+   * frame loop is running at whatever rate the machine can manage, and with
+   * three browsers sharing the cores that is a different number of frames every
+   * time. Every one of them is a frame of battle: the garrison fires, the men
+   * move, `Math.random` is drawn. So the suite began from a slightly different
+   * board on each run, and three tests have been coin flips for it — passing
+   * alone, failing in the batch, and moving between levels between runs.
+   *
+   * Under `tt.suite` the clock does not start until a test asks for time.
+   * `fastForward` drives physics and the battle directly, so every test that
+   * wants the level running still gets it, to the frame, identically.
+   */
+  try {
+    if (localStorage.getItem('tt.suite') === '1') testMenu.paused = true;
+  } catch { /* private mode */ }
+
+  /**
    * A frame that cannot take the picture down with it.
    *
    * `frame` re-arms itself on its first line, so a thrown error never stopped
