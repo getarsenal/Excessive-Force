@@ -1,0 +1,17 @@
+{
+  "id": "potala",
+  "name": "Potala Palace, Lhasa",
+  "lat": 29.65775,
+  "lon": 91.11722,
+  "spanMeters": 1150.0,
+  "size": 512,
+  "minElevation": 3618.065,
+  "maxElevation": 3782.0,
+  "metersPerDemPixel": 8.3029,
+  "seaLevel": 3648.981,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 3649.296,
+  "coastline": "surveyed",
+  "farSpan": 8050.0,
+  "farWater": 0.041
+}

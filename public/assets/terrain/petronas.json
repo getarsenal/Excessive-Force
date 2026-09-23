@@ -1,0 +1,17 @@
+{
+  "id": "petronas",
+  "name": "Petronas Towers, Kuala Lumpur",
+  "lat": 3.15785,
+  "lon": 101.71165,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -82.464,
+  "maxElevation": 71.077,
+  "metersPerDemPixel": 4.7701,
+  "seaLevel": 27.446,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 31.888,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0537
+}

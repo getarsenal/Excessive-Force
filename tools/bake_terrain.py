@@ -262,6 +262,61 @@ LEVELS = {
     # Dubai: the Burj Khalifa in a city the DEM sees as roofs — `ceiling`
     # flattens the towers the surface model brought with it — with its lake
     # from the survey and the Gulf three kilometres off, in the far water.
+    # Kuala Lumpur: the Petronas Towers in a city the DEM sees as roofs, with
+    # KLCC park at their feet. No river on the map — the Klang is a kilometre
+    # and a half west — and the Straits are far enough out to be skyline.
+    "petronas": {
+        "name": "Petronas Towers, Kuala Lumpur",
+        "lat": 3.15785,
+        "lon": 101.71165,
+        "span": 900.0,
+        # z15: a hundred-metre footprint is twelve pixels at z14, and most of
+        # those get smoothed into the streets around it.
+        "zoom": 15,
+        # The surface model over the Golden Triangle is a forest of towers.
+        "ceiling": 62.0,
+        # KLCC park, which really is a twenty-hectare wood south-east of the
+        # podium, and the lake in it.
+        "parks": [[120, -210, 240], [180, -300, 90]],
+        "flatten": [[0, 0, [130, 100], 44]],
+    },
+    # Lhasa: the Potala on Marpo Ri, which is the level. The hill is cut as a
+    # landform with firing shelves, the way the Corcovado is, because a summit
+    # at DEM resolution is a rounded lump and a palace on it has nowhere for a
+    # gun to stand. Wider map than the rest: the palace alone is four hundred
+    # metres end to end and the mountain it stands on has to have room around
+    # it or the level is a plinth in a box.
+    "potala": {
+        "name": "Potala Palace, Lhasa",
+        "lat": 29.65775,
+        "lon": 91.11722,
+        "span": 1150.0,
+        "zoom": 14,
+        # The Kyi Chu is a kilometre south of the hill and runs off the map;
+        # the valley floor it braids across is the flat the batteries stand on.
+        "parks": [[-520, 240, 260], [560, 180, 220]],
+        "peak": {
+            # Marpo Ri's summit, in metres above sea level. The valley floor
+            # around Lhasa is about thirty-six fifty, so this is the hundred
+            # and thirty metres of red rock the palace is famous for standing
+            # on and not a metre more.
+            "height": 3782.0,
+            # A mesa, not a cone: the palace is four hundred metres end to end
+            # and the top has to carry it with terraces to spare.
+            "top": 250.0,
+            "slope": 1.5,
+            # Three benches, each one a firing step, and wide enough that a
+            # battery put anywhere on one stands square. The last reaches out
+            # past four hundred metres so the guns the suite spawns at two
+            # hundred and twenty have level ground under the trail.
+            "shelves": [
+                [286.0, 62.0],
+                [372.0, 78.0],
+                [470.0, 86.0],
+            ],
+            "fade": 100.0,
+        },
+    },
     "dubai": {
         "name": "Burj Khalifa, Dubai",
         "lat": 25.19717,
