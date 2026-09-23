@@ -1085,11 +1085,12 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   #worldmap { animation: none; }
 }
 
-/* ── The campaign map ───────────────────────────────────────────────────────
-   The front door. Dark, because everything else in the game is, and because a
-   charred country has to read as charred against it. One SVG unit is one pixel
-   here — the land is moved by a transform, not by the viewBox — so every size
-   below is a real pixel at every zoom. */
+/* ── The front door ───────────────────────────────────────────────────────
+   One grammar on every screen: the ledger top-left, the lockup top-centre,
+   a banner naming the question, the answers, and the primary action pinned to
+   the bottom of the viewport. Nothing the player needs is ever below the fold,
+   which is what the old layout — map, then dossier, then DEPLOY — could not
+   say on any phone made. */
 #worldmap {
   position: fixed;
   inset: 0;
@@ -1097,50 +1098,213 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   display: flex;
   background:
     radial-gradient(120% 80% at 50% 0%, #1a2230 0%, #0b0f16 62%, #070a0f 100%);
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   animation: wm-in 0.5s ease both;
 }
 @keyframes wm-in { from { opacity: 0; } to { opacity: 1; } }
-.wm-inner {
+
+.ef {
   margin: auto;
   width: min(1180px, 100%);
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px
-           calc(env(safe-area-inset-bottom, 0px) + 18px);
+  height: 100%;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px
+           calc(env(safe-area-inset-bottom, 0px) + 14px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-height: 0;
 }
-/* The operations bar: the brand at the left, the ledger at the right — every
-   contract as a lamp, and the campaign's running totals. */
-.wm-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  padding: 6px 2px 2px;
+
+.ef-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+.ef-ledger {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+  color: #6f8299; white-space: nowrap;
 }
-.wm-brand { display: flex; align-items: center; gap: 12px; }
-.wm-logo { width: 46px; height: 46px; opacity: 0.92; }
-.wm-title {
-  font-size: clamp(18px, 3.4vw, 26px);
-  letter-spacing: 0.18em;
-  font-weight: 700;
-  color: #e8eef6;
-  line-height: 1.05;
+.ef-ledger b { color: #e06c34; font-weight: 700; }
+.ef-brand { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.ef-logo { width: 32px; height: 32px; opacity: 0.94; }
+.ef-brand span {
+  font-size: clamp(13px, 2.6vw, 23px); letter-spacing: 0.2em; font-weight: 700; color: #e8eef6;
+  white-space: nowrap;
 }
-.wm-sub { font-size: 10px; letter-spacing: 0.26em; color: #e06c34; margin-top: 4px; }
-.wm-ledger { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.wm-strip { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: calc(14 * 34px); }
-.wm-seg {
-  width: 30px; height: 22px; display: grid; place-items: center;
-  font-size: 9px; letter-spacing: 0.08em; font-weight: 700;
-  border: 1px solid #23303d; border-radius: 3px; color: #46586b; background: #0b1119;
-  cursor: pointer; user-select: none;
+.ef-gear {
+  justify-self: end; width: 38px; height: 38px; padding: 9px;
+  background: none; border: 1px solid #23303d; color: #6f8299; cursor: pointer;
 }
-.wm-seg.done { color: #0b0f16; background: #e06c34; border-color: #e06c34; }
-.wm-seg.next { color: #ffd9c0; border-color: #e06c34; box-shadow: inset 0 0 0 1px rgba(224, 108, 52, 0.35); animation: wm-lamp 1.6s ease-in-out infinite; }
-.wm-seg.open { color: #b7c6d8; border-color: #3b4b5d; }
-@keyframes wm-lamp { 0%, 100% { background: #0b1119; } 50% { background: #2a1a12; } }
-.wm-tally { display: flex; gap: 14px; font-size: 10px; letter-spacing: 0.14em; color: #6f8299; text-transform: uppercase; flex-wrap: wrap; justify-content: flex-end; }
-.wm-tally b { color: #e8eef6; font-weight: 700; margin-right: 4px; font-variant-numeric: tabular-nums; }
+.ef-gear:hover { color: #e8eef6; border-color: #3b4b5d; }
+.ef-gear svg { width: 100%; height: 100%; }
+
+.ef-banner {
+  padding: 9px 12px; text-align: center;
+  border-top: 1px solid #1d2836; border-bottom: 1px solid #1d2836;
+  font-size: 11px; letter-spacing: 0.3em; color: #6f8299;
+}
+
+.ef-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.ef-view { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 10px; }
+.ef[data-view="door"] .ef-view[data-view="door"],
+.ef[data-view="map"] .ef-view[data-view="map"],
+.ef[data-view="dossier"] .ef-view[data-view="dossier"],
+.ef[data-view="records"] .ef-view[data-view="records"] { display: flex; }
+
+/* The hero: the contract itself, at the size the game is actually about. */
+.ef-hero {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  padding: 0; text-align: left; cursor: pointer; color: inherit;
+  background: #0d141c; border: 1px solid #2c3a49; font: inherit;
+}
+.ef-hero:hover { border-color: #e06c34; }
+.ef-hero-art { position: relative; flex: 1 1 auto; min-height: 150px; overflow: hidden; display: block; }
+.ef-hero-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ef-hero-fade {
+  position: absolute; inset: auto 0 0 0; height: 62%;
+  background: linear-gradient(to top, #0b0f16 12%, rgba(11, 15, 22, 0));
+}
+.ef-hero-no {
+  position: absolute; left: 12px; top: 12px; padding: 3px 9px;
+  background: rgba(7, 10, 15, 0.84); border: 1px solid #e06c34;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #e06c34;
+}
+.ef-hero-stamp {
+  position: absolute; right: 12px; top: 12px; padding: 3px 9px;
+  border: 1px solid #46586b; color: #8ea0b4;
+  font-size: 10px; letter-spacing: 0.22em;
+}
+.ef-hero-text { position: absolute; left: 14px; right: 14px; bottom: 11px; display: block; }
+.ef-hero-target {
+  display: block; font-size: clamp(24px, 5vw, 40px); letter-spacing: 0.04em; line-height: 1; color: #f2f6fb;
+}
+.ef-hero-place {
+  display: block; margin-top: 5px; font-size: 12px; letter-spacing: 0.06em; color: #9db0c5;
+}
+.ef-hero-place i { font-family: 'JetBrains Mono', monospace; font-style: normal; font-size: 10.5px; color: #6f8299; }
+.ef-hero-objs { display: flex; gap: 6px; padding: 10px 12px 12px; border-top: 1px solid #1d2836; }
+.ef-obj {
+  flex: 1 1 0; padding: 6px 8px; background: #080d14; border: 1px solid #1d2836;
+  font-size: 10.5px; letter-spacing: 0.04em; color: #8ea0b4; text-align: center;
+}
+.ef-obj.met { color: #0b0f16; background: #6fd08c; border-color: #6fd08c; }
+
+.ef-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 0 0 auto; }
+.ef-card {
+  display: flex; flex-direction: column; gap: 7px; padding: 12px;
+  background: #0d141c; border: 1px solid #23303d; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; min-height: 104px;
+}
+.ef-card:hover { border-color: #3b4b5d; }
+.ef-card-name { font-size: 14px; letter-spacing: 0.18em; color: #e8eef6; }
+.ef-card-sub {
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #6f8299;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ef-mini { display: block; height: 52px; }
+/* The banner already says which contract this is. */
+.ef-view[data-view="dossier"] .wm-doss-no { display: none; }
+.ef-view[data-view="dossier"] .wm-doss-top { justify-content: flex-end; }
+.ef-mini-svg { width: 100%; height: 100%; display: block; }
+.ef-mini-land { fill: #1b2731; }
+.ef-mini-land.burnt { fill: #14100e; }
+.ef-mini-pin { fill: #46586b; }
+.ef-mini-pin.down { fill: #e0503a; }
+.ef-mini-pin.next { fill: #e06c34; }
+.ef-figs { display: flex; flex-direction: column; gap: 3px; height: 52px; justify-content: center; }
+.ef-fig { font-family: 'JetBrains Mono', monospace; font-size: 21px; color: #e8eef6; }
+.ef-fig i { font-style: normal; font-size: 11px; color: #6f8299; margin-left: 2px; }
+
+@media (min-width: 900px) {
+  .ef-view[data-view="door"] { flex-direction: row; gap: 18px; }
+  .ef-view[data-view="door"] .ef-hero { flex: 1 1 auto; }
+  .ef-cards { grid-template-columns: 1fr; width: 360px; flex: 0 0 auto; gap: 18px; }
+  .ef-card { justify-content: flex-start; }
+  .ef-mini { height: 190px; }
+  .ef-figs { height: auto; }
+  .ef-fig { font-size: 30px; }
+  .ef-card { justify-content: space-between; padding: 16px; }
+  .ef-go { min-height: 64px; max-width: 640px; }
+  .ef-foot { justify-content: center; }
+  .ef-view[data-view="map"] { flex-direction: row; gap: 18px; }
+  .ef-view[data-view="map"] .wm-stage { flex: 1 1 auto; }
+  .ef-view[data-view="map"] .ef-list-k { display: none; }
+  .ef-view[data-view="map"] .ef-list { width: 320px; flex: 0 0 auto; border-top: 0; }
+}
+
+/* The theatre: the board, and a list you can hit with a thumb. */
+.ef-list-k { font-size: 10px; letter-spacing: 0.24em; color: #56687d; }
+.ef-list { flex: 1 1 auto; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid #1d2836; }
+.ef-row {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 6px;
+  background: none; border: 0; border-bottom: 1px solid #1d2836; color: inherit; font: inherit;
+  cursor: pointer; text-align: left;
+}
+.ef-row:hover { background: rgba(224, 108, 52, 0.06); }
+.ef-row.sel { background: rgba(224, 108, 52, 0.1); }
+.ef-row.locked { opacity: 0.45; }
+.ef-row-no { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6f8299; width: 24px; }
+.ef-row.sel .ef-row-no { color: #e06c34; }
+.ef-row-name { flex: 1 1 auto; font-size: 14px; letter-spacing: 0.05em; color: #c8d5e3; }
+.ef-row em { font-family: 'JetBrains Mono', monospace; font-style: normal; font-size: 10px; color: #6f8299; }
+.ef-row em.down { color: #e0503a; }
+.ef-row em.next { color: #e06c34; }
+
+/* Records, and the settings that used to be reachable only mid-mission. */
+.ef-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; flex: 0 0 auto; }
+.ef-tile { padding: 12px; background: #0d141c; border: 1px solid #23303d; }
+.ef-tile b {
+  display: block; font-family: 'JetBrains Mono', monospace; font-size: 23px; font-weight: 400; color: #e8eef6;
+}
+.ef-tile b i { font-style: normal; font-size: 12px; color: #6f8299; }
+.ef-tile span { display: block; margin-top: 3px; font-size: 9.5px; letter-spacing: 0.16em; color: #56687d; }
+.ef-set-k { margin-top: 4px; font-size: 10px; letter-spacing: 0.24em; color: #56687d; }
+.ef-set-k.sub { margin-top: 2px; }
+.ef-sets { display: flex; flex-direction: column; gap: 7px; }
+.ef-set {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 46px; padding: 0 12px; background: #0d141c; border: 1px solid #23303d;
+  color: #c8d5e3; font: inherit; font-size: 12.5px; letter-spacing: 0.1em; cursor: pointer;
+}
+.ef-set em {
+  font-family: 'JetBrains Mono', monospace; font-style: normal; font-size: 10.5px;
+  letter-spacing: 0.04em; color: #6f8299; text-align: right;
+}
+.ef-set.on em { color: #e06c34; }
+.ef-qual { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.ef-q {
+  min-height: 44px; background: #0d141c; border: 1px solid #23303d; color: #8ea0b4;
+  font: inherit; font-size: 11px; letter-spacing: 0.1em; cursor: pointer;
+}
+.ef-q.on { background: #e06c34; border-color: #e06c34; color: #0b0f16; }
+
+/* The footer. Back on the left where it always is, the primary in the middle
+   where it always is, and both of them on the screen. */
+.ef-foot { flex: 0 0 auto; display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.ef-back {
+  width: 58px; background: none; border: 1px solid #23303d; color: #8ea0b4; cursor: pointer;
+  display: grid; place-items: center; padding: 0;
+}
+.ef-back:hover { color: #e8eef6; border-color: #3b4b5d; }
+.ef-back[hidden] { display: none; }
+.ef-back svg { width: 16px; height: 16px; }
+.ef-go {
+  flex: 1 1 auto; min-height: 58px; padding: 0 18px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  background: #e06c34; border: 1px solid #e06c34; color: #0b0f16;
+  font: inherit; font-size: clamp(16px, 2.4vw, 20px); letter-spacing: 0.22em; font-weight: 700;
+  cursor: pointer;
+}
+.ef-go:hover { background: #f07c40; border-color: #f07c40; }
+.ef-go em {
+  font-family: 'JetBrains Mono', monospace; font-style: normal; font-weight: 400;
+  font-size: 11.5px; letter-spacing: 0.06em; opacity: 0.74;
+}
+.ef-go.ghost { background: none; color: #c8d5e3; border-color: #3b4b5d; }
+.ef-go.sealed { background: none; color: #6f8299; border-color: #23303d; cursor: default; }
+.ef-go.sealed em { color: #56687d; }
+.ef-resume {
+  flex: 0 0 auto; padding: 0 16px; min-height: 58px;
+  background: none; border: 1px solid #3b4b5d; color: #c8d5e3;
+  font: inherit; font-size: 11px; letter-spacing: 0.16em; cursor: pointer;
+}
+.ef-resume:hover { border-color: #e06c34; color: #ffd9c0; }
 
 .wm-stage {
   position: relative;
@@ -1148,7 +1312,8 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   border-radius: 10px;
   overflow: hidden;
   background: #070c13;
-  height: clamp(260px, 44vh, 520px);
+  flex: 1 1 auto;
+  min-height: 190px;
   touch-action: none;          /* the map does its own panning and pinching */
   cursor: grab;
 }
@@ -1249,6 +1414,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
    coordinates, the brief, then objectives and record side by side, what the
    close releases, and the order. The photograph and the man holding the
    place sit down the right. */
+.ef-view[data-view="dossier"] { overflow: auto; -webkit-overflow-scrolling: touch; }
 .wm-panel { min-height: 1px; }
 .wm-doss {
   position: relative;
@@ -1381,17 +1547,16 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .wm-free.on .wm-sw::after { left: 14px; background: #e06c34; }
 
 @media (max-width: 620px) {
-  /* Fourteen lamps do not fit a phone in one row; two rows of seven do. */
-  .wm-strip { max-width: calc(7 * 34px); justify-content: center; }
-  .wm-ledger { align-items: center; }
-
-  .wm-inner { gap: 9px; }
-  .wm-stage { height: clamp(300px, 42vh, 460px); }
+  .ef { gap: 8px; }
+  .ef-logo { width: 24px; height: 24px; }
+  .ef-brand { gap: 7px; }
+  .ef-brand span { letter-spacing: 0.1em; }
+  .ef-ledger { font-size: 10px; letter-spacing: 0.04em; }
+  .ef-gear { width: 34px; height: 34px; padding: 8px; }
+  .ef-banner { letter-spacing: 0.22em; }
+  .ef-view[data-view="map"] .wm-stage { flex: 0 0 auto; height: 40vh; }
   .wm-doss-brief { font-size: 12.5px; }
   .wm-hint { display: none; }
-  .wm-head { justify-content: center; }
-  .wm-ledger { align-items: center; width: 100%; }
-  .wm-tally { justify-content: center; gap: 10px; }
   .wm-doss-grid { grid-template-columns: 1fr; gap: 12px; }
   .wm-doss-side { order: -1; }
   .wm-doss-cols { grid-template-columns: 1fr; gap: 10px; }

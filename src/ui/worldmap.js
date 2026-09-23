@@ -4,6 +4,9 @@ import {
   campaignState, objectivesFor, freeDeploy, setFreeDeploy, pendingBurn, markBurnSeen,
 } from '../game/campaign.js';
 import { CAST, DEFENDER_OF } from '../game/cast.js';
+import { introsEnabled, setIntrosEnabled } from './standoff.js';
+import { openingEnabled, setOpeningEnabled } from './opening.js';
+import { QUALITY_IDS, setQuality, detectQuality } from '../core/quality.js';
 import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
 
@@ -127,40 +130,82 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     const cls = t.down ? 'done' : (t === state.next ? 'next' : (t.open ? 'open' : 'locked'));
     return `<span class="wm-seg ${cls}" data-level="${t.id}" title="${t.city}">${String(t.no).padStart(2, '0')}</span>`;
   }).join('');
+  const tons = Math.round(tonnage).toLocaleString();
+  const gear = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>';
+  const chev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
   root.innerHTML = `
-    <div class="wm-inner">
-      <div class="wm-head">
-        <div class="wm-brand">
-          <img class="wm-logo" src="./logo-512.png" alt="" width="512" height="512">
-          <div>
-            <div class="wm-title">EXCESSIVE FORCE</div>
-            <div class="wm-sub">CAMPAIGN HQ · OPERATIONS</div>
+    <div class="ef" data-view="door">
+      <header class="ef-top">
+        <div class="ef-ledger"><b>${String(state.done).padStart(2, '0')}</b> / ${state.total} CLOSED</div>
+        <div class="ef-brand">
+          <img class="ef-logo" src="./logo-512.png" alt="" width="512" height="512">
+          <span>EXCESSIVE FORCE</span>
+        </div>
+        <button class="ef-gear" id="ef-gear" type="button" aria-label="Records and settings">${gear}</button>
+      </header>
+      <div class="ef-banner" id="ef-banner">NEXT CONTRACT</div>
+      <main class="ef-body">
+
+        <section class="ef-view" data-view="door">
+          <button class="ef-hero" id="ef-hero" type="button"></button>
+          <div class="ef-cards">
+            <button class="ef-card" id="ef-tomap" type="button">
+              <span class="ef-mini" id="ef-mini"></span>
+              <span class="ef-card-name">MAP</span>
+              <span class="ef-card-sub">${state.done} ${state.done === 1 ? 'country' : 'countries'} burnt · ${state.total - state.done} open</span>
+            </button>
+            <button class="ef-card" id="ef-torecords" type="button">
+              <span class="ef-figs">
+                <span class="ef-fig">${tons}<i>t</i></span>
+                <span class="ef-card-sub">${sorties} sortie${sorties === 1 ? '' : 's'} flown</span>
+              </span>
+              <span class="ef-card-name">RECORDS</span>
+              <span class="ef-card-sub" id="ef-last">and settings</span>
+            </button>
           </div>
-        </div>
-        <div class="wm-ledger">
-          <div class="wm-strip" aria-label="Contracts">${strip}</div>
-          <div class="wm-tally">
-            <span><b>${state.done}</b> of ${state.total} contracts closed</span>
-            <span><b>${Math.round(tonnage).toLocaleString()} t</b> masonry down</span>
-            <span><b>${sorties}</b> sortie${sorties === 1 ? '' : 's'} flown</span>
+        </section>
+
+        <section class="ef-view" data-view="map">
+          <div class="wm-stage">
+            <svg class="wm-svg" role="application" aria-label="Campaign map"></svg>
+            <div class="wm-zoom">
+              <button type="button" data-z="in" aria-label="Zoom in">+</button>
+              <button type="button" data-z="out" aria-label="Zoom out">&minus;</button>
+              <button type="button" data-z="fit" aria-label="Show the whole world">&#9974;</button>
+            </div>
+            <div class="wm-hint">DRAG TO PAN · PINCH OR SCROLL TO ZOOM</div>
           </div>
-        </div>
-      </div>
-      <div class="wm-stage">
-        <svg class="wm-svg" role="application" aria-label="Campaign map"></svg>
-        <div class="wm-zoom">
-          <button type="button" data-z="in" aria-label="Zoom in">+</button>
-          <button type="button" data-z="out" aria-label="Zoom out">&minus;</button>
-          <button type="button" data-z="fit" aria-label="Show the whole world">&#9974;</button>
-        </div>
-        <div class="wm-hint">DRAG TO PAN · PINCH OR SCROLL TO ZOOM</div>
-      </div>
-      <div class="wm-panel"></div>
-      <div class="wm-foot">
-        <button class="wm-free${state.free ? ' on' : ''}" id="wm-free" type="button" aria-pressed="${state.free ? 'true' : 'false'}">
-          <span class="wm-sw"></span>FREE DEPLOY <em>${state.free ? 'ON · every contract open' : 'OFF · contracts in order'}</em></button>
-        ${canResume ? '<button class="wm-back" id="wm-back" type="button">BACK TO THE MATCH</button>' : ''}
-      </div>
+          <div class="ef-list-k">CONTRACTS</div>
+          <div class="ef-list" id="ef-list"></div>
+        </section>
+
+        <section class="ef-view" data-view="dossier">
+          <div class="wm-panel"></div>
+        </section>
+
+        <section class="ef-view" data-view="records">
+          <div class="ef-tiles">
+            <div class="ef-tile"><b>${tons}<i>t</i></b><span>MASONRY DOWN</span></div>
+            <div class="ef-tile"><b>${sorties}</b><span>SORTIES FLOWN</span></div>
+            <div class="ef-tile"><b>${state.done}<i>/${state.total}</i></b><span>CONTRACTS CLOSED</span></div>
+            <div class="ef-tile"><b id="ef-best">—</b><span>BEST CLOSE</span></div>
+          </div>
+          <div class="ef-set-k">SETTINGS</div>
+          <div class="ef-sets">
+            <button class="ef-set" id="ef-free" type="button"><span>FREE DEPLOY</span><em></em></button>
+            <button class="ef-set" id="ef-intros" type="button"><span>STAND-OFF INTROS</span><em></em></button>
+            <button class="ef-set" id="ef-opening" type="button"><span>TITLE OPENING</span><em></em></button>
+          </div>
+          <div class="ef-set-k sub">QUALITY · RELOADS THE LEVEL</div>
+          <div class="ef-qual" id="ef-qual"></div>
+        </section>
+
+      </main>
+      <footer class="ef-foot">
+        <button class="ef-back" id="ef-back" type="button" aria-label="Back">${chev}</button>
+        <button class="ef-go" id="ef-go" type="button"></button>
+        ${canResume ? '<button class="ef-resume" id="wm-back" type="button">BACK TO THE MATCH</button>' : ''}
+      </footer>
     </div>`;
   document.body.appendChild(root);
 
@@ -409,9 +454,10 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     apply();
   };
 
-  // ── The opening framing: the contracts, with room round them.
-  measure();
-  {
+  // ── The opening framing: the contracts, with room round them. Run when the
+  // map is first shown, not at build time: the stage has no size until its
+  // view is, and a camera fitted to a box of nothing shows nothing.
+  const frameContracts = () => {
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const t of state.list) {
       x0 = Math.min(x0, x(t.lon)); x1 = Math.max(x1, x(t.lon));
@@ -425,10 +471,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     } else {
       centreOn(W / 2, H / 2, kFit);
     }
-  }
-  // A second pass once the browser has actually laid the text out, because the
-  // first call measures boxes that do not exist yet.
-  requestAnimationFrame(layout);
+  };
 
   /** The dossier for one contract, under the map. */
   const show = (t) => {
@@ -499,6 +542,149 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       </div>`;
   };
 
+  // ── The shell.
+  //
+  // One grammar, four screens: the ledger top-left, the lockup top-centre, a
+  // banner that names the question, the answers, and the primary action pinned
+  // to the bottom of the viewport. The front door used to be the map with a
+  // dossier stapled under it and DEPLOY below the fold on every phone made —
+  // the most common action in the game was the hardest thing on the screen to
+  // reach. The map is not a worse thing for being one room of four: fourteen
+  // pins doing the work of a menu is what made it hard to pick from, and it
+  // was always the trophy cabinet rather than the filing cabinet.
+  const shell = root.querySelector('.ef');
+  const banner = root.querySelector('#ef-banner');
+  const goBtn = root.querySelector('#ef-go');
+  const backBtn = root.querySelector('#ef-back');
+  const hero = root.querySelector('#ef-hero');
+  const listEl = root.querySelector('#ef-list');
+
+  const BANNERS = { door: 'NEXT CONTRACT', map: 'THEATRE OF OPERATIONS', records: 'RECORDS' };
+  let viewName = 'door';
+  let mapReady = false;
+
+  const setView = (name) => {
+    viewName = name;
+    shell.dataset.view = name;
+    banner.textContent = name === 'dossier' && selected
+      ? `CONTRACT ${String(selected.no).padStart(2, '0')} · ${selected.iso} · ${selected.city.toUpperCase()}`
+      : BANNERS[name];
+    backBtn.hidden = name === 'door';
+    paintFoot();
+    if (name === 'map') {
+      // The stage has no size until its view is on screen, and the camera is
+      // measured from the stage.
+      measure();
+      if (!mapReady) { mapReady = true; frameContracts(); }
+      apply();
+      requestAnimationFrame(layout);
+    }
+  };
+
+  const paintFoot = () => {
+    const t = selected;
+    if (viewName === 'records') {
+      goBtn.className = 'ef-go ghost';
+      goBtn.innerHTML = 'DONE';
+      return;
+    }
+    if (!t || !t.open) {
+      goBtn.className = 'ef-go sealed';
+      goBtn.innerHTML = t
+        ? 'SEALED <em>close the contract before it</em>'
+        : 'CHOOSE A TARGET';
+      return;
+    }
+    goBtn.className = 'ef-go';
+    goBtn.innerHTML = `${t.down ? 'RETURN' : 'DEPLOY'} <em>${String(t.no).padStart(2, '0')} · ${t.city.toUpperCase()}</em>`;
+  };
+
+  /** The hero: the contract itself, at the size the game is about. */
+  const paintDoor = (t) => {
+    const lv = LEVELS[t.id] || {};
+    const objectives = objectivesFor(t.id).slice(0, 3).map((o) => {
+      const met = o.key === 'primary' ? t.down : !!t.met[o.key];
+      return `<span class="ef-obj${met ? ' met' : ''}">${o.label}</span>`;
+    }).join('');
+    hero.innerHTML = `
+      <span class="ef-hero-art">
+        <img src="assets/recon/${t.id}.jpg" alt="" loading="lazy" onerror="this.hidden = true">
+        <span class="ef-hero-fade"></span>
+        <span class="ef-hero-no">CONTRACT ${String(t.no).padStart(2, '0')} · ${t.iso}</span>
+        ${t.down ? '<span class="ef-hero-stamp">CLOSED</span>' : ''}
+        <span class="ef-hero-text">
+          <span class="ef-hero-target">${lv.target || t.title}</span>
+          <span class="ef-hero-place">${lv.place || t.city} <i>${dms(t.lat, t.lon)}</i></span>
+        </span>
+      </span>
+      <span class="ef-hero-objs">${objectives}</span>`;
+  };
+
+  /** The whole board, small: the map card sells itself with the burning. */
+  const paintMini = () => {
+    const holder = root.querySelector('#ef-mini');
+    if (!holder) return;
+    const m = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'ef-mini-svg', 'aria-hidden': 'true' });
+    const g = el('g', {});
+    for (const c of world) {
+      const t = byIso.get(c.i);
+      g.appendChild(el('path', {
+        class: `ef-mini-land${t && t.down ? ' burnt' : ''}`, d: pathFor(c),
+      }));
+    }
+    m.appendChild(g);
+    for (const t of state.list) {
+      m.appendChild(el('circle', {
+        class: `ef-mini-pin${t.down ? ' down' : ''}${t === state.next ? ' next' : ''}`,
+        cx: x(t.lon), cy: y(t.lat), r: t === state.next ? 26 : 16,
+      }));
+    }
+    holder.replaceChildren(m);
+  };
+
+  /** The contracts as a list you can hit with a thumb. */
+  const paintList = () => {
+    listEl.innerHTML = state.list.map((t) => {
+      const rec = progress[t.id] || {};
+      const right = t.down
+        ? `<em class="down">DOWN · ${fmtTime(rec.bestTime)}</em>`
+        : (t === state.next ? '<em class="next">NEXT</em>'
+          : (t.open ? '<em>OPEN</em>' : '<em class="locked">SEALED</em>'));
+      return `<button class="ef-row${t.open ? '' : ' locked'}" type="button" data-level="${t.id}">
+        <span class="ef-row-no">${String(t.no).padStart(2, '0')}</span>
+        <span class="ef-row-name">${(LEVELS[t.id] || {}).target || t.title}</span>
+        ${right}
+      </button>`;
+    }).join('');
+  };
+
+  const paintRecords = () => {
+    const best = Object.values(progress).reduce(
+      (a, r) => (r.bestTime != null && (a == null || r.bestTime < a) ? r.bestTime : a), null);
+    root.querySelector('#ef-best').textContent = fmtTime(best);
+    const flag = (id, on, onText, offText) => {
+      const b = root.querySelector(id);
+      b.querySelector('em').textContent = on ? onText : offText;
+      b.classList.toggle('on', !!on);
+    };
+    flag('#ef-free', freeDeploy(), 'ON · every contract open', 'OFF · contracts in order');
+    flag('#ef-intros', introsEnabled(), 'ON', 'OFF');
+    flag('#ef-opening', openingEnabled(), 'ON', 'OFF');
+    const now = detectQuality().id;
+    root.querySelector('#ef-qual').innerHTML = QUALITY_IDS.map((q) => (
+      `<button class="ef-q${q === now ? ' on' : ''}" type="button" data-q="${q}">${q.toUpperCase()}</button>`
+    )).join('');
+    const last = Object.entries(progress)
+      .filter(([, r]) => r.runs)
+      .map(([id, r]) => ({ id, r }))
+      .pop();
+    const lastEl = root.querySelector('#ef-last');
+    if (last && lastEl) {
+      const t = state.list.find((k) => k.id === last.id);
+      if (t) lastEl.textContent = `LAST · ${t.city.toUpperCase()} ${fmtTime(last.r.bestTime)}`;
+    }
+  };
+
   let selected = null;
   const select = (id, { move = true } = {}) => {
     const t = state.list.find((k) => k.id === id);
@@ -508,26 +694,37 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     for (const p of lands.querySelectorAll('.wm-target')) {
       p.classList.toggle('sel', p.getAttribute('data-iso') === t.iso);
     }
-    layout();
+    if (mapReady) layout();
     show(t);
-    if (move) {
+    paintDoor(t);
+    if (viewName === 'dossier') {
+      banner.textContent = `CONTRACT ${String(t.no).padStart(2, '0')} · ${t.iso} · ${t.city.toUpperCase()}`;
+    }
+    paintFoot();
+    for (const r of listEl.querySelectorAll('.ef-row')) {
+      r.classList.toggle('sel', r.dataset.level === id);
+    }
+    if (move && mapReady) {
       glideTo(x(t.lon), y(t.lat), Math.max(view.k, kFit * 2.4));
       // Bring the whole dossier on screen when it fits: on a desktop the map
       // takes the top of the page and the DEPLOY button would otherwise sit
       // just under the fold. On a phone it is taller than the screen, and
       // scrolling to it would take the map away from the finger that tapped.
-      const doss = panel.querySelector('.wm-doss');
-      if (doss && doss.offsetHeight < root.clientHeight * 0.8) {
-        doss.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
     }
   };
 
+  paintMini();
+  paintList();
+  paintRecords();
   const opening = state.list.find((t) => t.id === current) || state.next || state.list[0];
   if (opening) select(opening.id, { move: false });
+  paintFoot();
 
   const burnT = burning ? byIso.get(burning) : null;
   if (burnT) {
+    // A contract just closed, so the map is where the player wants to be: the
+    // country going up is the whole reward and it does not play on a card.
+    setView('map');
     // Go and look at it first, then light it.
     glideTo(x(burnT.lon), y(burnT.lat), Math.max(kFit * 3.2, view.k));
     setTimeout(() => {
@@ -658,10 +855,40 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       const go = e.target.closest('.wm-go');
       if (go) finish(go.getAttribute('data-level'));
     });
-    for (const seg of root.querySelectorAll('.wm-seg')) {
-      seg.addEventListener('click', () => select(seg.dataset.level));
-    }
-    root.querySelector('#wm-free')?.addEventListener('click', () => {
+
+    // ── The shell's own controls.
+    hero.addEventListener('click', () => setView('dossier'));
+    root.querySelector('#ef-tomap').addEventListener('click', () => setView('map'));
+    root.querySelector('#ef-torecords').addEventListener('click', () => setView('records'));
+    root.querySelector('#ef-gear').addEventListener('click', () => setView('records'));
+    backBtn.addEventListener('click', () => {
+      setView(viewName === 'dossier' ? 'map' : 'door');
+    });
+    goBtn.addEventListener('click', () => {
+      if (viewName === 'records') { setView('door'); return; }
+      if (!selected) { setView('map'); return; }
+      if (!selected.open) { setView('map'); return; }
+      finish(selected.id);
+    });
+    listEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.ef-row');
+      if (!row) return;
+      select(row.dataset.level);
+      if (!row.classList.contains('locked')) setView('dossier');
+    });
+    root.querySelector('#ef-intros').addEventListener('click', () => {
+      setIntrosEnabled(!introsEnabled()); paintRecords();
+    });
+    root.querySelector('#ef-opening').addEventListener('click', () => {
+      setOpeningEnabled(!openingEnabled()); paintRecords();
+    });
+    root.querySelector('#ef-qual').addEventListener('click', (e) => {
+      const q = e.target.closest('.ef-q');
+      // The tier is a different world: a reload is the only honest switch, and
+      // it is what the pause menu does too.
+      if (q && setQuality(q.dataset.q)) window.location.reload();
+    });
+    root.querySelector('#ef-free')?.addEventListener('click', () => {
       // Kept because the campaign order is the point and testing it is not: a
       // player who wants to go straight back to the Taj can, and the map says
       // out loud that it has been let off the leash.

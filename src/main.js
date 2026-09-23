@@ -1266,7 +1266,11 @@ async function boot() {
 
     for (const s of structures) s.syncTransforms();
 
-    if (life) life.update(rawDt);
+    // Held with the rest of it: the birds and the traffic draw on the same
+    // generator the suite seeds, so leaving them running between the level
+    // loading and the tests starting put the stream at a different place on
+    // every run — which is the whole thing the seed was for.
+    if (life && !suiteHold) life.update(rawDt);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);
