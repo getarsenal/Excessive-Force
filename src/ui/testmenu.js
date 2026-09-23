@@ -1280,6 +1280,44 @@ export class TestMenu {
         return `${quads} quads over ${wetCells} wet cells, ${farQuads} beyond`;
       }],
 
+      ['the lift does not climb over the objective to reach the drop', () => {
+        // The run came in from behind the camera, always, and had to clear
+        // whatever stood along it — which on Dubai is a six-hundred-metre
+        // tower. The altitude that clears it is the altitude the men leave
+        // from: a drop two hundred and sixty metres from the Burj put the
+        // stick out at seven hundred and eight metres and left the player
+        // watching canopies for a minute and a half.
+        const O = b.primary.origin;
+        let at = null;
+        for (let k = 0; k < 24 && !at; k++) {
+          const th = (k / 24) * Math.PI * 2;
+          const p = new THREE.Vector3(O.x + Math.sin(th) * 260, 0, O.z + Math.cos(th) * 260);
+          p.y = c.terrain.heightAt(p.x, p.z);
+          if (b.validPlacement(p).ok) at = p;
+        }
+        assert(at, 'nowhere to drop a gun at 260 m');
+        const keep = { money: b.money, unlock: b.unlockAll, lift: b.airlift, free: b.freeBuild };
+        try {
+          b.unlockAll = true; b.money = 1e7; b.freeBuild = true; b.airlift = true;
+          this.clearUnits();
+          b.deploy('at4', at);
+          assert(b.package && b.package.drops.length === 1, 'the drop did not join a package');
+          b._launch();
+          const s = b.air.sorties.find((x) => x.lift);
+          assert(s, 'the package closed and no aircraft flew');
+          const above = s.alt - at.y;
+          assert(above < 340,
+            `the stick leaves at ${above.toFixed(0)} m over its own drop zone`);
+          const fall = Math.max(...s.lift.loads.map((L) => L.fall));
+          assert(fall < 18, `${fall.toFixed(0)} s under the canopy`);
+          return `out at ${above.toFixed(0)} m, ${fall.toFixed(0)} s to the ground`;
+        } finally {
+          this.clearUnits();
+          b.money = keep.money; b.unlockAll = keep.unlock;
+          b.airlift = keep.lift; b.freeBuild = keep.free;
+        }
+      }],
+
       ['zooming in brings the view down to the ground', () => {
         // Dubai opens three hundred and fifty metres up, because the tower is
         // six hundred and sixty. Nothing ever lowered the focus again, so

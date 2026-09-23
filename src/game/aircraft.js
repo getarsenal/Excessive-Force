@@ -756,8 +756,23 @@ function makeCanopy(radius, colour, loadY, loadHalf = 0.35) {
  *
  * Nothing in the air can be hit, and nothing on the ground can hit it.
  */
-const LIFT = { speed: 95, height: 112, clearance: 45, runIn: 720, spacing: 82, stagger: 0.9, perAircraft: 6, cluster: 150 };
-const CHUTE = { troopRate: 7.6, cargoRate: 7.0, freeFall: 1.0, open: 0.5, stick: 0.36 };
+const LIFT = { speed: 108, height: 96, clearance: 45, runIn: 520, spacing: 82, stagger: 0.9, perAircraft: 6, cluster: 150 };
+/**
+ * How the load comes down.
+ *
+ * A man under a round canopy falls at six or seven metres a second and a
+ * heavy platform rather less, and those were the numbers here. Measured from
+ * the tap: fifteen seconds of run-in, eighteen and a half under the canopy —
+ * half a minute of watching before the gun exists, every time, on top of a
+ * delivery the player has already paid for. Eleven and a half is faster than
+ * anybody jumps, and it is the difference between an airlift and a wait.
+ *
+ * `maxUnder` is the backstop for a drop that has to be let go from high up:
+ * the aircraft clears whatever is on its run, and where that cannot be flown
+ * around — a stick put down at the foot of the Burj — the canopy comes down
+ * at whatever rate gets it there in the time, rather than at its own.
+ */
+const CHUTE = { troopRate: 11.5, cargoRate: 10.0, freeFall: 0.7, open: 0.5, stick: 0.3, maxUnder: 13 };
 
 /**
  * What it takes to hurt something in the air.
@@ -832,17 +847,64 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlon
     // a little behind the last, then aimed through its own group.
     const lateral = (i - (n - 1) / 2) * LIFT.spacing + 30;
     const behind = LIFT.runIn + i * LIFT.stagger * LIFT.speed;
-    model.position.copy(target).addScaledVector(dir, -behind).addScaledVector(side, lateral);
-    dir.set(target.x - model.position.x, 0, target.z - model.position.z).normalize();
+
+    // The way in: a line that does not have to climb.
+    //
+    // The run came in from behind the camera, always, and had to clear
+    // whatever stood along it — which on a level with a six-hundred-metre
+    // tower in it is the tower. The altitude that clears it is the altitude
+    // the men leave from: a drop two hundred and sixty metres from the Burj
+    // put the stick out at seven hundred and eight metres and left the player
+    // watching canopies for a minute and a half, for a gun he had already
+    // paid for. A transport flies round a thing like that. The camera's own
+    // bearing is still the one it wants, and is kept unless another is
+    // materially lower, so on a level with nothing in the way the run comes in
+    // over the player's shoulder exactly as before.
+    // Scored on the line itself. A drop's own `ceiling` — the tower, when the
+    // drop is within two hundred metres of it — is what `_launch` hands over
+    // as a floor, and taking it as one here made every bearing equal: the
+    // aircraft was flown over the Burj because the *landing point* was near
+    // the Burj, whichever way it came in. The line answers the question the
+    // floor was standing in for, because a run to a point beside the tower
+    // passes beside the tower.
+    // The line a given bearing actually produces — start point, the heading
+    // from it through the drop, and the stretch flown past. Scored on exactly
+    // the geometry that will be flown, because the aircraft's own heading is
+    // not the bearing: it is aimed from a start point set off to one side of
+    // it, and those three degrees were the difference between a run passing
+    // a hundred and eighty-four metres from the Burj and one passing a
+    // hundred and seventy-eight, which is inside its corridor. Scoring one
+    // line and flying another chose a clear approach and then climbed over
+    // the tower anyway.
+    const lineFor = (bear) => {
+      const ux = Math.sin(bear), uz = Math.cos(bear);
+      const sx = target.x - ux * behind - uz * lateral;
+      const sz = target.z - uz * behind + ux * lateral;
+      let fx = target.x - sx, fz = target.z - sz;
+      const fl = Math.hypot(fx, fz) || 1;
+      fx /= fl; fz /= fl;
+      return { sx, sz, fx, fz, ex: target.x + fx * 700, ez: target.z + fz * 700 };
+    };
+    const ceilOn = (L) => this.ceilingAlong(L.sx, L.sz, L.ex, L.ez);
+    const camBear = Math.atan2(dir.x, dir.z);
+    let line = lineFor(camBear), low = ceilOn(line);
+    for (let k = 1; k < 12 && low > target.y + LIFT.height; k++) {
+      const l2 = lineFor(camBear + (k / 12) * Math.PI * 2);
+      const c2 = ceilOn(l2);
+      // Materially lower, not merely lower: a run swung round the compass for
+      // ten metres of clearance is a run that no longer comes from where the
+      // player is looking.
+      if (c2 < low - 25) { low = c2; line = l2; }
+    }
+
+    model.position.set(line.sx, 0, line.sz);
+    dir.set(line.fx, 0, line.fz);
     side.set(-dir.z, 0, dir.x);
     model.rotation.y = Math.atan2(dir.x, dir.z);
     // High enough for the whole run, and the stretch past it: the Hercules
     // flew through the Great Pyramid because the drop was clear of it and
     // the run was not.
-    const ex = target.x + dir.x * 700, ez = target.z + dir.z * 700;
-    const ceil = Math.max(group.reduce((a, d) => Math.max(a, d.ceiling ?? ceiling), 0),
-      this.ceilingAlong(model.position.x, model.position.z, ex, ez));
-    const alt = Math.max(target.y + LIFT.height, ceil + LIFT.clearance);
+    const alt = Math.max(target.y + LIFT.height, low + LIFT.clearance);
     model.position.y = alt;
     model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
@@ -852,7 +914,10 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlon
     // stick's spacing apart at least; the chutes steer the rest of the way.
     const loads = group.map((d) => {
       const troops = d.def.model === 'infantry';
-      const rate = troops ? CHUTE.troopRate : CHUTE.cargoRate;
+      // Its own rate, or whatever gets it down in the time when the run had to
+      // be flown high: a canopy is not worth watching for a minute.
+      const drop = Math.max(1, alt - d.pos.y);
+      const rate = Math.max(troops ? CHUTE.troopRate : CHUTE.cargoRate, drop / CHUTE.maxUnder);
       const along = (d.pos.x - target.x) * dir.x + (d.pos.z - target.z) * dir.z;
       const lead = troops ? 1.0 : 1.3;
       const fall = CHUTE.freeFall + (alt - d.pos.y - 9.81 * CHUTE.freeFall * CHUTE.freeFall * 0.5) / rate;
