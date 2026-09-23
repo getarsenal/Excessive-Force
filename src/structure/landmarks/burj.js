@@ -179,7 +179,10 @@ export function buildBurjKhalifa(quality) {
   const hex = (r, rot) => BlockList.circle(r, 6, rot);
   B.section('core', () => {
     courses(0, WING_TOP[0], course, (y, h, c) => {
-      B.polyRing(0, 0, hex(CORE_R, (c % 2) * (Math.PI / 6)), CORE_WALL, y, h, stone, hard(y, M.CURTAIN), 0);
+      // All the way up, and not the raft below sixty metres either: the core
+      // is one pour from the foundation to the spire and the thing the whole
+      // tower hangs on, so it is the same material at every height.
+      B.polyRing(0, 0, hex(CORE_R, (c % 2) * (Math.PI / 6)), CORE_WALL, y, h, stone, M.SPINE, 0);
     });
   });
 
@@ -255,8 +258,16 @@ export function buildBurjKhalifa(quality) {
             // The outer face stays on the wing's line; the wall thickens inward.
             const px = ux * along - uz * side * (WING_W / 2 - wall / 2);
             const pz = uz * along + ux * side * (WING_W / 2 - wall / 2);
+            // Inside the core's own radius this is not a wing, whatever the
+            // section is called: the wing walls run from `WING_IN` outward and
+            // the core stands at `CORE_R`, so every stone before that crosses
+            // the middle of the drum and is part of the spine. Measured the
+            // hard way — twenty howitzer rounds at the tower's centre line
+            // killed twenty of these and nothing else, and released three
+            // hundred and fifty metres of tower. Aiming at the middle of a
+            // skyscraper found the one soft thing inside the hard thing.
             B.add(px, y + h / 2, pz, wall / 2 - 0.02, h / 2 - 0.02, seg / 2 - 0.03,
-              hard(y, M.CURTAIN), ry);
+              along < CORE_R + 1.0 ? M.SPINE : hard(y, M.CURTAIN), ry);
             // The floor line, every fourth course: a fascia standing proud of
             // the glass, half a course deep so the course above lands on the
             // wall and not on it. It was a course of plain CONCRETE once, and

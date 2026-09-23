@@ -32,6 +32,7 @@ export const MATERIALS = {
   STEEL: 16,     // painted structural steel, white: the London Eye
   CURTAIN: 17,   // a supertall's high-strength concrete, glass-faced: the Burj
   RAFT: 18,      // the same pour at the bottom of it, where the tower is armour
+  SPINE: 19,     // and the buttressed core it stands on, all the way up
 };
 
 /**
@@ -168,6 +169,31 @@ export const MATERIAL_PROPS = {
   // entry that carries it is this one.
   [MATERIALS.RAFT]:      { density: 2.30, strength: 3.80, toughness: 210, color: 0x9fb6c6,
     structural: true, lethalScale: 0.35, span: 5.0, mustBreak: true, minPower: 6000 },
+  // The core, and the reason the tower is one building rather than three.
+  //
+  // Measured rather than assumed: severing one wing at three hundred metres
+  // costs forty-five stones and does *nothing* — the tower stands at its full
+  // height with the core untouched. Delete all eight and a half thousand wing
+  // stones and the bare core still stands, dead plumb. The buttressed core was
+  // already carrying the building on its own, exactly as the real one does.
+  //
+  // What it was not was a core. Forty-eight stones to a course at every height
+  // — it is a constant-section drum — of the same curtain wall as the glass
+  // four hundred metres up, and inside a blast's lethal radius one round takes
+  // one stone whatever it is made of. So twenty-five AT4 teams firing down the
+  // tower's centre line, where the wings are on either side and the middle is
+  // the core, put out forty-eight rounds in seven seconds and cut the spine.
+  // Aiming at the middle of a skyscraper is the most natural thing a player
+  // can do, and it was the cheapest kill in the game.
+  //
+  // So: the same pour, the same density and strength, and hard enough that
+  // only something that could genuinely breach metres of reinforced concrete
+  // gets through. One F-15 sortie severs it; artillery has to work for it; an
+  // 84 mm rocket does not touch it. No `span` — a core carries itself, it does
+  // not spread anyone else's load, and giving it the raft's reach as well
+  // would make it immortal.
+  [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 2000, color: 0xb9c6d0,
+    structural: true, mustBreak: true, minPower: 6000, shockScale: 0.10 },
 };
 
 

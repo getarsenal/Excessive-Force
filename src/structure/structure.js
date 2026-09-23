@@ -1199,18 +1199,42 @@ export class Structure {
    * joints around it have been shaken apart, and a course whose mortar has gone
    * carries a fraction of what it did.
    */
-  shockMortar(center, radius, amount) {
+  /**
+   * Is this stone simply beyond a blast of this size?
+   *
+   * There are three ways `explode` takes a stone out of a structure — burst
+   * inside the lethal radius, thrown loose on the rim, or shaken out of its
+   * mortar — and only the first ever asked what the stone was made of. So a
+   * warhead that could not break a core block plucked it out of the wall
+   * instead: ninety AT4 rockets destroyed three stones of a forty-eight stone
+   * course and severed it anyway, because the other forty-five were thrown or
+   * unmortared. A material that names a threshold is either breached or it is
+   * not, and below it a blast scorches the face and goes home.
+   */
+  _blastHolds(i, power) {
+    const min = MATERIAL_PROPS[this.mat[i]]?.minPower;
+    return min !== undefined && power < min;
+  }
+
+  shockMortar(center, radius, amount, power = Infinity) {
     const r2 = radius * radius;
     for (let i = 0; i < this.count; i++) {
       if (!(this.flags[i] & ALIVE)) continue;
       if (this.bond[i] <= 0.16) continue;
+      if (this._blastHolds(i, power)) continue;
       const dx = this.px[i] - center.x;
       const dy = this.py[i] - center.y;
       const dz = this.pz[i] - center.z;
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 > r2) continue;
       const f = 1 - Math.sqrt(d2) / radius;
-      this.bond[i] = Math.max(0.15, this.bond[i] - f * f * amount);
+      // And how much of that this stuff gives up. Shaking the grout out is the
+      // third way a blast removes a stone from a structure, and it was as
+      // blind to the material as the other two: twenty howitzer rounds drove a
+      // reinforced concrete core from fully bonded to a mean of 0.38, which is
+      // most of the way to loose, without destroying a single stone of it.
+      const hold = MATERIAL_PROPS[this.mat[i]]?.shockScale ?? 1;
+      this.bond[i] = Math.max(0.15, this.bond[i] - f * f * amount * hold);
     }
   }
 
@@ -1743,7 +1767,7 @@ export class Structure {
     // it alone; an air-dropped bomb is sized in share-of-building rather than
     // in metres, so on a slender target its radius is already most of the way
     // across and 2.4 of them shakes the mortar out of the whole shaft.
-    this.shockMortar(center, radius * (opts.shock ?? 2.4), 0.7);
+    this.shockMortar(center, radius * (opts.shock ?? 2.4), 0.7, power);
 
     // Anything already leaning takes the hit as a real impulse on the section,
     // so shelling a tower that is out of plumb visibly rocks it.
@@ -1781,6 +1805,7 @@ export class Structure {
     for (const t of thrown) {
       if (used >= budget) break;
       if (t.falloff < 0.12) continue;
+      if (this._blastHolds(t.i, power)) continue;
       const inv = 1 / (t.d || 1);
       const mag = power * t.falloff * 0.0055 * this.mass[t.i];
 
