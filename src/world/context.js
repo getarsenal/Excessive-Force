@@ -37,6 +37,19 @@ export function buildContext(terrain, quality, opts = {}) {
   const bodies = [];
   const roofs = [];
 
+  /**
+   * How much of this city pitches its roofs.
+   *
+   * A pitched roof is a climate, not a building size — it sheds rain and snow,
+   * and where there is neither, nobody builds one. The decision used to be
+   * taken per building from its height and footprint alone, which put a
+   * hundred and fifty-three tiled gables on downtown Dubai: a hundred and two
+   * on the invented terraces and fifty-one on surveyed footprints. A level
+   * says what its roofs are and every pitch decision below is scaled by it,
+   * so the same generator produces Cologne and the Gulf.
+   */
+  const ROOF_PITCH = opts.roofPitch ?? 1;
+
   const push = (arr, geo, x, y, z, ry) => {
     if (ry) geo.rotateY(ry);
     geo.translate(x, y, z);
@@ -370,7 +383,7 @@ export function buildContext(terrain, quality, opts = {}) {
     if (gHi - gLo > 10.0) { rejects.slope = (rejects.slope || 0) + 1; return false; }
     const g = gLo - 0.3;
     const roll = rng();
-    const pitched = roll < (opts.pitchChance ?? 0.42) && Math.min(w, d) < 26;
+    const pitched = roll < (opts.pitchChance ?? 0.42) * ROOF_PITCH && Math.min(w, d) < 26;
     const setback = !pitched && roll > 0.82 && h > 20 && Math.min(w, d) > 14;
 
     const bodyH = (setback ? h * 0.72 : h) + fall + 0.3;
@@ -700,13 +713,81 @@ export function buildContext(terrain, quality, opts = {}) {
       .filter((b) => Array.isArray(b.pts) && b.pts.length >= 3)
       .map((b) => ({ b, a: polyArea(b.pts) }))
       .sort((p, q) => q.a - p.a);
+
+    // What the survey records twice.
+    //
+    // Overture holds a complex the way the surveyor drew it: the mall or the
+    // podium as one outline, and the blocks standing on it as their own
+    // outlines *inside* that one. Both were built, both founded on the same
+    // ground, and where the two reached the same height their roofs were one
+    // slab drawn twice — which is the flicker the player reads as a roof that
+    // does not match the building under it. Dubai has forty-eight outlines
+    // inside another; in forty-five the inner one is wholly inside, and one
+    // podium carries three of them at three different heights.
+    //
+    // A tower standing out of a podium is not this fault — it is what Dubai
+    // looks like — so the test is height rather than containment alone.
+    // An outline wholly inside a building that already reaches as high as it
+    // does is inside that building, and nothing of it would ever be seen.
+    const inPoly = (x, z, pts) => {
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const a = pts[i], c = pts[j];
+        if ((a[1] > z) !== (c[1] > z)
+          && x < (c[0] - a[0]) * (z - a[1]) / (c[1] - a[1]) + a[0]) inside = !inside;
+      }
+      return inside;
+    };
+    const SWALLOW = 120;
+    const swGrid = new Map();
+    const swKeys = (e) => {
+      const out = [];
+      for (let cx = Math.floor(e.x0 / SWALLOW); cx <= Math.floor(e.x1 / SWALLOW); cx++) {
+        for (let cz = Math.floor(e.z0 / SWALLOW); cz <= Math.floor(e.z1 / SWALLOW); cz++) {
+          out.push(cx * 8192 + cz);
+        }
+      }
+      return out;
+    };
+    const survey = [];
+    for (const e of list) {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const q of e.b.pts) {
+        if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0];
+        if (q[1] < z0) z0 = q[1]; if (q[1] > z1) z1 = q[1];
+      }
+      e.x0 = x0; e.x1 = x1; e.z0 = z0; e.z1 = z1;
+      e.h = Math.max(3.5, e.b.h || 12);
+      const keys = swKeys(e);
+      let swallowed = false;
+      for (const k of keys) {
+        for (const o of swGrid.get(k) || []) {
+          // Only by something that encloses it and is not shorter than it is.
+          // Six metres of slack, because two storeys of difference between a
+          // podium and the block on it is not a block on a podium.
+          if (o.x0 > e.x0 || o.x1 < e.x1 || o.z0 > e.z0 || o.z1 < e.z1) continue;
+          if (o.h < e.h - 6) continue;
+          let n = 0;
+          for (const q of e.b.pts) if (inPoly(q[0], q[1], o.b.pts)) n++;
+          if (n >= e.b.pts.length * 0.9) { swallowed = true; break; }
+        }
+        if (swallowed) break;
+      }
+      if (swallowed) { rejects.buried = (rejects.buried || 0) + 1; continue; }
+      survey.push(e);
+      for (const k of keys) {
+        let bucket = swGrid.get(k);
+        if (!bucket) swGrid.set(k, bucket = []);
+        bucket.push(e);
+      }
+    }
     // What the tier can afford. Higher than the invented city's count, not
     // lower: a surveyed footprint is the cheapest building in the game — most
     // go through the same box path and the shaped ones merge into the same two
     // meshes — and a budget stopping at nine hundred leaves Westminster as a
     // few streets of houses in a field, which the generated city never was.
     const budget = { low: 900, medium: 2100, high: 3400, ultra: 5000 }[quality.name] ?? 2100;
-    for (const { b, a } of list) {
+    for (const { b, a } of survey) {
       if (realBuilt + realShaped >= budget) { rejects.budget = (rejects.budget || 0) + 1; continue; }
       if (a < 18) { rejects.tiny = (rejects.tiny || 0) + 1; continue; }
       const rect = boundingRect(b.pts);

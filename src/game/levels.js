@@ -801,7 +801,10 @@ export const LEVELS = {
       bed: new THREE.Color(0x3c6b73),
       dry: new THREE.Color(0xe3d5b2),
     },
-    setting: { haze: { colour: 0xe0d6c2, density: 0.00030 } },
+    // Nothing in the Gulf pitches a roof. It rains a handful of days a year
+    // and it never snows, so the whole city — the towers, the blocks behind
+    // them and the low buildings out towards the creek — is flat on top.
+    setting: { haze: { colour: 0xe0d6c2, density: 0.00030 }, roofPitch: 0 },
     cityExcludeRadius: 130,
     contextExclude: 130,
     // Far back and high: the tower is two thirds of a kilometre.

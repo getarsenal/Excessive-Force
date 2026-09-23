@@ -1932,7 +1932,38 @@ export class Garrison {
     const lead = t.kind === 'aircraft' ? 0.5 : 0.78;
     const hit = Math.random() < d.def.accuracy * (1 - 0.55 * (dist / reach)) * lead;
     const damage = (d.def.airDamage || d.def.damage) * this.damageScale;
-    shots.push({ from: d.muzzle, to: t.pos, hit, damage, unit: null, defender: d, air: t });
+    // Where the round actually goes.
+    //
+    // Every tracer used to be drawn from the muzzle to the target whether it
+    // hit or not, so a stream of fire at a parachute was a stream of rounds
+    // all stopping dead on the man — and most of them were misses. A miss at
+    // something overhead does not stop: it carries on past and up into the
+    // sky, which is the half of the picture that makes the hits read as hits.
+    // Wider the further out the target is, because that is what the accuracy
+    // falling off with range means.
+    let to = t.pos;
+    if (!hit) {
+      const dx = t.pos.x - d.muzzle.x, dy = t.pos.y - d.muzzle.y, dz = t.pos.z - d.muzzle.z;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      // Two axes across the line of flight: one from whichever world axis is
+      // least parallel to it, the other from the cross product of the two.
+      const flat = Math.abs(dx) < Math.abs(dz);
+      let ux = flat ? -dz : dy, uy = flat ? 0 : -dx, uz = flat ? dx : 0;
+      const ul = Math.hypot(ux, uy, uz) || 1;
+      ux /= ul; uy /= ul; uz /= ul;
+      const vx = (dy * uz - dz * uy) / len, vy = (dz * ux - dx * uz) / len, vz = (dx * uy - dy * ux) / len;
+      const spread = (3 + dist * 0.06) * (0.4 + Math.random());
+      const a = Math.random() * Math.PI * 2;
+      const sx = Math.cos(a) * spread, sy = Math.sin(a) * spread;
+      // And past it: a round that missed is still travelling.
+      const over = 1.25 + Math.random() * 0.9;
+      to = new THREE.Vector3(
+        d.muzzle.x + dx * over + ux * sx + vx * sy,
+        d.muzzle.y + dy * over + uy * sx + vy * sy,
+        d.muzzle.z + dz * over + uz * sx + vz * sy,
+      );
+    }
+    shots.push({ from: d.muzzle, to, hit, damage, unit: null, defender: d, air: t });
     if (hit) this.airHits++;
     this.airShots++;
     d.facing = Math.atan2(t.pos.x - d.pos.x, t.pos.z - d.pos.z);

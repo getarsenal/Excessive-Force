@@ -223,6 +223,8 @@ async function boot() {
     canopy: level.setting?.canopy,
     canopyFrom: level.setting?.canopyFrom,
     downtown: level.setting?.downtown,
+    // A pitched roof is a climate, not a building size. See `buildContext`.
+    roofPitch: level.setting?.roofPitch,
   });
   engine.scene.add(contextGroup);
   // And the city is solid. Until this it was scenery: a round fired at a gun
@@ -418,7 +420,10 @@ async function boot() {
   battle.fires = new Fires(fx, quality);
   // And the town burns. A shell that stops against a building guts it: the
   // walls go to soot, the windows go dark, and the fire is on the roof.
-  battle.cityFire = new CityFire({ cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene });
+  battle.cityFire = new CityFire({
+    cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene,
+    onBurn: (p) => battle.cityCollapse(p),
+  });
 
   // Flags on the landmarks, each standing on a stone and going with it.
   const flags = new Flags(engine.scene, quality);
@@ -588,7 +593,7 @@ async function boot() {
         hud.showPrompt(data.reason, 'warn');
         break;
       case 'unitlost':
-        hud.feed(`${data.def.name} LOST`, 'bad');
+        hud.feed(data.fell ? `${data.def.name} DOWN WITH THE BUILDING` : `${data.def.name} LOST`, 'bad');
         break;
       case 'crushed':
         if (data > 2) hud.feed(`${data} DEFENDERS CRUSHED`, 'big');

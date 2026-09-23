@@ -30,8 +30,9 @@ export class CityFire {
    * @param {object} o.fx              ExplosionFX
    * @param {object} o.fires           Fires
    * @param {object} o.audio
+   * @param {(plot:object)=>void} [o.onBurn]  told when a building is gutted
    */
-  constructor({ cityGroup, fx, fires, audio, scene }) {
+  constructor({ cityGroup, fx, fires, audio, scene, onBurn }) {
     this.plots = (cityGroup && cityGroup.userData.plots) || [];
     this.meshes = (cityGroup && cityGroup.userData.cityMeshes) || [];
     this.scene = scene || cityGroup;
@@ -41,6 +42,7 @@ export class CityFire {
     this.fx = fx;
     this.fires = fires;
     this.audio = audio;
+    this.onBurn = onBurn || null;
     this.burnt = 0;
     this._v = new THREE.Vector3();
 
@@ -221,5 +223,8 @@ export class CityFire {
       this._v.set(p.x, top, p.z);
       this.audio.play('explosion', this._v, { rate: 0.72, gain: 0.55 + Math.min(0.4, size * 0.006), rolloff: 420 });
     }
+    // The roof this building had is now a heap at its own base, and whatever
+    // was standing on it has to be told so.
+    if (this.onBurn) this.onBurn(p);
   }
 }

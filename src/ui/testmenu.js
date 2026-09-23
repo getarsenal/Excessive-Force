@@ -1662,6 +1662,71 @@ export class TestMenu {
         });
       }],
 
+      ['the town\u2019s roofs are the roofs the place has', () => {
+        // Downtown Dubai had a hundred and fifty-three tiled gables on it:
+        // fifty-one on surveyed footprints and a hundred and two on the
+        // invented infill between them, each one a pitch sitting next to a
+        // flat parapet at the same height. A pitched roof is a climate, not a
+        // building size, and the level record now says what its roofs are.
+        const plots = c.cityGroup?.userData?.plots || [];
+        if (!plots.length) return 'no town on this level';
+        const pitch = c.level.setting?.roofPitch;
+        const pitched = plots.filter((p) => p.pitched).length;
+        if (pitch === 0) {
+          assert(pitched === 0,
+            `${pitched} of ${plots.length} buildings have a pitched roof on a `
+            + 'level whose roofs are flat');
+          return `${plots.length} flat roofs, as the setting asks`;
+        }
+        return `${pitched} of ${plots.length} pitched`;
+      }],
+
+      ['a gun on a roof goes down with the building', () => {
+        // A rooftop is a firing position, and burning the building under it
+        // used to change nothing at all about the gun on top: the floors
+        // folded to a heap at the base and the battery went on shooting from
+        // the height where the roof had been, standing in the air over its
+        // own rubble.
+        const cf = b.cityFire;
+        const roofs = c.cityGroup?.userData?.roofs;
+        if (!cf || !cf.plots.length || !roofs || !roofs.length) {
+          return 'no surveyed town on this level';
+        }
+        const O = b.primary.origin;
+        const order = roofs
+          .filter((p) => !p.burnt)
+          .map((p) => ({ p, d: Math.hypot(p.x - O.x, p.z - O.z) }))
+          .filter((r) => r.d > 120)
+          .sort((x, y) => x.d - y.d);
+        assert(order.length > 0, 'no deployable roof stands clear of the objective');
+
+        const money = b.money, unlock = b.unlockAll, lift = b.airlift;
+        b.unlockAll = true; b.money = 1e6; b.airlift = false;
+        let unit = null, plot = null;
+        for (const { p } of order.slice(0, 30)) {
+          const pt = new THREE.Vector3(p.x, p.top ?? (p.base + p.h), p.z);
+          pt.onRoof = true;
+          if (!b.validPlacement(pt).ok) continue;
+          const before = b.units.length;
+          b.deploy('m119', pt);
+          if (b.units.length > before) { unit = b.units[b.units.length - 1]; plot = p; break; }
+        }
+        b.money = money; b.unlockAll = unlock; b.airlift = lift;
+        assert(unit, 'no roof in the town would take a gun');
+
+        const lost = b.unitsLost;
+        cf.burn(plot);
+        c.fastForward(0.4);
+        assert(!unit.alive,
+          'the building was gutted and the gun on its roof is still firing from '
+          + `${unit.pos.y.toFixed(0)} m, over nothing`);
+        assert(b.unitsLost === lost + 1,
+          `the gun died but the tally went ${lost} to ${b.unitsLost}`);
+        this.clearUnits();
+        return `gun on a ${plot.w.toFixed(0)}x${plot.d.toFixed(0)} m roof at `
+          + `${(plot.top ?? (plot.base + plot.h)).toFixed(0)} m went down with it`;
+      }],
+
       ['the city is detailed, and its roads keep out of the river', () => {
         const city = this.ctx.cityGroup;
         const d = city?.userData?.detail;

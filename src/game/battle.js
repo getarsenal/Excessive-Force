@@ -1013,6 +1013,43 @@ export class Battle {
     });
   }
 
+  /**
+   * A town building has been gutted, and its roof has gone down with it.
+   *
+   * A rooftop is a firing position like any other, and burning the building
+   * under it used to change nothing about the gun on top: the floors folded
+   * to a heap at the base and the battery went on shooting from the height
+   * where the roof had been, standing in the air over its own rubble. Anyone
+   * up there goes with the building — health to zero rather than a removal of
+   * their own, so the loss runs through the one path that counts it, pays out
+   * the wreck and tells the feed. A stick still under its canopies over that
+   * roof has nowhere left to land, and is lost on the drop.
+   *
+   * The test is the plot's own box, not a radius: a long terrace is long.
+   */
+  cityCollapse(p) {
+    if (!p) return;
+    const top = p.top ?? (p.base + p.h);
+    const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+    const onIt = (x, y, z) => {
+      if (y < p.base + 1 || y > top + 3) return false;
+      const dx = x - p.x, dz = z - p.z;
+      return Math.abs(dx * ca - dz * sa) < p.w / 2 + 1.5
+          && Math.abs(dx * sa + dz * ca) < p.d / 2 + 1.5;
+    };
+    for (const u of this.units) {
+      if (!u.alive || !u.onRoof || u.health <= 0) continue;
+      if (!onIt(u.pos.x, u.pos.y, u.pos.z)) continue;
+      u.health = 0;
+      u.fell = true;
+    }
+    for (const d of this.pending) {
+      if (d.lost || !d.pos.onRoof) continue;
+      if (!onIt(d.pos.x, d.pos.y, d.pos.z)) continue;
+      d.lost = true;
+    }
+  }
+
   // ───────────────────────────────────────────────────────────── targeting ──
 
   setTarget(point, label, defender = null) {
