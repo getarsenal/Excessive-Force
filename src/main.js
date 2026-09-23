@@ -1157,7 +1157,12 @@ async function boot() {
    * wants the level running still gets it, to the frame, identically.
    */
   try {
-    if (localStorage.getItem('tt.suite') === '1') testMenu.paused = true;
+    if (localStorage.getItem('tt.suite') === '1') {
+      testMenu.paused = true;
+      // And the machine does not get a vote on the simulation either: see
+      // `frozen` in the governor.
+      governor.frozen = true;
+    }
   } catch { /* private mode */ }
 
   /**

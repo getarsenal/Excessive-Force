@@ -558,7 +558,7 @@ export class TestMenu {
     }
     if (!isFinite(bestD)) return st.origin.clone();
 
-    // Of the stones at that height, the one a gun can actually see.
+    // The first stone a shell fired at the middle of the building would meet.
     //
     // This used to take the first stone it found at the wanted height, so the
     // build order chose the aim point — and the Burj's core is laid before its
@@ -566,24 +566,44 @@ export class TestMenu {
     // detonating eleven metres from the axis, in the middle of the one
     // material in the game a howitzer is deliberately not able to break, and
     // the test that used it passed only when the arc happened to clip a wing
-    // on the way in. A player taps a face; so does this.
-    const guns = this.ctx.battle.units.filter((u) => u.alive);
+    // on the way in.
+    //
+    // Nor is it simply the nearest stone to the guns, which was the first
+    // attempt: at the Taj that is the tip of a minaret a hundred and forty
+    // metres out from the dome, and two howitzers shelling a slender tower at
+    // that range mostly detonate in the air beside it. What a player does is
+    // point at the middle of the building, and what that means on the ground
+    // is the near face of the mass in front of it. So: the line from whoever
+    // is looking — the nearest gun, or the camera when nothing is deployed —
+    // to the structure's own axis, and the first standing stone on it.
     const band = bestD + 2.0;
-    let best = -1, score = -Infinity;
+    const eye = (() => {
+      let e = null, near = Infinity;
+      for (const u of this.ctx.battle.units) {
+        if (!u.alive) continue;
+        const d = Math.hypot(u.pos.x - st.origin.x, u.pos.z - st.origin.z);
+        if (d < near) { near = d; e = u.pos; }
+      }
+      return e || this.ctx.engine.camera.position;
+    })();
+    const lx = st.origin.x - eye.x, lz = st.origin.z - eye.z;
+    const ll = Math.hypot(lx, lz) || 1;
+    const ux = lx / ll, uz = lz / ll;
+    let best = -1, nearest = Infinity, widest = -Infinity, fallback = -1;
     for (let i = 0; i < st.count; i++) {
       if (!standing(i)) continue;
       if (Math.abs(st.py[i] - want) > band) continue;
-      let s;
-      if (guns.length) {
-        s = -Infinity;
-        for (const u of guns) {
-          s = Math.max(s, -Math.hypot(st.px[i] - u.pos.x, st.pz[i] - u.pos.z));
-        }
-      } else {
-        s = Math.hypot(st.px[i] - st.origin.x, st.pz[i] - st.origin.z);
-      }
-      if (s > score) { score = s; best = i; }
+      const rx = st.px[i] - st.origin.x, rz = st.pz[i] - st.origin.z;
+      const out = Math.hypot(rx, rz);
+      if (out > widest) { widest = out; fallback = i; }
+      // How far this stone sits off the line of fire, and how far along it.
+      const dx = st.px[i] - eye.x, dz = st.pz[i] - eye.z;
+      const along = dx * ux + dz * uz;
+      if (along <= 0) continue;
+      if (Math.abs(dx * uz - dz * ux) > 4.0) continue;
+      if (along < nearest) { nearest = along; best = i; }
     }
+    if (best < 0) best = fallback;
     if (best < 0) return st.origin.clone();
     return new THREE.Vector3(st.px[best], st.py[best], st.pz[best]);
   }

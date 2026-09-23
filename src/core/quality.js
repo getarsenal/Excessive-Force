@@ -241,6 +241,17 @@ export class AdaptiveGovernor {
    * it is no longer asked to pay for a bill it did not run up.
    */
   update(dtMs) {
+    // A regression run is not allowed to be governed.
+    //
+    // The budget this returns is the number of stones the physics may keep
+    // awake, and it is cut when frames get long — so on a box running three
+    // browsers at once the suite was handed a smaller simulation than the
+    // same suite got on an idle one. That is how "undercutting the base
+    // brings it down" came to fail in a batch and pass alone: with the budget
+    // shed to its floor there were not enough bodies to break the section up,
+    // so it landed as one three-thousand-stone slab. A test asks what the
+    // game does, not what the machine under it had left that minute.
+    if (this.frozen) return this.budget;
     this.samples.push(dtMs);
     if (this.samples.length < 45) return this.budget;
 
