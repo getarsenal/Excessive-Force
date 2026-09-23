@@ -192,8 +192,17 @@ export const MATERIAL_PROPS = {
   // 84 mm rocket does not touch it. No `span` — a core carries itself, it does
   // not spread anyone else's load, and giving it the raft's reach as well
   // would make it immortal.
-  [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 2000, color: 0xb9c6d0,
-    structural: true, mustBreak: true, minPower: 6000, shockScale: 0.10 },
+  //
+  // The threshold is read off the weapons table rather than guessed at. Every
+  // infantry warhead in the game is 3,400 or under and everything crew-served
+  // is 6,200 or over, so five thousand sits in the gap with room either side:
+  // a shoulder-fired rocket is below it at any range and the lightest howitzer
+  // is above it. Toughness is what decides how long the guns above the line
+  // take, and it was briefly set to two thousand during an experiment that was
+  // measuring the wrong thing — at which point the lightest howitzer needed
+  // thirty-seven rounds for one stone and the suite said so.
+  [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 420, color: 0xb9c6d0,
+    structural: true, mustBreak: true, minPower: 5000, shockScale: 0.10 },
 };
 
 
