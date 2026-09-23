@@ -201,7 +201,7 @@ export const MATERIAL_PROPS = {
   // take, and it was briefly set to two thousand during an experiment that was
   // measuring the wrong thing — at which point the lightest howitzer needed
   // thirty-seven rounds for one stone and the suite said so.
-  [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 420, color: 0xb9c6d0,
+  [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 240, color: 0xb9c6d0,
     structural: true, mustBreak: true, minPower: 5000, shockScale: 0.10 },
 };
 
