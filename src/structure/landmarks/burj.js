@@ -301,10 +301,12 @@ export function buildBurjKhalifa(quality) {
     });
   });
 
-  // ── The spire: steel, hollow, tapering from the core's top to the tip.
+  // ── The spire: steel, hollow, tapering from the core's top to the tip. It
+  // is the top two hundred metres of the core and is gated like the core: five
+  // rockets used to take a third of the building's height off it.
   B.section('spire', () => {
-    B.spire(0, 0, WING_TOP[0], SPIRE_TOP - 30, CORE_R * 1.6, 3.0, course * 1.3, stone, M.STEEL, 0.32);
-    B.pinnacle(0, 0, SPIRE_TOP - 30, 30, 3.5, stone, M.STEEL);
+    B.spire(0, 0, WING_TOP[0], SPIRE_TOP - 30, CORE_R * 1.6, 3.0, course * 1.3, stone, M.MAST, 0.32);
+    B.pinnacle(0, 0, SPIRE_TOP - 30, 30, 3.5, stone, M.MAST);
   });
 
   B.scaleAll(S);

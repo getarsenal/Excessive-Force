@@ -33,6 +33,7 @@ export const MATERIALS = {
   CURTAIN: 17,   // a supertall's high-strength concrete, glass-faced: the Burj
   RAFT: 18,      // the same pour at the bottom of it, where the tower is armour
   SPINE: 19,     // and the buttressed core it stands on, all the way up
+  MAST: 20,      // the steel spire on top of that core, which is still the core
 };
 
 /**
@@ -203,6 +204,30 @@ export const MATERIAL_PROPS = {
   // thirty-seven rounds for one stone and the suite said so.
   [MATERIALS.SPINE]:     { density: 2.30, strength: 12.0, toughness: 240, color: 0xb9c6d0,
     structural: true, mustBreak: true, minPower: 5000, shockScale: 0.10 },
+  // The spire, which is the top two hundred metres of the same core.
+  //
+  // Reported as five AT4 rounds bringing the Burj down, and it reproduced at
+  // the phone tier: five rockets into the mast took thirty-seven metres off
+  // the top, and five more where it leaves the core took a hundred and fifty-
+  // eight. A third of the building's height, for six hundred dollars of
+  // infantry, and not one stone of the core or the wings touched — because the
+  // mast was plain STEEL, which is what the London Eye is made of, and nothing
+  // about it said it was structure a tower's whole silhouette hangs from.
+  //
+  // Identical to STEEL in density and strength, so the wheel in London and the
+  // statics of the spire itself are untouched, and gated exactly as the core
+  // is: the same five thousand read off the weapons table, so a shoulder-fired
+  // rocket cannot cut it at any range and the lightest howitzer can. It keeps
+  // the core's shock resistance for the same reason the core has it.
+  //
+  // And it spans, which the core deliberately does not. A mast is a tube a few
+  // metres across: one stone out of a ring is a notch across a third of the
+  // section, and against masonry's two metres of reach that is a cut — the
+  // "one random piece holding up hundreds of metres" case. Two and a half
+  // times the reference bridges its own cross-section and no more.
+  [MATERIALS.MAST]:      { density: 7.85, strength: 14.0, toughness: 280, color: 0xeef1f3,
+    structural: true, mustBreak: true, minPower: 5000, shockScale: 0.12,
+    lethalScale: 0.6, span: 2.5 },
 };
 
 

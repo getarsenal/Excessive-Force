@@ -480,26 +480,59 @@ export class Structure {
     for (let i = 0; i < n; i++) {
       const b = Math.max(0, Math.floor((this.py[i] - this.groundY) / this.bandHeight));
       this.bandOf[i] = b;
-      if (b > maxBand) maxBand = b;
+      const t = Math.max(0, Math.floor((this.py[i] + this.hy[i] - this.groundY - EPS) / this.bandHeight));
+      if (t > maxBand) maxBand = t;
     }
     this.bandCount = maxBand + 1;
 
+    // A slice is cut by every stone that crosses it, and not only by the ones
+    // whose centres happen to land inside it.
+    //
+    // Membership used to be the centre alone, and a band is three metres: at
+    // the phone tier, where the grid is coarsened until a course of the Burj
+    // is four and a half metres tall, most slices held a fraction of a course
+    // and some held almost nothing. Band 45 of the tower — a hundred and
+    // thirty-five metres up, the full Y-shaped section of a core and three
+    // wings — was thirty-eight stones and a hundred and forty-seven square
+    // metres, where the band below it was a hundred and nine stones and twelve
+    // hundred. The bearing analysis divides half a million tonnes by that
+    // area, so it read twenty-six megapascals where the true section is at
+    // three, and one stone out of such a slice moved its centroid far enough
+    // to condemn the whole building: five AT4 rockets, one stone destroyed,
+    // and the tallest building in the world went over. Nothing was wrong with
+    // the analysis; it was being handed a quarter of the section and told it
+    // was all of it.
+    const lowBand = (i) =>
+      Math.max(0, Math.floor((this.py[i] - this.hy[i] - this.groundY + EPS) / this.bandHeight));
+    const highBand = (i) => Math.min(this.bandCount - 1,
+      Math.max(0, Math.floor((this.py[i] + this.hy[i] - this.groundY - EPS) / this.bandHeight)));
+
     const counts = new Int32Array(this.bandCount + 1);
-    for (let i = 0; i < n; i++) counts[this.bandOf[i]]++;
+    let total = 0;
+    for (let i = 0; i < n; i++) {
+      const b0 = lowBand(i), b1 = Math.max(lowBand(i), highBand(i));
+      for (let b = b0; b <= b1; b++) counts[b]++;
+      total += b1 - b0 + 1;
+    }
     this.bandStart = new Int32Array(this.bandCount + 1);
     let cursor = 0;
     for (let b = 0; b < this.bandCount; b++) { this.bandStart[b] = cursor; cursor += counts[b]; }
     this.bandStart[this.bandCount] = cursor;
-    this.bandList = new Int32Array(n);
+    this.bandList = new Int32Array(total);
     const fill = Int32Array.from(this.bandStart);
-    for (let i = 0; i < n; i++) this.bandList[fill[this.bandOf[i]]++] = i;
+    for (let i = 0; i < n; i++) {
+      const b0 = lowBand(i), b1 = Math.max(lowBand(i), highBand(i));
+      for (let b = b0; b <= b1; b++) this.bandList[fill[b]++] = i;
+    }
 
     // Intact bearing area per band, so the check can tell which bands have
-    // actually been cut into.
+    // actually been cut into. Over the same membership, or a slice would be
+    // compared against an area its own stone list can never reach.
     this.bandArea0 = new Float32Array(this.bandCount);
     for (let i = 0; i < n; i++) {
       if (!this.structural[i]) continue;
-      this.bandArea0[this.bandOf[i]] += 4 * this.hx[i] * this.hz[i];
+      const b0 = lowBand(i), b1 = Math.max(lowBand(i), highBand(i));
+      for (let b = b0; b <= b1; b++) this.bandArea0[b] += 4 * this.hx[i] * this.hz[i];
     }
 
     // Scratch for the overturning pass.
