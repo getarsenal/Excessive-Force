@@ -1156,14 +1156,19 @@ async function boot() {
    * `fastForward` drives physics and the battle directly, so every test that
    * wants the level running still gets it, to the frame, identically.
    */
+  let suiteHold = false;
   try {
     if (localStorage.getItem('tt.suite') === '1') {
       testMenu.paused = true;
+      suiteHold = true;
       // And the machine does not get a vote on the simulation either: see
       // `frozen` in the governor.
       governor.frozen = true;
     }
   } catch { /* private mode */ }
+  // Nothing a test wants is out of reach while the hold is on: `fastForward`
+  // drives the physics, the structures and the battle directly, which is how
+  // every test that needs the level running already buys its time.
 
   /**
    * A frame that cannot take the picture down with it.
@@ -1218,12 +1223,23 @@ async function boot() {
 
     try {
     const pStart = performance.now();
-    physics.setBudget(governor.update(dtMs));
-    physics.step(dt);
-    physics.recycleSettled(quality.settleFrames);
-    physics.auditFrozen();
-    physics.cullRunaways(terrain.span * 1.6);
-    for (const s of structures) { s.solveStability(); s.maintainIslands(dt); s.tickLean(dt); }
+    // Held for a regression run until a test asks for time.
+    //
+    // Pausing sets `dt` to zero, and that is not the same as not running: the
+    // bodies still take a step, the recycler still counts a frame toward
+    // settling, the freeze audit still runs. Those are counted in frames, not
+    // in seconds, so the number of real frames between the level finishing
+    // loading and the suite starting still moved the board about — which is
+    // three quarters of a second on an idle box and several on a loaded one.
+    // Cologne's hanging rubble was the last test still flipping on it.
+    if (!suiteHold) {
+      physics.setBudget(governor.update(dtMs));
+      physics.step(dt);
+      physics.recycleSettled(quality.settleFrames);
+      physics.auditFrozen();
+      physics.cullRunaways(terrain.span * 1.6);
+      for (const s of structures) { s.solveStability(); s.maintainIslands(dt); s.tickLean(dt); }
+    }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;
 
     for (const s of structures) s.syncTransforms();
@@ -1231,7 +1247,7 @@ async function boot() {
     if (life) life.update(rawDt);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
-    battle.update(dt);
+    if (!suiteHold) battle.update(dt);
     // Anything the last frame uncovered goes off now, one frame late and
     // safely outside the pass that exposed it.
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
