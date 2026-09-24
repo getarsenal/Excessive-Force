@@ -422,3 +422,77 @@ export function populatePotalaPalace(g, origin, groundY) {
     }
   }
 }
+
+/**
+ * The Pargo Kaling: the great chörten gate at the foot of the hill.
+ *
+ * A whitewashed stupa built over an archway, straddling the road through the
+ * saddle between Marpo Ri and Chakpo Ri — everybody coming into Lhasa from the
+ * west walked under it. It is not the contract and it holds no garrison worth
+ * the name; it is here because the hill has a foot and the foot has a gate,
+ * and because a mountain of a level needs one thing on it a player can knock
+ * down inside a minute.
+ */
+const GATE = { pier: 11.0, span: 13.0, rise: 19.0, drum: 14.0, dome: 11.0 };
+
+export const CHORTEN = {
+  scale: 1.0,
+  height: GATE.rise + GATE.drum + GATE.dome + 16.0,
+  span: GATE.span,
+};
+
+export function buildChortenGate(quality) {
+  const B = new BlockList();
+  const s = Math.min(quality.blockScale, 1.3) * 1.15;
+  const stone = 1.4 * s;
+  const course = 1.3 * s;
+  const courses = (y0, y1, nominal, fn) => {
+    const n = Math.max(1, Math.round((y1 - y0) / nominal));
+    const ch = (y1 - y0) / n;
+    for (let c = 0; c < n; c++) fn(y0 + c * ch, ch, c);
+  };
+  const half = GATE.span / 2 + GATE.pier / 2;
+
+  // The two piers and the barrel over the road.
+  B.section('gate', () => {
+    const voidAt = BlockList.archVoid(0, GATE.rise, 0, GATE.span, 1.6, GATE.pier + 2, 'x');
+    B.openings((x, y, z) => voidAt(x, y, z)
+      || (y < GATE.rise && Math.abs(x) < GATE.span / 2 + 0.4), () => {
+      courses(0, GATE.rise + GATE.span / 2 + 2.0, course, (y, h, c) => {
+        B.ring(0, 0, GATE.span + GATE.pier * 2, GATE.pier, 3.0, y, h, stone,
+          M.MARBLE, c % 2 ? 0.5 : 0);
+      });
+    });
+    B.arch(0, GATE.rise, 0, GATE.span, GATE.pier, 1.6, 13, M.MARBLE, 'x');
+    // The plinth the stupa stands on, across both piers.
+    B.slab(0, GATE.rise + GATE.span / 2 + 3.2, 0, half * 2, 2.4, GATE.pier + 1.4,
+      stone, M.MARBLE);
+  });
+
+  // The chörten itself: a stepped plinth, the bumpa, and thirteen rings of
+  // the spire with the sun and moon on top.
+  B.section('chorten', () => {
+    const y0 = GATE.rise + GATE.span / 2 + 4.4;
+    courses(y0, y0 + GATE.drum, course, (y, h, c) => {
+      const k = 1 - ((y - y0) / GATE.drum) * 0.22;
+      B.ring(0, 0, 17.0 * k, 17.0 * k, 3.0, y, h, stone, M.MARBLE, c % 2 ? 0.5 : 0);
+    });
+    B.dome(0, 0, y0 + GATE.drum, GATE.dome, 8.0, 2.2, course, stone, M.MARBLE,
+      (t) => Math.sqrt(Math.max(0, 1 - t * t * 0.94)));
+    const sy = y0 + GATE.drum + GATE.dome;
+    B.spire(0, 0, sy, sy + 12.0, 5.0, 1.6, course * 0.9, stone * 0.8, M.GILT, 0.6);
+    B.pinnacle(0, 0, sy + 12.0, 4.0, 1.5, stone * 0.7, M.GILT);
+  });
+
+  return B;
+}
+
+/** A picket on the gate: two men in the arch and two on the plinth. */
+export function populateChortenGate(g, origin, groundY) {
+  for (const sx of [-1, 1]) {
+    g.place('rifleman', new THREE.Vector3(origin.x + sx * 10, groundY + 1.0, origin.z),
+      sx > 0 ? Math.PI / 2 : -Math.PI / 2, 7, { cover: 'arcade' });
+    g.place('sniper', new THREE.Vector3(origin.x + sx * 9, groundY + GATE.rise + GATE.span / 2 + 5.0, origin.z),
+      sx > 0 ? Math.PI / 2 : -Math.PI / 2, 8, { cover: 'roof' });
+  }
+}

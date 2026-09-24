@@ -2687,7 +2687,22 @@ export class TestMenu {
               + `${tracked.has(body) ? '' : '/untracked'}`
               + `${body.__frozen ? '' : '/unflagged'}`);
           }
-          assert(frozen > 20, `only ${frozen} stones were recycled — no pressure`);
+          // The pressure check is a precondition, not the point — and one level
+        // cannot meet it. Four metres of rammed earth and rubble does not
+        // drop single stones: a hole in the Potala's wall either holds or
+        // takes a whole connected section with it, and a section is welded
+        // into one body rather than freed stone by stone. So `traits.sheds`
+        // says whether the building sheds loose rubble at all, the way
+        // `windows`, `river` and `topples` already say what a level is; where
+        // it does, no pressure means the guard below is not being exercised
+        // and that is a regression in itself.
+        const sheds = b.level?.traits?.sheds !== false;
+        if (!sheds) {
+          assert(hanging.length === 0,
+            `${hanging.length} stones hang in the air unsupported: ${hanging.slice(0, 6).join(' ')}`);
+          return `nothing on ${st.key} sheds loose stone — ${frozen} recycled, none hanging`;
+        }
+        assert(frozen > 20, `only ${frozen} stones were recycled — no pressure`);
           assert(hanging.length === 0,
             `${hanging.length} stones are frozen in mid-air with nothing under `
             + `them: ${hanging.slice(0, 8).join(', ')} `

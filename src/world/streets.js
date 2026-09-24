@@ -945,8 +945,20 @@ export function padRadius(node) {
     // two ribbons overlapping round a sixty-degree bend leave a notch in the
     // outside kerb, which is the ragged pavement at the foot of the bridge.
     // Gentler than thirty degrees and it is a bend in the road, left alone.
+    //
+    // Both measures have to call it a corner. `linkDir` looks a few metres up
+    // each arm, which is what stops twenty centimetres of tracing noise
+    // reading as a right angle; but a traced curve can carry dead straight
+    // through the node and still have turned forty degrees by the time it is
+    // ten metres away, and paving that pinches a bend into the same wedge,
+    // arrived at from the other side. One such node in Kuala Lumpur, whose
+    // first segment is a metre and a third and whose street is a forty-two
+    // point curve. Where the two disagree the road carries on, which is the
+    // reading whose failure is two ribbons overlapping and not a hole.
     const a = linkDir(node, node.links[0]), b = linkDir(node, node.links[1]);
     if (-(a.x * b.x + a.z * b.z) > 0.866) return 0;
+    const ta = tangentAt(node, node.links[0]), tb = tangentAt(node, node.links[1]);
+    if (-(ta.x * tb.x + ta.z * tb.z) > 0.866) return 0;
   }
   let r = 6;
   for (const l of node.links) r = Math.max(r, halfWidth(l.edge.cls));
@@ -971,6 +983,15 @@ export function padRadius(node) {
  * fifty of Westminster's straight-through nodes read as ninety-degree corners
  * and kept their pads, and every pad built from noise drew a spike.
  */
+/** The road's direction at the node itself: straight at the next vertex. */
+function tangentAt(node, link) {
+  const pts = link.edge.pts;
+  const p = link.at === 0 ? pts[1] : pts[pts.length - 2];
+  const dx = p.x - node.x, dz = p.z - node.z;
+  const d = Math.hypot(dx, dz) || 1;
+  return { x: dx / d, z: dz / d };
+}
+
 function linkDir(node, link) {
   const pts = link.edge.pts;
   const fwd = link.at === 0;

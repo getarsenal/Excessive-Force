@@ -17,7 +17,8 @@ import { buildBurjKhalifa, populateBurjKhalifa } from '../structure/landmarks/bu
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
 import { buildPetronasTowers, populatePetronasTowers } from '../structure/landmarks/petronas.js';
-import { buildPotalaPalace, populatePotalaPalace } from '../structure/landmarks/potala.js';
+import { buildPotalaPalace, populatePotalaPalace, buildChortenGate, populateChortenGate }
+  from '../structure/landmarks/potala.js';
 
 /**
  * Level registry.
@@ -924,8 +925,17 @@ export const LEVELS = {
     structures: (quality) => [
       { key: 'potala', blocks: buildPotalaPalace(quality), primary: true,
         required: true, label: 'POTALA PALACE' },
+      // The Pargo Kaling, on the second bench below the palace, where the
+      // road through the saddle runs. Worth money, nothing else — and the one
+      // thing on this mountain a player can put down inside a minute.
+      { key: 'chorten', blocks: buildChortenGate(quality),
+        label: 'CHÖRTEN GATE', offset: { x: -268, z: 296 } },
     ],
-    garrison: (g, origin, groundY) => { populatePotalaPalace(g, origin, groundY); },
+    garrison: (g, origin, groundY, sites) => {
+      populatePotalaPalace(g, origin, groundY);
+      const c = sites && sites.chorten;
+      if (c) populateChortenGate(g, c.origin, c.groundY);
+    },
     // The Red Palace and the gilded roofs on it. The white wings are a
     // curtain of living quarters and the bar does not move for them, which
     // is the whole trick of the level: the biggest thing in front of you is
@@ -935,7 +945,13 @@ export const LEVELS = {
     // Battered walls four metres thick bonded to a rock outcrop. Nothing
     // here leans and nothing here goes over; it comes down course by course
     // or it does not come down.
-    traits: { windows: true, river: false, topples: false },
+    //
+    // And it does not shed. A hole in a wall this thick either holds or takes
+    // a whole connected section down with it, and a section comes away as one
+    // welded body rather than as loose stone — so there is no rubble here for
+    // the recycler to freeze, which is a fact about rammed earth and not a
+    // fault. `sheds` says so; the suite reads it.
+    traits: { windows: true, river: false, topples: false, sheds: false },
     // Two million three hundred and sixty thousand cubic metres, second only
     // to the Giza plateau. Unlocks are a fraction of all the mass on the map,
     // so unscaled an AT4 would earn a hundredth of a per cent and nothing
