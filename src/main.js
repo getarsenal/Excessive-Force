@@ -166,8 +166,24 @@ async function boot() {
   // parkland where the level's precinct is lawn or garden.
   const green = ['lawn', 'charbagh'].includes(level.precinct?.ground);
   for (const g of pads.values()) {
-    const r = Math.max(g.x1 - g.x0, g.z1 - g.z0) * 0.5 + 8;
     const cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2;
+    // The pad is normally the landmark's own footprint, which is right for a
+    // building that stands on ground and wrong for one that stands on a hill.
+    // A structure four hundred metres across levels a four-hundred-metre disc,
+    // and on a summit that is the summit: the Potala flattened Marpo Ri into a
+    // table five hundred and forty metres wide and then sat in the middle of
+    // it, so the hundred and thirty metres of rock the place is famous for
+    // became a cliff at the rim of a car park.
+    //
+    // `padRadius` lets a level say how much ground its monument is entitled to
+    // flatten. Zero means none at all — the bake's own summit is the floor,
+    // and the building is expected to carry its own foundations down to meet
+    // the rock wherever the rock happens to be, which is what a palace built
+    // on retaining walls does anyway.
+    const override = level.padRadius;
+    const r = Number.isFinite(override)
+      ? override : Math.max(g.x1 - g.x0, g.z1 - g.z0) * 0.5 + 8;
+    if (!(r > 0)) continue;
     // `groundLevel: 'bake'` — the bake's `flatten` pad already cut the ground
     // to its real height, so the pad is levelled to that and not to the
     // median of whatever the ring round it happens to be standing on.

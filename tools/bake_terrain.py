@@ -301,29 +301,43 @@ LEVELS = {
             # and thirty metres of red rock the palace is famous for standing
             # on and not a metre more.
             "height": 3782.0,
-            # A mesa, not a cone. The palace is four hundred and sixty metres
-            # end to end and the game levels a pad under its whole footprint,
-            # so the flat top has to be at least that wide or the pad cuts the
-            # summit off square and the mountain reads as a plinth.
-            "top": 270.0,
-            "slope": 1.5,
-            # Three benches, each one a firing step, and wide enough that a
-            # battery put anywhere on one stands square. The first starts
-            # outside the pad the palace levels, so the player's guns have
-            # real ground rather than the monument's own apron.
+            # A ridge, not a mesa. This read 270 and it was the whole reason
+            # the level looked like buildings dropped on waste ground: a 270 m
+            # summit radius is a flat table five hundred and forty metres
+            # across, the palace stood in the middle of it, and Marpo Ri's
+            # famous hundred and thirty metres of rock were a cliff at the rim
+            # of a car park. Measured on the old bake, the ground did not vary
+            # by one metre from x -300 to +250.
+            #
+            # Marpo Ri is a whaleback running east to west, about three
+            # hundred and sixty metres along the top and two hundred across.
+            # That is what `top` plus the 2-theta term in `wobble` below now
+            # cuts: the summit is 1.39x this radius along the ridge and 0.78x
+            # across it, so the palace sits the length of the ridge with the
+            # rock falling away on both flanks and, above all, in front.
+            "top": 130.0,
+            "slope": 1.25,
+            # Two benches now, not three, and both much closer in. With the
+            # summit pulled in by a hundred and forty metres the old shelves
+            # were stranded out in the valley with a four-hundred-metre face
+            # above them, and the arithmetic said so: 180 m of run at slope
+            # 1.5 is a 270 m drop off a hill that is only 132 m tall.
             "shelves": [
-                [310.0, 66.0],
-                [396.0, 76.0],
-                [486.0, 84.0],
+                [165.0, 40.0],
+                [225.0, 48.0],
             ],
             # Crags. The default wobble is two low harmonics, which weathers a
             # summit into a smooth dome; Marpo Ri is a rock outcrop and reads
             # as one only with the finer orders in it as well.
             "wobble": [
+                # The ridge. sin(2*theta - pi/2) is -cos(2*theta): it pulls the
+                # radius in along east-west and pushes it out north-south, so
+                # the summit comes out long and narrow instead of round.
+                [0.28, 2, -1.5707963],
                 [0.11, 3, 1.1], [0.06, 7, 0.4],
                 [0.035, 13, 2.2], [0.018, 23, 0.9],
             ],
-            "fade": 100.0,
+            "fade": 90.0,
         },
     },
     "dubai": {

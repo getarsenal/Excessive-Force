@@ -1590,10 +1590,21 @@ export class TestMenu {
         b.rangeRing.visible = false;
 
         // Damage bars: only for units that have actually been hit.
+        //
+        // On ground the monument is not standing on. A fixed 160 m south of
+        // the origin is clear on fifteen levels and inside the Potala on the
+        // sixteenth, whose terraces run two hundred and fifteen metres down
+        // the front of Marpo Ri — and a spawn inside masonry is refused, so
+        // this failed for having nowhere to put a man rather than for anything
+        // to do with health bars.
         this.clearUnits();
-        this.spawnAt('at4', 1, 0, 160);
+        let far = 160;
+        for (let i = 0; i < st.count; i++) {
+          if (st.pz[i] - st.origin.z > far) far = st.pz[i] - st.origin.z;
+        }
+        this.spawnAt('at4', 1, 0, far + 70);
         const u = b.units.find((x) => x.alive);
-        assert(u, 'no unit to test the bar on');
+        assert(u, `no unit to test the bar on (tried ${Math.round(far + 70)} m out)`);
         b._updateHealthBars();
         assert(b.hpFill.count === 0, 'an undamaged unit is showing a damage bar');
         u.health = u.maxHealth * 0.4;

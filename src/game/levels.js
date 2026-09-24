@@ -977,22 +977,44 @@ export const LEVELS = {
     },
     // Lhasa comes up the lower slopes, which is what the place looks like:
     // the town runs right to the foot of Marpo Ri and a fair way up it, and
-    // held off to the far corners the hill stood in a paddock. Four hundred
-    // and thirty clears the palace's own pad and the first firing shelf and
-    // lets the surveyed town have everything below the second.
-    cityExcludeRadius: 430,
-    contextExclude: 415,
-    // The bake cut Marpo Ri to a mesa at 3782 m; the game's own pad must
+    // held off to the far corners the hill stood in a paddock. Pulled in with
+    // the hill: Marpo Ri's base is now about two hundred and eighty metres out
+    // instead of five hundred and seventy, and clearing to 430 left a ring of
+    // bare gravel round the foot of it. Lhasa comes right up to the rock.
+    cityExcludeRadius: 300,
+    contextExclude: 285,
+    // The bake cuts Marpo Ri to a ridge at 3782 m; the game's own pad must
     // level to that and not to the median of a ring that straddles the
     // summit's edge, which took twenty-one metres off the top and left a
     // step round the palace where the natural ground stood higher than the
     // ground the palace was standing on.
     groundLevel: 'bake',
-    // From the south, across the valley, high enough to hold four hundred
-    // and sixty metres of wall and a hundred and forty of building in one
-    // frame. This is the view every photograph of the place is taken from
-    // and the one that says how big it is.
-    camera: { yaw: 0.05, pitch: 0.24, distance: 900, height: 165 },
+    // And then: no pad at all. Every other level lets its monument flatten its
+    // own footprint, and this one may not, because its footprint *is* the
+    // summit. A four-hundred-metre palace levels a four-hundred-metre disc,
+    // which on a hill two hundred metres across is the hill — measured on the
+    // old bake, the ground did not vary by a metre from x -300 to +250, so the
+    // famous hundred and thirty metres of rock were a cliff at the rim of a
+    // car park and the palace stood in the middle of the car park.
+    //
+    // Instead the bake's own summit is the floor, and the palace carries its
+    // retaining walls ninety metres down to meet the rock wherever it has
+    // fallen away. That is the actual construction, and it is why the front of
+    // the real building is a hundred metres of blank white wall with a
+    // staircase zigzagging up it.
+    padRadius: 0,
+    // From the south and *low*, which is the whole difference. Every
+    // photograph of this place is taken from the road at the foot looking up,
+    // because that is the view the building was designed to be seen from: the
+    // rock, then eighty metres of blank white wall with the stair cut across
+    // it, then the wings, then the Red Palace riding over the top of them.
+    //
+    // The old camera stood nine hundred metres back at a quarter radian of
+    // pitch, looking down on the roofs, and from up there a mountain fortress
+    // is a floor plan. Three hundred and thirty-six metres of standing height
+    // now, and the frame is filled by looking up at it rather than back from
+    // it.
+    camera: { yaw: 0.05, pitch: 0.10, distance: 700, height: 70 },
     structures: (quality) => [
       { key: 'potala', blocks: buildPotalaPalace(quality), primary: true,
         required: true, label: 'POTALA PALACE' },

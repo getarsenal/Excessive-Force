@@ -28,22 +28,57 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * contract; `scoreTags` says so, and the bar does not move for the wings.
  */
 
-// Fifteen per cent above life size. The real palace is already vast — at
-// this scale it is four hundred and sixty metres end to end, which makes it
-// the widest thing in the campaign by a factor of two — and it goes up rather
-// than down because the whole level is one hill and the camera stands a long
-// way back from it. It does not go up further than this: the game levels a
-// pad under the whole footprint of a structure, and a palace much wider than
-// this cuts the summit of Marpo Ri off square and eats the first firing shelf
-// with it.
+// Fifteen per cent above life size, and narrower in plan than it was.
+//
+// The first build was four hundred and sixty metres end to end, which is a
+// quarter wider than the real palace, and it was that width that made the
+// level look like a wedding cake on waste ground: a monument only reads as
+// tall against its own width, and this one was carrying a hundred and eighty
+// metres of building on a footprint half a kilometre across. It is now three
+// hundred and forty-five metres wide and three hundred and thirty-six tall
+// from the valley floor — taller than it is wide, which is what you see in
+// every photograph and what the place actually feels like.
+//
+// The old note here said the palace could not be narrower because the game
+// levels a pad under a structure's whole footprint and a smaller summit would
+// be cut off square. That was backwards: the pad was the problem, not the
+// constraint. `padRadius: 0` on the level record turns it off, and the
+// retaining walls carry down to meet the rock instead.
 const S = 1.15;
 const STONE_FINENESS = 2.15;
 
 // Real metres, scaled once at the end.
-const TERRACE = { w: 400.0, d: 172.0, h: 46.0, batter: 0.085 };
+//
+// `FOUND` is the one number that changed everything about how this level
+// looks. The palace used to be founded at the summit — y 0 — which meant the
+// bake had to hand it a flat top wide enough for the whole footprint, which
+// meant Marpo Ri was cut as a table five hundred and forty metres across, and
+// the hundred and thirty metres of rock the place is famous for standing on
+// became a cliff round the rim of a car park with a building parked in it.
+//
+// Now the retaining walls start ninety-six metres *under* the summit and run
+// up. At the back and along the ridge that masonry is buried and costs a few
+// courses nobody sees; across the south front, where the rock falls away, it
+// is exposed — and what it is exposed as is the thing every photograph of the
+// Potala is actually of: eighty-odd metres of blank white battered wall with
+// a staircase zigzagging up it, out of which the palace grows. The building
+// meets the hill instead of the hill being flattened to meet the building.
+const FOUND = -126.0;
+// Metres in per metre up. Every face on the hill leans at this one angle, so
+// the terraces, the tiers and the palace blocks read as one mountain of
+// masonry rather than as boxes stacked on boxes. The real walls are about one
+// in ten; this is a little steeper because it has to read at four hundred
+// metres through haze.
+const BATTER = 0.12;
+// `h` is the deck height above the summit — the walk the palace stands on —
+// not the height of the wall, which is `h - FOUND`.
+const TERRACE = { w: 300.0, d: 130.0, h: 40.0 };
 const WALL = 5.2;                 // the thickness of a palace wall at its head
 const PARAPET = 4.0;              // the dark kyema frieze every roofline carries
 const DECK = 3.2;                 // the terrace walk round the palace
+
+/** Half-width of a battered wall at height `y`, given its width at its top. */
+const wAt = (wTop, top, y) => wTop + 2 * BATTER * (top - y);
 
 /**
  * The terraces under the palace, outermost and lowest first.
@@ -57,10 +92,18 @@ const DECK = 3.2;                 // the terrace walk round the palace
  *
  * `z` is how far south of the palace's own axis each one is centred.
  */
+// Four now. The lowest one is the reason: with three, the masonry stopped
+// forty metres above the foot of Marpo Ri and the bottom third of every view
+// was bare tan slope with a palace balanced on it. The real walls come most of
+// the way down the rock — that is what you are looking at in every photograph
+// taken from the road — so the outermost terrace now runs out to z 215 and
+// tops out sixty metres below the summit, which on this hill is about twenty
+// metres of wall standing clear of the ground it lands on.
 const TIERS = [
-  { w: 452.0, d: 232.0, h: 14.0, z: 30.0, wall: 8.0 },
-  { w: 428.0, d: 210.0, h: 24.0, z: 20.0, wall: 7.0 },
-  { w: 412.0, d: 190.0, h: 32.0, z: 10.0, wall: 6.0 },
+  { w: 372.0, d: 250.0, top: -62.0, z: 90.0, wall: 10.0, quarters: true },
+  { w: 344.0, d: 200.0, top: -40.0, z: 48.0, wall: 9.0 },
+  { w: 326.0, d: 172.0, top: -14.0, z: 32.0, wall: 8.0 },
+  { w: 312.0, d: 150.0, top: 12.0, z: 16.0, wall: 7.0 },
 ];
 
 /**
@@ -73,16 +116,27 @@ const TIERS = [
  * masonry that goes to the rock rather than on a deck plate, the deck is cut
  * where they come through it, and the garrison reads their loopholes.
  */
+// `cz` and `d` are set so that the wings' south faces land on z = 64, a metre
+// inside the terrace's own front at 65. That one alignment is what stops the
+// thing reading as a wedding cake: on the real building the White Palace's
+// wall is the retaining wall carried on upward, so the eye runs from the rock
+// to the roofline over one continuous battered surface a hundred and eighty
+// metres tall. Set the blocks back on a shelf — which is what they were, by
+// twenty metres — and you get a tier of cake with a smaller tier on it.
+//
+// The Red Palace is the exception and is *meant* to be: it sits a little
+// behind the wings and rides above them, which is how it reads as the thing
+// in the middle rather than as more frontage.
 const BLOCKS = [
-  { cx: -155.0, cz: 6.0, w: 46.0, d: 78.0, h: 44.0, batter: 0.075,
+  { cx: -124.0, cz: 20.0, w: 40.0, d: 88.0, h: 50.0, batter: 0.075,
     mat: 'MARBLE', tag: 'east-low' },
-  { cx: -98.0, cz: 6.0, w: 65.0, d: 92.0, h: 62.0, batter: 0.075,
+  { cx: -80.0, cz: 20.0, w: 54.0, d: 88.0, h: 72.0, batter: 0.075,
     mat: 'MARBLE', tag: 'east' },
-  { cx: 0.0, cz: -6.0, w: 126.0, d: 106.0, h: 88.0, batter: 0.07,
+  { cx: 0.0, cz: 8.0, w: 108.0, d: 100.0, h: 104.0, batter: 0.07,
     mat: 'MADDER', tag: 'red' },
-  { cx: 104.0, cz: 6.0, w: 74.0, d: 92.0, h: 60.0, batter: 0.075,
+  { cx: 86.0, cz: 20.0, w: 62.0, d: 88.0, h: 70.0, batter: 0.075,
     mat: 'MARBLE', tag: 'west' },
-  { cx: 169.0, cz: 6.0, w: 52.0, d: 78.0, h: 42.0, batter: 0.075,
+  { cx: 137.0, cz: 20.0, w: 44.0, d: 88.0, h: 48.0, batter: 0.075,
     mat: 'MARBLE', tag: 'west-low' },
 ];
 
@@ -105,25 +159,33 @@ const SHOL = [];
   // car park with a palace behind it.
   let seed = 0x5f3a91;
   const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
-  const rows = [
-    // [tier index or -1 for the ground at the foot, south offset, how many]
-    [-1, 166.0, 9], [0, 0.0, 7], [1, 0.0, 6], [2, 0.0, 4],
-  ];
-  for (const [ti, footZ, n] of rows) {
-    const t = ti >= 0 ? TIERS[ti] : null;
-    const halfSpan = t ? t.w / 2 - 34 : 200.0;
-    const y = t ? t.h : 0.0;
-    const z = t ? t.z + t.d / 2 - t.wall * 1.1 : footZ;
-    for (let i = 0; i < n; i++) {
-      const u = n === 1 ? 0.5 : i / (n - 1);
+  // A terrace of quarters, not a scatter of huts. The first pass put nine
+  // free-standing boxes on each walk with gaps between them, and from the
+  // valley that is what it looked like: packing crates left on the steps of a
+  // palace. Real Shol is a continuous run of flat-roofed houses sharing party
+  // walls, stepping along the hill — so these are laid end to end from one
+  // side to the other, abutting, and only their heights and depths wander.
+  //
+  // The row that stood on the ground at the foot is gone with them. Lhasa is
+  // surveyed now and comes right up to the rock, so the village at the foot
+  // is the actual village at the foot.
+  for (const t of TIERS) {
+    if (!t.quarters) continue;
+    const half = t.w / 2 - 26.0;
+    const z = t.z + t.d / 2 - t.wall * 1.15;
+    let x = -half;
+    while (x < half - 12.0) {
+      const w = Math.min(16 + rnd() * 20, half - x);
       SHOL.push({
-        x: -halfSpan + u * halfSpan * 2 + (rnd() - 0.5) * 18,
-        z: z + (rnd() - 0.5) * 9,
-        y,
-        w: 18 + rnd() * 18,
-        d: 12 + rnd() * 7,
-        h: 9 + rnd() * 9,
+        x: x + w / 2,
+        z: z + (rnd() - 0.5) * 3.0,
+        y: t.top,
+        w,
+        d: 13 + rnd() * 6,
+        h: 10 + rnd() * 8,
       });
+      // Party walls, so the run reads as one street rather than as objects.
+      x += w + (rnd() < 0.78 ? 0.0 : 7 + rnd() * 11);
     }
   }
 }
@@ -143,10 +205,11 @@ const SHOL = [];
  * in it stands on the stone under it rather than on air.
  */
 const STAIR = [
-  { x0: 128.0, z0: 154.0, x1: 2.0, z1: 152.0, y0: 0.0, y1: TIERS[0].h },
-  { x0: -14.0, z0: 133.0, x1: 112.0, z1: 131.0, y0: TIERS[0].h, y1: TIERS[1].h },
-  { x0: 128.0, z0: 112.0, x1: 2.0, z1: 111.0, y0: TIERS[1].h, y1: TIERS[2].h },
-  { x0: -14.0, z0: 93.0, x1: 112.0, z1: 92.0, y0: TIERS[2].h, y1: TERRACE.h },
+  { x0: 152.0, z0: 218.0, x1: 8.0, z1: 216.0, y0: -84.0, y1: TIERS[0].top },
+  { x0: -6.0, z0: 200.0, x1: 134.0, z1: 198.0, y0: TIERS[0].top, y1: TIERS[1].top },
+  { x0: 152.0, z0: 156.0, x1: 8.0, z1: 154.0, y0: TIERS[1].top, y1: TIERS[2].top },
+  { x0: -6.0, z0: 123.0, x1: 134.0, z1: 121.0, y0: TIERS[2].top, y1: TIERS[3].top },
+  { x0: 140.0, z0: 91.0, x1: 8.0, z1: 89.0, y0: TIERS[3].top, y1: TERRACE.h },
 ];
 
 /** Where a battered wall's face is at height `y` of a block `h` tall. */
@@ -157,16 +220,16 @@ export const POTALA = {
   scale: S,
   terrace: { w: TERRACE.w * S, d: TERRACE.d * S, h: TERRACE.h * S },
   red: { w: RED.w * S, d: RED.d * S, h: RED.h * S, top: (TERRACE.h + RED.h) * S },
-  white: { off: 98.0 * S, top: (TERRACE.h + 62.0) * S },
-  outer: { w: TIERS[0].w * S, d: TIERS[0].d * S, h: TIERS[0].h * S, z: TIERS[0].z * S },
+  white: { off: 80.0 * S, top: (TERRACE.h + 72.0) * S },
+  outer: { w: TIERS[0].w * S, d: TIERS[0].d * S, h: TIERS[0].top * S, z: TIERS[0].z * S },
   /** The tier walks, low to high: where the first two lines stand. */
-  tiers: TIERS.map((t) => ({ w: t.w * S, d: t.d * S, h: t.h * S, z: t.z * S })),
+  tiers: TIERS.map((t) => ({ w: t.w * S, d: t.d * S, h: t.top * S, z: t.z * S })),
   /** The roofline courses a man can be posted on, low to high. */
-  galleries: [TERRACE.h * S, (TERRACE.h + 34.0) * S, (TERRACE.h + 62.0) * S],
+  galleries: [TERRACE.h * S, (TERRACE.h + 48.0) * S, (TERRACE.h + 70.0) * S],
   /** On the Red Palace roof, between the two middle pavilions. */
-  flag: { x: 0.5 * S, y: (TERRACE.h + RED.h + PARAPET + 1.0) * S, z: -6 * S },
+  flag: { x: 0.5 * S, y: (TERRACE.h + RED.h + PARAPET + 1.0) * S, z: 8 * S },
   /** The gilded pavilions on the Red Palace, for the flag and the fire. */
-  pavilions: [-46, -23, 0, 23, 46].map((x) => ({ x: x * S, z: -8 * S })),
+  pavilions: [-40, -20, 0, 20, 40].map((x) => ({ x: x * S, z: 6 * S })),
 };
 
 export function buildPotalaPalace(quality) {
@@ -210,49 +273,85 @@ export function buildPotalaPalace(quality) {
   // terrace's number comes out nearly vertical beside it and the whole pile
   // reads as boxes on boxes; converted to a slope it reads as one mountain of
   // masonry, which is what it is.
-  const SLOPE = TERRACE.batter * TERRACE.w / 2 / TERRACE.h;
-  const tierBatter = (t) => (SLOPE * t.h * 2) / t.w;
+  // Below this the masonry is never seen and never shot at: it is inside the
+  // hill. Laying it at the same fineness as the face cost eighteen thousand
+  // stones of buried rock and pushed the level to fifty-four thousand, which
+  // the software rasteriser could not even screenshot. Coarse blocks below,
+  // fine blocks where the rock has fallen away and the wall shows.
+  //
+  // It is also what a foundation is. Nobody dresses ashlar for the part that
+  // goes in the ground.
+  const ROUGH = -52.0;
+  const rough = stone * 3.2, roughCourse = course * 3.0;
+  /**
+   * The skin of the hill.
+   *
+   * The terraces were laid in LIMESTONE, which is 0xdcc99e — a warm tan — and
+   * that one constant is most of why the level read as scenery: the Potala's
+   * single loudest fact is that it is *white*, four hundred metres of lime
+   * wash you can see from the far side of the valley, and ours had a sand
+   * coloured apron under a white palace. The retaining walls are limewashed
+   * exactly like the wings above them, so they wear the same stone.
+   *
+   * Below the deepest point the rock can have fallen to, it stops mattering
+   * and goes back to bare footing stone, because nobody whitewashes what is
+   * under the ground.
+   */
+  const skin = (y) => (y < -104.0 ? M.LIMESTONE : M.MARBLE);
+  /** Lay a battered ring from `y0` to `y1`, coarse and bare where it is buried. */
+  const wall = (cx, cz, wTop, dTop, top, thick, y0, y1) => {
+    const band = (a, b, st, ch) => courses(a, b, ch, (y, h, c) => {
+      B.ring(cx, cz, wAt(wTop, top, y), wAt(dTop, top, y), thick, y, h,
+        st, skin(y), c % 2 ? 0.5 : 0);
+    });
+    if (y0 < ROUGH) band(y0, Math.min(ROUGH, y1), rough, roughCourse);
+    if (y1 > ROUGH) band(Math.max(ROUGH, y0), y1, stone, course);
+  };
   B.section('terrace', () => {
     for (const t of TIERS) {
-      const tb = tierBatter(t);
-      courses(0, t.h, course, (y, h, c) => {
-        const w = taper(t.w, y, t.h, tb);
-        const d = taper(t.d, y, t.h, tb);
-        B.ring(0, t.z, w, d, t.wall, y, h, stone, M.LIMESTONE, c % 2 ? 0.5 : 0);
-      });
-      // A walk on top of each, over its own wall and no wider — the quarters
-      // along the front stand on it, and a plate across the whole tier is
-      // twenty thousand stones of solid rock nobody can see.
-      B.ring(0, t.z, taper(t.w, t.h, t.h, tb) + 1.4,
-        taper(t.d, t.h, t.h, tb) + 1.4, t.wall * 2.4,
-        t.h - course * 0.6, course * 0.6, stone, M.LIMESTONE);
+      // From the foundation to the tier's own top. Below the summit this is
+      // buried on three sides and stands clear on the fourth, which is the
+      // whole point: the south front is where Marpo Ri falls away, so that is
+      // where the wall shows, and it shows eighty metres tall.
+      wall(0, t.z, t.w, t.d, t.top, t.wall, FOUND, t.top);
+      // A walk on top of each, over its own wall and no wider — a plate
+      // across the whole tier is twenty thousand stones of solid rock nobody
+      // can see.
+      B.ring(0, t.z, t.w + 1.4, t.d + 1.4, t.wall * 2.4,
+        t.top - course * 0.6, course * 0.6, stone, M.MARBLE);
       // The kyema under each terrace's lip. A band of shadow along every
       // roofline is the one mark that makes a Tibetan wall read as Tibetan,
       // and without it four hundred metres of battered stone is a dam.
-      courses(t.h - course * 2.2, t.h - course * 0.6, course * 0.8, (y, h) => {
-        B.ring(0, t.z, taper(t.w, t.h, t.h, tb) + 2.4,
-          taper(t.d, t.h, t.h, tb) + 2.4, 2.4, y, h, stone, M.KYEMA);
+      courses(t.top - course * 2.2, t.top - course * 0.6, course * 0.8, (y, h) => {
+        B.ring(0, t.z, t.w + 2.4, t.d + 2.4, 2.4, y, h, stone, M.KYEMA);
       });
     }
-    courses(0, TERRACE.h, course, (y, h, c) => {
-      const w = taper(TERRACE.w, y, TERRACE.h, TERRACE.batter);
-      const d = taper(TERRACE.d, y, TERRACE.h, TERRACE.batter);
+    wall(0, 0, TERRACE.w, TERRACE.d, TERRACE.h, WALL * 1.6, FOUND, ROUGH);
+    courses(ROUGH, TERRACE.h, course, (y, h, c) => {
+      const w = wAt(TERRACE.w, TERRACE.h, y);
+      const d = wAt(TERRACE.d, TERRACE.h, y);
+      // The vaults and cross walls are only worth laying where a shell can
+      // reach them. Below the summit the outer shell is the only thing that
+      // is ever seen or shot at, and running every internal wall the full
+      // hundred and thirty metres cost twenty thousand stones of buried rock.
+      const buried = y < -6.0;
       // Two leaves with a rubble core between them, which is how a wall this
       // thick is built and which keeps the stones inside a shell's reach.
-      B.ring(0, 0, w, d, WALL * 1.6, y, h, stone, M.LIMESTONE, c % 2 ? 0.5 : 0);
+      B.ring(0, 0, w, d, WALL * 1.6, y, h, stone, M.MARBLE, c % 2 ? 0.5 : 0);
+      if (buried) return;
       // The vault walls: laid on the footprint of the block above, so the
       // palace stands on masonry that goes to the rock rather than on the
       // deck plate. A hollow box this wide is a drum as well, and a drum four
       // hundred metres across has nothing holding its long faces apart.
       for (const b of BLOCKS) {
-        B.ring(b.cx, b.cz, b.w, b.d, WALL, y, h, stone, M.LIMESTONE, c % 2 ? 0.5 : 0);
-        crossWalls(b.cx, b.cz, b.w, b.d, y, h, M.LIMESTONE);
+        B.ring(b.cx, b.cz, b.w, b.d, WALL, y, h, stone, M.MARBLE, c % 2 ? 0.5 : 0);
+        crossWalls(b.cx, b.cz, b.w, b.d, y, h, M.MARBLE);
       }
       // And two more under the walk, front and back, so no run of the deck
       // is more than fifteen metres from a wall. Storerooms: the terraces of
       // the real building are solid with them.
       for (const wz of [-62.0, 62.0]) {
-        B.slab(0, y + h / 2, wz, w - WALL * 3.2, h, WALL, stone, M.LIMESTONE);
+        B.slab(0, y + h / 2, wz, w - WALL * 3.2, h, WALL, stone, M.MARBLE);
       }
     });
     // The deck: the terrace walk, laid everywhere the palace is not. Under
@@ -266,9 +365,7 @@ export function buildPotalaPalace(quality) {
     B.openings((x, _y, z) => BLOCKS.some(
       (b) => Math.abs(x - b.cx) < b.w / 2 + edge && Math.abs(z - b.cz) < b.d / 2 + edge), () => {
       B.slab(0, TERRACE.h + DECK / 2, 0,
-        taper(TERRACE.w, TERRACE.h, TERRACE.h, TERRACE.batter) - WALL, DECK,
-        taper(TERRACE.d, TERRACE.h, TERRACE.h, TERRACE.batter) - WALL,
-        stone * 1.1, M.LIMESTONE);
+        TERRACE.w - WALL, DECK, TERRACE.d - WALL, stone * 1.1, M.MARBLE);
     });
   });
 
@@ -347,7 +444,7 @@ export function buildPotalaPalace(quality) {
     const y0 = TERRACE.h;
     B.section(tag, () => {
       const rows = [];
-      for (let ly = h * 0.2; ly < h - 8; ly += 11.0) rows.push(y0 + ly);
+      for (let ly = h * 0.18; ly < h - 7; ly += 8.2) rows.push(y0 + ly);
       const win = (x, y, z) => {
         const lx = Math.abs(x - cx), lz = Math.abs(z - cz);
         // Only the outer wall has windows in it.
