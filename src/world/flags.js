@@ -12,6 +12,8 @@ import { SOPHIA } from '../structure/landmarks/hagiasophia.js';
 import { DOM } from '../structure/landmarks/cologne.js';
 import { HIMEJI } from '../structure/landmarks/himeji.js';
 import { BURJ } from '../structure/landmarks/burj.js';
+import { PETRONAS } from '../structure/landmarks/petronas.js';
+import { POTALA } from '../structure/landmarks/potala.js';
 
 /**
  * Flags on the landmarks.
@@ -98,6 +100,8 @@ export const FLAG_SITES = {
   cologne: [{ key: 'dom', ...DOM.flag, pattern: 'germany', w: 8, h: 5, pole: 9 }],
   himeji: [{ key: 'keep', ...HIMEJI.flag, pattern: 'japan', w: 8, h: 5.5, pole: 9 }],
   dubai: [{ key: 'burj', ...BURJ.flag, pattern: 'uae', w: 9, h: 4.5, pole: 9 }],
+  petronas: [{ key: 'petronas', ...PETRONAS.flag, pattern: 'malaysia', w: 9, h: 4.5, pole: 9 }],
+  potala: [{ key: 'potala', ...POTALA.flag, pattern: 'china', w: 9, h: 6, pole: 10 }],
 };
 
 /** The cloth's pattern, drawn once into a small canvas. */
@@ -213,6 +217,27 @@ PATTERNS.germany = (ctx, w, h) => {
 PATTERNS.japan = (ctx, w, h) => {
   ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#bc002d'; ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.3, 0, Math.PI * 2); ctx.fill();
+};
+PATTERNS.malaysia = (ctx, w, h) => {
+  // Fourteen stripes, red and white, with a blue canton over the first seven
+  // and the crescent and star on it in gold.
+  for (let i = 0; i < 14; i++) { ctx.fillStyle = i % 2 ? '#f4f2ec' : '#cc0001'; ctx.fillRect(0, (h * i) / 14, w, h / 14 + 1); }
+  const cw = w * 0.5, ch = (h * 8) / 14;
+  ctx.fillStyle = '#010066'; ctx.fillRect(0, 0, cw, ch);
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath(); ctx.arc(cw * 0.42, ch / 2, ch * 0.28, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#010066';
+  ctx.beginPath(); ctx.arc(cw * 0.52, ch / 2, ch * 0.24, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath(); ctx.arc(cw * 0.70, ch / 2, ch * 0.13, 0, Math.PI * 2); ctx.fill();
+};
+PATTERNS.china = (ctx, w, h) => {
+  ctx.fillStyle = '#de2910'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#ffde00';
+  ctx.beginPath(); ctx.arc(w * 0.17, h * 0.3, h * 0.13, 0, Math.PI * 2); ctx.fill();
+  for (const [fx, fy] of [[0.30, 0.15], [0.36, 0.28], [0.34, 0.46], [0.27, 0.58]]) {
+    ctx.beginPath(); ctx.arc(w * fx, h * fy, h * 0.045, 0, Math.PI * 2); ctx.fill();
+  }
 };
 PATTERNS.uae = (ctx, w, h) => {
   ctx.fillStyle = '#00732f'; ctx.fillRect(0, 0, w, h / 3);

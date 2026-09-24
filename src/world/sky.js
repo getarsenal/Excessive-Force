@@ -47,7 +47,11 @@ const SKY_FRAG = /* glsl */`
 
   void main() {
     #include <logdepthbuf_fragment>
-    vec3 dir = normalize(vWorld);
+    // From the eye, not from the world origin. The dome rides with the camera
+    // so that a level three and a half kilometres above sea level is not
+    // standing at the top of a four-kilometre sphere looking at the outside
+    // of it — which on the Potala put a hard black band over half the sky.
+    vec3 dir = normalize(vWorld - cameraPosition);
     float h = dir.y;
 
     // Three-stop gradient. A two-stop sky always reads as a flat wash; the

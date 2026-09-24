@@ -95,6 +95,17 @@ export const CAST = {
     rank: 'Fariq Awwal', name: 'Saif bin Hamdan', nation: 'United Arab Emirates', side: 'right',
     colours: ['#ff0000', '#00732f', '#000000'],
   },
+  // The last two. Art pending, as above.
+  my: {
+    id: 'my', file: 'assets/characters/my-jeneral.png',
+    rank: 'Jeneral', name: 'Hafiz bin Zulkifli', nation: 'Malaysia', side: 'right',
+    colours: ['#cc0001', '#ffffff', '#010066'],
+  },
+  cn: {
+    id: 'cn', file: 'assets/characters/cn-shangjiang.png',
+    rank: 'Shàngjiàng', name: 'Wen Jiahao', nation: 'China', side: 'right',
+    colours: ['#de2910', '#ffde00', '#de2910'],
+  },
 };
 
 /** Which defender holds each level. */
@@ -102,6 +113,7 @@ export const DEFENDER_OF = {
   westminster: 'uk', paris: 'fr', agra: 'in', giza: 'eg',
   chichen: 'mx', pisa: 'it', moscow: 'ru', sydney: 'au', rio: 'br',
   athens: 'gr', istanbul: 'tr', cologne: 'de', himeji: 'jp', dubai: 'ae',
+  petronas: 'my', potala: 'cn',
 };
 
 /**
@@ -185,5 +197,15 @@ export const STANDOFF = {
     { who: 'us', line: 'Eight hundred metres of glass in the middle of a desert. Somebody was compensating.' },
     { who: 'ae', line: 'ثمانمئة متر يا أمريكي. مدافعك ما توصل نصّها.' },
     { who: 'us', line: "Eight hundred? Fine. I'll take it in two payments." },
+  ],
+  petronas: [
+    { who: 'us', line: "Two of them. Somebody built it twice and still couldn't get it right." },
+    { who: 'my', line: 'Dua menara, satu jambatan. Tembak jambatan itu — ia tidak menahan apa-apa.' },
+    { who: 'us', line: "He's pointing at the bridge. Boys, shoot everything BUT the bridge." },
+  ],
+  potala: [
+    { who: 'us', line: 'Thirteen storeys of whitewash on a red rock. Walk out and I leave the paint on it.' },
+    { who: 'cn', line: '这堵墙比你的炮管还厚。你打的是山，不是房子。' },
+    { who: 'us', line: "A mountain. Great. Bring the whole catalogue, we're going to be here a while." },
   ],
 };

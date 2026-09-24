@@ -301,18 +301,20 @@ LEVELS = {
             # and thirty metres of red rock the palace is famous for standing
             # on and not a metre more.
             "height": 3782.0,
-            # A mesa, not a cone: the palace is four hundred metres end to end
-            # and the top has to carry it with terraces to spare.
-            "top": 250.0,
+            # A mesa, not a cone. The palace is four hundred and sixty metres
+            # end to end and the game levels a pad under its whole footprint,
+            # so the flat top has to be at least that wide or the pad cuts the
+            # summit off square and the mountain reads as a plinth.
+            "top": 270.0,
             "slope": 1.5,
             # Three benches, each one a firing step, and wide enough that a
-            # battery put anywhere on one stands square. The last reaches out
-            # past four hundred metres so the guns the suite spawns at two
-            # hundred and twenty have level ground under the trail.
+            # battery put anywhere on one stands square. The first starts
+            # outside the pad the palace levels, so the player's guns have
+            # real ground rather than the monument's own apron.
             "shelves": [
-                [286.0, 62.0],
-                [372.0, 78.0],
-                [470.0, 86.0],
+                [310.0, 66.0],
+                [396.0, 76.0],
+                [486.0, 84.0],
             ],
             "fade": 100.0,
         },

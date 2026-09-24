@@ -34,6 +34,8 @@ export const MATERIALS = {
   RAFT: 18,      // the same pour at the bottom of it, where the tower is armour
   SPINE: 19,     // and the buttressed core it stands on, all the way up
   MAST: 20,      // the steel spire on top of that core, which is still the core
+  MADDER: 21,    // rammed earth washed in the red dye: the Potala's Red Palace
+  KYEMA: 22,     // the dark brushwood frieze laid under every Tibetan roofline
 };
 
 /**
@@ -228,6 +230,20 @@ export const MATERIAL_PROPS = {
   [MATERIALS.MAST]:      { density: 7.85, strength: 14.0, toughness: 280, color: 0xeef1f3,
     structural: true, mustBreak: true, minPower: 5000, shockScale: 0.12,
     lethalScale: 0.6, span: 2.5 },
+
+  // Tibet. The Potala's walls are rammed earth and rubble in courses, three
+  // to five metres thick and battered inward, with molten copper poured into
+  // the foundations against earthquakes — as strong as any masonry in the
+  // campaign and a good deal heavier for its height. The colour is madder,
+  // the plant dye the Red Palace is washed in every year, which is a deep
+  // oxblood and not the terracotta that sandstone was standing in for.
+  [MATERIALS.MADDER]:    { density: 2.40, strength: 1.02, toughness: 104, color: 0x8c3a2e,
+    structural: true },
+  // The kyema: a metre-deep band of tamarisk brushwood laid in courses under
+  // every roofline, trimmed flat and dyed almost black. It carries the roof
+  // it is under and nothing else, which is why it is infill.
+  [MATERIALS.KYEMA]:     { density: 1.10, strength: 0.42, toughness: 42, color: 0x4a3124,
+    structural: false },
 };
 
 

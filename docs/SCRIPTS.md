@@ -122,3 +122,19 @@ Defender: **Fariq Awwal Saif bin Hamdan**, United Arab Emirates. Level id `dubai
 - US: Eight hundred metres of glass in the middle of a desert. Somebody was compensating.
 - AE: ثمانمئة متر يا أمريكي. مدافعك ما توصل نصّها. *(Eight hundred metres, American. Your guns won't reach half of it.)*
 - US: Eight hundred? Fine. I'll take it in two payments.
+
+## Malaysia — Kuala Lumpur, the Petronas Towers *(draft)*
+
+Defender: **Jeneral Hafiz bin Zulkifli**, Malaysia. Level id `petronas`.
+
+- US: Two of them. Somebody built it twice and still couldn't get it right.
+- MY: Dua menara, satu jambatan. Tembak jambatan itu — ia tidak menahan apa-apa. *(Two towers, one bridge. Shoot the bridge — it holds nothing up.)*
+- US: He's pointing at the bridge. Boys, shoot everything BUT the bridge.
+
+## China — Lhasa, the Potala Palace *(draft)*
+
+Defender: **Shàngjiàng Wen Jiahao**, China. Level id `potala`.
+
+- US: Thirteen storeys of whitewash on a red rock. Walk out and I leave the paint on it.
+- CN: 这堵墙比你的炮管还厚。你打的是山，不是房子。 *(This wall is thicker than your gun barrel. You are shooting a mountain, not a house.)*
+- US: A mountain. Great. Bring the whole catalogue, we're going to be here a while.

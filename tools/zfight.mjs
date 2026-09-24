@@ -1,14 +1,17 @@
-// Usage: node tools/zfight.mjs [tower|wing|eiffel|chaillot|khufu|sphinx|taj|mosque] [low|med|high|ultra]
+// Usage: node tools/zfight.mjs [tower|wing|eiffel|chaillot|khufu|sphinx|taj|mosque|petronas|potala] [low|med|high|ultra]
 // Offline: find pairs of stones that share volume, and pairs with exposed
 // faces within a few millimetres of the same plane (z-fighting candidates).
 import { buildEiffelTower, buildChaillotWing } from '../src/structure/landmarks/eiffel.js';
 import { buildElizabethTower, buildPalaceWing } from '../src/structure/landmarks/bigben.js';
 import { buildGreatPyramid, buildSphinx } from '../src/structure/landmarks/giza.js';
 import { buildTajMahal, buildTajMosque } from '../src/structure/landmarks/tajmahal.js';
+import { buildPetronasTowers } from '../src/structure/landmarks/petronas.js';
+import { buildPotalaPalace } from '../src/structure/landmarks/potala.js';
 
 const WHICH = { tower: buildElizabethTower, wing: buildPalaceWing, eiffel: buildEiffelTower,
   chaillot: buildChaillotWing, khufu: buildGreatPyramid, sphinx: buildSphinx,
-  taj: buildTajMahal, mosque: buildTajMosque };
+  taj: buildTajMahal, mosque: buildTajMosque,
+  petronas: buildPetronasTowers, potala: buildPotalaPalace };
 const only = process.argv[2];
 const tier = process.argv[3] || 'high';
 const SCALE = { low: 1.55, med: 1.2, high: 1.0, ultra: 0.85 }[tier];

@@ -16,6 +16,8 @@ import { buildHimejiKeep, populateHimejiKeep } from '../structure/landmarks/hime
 import { buildBurjKhalifa, populateBurjKhalifa } from '../structure/landmarks/burj.js';
 import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
   from '../structure/landmarks/giza.js';
+import { buildPetronasTowers, populatePetronasTowers } from '../structure/landmarks/petronas.js';
+import { buildPotalaPalace, populatePotalaPalace } from '../structure/landmarks/potala.js';
 
 /**
  * Level registry.
@@ -821,6 +823,128 @@ export const LEVELS = {
     unlockScale: 1,
     brief: 'Everything above a setback stands on the setback under it. Take the core at one.',
   },
+  petronas: {
+    id: 'petronas',
+    terrain: 'petronas',
+    name: 'Petronas Towers, Kuala Lumpur',
+    place: 'KLCC, Kuala Lumpur',
+    target: 'PETRONAS TOWERS',
+    subtitle: 'Petronas Towers \u00b7 Kuala Lumpur',
+    victory: 'Twin Billing',
+    // Equatorial, and wet. Everything here grows: the ground between the
+    // buildings is the green of a place that gets two and a half metres of
+    // rain a year, the roads are dark and permanently damp, and the KLCC
+    // park at the towers' feet is real jungle rather than municipal lawn.
+    palette: {
+      urban: new THREE.Color(0x7d8468),
+      urbanAlt: new THREE.Color(0x6a7358),
+      park: new THREE.Color(0x35542a),
+      parkAlt: new THREE.Color(0x436530),
+      road: new THREE.Color(0x3c3c3e),
+      bank: new THREE.Color(0x8d8a6e),
+      bed: new THREE.Color(0x3a5a4e),
+      dry: new THREE.Color(0x8f9470),
+    },
+    // Three degrees off the equator. It rains most afternoons and it has
+    // never once snowed, so nothing in this city pitches a roof; the haze is
+    // the warm white of air holding all the water it can.
+    setting: {
+      haze: { colour: 0xd7dde0, density: 0.00032 },
+      roofPitch: 0,
+      canopy: 1.4,
+    },
+    cityExcludeRadius: 120,
+    contextExclude: 120,
+    // Both towers have to be in frame or the level is a tower level, and the
+    // pair is two hundred metres wide before the first stone is laid.
+    camera: { yaw: 0.72, pitch: 0.22, distance: 840, height: 235 },
+    structures: (quality) => [
+      { key: 'petronas', blocks: buildPetronasTowers(quality), primary: true,
+        required: true, label: 'PETRONAS TOWERS' },
+    ],
+    garrison: (g, origin, groundY) => { populatePetronasTowers(g, origin, groundY); },
+    // The towers, not the shopping centre they stand on — and the bridge is
+    // scored with them, which is the trap: it is four per cent of the mass
+    // and the first thing anybody shoots.
+    scoreTags: ['tower-west', 'tower-east', 'skybridge'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 1,
+    brief: 'The bridge is tied to neither tower. Taking it costs them nothing.',
+  },
+  potala: {
+    id: 'potala',
+    terrain: 'potala',
+    name: 'Potala Palace, Lhasa',
+    place: 'Marpo Ri, Lhasa',
+    target: 'POTALA PALACE',
+    subtitle: 'Potala Palace \u00b7 Marpo Ri',
+    victory: 'The Red Palace Comes Down',
+    // Three thousand six hundred metres up, on a hill of red rock in a dry
+    // valley. Almost nothing here is green: the ground is gravel and dust
+    // with willow and poplar along the water, the rock is the iron red the
+    // hill is named for, and the built colour is lime-wash over rammed earth.
+    palette: {
+      urban: new THREE.Color(0xc0b49c),
+      urbanAlt: new THREE.Color(0xa89a80),
+      park: new THREE.Color(0x6a7a48),
+      parkAlt: new THREE.Color(0x7b8a52),
+      road: new THREE.Color(0x585552),
+      bank: new THREE.Color(0xc8bb9a),
+      bed: new THREE.Color(0x4d6a63),
+      dry: new THREE.Color(0xb9a882),
+    },
+    // Thin air over a dry valley. At three and a half kilometres there is a
+    // third less atmosphere above you than at sea level, the light is hard,
+    // and you can see the mountains on the far side of the Kyi Chu all day.
+    // A sea-level haze here would put fog on a place famous for having none.
+    setting: {
+      hinterland: 'fields',
+      haze: { colour: 0xc9d6e2, density: 0.00016 },
+      roofPitch: 0.18,
+    },
+    // The whole map inside the last shelf is mountain, so the town starts
+    // where the mountain stops — which is where Shöl really stands, at the
+    // foot of Marpo Ri. Five hundred and seventy is the outer edge of the
+    // third firing step; the surveyed Lhasa that is left is in the corners
+    // and out past the boundary in the surround, exactly as Rio's is.
+    cityExcludeRadius: 560,
+    contextExclude: 545,
+    // The bake cut Marpo Ri to a mesa at 3782 m; the game's own pad must
+    // level to that and not to the median of a ring that straddles the
+    // summit's edge, which took twenty-one metres off the top and left a
+    // step round the palace where the natural ground stood higher than the
+    // ground the palace was standing on.
+    groundLevel: 'bake',
+    // From the south, across the valley, high enough to hold four hundred
+    // and sixty metres of wall and a hundred and forty of building in one
+    // frame. This is the view every photograph of the place is taken from
+    // and the one that says how big it is.
+    camera: { yaw: 0.05, pitch: 0.24, distance: 900, height: 165 },
+    structures: (quality) => [
+      { key: 'potala', blocks: buildPotalaPalace(quality), primary: true,
+        required: true, label: 'POTALA PALACE' },
+    ],
+    garrison: (g, origin, groundY) => { populatePotalaPalace(g, origin, groundY); },
+    // The Red Palace and the gilded roofs on it. The white wings are a
+    // curtain of living quarters and the bar does not move for them, which
+    // is the whole trick of the level: the biggest thing in front of you is
+    // not the thing you are being paid for.
+    scoreTags: ['red', 'roofs'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // Battered walls four metres thick bonded to a rock outcrop. Nothing
+    // here leans and nothing here goes over; it comes down course by course
+    // or it does not come down.
+    traits: { windows: true, river: false, topples: false },
+    // Two million three hundred and sixty thousand cubic metres, second only
+    // to the Giza plateau. Unlocks are a fraction of all the mass on the map,
+    // so unscaled an AT4 would earn a hundredth of a per cent and nothing
+    // past the first two weapons would ever come out of the depot. Giza
+    // carries sixteen on two point eight million; this carries fourteen on
+    // two point four.
+    unlockScale: 14,
+    brief: 'The white is not the building. The red one in the middle is the contract.',
+  },
 };
 
 export const DEFAULT_LEVEL = 'westminster';
@@ -834,7 +958,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * cantilever, a dome, a lattice, and a mountain.
  */
 export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio',
-  'athens', 'istanbul', 'cologne', 'himeji', 'dubai'];
+  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -851,7 +975,9 @@ export const LEVEL_BLURB = {
   istanbul: 'A dome fifty metres up on four arches, held from outside. Open one side and it thrusts out.',
   cologne: 'Two hollow stone spires on their piers. Cut a pier and the spire above it follows.',
   himeji: 'Six storeys of timber on a sloping stone base. The base stands; the keep goes over.',
+  petronas: 'Two towers and a bridge that holds neither of them up. Both towers are the contract.',
   dubai: 'Half a kilometre of concrete core and glass in setbacks. Everything above a cut is a free body.',
+  potala: 'Four hundred metres of battered wall on a red hill. The white is not the building.',
 };
 
 /** Ordered level records, for menus. */

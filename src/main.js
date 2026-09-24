@@ -1293,6 +1293,10 @@ async function boot() {
 
     water.material.uniforms.uTime.value = now * 0.001;
     if (sky.material.uniforms) sky.material.uniforms.uTime.value = now * 0.001;
+    // The dome rides with the eye. It is four kilometres across and Lhasa
+    // stands three and a half up, so a dome pinned to the world origin has
+    // the camera at the top of it with half the sky outside the geometry.
+    sky.position.copy(engine.camera.position);
     cloudUniforms.uCloudTime.value = now * 0.001;
 
     const shake = engine.updateShake(rawDt, rig.distance);

@@ -233,17 +233,47 @@ export const THEATRES = [
     unlockLine: 'Nothing new — you have it all',
   },
   {
+    id: 'petronas',
+    iso: 'MYS',
+    lx: 38, ly: 26,
+    city: 'KUALA LUMPUR',
+    lon: 101.7117, lat: 3.1579,
+    no: 14,
+    title: 'TWIN BILLING',
+    brief: 'Two four-hundred-metre towers on concrete cores, joined halfway up '
+      + 'by a bridge that is tied to neither of them. It sits on bearings and '
+      + 'slides, because the towers sway apart on a windy afternoon. Shoot it '
+      + 'and it costs them nothing. Both towers are the contract.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
     id: 'dubai',
     iso: 'ARE',
     lx: 46, ly: 20,
     city: 'DUBAI',
     lon: 55.2744, lat: 25.1972,
-    no: 14,
+    no: 15,
     title: 'THE NEEDLE',
     brief: 'Half a kilometre of concrete core and glass, stepping back as it '
       + 'climbs. Everything above a setback stands on the setback under it; '
       + 'take the core at one and the tower above it is a free body with a '
       + 'long way to fall.',
+    unlocks: [],
+    unlockLine: 'Nothing new — you have it all',
+  },
+  {
+    id: 'potala',
+    iso: 'CHN',
+    lx: -46, ly: -26,
+    city: 'LHASA',
+    lon: 91.1172, lat: 29.6578,
+    no: 16,
+    title: 'THE RED HILL',
+    brief: 'Four hundred and fifty metres of battered wall, four metres thick '
+      + 'at the head and bonded to a rock outcrop three and a half kilometres '
+      + 'up. Nothing here leans and nothing here goes over. The white palace '
+      + 'is a curtain of quarters; the red one in the middle is the contract.',
     unlocks: [],
     unlockLine: 'The board is clear',
   },
