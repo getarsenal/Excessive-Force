@@ -349,9 +349,20 @@ export function buildPotalaPalace(quality) {
       const rows = [];
       for (let ly = h * 0.2; ly < h - 8; ly += 11.0) rows.push(y0 + ly);
       const win = (x, y, z) => {
+        const lx = Math.abs(x - cx), lz = Math.abs(z - cz);
+        // Only the outer wall has windows in it.
+        //
+        // `openings` is asked about every stone laid inside it, and the cross
+        // walls are laid inside it too — so the predicate, which only knows
+        // about heights and bays, was cutting a window-sized hole through the
+        // middle of the block on every storey. At a four-metre band that left
+        // a notch the course above lapped; widened to six it took whole
+        // courses of cross wall out and thirty-nine stones of the Red Palace
+        // started detached.
+        const ww = taper(w, y - y0, h, batter), dd = taper(d, y - y0, h, batter);
+        if (lx < ww / 2 - WALL * 1.8 && lz < dd / 2 - WALL * 1.8) return false;
         // Never within a stone and a half of a corner: a window that takes a
         // corner stone out leaves the pier above it standing on nothing.
-        const lx = Math.abs(x - cx), lz = Math.abs(z - cz);
         if (lx > w / 2 - 11 && lz > d / 2 - 11) return false;
         const row = rows.find((r) => y > r && y < r + 6.2);
         if (row === undefined) return false;
