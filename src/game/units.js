@@ -173,14 +173,14 @@ export const UNITS = [
   // allowed to reach, and `strike.shock` how many blast radii the mortar is
   // shaken out to. Both are how the Eagle is kept to what its blurb promises:
   // a low hit used to sever a tower's whole cross section and shake the
-  // mortar out of two hundred feet of shaft above it, so a single $200k
+  // mortar out of two hundred feet of shaft above it, so a single $100k
   // 500-pounder laid the Elizabeth Tower flat — a tenth of the building on
   // paper, all of it in practice. Held to a bite and a short shock it takes
   // its tenth and the tower stands. The Lancer has neither, which is what the
-  // extra $300k buys: the MOAB still fells a tower in one pass.
+  // extra $150k buys: the MOAB still fells a tower in one pass.
   {
     id: 'f15', name: 'F-15E', full: 'F-15E Strike Eagle · GBU-12 500 lb', tier: 'AIR',
-    cost: 200000, unlockFrac: 0.12,
+    cost: 100000, unlockFrac: 0.12,
     model: 'aircraft', strike: { frac: 0.10, maxR: 64, minR: 9, fx: 4.6, bite: 0.62, shock: 1.2 },
     aircraft: { kind: 'eagle', speed: 230, height: 110, clearance: 45, runIn: 2400, offset: 40 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
@@ -191,7 +191,7 @@ export const UNITS = [
   },
   {
     id: 'b1', name: 'MOAB', full: 'B-1B Lancer · GBU-43/B MOAB', tier: 'AIR',
-    cost: 500000, unlockFrac: 0.25,
+    cost: 250000, unlockFrac: 0.25,
     model: 'aircraft', strike: { frac: 0.35, maxR: 120, minR: 18, fx: 9.5 },
     aircraft: { kind: 'lancer', speed: 210, height: 330, clearance: 150, runIn: 3200, offset: 60 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
