@@ -53,6 +53,10 @@ export function recordResult(levelId, won, summary) {
     bestTime: best(was.bestTime, summary?.time),
     bestShots: best(was.bestShots, summary?.shotsFired),
     bestSpent: best(was.bestSpent, summary?.spent),
+    // The one record where best means largest. `best` takes the minimum, which
+    // is right for rounds, money and the clock and exactly wrong here.
+    bestLeverage: !won || summary?.leverage == null ? was.bestLeverage
+      : Math.max(was.bestLeverage || 0, summary.leverage),
   };
   p[levelId] = next;
   saveProgress(p);
@@ -67,7 +71,14 @@ export function recordResult(levelId, won, summary) {
  * different thing from one that comes in under budget, and rolling them into
  * a single gold/silver/bronze hides which of the two a player is actually
  * good at — as well as making two of the three marks invisible on any run
- * that missed the third. Three marks, each independently won.
+ * that missed the third. Four marks, each independently won.
+ *
+ * The fourth is leverage, and it is the only one that rewards *not* firing.
+ * Rounds, budget and the clock can all be beaten by a bigger battery shooting
+ * faster; leverage cannot be beaten by shooting at all. It asks how much of
+ * the monument came down that the player never hit — which is the whole
+ * difference between finding what the building stands on and grinding it into
+ * gravel from the top down.
  */
 export function marksFor(level, summary) {
   const par = level?.par;
@@ -79,6 +90,13 @@ export function marksFor(level, summary) {
       unit: '$', won: Math.round(summary.spent) <= par.spend },
     { id: 'time', label: 'CLOCK', par: par.minutes * 60, got: Math.round(summary.time),
       unit: 's', won: summary.time <= par.minutes * 60 },
+    // The only mark that goes the other way: more is better, and it is the one
+    // that says whether the player found the load path or ground the monument
+    // down. Rounded to one place because the difference between 11.4 and 11.6
+    // is not a thing anyone played differently.
+    { id: 'leverage', label: 'LEVERAGE', par: par.leverage,
+      got: Math.round((summary.leverage ?? 1) * 10) / 10,
+      unit: 'x', high: true, won: (summary.leverage ?? 1) >= par.leverage },
   ];
 }
 

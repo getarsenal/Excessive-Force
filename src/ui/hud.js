@@ -76,7 +76,7 @@ export class HUD {
       dockView: document.getElementById('dock-view'),
       dockMenu: document.getElementById('dock-menu'),
       ordersClear: document.getElementById('orders-clear'),
-      surveyBtn: document.getElementById('orders-survey'),
+      surveyBtn: document.getElementById('survey-btn'),
       surveyKey: document.getElementById('survey-key'),
       ordersModes: document.getElementById('orders-modes'),
       menuBtn: document.getElementById('dock-menu'),
@@ -836,11 +836,12 @@ export class HUD {
       this.el.ecMarks.innerHTML = marks.map((m) => {
         const fmt = (v) => (m.unit === '$' ? `$${v.toLocaleString()}`
           : m.unit === 's' ? `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`
-            : v.toLocaleString());
+            : m.unit === 'x' ? `${v}\u00d7`
+              : v.toLocaleString());
         return `<div class="ec-mark${m.won ? ' won' : ''}${m.best ? ' best' : ''}">`
           + `<span class="em-label">${m.label}</span>`
           + `<b class="em-got">${fmt(m.got)}</b>`
-          + `<span class="em-par">par ${fmt(m.par)}</span>`
+          + `<span class="em-par">par ${m.high ? '\u2265' : ''}${fmt(m.par)}</span>`
           + `${m.best ? '<span class="em-best">BEST</span>' : ''}</div>`;
       }).join('');
     }

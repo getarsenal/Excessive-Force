@@ -497,6 +497,10 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     par && rec.bestSpent != null && rec.bestSpent <= par.spend)}
            ${cell('Time', fmtTime(rec.bestTime), par ? `${par.minutes}:00` : null,
     par && rec.bestTime != null && rec.bestTime <= par.minutes * 60)}
+           ${cell('Leverage', rec.bestLeverage != null
+    ? `${Math.round(rec.bestLeverage * 10) / 10}\u00d7` : '\u2014',
+  par ? `\u2265${par.leverage}\u00d7` : null,
+  par && rec.bestLeverage != null && rec.bestLeverage >= par.leverage)}
            ${cell('Attempts', rec.runs, null, false)}
          </div>`
       : '<div class="wm-rec none">NO ATTEMPTS ON RECORD</div>';

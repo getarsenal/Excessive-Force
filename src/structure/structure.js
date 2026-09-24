@@ -295,6 +295,19 @@ export class Structure {
     this._nextIslandId = 1;
     this.stabilityDirty = true;
     this.destroyedCount = 0;
+    /**
+     * Mass this structure has lost to the player's own fire, as opposed to mass
+     * that came down afterwards because what held it up had gone.
+     *
+     * Every stone a detonation removes from the standing structure is counted
+     * here — blown to gravel or thrown clear, both are the shell's doing. What
+     * is *not* counted is the rest of the building: the courses that lose their
+     * bearing, the section that goes over, the rubble that lands on a roof and
+     * takes it through. `demolishedMass / blastMass` is therefore how hard the
+     * masonry worked for the player, and it is the difference between finding
+     * the load path and grinding a monument into sand one crater at a time.
+     */
+    this.blastMass = 0;
     // Stones culled by the grout pass were never part of the building, so they
     // must not count toward the mass the player has to bring down.
     let total = 0;
@@ -1777,8 +1790,10 @@ export class Structure {
       }
     }
 
+    for (const i of ejected) this.blastMass += this.mass[i];
     for (const i of destroyed) {
       if (ejected.has(i)) continue;
+      this.blastMass += this.mass[i];
       this.destroyChunk(i, center);
     }
 
@@ -3820,6 +3835,19 @@ export class Structure {
   /** Mass no longer part of the standing structure — destroyed or fallen. */
   get demolishedMass() {
     return Math.max(0, this.totalMass - (this.standingMass ?? this.totalMass));
+  }
+
+  /**
+   * How much masonry came down for every tonne the player actually shot.
+   *
+   * One means the building only ever loses what is hit — a wall taken apart
+   * stone by stone. Twenty means the shells found something that was holding
+   * the rest up. Below a tonne of blast it reads one, because a ratio over
+   * nothing is noise, not a result.
+   */
+  get leverage() {
+    if (!(this.blastMass > 1000)) return 1;
+    return Math.max(1, this.demolishedMass / this.blastMass);
   }
 
   /** Highest point still attached to the ground — drives the "topple" check. */

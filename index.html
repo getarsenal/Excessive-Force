@@ -114,9 +114,6 @@
           <button id="orders-smoke" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
           <button id="orders-clear" title="Let the guns pick their own aim point">CLEAR TARGET</button>
         </div>
-        <div class="dr-row">
-          <button id="orders-survey" title="Paint the masonry by how much weight every stone is carrying">SURVEY</button>
-        </div>
       </section>
     </div>
     <div id="dock">
@@ -156,6 +153,17 @@
 
     <!-- Sound lives in the pause menu now; the rail it used to share with
          MENU and VIEW is gone, and those two are buttons on the dock. -->
+    <!-- The survey switch.
+         On the HUD, not inside a drawer, and wearing its own key. A tool for
+         reading which stones are holding a building up is the difference
+         between shelling a monument and taking it apart, and the first
+         version of it was a text button on the third row of a drawer plus an
+         undocumented V — which is to say it shipped and nobody found it. -->
+    <button id="survey-btn" type="button"
+            title="Paint the masonry by how much weight every stone is carrying">
+      <span class="sv-dot"></span><span class="sv-label">SURVEY</span><kbd>V</kbd>
+    </button>
+
     <!-- The survey key. Only up while the survey is, and deliberately small:
          it is a legend, not a readout, and the thing worth looking at is the
          building. -->

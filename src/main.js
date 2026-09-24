@@ -1076,6 +1076,16 @@ async function boot() {
 
   const firstPrompt = () => {
     hud.status(`${TAP} the tower to designate a target`, 4);
+    // And then, once, the thing the game had never said out loud: that the
+    // building is a load path and the player can see it. The mechanic was
+    // always there — ninety stones out of five thousand, cut on the right
+    // side, and the campanile goes over — but a tool nobody is told about is
+    // a tool nobody uses, and every level was being ground down from the top.
+    setTimeout(() => {
+      if (battle.state === 'playing' && !hud.survey) {
+        hud.status('SURVEY (V) \u2014 red stone is holding the rest up', 6);
+      }
+    }, 9000);
   };
   const uiEl = document.getElementById('ui');
   let standoff = null;

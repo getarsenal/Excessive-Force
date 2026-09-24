@@ -2765,6 +2765,9 @@ export class TestMenu {
           const p = LEVELS[id]?.par;
           if (!p) { bad.push(`${id}: none`); continue; }
           if (!(p.rounds > 0) || !(p.spend > 0) || !(p.minutes > 0)) bad.push(`${id}: ${JSON.stringify(p)}`);
+          // Leverage under one would be a par for bringing down less masonry
+          // than you shot, which is not possible and not a target.
+          if (!(p.leverage >= 1)) bad.push(`${id}: leverage ${p.leverage}`);
           // A clock par the round par cannot be met inside is not a par, it
           // is a second way of saying the same thing.
           if (p.minutes * 60 < p.rounds * 1.2) bad.push(`${id}: ${p.minutes}m is under ${p.rounds} rounds`);
@@ -2774,9 +2777,14 @@ export class TestMenu {
         // And the marks read it. A run exactly on par takes the mark; one
         // round over does not.
         const lv = LEVELS[b.level.id];
-        const on = marksFor(lv, { shotsFired: lv.par.rounds, spent: lv.par.spend, time: lv.par.minutes * 60 });
-        const over = marksFor(lv, { shotsFired: lv.par.rounds + 1, spent: lv.par.spend + 1, time: lv.par.minutes * 60 + 1 });
-        assert(on.length === 3 && on.every((m) => m.won), 'a run exactly on par took no mark');
+        const at = (d) => marksFor(lv, {
+          shotsFired: lv.par.rounds + d, spent: lv.par.spend + d,
+          time: lv.par.minutes * 60 + d,
+          // Leverage is the one mark where over par is *under* the number.
+          leverage: lv.par.leverage - d,
+        });
+        const on = at(0), over = at(1);
+        assert(on.length === 4 && on.every((m) => m.won), 'a run exactly on par took no mark');
         assert(over.every((m) => !m.won), 'a run over par took a mark anyway');
         return `${LEVEL_ORDER.length} levels; ${b.level.id} par ${lv.par.rounds} rounds`;
       }],
@@ -3013,6 +3021,10 @@ export class TestMenu {
         const h0 = st.standingHeight();
         const gy = b.originGround;
         const intactAtStart = st.monumentIntegrity;
+        // Leverage is a property of *this* cut, so it is measured here rather
+        // than in a test of its own: a second eighty-round undercut would cost
+        // the suite the same again to learn what this one already knows.
+        const shot0 = st.blastMass, fell0 = st.demolishedMass;
 
         // Footprint, for the slenderness test.
         let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -3032,6 +3044,19 @@ export class TestMenu {
         // it is undercutting one side that produces a lean. And the lowest
         // stone of all is usually a buried foundation block, where shells
         // accomplish nothing.
+        //
+        // The face is always -z, which is a fixed choice and not always the
+        // right one — and at Pisa it is the wrong one, which is worth knowing
+        // before reading a marginal result here as noise. Measured on a
+        // pristine campanile, a 240° cut eight metres deep takes it to 0.002
+        // integrity on the +z and -x quadrants and leaves it standing at 0.93
+        // on -z: ninety stones out of five thousand either way, and the lean
+        // decides which. So this test cuts the side the tower is strongest on,
+        // its peak lean here sits around half a degree against a bar of 0.4,
+        // and under batch load it can read either side of that. That is the
+        // level being a puzzle rather than the mechanism being broken — but a
+        // generic check of "does undercutting work" should not be given the
+        // answer, so the face stays where it is.
         const mask = st._winMask;
         const face = st.origin.z - 1.0;
         const foot = () => {
@@ -3100,6 +3125,22 @@ export class TestMenu {
         }
         const dropped = st.standingHeight() < h0 ? h0 - st.standingHeight() : 0;
         const integ = st.monumentIntegrity;
+
+        // What the cut was worth. A building is a load path, so shells put in
+        // at the foot of one face bring down a multiple of what they remove —
+        // and that multiple is what the end card scores, so it has to be an
+        // honest number rather than a hopeful one.
+        //
+        // The accounting is the half that would fail silently: a stone cannot
+        // leave the standing structure without having left it, so what fell
+        // can never be less than what was blasted out. If that ever inverts,
+        // the blast is being counted twice.
+        const shot = st.blastMass - shot0, fell = st.demolishedMass - fell0;
+        assert(fell >= shot - 1,
+          `${Math.round(fell / 1000)} t came down but ${Math.round(shot / 1000)} t was shot `
+          + '— the blast is being double-counted or the loss is not counted at all');
+        assert(isFinite(st.leverage) && st.leverage >= 1, `leverage reads ${st.leverage}`);
+        const lev = shot > 1000 ? fell / shot : 1;
         // The lean is only required of a tall building that is still *there*.
         //
         // Slenderness alone is not the premise: by the time this runs, last in
@@ -3148,7 +3189,8 @@ export class TestMenu {
             + `${(removedFrac * 100).toFixed(2)}% of the monument`);
           return `cannot topple, and should not: ${st.destroyedCount} stones `
             + `quarried out of one face by eighty light rounds `
-            + `(${(removedFrac * 100).toFixed(2)}% of the monument)`;
+            + `(${(removedFrac * 100).toFixed(2)}% of the monument, `
+            + `${lev.toFixed(1)}\u00d7 what was shot)`;
         }
 
         if (slender > 2.5 || intactAtStart > 0.55) {
@@ -3232,11 +3274,12 @@ export class TestMenu {
           `a landed section is still welded into one ${biggest}-stone slab `
           + `(the most a ${st.count}-stone structure may leave is ${lump})`);
 
-        return requiresLean
+        return (requiresLean
           ? `leaned ${leaned.toFixed(1)}°, then lost ${dropped.toFixed(0)} m`
           : `${slender.toFixed(1)}:1 at ${(intactAtStart * 100).toFixed(0)}%; `
             + `peak lean ${(st.peakLean || 0).toFixed(1)}°; `
-            + `down to ${(integ * 100).toFixed(0)}%`;
+            + `down to ${(integ * 100).toFixed(0)}%`)
+          + `; ${lev.toFixed(1)}\u00d7 what was shot`;
       })],
 
       ['a welded section is drawn where its colliders are', () => this._calm(() => {

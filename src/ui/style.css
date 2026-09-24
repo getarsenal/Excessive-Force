@@ -624,10 +624,39 @@ html, body {
 /* Bottom-left, clear of the dock and of the thumb that works it. It sits
    inside #ui, so the clear view takes it with everything else: the survey is
    for playing and the clear view is for looking. */
+/* The switch sits where the key used to, and the key stacks on top of it, so
+   the pair reads as one instrument whether or not it is lit. */
+#survey-btn {
+  position: absolute; z-index: 27;
+  left: var(--ui-pad);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 9px;
+  background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px; letter-spacing: 0.12em;
+  color: rgba(219, 227, 236, 0.74); cursor: pointer;
+}
+#survey-btn:hover { border-color: var(--edge-bright); color: var(--text); }
+#survey-btn .sv-dot {
+  width: 8px; height: 8px; flex: none;
+  background: linear-gradient(135deg, #24708c 0%, #47a870 50%, #d13828 100%);
+}
+#survey-btn kbd {
+  font: inherit; padding: 1px 4px;
+  border: 1px solid rgba(150, 168, 190, 0.28);
+  color: rgba(219, 227, 236, 0.55);
+}
+#survey-btn.on {
+  color: var(--accent); border-color: rgba(88, 166, 255, 0.55);
+}
+#survey-btn.on kbd { border-color: rgba(88, 166, 255, 0.42); color: var(--accent); }
+
 #survey-key {
   position: absolute; z-index: 26;
   left: var(--ui-pad);
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px + 36px);
   width: min(238px, calc(100vw - var(--ui-pad) * 2));
   padding: 9px 10px 8px;
   background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
@@ -656,7 +685,6 @@ html, body {
 #survey-key .sk-notes i { width: 9px; height: 9px; flex: none; }
 #survey-key .sk-infill { background: #262c33; }
 #survey-key .sk-gated { background: #5d86ab; }
-#orders-survey.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
 
 /* One rule, so nothing new can be added to the HUD and quietly stay on
    screen through a clear view: everything inside #ui goes, and the handful

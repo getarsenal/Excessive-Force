@@ -2061,6 +2061,25 @@ export class Battle {
     return best;
   }
 
+  /**
+   * How much masonry the player brought down for every tonne they shot, over
+   * every structure that counts towards the contract.
+   *
+   * Summed across the objectives rather than averaged, because the question is
+   * about the battle and not about each building: a player who finds the load
+   * path in the campanile and then grinds the Duomo has done one clever thing
+   * and one dull one, and the figure should say so.
+   */
+  get leverage() {
+    let down = 0, shot = 0;
+    for (const o of this.objectives) {
+      down += o.structure.demolishedMass;
+      shot += o.structure.blastMass;
+    }
+    if (!(shot > 1000)) return 1;
+    return Math.max(1, down / shot);
+  }
+
   summary() {
     return {
       score: Math.round(this.score),
@@ -2072,6 +2091,7 @@ export class Battle {
       shotsFired: this.shotsFired,
       spent: Math.round(this.spent),
       time: this.elapsed,
+      leverage: this.leverage,
     };
   }
 }
