@@ -480,14 +480,26 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       const met = o.key === 'primary' ? t.down : !!t.met[o.key];
       return `<li class="${met ? 'met' : ''}">${o.label}</li>`;
     }).join('');
+    const lv = LEVELS[t.id] || {};
+    // Rounds and money beside the clock, and the par beside each of them.
+    // A record that only says a contract was closed cannot tell a player they
+    // have got better at it, which is the only reason to open one twice.
+    const par = lv.par;
+    const cell = (label, value, parValue, beat) =>
+      `<div class="${beat ? 'beat' : ''}"><span>${label}</span><b>${value}</b>`
+      + (parValue != null ? `<i>par ${parValue}</i>` : '') + '</div>';
     const record = rec.runs
       ? `<div class="wm-rec">
-           <div><span>Best</span><b>${Math.round(rec.bestScore || 0).toLocaleString()} t</b></div>
-           <div><span>Time</span><b>${fmtTime(rec.bestTime)}</b></div>
-           <div><span>Attempts</span><b>${rec.runs}</b></div>
+           ${cell('Rounds', rec.bestShots ?? '—', par?.rounds,
+    par && rec.bestShots != null && rec.bestShots <= par.rounds)}
+           ${cell('Spent', rec.bestSpent != null ? `$${rec.bestSpent.toLocaleString()}` : '—',
+    par ? `$${par.spend.toLocaleString()}` : null,
+    par && rec.bestSpent != null && rec.bestSpent <= par.spend)}
+           ${cell('Time', fmtTime(rec.bestTime), par ? `${par.minutes}:00` : null,
+    par && rec.bestTime != null && rec.bestTime <= par.minutes * 60)}
+           ${cell('Attempts', rec.runs, null, false)}
          </div>`
       : '<div class="wm-rec none">NO ATTEMPTS ON RECORD</div>';
-    const lv = LEVELS[t.id] || {};
     const status = t.down ? 'closed' : (t.open ? 'active' : 'sealed');
     const stamp = t.down ? 'CLOSED' : (t.open ? 'ACTIVE' : 'SEALED');
     const cmdr = CAST[DEFENDER_OF[t.id]];

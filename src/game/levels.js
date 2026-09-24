@@ -21,6 +21,41 @@ import { buildPotalaPalace, populatePotalaPalace, buildChortenGate, populateChor
   from '../structure/landmarks/potala.js';
 
 /**
+ * Par.
+ *
+ * Every level record carries `par: { rounds, spend, minutes }`, and the three
+ * marks on the end card are won independently against it. Closing a contract
+ * stops being interesting the first time; closing it in nine rounds when it
+ * took forty is the whole reason to open one twice, and a record that only
+ * remembers *that* it was closed cannot tell a player they have got better.
+ *
+ * Where the numbers come from, so that moving one is an argument about play
+ * and not about arithmetic:
+ *
+ *  - `rounds` is the undercut line the suite already measures — a 155 mm
+ *    round into the lowest scored stone on one face, over and over. Giza
+ *    takes eighty of those to shift seven and a half per cent of the
+ *    monument, Istanbul eighty for half of it, Chichen Itza eighty for all of
+ *    it; par is what that rate implies for a win, rounded to a number a
+ *    player can hold in their head. A machine aiming perfectly is not a
+ *    person, so there is slack in it.
+ *  - `spend` is six guns of the tier the campaign has released by then: the
+ *    M119 at Westminster, the M777 by Agra, the Paladin by Sydney, MLRS by
+ *    Istanbul, HIMARS by Kuala Lumpur. Coming in under it means a leaner
+ *    force, not a longer battle.
+ *  - `minutes` is `rounds` at a battery's real cadence, about two seconds a
+ *    round, rounded up.
+ *
+ * These are a first cut from measurement, and they are the numbers most
+ * likely in this file to need moving once people have actually played the
+ * levels. That is fine: they are three integers in one place.
+ *
+ * There is deliberately no `kind: puzzle | siege` beside them. It was going
+ * to be here, and it earns nothing — par already says which a level is (forty
+ * rounds at Pisa, six hundred at Giza), and `brief` already says it in words.
+ */
+
+/**
  * Level registry.
  *
  * A level is a real place plus a list of structures to raise on it. Everything
@@ -93,6 +128,7 @@ export const LEVELS = {
     // is left — but it is also four times the tower's footprint and grinding
     // all of it down would be a chore, so the bar sits where the building has
     // plainly been gutted rather than where the last stone has gone.
+    par: { rounds: 45, spend: 4200, minutes: 3 },
     brief: 'Undercut one face and the whole tower goes over that way.',
   },
 
@@ -159,6 +195,7 @@ export const LEVELS = {
       // Hot, dusty and low: the haze is warm and sits on the plain.
       haze: { colour: 0xd6c9ae, density: 0.00026 },
     },
+    par: { rounds: 140, spend: 8000, minutes: 6 },
     brief: 'The dome stands on four piers. Shelling the shell only makes holes.',
   },
 
@@ -199,6 +236,7 @@ export const LEVELS = {
       river: 'embankment',        // the Seine's quais, walled the same way
       pier: true,                 // a bateau-mouche landing on the quai
     },
+    par: { rounds: 40, spend: 6000, minutes: 3 },
     brief: 'It stands on four legs and nothing else. Cut one and it falls that way.',
   },
 
@@ -269,6 +307,7 @@ export const LEVELS = {
     // A twentieth of Khufu, so nothing like Giza's factor — but still a solid
     // mass rather than a hollow tower.
     unlockScale: 4,
+    par: { rounds: 70, spend: 8000, minutes: 4 },
     brief: 'There is an older pyramid inside this one, and the top of the new one is standing on it.',
   },
 
@@ -336,6 +375,7 @@ export const LEVELS = {
     setting: { haze: { colour: 0xd9cfb4, density: 0.00027 } },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
+    par: { rounds: 35, spend: 6000, minutes: 3 },
     brief: 'It is bent, not tilted. The overhang at the top is the part they corrected.',
   },
 
@@ -400,6 +440,7 @@ export const LEVELS = {
     },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
+    par: { rounds: 90, spend: 12000, minutes: 5 },
     brief: 'A shell has no mass and nothing above it. Hit the haunches, not the crowns.',
   },
 
@@ -458,6 +499,7 @@ export const LEVELS = {
     setting: { haze: { colour: 0xccd2d6, density: 0.00023 } },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
+    par: { rounds: 120, spend: 14000, minutes: 6 },
     brief: 'Nine churches that do not touch. The only thing they share is underneath them.',
   },
 
@@ -534,6 +576,7 @@ export const LEVELS = {
     },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 2,
+    par: { rounds: 55, spend: 11000, minutes: 4 },
     brief: 'The arms are the whole silhouette and almost none of the building.',
   },
 
@@ -618,6 +661,7 @@ export const LEVELS = {
     // very long grind on two and a third million cubic metres of limestone,
     // and this is the level most likely to need its own number once it has
     // been played rather than measured.
+    par: { rounds: 600, spend: 12000, minutes: 20 },
     brief: 'Nothing here can topple. Open the casing and break what the chambers hang on.',
   },
 
@@ -662,6 +706,7 @@ export const LEVELS = {
     scoreTags: ['columns', 'entablature', 'pediment', 'cella'],
     precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
     traits: { windows: false, river: false, topples: true },
+    par: { rounds: 70, spend: 10000, minutes: 4 },
     brief: 'Nothing is fixed to anything. The drums sit on the drums and the beams sit on the columns.',
   },
 
@@ -700,6 +745,7 @@ export const LEVELS = {
     scoreTags: ['dome', 'halfdomes', 'arches', 'piers', 'buttresses', 'minarets'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: false },
+    par: { rounds: 150, spend: 18000, minutes: 7 },
     brief: 'The dome is held from outside. Open one side and the thrust has nowhere to go.',
   },
 
@@ -743,6 +789,7 @@ export const LEVELS = {
     // square has.
     precinct: { boundary: 'railings', ground: 'sand', ornament: 'statues' },
     traits: { windows: true, river: true, topples: true },
+    par: { rounds: 100, spend: 16000, minutes: 5 },
     brief: 'Gothic stone does as little work as it can. Cut a pier and the spire above it follows.',
   },
 
@@ -781,6 +828,7 @@ export const LEVELS = {
     scoreTags: ['keep', 'westkeep', 'corridor'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
+    par: { rounds: 60, spend: 14000, minutes: 4 },
     brief: 'The stone base cannot be shot down. The keep on it is top-heavy by design.',
   },
 
@@ -822,6 +870,7 @@ export const LEVELS = {
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 1,
+    par: { rounds: 70, spend: 26000, minutes: 5 },
     brief: 'Everything above a setback stands on the setback under it. Take the core at one.',
   },
   petronas: {
@@ -871,6 +920,7 @@ export const LEVELS = {
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
     unlockScale: 1,
+    par: { rounds: 110, spend: 24000, minutes: 6 },
     brief: 'The bridge is tied to neither tower. Taking it costs them nothing.',
   },
   potala: {
@@ -960,6 +1010,7 @@ export const LEVELS = {
     // would ever come out of the depot. Giza carries sixteen on two point
     // eight million; this carries twenty-four on four point four.
     unlockScale: 24,
+    par: { rounds: 190, spend: 34000, minutes: 9 },
     brief: 'The white is not the building. The red one in the middle is the contract.',
   },
 };

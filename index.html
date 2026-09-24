@@ -114,6 +114,9 @@
           <button id="orders-smoke" title="Lay a smoke screen the garrison cannot see through">SMOKE $120</button>
           <button id="orders-clear" title="Let the guns pick their own aim point">CLEAR TARGET</button>
         </div>
+        <div class="dr-row">
+          <button id="orders-survey" title="Paint the masonry by how much weight every stone is carrying">SURVEY</button>
+        </div>
       </section>
     </div>
     <div id="dock">
@@ -153,6 +156,17 @@
 
     <!-- Sound lives in the pause menu now; the rail it used to share with
          MENU and VIEW is gone, and those two are buttons on the dock. -->
+    <!-- The survey key. Only up while the survey is, and deliberately small:
+         it is a legend, not a readout, and the thing worth looking at is the
+         building. -->
+    <div id="survey-key" hidden>
+      <div class="sk-ramp"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="sk-ends"><span>IDLE</span><span>BEARING MOST</span></div>
+      <div class="sk-notes">
+        <span><i class="sk-infill"></i>INFILL &mdash; holds nothing up</span>
+        <span><i class="sk-gated"></i>YOUR GUNS WILL NOT CUT IT</span>
+      </div>
+    </div>
     <button id="sound-toggle" hidden></button>
     <button id="restore-btn" hidden>SHOW UI</button>
     <div id="menu" hidden>
@@ -218,6 +232,9 @@
         <div class="ec-title" id="ec-title">TOWER DOWN</div>
         <div class="ec-sub" id="ec-sub"></div>
         <div class="ec-stats" id="ec-stats"></div>
+        <!-- The three marks. A contract is closed or it is not; these are how
+             well, and they are the reason to run one twice. -->
+        <div class="ec-marks" id="ec-marks" hidden></div>
         <div class="ec-release" id="ec-release" hidden></div>
         <div class="ec-buttons">
           <button id="ec-next" class="ec-btn primary">NEXT TARGET</button>

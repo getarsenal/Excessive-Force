@@ -22,7 +22,7 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
 
 ```
 npx vite --port 5177 --strictPort &
-sh tools/suiteall.sh <id>...            # expect "<id>: 47 pass 0 fail" per level
+sh tools/suiteall.sh <id>...            # expect "<id>: 49 pass 0 fail" per level
 npx vite build
 ```
 

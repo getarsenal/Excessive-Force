@@ -31,6 +31,7 @@ export class HUD {
     this.onSmoke = opts.onSmoke || (() => {});
     this.onPause = opts.onPause || (() => {});
     this.onQuality = opts.onQuality || (() => {});
+    this.onSurvey = opts.onSurvey || (() => {});
     this.picker = opts.picker || null;
     this.qualityId = opts.qualityId || null;
     this.nextTargetLabel = null;
@@ -56,6 +57,7 @@ export class HUD {
       tcBriefGuns: document.getElementById('tc-brief-guns'),
       feed: document.getElementById('feed'),
       endcard: document.getElementById('endcard'),
+      ecMarks: document.getElementById('ec-marks'),
       ecTitle: document.getElementById('ec-title'),
       ecSub: document.getElementById('ec-sub'),
       ecStats: document.getElementById('ec-stats'),
@@ -74,6 +76,8 @@ export class HUD {
       dockView: document.getElementById('dock-view'),
       dockMenu: document.getElementById('dock-menu'),
       ordersClear: document.getElementById('orders-clear'),
+      surveyBtn: document.getElementById('orders-survey'),
+      surveyKey: document.getElementById('survey-key'),
       ordersModes: document.getElementById('orders-modes'),
       menuBtn: document.getElementById('dock-menu'),
       menu: document.getElementById('menu'),
@@ -102,14 +106,27 @@ export class HUD {
     };
     this.el.clearBtn?.addEventListener('click', () => this.setClearView(true));
     this.el.restoreBtn?.addEventListener('click', () => this.setClearView(false));
+
+    // The survey. `onSurvey` is handed to the structures by `main`; the HUD
+    // owns only the button, the key and the legend, because the legend is the
+    // difference between a coloured building and a readable one.
+    this.survey = false;
+    this.setSurvey = (on) => {
+      this.survey = !!on;
+      this.el.surveyBtn?.classList.toggle('on', this.survey);
+      if (this.el.surveyKey) this.el.surveyKey.hidden = !this.survey;
+      this.onSurvey?.(this.survey);
+    };
+    this.el.surveyBtn?.addEventListener('click', () => this.setSurvey(!this.survey));
     window.addEventListener('keydown', (e) => {
       // Not over the report or the menu: the clear-view rule hides them too,
       // and left only the faint SHOW UI pill on a screen the player thought
       // had frozen.
-      if (e.code === 'KeyH' && !e.ctrlKey && !e.metaKey && !e.altKey
-          && !document.body.classList.contains('ended') && (!this.el.menu || this.el.menu.hidden)) {
-        this.setClearView(!this.clearView);
-      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (document.body.classList.contains('ended')) return;
+      if (this.el.menu && !this.el.menu.hidden) return;
+      if (e.code === 'KeyH') this.setClearView(!this.clearView);
+      if (e.code === 'KeyV') this.setSurvey(!this.survey);
     });
     this.soundOn = true;
     this.el.sound = document.getElementById('sound-toggle');
@@ -805,6 +822,29 @@ export class HUD {
       this.el.ecNext.textContent = this.nextTargetLabel
         ? `NEXT: ${this.nextTargetLabel}` : 'NEXT TARGET';
     }
+    // The marks.
+    //
+    // Closing a contract stops being interesting the first time; closing it
+    // in nine rounds when it took forty stays interesting, and that is the
+    // whole reason to run one again. Three of them rather than one medal,
+    // each won on its own, because coming in under the round count and coming
+    // in under budget are different skills and a single grade hides which one
+    // a player has.
+    if (this.el.ecMarks) {
+      const marks = won ? (opts.marks || []) : [];
+      this.el.ecMarks.hidden = !marks.length;
+      this.el.ecMarks.innerHTML = marks.map((m) => {
+        const fmt = (v) => (m.unit === '$' ? `$${v.toLocaleString()}`
+          : m.unit === 's' ? `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`
+            : v.toLocaleString());
+        return `<div class="ec-mark${m.won ? ' won' : ''}${m.best ? ' best' : ''}">`
+          + `<span class="em-label">${m.label}</span>`
+          + `<b class="em-got">${fmt(m.got)}</b>`
+          + `<span class="em-par">par ${fmt(m.par)}</span>`
+          + `${m.best ? '<span class="em-best">BEST</span>' : ''}</div>`;
+      }).join('');
+    }
+
     // What closing the contract bought. Said here rather than on the map,
     // because this is the moment it was earned.
     if (this.el.ecRelease) {

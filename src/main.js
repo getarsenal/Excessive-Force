@@ -13,7 +13,7 @@ import { buildFieldWorks } from './world/works.js';
 import { CoastalTurret } from './game/turret.js';
 import { Structure } from './structure/structure.js';
 import {
-  resolveStartLevel, recordResult, nextTarget, goToLevel,
+  resolveStartLevel, recordResult, marksFor, loadProgress, nextTarget, goToLevel,
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
 import { recordTheatre, releaseNoteFor } from './game/campaign.js';
@@ -509,6 +509,9 @@ async function boot() {
     onSmoke: () => battle.placeSmoke(),
     onPause: (p) => { testMenu.paused = p; },
     onQuality: (id) => { if (setQuality(id)) goToLevel(level.id); },
+    // The survey goes on every structure on the map, not just the contract:
+    // at Giza the answer to "what is holding Khafre up" is Khafre.
+    onSurvey: (on) => { for (const st of structures) st.setSurvey(on); },
     picker,
     qualityId: quality.id,
   });
@@ -520,6 +523,20 @@ async function boot() {
 
   // The win is written to the campaign once, whichever report shows it.
   let winRecorded = false;
+  /**
+   * The three marks for a finished run, and which of them are new bests.
+   *
+   * Asked before `recordResult` banks the run, because banking it rewrites
+   * the stored best — ask afterwards and every single run comes back a
+   * personal best, which is the same as none of them being one.
+   */
+  const markRun = (sum) => {
+    const rec = loadProgress()[level.id] || {};
+    const had = { rounds: rec.bestShots, spend: rec.bestSpent, time: rec.bestTime };
+    return marksFor(level, sum).map((m) => ({
+      ...m, best: had[m.id] == null || m.got < had[m.id],
+    }));
+  };
   function handleEvent(kind, data) {
     switch (kind) {
       case 'bounty':
@@ -623,6 +640,10 @@ async function boot() {
       case 'charge':
         hud.feed(`DEMOLITION CHARGE — ${data.destroyed} STONES`, 'big');
         break;
+      // The marks, and which of them fell to this run.
+      //
+      // Read *before* the result is banked, because banking it rewrites the
+      // best — ask afterwards and every run is a personal best.
       case 'win':
         // Let the collapse actually finish before covering it with a panel —
         // the tower coming down is the thing the player came for.
@@ -631,16 +652,18 @@ async function boot() {
           level.camera.distance * 1.3);
         setTimeout(() => {
           const sum = battle.summary();
+          const marks = markRun(sum);
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
-          hud.showEnd('win', sum, { release: releaseNoteFor(level.id) });
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks });
         }, 7000);
         break;
       case 'flattened':
         hud.feed('NOTHING LEFT STANDING', 'big');
         setTimeout(() => {
           const sum = battle.summary();
+          const marks = markRun(sum);
           // One play is one result, however many reports it shows.
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
@@ -649,6 +672,7 @@ async function boot() {
             title: 'Flattened',
             sub: `${level.subtitle} · nothing left standing`,
             release: releaseNoteFor(level.id),
+            marks,
           });
         }, 3000);
         break;
@@ -1274,6 +1298,11 @@ async function boot() {
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);
+    // The survey follows the solver. Throttled inside `paintSurvey` — the
+    // numbers only move when the stability pass runs, and repainting thirty
+    // thousand stones sixty times a second to watch that is a frame's work
+    // for nothing.
+    if (hud.survey) for (const st of structures) st.paintSurvey();
     // Anything the last frame uncovered goes off now, one frame late and
     // safely outside the pass that exposed it.
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());

@@ -620,6 +620,44 @@ html, body {
   opacity: 0.45; transition: opacity 0.25s ease;
 }
 #restore-btn:hover, #restore-btn:active { opacity: 1; }
+/* ── The survey key ──────────────────────────────────────────────────── */
+/* Bottom-left, clear of the dock and of the thumb that works it. It sits
+   inside #ui, so the clear view takes it with everything else: the survey is
+   for playing and the clear view is for looking. */
+#survey-key {
+  position: absolute; z-index: 26;
+  left: var(--ui-pad);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  width: min(238px, calc(100vw - var(--ui-pad) * 2));
+  padding: 9px 10px 8px;
+  background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  pointer-events: none;
+}
+#survey-key .sk-ramp { display: flex; height: 7px; }
+#survey-key .sk-ramp i { flex: 1 1 0; }
+/* The five stops the painter interpolates, in the same order. */
+#survey-key .sk-ramp i:nth-child(1) { background: #212352; }
+#survey-key .sk-ramp i:nth-child(2) { background: #24708c; }
+#survey-key .sk-ramp i:nth-child(3) { background: #47a870; }
+#survey-key .sk-ramp i:nth-child(4) { background: #debb42; }
+#survey-key .sk-ramp i:nth-child(5) { background: #d13828; }
+#survey-key .sk-ends {
+  display: flex; justify-content: space-between; margin-top: 5px;
+  font-size: 8px; letter-spacing: 0.10em; color: rgba(219, 227, 236, 0.62);
+}
+#survey-key .sk-notes {
+  display: flex; flex-direction: column; gap: 3px; margin-top: 7px;
+  padding-top: 6px; border-top: 1px solid rgba(150, 168, 190, 0.16);
+  font-size: 8px; letter-spacing: 0.08em; color: rgba(219, 227, 236, 0.62);
+}
+#survey-key .sk-notes span { display: flex; align-items: center; gap: 6px; }
+#survey-key .sk-notes i { width: 9px; height: 9px; flex: none; }
+#survey-key .sk-infill { background: #262c33; }
+#survey-key .sk-gated { background: #5d86ab; }
+#orders-survey.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
+
 /* One rule, so nothing new can be added to the HUD and quietly stay on
    screen through a clear view: everything inside #ui goes, and the handful
    of things that must remain are named back in. */
@@ -770,6 +808,27 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 .ec-stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
 .ec-stat span { color: var(--dim); }
 .ec-stat b { font-variant-numeric: tabular-nums; }
+/* The three marks, in a row that wraps to one per line on a narrow phone. */
+.ec-marks { display: flex; gap: 8px; margin: -10px 0 22px; flex-wrap: wrap; }
+.ec-mark {
+  flex: 1 1 96px; min-width: 96px; padding: 9px 10px;
+  border: 1px solid var(--edge); border-radius: 6px;
+  display: flex; flex-direction: column; gap: 1px; position: relative;
+}
+.ec-mark .em-label { font-size: 9px; letter-spacing: 0.18em; color: var(--dim); }
+.ec-mark .em-got { font-size: 17px; font-variant-numeric: tabular-nums; }
+.ec-mark .em-par {
+  font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums;
+}
+/* Taken. The border and the figure carry it; no tick, because three ticks in
+   a row on a dark card is a lot of noise for one bit of information each. */
+.ec-mark.won { border-color: rgba(224, 163, 60, 0.62); }
+.ec-mark.won .em-got { color: var(--warn); }
+.ec-mark .em-best {
+  position: absolute; top: 7px; right: 8px;
+  font-size: 8px; letter-spacing: 0.14em; color: var(--warn);
+}
+
 /* The buttons had no rules at all, so four native controls ran into each other
    in the middle of the report. One column, one order, one size. */
 .ec-buttons { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
@@ -1480,7 +1539,14 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 }
 .wm-rec div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 3px 0; border-bottom: 1px dashed #1d2836; }
 .wm-rec span { color: #7d8ea1; letter-spacing: 0.08em; }
-.wm-rec b { color: #e8eef6; font-variant-numeric: tabular-nums; }
+.wm-rec b { color: #e8eef6; font-variant-numeric: tabular-nums; margin-left: auto; }
+/* Par, small and after the figure, so the eye reads what was done first and
+   what it was measured against second. */
+.wm-rec i {
+  font-style: normal; font-size: 10px; color: #55677c; min-width: 62px;
+  text-align: right; font-variant-numeric: tabular-nums;
+}
+.wm-rec .beat b, .wm-rec .beat i { color: #e0a33c; }
 .wm-rec.none { font-size: 10px; letter-spacing: 0.18em; color: #46586b; padding-top: 6px; }
 .wm-release { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 8px 10px; border: 1px dashed #2b3a4a; border-radius: 6px; background: rgba(10, 16, 24, 0.5); }
 .wm-rel-icon { width: 84px; height: 52px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); flex: none; }

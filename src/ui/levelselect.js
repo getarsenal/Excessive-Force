@@ -33,24 +33,53 @@ function saveProgress(p) {
 /**
  * Record a finished level.
  *
- * Keeps the best run rather than the last one: most masonry down, and the
- * quickest time among winning runs.
+ * Keeps the best run rather than the last one: most masonry down, and among
+ * winning runs the quickest, the fewest rounds and the least money. Those
+ * last two are the point of keeping any of it. Finishing a contract is not
+ * interesting after the first time; finishing it in nine rounds when it took
+ * forty the first time is the whole game, and a record that only remembers
+ * *that* it was finished cannot tell the player they have got better.
  */
 export function recordResult(levelId, won, summary) {
   if (!levelId) return;
   const p = loadProgress();
   const was = p[levelId] || { runs: 0, won: false, bestScore: 0, bestTime: null };
+  const best = (had, got) => (!won || got == null ? had
+    : had == null ? got : Math.min(had, got));
   const next = {
     runs: was.runs + 1,
     won: was.won || !!won,
     bestScore: Math.max(was.bestScore || 0, Math.round(summary?.score || 0)),
-    bestTime: won
-      ? (was.bestTime == null ? summary?.time : Math.min(was.bestTime, summary?.time))
-      : was.bestTime,
+    bestTime: best(was.bestTime, summary?.time),
+    bestShots: best(was.bestShots, summary?.shotsFired),
+    bestSpent: best(was.bestSpent, summary?.spent),
   };
   p[levelId] = next;
   saveProgress(p);
   return next;
+}
+
+/**
+ * The three marks a contract can be closed with, and whether this run took
+ * them.
+ *
+ * Deliberately not one medal. A run that comes in under the round count is a
+ * different thing from one that comes in under budget, and rolling them into
+ * a single gold/silver/bronze hides which of the two a player is actually
+ * good at — as well as making two of the three marks invisible on any run
+ * that missed the third. Three marks, each independently won.
+ */
+export function marksFor(level, summary) {
+  const par = level?.par;
+  if (!par || !summary) return [];
+  return [
+    { id: 'rounds', label: 'ROUNDS', par: par.rounds, got: summary.shotsFired,
+      unit: '', won: summary.shotsFired <= par.rounds },
+    { id: 'spend', label: 'BUDGET', par: par.spend, got: Math.round(summary.spent),
+      unit: '$', won: Math.round(summary.spent) <= par.spend },
+    { id: 'time', label: 'CLOCK', par: par.minutes * 60, got: Math.round(summary.time),
+      unit: 's', won: summary.time <= par.minutes * 60 },
+  ];
 }
 
 /** The next target after `id` that has not been taken down yet. */

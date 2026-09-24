@@ -1894,6 +1894,155 @@ export class Structure {
     for (const e of dirty) e.mesh.instanceColor.needsUpdate = true;
   }
 
+  /**
+   * Survey: paint the building by how hard every stone is working.
+   *
+   * The engine already solves this. `load[i]` is the weight in newtons
+   * arriving on a stone from everything it carries, `strength[i]` is what its
+   * plan area and material will take, and damage scales that capacity down —
+   * which is how a shelled column comes to fail under a load it held all
+   * morning. The ratio of the two is how close a stone is to crushing, and on
+   * an intact Elizabeth Tower it runs from a fifteen-hundredth at the
+   * parapets to seven tenths at the foot of the shaft.
+   *
+   * Nothing here says where to shoot. It shows the load path and leaves the
+   * reading to the player, which is the whole point: a keystone, a corner
+   * pier, the one course an arcade is standing on — they light up because
+   * they *are* working hardest, not because a designer flagged them. Take one
+   * and the stones beside it go from green to red while you watch, because
+   * the solver has genuinely handed them the load.
+   *
+   * Two things are shown that are not load. Infill — glazing, applied
+   * ornament — is drawn flat and dark, because it carries nothing and never
+   * will. And stone the guns are gated against (`minPower`: the Burj's core,
+   * its raft, a steel mast) keeps the ramp but in steel blue, so "that is
+   * holding the tower up" and "you have nothing that will cut it" read as two
+   * different facts rather than one.
+   */
+  setSurvey(on) {
+    const want = !!on;
+    if (want === !!this._survey) return want;
+    this._survey = want;
+    if (want) {
+      // Snapshot what the stone actually looks like now, soot and all, so
+      // turning the survey off does not scrub a morning's damage off it.
+      this._surveyBase = this.meshes.map((e) => e.mesh.instanceColor.array.slice());
+      this.paintSurvey(true);
+    } else {
+      this.meshes.forEach((e, k) => {
+        e.mesh.instanceColor.array.set(this._surveyBase[k]);
+        e.mesh.instanceColor.needsUpdate = true;
+      });
+      this._surveyBase = null;
+    }
+    return want;
+  }
+
+  /** How close stone `i` is to crushing: 1 is the moment it goes. */
+  utilisation(i) {
+    const cap = this.strength[i] * (this.health[i] / this.maxHealth[i]);
+    if (!(cap > 0)) return 1;
+    return (this.mass[i] * 9.81 + this.load[i]) / cap;
+  }
+
+  /**
+   * Repaint the survey. Called on a throttle rather than every frame: it is
+   * one pass over every stone, which is a millisecond on a big structure and
+   * not worth paying sixty times a second to watch a number that only moves
+   * when the solver runs.
+   */
+  paintSurvey(force = false) {
+    if (!this._survey) return;
+    const now = performance.now();
+    if (!force && now - (this._surveyAt || 0) < 150) return;
+    this._surveyAt = now;
+    // Scaled to this building, not to an absolute.
+    //
+    // A tower and a pyramid do not work their stone alike: the Elizabeth
+    // Tower's median stone sits at a sixth of capacity and the Burj's at a
+    // twentieth, so one fixed ramp paints the Burj uniformly idle and says
+    // nothing. The scale is the structure's own ninety-fifth percentile,
+    // sampled rather than sorted whole, and re-measured every couple of
+    // seconds because knocking a pier out is exactly the event that moves it.
+    if (force || now - (this._surveyScaleAt || 0) > 2000) {
+      const sample = [];
+      for (let i = 0; i < this.count; i += 7) {
+        if (!(this.flags[i] & ALIVE) || !this.structural[i]) continue;
+        sample.push(this.utilisation(i));
+      }
+      sample.sort((a, b) => a - b);
+      // A floor on the scale: an untouched building with nothing working hard
+      // should read as an untouched building, not have its noise amplified
+      // into a rainbow.
+      this._surveyHi = Math.max(0.12, sample.length
+        ? sample[Math.floor(sample.length * 0.95)] : 1);
+      this._surveyScaleAt = now;
+    }
+    const hi = this._surveyHi || 1;
+    // One smoothing pass over the neighbour graph.
+    //
+    // Load splits evenly between whatever a stone is standing on, so a stone
+    // with one supporter takes twice what its neighbour with two does, and
+    // the raw field comes out as speckle. That is true and it is unreadable:
+    // half of it is which way the bond happened to fall. Half the stone's own
+    // figure and half its neighbours' mean leaves the bands where they are
+    // and takes the noise out of them.
+    const util = this._surveyU || (this._surveyU = new Float32Array(this.count));
+    for (let i = 0; i < this.count; i++) {
+      util[i] = (this.flags[i] & ALIVE) && this.structural[i] ? this.utilisation(i) : -1;
+    }
+    const smooth = this._surveyS || (this._surveyS = new Float32Array(this.count));
+    for (let i = 0; i < this.count; i++) {
+      if (util[i] < 0) { smooth[i] = util[i]; continue; }
+      let sum = 0, n = 0;
+      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+        const j = this.adjList[a];
+        if (util[j] >= 0) { sum += util[j]; n++; }
+      }
+      smooth[i] = n ? util[i] * 0.5 + (sum / n) * 0.5 : util[i];
+    }
+    // Cool to hot, ordered so that the ramp reads even in shadow: indigo,
+    // teal, green, amber, red. Five stops rather than two because a two-stop
+    // wash puts four fifths of a building in the same colour.
+    const RAMP = [
+      [0.13, 0.14, 0.32], [0.14, 0.44, 0.55], [0.28, 0.66, 0.44],
+      [0.87, 0.73, 0.26], [0.82, 0.22, 0.16],
+    ];
+    for (const entry of this.meshes) {
+      const props = MATERIAL_PROPS[entry.matId] || {};
+      const gated = props.minPower > 0;
+      const a = entry.mesh.instanceColor.array;
+      for (let k = 0; k < entry.list.length; k++) {
+        const i = entry.list[k];
+        const o = k * 3;
+        if (!(this.flags[i] & ALIVE)) { a[o] = 0.04; a[o + 1] = 0.04; a[o + 2] = 0.05; continue; }
+        if (!this.structural[i]) { a[o] = 0.15; a[o + 1] = 0.17; a[o + 2] = 0.20; continue; }
+        // Where this stone sits among its own building's — and then, over the
+        // top of that, an absolute: a stone genuinely near crushing reads hot
+        // whatever the rest of the structure is doing, because that is a fact
+        // about the stone and not a ranking.
+        const u = smooth[i];
+        const t = Math.max(
+          Math.pow(Math.min(1, u / hi), 0.85),
+          Math.min(1, Math.max(0, (u - 0.6) / 0.35)),
+        );
+        const f = t * (RAMP.length - 1);
+        const lo = Math.min(RAMP.length - 2, Math.floor(f));
+        const frac = f - lo;
+        let r = RAMP[lo][0] + (RAMP[lo + 1][0] - RAMP[lo][0]) * frac;
+        let g = RAMP[lo][1] + (RAMP[lo + 1][1] - RAMP[lo][1]) * frac;
+        let b = RAMP[lo][2] + (RAMP[lo + 1][2] - RAMP[lo][2]) * frac;
+        if (gated) {
+          // Steel: the same brightness, a different fact.
+          const v = 0.3 + (r + g + b) / 3;
+          r = v * 0.45; g = v * 0.62; b = v * 0.78;
+        }
+        a[o] = r; a[o + 1] = g; a[o + 2] = b;
+      }
+      entry.mesh.instanceColor.needsUpdate = true;
+    }
+  }
+
   /** Scale a stone's colour: uniform, and a little more on green and blue. */
   _tint(i, k, kg, kb, dirty) {
     const entry = this.meshes[this.meshIndexOf[i]];

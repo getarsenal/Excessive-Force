@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, makeInfantryMesh } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
-import { LEVELS } from '../game/levels.js';
+import { LEVELS, LEVEL_ORDER } from '../game/levels.js';
+import { marksFor } from './levelselect.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveArc } from '../game/projectiles.js';
 import { junctionRing, padRadius, halfWidth, bearingNear } from '../world/streets.js';
@@ -2713,6 +2714,72 @@ export class TestMenu {
           P.setBudget(wasBudget);
         }
       })],
+
+      ['the survey reads the load and puts the colour back', () => this._calm(() => {
+        // Two claims. That the survey is showing the solver's own numbers —
+        // a building whose every stone came back at the same utilisation
+        // would be a painter making the picture up — and that turning it off
+        // restores the stone, *including* damage done while it was on. The
+        // second is the one that would be caught late and look like a
+        // rendering bug: soot and scorch live in the same instance colours
+        // the survey overwrites.
+        const st = b.primary;
+        const before = st.meshes.map((e) => Array.from(e.mesh.instanceColor.array));
+
+        let lo = Infinity, hi = -Infinity, n = 0;
+        for (let i = 0; i < st.count; i++) {
+          if (!(st.flags[i] & 1) || !st.structural[i]) continue;
+          const u = st.utilisation(i);
+          assert(isFinite(u) && u >= 0, `stone ${i} has a nonsense load: ${u}`);
+          lo = Math.min(lo, u); hi = Math.max(hi, u); n++;
+        }
+        assert(n > 0, 'nothing structural to survey');
+        assert(hi > lo * 2,
+          `the load is flat across the whole structure (${lo.toFixed(4)}..${hi.toFixed(4)}) — `
+          + 'the survey would be painting one colour');
+
+        st.setSurvey(true);
+        let changed = 0;
+        st.meshes.forEach((e, k) => {
+          const a = e.mesh.instanceColor.array;
+          for (let x = 0; x < a.length; x++) if (Math.abs(a[x] - before[k][x]) > 0.002) changed++;
+        });
+        assert(changed > 0, 'the survey turned on and painted nothing');
+
+        st.setSurvey(false);
+        let wrong = 0;
+        st.meshes.forEach((e, k) => {
+          const a = e.mesh.instanceColor.array;
+          for (let x = 0; x < a.length; x++) if (Math.abs(a[x] - before[k][x]) > 1e-4) wrong++;
+        });
+        assert(wrong === 0, `${wrong} instance colours were not put back after the survey`);
+        return `load ${lo.toFixed(4)}..${hi.toFixed(2)} over ${n} stones; colour restored`;
+      })],
+
+      ['every level has a par a player could hold in their head', () => {
+        // Par is three integers per level and the marks are read straight off
+        // them, so a missing or nonsense one is three blank chips on the end
+        // card and a dossier that cannot say whether a run was any good.
+        const bad = [];
+        for (const id of LEVEL_ORDER) {
+          const p = LEVELS[id]?.par;
+          if (!p) { bad.push(`${id}: none`); continue; }
+          if (!(p.rounds > 0) || !(p.spend > 0) || !(p.minutes > 0)) bad.push(`${id}: ${JSON.stringify(p)}`);
+          // A clock par the round par cannot be met inside is not a par, it
+          // is a second way of saying the same thing.
+          if (p.minutes * 60 < p.rounds * 1.2) bad.push(`${id}: ${p.minutes}m is under ${p.rounds} rounds`);
+        }
+        assert(bad.length === 0, `par is wrong on ${bad.length}: ${bad.slice(0, 4).join('; ')}`);
+
+        // And the marks read it. A run exactly on par takes the mark; one
+        // round over does not.
+        const lv = LEVELS[b.level.id];
+        const on = marksFor(lv, { shotsFired: lv.par.rounds, spent: lv.par.spend, time: lv.par.minutes * 60 });
+        const over = marksFor(lv, { shotsFired: lv.par.rounds + 1, spent: lv.par.spend + 1, time: lv.par.minutes * 60 + 1 });
+        assert(on.length === 3 && on.every((m) => m.won), 'a run exactly on par took no mark');
+        assert(over.every((m) => !m.won), 'a run over par took a mark anyway');
+        return `${LEVEL_ORDER.length} levels; ${b.level.id} par ${lv.par.rounds} rounds`;
+      }],
 
       ['no stone is ever drawn the size of a district', () => this._calm(() => {
         // The worst thing this engine has done on screen, and it was a
