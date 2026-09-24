@@ -148,6 +148,20 @@ export class Engine {
 
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
+    // Safari on a phone changes the size of the page without always saying
+    // so. The toolbar collapsing on a scroll, the swipe-back gesture being
+    // started and abandoned, coming back from another tab — each of these
+    // can grow the viewport while the page is not being told, or while it is
+    // hidden and the event is thrown away. The HUD is CSS and reflows on its
+    // own; the canvas is whatever size it was last given, so the game came
+    // back with a black band down the right edge and across the bottom and
+    // the UNITS readout sitting out in the black. These are the events that
+    // do get sent in those cases; the frame loop below is the guarantee.
+    this._onShown = () => { if (!document.hidden) this._onResize(); };
+    window.visualViewport?.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', this._onResize);
+    window.addEventListener('pageshow', this._onShown);
+    document.addEventListener('visibilitychange', this._onShown);
     this._onResize();
   }
 
@@ -300,10 +314,23 @@ export class Engine {
   _onResize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
+    this._sizedW = w; this._sizedH = h;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
+  }
+
+  /**
+   * Is the canvas still the size of the window? Asked every frame, because
+   * no set of events is enough: whatever Safari does or does not send, the
+   * next frame drawn while the page is visible is drawn at the right size.
+   * Two integer reads a frame; the resize itself only runs when they differ.
+   */
+  _checkSize() {
+    if (window.innerWidth !== this._sizedW || window.innerHeight !== this._sizedH) {
+      this._onResize();
+    }
   }
 
   /**
@@ -369,10 +396,14 @@ export class Engine {
     return this._shakeVec;
   }
 
-  render() { this.composer.render(); }
+  render() { this._checkSize(); this.composer.render(); }
 
   dispose() {
     window.removeEventListener('resize', this._onResize);
+    window.visualViewport?.removeEventListener('resize', this._onResize);
+    window.removeEventListener('orientationchange', this._onResize);
+    window.removeEventListener('pageshow', this._onShown);
+    document.removeEventListener('visibilitychange', this._onShown);
     this.renderer.dispose();
   }
 }
