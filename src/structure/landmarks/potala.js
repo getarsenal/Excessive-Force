@@ -105,6 +105,13 @@ const TIERS = [
   { w: 326.0, d: 172.0, top: -14.0, z: 32.0, wall: 8.0 },
   { w: 312.0, d: 150.0, top: 12.0, z: 16.0, wall: 7.0 },
 ];
+// Where the wall above each tier stands, so the tier knows how wide its own
+// front walk has to be to reach it. The innermost one hands off to the main
+// terrace, which is the wall the last flight of the stair climbs.
+for (let i = 0; i < TIERS.length; i++) {
+  const next = TIERS[i + 1];
+  TIERS[i].nextFace = next ? next.z + next.d / 2 : TERRACE.d / 2;
+}
 
 /**
  * The blocks of the palace, east to west, laid on the terrace deck.
@@ -204,12 +211,23 @@ const SHOL = [];
  * the one below so the pile's top follows the climb, and so that every stone
  * in it stands on the stone under it rather than on air.
  */
+// Three rules, all of which the first cut broke.
+//
+// Every flight ends where the next one begins — the old ones were twenty
+// metres apart in plan at every junction, which is exactly the "attached to
+// nothing, not even each other" you can see from the road. Every flight sits
+// four metres south of the wall it is climbing, so it leans on masonry
+// instead of hanging over the trench behind it. And every flight is about
+// seventy metres long for twenty-odd of rise, which is a stair at twenty
+// degrees; the old ones ran a hundred and forty-four metres for the same
+// climb, which is a ramp at nine degrees and reads as a ribbon lying on the
+// hill rather than as steps going up it.
 const STAIR = [
-  { x0: 152.0, z0: 218.0, x1: 8.0, z1: 216.0, y0: -84.0, y1: TIERS[0].top },
-  { x0: -6.0, z0: 200.0, x1: 134.0, z1: 198.0, y0: TIERS[0].top, y1: TIERS[1].top },
-  { x0: 152.0, z0: 156.0, x1: 8.0, z1: 154.0, y0: TIERS[1].top, y1: TIERS[2].top },
-  { x0: -6.0, z0: 123.0, x1: 134.0, z1: 121.0, y0: TIERS[2].top, y1: TIERS[3].top },
-  { x0: 140.0, z0: 91.0, x1: 8.0, z1: 89.0, y0: TIERS[3].top, y1: TERRACE.h },
+  { x0: 78.0, z0: 219.0, x1: 8.0, z1: 219.0, y0: -84.0, y1: TIERS[0].top },
+  { x0: 8.0, z0: 152.0, x1: 78.0, z1: 152.0, y0: TIERS[0].top, y1: TIERS[1].top },
+  { x0: 78.0, z0: 122.0, x1: 8.0, z1: 122.0, y0: TIERS[1].top, y1: TIERS[2].top },
+  { x0: 8.0, z0: 95.0, x1: 78.0, z1: 95.0, y0: TIERS[2].top, y1: TIERS[3].top },
+  { x0: 78.0, z0: 69.0, x1: 8.0, z1: 69.0, y0: TIERS[3].top, y1: TERRACE.h },
 ];
 
 /** Where a battered wall's face is at height `y` of a block `h` tall. */
@@ -319,6 +337,26 @@ export function buildPotalaPalace(quality) {
       // can see.
       B.ring(0, t.z, t.w + 1.4, t.d + 1.4, t.wall * 2.4,
         t.top - course * 0.6, course * 0.6, stone, M.MARBLE);
+      // And then the walk across the front, from this tier's own face back to
+      // the face of the one above it.
+      //
+      // Without this there is nothing between the terraces at all. Each tier
+      // is a hollow ring, so the band between one tier's inner edge and the
+      // next tier's wall is a void running the whole way down to the
+      // foundation — and the great stair was switchbacking across it. That is
+      // what "sits randomly spaced out, attached to nothing" was: flights
+      // climbing through open air over a trench, landing on a walk that
+      // stopped forty metres short of the wall they were climbing to.
+      //
+      // Laid as one course over the front band only, which is about three
+      // thousand stones across the four tiers rather than the twenty thousand
+      // a full plate would cost, and is also what the photographs show: broad
+      // white walks across the front of every level.
+      const faceZ = t.z + t.d / 2;
+      if (t.nextFace < faceZ) {
+        B.slab(0, t.top - course * 0.3, (t.nextFace + faceZ) / 2,
+          t.w, course * 0.6, faceZ - t.nextFace, stone, M.MARBLE);
+      }
       // The kyema under each terrace's lip. A band of shadow along every
       // roofline is the one mark that makes a Tibetan wall read as Tibetan,
       // and without it four hundred metres of battered stone is a dam.
@@ -375,7 +413,7 @@ export function buildPotalaPalace(quality) {
       const dx = f.x1 - f.x0, dz = f.z1 - f.z0;
       const len = Math.hypot(dx, dz);
       const yaw = Math.atan2(-dz, dx);
-      const halfW = 7.0;
+      const halfW = 6.5;
       const rise = f.y1 - f.y0;
       courses(f.y0, f.y1, course, (y, h, c) => {
         // Each course starts further along the run than the one below it, so
@@ -398,8 +436,14 @@ export function buildPotalaPalace(quality) {
           }
         }
       });
-      // The two parapets, on the climb, which is the line that reads white
-      // against the hill from three kilometres away.
+      // The two parapets, on the climb.
+      //
+      // In kyema, not marble. A white handrail on a white ramp against a white
+      // wall is invisible — the stair had the right geometry and still read as
+      // a lump, because nothing edged it. The real one is banded in the same
+      // dark red-brown as every other Tibetan roofline, and that dark line
+      // running diagonally up the face is what your eye actually follows in
+      // every photograph of the place.
       const n = Math.max(2, Math.round(len / stone));
       for (let i = 0; i < n; i++) {
         const u = (i + 0.5) / n;
@@ -407,8 +451,8 @@ export function buildPotalaPalace(quality) {
         for (const side of [-1, 1]) {
           const ox = side * Math.sin(yaw) * (halfW - 1.1);
           const oz = side * Math.cos(yaw) * (halfW - 1.1);
-          B.add(f.x0 + dx * u + ox, y + course * 0.9, f.z0 + dz * u + oz,
-            (len / n) / 2, course * 1.3, 1.5, M.MARBLE, yaw);
+          B.add(f.x0 + dx * u + ox, y + course * 0.5, f.z0 + dz * u + oz,
+            (len / n) / 2, course * 0.45, 1.4, M.KYEMA, yaw);
         }
       }
     }
