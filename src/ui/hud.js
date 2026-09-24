@@ -288,6 +288,12 @@ export class HUD {
         }
       }
       this.openDrawer = next;
+      // The drawers glide up into the bottom-left corner, which is where the
+      // survey switch lives, and the switch is above them in z — so with
+      // UNITS open, the tap meant for the first gun card landed on SURVEY
+      // instead. The switch steps aside while a drawer is up; the survey
+      // itself stays on if it was on.
+      document.body.classList.toggle('drawer-open', !!next);
     };
     this.closeDrawer = () => { if (this.openDrawer) this.setDrawer(null); };
 

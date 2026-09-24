@@ -653,6 +653,9 @@ html, body {
 }
 #survey-btn.on kbd { border-color: rgba(88, 166, 255, 0.42); color: var(--accent); }
 
+/* Out of the way while a drawer is up: the drawers rise into this corner. */
+body.drawer-open #survey-btn, body.drawer-open #survey-key { display: none; }
+
 #survey-key {
   position: absolute; z-index: 26;
   left: var(--ui-pad);
