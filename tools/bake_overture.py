@@ -1056,7 +1056,43 @@ def bake_far_water(sink, level_id, lat0, lon0, span):
     return frac
 
 
-def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None):
+def _water_surface(w: np.ndarray, height: np.ndarray, size: int) -> float:
+    """Where the surface of the water is.
+
+    The DEM already knows, and it is the only thing here that does. Terrarium
+    fills every water body flat at its own shoreline, so the elevation under a
+    real coastline is a plateau at the water's true level — take its median and
+    that is the surface, to within the sampling error.
+
+    The two obvious alternatives are both wrong, and were both tried. The
+    deepest point on the map plus a constant is what the loader falls back to,
+    and Sydney's deepest sample is nine metres down in the middle of the
+    harbour: five metres above that is three below the quay, so the tide goes
+    out across the whole map. The shoreline's own height is worse, because a
+    surface model's shoreline includes the buildings standing on it — the
+    thirtieth percentile of Sydney's came to 5.3 m, which is a metre over the
+    Opera House's own ground, and Bennelong Point went under the harbour.
+
+    The middle of the plateau. Three quarters of the way up it was tried, to
+    keep the Thames from sitting two metres under its own embankment, and it is
+    the wrong trade: the Thames is tidal and has a real foreshore, while Sydney
+    Harbour does not, and a surface pushed up to 2.5 m there is above the quay —
+    which took four hundred of the city's seven hundred buildings out as
+    standing in the water.
+    """
+    wet = w > 0.5
+    if wet.sum() > size * size * 0.004:
+        surface = float(np.median(height[wet]))
+    else:
+        surface = float(np.percentile(height, 4))
+    # And never above the land: whatever the DEM says, a water plane over the
+    # dry fifth of the map is a flood, not a coastline.
+    dry = height[~wet] if (~wet).any() else height
+    return min(surface, float(np.percentile(dry, 12)))
+
+
+def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
+              cut_peak=False):
     """Rewrite the water and green channels of the level's mask from real data,
     and cut the bed the new water needs.
 
@@ -1089,6 +1125,33 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None):
         # middle of Sydney Harbour. Dilating and then eroding by the same
         # amount closes the seams and leaves the real coastline where it was.
         w = close(w, 2)
+        # Drop the water the landform swallowed — on a cut hill, and only
+        # there.
+        #
+        # A level with a `peak` has its hill carved in after the DEM is fetched
+        # and before this runs, and the cut takes no notice of what the survey
+        # says is wet. Lhasa has ponds at the foot of Marpo Ri and a couple on
+        # its flank; the cut lifted the ground under them by a hundred metres,
+        # and the clamp at the bottom of this function then drove every one of
+        # those pixels back down to the waterline — with no feather, because
+        # the feather is on the bed cut and not on the clamp. The result was a
+        # vertical-sided canyon a hundred metres deep across the face of the
+        # hill with a pond lying in the bottom of it, which is what the Potala
+        # was standing behind.
+        #
+        # There is one water plane per map, so water that ends up well above it
+        # is not representable whatever is done with the ground: it stops being
+        # water. But only where a cut put it there. Run over a real coastline
+        # the same test throws away a fifth of Sydney Harbour, because a
+        # surveyed polygon laps a metre or two of headland everywhere it meets
+        # one and a surface model's headland is a cliff.
+        if cut_peak:
+            surf0 = _water_surface(w, height, size)
+            swallowed = (w > 0.5) & (height > surf0 + 14.0)
+            if swallowed.any():
+                drowned = float(swallowed.mean() * 100)
+                w = np.where(swallowed, 0.0, w)
+                print(f"  dropped water the cut swallowed: {drowned:.2f}% of the map")
         # Replaced, not unioned: where a real shoreline exists it is the
         # shoreline, and the level's own typed river was skipped upstream.
         mask[:, :, 0] = w
@@ -1132,14 +1195,7 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None):
         # 2.5 m there is above the quay — which took four hundred of the city's
         # seven hundred buildings out as standing in the water.
         wet = w > 0.5
-        if wet.sum() > size * size * 0.004:
-            surface = float(np.median(height[wet]))
-        else:
-            surface = float(np.percentile(height, 4))
-        # And never above the land: whatever the DEM says, a water plane over
-        # the dry fifth of the map is a flood, not a coastline.
-        dry = height[~wet] if (~wet).any() else height
-        surface = min(surface, float(np.percentile(dry, 12)))
+        surface = _water_surface(w, height, size)
         bed = surface - 4.5
         cut = np.minimum(height, bed)
         height = height * (1 - soft) + cut * soft
@@ -1327,7 +1383,8 @@ def bake(level_id):
     mpath = TERRAIN_DIR / f"{level_id}.json"
     if mpath.exists():
         bake_mask(sink, level_id, lat0, lon0, span,
-                  json.loads(mpath.read_text()), water if natural else [], roads)
+                  json.loads(mpath.read_text()), water if natural else [], roads,
+                  cut_peak="peak" in cfg)
         meta = json.loads(mpath.read_text())
         meta["farSpan"] = span * FAR
         meta["farWater"] = round(far, 4)

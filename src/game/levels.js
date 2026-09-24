@@ -888,12 +888,12 @@ export const LEVELS = {
     palette: {
       urban: new THREE.Color(0xc0b49c),
       urbanAlt: new THREE.Color(0xa89a80),
-      park: new THREE.Color(0x6a7a48),
-      parkAlt: new THREE.Color(0x7b8a52),
+      park: new THREE.Color(0x6f6c46),
+      parkAlt: new THREE.Color(0x7d764e),
       road: new THREE.Color(0x585552),
       bank: new THREE.Color(0xc8bb9a),
       bed: new THREE.Color(0x4d6a63),
-      dry: new THREE.Color(0xb9a882),
+      dry: new THREE.Color(0xb09a74),
     },
     // Thin air over a dry valley. At three and a half kilometres there is a
     // third less atmosphere above you than at sea level, the light is hard,
@@ -904,13 +904,13 @@ export const LEVELS = {
       haze: { colour: 0xc9d6e2, density: 0.00016 },
       roofPitch: 0.18,
     },
-    // The whole map inside the last shelf is mountain, so the town starts
-    // where the mountain stops — which is where Shöl really stands, at the
-    // foot of Marpo Ri. Five hundred and seventy is the outer edge of the
-    // third firing step; the surveyed Lhasa that is left is in the corners
-    // and out past the boundary in the surround, exactly as Rio's is.
-    cityExcludeRadius: 560,
-    contextExclude: 545,
+    // Lhasa comes up the lower slopes, which is what the place looks like:
+    // the town runs right to the foot of Marpo Ri and a fair way up it, and
+    // held off to the far corners the hill stood in a paddock. Four hundred
+    // and thirty clears the palace's own pad and the first firing shelf and
+    // lets the surveyed town have everything below the second.
+    cityExcludeRadius: 430,
+    contextExclude: 415,
     // The bake cut Marpo Ri to a mesa at 3782 m; the game's own pad must
     // level to that and not to the median of a ring that straddles the
     // summit's edge, which took twenty-one metres off the top and left a
@@ -952,13 +952,14 @@ export const LEVELS = {
     // the recycler to freeze, which is a fact about rammed earth and not a
     // fault. `sheds` says so; the suite reads it.
     traits: { windows: true, river: false, topples: false, sheds: false },
-    // Two million three hundred and sixty thousand cubic metres, second only
-    // to the Giza plateau. Unlocks are a fraction of all the mass on the map,
-    // so unscaled an AT4 would earn a hundredth of a per cent and nothing
-    // past the first two weapons would ever come out of the depot. Giza
-    // carries sixteen on two point eight million; this carries fourteen on
-    // two point four.
-    unlockScale: 14,
+    // Four million four hundred thousand cubic metres: the heaviest thing in
+    // the campaign, half again as much as the Giza plateau, once the terraces
+    // and the village on them were built as what they are. Unlocks are a
+    // fraction of all the mass on the map, so unscaled an AT4 would earn a
+    // two-hundredth of a per cent and nothing past the first two weapons
+    // would ever come out of the depot. Giza carries sixteen on two point
+    // eight million; this carries twenty-four on four point four.
+    unlockScale: 24,
     brief: 'The white is not the building. The red one in the middle is the contract.',
   },
 };

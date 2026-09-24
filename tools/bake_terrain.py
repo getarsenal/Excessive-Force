@@ -316,6 +316,13 @@ LEVELS = {
                 [396.0, 76.0],
                 [486.0, 84.0],
             ],
+            # Crags. The default wobble is two low harmonics, which weathers a
+            # summit into a smooth dome; Marpo Ri is a rock outcrop and reads
+            # as one only with the finer orders in it as well.
+            "wobble": [
+                [0.11, 3, 1.1], [0.06, 7, 0.4],
+                [0.035, 13, 2.2], [0.018, 23, 0.9],
+            ],
             "fade": 100.0,
         },
     },
