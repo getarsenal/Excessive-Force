@@ -27,21 +27,24 @@ npx vite build
 ```
 
 `suiteall.sh` runs three browsers at a time against the one dev server, which
-is what the box has cores for: all fourteen levels in eleven minutes rather
-than thirty-three. `JOBS=1` for a clean timing, `TIER=high` for another tier. It sets
+is what the box has cores for: all sixteen levels in thirteen minutes rather
+than thirty-eight. `JOBS=1` for a clean timing, `TIER=high` for another tier. It sets
 `TT_SUITE=1`, which drops the three screenshots and the twelve seconds of
 settling between them — those exist so a human can look, and a regression run
 is not a human looking.
 
 Iterate on *one* level. A change to the masonry is a change to the masonry on
 every map, and finding that out costs seven minutes each time; find the fault
-on one level, fix the batch, then run the nine once.
+on one level, fix the batch, then run the sixteen once. `suiteall.sh` rewrites
+`<id>-console.txt` only when that level's run *finishes*, so a report read out
+of a batch still in flight is the previous run's — check the file's mtime
+before believing a failure.
 
 Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
 `chichen`, `pisa`, `sydney`, `moscow`, `rio`, `athens`, `istanbul`,
-`cologne`, `himeji`, `dubai`. Tiers: `low` (phones; the
-grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out in
-the software rasteriser; verify those at low.
+`cologne`, `himeji`, `petronas`, `dubai`, `potala`. Tiers: `low` (phones;
+the grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out
+in the software rasteriser; verify those at low.
 
 `node tools/mapcheck.mjs <level>` says whether a level is wired everywhere
 it has to be (tables, bakes, contract, portrait, recon) before the suite is
