@@ -377,6 +377,339 @@ LEVELS = {
             [350, -350, 80, 60],      # the Sphinx enclosure
         ],
     },
+    "colosseum": {
+        "name": "Colosseum, Rome",
+        "lat": 41.89021,
+        "lon": 12.49223,
+        "span": 900.0,
+        "zoom": 15,
+        # The surface model has the amphitheatre itself as a fifty-metre drum;
+        # the game builds its own. Rome's roofs, compressed.
+        "ceiling": 48.0,
+        "parks": [[-260, -140, 230], [170, 210, 170]],
+        "flatten": [[0, 0, [110, 95], 34]],
+    },
+    "towerbridge": {
+        "name": "Tower Bridge, London",
+        "lat": 51.50760,
+        "lon": -0.07610,
+        "span": 900.0,
+        "zoom": 15,
+        # The City's towers and the Shard are in the surface model.
+        "ceiling": 40.0,
+        # The Thames comes from the survey. The origin is the north abutment,
+        # on Tower Hill, and the bridge is built south from it across the water.
+        "parks": [[-140, 60, 110]],
+    },
+    "florence": {
+        "name": "Florence Cathedral, Florence",
+        "lat": 43.77313,
+        "lon": 11.256,
+        "span": 900.0,
+        "zoom": 15,
+        # Brunelleschi's dome is a hundred and fourteen metres of surface model.
+        "ceiling": 62.0,
+        "flatten": [[0, 0, [100, 62], 30]],
+        "parks": [],
+    },
+    "segovia": {
+        "name": "Aqueduct of Segovia, Segovia",
+        "lat": 40.94795,
+        "lon": -4.11798,
+        "span": 900.0,
+        "zoom": 15,
+        # No pad. The aqueduct exists because the ground under it is not level:
+        # the Azoguejo is the low point and the old town climbs west of it. The
+        # builder founds every pier down to meet the rock.
+        "ceiling": 1020.0,
+        "parks": [[380, 160, 160]],
+    },
+    "atomium": {
+        "name": "Atomium, Brussels",
+        "lat": 50.89494,
+        "lon": 4.34144,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 36.0,
+        "parks": [[-330, -160, 300], [300, 340, 260]],
+        "flatten": [[0, 0, 70, 30]],
+    },
+    "tokyotower": {
+        "name": "Tokyo Tower, Tokyo",
+        "lat": 35.65858,
+        "lon": 139.74543,
+        "span": 900.0,
+        "zoom": 15,
+        # Minato's towers are in the surface model, and so is the tower.
+        "ceiling": 46.0,
+        "parks": [[-40, -160, 210], [160, 120, 120]],
+        "flatten": [[0, 0, 75, 30]],
+    },
+    "budapest": {
+        "name": "Hungarian Parliament, Budapest",
+        "lat": 47.50704,
+        "lon": 19.04569,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 122.0,
+        # The Danube comes from the survey; the House stands on its bank.
+        "parks": [[120, 40, 90]],
+        "flatten": [[0, 0, [150, 80], 30]],
+    },
+    "sagrada": {
+        "name": "Sagrada Familia, Barcelona",
+        "lat": 41.40363,
+        "lon": 2.17435,
+        "span": 900.0,
+        "zoom": 15,
+        # The Eixample's blocks are twenty-five metres; the spires are a
+        # hundred and seventy, and the surface model has them.
+        "ceiling": 52.0,
+        "parks": [[0, -130, 75], [0, 130, 75]],
+        "flatten": [[0, 0, [85, 60], 30]],
+    },
+    "edinburgh": {
+        "name": "Edinburgh Castle, Edinburgh",
+        "lat": 55.94862,
+        "lon": -3.1998,
+        "span": 900.0,
+        "zoom": 15,
+        # Castle Rock: a crag and tail. Sheer on the north, south and west,
+        # the Royal Mile running down the tail to the east. The summit is a
+        # plateau about 200 by 100, long east to west.
+        "parks": [[40, 200, 220], [-250, -120, 120]],
+        "peak": {
+            "height": 130.0,
+            "top": 80.0,
+            "slope": 1.4,
+            "shelves": [[115.0, 34.0], [175.0, 44.0]],
+            "wobble": [[0.26, 2, -1.5707963], [0.10, 3, 0.8], [0.05, 7, 0.3], [0.03, 13, 2.0]],
+            "fade": 70.0,
+        },
+    },
+    "neuschwanstein": {
+        "name": "Neuschwanstein Castle, Schwangau",
+        "lat": 47.55757,
+        "lon": 10.74972,
+        "span": 1000.0,
+        "zoom": 15,
+        # The castle stands on a ridge running north-south above the Pollat
+        # gorge, a hundred and sixty metres over the village.
+        "parks": [[0, 0, 1100]],
+        "peak": {
+            "height": 965.0,
+            "top": 72.0,
+            "slope": 1.35,
+            "shelves": [[105.0, 36.0], [160.0, 46.0]],
+            "wobble": [[0.30, 2, 1.5707963], [0.09, 3, 1.1], [0.05, 7, 0.4], [0.03, 13, 2.2]],
+            "fade": 90.0,
+        },
+    },
+    "montstmichel": {
+        "name": "Mont-Saint-Michel, Normandy",
+        "lat": 48.63601,
+        "lon": -1.51141,
+        "span": 900.0,
+        "zoom": 15,
+        # The bay at high water: everything on the flats is under it, and the
+        # Mont is an island with the causeway running off the map.
+        "sea": {"level": 5.0, "depth": 6.0, "shore": 1.2},
+        "parks": [],
+        # The rock, eighty metres, with the abbey on the summit and the village
+        # climbing the south-east face on the benches.
+        "peak": {
+            "height": 80.0,
+            "top": 42.0,
+            "slope": 1.5,
+            "shelves": [[62.0, 22.0], [98.0, 26.0]],
+            "wobble": [[0.10, 3, 1.1], [0.055, 7, 0.4], [0.03, 13, 2.2]],
+            "fade": 45.0,
+        },
+    },
+    "pena": {
+        "name": "Pena Palace, Sintra",
+        "lat": 38.78762,
+        "lon": -9.39058,
+        "span": 900.0,
+        "zoom": 15,
+        # The Sintra hills: the palace on its own crag in the forest.
+        "parks": [[0, 0, 1000]],
+        "peak": {
+            "height": 500.0,
+            "top": 62.0,
+            "slope": 1.3,
+            "shelves": [[92.0, 32.0], [142.0, 42.0]],
+            "wobble": [[0.16, 2, 1.5707963], [0.09, 3, 1.1], [0.05, 7, 0.4], [0.03, 13, 2.2]],
+            "fade": 90.0,
+        },
+    },
+    "hassan": {
+        "name": "Hassan II Mosque, Casablanca",
+        "lat": 33.60822,
+        "lon": -7.63262,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 36.0,
+        # The Atlantic. The mosque's esplanade is built out over the shore.
+        "sea": {"level": 0.6, "depth": 10.0, "shore": 1.2},
+        "parks": [[-260, -420, 160]],
+        "flatten": [[0, 0, [160, 130], 34, 7.0]],
+    },
+    "kuwait": {
+        "name": "Kuwait Towers, Kuwait City",
+        "lat": 29.38988,
+        "lon": 48.0028,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 30.0,
+        # The Gulf on three sides of Ras Ajouza.
+        "sea": {"level": 0.6, "depth": 9.0, "shore": 1.2},
+        "parks": [[-260, -120, 140]],
+        "flatten": [[0, 0, [95, 70], 30, 4.5]],
+    },
+    "karnak": {
+        "name": "Karnak Temple, Luxor",
+        "lat": 25.71877,
+        "lon": 32.65721,
+        "span": 900.0,
+        "zoom": 14,
+        # The precinct of Amun is level ground; the Nile is the western edge.
+        "parks": [],
+        "flatten": [[0, 0, [240, 150], 44]],
+    },
+    "forbidden": {
+        "name": "Forbidden City, Beijing",
+        "lat": 39.91593,
+        "lon": 116.39069,
+        "span": 1100.0,
+        "zoom": 14,
+        # The palace roofs are the surface model; Beijing is flat.
+        "ceiling": 52.0,
+        "parks": [[0, 620, 230], [-520, 300, 260], [-520, -20, 200]],
+        "flatten": [[0, 0, [220, 160], 40]],
+    },
+    "gyeongbok": {
+        "name": "Gyeongbokgung, Seoul",
+        "lat": 37.57859,
+        "lon": 126.97705,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 48.0,
+        # The palace grounds are gardens; Bugaksan rises off the north edge.
+        "parks": [[0, 170, 260], [-320, -60, 120]],
+        "flatten": [[0, 0, [160, 120], 34]],
+    },
+    "watarun": {
+        "name": "Wat Arun, Bangkok",
+        "lat": 13.74378,
+        "lon": 100.48885,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": 12.0,
+        # The Chao Phraya comes from the survey, sixty metres east.
+        "parks": [],
+        "flatten": [[0, 0, [75, 75], 26]],
+    },
+    "shwedagon": {
+        "name": "Shwedagon Pagoda, Yangon",
+        "lat": 16.79845,
+        "lon": 96.14957,
+        "span": 900.0,
+        "zoom": 15,
+        # Singuttara Hill: fifty metres over the city, with the whole platform
+        # on top of it, and the platform really is this big.
+        "parks": [[-460, -100, 340]],
+        "peak": {
+            "height": 58.0,
+            "top": 125.0,
+            "slope": 1.0,
+            "shelves": [[165.0, 34.0]],
+            "wobble": [[0.08, 2, -1.5707963], [0.07, 3, 1.1], [0.04, 7, 0.4]],
+            "fade": 80.0,
+        },
+    },
+    "angkor": {
+        "name": "Angkor Wat, Siem Reap",
+        "lat": 13.41253,
+        "lon": 103.86699,
+        "span": 1000.0,
+        "zoom": 14,
+        # Flat. The moat and the enclosure come from the survey; the temple
+        # stands on its own terrace in the middle of the forest.
+        "parks": [[0, 0, 1200]],
+        "flatten": [[0, 0, [200, 170], 34]],
+    },
+    "borobudur": {
+        "name": "Borobudur, Magelang",
+        "lat": -7.60788,
+        "lon": 110.20367,
+        "span": 900.0,
+        "zoom": 15,
+        # The surface model has the monument as a thirty-metre mound; the game
+        # builds its own on the levelled hilltop.
+        "parks": [[0, 0, 1000]],
+        "flatten": [[0, 0, 90, 34]],
+    },
+    "tikal": {
+        "name": "Tikal, Peten",
+        "lat": 17.2218,
+        "lon": -89.62339,
+        "span": 900.0,
+        "zoom": 15,
+        # The Great Plaza under the canopy. The surface model over jungle is
+        # the treetops; the plaza is levelled and the rest is left as forest.
+        "parks": [[0, 0, 1000]],
+        "flatten": [[0, 0, [150, 110], 40]],
+    },
+    "teotihuacan": {
+        "name": "Pyramid of the Sun, Teotihuacan",
+        "lat": 19.69245,
+        "lon": -98.84366,
+        "span": 1100.0,
+        "zoom": 14,
+        # The DEM has both pyramids as hills; the game builds the Sun and
+        # stands the Moon's mound as scenery on its own pad.
+        "parks": [],
+        "flatten": [[0, 0, [150, 150], 44], [-300, 780, [95, 95], 40]],
+    },
+    "machupicchu": {
+        "name": "Machu Picchu, Cusco",
+        "lat": -13.16313,
+        "lon": -72.54495,
+        "span": 900.0,
+        "zoom": 15,
+        # A saddle ridge running north-south between Machu Picchu mountain
+        # and Huayna Picchu, four hundred metres above the Urubamba on both
+        # sides. The citadel is the ridge.
+        "parks": [[0, 0, 1000]],
+        "peak": {
+            "height": 2430.0,
+            "top": 110.0,
+            "slope": 1.6,
+            "shelves": [[150.0, 40.0], [220.0, 52.0]],
+            "wobble": [[0.30, 2, 1.5707963], [0.08, 3, 1.1], [0.05, 7, 0.4], [0.03, 13, 2.2]],
+            "fade": 120.0,
+        },
+    },
+    "greatwall": {
+        "name": "Great Wall at Badaling, Beijing",
+        "lat": 40.35968,
+        "lon": 116.02005,
+        "span": 1000.0,
+        "zoom": 15,
+        # Badaling: the wall runs along the ridge crest north from the pass.
+        # The ridge is cut long and narrow so the wall has a crest to stand on
+        # and the flanks fall away under the towers.
+        "parks": [[0, 0, 1100]],
+        "peak": {
+            "height": 800.0,
+            "top": 120.0,
+            "slope": 1.2,
+            "shelves": [[170.0, 44.0], [240.0, 52.0]],
+            "wobble": [[0.36, 2, 1.5707963], [0.07, 3, 1.1], [0.05, 7, 0.4], [0.03, 13, 2.2]],
+            "fade": 110.0,
+        },
+    },
 }
 
 

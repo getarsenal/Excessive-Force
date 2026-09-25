@@ -1,0 +1,16 @@
+{
+  "id": "segovia",
+  "name": "Aqueduct of Segovia, Segovia",
+  "lat": 40.94795,
+  "lon": -4.11798,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 918.3,
+  "maxElevation": 1021.743,
+  "metersPerDemPixel": 3.6083,
+  "seaLevel": 928.171,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0103
+}

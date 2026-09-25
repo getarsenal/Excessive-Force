@@ -1,329 +1,504 @@
 {
- "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian and the Chinese are slots — the look is specified here and the stand-off tolerates the picture being missing.",
- "player": {
-  "id": "us-general",
-  "file": "us-general.png",
-  "nation": "United States",
-  "role": "The player's commander — appears on every level, bottom-left",
-  "look": "Four-star general, helmet with five stars, stars-and-stripes aviators, cigar, pointing finger, swagger stick in the other hand",
-  "pose": "pointing (accusatory) — reads as an ultimatum",
-  "side": "left"
- },
- "scripts": {
-  "note": "The stand-off before each level: three beats, player / defender / player. All nine levels' lines are the writer's, verbatim, in src/game/cast.js.",
-  "westminster": [
-   {
-    "who": "us",
-    "line": "Give it up you limey bastard"
-   },
-   {
-    "who": "uk",
-    "line": "God save the queen, and your soul"
-   },
-   {
-    "who": "us",
-    "line": "Thank god, I was worried we dragged this ordnance across the Atlantic for nothing!"
-   }
-  ],
-  "paris": [
-   {
-    "who": "us",
-    "line": "Surrender or die Frenchie"
-   },
-   {
-    "who": "fr",
-    "line": "Va t'étouffer avec une baguette"
-   },
-   {
-    "who": "us",
-    "line": "All I heard was baguette, and that's all I need"
-   }
-  ],
-  "agra": [
-   {
-    "who": "us",
-    "line": "Nice tomb. Vacate the premises before I add to the occupancy."
-   },
-   {
-    "who": "in",
-    "line": "Twenty thousand men built this in twenty-two years. You have four guns and a hangover."
-   },
-   {
-    "who": "us",
-    "line": "Twenty-two years? Give me twenty-two minutes."
-   }
-  ],
-  "agra_alt": [
-   {
-    "who": "us",
-    "line": "That's a hell of a headstone. Move it or lose it, chief."
-   },
-   {
-    "who": "in",
-    "line": "It was built for love, sahib. You would not understand — no one has ever loved you."
-   },
-   {
-    "who": "us",
-    "line": "Love, huh? Boys, show him how much I love a 155."
-   }
-  ],
-  "giza": [
-   {
-    "who": "us",
-    "line": "God it's hot out here, give it up before we all melt would ya?"
-   },
-   {
-    "who": "eg",
-    "line": "اطلع الهرم ده وهاتك يا طفل يا تخين"
-   },
-   {
-    "who": "us",
-    "line": "I don't speak Sanskrit habibi, but I get the gist. Someone get me some damn water and a lot of bombs"
-   }
-  ],
-  "chichen": [
-   {
-    "who": "us",
-    "line": "Step aside, chief. We do not negotiate with calendars."
-   },
-   {
-    "who": "mx",
-    "line": "Llevas mil años tarde. Esto ya lo enterramos una vez y lo volvimos a construir encima."
-   },
-   {
-    "who": "us",
-    "line": "Built it twice, huh? Well hell, that is half my work done for me."
-   }
-  ],
-  "pisa": [
-   {
-    "who": "us",
-    "line": "That thing is already falling over. Save us both the ammunition."
-   },
-   {
-    "who": "it",
-    "line": "Pende da ottocento anni, americano. Tu non duri otto minuti in questo sole."
-   },
-   {
-    "who": "us",
-    "line": "Eight hundred years of leaning. Let us call it a running start."
-   }
-  ],
-  "moscow": [
-   {
-    "who": "us",
-    "line": "Nine churches. I brought enough for ten."
-   },
-   {
-    "who": "ru",
-    "line": "Иван ослепил зодчего, чтобы он не построил второго. Тебе глаза оставим — смотри."
-   },
-   {
-    "who": "us",
-    "line": "I did not catch a word of that, but he sounded real confident about it."
-   }
-  ],
-  "sydney": [
-   {
-    "who": "us",
-    "line": "You are on a point with water on three sides. Where exactly are you going?"
-   },
-   {
-    "who": "au",
-    "line": "Mate, you have got one road in and we have got the whole harbour. Take your shot."
-   },
-   {
-    "who": "us",
-    "line": "Finally, one of them speaks English. Does not make him right."
-   }
-  ],
-  "rio": [
-   {
-    "who": "us",
-    "line": "Seven hundred metres up with no road out. Walk down or be carried."
-   },
-   {
-    "who": "br",
-    "line": "Ele está de braços abertos há um século. Nem por você ele abaixa."
-   },
-   {
-    "who": "us",
-    "line": "Arms out like that? Son, that is not a welcome, that is a target."
-   }
-  ],
-  "petronas": [
-   {
-    "who": "us",
-    "line": "Two of them. Somebody built it twice and still couldn't get it right."
-   },
-   {
-    "who": "my",
-    "line": "Dua menara, satu jambatan. Tembak jambatan itu — ia tidak menahan apa-apa."
-   },
-   {
-    "who": "us",
-    "line": "He's pointing at the bridge. Boys, shoot everything BUT the bridge."
-   }
-  ],
-  "potala": [
-   {
-    "who": "us",
-    "line": "Thirteen storeys of whitewash on a red rock. Walk out and I leave the paint on it."
-   },
-   {
-    "who": "cn",
-    "line": "这堵墙比你的炮管还厚。你打的是山，不是房子。"
-   },
-   {
-    "who": "us",
-    "line": "A mountain. Great. Bring the whole catalogue, we're going to be here a while."
-   }
-  ]
- },
- "enemies": {
-  "westminster": {
-   "id": "uk-field-marshal",
-   "file": "uk-field-marshal.png",
-   "nation": "United Kingdom",
-   "defends": "Elizabeth Tower and the Palace of Westminster",
-   "look": "Field marshal, peaked cap with crown badge, Union flag patch, riding crop, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian and the Chinese are slots — the look is specified here and the stand-off tolerates the picture being missing.",
+  "player": {
+    "id": "us-general",
+    "file": "us-general.png",
+    "nation": "United States",
+    "role": "The player's commander — appears on every level, bottom-left",
+    "look": "Four-star general, helmet with five stars, stars-and-stripes aviators, cigar, pointing finger, swagger stick in the other hand",
+    "pose": "pointing (accusatory) — reads as an ultimatum",
+    "side": "left"
   },
-  "paris": {
-   "id": "fr-marshal",
-   "file": "fr-marshal.png",
-   "nation": "France",
-   "defends": "Eiffel Tower and the Palais de Chaillot",
-   "look": "Napoleonic marshal, bicorne with tricolore plume and cockade, epaulettes, sabre, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
+  "scripts": {
+    "note": "The stand-off before each level: three beats, player / defender / player. All nine levels' lines are the writer's, verbatim, in src/game/cast.js.",
+    "westminster": [
+      {
+        "who": "us",
+        "line": "Give it up you limey bastard"
+      },
+      {
+        "who": "uk",
+        "line": "God save the queen, and your soul"
+      },
+      {
+        "who": "us",
+        "line": "Thank god, I was worried we dragged this ordnance across the Atlantic for nothing!"
+      }
+    ],
+    "paris": [
+      {
+        "who": "us",
+        "line": "Surrender or die Frenchie"
+      },
+      {
+        "who": "fr",
+        "line": "Va t'étouffer avec une baguette"
+      },
+      {
+        "who": "us",
+        "line": "All I heard was baguette, and that's all I need"
+      }
+    ],
+    "agra": [
+      {
+        "who": "us",
+        "line": "Nice tomb. Vacate the premises before I add to the occupancy."
+      },
+      {
+        "who": "in",
+        "line": "Twenty thousand men built this in twenty-two years. You have four guns and a hangover."
+      },
+      {
+        "who": "us",
+        "line": "Twenty-two years? Give me twenty-two minutes."
+      }
+    ],
+    "agra_alt": [
+      {
+        "who": "us",
+        "line": "That's a hell of a headstone. Move it or lose it, chief."
+      },
+      {
+        "who": "in",
+        "line": "It was built for love, sahib. You would not understand — no one has ever loved you."
+      },
+      {
+        "who": "us",
+        "line": "Love, huh? Boys, show him how much I love a 155."
+      }
+    ],
+    "giza": [
+      {
+        "who": "us",
+        "line": "God it's hot out here, give it up before we all melt would ya?"
+      },
+      {
+        "who": "eg",
+        "line": "اطلع الهرم ده وهاتك يا طفل يا تخين"
+      },
+      {
+        "who": "us",
+        "line": "I don't speak Sanskrit habibi, but I get the gist. Someone get me some damn water and a lot of bombs"
+      }
+    ],
+    "chichen": [
+      {
+        "who": "us",
+        "line": "Step aside, chief. We do not negotiate with calendars."
+      },
+      {
+        "who": "mx",
+        "line": "Llevas mil años tarde. Esto ya lo enterramos una vez y lo volvimos a construir encima."
+      },
+      {
+        "who": "us",
+        "line": "Built it twice, huh? Well hell, that is half my work done for me."
+      }
+    ],
+    "pisa": [
+      {
+        "who": "us",
+        "line": "That thing is already falling over. Save us both the ammunition."
+      },
+      {
+        "who": "it",
+        "line": "Pende da ottocento anni, americano. Tu non duri otto minuti in questo sole."
+      },
+      {
+        "who": "us",
+        "line": "Eight hundred years of leaning. Let us call it a running start."
+      }
+    ],
+    "moscow": [
+      {
+        "who": "us",
+        "line": "Nine churches. I brought enough for ten."
+      },
+      {
+        "who": "ru",
+        "line": "Иван ослепил зодчего, чтобы он не построил второго. Тебе глаза оставим — смотри."
+      },
+      {
+        "who": "us",
+        "line": "I did not catch a word of that, but he sounded real confident about it."
+      }
+    ],
+    "sydney": [
+      {
+        "who": "us",
+        "line": "You are on a point with water on three sides. Where exactly are you going?"
+      },
+      {
+        "who": "au",
+        "line": "Mate, you have got one road in and we have got the whole harbour. Take your shot."
+      },
+      {
+        "who": "us",
+        "line": "Finally, one of them speaks English. Does not make him right."
+      }
+    ],
+    "rio": [
+      {
+        "who": "us",
+        "line": "Seven hundred metres up with no road out. Walk down or be carried."
+      },
+      {
+        "who": "br",
+        "line": "Ele está de braços abertos há um século. Nem por você ele abaixa."
+      },
+      {
+        "who": "us",
+        "line": "Arms out like that? Son, that is not a welcome, that is a target."
+      }
+    ],
+    "petronas": [
+      {
+        "who": "us",
+        "line": "Two of them. Somebody built it twice and still couldn't get it right."
+      },
+      {
+        "who": "my",
+        "line": "Dua menara, satu jambatan. Tembak jambatan itu — ia tidak menahan apa-apa."
+      },
+      {
+        "who": "us",
+        "line": "He's pointing at the bridge. Boys, shoot everything BUT the bridge."
+      }
+    ],
+    "potala": [
+      {
+        "who": "us",
+        "line": "Thirteen storeys of whitewash on a red rock. Walk out and I leave the paint on it."
+      },
+      {
+        "who": "cn",
+        "line": "这堵墙比你的炮管还厚。你打的是山，不是房子。"
+      },
+      {
+        "who": "us",
+        "line": "A mountain. Great. Bring the whole catalogue, we're going to be here a while."
+      }
+    ]
   },
-  "agra": {
-   "id": "in-maharaja-general",
-   "file": "in-maharaja-general.png",
-   "nation": "India",
-   "defends": "Taj Mahal, mosque and jawab",
-   "look": "Maharaja-general, tricolour turban with pearls and plume, cream tunic with gold cords, Ashoka lion buckle, tulwar, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "giza": {
-   "id": "eg-field-marshal",
-   "file": "eg-field-marshal.png",
-   "nation": "Egypt",
-   "defends": "The Great Pyramid and Khafre",
-   "look": "Field marshal, peaked cap with eagle, Egyptian flag patch and belt plate, khaki service dress, sabre, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "chichen": {
-   "id": "mx-general",
-   "file": "mx-general.png",
-   "nation": "Mexico",
-   "defends": "El Castillo and the Temple of the Warriors",
-   "look": "General in black charro dress with gold filigree, wide embroidered sombrero with the eagle-and-serpent, red bow, bandolier, silver-tooled holster and boots with spurs, Mexican flag patch, a serape in the flag's colours over one shoulder, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "pisa": {
-   "id": "it-generale",
-   "file": "it-generale.png",
-   "nation": "Italy",
-   "defends": "The campanile, the Duomo and the Baptistery",
-   "look": "Generale in olive service dress, maroon paratrooper beret with the winged badge, red neckerchief, ITALIA shield patch, medals, sabre with a tricolore tassel, the tricolore worn as a cape, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "moscow": {
-   "id": "ru-marshal",
-   "file": "ru-marshal.png",
-   "nation": "Russia",
-   "defends": "Saint Basil's Cathedral and the Kremlin wall",
-   "look": "Marshal in grey-green greatcoat with red piping and gold aigulettes, black fur hat with the double-headed eagle, fur-collared cape lined red, Russian flag patch, chestful of medals, holstered revolver and gilt sabre, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "sydney": {
-   "id": "au-general",
-   "file": "au-general.png",
-   "nation": "Australia",
-   "defends": "The Opera House on Bennelong Point",
-   "look": "General in Australian camouflage, slouch hat with the rising-sun badge and one side pinned up, shemagh, AUSTRALIA name tape, flag patch, kangaroo tattoo reading AUSSIE AUSSIE AUSSIE, a can of VB in a kangaroo stubby holder on the belt, knife, the Australian flag worn as a cape, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "rio": {
-   "id": "br-marechal",
-   "file": "br-marechal.png",
-   "nation": "Brazil",
-   "defends": "Christ the Redeemer on the Corcovado",
-   "look": "Marechal in dark green dress uniform heavy with gold cord and stars, peaked cap with the national arms, medals, gilt sabre, Brazilian flag patch and the flag worn as a cape, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "athens": {
-   "id": "gr-strategos",
-   "file": "gr-strategos.png",
-   "nation": "Greece",
-   "defends": "the Parthenon on the Acropolis",
-   "look": "Strategos in Greek digital camouflage with a bronze Corinthian helmet over it, white-and-blue horsehair crest, olive wreath round the bowl, blue-and-white flag worn as a cloak with a Greek key border, ELLAS plate carrier with a hoplite patch, Zeus tattoo, olive sprig in a pouch, gilt lion-hilted dagger, a bronze Lambda shield at his heel, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "istanbul": {
-   "id": "tr-orgeneral",
-   "file": "tr-orgeneral.png",
-   "nation": "Turkey",
-   "defends": "Hagia Sophia",
-   "look": "Orgeneral in Turkish camouflage, maroon beret with the star-and-crescent wreath, red-and-white keffiyeh, TURKIYE plate carrier, grey wolf patch and wolf tattoo with the crescent, a saker falcon on his shoulder, crescent belt buckle, gilt kilij at his hip, Turkish flag as a cape with the Bosphorus and the mosques printed on it, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "cologne": {
-   "id": "de-general",
-   "file": "de-general.png",
-   "nation": "Germany",
-   "defends": "Cologne Cathedral",
-   "look": "General in field grey with red piping and gold aiguillettes, peaked cap, fur-collared greatcoat worn as a cape, the federal eagle on his arm and on the cape, black-red-gold in its lining, Neuschwanstein and the pines printed on it, marshal’s baton, holstered revolver, a German shepherd at heel, a stein and an edelweiss at his boot, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "himeji": {
-   "id": "jp-taisho",
-   "file": "jp-taisho.png",
-   "nation": "Japan",
-   "defends": "Himeji Castle",
-   "look": "Taisho in black lacquered samurai armour over a modern plate carrier, hachimaki headband with the rising sun, rising sun and chrysanthemum on the shoulder plate, red sash and a cherry-blossom banner at his waist, katana at his back and a sheathed nodachi in hand, wave-pattern sleeves, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "dubai": {
-   "id": "ae-fariq",
-   "file": "ae-fariq.png",
-   "nation": "United Arab Emirates",
-   "defends": "the Burj Khalifa",
-   "look": "Fariq Awwal in a white kandura under a gold-edged bisht, ghutra and black agal, UAE flag and falcon on the shoulder, eagle belt plate, gold khanjar at the waist, a hooded saker falcon on its perch beside him, dallah and finjan on the rug, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "petronas": {
-   "id": "my-jeneral",
-   "file": "my-jeneral.png",
-   "nation": "Malaysia",
-   "defends": "the Petronas Towers",
-   "look": "Jeneral in Malaysian Army olive service dress, songkok, the fourteen-point federal star and crescent on the cap, Jalur Gemilang on the shoulder, gold aiguillette, keris in a carved wooden sheath at the hip, songket sash over the tunic, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
-  },
-  "potala": {
-   "id": "cn-shangjiang",
-   "file": "cn-shangjiang.png",
-   "nation": "China",
-   "defends": "the Potala Palace",
-   "look": "Shangjiang in a dark olive dress tunic with heavy gold shoulder boards and three gold stars, peaked cap with the gold wreath, red collar tabs, rows of ribbons, a fur-collared greatcoat slung over the shoulders against the altitude, snow on the epaulettes, cigar, arms folded",
-   "pose": "arms folded — reads as refusal",
-   "side": "right"
+  "enemies": {
+    "westminster": {
+      "id": "uk-field-marshal",
+      "file": "uk-field-marshal.png",
+      "nation": "United Kingdom",
+      "defends": "Elizabeth Tower and the Palace of Westminster",
+      "look": "Field marshal, peaked cap with crown badge, Union flag patch, riding crop, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "paris": {
+      "id": "fr-marshal",
+      "file": "fr-marshal.png",
+      "nation": "France",
+      "defends": "Eiffel Tower and the Palais de Chaillot",
+      "look": "Napoleonic marshal, bicorne with tricolore plume and cockade, epaulettes, sabre, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "agra": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Taj Mahal, mosque and jawab",
+      "look": "Maharaja-general, tricolour turban with pearls and plume, cream tunic with gold cords, Ashoka lion buckle, tulwar, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "giza": {
+      "id": "eg-field-marshal",
+      "file": "eg-field-marshal.png",
+      "nation": "Egypt",
+      "defends": "The Great Pyramid and Khafre",
+      "look": "Field marshal, peaked cap with eagle, Egyptian flag patch and belt plate, khaki service dress, sabre, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "chichen": {
+      "id": "mx-general",
+      "file": "mx-general.png",
+      "nation": "Mexico",
+      "defends": "El Castillo and the Temple of the Warriors",
+      "look": "General in black charro dress with gold filigree, wide embroidered sombrero with the eagle-and-serpent, red bow, bandolier, silver-tooled holster and boots with spurs, Mexican flag patch, a serape in the flag's colours over one shoulder, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "pisa": {
+      "id": "it-generale",
+      "file": "it-generale.png",
+      "nation": "Italy",
+      "defends": "The campanile, the Duomo and the Baptistery",
+      "look": "Generale in olive service dress, maroon paratrooper beret with the winged badge, red neckerchief, ITALIA shield patch, medals, sabre with a tricolore tassel, the tricolore worn as a cape, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "moscow": {
+      "id": "ru-marshal",
+      "file": "ru-marshal.png",
+      "nation": "Russia",
+      "defends": "Saint Basil's Cathedral and the Kremlin wall",
+      "look": "Marshal in grey-green greatcoat with red piping and gold aigulettes, black fur hat with the double-headed eagle, fur-collared cape lined red, Russian flag patch, chestful of medals, holstered revolver and gilt sabre, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "sydney": {
+      "id": "au-general",
+      "file": "au-general.png",
+      "nation": "Australia",
+      "defends": "The Opera House on Bennelong Point",
+      "look": "General in Australian camouflage, slouch hat with the rising-sun badge and one side pinned up, shemagh, AUSTRALIA name tape, flag patch, kangaroo tattoo reading AUSSIE AUSSIE AUSSIE, a can of VB in a kangaroo stubby holder on the belt, knife, the Australian flag worn as a cape, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "rio": {
+      "id": "br-marechal",
+      "file": "br-marechal.png",
+      "nation": "Brazil",
+      "defends": "Christ the Redeemer on the Corcovado",
+      "look": "Marechal in dark green dress uniform heavy with gold cord and stars, peaked cap with the national arms, medals, gilt sabre, Brazilian flag patch and the flag worn as a cape, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "athens": {
+      "id": "gr-strategos",
+      "file": "gr-strategos.png",
+      "nation": "Greece",
+      "defends": "the Parthenon on the Acropolis",
+      "look": "Strategos in Greek digital camouflage with a bronze Corinthian helmet over it, white-and-blue horsehair crest, olive wreath round the bowl, blue-and-white flag worn as a cloak with a Greek key border, ELLAS plate carrier with a hoplite patch, Zeus tattoo, olive sprig in a pouch, gilt lion-hilted dagger, a bronze Lambda shield at his heel, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "istanbul": {
+      "id": "tr-orgeneral",
+      "file": "tr-orgeneral.png",
+      "nation": "Turkey",
+      "defends": "Hagia Sophia",
+      "look": "Orgeneral in Turkish camouflage, maroon beret with the star-and-crescent wreath, red-and-white keffiyeh, TURKIYE plate carrier, grey wolf patch and wolf tattoo with the crescent, a saker falcon on his shoulder, crescent belt buckle, gilt kilij at his hip, Turkish flag as a cape with the Bosphorus and the mosques printed on it, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "cologne": {
+      "id": "de-general",
+      "file": "de-general.png",
+      "nation": "Germany",
+      "defends": "Cologne Cathedral",
+      "look": "General in field grey with red piping and gold aiguillettes, peaked cap, fur-collared greatcoat worn as a cape, the federal eagle on his arm and on the cape, black-red-gold in its lining, Neuschwanstein and the pines printed on it, marshal’s baton, holstered revolver, a German shepherd at heel, a stein and an edelweiss at his boot, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "himeji": {
+      "id": "jp-taisho",
+      "file": "jp-taisho.png",
+      "nation": "Japan",
+      "defends": "Himeji Castle",
+      "look": "Taisho in black lacquered samurai armour over a modern plate carrier, hachimaki headband with the rising sun, rising sun and chrysanthemum on the shoulder plate, red sash and a cherry-blossom banner at his waist, katana at his back and a sheathed nodachi in hand, wave-pattern sleeves, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "dubai": {
+      "id": "ae-fariq",
+      "file": "ae-fariq.png",
+      "nation": "United Arab Emirates",
+      "defends": "the Burj Khalifa",
+      "look": "Fariq Awwal in a white kandura under a gold-edged bisht, ghutra and black agal, UAE flag and falcon on the shoulder, eagle belt plate, gold khanjar at the waist, a hooded saker falcon on its perch beside him, dallah and finjan on the rug, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "petronas": {
+      "id": "my-jeneral",
+      "file": "my-jeneral.png",
+      "nation": "Malaysia",
+      "defends": "the Petronas Towers",
+      "look": "Jeneral in Malaysian Army olive service dress, songkok, the fourteen-point federal star and crescent on the cap, Jalur Gemilang on the shoulder, gold aiguillette, keris in a carved wooden sheath at the hip, songket sash over the tunic, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "potala": {
+      "id": "cn-shangjiang",
+      "file": "cn-shangjiang.png",
+      "nation": "China",
+      "defends": "the Potala Palace",
+      "look": "Shangjiang in a dark olive dress tunic with heavy gold shoulder boards and three gold stars, peaked cap with the gold wreath, red collar tabs, rows of ribbons, a fur-collared greatcoat slung over the shoulders against the altitude, snow on the epaulettes, cigar, arms folded",
+      "pose": "arms folded — reads as refusal",
+      "side": "right"
+    },
+    "colosseum": {
+      "id": "it-officer",
+      "file": "it-officer.png",
+      "nation": "Italy",
+      "defends": "the Colosseum",
+      "look": "TODO(colosseum) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "towerbridge": {
+      "id": "uk-officer",
+      "file": "uk-officer.png",
+      "nation": "United Kingdom",
+      "defends": "the Tower Bridge",
+      "look": "TODO(towerbridge) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "florence": {
+      "id": "it-officer",
+      "file": "it-officer.png",
+      "nation": "Italy",
+      "defends": "the Florence Cathedral",
+      "look": "TODO(florence) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "segovia": {
+      "id": "es-officer",
+      "file": "es-officer.png",
+      "nation": "Spain",
+      "defends": "the Aqueduct of Segovia",
+      "look": "TODO(segovia) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "atomium": {
+      "id": "be-officer",
+      "file": "be-officer.png",
+      "nation": "Belgium",
+      "defends": "the Atomium",
+      "look": "TODO(atomium) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "tokyotower": {
+      "id": "jp-officer",
+      "file": "jp-officer.png",
+      "nation": "Japan",
+      "defends": "the Tokyo Tower",
+      "look": "TODO(tokyotower) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "budapest": {
+      "id": "hu-officer",
+      "file": "hu-officer.png",
+      "nation": "Hungary",
+      "defends": "the Hungarian Parliament",
+      "look": "TODO(budapest) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "sagrada": {
+      "id": "es-officer",
+      "file": "es-officer.png",
+      "nation": "Spain",
+      "defends": "the Sagrada Familia",
+      "look": "TODO(sagrada) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "edinburgh": {
+      "id": "uk-officer",
+      "file": "uk-officer.png",
+      "nation": "United Kingdom",
+      "defends": "the Edinburgh Castle",
+      "look": "TODO(edinburgh) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "neuschwanstein": {
+      "id": "de-officer",
+      "file": "de-officer.png",
+      "nation": "Germany",
+      "defends": "the Neuschwanstein Castle",
+      "look": "TODO(neuschwanstein) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "montstmichel": {
+      "id": "fr-officer",
+      "file": "fr-officer.png",
+      "nation": "France",
+      "defends": "the Mont-Saint-Michel",
+      "look": "TODO(montstmichel) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "pena": {
+      "id": "pt-officer",
+      "file": "pt-officer.png",
+      "nation": "Portugal",
+      "defends": "the Pena Palace",
+      "look": "TODO(pena) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "hassan": {
+      "id": "ma-officer",
+      "file": "ma-officer.png",
+      "nation": "Morocco",
+      "defends": "the Hassan II Mosque",
+      "look": "TODO(hassan) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "kuwait": {
+      "id": "kw-officer",
+      "file": "kw-officer.png",
+      "nation": "Kuwait",
+      "defends": "the Kuwait Towers",
+      "look": "TODO(kuwait) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "karnak": {
+      "id": "eg-officer",
+      "file": "eg-officer.png",
+      "nation": "Egypt",
+      "defends": "the Karnak Temple",
+      "look": "TODO(karnak) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "forbidden": {
+      "id": "cn-officer",
+      "file": "cn-officer.png",
+      "nation": "China",
+      "defends": "the Forbidden City",
+      "look": "TODO(forbidden) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "gyeongbok": {
+      "id": "kr-officer",
+      "file": "kr-officer.png",
+      "nation": "South Korea",
+      "defends": "the Gyeongbokgung",
+      "look": "TODO(gyeongbok) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "watarun": {
+      "id": "th-officer",
+      "file": "th-officer.png",
+      "nation": "Thailand",
+      "defends": "the Wat Arun",
+      "look": "TODO(watarun) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "shwedagon": {
+      "id": "mm-officer",
+      "file": "mm-officer.png",
+      "nation": "Myanmar",
+      "defends": "the Shwedagon Pagoda",
+      "look": "TODO(shwedagon) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "angkor": {
+      "id": "kh-officer",
+      "file": "kh-officer.png",
+      "nation": "Cambodia",
+      "defends": "the Angkor Wat",
+      "look": "TODO(angkor) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "borobudur": {
+      "id": "id-officer",
+      "file": "id-officer.png",
+      "nation": "Indonesia",
+      "defends": "the Borobudur",
+      "look": "TODO(borobudur) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "tikal": {
+      "id": "gt-officer",
+      "file": "gt-officer.png",
+      "nation": "Guatemala",
+      "defends": "the Tikal",
+      "look": "TODO(tikal) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "teotihuacan": {
+      "id": "mx-officer",
+      "file": "mx-officer.png",
+      "nation": "Mexico",
+      "defends": "the Pyramid of the Sun",
+      "look": "TODO(teotihuacan) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "machupicchu": {
+      "id": "pe-officer",
+      "file": "pe-officer.png",
+      "nation": "Peru",
+      "defends": "the Machu Picchu",
+      "look": "TODO(machupicchu) the officer's uniform, rank insignia and bearing, for the artist."
+    },
+    "greatwall": {
+      "id": "cn-officer",
+      "file": "cn-officer.png",
+      "nation": "China",
+      "defends": "the Great Wall at Badaling",
+      "look": "TODO(greatwall) the officer's uniform, rank insignia and bearing, for the artist."
+    }
   }
- }
 }

@@ -36,6 +36,7 @@ export const MATERIALS = {
   MAST: 20,      // the steel spire on top of that core, which is still the core
   MADDER: 21,    // rammed earth washed in the red dye: the Potala's Red Palace
   KYEMA: 22,     // the dark brushwood frieze laid under every Tibetan roofline
+  GOLD: 23,      // gilded brick: a stupa's bell, a palace's glazed yellow roof — structural, unlike GILT
 };
 
 /**
@@ -244,6 +245,10 @@ export const MATERIAL_PROPS = {
   // it is under and nothing else, which is why it is infill.
   [MATERIALS.KYEMA]:     { density: 1.10, strength: 0.42, toughness: 42, color: 0x4a3124,
     structural: false },
+  // Gilded masonry. GILT is leaf and carries nothing; a stupa is a solid brick
+  // bell under its gold and a Chinese hall's roof is fired clay under its glaze,
+  // and both have to bear their own weight and the courses over them.
+  [MATERIALS.GOLD]:      { density: 1.95, strength: 0.80, toughness: 80,  color: 0xd9a63a, structural: true },
 };
 
 

@@ -19,6 +19,31 @@ import { buildGreatPyramid, buildKhafre, buildMenkaure, buildSphinx }
 import { buildPetronasTowers, populatePetronasTowers } from '../structure/landmarks/petronas.js';
 import { buildPotalaPalace, populatePotalaPalace, buildChortenGate, populateChortenGate }
   from '../structure/landmarks/potala.js';
+import { buildColosseum, populateColosseum } from '../structure/landmarks/colosseum.js';
+import { buildTowerbridge, populateTowerbridge } from '../structure/landmarks/towerbridge.js';
+import { buildFlorence, populateFlorence } from '../structure/landmarks/florence.js';
+import { buildSegovia, populateSegovia } from '../structure/landmarks/segovia.js';
+import { buildAtomium, populateAtomium } from '../structure/landmarks/atomium.js';
+import { buildTokyotower, populateTokyotower } from '../structure/landmarks/tokyotower.js';
+import { buildBudapest, populateBudapest } from '../structure/landmarks/budapest.js';
+import { buildSagrada, populateSagrada } from '../structure/landmarks/sagrada.js';
+import { buildEdinburgh, populateEdinburgh } from '../structure/landmarks/edinburgh.js';
+import { buildNeuschwanstein, populateNeuschwanstein } from '../structure/landmarks/neuschwanstein.js';
+import { buildMontstmichel, populateMontstmichel } from '../structure/landmarks/montstmichel.js';
+import { buildPena, populatePena } from '../structure/landmarks/pena.js';
+import { buildHassan, populateHassan } from '../structure/landmarks/hassan.js';
+import { buildKuwait, populateKuwait } from '../structure/landmarks/kuwait.js';
+import { buildKarnak, populateKarnak } from '../structure/landmarks/karnak.js';
+import { buildForbidden, populateForbidden } from '../structure/landmarks/forbidden.js';
+import { buildGyeongbok, populateGyeongbok } from '../structure/landmarks/gyeongbok.js';
+import { buildWatarun, populateWatarun } from '../structure/landmarks/watarun.js';
+import { buildShwedagon, populateShwedagon } from '../structure/landmarks/shwedagon.js';
+import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
+import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
+import { buildTikal, populateTikal } from '../structure/landmarks/tikal.js';
+import { buildTeotihuacan, populateTeotihuacan } from '../structure/landmarks/teotihuacan.js';
+import { buildMachupicchu, populateMachupicchu } from '../structure/landmarks/machupicchu.js';
+import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 
 /**
  * Par.
@@ -1056,6 +1081,606 @@ export const LEVELS = {
     par: { rounds: 190, spend: 34000, minutes: 9, leverage: 2 },
     brief: 'The white is not the building. The red one in the middle is the contract.',
   },
+  colosseum: {
+    id: 'colosseum',
+    terrain: 'colosseum',
+    lat: 41.89021, lon: 12.49223,
+    name: 'COLOSSEUM',
+    place: 'Rome',
+    target: 'COLOSSEUM',
+    subtitle: 'Colosseum, Rome',
+    victory: 'TODO(colosseum) THE LINE THE END CARD LEADS WITH',
+    // TODO(colosseum) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(colosseum) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(colosseum) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(colosseum) the postcard angle
+    structures: (quality) => [
+      { key: 'colosseum', blocks: buildColosseum(quality), primary: true, required: true, label: 'COLOSSEUM' },
+    ],
+    garrison: (g, origin, groundY) => populateColosseum(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(colosseum)
+    traits: { windows: false, river: false, topples: true },           // TODO(colosseum)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(colosseum) from the suite's undercut
+    brief: 'TODO(colosseum) one sentence: what the player has to find out about this building.',
+  },
+  towerbridge: {
+    id: 'towerbridge',
+    terrain: 'towerbridge',
+    lat: 51.5076, lon: -0.0761,
+    name: 'TOWER BRIDGE',
+    place: 'London',
+    target: 'TOWER BRIDGE',
+    subtitle: 'Tower Bridge, London',
+    victory: 'TODO(towerbridge) THE LINE THE END CARD LEADS WITH',
+    // TODO(towerbridge) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(towerbridge) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(towerbridge) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(towerbridge) the postcard angle
+    structures: (quality) => [
+      { key: 'towerbridge', blocks: buildTowerbridge(quality), primary: true, required: true, label: 'TOWER BRIDGE' },
+    ],
+    garrison: (g, origin, groundY) => populateTowerbridge(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(towerbridge)
+    traits: { windows: false, river: false, topples: true },           // TODO(towerbridge)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(towerbridge) from the suite's undercut
+    brief: 'TODO(towerbridge) one sentence: what the player has to find out about this building.',
+  },
+  florence: {
+    id: 'florence',
+    terrain: 'florence',
+    lat: 43.77313, lon: 11.256,
+    name: 'FLORENCE CATHEDRAL',
+    place: 'Florence',
+    target: 'FLORENCE CATHEDRAL',
+    subtitle: 'Florence Cathedral, Florence',
+    victory: 'TODO(florence) THE LINE THE END CARD LEADS WITH',
+    // TODO(florence) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(florence) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(florence) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(florence) the postcard angle
+    structures: (quality) => [
+      { key: 'florence', blocks: buildFlorence(quality), primary: true, required: true, label: 'FLORENCE CATHEDRAL' },
+    ],
+    garrison: (g, origin, groundY) => populateFlorence(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(florence)
+    traits: { windows: false, river: false, topples: true },           // TODO(florence)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(florence) from the suite's undercut
+    brief: 'TODO(florence) one sentence: what the player has to find out about this building.',
+  },
+  segovia: {
+    id: 'segovia',
+    terrain: 'segovia',
+    lat: 40.94795, lon: -4.11798,
+    name: 'AQUEDUCT OF SEGOVIA',
+    place: 'Segovia',
+    target: 'AQUEDUCT OF SEGOVIA',
+    subtitle: 'Aqueduct of Segovia, Segovia',
+    victory: 'TODO(segovia) THE LINE THE END CARD LEADS WITH',
+    // TODO(segovia) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(segovia) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(segovia) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(segovia) the postcard angle
+    structures: (quality) => [
+      { key: 'segovia', blocks: buildSegovia(quality), primary: true, required: true, label: 'AQUEDUCT OF SEGOVIA' },
+    ],
+    garrison: (g, origin, groundY) => populateSegovia(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(segovia)
+    traits: { windows: false, river: false, topples: true },           // TODO(segovia)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(segovia) from the suite's undercut
+    brief: 'TODO(segovia) one sentence: what the player has to find out about this building.',
+  },
+  atomium: {
+    id: 'atomium',
+    terrain: 'atomium',
+    lat: 50.89494, lon: 4.34144,
+    name: 'ATOMIUM',
+    place: 'Brussels',
+    target: 'ATOMIUM',
+    subtitle: 'Atomium, Brussels',
+    victory: 'TODO(atomium) THE LINE THE END CARD LEADS WITH',
+    // TODO(atomium) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(atomium) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(atomium) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(atomium) the postcard angle
+    structures: (quality) => [
+      { key: 'atomium', blocks: buildAtomium(quality), primary: true, required: true, label: 'ATOMIUM' },
+    ],
+    garrison: (g, origin, groundY) => populateAtomium(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(atomium)
+    traits: { windows: false, river: false, topples: true },           // TODO(atomium)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(atomium) from the suite's undercut
+    brief: 'TODO(atomium) one sentence: what the player has to find out about this building.',
+  },
+  tokyotower: {
+    id: 'tokyotower',
+    terrain: 'tokyotower',
+    lat: 35.65858, lon: 139.74543,
+    name: 'TOKYO TOWER',
+    place: 'Tokyo',
+    target: 'TOKYO TOWER',
+    subtitle: 'Tokyo Tower, Tokyo',
+    victory: 'TODO(tokyotower) THE LINE THE END CARD LEADS WITH',
+    // TODO(tokyotower) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(tokyotower) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(tokyotower) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tokyotower) the postcard angle
+    structures: (quality) => [
+      { key: 'tokyotower', blocks: buildTokyotower(quality), primary: true, required: true, label: 'TOKYO TOWER' },
+    ],
+    garrison: (g, origin, groundY) => populateTokyotower(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tokyotower)
+    traits: { windows: false, river: false, topples: true },           // TODO(tokyotower)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tokyotower) from the suite's undercut
+    brief: 'TODO(tokyotower) one sentence: what the player has to find out about this building.',
+  },
+  budapest: {
+    id: 'budapest',
+    terrain: 'budapest',
+    lat: 47.50704, lon: 19.04569,
+    name: 'HUNGARIAN PARLIAMENT',
+    place: 'Budapest',
+    target: 'HUNGARIAN PARLIAMENT',
+    subtitle: 'Hungarian Parliament, Budapest',
+    victory: 'TODO(budapest) THE LINE THE END CARD LEADS WITH',
+    // TODO(budapest) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(budapest) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(budapest) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(budapest) the postcard angle
+    structures: (quality) => [
+      { key: 'budapest', blocks: buildBudapest(quality), primary: true, required: true, label: 'HUNGARIAN PARLIAMENT' },
+    ],
+    garrison: (g, origin, groundY) => populateBudapest(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(budapest)
+    traits: { windows: false, river: false, topples: true },           // TODO(budapest)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(budapest) from the suite's undercut
+    brief: 'TODO(budapest) one sentence: what the player has to find out about this building.',
+  },
+  sagrada: {
+    id: 'sagrada',
+    terrain: 'sagrada',
+    lat: 41.40363, lon: 2.17435,
+    name: 'SAGRADA FAMILIA',
+    place: 'Barcelona',
+    target: 'SAGRADA FAMILIA',
+    subtitle: 'Sagrada Familia, Barcelona',
+    victory: 'TODO(sagrada) THE LINE THE END CARD LEADS WITH',
+    // TODO(sagrada) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(sagrada) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(sagrada) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(sagrada) the postcard angle
+    structures: (quality) => [
+      { key: 'sagrada', blocks: buildSagrada(quality), primary: true, required: true, label: 'SAGRADA FAMILIA' },
+    ],
+    garrison: (g, origin, groundY) => populateSagrada(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(sagrada)
+    traits: { windows: false, river: false, topples: true },           // TODO(sagrada)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(sagrada) from the suite's undercut
+    brief: 'TODO(sagrada) one sentence: what the player has to find out about this building.',
+  },
+  edinburgh: {
+    id: 'edinburgh',
+    terrain: 'edinburgh',
+    lat: 55.94862, lon: -3.1998,
+    name: 'EDINBURGH CASTLE',
+    place: 'Edinburgh',
+    target: 'EDINBURGH CASTLE',
+    subtitle: 'Edinburgh Castle, Edinburgh',
+    victory: 'TODO(edinburgh) THE LINE THE END CARD LEADS WITH',
+    // TODO(edinburgh) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(edinburgh) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(edinburgh) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(edinburgh) the postcard angle
+    structures: (quality) => [
+      { key: 'edinburgh', blocks: buildEdinburgh(quality), primary: true, required: true, label: 'EDINBURGH CASTLE' },
+    ],
+    garrison: (g, origin, groundY) => populateEdinburgh(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(edinburgh)
+    traits: { windows: false, river: false, topples: true },           // TODO(edinburgh)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(edinburgh) from the suite's undercut
+    brief: 'TODO(edinburgh) one sentence: what the player has to find out about this building.',
+  },
+  neuschwanstein: {
+    id: 'neuschwanstein',
+    terrain: 'neuschwanstein',
+    lat: 47.55757, lon: 10.74972,
+    name: 'NEUSCHWANSTEIN CASTLE',
+    place: 'Schwangau',
+    target: 'NEUSCHWANSTEIN CASTLE',
+    subtitle: 'Neuschwanstein Castle, Schwangau',
+    victory: 'TODO(neuschwanstein) THE LINE THE END CARD LEADS WITH',
+    // TODO(neuschwanstein) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(neuschwanstein) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(neuschwanstein) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(neuschwanstein) the postcard angle
+    structures: (quality) => [
+      { key: 'neuschwanstein', blocks: buildNeuschwanstein(quality), primary: true, required: true, label: 'NEUSCHWANSTEIN CASTLE' },
+    ],
+    garrison: (g, origin, groundY) => populateNeuschwanstein(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(neuschwanstein)
+    traits: { windows: false, river: false, topples: true },           // TODO(neuschwanstein)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(neuschwanstein) from the suite's undercut
+    brief: 'TODO(neuschwanstein) one sentence: what the player has to find out about this building.',
+  },
+  montstmichel: {
+    id: 'montstmichel',
+    terrain: 'montstmichel',
+    lat: 48.63601, lon: -1.51141,
+    name: 'MONT-SAINT-MICHEL',
+    place: 'Normandy',
+    target: 'MONT-SAINT-MICHEL',
+    subtitle: 'Mont-Saint-Michel, Normandy',
+    victory: 'TODO(montstmichel) THE LINE THE END CARD LEADS WITH',
+    // TODO(montstmichel) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(montstmichel) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(montstmichel) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(montstmichel) the postcard angle
+    structures: (quality) => [
+      { key: 'montstmichel', blocks: buildMontstmichel(quality), primary: true, required: true, label: 'MONT-SAINT-MICHEL' },
+    ],
+    garrison: (g, origin, groundY) => populateMontstmichel(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(montstmichel)
+    traits: { windows: false, river: false, topples: true },           // TODO(montstmichel)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(montstmichel) from the suite's undercut
+    brief: 'TODO(montstmichel) one sentence: what the player has to find out about this building.',
+  },
+  pena: {
+    id: 'pena',
+    terrain: 'pena',
+    lat: 38.78762, lon: -9.39058,
+    name: 'PENA PALACE',
+    place: 'Sintra',
+    target: 'PENA PALACE',
+    subtitle: 'Pena Palace, Sintra',
+    victory: 'TODO(pena) THE LINE THE END CARD LEADS WITH',
+    // TODO(pena) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(pena) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(pena) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(pena) the postcard angle
+    structures: (quality) => [
+      { key: 'pena', blocks: buildPena(quality), primary: true, required: true, label: 'PENA PALACE' },
+    ],
+    garrison: (g, origin, groundY) => populatePena(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(pena)
+    traits: { windows: false, river: false, topples: true },           // TODO(pena)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(pena) from the suite's undercut
+    brief: 'TODO(pena) one sentence: what the player has to find out about this building.',
+  },
+  hassan: {
+    id: 'hassan',
+    terrain: 'hassan',
+    lat: 33.60822, lon: -7.63262,
+    name: 'HASSAN II MOSQUE',
+    place: 'Casablanca',
+    target: 'HASSAN II MOSQUE',
+    subtitle: 'Hassan II Mosque, Casablanca',
+    victory: 'TODO(hassan) THE LINE THE END CARD LEADS WITH',
+    // TODO(hassan) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(hassan) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(hassan) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(hassan) the postcard angle
+    structures: (quality) => [
+      { key: 'hassan', blocks: buildHassan(quality), primary: true, required: true, label: 'HASSAN II MOSQUE' },
+    ],
+    garrison: (g, origin, groundY) => populateHassan(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(hassan)
+    traits: { windows: false, river: false, topples: true },           // TODO(hassan)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(hassan) from the suite's undercut
+    brief: 'TODO(hassan) one sentence: what the player has to find out about this building.',
+  },
+  kuwait: {
+    id: 'kuwait',
+    terrain: 'kuwait',
+    lat: 29.38988, lon: 48.0028,
+    name: 'KUWAIT TOWERS',
+    place: 'Kuwait City',
+    target: 'KUWAIT TOWERS',
+    subtitle: 'Kuwait Towers, Kuwait City',
+    victory: 'TODO(kuwait) THE LINE THE END CARD LEADS WITH',
+    // TODO(kuwait) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(kuwait) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(kuwait) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(kuwait) the postcard angle
+    structures: (quality) => [
+      { key: 'kuwait', blocks: buildKuwait(quality), primary: true, required: true, label: 'KUWAIT TOWERS' },
+    ],
+    garrison: (g, origin, groundY) => populateKuwait(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(kuwait)
+    traits: { windows: false, river: false, topples: true },           // TODO(kuwait)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(kuwait) from the suite's undercut
+    brief: 'TODO(kuwait) one sentence: what the player has to find out about this building.',
+  },
+  karnak: {
+    id: 'karnak',
+    terrain: 'karnak',
+    lat: 25.71877, lon: 32.65721,
+    name: 'KARNAK TEMPLE',
+    place: 'Luxor',
+    target: 'KARNAK TEMPLE',
+    subtitle: 'Karnak Temple, Luxor',
+    victory: 'TODO(karnak) THE LINE THE END CARD LEADS WITH',
+    // TODO(karnak) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(karnak) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(karnak) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(karnak) the postcard angle
+    structures: (quality) => [
+      { key: 'karnak', blocks: buildKarnak(quality), primary: true, required: true, label: 'KARNAK TEMPLE' },
+    ],
+    garrison: (g, origin, groundY) => populateKarnak(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(karnak)
+    traits: { windows: false, river: false, topples: true },           // TODO(karnak)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(karnak) from the suite's undercut
+    brief: 'TODO(karnak) one sentence: what the player has to find out about this building.',
+  },
+  forbidden: {
+    id: 'forbidden',
+    terrain: 'forbidden',
+    lat: 39.91593, lon: 116.39069,
+    name: 'FORBIDDEN CITY',
+    place: 'Beijing',
+    target: 'FORBIDDEN CITY',
+    subtitle: 'Forbidden City, Beijing',
+    victory: 'TODO(forbidden) THE LINE THE END CARD LEADS WITH',
+    // TODO(forbidden) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(forbidden) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(forbidden) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(forbidden) the postcard angle
+    structures: (quality) => [
+      { key: 'forbidden', blocks: buildForbidden(quality), primary: true, required: true, label: 'FORBIDDEN CITY' },
+    ],
+    garrison: (g, origin, groundY) => populateForbidden(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(forbidden)
+    traits: { windows: false, river: false, topples: true },           // TODO(forbidden)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(forbidden) from the suite's undercut
+    brief: 'TODO(forbidden) one sentence: what the player has to find out about this building.',
+  },
+  gyeongbok: {
+    id: 'gyeongbok',
+    terrain: 'gyeongbok',
+    lat: 37.57859, lon: 126.97705,
+    name: 'GYEONGBOKGUNG',
+    place: 'Seoul',
+    target: 'GYEONGBOKGUNG',
+    subtitle: 'Gyeongbokgung, Seoul',
+    victory: 'TODO(gyeongbok) THE LINE THE END CARD LEADS WITH',
+    // TODO(gyeongbok) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(gyeongbok) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(gyeongbok) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(gyeongbok) the postcard angle
+    structures: (quality) => [
+      { key: 'gyeongbok', blocks: buildGyeongbok(quality), primary: true, required: true, label: 'GYEONGBOKGUNG' },
+    ],
+    garrison: (g, origin, groundY) => populateGyeongbok(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(gyeongbok)
+    traits: { windows: false, river: false, topples: true },           // TODO(gyeongbok)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(gyeongbok) from the suite's undercut
+    brief: 'TODO(gyeongbok) one sentence: what the player has to find out about this building.',
+  },
+  watarun: {
+    id: 'watarun',
+    terrain: 'watarun',
+    lat: 13.74378, lon: 100.48885,
+    name: 'WAT ARUN',
+    place: 'Bangkok',
+    target: 'WAT ARUN',
+    subtitle: 'Wat Arun, Bangkok',
+    victory: 'TODO(watarun) THE LINE THE END CARD LEADS WITH',
+    // TODO(watarun) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(watarun) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(watarun) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(watarun) the postcard angle
+    structures: (quality) => [
+      { key: 'watarun', blocks: buildWatarun(quality), primary: true, required: true, label: 'WAT ARUN' },
+    ],
+    garrison: (g, origin, groundY) => populateWatarun(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(watarun)
+    traits: { windows: false, river: false, topples: true },           // TODO(watarun)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(watarun) from the suite's undercut
+    brief: 'TODO(watarun) one sentence: what the player has to find out about this building.',
+  },
+  shwedagon: {
+    id: 'shwedagon',
+    terrain: 'shwedagon',
+    lat: 16.79845, lon: 96.14957,
+    name: 'SHWEDAGON PAGODA',
+    place: 'Yangon',
+    target: 'SHWEDAGON PAGODA',
+    subtitle: 'Shwedagon Pagoda, Yangon',
+    victory: 'TODO(shwedagon) THE LINE THE END CARD LEADS WITH',
+    // TODO(shwedagon) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(shwedagon) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(shwedagon) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(shwedagon) the postcard angle
+    structures: (quality) => [
+      { key: 'shwedagon', blocks: buildShwedagon(quality), primary: true, required: true, label: 'SHWEDAGON PAGODA' },
+    ],
+    garrison: (g, origin, groundY) => populateShwedagon(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(shwedagon)
+    traits: { windows: false, river: false, topples: true },           // TODO(shwedagon)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(shwedagon) from the suite's undercut
+    brief: 'TODO(shwedagon) one sentence: what the player has to find out about this building.',
+  },
+  angkor: {
+    id: 'angkor',
+    terrain: 'angkor',
+    lat: 13.41253, lon: 103.86699,
+    name: 'ANGKOR WAT',
+    place: 'Siem Reap',
+    target: 'ANGKOR WAT',
+    subtitle: 'Angkor Wat, Siem Reap',
+    victory: 'TODO(angkor) THE LINE THE END CARD LEADS WITH',
+    // TODO(angkor) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(angkor) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(angkor) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(angkor) the postcard angle
+    structures: (quality) => [
+      { key: 'angkor', blocks: buildAngkor(quality), primary: true, required: true, label: 'ANGKOR WAT' },
+    ],
+    garrison: (g, origin, groundY) => populateAngkor(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(angkor)
+    traits: { windows: false, river: false, topples: true },           // TODO(angkor)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(angkor) from the suite's undercut
+    brief: 'TODO(angkor) one sentence: what the player has to find out about this building.',
+  },
+  borobudur: {
+    id: 'borobudur',
+    terrain: 'borobudur',
+    lat: -7.60788, lon: 110.20367,
+    name: 'BOROBUDUR',
+    place: 'Magelang',
+    target: 'BOROBUDUR',
+    subtitle: 'Borobudur, Magelang',
+    victory: 'TODO(borobudur) THE LINE THE END CARD LEADS WITH',
+    // TODO(borobudur) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(borobudur) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(borobudur) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(borobudur) the postcard angle
+    structures: (quality) => [
+      { key: 'borobudur', blocks: buildBorobudur(quality), primary: true, required: true, label: 'BOROBUDUR' },
+    ],
+    garrison: (g, origin, groundY) => populateBorobudur(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(borobudur)
+    traits: { windows: false, river: false, topples: true },           // TODO(borobudur)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(borobudur) from the suite's undercut
+    brief: 'TODO(borobudur) one sentence: what the player has to find out about this building.',
+  },
+  tikal: {
+    id: 'tikal',
+    terrain: 'tikal',
+    lat: 17.2218, lon: -89.62339,
+    name: 'TIKAL',
+    place: 'Peten',
+    target: 'TIKAL',
+    subtitle: 'Tikal, Peten',
+    victory: 'TODO(tikal) THE LINE THE END CARD LEADS WITH',
+    // TODO(tikal) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(tikal) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(tikal) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tikal) the postcard angle
+    structures: (quality) => [
+      { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TIKAL' },
+    ],
+    garrison: (g, origin, groundY) => populateTikal(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tikal)
+    traits: { windows: false, river: false, topples: true },           // TODO(tikal)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tikal) from the suite's undercut
+    brief: 'TODO(tikal) one sentence: what the player has to find out about this building.',
+  },
+  teotihuacan: {
+    id: 'teotihuacan',
+    terrain: 'teotihuacan',
+    lat: 19.69245, lon: -98.84366,
+    name: 'PYRAMID OF THE SUN',
+    place: 'Teotihuacan',
+    target: 'PYRAMID OF THE SUN',
+    subtitle: 'Pyramid of the Sun, Teotihuacan',
+    victory: 'TODO(teotihuacan) THE LINE THE END CARD LEADS WITH',
+    // TODO(teotihuacan) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(teotihuacan) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(teotihuacan) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(teotihuacan) the postcard angle
+    structures: (quality) => [
+      { key: 'teotihuacan', blocks: buildTeotihuacan(quality), primary: true, required: true, label: 'PYRAMID OF THE SUN' },
+    ],
+    garrison: (g, origin, groundY) => populateTeotihuacan(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(teotihuacan)
+    traits: { windows: false, river: false, topples: true },           // TODO(teotihuacan)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(teotihuacan) from the suite's undercut
+    brief: 'TODO(teotihuacan) one sentence: what the player has to find out about this building.',
+  },
+  machupicchu: {
+    id: 'machupicchu',
+    terrain: 'machupicchu',
+    lat: -13.16313, lon: -72.54495,
+    name: 'MACHU PICCHU',
+    place: 'Cusco',
+    target: 'MACHU PICCHU',
+    subtitle: 'Machu Picchu, Cusco',
+    victory: 'TODO(machupicchu) THE LINE THE END CARD LEADS WITH',
+    // TODO(machupicchu) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(machupicchu) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(machupicchu) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(machupicchu) the postcard angle
+    structures: (quality) => [
+      { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'MACHU PICCHU' },
+    ],
+    garrison: (g, origin, groundY) => populateMachupicchu(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(machupicchu)
+    traits: { windows: false, river: false, topples: true },           // TODO(machupicchu)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(machupicchu) from the suite's undercut
+    brief: 'TODO(machupicchu) one sentence: what the player has to find out about this building.',
+  },
+  greatwall: {
+    id: 'greatwall',
+    terrain: 'greatwall',
+    lat: 40.35968, lon: 116.02005,
+    name: 'GREAT WALL AT BADALING',
+    place: 'Beijing',
+    target: 'GREAT WALL AT BADALING',
+    subtitle: 'Great Wall at Badaling, Beijing',
+    victory: 'TODO(greatwall) THE LINE THE END CARD LEADS WITH',
+    // TODO(greatwall) palette and setting for anywhere that is not a temperate river city
+    //   (copy the nearest neighbour's and change what differs).
+    cityExcludeRadius: 120,          // TODO(greatwall) read tools/survey.py: what does this delete?
+    contextExclude: 110,
+    // TODO(greatwall) on a summit: groundLevel: 'bake' and padRadius: 0.
+    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(greatwall) the postcard angle
+    structures: (quality) => [
+      { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL AT BADALING' },
+    ],
+    garrison: (g, origin, groundY) => populateGreatwall(g, origin, groundY),
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(greatwall)
+    traits: { windows: false, river: false, topples: true },           // TODO(greatwall)
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(greatwall) from the suite's undercut
+    brief: 'TODO(greatwall) one sentence: what the player has to find out about this building.',
+  },
 };
 
 export const DEFAULT_LEVEL = 'westminster';
@@ -1069,7 +1694,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * cantilever, a dome, a lattice, and a mountain.
  */
 export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio',
-  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala'];
+  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala', 'colosseum', 'towerbridge', 'florence', 'segovia', 'atomium', 'tokyotower', 'budapest', 'sagrada', 'edinburgh', 'neuschwanstein', 'montstmichel', 'pena', 'hassan', 'kuwait', 'karnak', 'forbidden', 'gyeongbok', 'watarun', 'shwedagon', 'angkor', 'borobudur', 'tikal', 'teotihuacan', 'machupicchu', 'greatwall'];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -1089,6 +1714,31 @@ export const LEVEL_BLURB = {
   petronas: 'Two towers and a bridge that holds neither of them up. Both towers are the contract.',
   dubai: 'Half a kilometre of concrete core and glass in setbacks. Everything above a cut is a free body.',
   potala: 'Four hundred metres of battered wall on a red hill. The white is not the building.',
+  colosseum: 'TODO(colosseum) one line on the target-select card: what kind of problem this is.',
+  towerbridge: 'TODO(towerbridge) one line on the target-select card: what kind of problem this is.',
+  florence: 'TODO(florence) one line on the target-select card: what kind of problem this is.',
+  segovia: 'TODO(segovia) one line on the target-select card: what kind of problem this is.',
+  atomium: 'TODO(atomium) one line on the target-select card: what kind of problem this is.',
+  tokyotower: 'TODO(tokyotower) one line on the target-select card: what kind of problem this is.',
+  budapest: 'TODO(budapest) one line on the target-select card: what kind of problem this is.',
+  sagrada: 'TODO(sagrada) one line on the target-select card: what kind of problem this is.',
+  edinburgh: 'TODO(edinburgh) one line on the target-select card: what kind of problem this is.',
+  neuschwanstein: 'TODO(neuschwanstein) one line on the target-select card: what kind of problem this is.',
+  montstmichel: 'TODO(montstmichel) one line on the target-select card: what kind of problem this is.',
+  pena: 'TODO(pena) one line on the target-select card: what kind of problem this is.',
+  hassan: 'TODO(hassan) one line on the target-select card: what kind of problem this is.',
+  kuwait: 'TODO(kuwait) one line on the target-select card: what kind of problem this is.',
+  karnak: 'TODO(karnak) one line on the target-select card: what kind of problem this is.',
+  forbidden: 'TODO(forbidden) one line on the target-select card: what kind of problem this is.',
+  gyeongbok: 'TODO(gyeongbok) one line on the target-select card: what kind of problem this is.',
+  watarun: 'TODO(watarun) one line on the target-select card: what kind of problem this is.',
+  shwedagon: 'TODO(shwedagon) one line on the target-select card: what kind of problem this is.',
+  angkor: 'TODO(angkor) one line on the target-select card: what kind of problem this is.',
+  borobudur: 'TODO(borobudur) one line on the target-select card: what kind of problem this is.',
+  tikal: 'TODO(tikal) one line on the target-select card: what kind of problem this is.',
+  teotihuacan: 'TODO(teotihuacan) one line on the target-select card: what kind of problem this is.',
+  machupicchu: 'TODO(machupicchu) one line on the target-select card: what kind of problem this is.',
+  greatwall: 'TODO(greatwall) one line on the target-select card: what kind of problem this is.',
 };
 
 /** Ordered level records, for menus. */

@@ -96,7 +96,7 @@ CLASS_HEIGHT = {
 # So the cover layer is only taken where the level really is standing in it —
 # the Corcovado is rainforest to the sea and Chichen Itza is jungle in every
 # direction, and there the one enormous forest polygon is the literal truth.
-WILD_COVER = {"rio", "chichen"}
+WILD_COVER = {"rio", "chichen", "neuschwanstein", "pena", "angkor", "borobudur", "tikal", "machupicchu", "greatwall"}
 COVER_KEEP = {"forest", "tree", "trees", "wood", "mangrove", "wetland", "shrub"}
 
 # Land use that is built on rather than grown on. This goes into the mask's

@@ -1,0 +1,16 @@
+{
+  "id": "colosseum",
+  "name": "Colosseum, Rome",
+  "lat": 41.89021,
+  "lon": 12.49223,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 18.13,
+  "maxElevation": 51.277,
+  "metersPerDemPixel": 3.5564,
+  "seaLevel": 25.12,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0315
+}

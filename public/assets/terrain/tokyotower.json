@@ -1,0 +1,16 @@
+{
+  "id": "tokyotower",
+  "name": "Tokyo Tower, Tokyo",
+  "lat": 35.65858,
+  "lon": 139.74543,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -5.641,
+  "maxElevation": 47.378,
+  "metersPerDemPixel": 3.8816,
+  "seaLevel": 8.412,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.1761
+}

@@ -1,0 +1,16 @@
+{
+  "id": "edinburgh",
+  "name": "Edinburgh Castle, Edinburgh",
+  "lat": 55.94862,
+  "lon": -3.1998,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 23.483,
+  "maxElevation": 130.0,
+  "metersPerDemPixel": 2.675,
+  "seaLevel": 45.39,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.2706
+}

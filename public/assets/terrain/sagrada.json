@@ -1,0 +1,16 @@
+{
+  "id": "sagrada",
+  "name": "Sagrada Familia, Barcelona",
+  "lat": 41.40363,
+  "lon": 2.17435,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 15.385,
+  "maxElevation": 59.01,
+  "metersPerDemPixel": 3.5833,
+  "seaLevel": 26.979,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.2654
+}

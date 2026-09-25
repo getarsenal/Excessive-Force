@@ -1,0 +1,17 @@
+{
+  "id": "florence",
+  "name": "Florence Cathedral, Florence",
+  "lat": 43.77313,
+  "lon": 11.256,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 40.489,
+  "maxElevation": 64.567,
+  "metersPerDemPixel": 3.4496,
+  "seaLevel": 47.009,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 49.7,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0305
+}

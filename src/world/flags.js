@@ -14,6 +14,31 @@ import { HIMEJI } from '../structure/landmarks/himeji.js';
 import { BURJ } from '../structure/landmarks/burj.js';
 import { PETRONAS } from '../structure/landmarks/petronas.js';
 import { POTALA } from '../structure/landmarks/potala.js';
+import { COLOSSEUM } from '../structure/landmarks/colosseum.js';
+import { TOWERBRIDGE } from '../structure/landmarks/towerbridge.js';
+import { FLORENCE } from '../structure/landmarks/florence.js';
+import { SEGOVIA } from '../structure/landmarks/segovia.js';
+import { ATOMIUM } from '../structure/landmarks/atomium.js';
+import { TOKYOTOWER } from '../structure/landmarks/tokyotower.js';
+import { BUDAPEST } from '../structure/landmarks/budapest.js';
+import { SAGRADA } from '../structure/landmarks/sagrada.js';
+import { EDINBURGH } from '../structure/landmarks/edinburgh.js';
+import { NEUSCHWANSTEIN } from '../structure/landmarks/neuschwanstein.js';
+import { MONTSTMICHEL } from '../structure/landmarks/montstmichel.js';
+import { PENA } from '../structure/landmarks/pena.js';
+import { HASSAN } from '../structure/landmarks/hassan.js';
+import { KUWAIT } from '../structure/landmarks/kuwait.js';
+import { KARNAK } from '../structure/landmarks/karnak.js';
+import { FORBIDDEN } from '../structure/landmarks/forbidden.js';
+import { GYEONGBOK } from '../structure/landmarks/gyeongbok.js';
+import { WATARUN } from '../structure/landmarks/watarun.js';
+import { SHWEDAGON } from '../structure/landmarks/shwedagon.js';
+import { ANGKOR } from '../structure/landmarks/angkor.js';
+import { BOROBUDUR } from '../structure/landmarks/borobudur.js';
+import { TIKAL } from '../structure/landmarks/tikal.js';
+import { TEOTIHUACAN } from '../structure/landmarks/teotihuacan.js';
+import { MACHUPICCHU } from '../structure/landmarks/machupicchu.js';
+import { GREATWALL } from '../structure/landmarks/greatwall.js';
 
 /**
  * Flags on the landmarks.
@@ -102,10 +127,130 @@ export const FLAG_SITES = {
   dubai: [{ key: 'burj', ...BURJ.flag, pattern: 'uae', w: 9, h: 4.5, pole: 9 }],
   petronas: [{ key: 'petronas', ...PETRONAS.flag, pattern: 'malaysia', w: 9, h: 4.5, pole: 9 }],
   potala: [{ key: 'potala', ...POTALA.flag, pattern: 'china', w: 9, h: 6, pole: 10 }],
+  colosseum: [{ key: 'colosseum', ...COLOSSEUM.flag, pattern: 'italy', w: 9, h: 6, pole: 10 }],
+  towerbridge: [{ key: 'towerbridge', ...TOWERBRIDGE.flag, pattern: 'union', w: 9, h: 6, pole: 10 }],
+  florence: [{ key: 'florence', ...FLORENCE.flag, pattern: 'italy', w: 9, h: 6, pole: 10 }],
+  segovia: [{ key: 'segovia', ...SEGOVIA.flag, pattern: 'spain', w: 9, h: 6, pole: 10 }],
+  atomium: [{ key: 'atomium', ...ATOMIUM.flag, pattern: 'belgium', w: 9, h: 6, pole: 10 }],
+  tokyotower: [{ key: 'tokyotower', ...TOKYOTOWER.flag, pattern: 'japan', w: 9, h: 6, pole: 10 }],
+  budapest: [{ key: 'budapest', ...BUDAPEST.flag, pattern: 'hungary', w: 9, h: 6, pole: 10 }],
+  sagrada: [{ key: 'sagrada', ...SAGRADA.flag, pattern: 'spain', w: 9, h: 6, pole: 10 }],
+  edinburgh: [{ key: 'edinburgh', ...EDINBURGH.flag, pattern: 'saltire', w: 9, h: 6, pole: 10 }],
+  neuschwanstein: [{ key: 'neuschwanstein', ...NEUSCHWANSTEIN.flag, pattern: 'germany', w: 9, h: 6, pole: 10 }],
+  montstmichel: [{ key: 'montstmichel', ...MONTSTMICHEL.flag, pattern: 'tricolore', w: 9, h: 6, pole: 10 }],
+  pena: [{ key: 'pena', ...PENA.flag, pattern: 'portugal', w: 9, h: 6, pole: 10 }],
+  hassan: [{ key: 'hassan', ...HASSAN.flag, pattern: 'morocco', w: 9, h: 6, pole: 10 }],
+  kuwait: [{ key: 'kuwait', ...KUWAIT.flag, pattern: 'kuwait', w: 9, h: 6, pole: 10 }],
+  karnak: [{ key: 'karnak', ...KARNAK.flag, pattern: 'egypt', w: 9, h: 6, pole: 10 }],
+  forbidden: [{ key: 'forbidden', ...FORBIDDEN.flag, pattern: 'china', w: 9, h: 6, pole: 10 }],
+  gyeongbok: [{ key: 'gyeongbok', ...GYEONGBOK.flag, pattern: 'korea', w: 9, h: 6, pole: 10 }],
+  watarun: [{ key: 'watarun', ...WATARUN.flag, pattern: 'thailand', w: 9, h: 6, pole: 10 }],
+  shwedagon: [{ key: 'shwedagon', ...SHWEDAGON.flag, pattern: 'myanmar', w: 9, h: 6, pole: 10 }],
+  angkor: [{ key: 'angkor', ...ANGKOR.flag, pattern: 'cambodia', w: 9, h: 6, pole: 10 }],
+  borobudur: [{ key: 'borobudur', ...BOROBUDUR.flag, pattern: 'indonesia', w: 9, h: 6, pole: 10 }],
+  tikal: [{ key: 'tikal', ...TIKAL.flag, pattern: 'guatemala', w: 9, h: 6, pole: 10 }],
+  teotihuacan: [{ key: 'teotihuacan', ...TEOTIHUACAN.flag, pattern: 'mexico', w: 9, h: 6, pole: 10 }],
+  machupicchu: [{ key: 'machupicchu', ...MACHUPICCHU.flag, pattern: 'peru', w: 9, h: 6, pole: 10 }],
+  greatwall: [{ key: 'greatwall', ...GREATWALL.flag, pattern: 'china', w: 9, h: 6, pole: 10 }],
 };
 
 /** The cloth's pattern, drawn once into a small canvas. */
 const PATTERNS = {
+  spain(ctx, w, h) {
+    ctx.fillStyle = '#aa151b'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f1bf00'; ctx.fillRect(0, h * 0.25, w, h * 0.5);
+  },
+  belgium(ctx, w, h) {
+    ctx.fillStyle = '#111111'; ctx.fillRect(0, 0, w / 3, h);
+    ctx.fillStyle = '#fdda24'; ctx.fillRect(w / 3, 0, w / 3, h);
+    ctx.fillStyle = '#ef3340'; ctx.fillRect((w * 2) / 3, 0, w / 3, h);
+  },
+  hungary(ctx, w, h) {
+    ctx.fillStyle = '#ce2939'; ctx.fillRect(0, 0, w, h / 3);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, h / 3, w, h / 3);
+    ctx.fillStyle = '#477050'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+  },
+  portugal(ctx, w, h) {
+    ctx.fillStyle = '#046a38'; ctx.fillRect(0, 0, w * 0.4, h);
+    ctx.fillStyle = '#da291c'; ctx.fillRect(w * 0.4, 0, w * 0.6, h);
+    ctx.fillStyle = '#ffe900'; ctx.beginPath(); ctx.arc(w * 0.4, h / 2, h * 0.22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#da291c'; ctx.beginPath(); ctx.arc(w * 0.4, h / 2, h * 0.16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(w * 0.4 - h * 0.07, h * 0.38, h * 0.14, h * 0.24);
+  },
+  morocco(ctx, w, h) {
+    ctx.fillStyle = '#c1272d'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#006233'; ctx.lineWidth = h * 0.045; ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + (i * 4 * Math.PI) / 5;
+      const x = w / 2 + Math.cos(a) * h * 0.3, y = h / 2 + Math.sin(a) * h * 0.3;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.stroke();
+  },
+  kuwait(ctx, w, h) {
+    ctx.fillStyle = '#007a3d'; ctx.fillRect(0, 0, w, h / 3);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, h / 3, w, h / 3);
+    ctx.fillStyle = '#ce1126'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+    ctx.fillStyle = '#111111'; ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(w * 0.25, h / 3); ctx.lineTo(w * 0.25, (h * 2) / 3); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+  },
+  korea(ctx, w, h) {
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, 0, w, h);
+    const r = h * 0.25, cx = w / 2, cy = h / 2;
+    ctx.fillStyle = '#cd2e3a'; ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#0047a0'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#cd2e3a'; ctx.beginPath(); ctx.arc(cx - r / 2, cy, r / 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#0047a0'; ctx.beginPath(); ctx.arc(cx + r / 2, cy, r / 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#111111';
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      for (let k = 0; k < 3; k++) {
+        ctx.save(); ctx.translate(cx + sx * w * 0.3, cy + sy * h * 0.3); ctx.rotate(sx * sy * Math.PI / 4 + Math.PI / 2);
+        ctx.fillRect(-h * 0.16, (k - 1) * h * 0.09 - h * 0.03, h * 0.32, h * 0.06); ctx.restore();
+      }
+    }
+  },
+  thailand(ctx, w, h) {
+    ctx.fillStyle = '#a51931'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f4f5f8'; ctx.fillRect(0, h / 6, w, (h * 4) / 6);
+    ctx.fillStyle = '#2d2a4a'; ctx.fillRect(0, h / 3, w, h / 3);
+  },
+  myanmar(ctx, w, h) {
+    ctx.fillStyle = '#fecb00'; ctx.fillRect(0, 0, w, h / 3);
+    ctx.fillStyle = '#34b233'; ctx.fillRect(0, h / 3, w, h / 3);
+    ctx.fillStyle = '#ea2839'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
+    ctx.fillStyle = '#f4f2ec'; ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? h * 0.16 : h * 0.4;
+      const x = w / 2 + Math.cos(a) * rr, y = h * 0.55 + Math.sin(a) * rr;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath(); ctx.fill();
+  },
+  cambodia(ctx, w, h) {
+    ctx.fillStyle = '#032ea1'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#e00025'; ctx.fillRect(0, h * 0.25, w, h * 0.5);
+    ctx.fillStyle = '#f4f2ec';
+    ctx.fillRect(w * 0.36, h * 0.52, w * 0.28, h * 0.16);
+    for (const [x, t] of [[0.42, 0.38], [0.5, 0.31], [0.58, 0.38]]) ctx.fillRect(w * x - w * 0.025, h * t, w * 0.05, h * 0.68 - h * t);
+  },
+  indonesia(ctx, w, h) {
+    ctx.fillStyle = '#ce1126'; ctx.fillRect(0, 0, w, h / 2);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(0, h / 2, w, h / 2);
+  },
+  guatemala(ctx, w, h) {
+    ctx.fillStyle = '#4997d0'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(w / 3, 0, w / 3, h);
+    ctx.fillStyle = '#6a8f3f'; ctx.beginPath(); ctx.arc(w / 2, h / 2, h * 0.12, 0, Math.PI * 2); ctx.fill();
+  },
+  peru(ctx, w, h) {
+    ctx.fillStyle = '#d91023'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f4f2ec'; ctx.fillRect(w / 3, 0, w / 3, h);
+  },
+  saltire(ctx, w, h) {
+    ctx.fillStyle = '#0065bd'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#f4f2ec'; ctx.lineWidth = h * 0.18;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w, h); ctx.moveTo(w, 0); ctx.lineTo(0, h); ctx.stroke();
+  },
   union(ctx, w, h) {
     ctx.fillStyle = '#1b3a7a'; ctx.fillRect(0, 0, w, h);
     ctx.strokeStyle = '#f2f2ec'; ctx.lineWidth = h * 0.2;

@@ -1,0 +1,16 @@
+{
+  "id": "atomium",
+  "name": "Atomium, Brussels",
+  "lat": 50.89494,
+  "lon": 4.34144,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 33.612,
+  "maxElevation": 40.72,
+  "metersPerDemPixel": 3.0133,
+  "seaLevel": 36.093,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0627
+}

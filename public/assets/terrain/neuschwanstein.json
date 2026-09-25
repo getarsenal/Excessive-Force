@@ -1,0 +1,16 @@
+{
+  "id": "neuschwanstein",
+  "name": "Neuschwanstein Castle, Schwangau",
+  "lat": 47.55757,
+  "lon": 10.74972,
+  "spanMeters": 1000.0,
+  "size": 512,
+  "minElevation": 791.68,
+  "maxElevation": 1453.4,
+  "metersPerDemPixel": 3.224,
+  "seaLevel": 798.214,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 7000.0,
+  "farWater": 0.0967
+}

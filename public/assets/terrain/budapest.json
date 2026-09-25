@@ -1,0 +1,17 @@
+{
+  "id": "budapest",
+  "name": "Hungarian Parliament, Budapest",
+  "lat": 47.50704,
+  "lon": 19.04569,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 92.0,
+  "maxElevation": 128.145,
+  "metersPerDemPixel": 3.2271,
+  "seaLevel": 96.5,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 96.5,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0626
+}
