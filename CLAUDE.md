@@ -54,7 +54,8 @@ worth running. `python3 tools/survey.py <level>` is the aerial survey out of
 the bakes — the ground under the origin and every named building the
 exclusion radius is about to delete. `node tools/blocks.mjs <level>` runs
 the builder in Node in a quarter of a second: stones, the box above ground,
-sections, material share by colour. `node tools/postcard.mjs <level>`
+sections, material share by colour; `node tools/loosecheck.mjs <level> low`
+runs the support solver on it, also in Node, and names every loose stone. `node tools/postcard.mjs <level>`
 renders it from the level's own camera with the HUD cleared.
 `node tools/wateraudit.mjs <level>...` says whether the water is right: how
 much stands above its own surface (must be none), how many pieces it is in,
