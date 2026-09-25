@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildCraft } from './craft.js';
 
 /**
  * The things that move.
@@ -17,7 +18,7 @@ import * as THREE from 'three';
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Life {
-  constructor(scene, terrain, net, quality, rng) {
+  constructor(scene, terrain, net, quality, rng, fleet = []) {
     this.terrain = terrain;
     this.net = net;
     this.rng = rng;
@@ -29,7 +30,7 @@ export class Life {
 
     const dense = quality.groundClutter ? 1 : 0.45;
     this.cars = this._buildTraffic(scene, Math.round(150 * dense));
-    this.boats = this._buildBoats(scene, Math.round(14 * dense));
+    this.boats = this._buildBoats(scene, Math.round(14 * dense), fleet);
     this.birds = this._buildBirds(scene, Math.round(120 * dense));
   }
 
@@ -114,80 +115,149 @@ export class Life {
 
   // ───────────────────────────────────────────────────────────────── river ──
 
-  _buildBoats(scene, n) {
-    if (n <= 0) return null;
-    const hull = new THREE.BoxGeometry(5.4, 1.7, 21);
-    hull.translate(0, 0.85, 0);
-    const house = new THREE.BoxGeometry(4.0, 2.0, 6.0);
-    house.translate(0, 2.7, -5);
-    const geo = mergeTwo(hull, house);
-    const mesh = new THREE.InstancedMesh(geo,
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), n);
-    mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-    mesh.frustumCulled = false;
-    mesh.name = 'rivercraft';
-    scene.add(mesh);
+  /**
+   * The waterways: every navigable channel on the map, as polylines whose
+   * every sample and every segment is verified wet.
+   *
+   * The old router scanned rows of constant z, took the *outermost* wet
+   * points on each row, and called their midpoint the channel. That is a
+   * river's centreline only for one river running straight down the map. On
+   * a harbour with two shores the midpoint of the outermost wet points is the
+   * headland between them; on an island it is the island; on a meander that
+   * crosses the row twice it is the bank. And the boat was then interpolated
+   * in a straight line between two such midpoints. That is the fleet of
+   * barges the player found ploughing across dry land on most of the sea
+   * maps, and it was never going to be fixed by a wider row.
+   *
+   * So: each row is cut into its separate contiguous wet runs, each run's
+   * own midpoint is a sample — wet by construction — and samples in adjacent
+   * rows are linked into a chain only where the straight segment between them
+   * tests wet every six metres along its length. Columns are scanned the same
+   * way for the reaches that run across the map. What comes out is one chain
+   * per channel or shore, and nothing on any of them can be over land.
+   */
+  _waterways() {
+    const t = this.terrain, span = t.span, lim = span * 0.95;
+    const STEP = 24, SUB = 6, MIN_RUN = 30, LINK = 80, MIN_CHAIN = 160;
+    const wetSeg = (a, b) => {
+      const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / SUB));
+      for (let i = 1; i < n; i++) {
+        const f = i / n;
+        if (!t.isWater(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f)) return false;
+      }
+      return true;
+    };
+    // The contiguous wet runs along one line, as midpoints with widths.
+    const runs = (fixed, alongX) => {
+      const out = [];
+      let lo = null, prev = null;
+      for (let u = -lim; u <= lim + SUB; u += SUB) {
+        const wet = u <= lim && (alongX ? t.isWater(u, fixed) : t.isWater(fixed, u));
+        if (wet && lo === null) lo = u;
+        if (!wet && lo !== null) {
+          const w = prev - lo;
+          if (w >= MIN_RUN) {
+            const m = (lo + prev) / 2;
+            out.push(alongX ? { x: m, z: fixed, w } : { x: fixed, z: m, w });
+          }
+          lo = null;
+        }
+        if (wet) prev = u;
+      }
+      return out;
+    };
+    const chains = [];
+    const sweep = (alongX) => {
+      const lines = [];
+      for (let v = -lim; v <= lim; v += STEP) lines.push(runs(v, alongX));
+      // Drop the runs that are the *length* of a reach rather than its width:
+      // a row that happens to lie along a channel reports a kilometre of
+      // water whose midpoint is nowhere in particular.
+      const all = lines.flat();
+      if (all.length > 4) {
+        const med = all.map((p) => p.w).sort((x, y) => x - y)[all.length >> 1];
+        for (const L of lines) for (let i = L.length - 1; i >= 0; i--) if (L[i].w > med * 3) L.splice(i, 1);
+      }
+      const open = new Map(); // sample -> chain it ends
+      for (let i = 0; i < lines.length; i++) {
+        const next = lines[i + 1] || [];
+        const claimed = new Set();
+        for (const a of lines[i]) {
+          let best = null, bd = LINK;
+          for (const b of next) {
+            if (claimed.has(b)) continue;
+            const d = alongX ? Math.abs(b.x - a.x) : Math.abs(b.z - a.z);
+            if (d < bd && wetSeg(a, b)) { bd = d; best = b; }
+          }
+          const ch = open.get(a) || (chains.push([a]), chains[chains.length - 1]);
+          open.delete(a);
+          if (best) { ch.push(best); claimed.add(best); open.set(best, ch); }
+        }
+      }
+    };
+    sweep(true);
+    sweep(false);
+    const out = [];
+    for (const pts of chains) {
+      let total = 0;
+      for (let i = 0; i < pts.length; i++) {
+        pts[i].s = total;
+        if (i < pts.length - 1) total += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+      }
+      if (total >= MIN_CHAIN) out.push({ pts, total });
+    }
+    return out;
+  }
 
-    // The river's own axis, found by walking the water mask.
-    const span = this.terrain.span;
-    const wet = [];
-    for (let z = -span * 0.95; z < span * 0.95; z += 24) {
-      let lo = null, hi = null;
-      for (let x = -span * 0.95; x < span * 0.95; x += 6) {
-        if (!this.terrain.isWater(x, z)) continue;
-        if (lo === null) lo = x;
-        hi = x;
-      }
-      if (lo !== null && hi - lo > 40) wet.push({ z, x: (lo + hi) / 2, w: hi - lo });
+  /**
+   * Craft on the water: one instanced mesh per kind in the level's fleet,
+   * each boat on a verified chain, and nothing on dry land.
+   */
+  _buildBoats(scene, n, fleet) {
+    if (n <= 0 || !fleet || !fleet.length) return null;
+    const chains = this._waterways();
+    if (!chains.length) return null;
+    const grand = chains.reduce((a, c) => a + c.total, 0);
+
+    const kinds = [...new Set(fleet)];
+    const meshes = new Map();
+    const slots = new Map();
+    for (const kind of kinds) {
+      const { geo } = buildCraft(kind);
+      const mesh = new THREE.InstancedMesh(geo,
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.58, side: THREE.DoubleSide }), n);
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+      mesh.frustumCulled = false;
+      mesh.name = `craft-${kind}`;
+      mesh.count = 0;
+      scene.add(mesh);
+      meshes.set(kind, mesh);
+      slots.set(kind, 0);
     }
-    // Throw away the rows that ran *along* the river instead of across it.
-    //
-    // The scan measures the wet span of a line of constant z, which is the
-    // channel's width only where the channel runs north-south. Where it runs
-    // east-west — most of the Seine, once the river was put where the ground
-    // says it is — one row can be fifteen hundred metres of water, its
-    // midpoint is nowhere near the centreline, and the width it reports is the
-    // length of a reach. A boat offset by a quarter of *that* jumps two
-    // hundred metres sideways at the sample boundary and reads as doing
-    // twenty-three knots.
-    if (wet.length > 4) {
-      const med = wet.map((p) => p.w).sort((a, b) => a - b)[wet.length >> 1];
-      for (let i = wet.length - 1; i >= 0; i--) {
-        if (wet[i].w > med * 2.5) wet.splice(i, 1);
-      }
-    }
-    // Measured along the channel, not counted in samples.
-    //
-    // Position used to be an index into this list advanced at a fixed rate, and
-    // the samples are a fixed step in *z* — so wherever the river runs across
-    // the map rather than down it, consecutive samples are much further apart
-    // and the same rate is a much higher speed. Some of them were doing forty
-    // knots. A cumulative length table makes the parameter metres, and a boat
-    // given six metres a second travels six metres a second wherever it is.
-    let total = 0;
-    for (let i = 0; i < wet.length; i++) {
-      wet[i].s = total;
-      if (i < wet.length - 1) {
-        total += Math.hypot(wet[i + 1].x - wet[i].x, wet[i + 1].z - wet[i].z);
-      }
-    }
+
     const boats = [];
-    const c = new THREE.Color();
-    for (let i = 0; i < n && wet.length > 2; i++) {
+    for (let i = 0; i < n; i++) {
+      const kind = fleet[Math.floor(this.rng() * fleet.length)];
+      const { speed, scale } = buildCraft(kind);
+      // A chain by its share of the water, so a long reach carries more.
+      let pick = this.rng() * grand, chain = chains[0];
+      for (const c of chains) { if (pick < c.total) { chain = c; break; } pick -= c.total; }
+      const slot = slots.get(kind); slots.set(kind, slot + 1);
+      const mesh = meshes.get(kind);
+      mesh.count = slot + 1;
+      const tint = 0.82 + this.rng() * 0.3;
+      mesh.instanceColor.setXYZ(slot, tint, tint, tint);
+      mesh.instanceColor.needsUpdate = true;
       boats.push({
-        s: this.rng() * total,
-        // A working river: barges plod, launches move. Nothing on it does more
-        // than about twelve knots.
-        speed: (2.4 + this.rng() * 3.6) * (this.rng() < 0.5 ? 1 : -1),
-        off: (this.rng() - 0.5) * 0.5,
+        kind, mesh, slot, chain,
+        s: this.rng() * chain.total,
+        speed: (speed[0] + this.rng() * (speed[1] - speed[0])) * (this.rng() < 0.5 ? 1 : -1),
+        off: (this.rng() - 0.5) * 0.4,
+        k: scale[0] + this.rng() * (scale[1] - scale[0]),
       });
-      c.setHex([0x3b4249, 0x6b3f36, 0x2f4a55, 0xb0aa9a][Math.floor(this.rng() * 4)])
-        .multiplyScalar(0.8 + this.rng() * 0.4);
-      mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
     }
-    mesh.instanceColor.needsUpdate = true;
-    mesh.count = boats.length;
-    return { mesh, boats, wet, total };
+    const first = meshes.values().next().value;
+    return { meshes, boats, chains, total: grand, mesh: first };
   }
 
   // ───────────────────────────────────────────────────────────────── birds ──
@@ -274,42 +344,38 @@ export class Life {
       mesh.instanceMatrix.needsUpdate = true;
     }
 
-    if (this.boats && this.boats.wet.length > 2 && this.boats.total > 1) {
-      const { mesh, boats, wet, total } = this.boats;
-      let w = 0;
+    if (this.boats) {
+      const { boats } = this.boats;
       for (const b of boats) {
-        // Turn at the ends rather than wrapping round to the other one.
-        //
-        // Wrapping teleported a boat from the last sample of the reach to the
-        // first, which is a jump of the whole length of the river in one frame
-        // — on Westminster that is far enough away to go unnoticed, and on the
-        // Yamuna, where the reach is shorter, it read as a barge doing thirty-
-        // six knots. A river is not a loop; a working boat goes up it and then
-        // comes back down.
+        const { pts, total } = b.chain;
+        // Turn at the ends rather than wrapping round to the other one. A
+        // river is not a loop; a working boat goes up it and then comes back.
         b.s += b.speed * dt;
         if (b.s < 0) { b.s = -b.s; b.speed = -b.speed; }
         else if (b.s > total) { b.s = 2 * total - b.s; b.speed = -b.speed; }
-        // Find the pair of samples this distance falls between.
         let i0 = 0;
-        while (i0 < wet.length - 2 && wet[i0 + 1].s <= b.s) i0++;
-        const i1 = Math.min(wet.length - 1, i0 + 1);
-        const seg = Math.max(0.001, wet[i1].s - wet[i0].s);
-        const f = Math.min(1, Math.max(0, (b.s - wet[i0].s) / seg));
-        const a = wet[i0], c = wet[i1];
-        // Width interpolated with everything else. Taken from `a` alone it
-        // steps at every sample boundary, and a boat holding a fixed fraction
-        // of the width slides sideways by half that step in one frame.
+        while (i0 < pts.length - 2 && pts[i0 + 1].s <= b.s) i0++;
+        const i1 = Math.min(pts.length - 1, i0 + 1);
+        const seg = Math.max(0.001, pts[i1].s - pts[i0].s);
+        const f = Math.min(1, Math.max(0, (b.s - pts[i0].s) / seg));
+        const a = pts[i0], c = pts[i1];
         const wid = Math.min(a.w + (c.w - a.w) * f, 120);
-        const x = a.x + (c.x - a.x) * f + b.off * wid * 0.5;
-        const z = a.z + (c.z - a.z) * f;
-        this._p.set(x, t.waterLevel + 0.15, z);
+        const cx = a.x + (c.x - a.x) * f, cz = a.z + (c.z - a.z) * f;
+        // Off the centreline by a share of the width — and back onto it if
+        // that share turns out to be bank. The centreline itself is wet by
+        // construction; a boat that still reads dry is one nobody sees.
+        let x = cx + b.off * wid * 0.5;
+        if (!t.isWater(x, cz)) x = cx;
+        const shown = t.isWater(x, cz);
+        this._p.set(x, t.waterLevel + 0.1, cz);
         this._q.setFromAxisAngle(UP,
           Math.atan2(c.x - a.x, c.z - a.z) + (b.speed < 0 ? Math.PI : 0));
+        this._s.setScalar(shown ? b.k : 0);
         this._m.compose(this._p, this._q, this._s);
-        mesh.setMatrixAt(w++, this._m);
+        b.mesh.setMatrixAt(b.slot, this._m);
       }
-      mesh.count = w;
-      mesh.instanceMatrix.needsUpdate = true;
+      for (const m of this.boats.meshes.values()) m.instanceMatrix.needsUpdate = true;
+      this._s.set(1, 1, 1);
     }
 
     if (this.birds) {

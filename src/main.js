@@ -7,6 +7,7 @@ import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
 import { Life } from './world/life.js';
+import { FLEETS } from './world/craft.js';
 import { loadCity } from './world/city.js';
 import { buildCityBodies } from './world/citybodies.js';
 import { buildFieldWorks } from './world/works.js';
@@ -315,7 +316,8 @@ async function boot() {
   };
   const life = contextGroup?.userData?.network
     ? new Life(engine.scene, terrain,
-      contextGroup.userData.network, quality, lifeRng())
+      contextGroup.userData.network, quality, lifeRng(),
+      level.setting?.fleet || FLEETS[level.id] || [])
     : null;
 
   await progress(44, 'quarrying stone');

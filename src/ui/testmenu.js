@@ -2081,23 +2081,32 @@ export class TestMenu {
         }
         assert(far > 60, `only ${far} water vertices lie beyond the playfield`);
 
-        // Boat speeds, measured over the ground rather than trusted.
+        // Boat speeds, measured over the ground rather than trusted. One
+        // instanced mesh per kind of craft now, so the fleet is read across
+        // all of them; a zero-scale instance is a boat the router has hidden
+        // and is not a boat.
         const life = c.life;
-        const bm = life?.boats?.mesh;
-        assert(bm && bm.count > 3, 'there is a river but nothing is on it');
+        const meshes = life?.boats ? [...life.boats.meshes.values()] : [];
         const mat2 = new THREE.Matrix4();
-        const was = [];
-        life.update(0.001);
-        for (let i = 0; i < bm.count; i++) {
-          bm.getMatrixAt(i, mat2);
-          was.push(mat2.elements[12], mat2.elements[14]);
-        }
+        const read = () => {
+          const out = [];
+          for (const bm of meshes) {
+            for (let i = 0; i < bm.count; i++) {
+              bm.getMatrixAt(i, mat2);
+              if (mat2.elements[0] === 0) continue;
+              out.push([mat2.elements[12], mat2.elements[14]]);
+            }
+          }
+          return out;
+        };
+        life?.update(0.001);
+        const was = read();
+        assert(was.length > 3, 'there is a river but nothing is on it');
         for (let k = 0; k < 10; k++) life.update(0.1);
+        const now = read();
         let fastest = 0, slowest = Infinity;
-        for (let i = 0; i < bm.count; i++) {
-          bm.getMatrixAt(i, mat2);
-          const v = Math.hypot(mat2.elements[12] - was[i * 2],
-            mat2.elements[14] - was[i * 2 + 1]);
+        for (let i = 0; i < Math.min(was.length, now.length); i++) {
+          const v = Math.hypot(now[i][0] - was[i][0], now[i][1] - was[i][1]);
           fastest = Math.max(fastest, v);
           slowest = Math.min(slowest, v);
         }
@@ -2105,7 +2114,43 @@ export class TestMenu {
           `a boat is doing ${fastest.toFixed(1)} m/s — about ${Math.round(fastest * 1.94)} knots`);
         assert(slowest > 1.2, `a boat is doing ${slowest.toFixed(1)} m/s, adrift`);
         return `${tails.length} reaches out to ${Math.round(reach)} m, `
-          + `${bm.count} boats at ${slowest.toFixed(1)}–${fastest.toFixed(1)} m/s`;
+          + `${was.length} boats at ${slowest.toFixed(1)}–${fastest.toFixed(1)} m/s`;
+      }],
+
+      ['nothing sails on dry land', () => {
+        // The complaint was literal: dozens of boats crossing dry land on a
+        // bunch of maps. The old router took the midpoint of the outermost wet
+        // points on each row and called it the channel, which on a harbour
+        // with two shores is the headland between them. So this walks the
+        // whole fleet through a stretch of its routes and asks the terrain,
+        // at every visible boat, whether there is water under it.
+        const life = c.life, t = c.terrain;
+        if (!life?.boats) return 'no craft on this map';
+        const meshes = [...life.boats.meshes.values()];
+        const mat2 = new THREE.Matrix4();
+        let seen = 0, dry = 0, kinds = 0;
+        const where = [];
+        for (let step = 0; step < 24; step++) {
+          life.update(0.5);
+          for (const bm of meshes) {
+            let any = false;
+            for (let i = 0; i < bm.count; i++) {
+              bm.getMatrixAt(i, mat2);
+              if (mat2.elements[0] === 0) continue;
+              any = true; seen++;
+              const x = mat2.elements[12], z = mat2.elements[14];
+              if (!t.isWater(x, z)) {
+                dry++;
+                if (where.length < 3) where.push(`${bm.name.replace('craft-', '')} at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+              }
+            }
+            if (step === 0 && any) kinds++;
+          }
+        }
+        assert(seen > 0, 'a fleet was built and none of it is ever shown');
+        assert(dry === 0, `${dry} of ${seen} boat positions were over dry land: ${where.join('; ')}`);
+        return `${life.boats.boats.length} craft of ${kinds} kinds on ${life.boats.chains.length} waterways, `
+          + `${seen} positions sampled, all afloat`;
       }],
 
       ['the city is a street network, not a grid of stripes', () => {
