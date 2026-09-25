@@ -2101,7 +2101,10 @@ export class TestMenu {
         };
         life?.update(0.001);
         const was = read();
-        assert(was.length > 3, 'there is a river but nothing is on it');
+        // The fleet is sized to the water now — one boat per hundred and
+        // twenty metres of channel — so a stream carries three and a harbour
+        // fourteen. "Nothing on it" means nothing.
+        assert(was.length >= 1, 'there is a river but nothing is on it');
         for (let k = 0; k < 10; k++) life.update(0.1);
         const now = read();
         let fastest = 0, slowest = Infinity;
@@ -2125,10 +2128,25 @@ export class TestMenu {
         // whole fleet through a stretch of its routes and asks the terrain,
         // at every visible boat, whether there is water under it.
         const life = c.life, t = c.terrain;
+        // First the water itself, on every map that has any: nothing wet may
+        // stand above its own surface. Petronas had nineteen per cent of its
+        // river above the sheet and the sampans on it were on mud; the loader
+        // reconciles the bed to the waterline now, and this is the line that
+        // says it did.
+        if (t.hasWater) {
+          const n = t.size;
+          let wet = 0, above = 0;
+          for (let i = 0; i < n * n; i++) {
+            if (t.mask[i * 3] <= 0.5) continue;
+            wet++;
+            if (t.heights[i] > t.waterLevel - 0.3) above++;
+          }
+          assert(above === 0, `${above} of ${wet} wet cells stand above the water surface`);
+        }
         if (!life?.boats) return 'no craft on this map';
         const meshes = [...life.boats.meshes.values()];
         const mat2 = new THREE.Matrix4();
-        let seen = 0, dry = 0, kinds = 0;
+        let seen = 0, dry = 0, aground = 0, kinds = 0;
         const where = [];
         for (let step = 0; step < 24; step++) {
           life.update(0.5);
@@ -2142,6 +2160,11 @@ export class TestMenu {
               if (!t.isWater(x, z)) {
                 dry++;
                 if (where.length < 3) where.push(`${bm.name.replace('craft-', '')} at (${x.toFixed(0)}, ${z.toFixed(0)})`);
+              } else if (t.heightAt(x, z) > t.waterLevel - 0.3) {
+                // Mask water with the ground poking up through it: a boat on
+                // mud, which is a boat on land whatever the mask says.
+                aground++;
+                if (where.length < 3) where.push(`${bm.name.replace('craft-', '')} aground at (${x.toFixed(0)}, ${z.toFixed(0)})`);
               }
             }
             if (step === 0 && any) kinds++;
@@ -2149,6 +2172,7 @@ export class TestMenu {
         }
         assert(seen > 0, 'a fleet was built and none of it is ever shown');
         assert(dry === 0, `${dry} of ${seen} boat positions were over dry land: ${where.join('; ')}`);
+        assert(aground === 0, `${aground} of ${seen} boat positions were on ground above the waterline: ${where.join('; ')}`);
         return `${life.boats.boats.length} craft of ${kinds} kinds on ${life.boats.chains.length} waterways, `
           + `${seen} positions sampled, all afloat`;
       }],

@@ -317,7 +317,7 @@ async function boot() {
   const life = contextGroup?.userData?.network
     ? new Life(engine.scene, terrain,
       contextGroup.userData.network, quality, lifeRng(),
-      level.setting?.fleet || FLEETS[level.id] || [])
+      level.setting?.fleet || FLEETS[level.id] || [], contextGroup.userData.plots || [])
     : null;
 
   await progress(44, 'quarrying stone');

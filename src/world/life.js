@@ -18,9 +18,27 @@ import { buildCraft } from './craft.js';
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class Life {
-  constructor(scene, terrain, net, quality, rng, fleet = []) {
+  constructor(scene, terrain, net, quality, rng, fleet = [], plots = []) {
     this.terrain = terrain;
     this.net = net;
+    // The town's footprints, on a coarse grid, so the router can refuse water
+    // that has a building standing on it. The mask and the survey disagree in
+    // places — a culverted stream under a Kuala Lumpur block is "water" to the
+    // one and a shophouse to the other — and a boat that trusts the mask alone
+    // sails through the shophouse.
+    this._plotGrid = new Map();
+    this._plotCell = 32;
+    for (const p of plots) {
+      if (p.wharf || p.x == null || p.w == null) continue;
+      const r = Math.hypot(p.w, p.d) / 2;
+      const c0x = Math.floor((p.x - r) / this._plotCell), c1x = Math.floor((p.x + r) / this._plotCell);
+      const c0z = Math.floor((p.z - r) / this._plotCell), c1z = Math.floor((p.z + r) / this._plotCell);
+      for (let cx = c0x; cx <= c1x; cx++) for (let cz = c0z; cz <= c1z; cz++) {
+        const k = `${cx},${cz}`;
+        if (!this._plotGrid.has(k)) this._plotGrid.set(k, []);
+        this._plotGrid.get(k).push(p);
+      }
+    }
     this.rng = rng;
     this.enabled = true;
     this._m = new THREE.Matrix4();
@@ -136,14 +154,41 @@ export class Life {
    * way for the reaches that run across the map. What comes out is one chain
    * per channel or shore, and nothing on any of them can be over land.
    */
+  /** Is there a building standing on this point? */
+  _built(x, z) {
+    const list = this._plotGrid.get(`${Math.floor(x / this._plotCell)},${Math.floor(z / this._plotCell)}`);
+    if (!list) return false;
+    for (const p of list) {
+      const a = -(p.yaw || 0), dx = x - p.x, dz = z - p.z;
+      const lx = dx * Math.cos(a) - dz * Math.sin(a), lz = dx * Math.sin(a) + dz * Math.cos(a);
+      if (Math.abs(lx) <= p.w / 2 + 2 && Math.abs(lz) <= p.d / 2 + 2) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Can a boat be here? Three things have to agree, and the first cut asked
+   * only the first: the mask says wet; the ground the renderer actually
+   * draws — `heightAt` interpolates between cells, so a point beside a bank
+   * reads the bank — is under the sheet; and nothing has been built on it.
+   */
+  _navigable(x, z) {
+    const t = this.terrain;
+    return t.isWater(x, z) && t.heightAt(x, z) < t.waterLevel - 0.3 && !this._built(x, z);
+  }
+
   _waterways() {
     const t = this.terrain, span = t.span, lim = span * 0.95;
-    const STEP = 24, SUB = 6, MIN_RUN = 30, LINK = 80, MIN_CHAIN = 160;
+    // MIN_RUN is a sampan, not a barge: the Klang through Kuala Lumpur is two
+    // coarse cells wide, and the strip of it whose *rendered* bed is under the
+    // sheet is about fifteen metres. At thirty the level had no boats at all.
+    const STEP = 24, SUB = 6, MIN_RUN = 14, LINK = 80, MIN_CHAIN = 160;
+    const nav = (x, z) => this._navigable(x, z);
     const wetSeg = (a, b) => {
       const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / SUB));
       for (let i = 1; i < n; i++) {
         const f = i / n;
-        if (!t.isWater(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f)) return false;
+        if (!nav(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f)) return false;
       }
       return true;
     };
@@ -152,7 +197,7 @@ export class Life {
       const out = [];
       let lo = null, prev = null;
       for (let u = -lim; u <= lim + SUB; u += SUB) {
-        const wet = u <= lim && (alongX ? t.isWater(u, fixed) : t.isWater(fixed, u));
+        const wet = u <= lim && (alongX ? nav(u, fixed) : nav(fixed, u));
         if (wet && lo === null) lo = u;
         if (!wet && lo !== null) {
           const w = prev - lo;
@@ -218,6 +263,10 @@ export class Life {
     const chains = this._waterways();
     if (!chains.length) return null;
     const grand = chains.reduce((a, c) => a + c.total, 0);
+    // As many boats as there is water for. Six on three hundred metres of
+    // stream is a queue; one every hundred and twenty metres reads as a
+    // working river whatever its size.
+    n = Math.max(1, Math.min(n, Math.ceil(grand / 120)));
 
     const kinds = [...new Set(fleet)];
     const meshes = new Map();
@@ -365,8 +414,8 @@ export class Life {
         // that share turns out to be bank. The centreline itself is wet by
         // construction; a boat that still reads dry is one nobody sees.
         let x = cx + b.off * wid * 0.5;
-        if (!t.isWater(x, cz)) x = cx;
-        const shown = t.isWater(x, cz);
+        if (!this._navigable(x, cz)) x = cx;
+        const shown = this._navigable(x, cz);
         this._p.set(x, t.waterLevel + 0.1, cz);
         this._q.setFromAxisAngle(UP,
           Math.atan2(c.x - a.x, c.z - a.z) + (b.speed < 0 ? Math.PI : 0));

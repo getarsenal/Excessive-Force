@@ -55,7 +55,10 @@ the bakes — the ground under the origin and every named building the
 exclusion radius is about to delete. `node tools/blocks.mjs <level>` runs
 the builder in Node in a quarter of a second: stones, the box above ground,
 sections, material share by colour. `node tools/postcard.mjs <level>`
-renders it from the level's own camera with the HUD cleared. `node tools/loose.mjs <level> low` says *where* the loose stones are and
+renders it from the level's own camera with the HUD cleared.
+`node tools/wateraudit.mjs <level>...` says whether the water is right: how
+much stands above its own surface (must be none), how many pieces it is in,
+and every boat position over ground or through a building (must be none). `node tools/loose.mjs <level> low` says *where* the loose stones are and
 `node tools/look.mjs /tmp/out/<id> <level>` gives three views plus the
 blind ranks — both are quicker than the whole suite while building.
 `sh tools/suiteall.sh <level>...` runs the suite over several levels and

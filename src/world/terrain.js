@@ -60,6 +60,7 @@ export class Terrain {
     this.openSea = this._computeOpenSea();
     if (this.openSea) this._liftQuays();
     this._repairRiver();
+    this._reconcileWater();
     // Whether there is any water on the map at all. The flood line the
     // builders keep above is meaningless without it: Pisa's sea level is a
     // metre and a half above its own low streets, and the Arno is off the map.
@@ -237,7 +238,20 @@ export class Terrain {
     // rock down twenty-eight metres and set the temple in a pit. A level whose
     // bake has already cut the ground says so, and the pad is levelled to the
     // height the bake gave the origin.
-    const level = Number.isFinite(opts.level) ? opts.level : ring[ring.length >> 1];
+    let level = Number.isFinite(opts.level) ? opts.level : ring[ring.length >> 1];
+    // Never under the water. On Bennelong Point the ring's median is mostly
+    // harbour bed, and the Opera House's pad was being dug to a metre and a
+    // half below sea level — invisible for as long as the mask there stayed
+    // dry, and "the target is standing in the river" the moment the water was
+    // reconciled to the ground. A building pad on a map with water sits above
+    // the waterline, whatever the ring says.
+    if (this.hasWater !== false && Number.isFinite(this.waterLevel)) {
+      level = Math.max(level, this.waterLevel + 0.6);
+    }
+    // Remembered, so the water's flood step (`_reconcileWater`) keeps out of
+    // it: a pad is ground somebody built on, and the reconcile runs again
+    // after the coarsen, which is after the pads.
+    (this._pads || (this._pads = [])).push({ cx, cz, r: rOut });
 
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
@@ -354,6 +368,117 @@ export class Terrain {
    * test is whether the baked mask is mostly under water already, and
    * Westminster's is.
    */
+  /**
+   * Make the mask and the bed agree with the one waterline the game draws.
+   *
+   * The game has one water level per map and a sheet drawn wherever the mask
+   * says wet. The bake dredges the bed under that mask so the two agree, and
+   * on a river with a gradient they cannot both be right at both ends: the
+   * Klang drops several metres across Kuala Lumpur, so at one flat waterline
+   * the upstream bed stood above the sheet — nineteen per cent of Petronas's
+   * "water" was above its own surface, and the sampans on it were sitting on
+   * mud a metre and a half in the air — while downstream the sheet stopped
+   * short of ground that was below it. Himeji read seven per cent above,
+   * Moscow six, Dubai five, and Dubai's creek ended forty metres before the
+   * edge of the map with the bed carrying on ten metres deep past it.
+   *
+   * Measured on all sixteen after the fact rather than trusted, and fixed
+   * here once for all of them rather than in sixteen bakes:
+   *
+   *  1. Specks go. A wet component under a quarter of a hectare is mask noise
+   *     — Petronas had sixty-nine of them — and every one draws a puddle of
+   *     sheet on somebody's street.
+   *  2. Low ground touching water is water. A dry cell more than 0.8 m below
+   *     the surface and adjacent to a wet one is flooded, and so on outward,
+   *     but no further than 150 m from where the mask already had water: the
+   *     flood follows a channel to the edge of the map and cannot cross an
+   *     embankment, because an embankment is above the waterline, and cannot
+   *     wander into a low quarter half a kilometre away.
+   *  3. Nothing wet stands above the surface. Every wet cell is sunk to at
+   *     least 2.4 m under it. Upstream of a graded river that is a trench
+   *     below its banks, which is what a dredged river is; it is a great deal
+   *     better than a boat on a dry bed.
+   *
+   * Order matters: specks first so nothing floods from noise, then the flood,
+   * then the sink so the flooded cells are bedded too. This runs before the
+   * city, the streets and the boats read the mask, so all three see one
+   * answer.
+   */
+  _reconcileWater() {
+    const n = this.size, N = n * n, h = this.heights, m = this.mask, wl = this.waterLevel;
+    const cell = this.cellSize;
+    const isWet = (i) => m[i * 3] > 0.5;
+    let wetCount = 0;
+    for (let i = 0; i < N; i++) if (isWet(i)) wetCount++;
+    if (!wetCount) return;
+
+    // 1. Specks.
+    const MIN_CELLS = Math.max(4, Math.round(2500 / (cell * cell)));
+    const seen = new Uint8Array(N);
+    const stack = [];
+    let specks = 0, speckCells = 0;
+    for (let s0 = 0; s0 < N; s0++) {
+      if (seen[s0] || !isWet(s0)) continue;
+      const comp = [];
+      stack.length = 0; stack.push(s0); seen[s0] = 1;
+      while (stack.length) {
+        const i = stack.pop(); comp.push(i);
+        const v = (i / n) | 0, u = i - v * n;
+        if (u > 0 && !seen[i - 1] && isWet(i - 1)) { seen[i - 1] = 1; stack.push(i - 1); }
+        if (u < n - 1 && !seen[i + 1] && isWet(i + 1)) { seen[i + 1] = 1; stack.push(i + 1); }
+        if (v > 0 && !seen[i - n] && isWet(i - n)) { seen[i - n] = 1; stack.push(i - n); }
+        if (v < n - 1 && !seen[i + n] && isWet(i + n)) { seen[i + n] = 1; stack.push(i + n); }
+      }
+      if (comp.length < MIN_CELLS) {
+        specks++; speckCells += comp.length;
+        for (const i of comp) m[i * 3] = 0;
+      }
+    }
+
+    // 2. The flood, breadth-first from the water that is left, with a reach.
+    const REACH = Math.ceil(150 / cell);
+    const dist = new Int16Array(N).fill(-1);
+    const queue = [];
+    for (let i = 0; i < N; i++) if (isWet(i)) { dist[i] = 0; queue.push(i); }
+    let flooded = 0;
+    for (let q = 0; q < queue.length; q++) {
+      const i = queue[q];
+      if (dist[i] >= REACH) continue;
+      const v = (i / n) | 0, u = i - v * n;
+      const nb = [];
+      if (u > 0) nb.push(i - 1);
+      if (u < n - 1) nb.push(i + 1);
+      if (v > 0) nb.push(i - n);
+      if (v < n - 1) nb.push(i + n);
+      for (const j of nb) {
+        if (dist[j] >= 0 || h[j] >= wl - 0.8) continue;
+        if (this._pads && this._pads.length) {
+          const jv = (j / n) | 0, ju = j - jv * n;
+          const jx = -this.span + ju * cell, jz = this.span - jv * cell;
+          if (this._pads.some((p) => Math.hypot(jx - p.cx, jz - p.cz) <= p.r)) continue;
+        }
+        dist[j] = dist[i] + 1;
+        m[j * 3] = 1;
+        flooded++;
+        queue.push(j);
+      }
+    }
+
+    // 3. The sink. 2.4 m rather than a nominal metre, because the rendered
+    //    surface between a sunk wet vertex and a dry bank crosses the
+    //    waterline partway across the cell, and the deeper the wet vertex the
+    //    wider the strip that is actually under water — which on a two-cell
+    //    river is the difference between a channel a boat fits in and none.
+    let sunk = 0;
+    for (let i = 0; i < N; i++) {
+      if (isWet(i) && h[i] > wl - 2.4) { h[i] = wl - 2.4; sunk++; }
+    }
+    if (specks || flooded || sunk) {
+      console.log(`[tumble] water reconciled: ${specks} specks (${speckCells} cells) dried, `
+        + `${flooded} cells flooded, ${sunk} wet cells sunk under the surface`);
+    }
+  }
+
   _repairRiver() {
     // Nothing to repair when the coastline came off a survey: the mask is the
     // real shoreline and the heightmap was dredged to agree with it.
@@ -703,6 +828,16 @@ export class Terrain {
 
   buildMesh() {
     if (this.quality.name === 'low' && !this._coarse) this.coarsen();
+    // Again, on the coarse grid. `coarsen` resamples the heights and the mask,
+    // and a wet cell sunk under the surface at fine resolution averages back
+    // up against its dry neighbours at coarse: Petronas went from nineteen
+    // per cent of its water above the sheet, to zero after the constructor's
+    // pass, to fifteen after this line's coarsen — and with the bed back up,
+    // the boat router found no navigable channel and the level had no boats
+    // at all. Everything downstream — the sheet, the city, the streets, the
+    // boats — reads the arrays as they are *after* this call, so this is
+    // where the reconciliation has to hold.
+    this._reconcileWater();
     this._openMouths();
     const n = this.size;
     const rn = n;

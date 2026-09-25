@@ -21,6 +21,7 @@ them has its entry, and is the first thing to run when a level is "done":
 | `tools/newmap.mjs` | The scaffold: one command writes a marked stub into all eleven places a level touches and runs `mapcheck`, so the list that remains is the real work. |
 | `tools/blocks.mjs` | The builder, dry, in Node: stones, the box above ground, taller-than-wide, sections, and the share of visible volume per material with its colour. A second, not a browser load. |
 | `tools/postcard.mjs` | The level from the level's own camera (or an override), HUD cleared, `--survey` for the load painter. The picture that goes beside the photograph. |
+| `tools/wateraudit.mjs` | Is the water right: share above its own surface, pits below it, pieces and whether they reach the edge, buildings on water, and every boat position over ground or through a plot. |
 | `tools/bake_overture.py` | Nothing per level, unless the ground is wild (forest, jungle, desert scrub): then the id goes in `WILD_COVER` so the survey's land cover is kept instead of the town's. |
 | `public/assets/terrain/<id>_{height,mask,far}.png`, `<id>.json` | Written by the bakes. Committed. |
 | `public/assets/city/<id>.json` | Written by the Overture bake: the surveyed buildings, streets and the surround. Committed. Never a synthetic fixture. |
@@ -398,6 +399,26 @@ that way.)
   rasteriser its holes to clear. Any new coastal bake whose self-check
   reports the origin under water: look at the water polygons' interiors
   before anything else.
+- **The mask and the bed are reconciled at load, so make the mask right and
+  let the loader do the bed.** The game draws one flat sheet per map at
+  `waterLevel`, and a river with a gradient cannot agree with it at both
+  ends: the Klang drops metres across Kuala Lumpur, so at one waterline
+  nineteen per cent of Petronas's "water" stood above its own surface with
+  the sampans sitting on mud, while Dubai's creek ended forty metres short
+  of the edge with the bed running on ten metres deep. `_reconcileWater`
+  in `terrain.js` now runs in the constructor and again after the low
+  tier's `coarsen` (which resamples the arrays and undid the first pass):
+  wet specks under a quarter-hectare are dried, low ground touching water
+  is flooded out to 150 m, and every wet cell is sunk 2.4 m under the
+  sheet. The boat router then trusts none of it blindly — a point is
+  navigable only if the mask is wet *and* the rendered ground is under the
+  sheet *and* no building stands on it — and the harness asserts both:
+  `nothing sails on dry land` fails on any wet cell above the surface and
+  on any boat over ground or through a plot. Audit a new map with
+  `node tools/wateraudit.mjs <id>` before trusting its water: it prints
+  the share of water above the sheet, the dry pits below it, how many
+  pieces the water is in and whether the biggest reaches the edge, the
+  buildings standing on water, and every boat position that fails.
 - **A map with no water has no flood line.** The builders keep buildings a
   freeboard above `waterLevel`, and on a map whose water is all off the edge
   (Pisa: the Arno is a kilometre south) that level is the bake's sea level,
