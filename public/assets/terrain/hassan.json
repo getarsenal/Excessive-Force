@@ -1,0 +1,17 @@
+{
+  "id": "hassan",
+  "name": "Hassan II Mosque, Casablanca",
+  "lat": 33.60822,
+  "lon": -7.63262,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -17.843,
+  "maxElevation": 12.995,
+  "metersPerDemPixel": 3.9787,
+  "seaLevel": -0.101,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.006,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.5535
+}
