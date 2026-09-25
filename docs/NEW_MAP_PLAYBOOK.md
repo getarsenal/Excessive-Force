@@ -17,6 +17,7 @@ them has its entry, and is the first thing to run when a level is "done":
 | File | What goes in it |
 |---|---|
 | `tools/bake_terrain.py` | The place: lat/lon, span, zoom, and the ground's corrections — river polyline, parks, flatten pads, `sea`, `ceiling`, `peak`. |
+| `tools/survey.py` | The aerial survey, read from the bakes: the ground under the origin, the level extent, every surveyed building within the exclusion radius with its name, and a plan. Run before writing a constant (§0b). |
 | `tools/bake_overture.py` | Nothing per level, unless the ground is wild (forest, jungle, desert scrub): then the id goes in `WILD_COVER` so the survey's land cover is kept instead of the town's. |
 | `public/assets/terrain/<id>_{height,mask,far}.png`, `<id>.json` | Written by the bakes. Committed. |
 | `public/assets/city/<id>.json` | Written by the Overture bake: the surveyed buildings, streets and the surround. Committed. Never a synthetic fixture. |
@@ -60,6 +61,81 @@ matchstick from the camera distance the game plays at. Pick the scale
 before the builder is written; the constants in the builder should all
 derive from one `scale` number, and the garrison must read them from the
 builder (see §4).
+
+---
+
+## 0b. Survey the place before you lay a stone
+
+The Potala was built twice, and the second time was not more talent, it was
+two things that were on disk the whole time and nobody had looked at.
+
+```
+python3 tools/survey.py <id>            # after the bakes in §1 have run
+```
+
+It prints the ground under the origin — the profile through it both ways,
+and the extent of the *level* ground connected to it — and every surveyed
+building within the exclusion radius, largest first, with its footprint,
+height, bearing and name, and then draws the lot as a plan at
+`/tmp/out/<id>-survey.png`. Read it before writing a constant. Three things
+it exists to tell you:
+
+- **The landmark's own outline is in the bake.** Overture had the Potala
+  as a seventy-one-point polygon named `布达拉宫 ཕོ་བྲང་པོ་ཏ་ལ།`, 360 m end
+  to end. The first builder was written from a remembered photograph at 460.
+  The survey gives the plan; the photographs give the elevation; neither
+  gives the other.
+- **The outbuildings are in the bake too, and the exclusion deletes them.**
+  Within 320 m of the Potala's origin the survey had the Shöl Lekhung, the
+  printing house, the prison and the old army headquarters, all *named*.
+  `cityExcludeRadius: 430` removed every one, and the level then invented
+  "Shöl" as twenty-six boxes scattered on the terraces, which from the
+  valley read as packing crates. The tool lists what the radius is about to
+  delete. If any of it is part of the place, either build it or pull the
+  radius in until the survey keeps it.
+
+  This is what the survey actually prints for the Potala, and it is the
+  whole of Shöl by name:
+
+  ```
+  19023 m2  373x123  h 14.4   40 m at 127 deg  布达拉宫 ཕོ་བྲང་པོ་ཏ་ལ།  <- the landmark?
+   3722 m2   68x 73  h 14.4  134 m at 358 deg  雪奇惹
+   2343 m2   67x 64  h 14.4  131 m at 323 deg  印经院            (printing house)
+   1895 m2   75x 39  h 14.2  113 m at  75 deg  旧藏军司令部       (old army HQ)
+   1252 m2   50x 42  h 13.0   82 m at 341 deg  雪巴列空          (Shöl Lekhung)
+   1041 m2   45x 33  h 12.4   91 m at  12 deg  监狱              (the prison)
+    868 m2   26x 58  h 12.0  192 m at  58 deg  宝藏局造币厂       (the mint)
+    673 m2   37x 25  h 11.3  218 m at  21 deg  宫门              (the palace gate)
+    ...      29x 22          西南角楼 / 东南角楼                 (SW and SE corner towers)
+    ...      20x 26          东边楼 / 西边楼                     (east and west side buildings)
+  ```
+
+  Twenty-three named buildings, the gate and both corner towers of the
+  Shöl wall among them. Note the landmark's own plan: 373 by 123. The first
+  builder was 460 wide; the second, written from photographs, came out at
+  345 by 130 — right, but by luck. The number was on disk.
+- **The ground is measured, not assumed.** On the first Potala the terrain
+  did not vary by one metre from x −300 to +250 and z −200 to +300: a table
+  540 m across, with the famous 130 m of rock reduced to a cliff round its
+  rim. Nobody had sampled it. The survey prints the level extent and says,
+  in so many words, when a hilltop is a table.
+
+Then, still before code, write the **proportion table** — the real thing
+against what you are about to build, from the photographs everyone knows:
+
+| | The real Potala | First build | Second |
+|---|---|---|---|
+| Width, end to end | 360 m | 460 m | 345 m |
+| Height, valley floor to roofline | ~250 m | 185 m | 336 m |
+| Taller than wide? | yes | no | yes |
+| The bottom third | blank white battered wall | windows, tan decks | blank white wall |
+| Dominant surface colour | lime white | `LIMESTONE` 0xdcc99e, tan | `MARBLE` |
+| Where the eye goes | the stair up the white face | nowhere | the stair |
+
+A monument only reads as tall against its own width, and the eye reads one
+colour and one line before it reads any detail. Four of the six rows above
+were wrong on the first build and none of them was about detail. If the
+table says the shape is wrong, no amount of windows will fix it.
 
 ---
 
@@ -272,6 +348,28 @@ that way.)
   and the ring test at 170 m, so the ground has to be level out to about
   250 m in the direction the guns come from. Offset the pad — a ridge rather
   than a cone — and the rim can still be close on the side the camera looks.
+- **`top` is the summit, so it must be the size of the summit.** It was 270
+  at the Potala because "the pad has to fit the footprint", and a 270 m
+  radius is a level table 540 m across on a hill 350 m long. Measure the
+  real hilltop (the survey prints it) and cut `top` to that. Marpo Ri is a
+  whaleback, 350 m along and 150 across: a `[0.28, 2, -1.5708]` term in
+  `wobble` — sin(2θ − π/2) is −cos 2θ — pulls the radius in along one axis
+  and pushes it out along the other, and the summit comes out long and
+  narrow instead of round.
+- **The shelves have to fit on the hill.** Drop is `slope × run`. The old
+  Potala shelves were 180 m of run at slope 1.5 below a 132 m hill: a 270 m
+  fall that ended below the valley floor and was blended away by `fade`.
+  With `top` pulled in, pull the shelves in with it and check the sum.
+- **A landmark on a hill may not flatten the hill.** `padRadius` on the
+  level record overrides the disc a structure levels under itself (which is
+  otherwise half its longest side plus eight). `padRadius: 0` levels
+  nothing: the bake's summit is the floor, and the builder carries its own
+  foundations down to meet the rock wherever the rock has fallen away
+  (§2b). Any summit map should set it; the pad is the reason a hill turns
+  into a car park with a monument parked on it.
+- **Pull the exclusion in with the hill.** Marpo Ri's base came in from
+  570 m to 280 m; `cityExcludeRadius` at 430 left a ring of bare gravel
+  round the foot of it. The town comes right up to the rock.
 - **A sea is one polygon and the land is its holes.** Overture draws the
   Arabian Sea as a single feature with five hundred and ninety-five interior
   rings and the Persian Gulf with thirteen hundred, and every ring is a
@@ -481,6 +579,90 @@ menu (TEST button) or the harness, the checks that matter:
   one thick course to stand on, air under it, and no masonry within about
   two metres at his own level. The Parthenon's krepis and the Burj's terrace
   are both this lesson.
+
+### 2b. Building on a hill: what the Potala taught
+
+Everything in this subsection was learned on one map in one day, from a
+screenshot beside three photographs. It is written down because every rule
+in it is general.
+
+- **Found the walls below the ground, and let the ground decide what shows.**
+  A structure founded at y 0 needs a flat top the width of its footprint,
+  which is how the hill became a table. The second Potala founds its
+  retaining walls at `FOUND = −126` — a hundred and twenty-six metres
+  *under* the summit — and runs them up. At the back and along the ridge
+  that masonry is buried and costs a few coarse courses; across the front,
+  where the rock falls away, it is exposed, and what it is exposed as is the
+  eighty metres of blank white wall every photograph of the place is of. The
+  building meets the hill instead of the hill being flattened to meet the
+  building.
+- **Buried masonry is coarse and bare.** Foundations at the face's own
+  fineness cost eighteen thousand stones the software rasteriser could not
+  even screenshot. Below the deepest point the rock can have fallen to,
+  lay blocks at about three times the size (`rough = stone × 3.2`) in the
+  footing stone; above it, the face's own fineness in the face's own
+  material. Nobody dresses ashlar for the part that goes in the ground. The
+  boundary between the two was moved three times; put it at the lowest
+  ground the survey shows under the footprint, minus a few metres.
+- **One material for the whole visible envelope.** The terraces were laid
+  in `LIMESTONE`, 0xdcc99e, a warm tan, under a `MARBLE` palace. That one
+  constant was most of why the level read as scenery: the Potala's loudest
+  single fact is that it is white from across the valley. Pick the dominant
+  colour from the photograph before picking a material, and use it for
+  everything the photograph shows in that colour.
+- **A continuous face, not a shelf at every level.** The palace blocks sat
+  twenty metres back on the terrace deck, and the tiers below stepped the
+  same way, so the eye met a horizontal shelf every forty metres: a wedding
+  cake. On the real building the White Palace's wall is the retaining wall
+  carried on upward. The blocks' south faces now land a metre inside the
+  terrace front, so rock-to-roofline is one battered surface. Set every face
+  on the hill to one batter (`BATTER`, metres in per metre up) and write the
+  width of a wall at height y as `wTop + 2·BATTER·(top − y)`, not as a
+  fraction of its own height: a fourteen-metre tier given the main terrace's
+  fraction comes out nearly vertical beside it and the pile reads as boxes.
+- **The lowest terrace runs to the road.** With the masonry stopping forty
+  metres above the foot, the bottom third of every view was bare slope with
+  a palace balanced on it. Carry the outermost terrace down until about
+  twenty metres of it stand clear of the ground where it lands.
+- **Between two terraces there is a walk, or there is a void.** A terrace
+  is a hollow ring, so the band between one tier's inner edge and the next
+  tier's wall is nothing, all the way to the foundation — and the stair was
+  switchbacking across it and the garrison posted on it. Every tier lays a
+  one-course walk across its front from its own face back to the face of
+  the one above: three thousand stones for four tiers against twenty
+  thousand for full plates, and what the photographs show anyway. Ten blind
+  defenders became none.
+- **A stair meets itself, leans on something, and is a stair.** Three rules
+  the first one broke. Consecutive flights end and begin at the same point
+  (they were twenty-one metres apart in plan at every junction: rungs of a
+  ladder left on the hill). Each flight sits a few metres in front of the
+  wall it climbs, on the walk of the tier below. And the pitch is a stair's:
+  seventy metres of run for twenty-odd of rise is twenty degrees; a hundred
+  and forty-four for the same rise is nine, which is a ribbon lying on a
+  wall. Edge it in the dark frieze colour (`KYEMA` here) — a white handrail
+  on a white ramp against a white wall is invisible, and that dark diagonal
+  is what the eye follows — and keep the parapet a handrail's height, not
+  twelve metres.
+- **Outbuildings are a street, not a scatter.** Twenty-six free-standing
+  boxes on three walks read as crates. Party-walled houses laid end to end
+  along one walk, heights and depths wandering, read as a village. Better
+  still, build the ones the survey names (§0b) where the survey puts them.
+- **The stone budget is a number, not a feeling.** The level went 36k →
+  55k → 40k → 50k → 43k stones across the rebuild. Above about 45k at low
+  tier the rasteriser cannot screenshot it and a phone will not enjoy it.
+  Print the count from `look.mjs` after every structural change.
+- **The camera is where the photographs are taken from.** Every picture of
+  the Potala is from the road at the foot, looking up. The level camera was
+  nine hundred metres back at a quarter radian of pitch, looking *down* on
+  the roofs, from where a mountain fortress is a floor plan. Low and close
+  (`pitch: 0.10, distance: 700, height: 70`), and 336 m of building fills
+  the frame by being looked up at.
+- **Resizing the landmark stales everything that was sized to it.** The
+  garrison's rooflines were three numbers from the old block heights, so ten
+  men were posted inside masonry. The deployment test spawned its dummy unit
+  at a fixed 160 m south, which the new terraces occupied, and failed for
+  having nowhere to stand a man. After a rebuild, grep the level's constants
+  for every consumer and re-derive them from the builder.
 
 ---
 
@@ -726,7 +908,7 @@ Then the harness, which drives the real game in headless Chromium:
 
 ```
 npx vite --port 5177 --strictPort &                      # dev server
-sh tools/suiteall.sh <id>                                # expect "<id>: 35 pass 0 fail"
+sh tools/suiteall.sh <id>                                # expect "<id>: 50 pass 0 fail"
 TIER=high sh tools/suiteall.sh <id>                      # another tier
 ```
 
@@ -740,6 +922,15 @@ is any JS expression evaluated in the page, and may return a Promise.
 Useful handles on `window`: `battle`, `primary`, `structures`, `terrain`,
 `rig`, `garrison`, `testMenu`, `standoff`, `__fastForward(seconds)`,
 `__runTests()`.
+
+Before any of that, look at it from where the photographs are taken. The
+suite says whether it stands; it cannot say whether it is the place. Set
+the rig to the postcard angle — low, from the side every picture of the
+building is shot from — and put the render beside the photograph, then fill
+in the proportion table from §0b with the numbers you can now measure.
+Iterate there, on one level, one screenshot a minute, until the table is
+right; only then run the suite. The Potala went through nine renders that
+way and the suite once.
 
 Two probes worth reaching for before the whole suite:
 
@@ -774,8 +965,13 @@ Rules of the harness, learned the hard way:
   one, fix it, then run the nine once.
 - Scratch probes live under `tools/` (Playwright resolves from the repo)
   and are deleted before the commit.
+- A test that spawns or aims at a fixed offset from the origin is a test
+  that assumes a footprint. The deployment test put its unit at (0, 160)
+  and the Potala's terraces reach z 215; it now spawns beyond the
+  structure's own extent. Derive coordinates from the structure, not from
+  the eight landmarks that happened to fit.
 
-A level is done when `mapcheck` is clean, the suite is 35 pass 0 fail at
+A level is done when `mapcheck` is clean, the suite is 50 pass 0 fail at
 low tier, the production build (`npx vite build`) is clean, and you have
 *looked* at it: the opening camera, the precinct from close in, both banks
 of the river or the whole shore, the mouths where the water leaves the map,
