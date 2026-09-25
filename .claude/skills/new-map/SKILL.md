@@ -15,6 +15,9 @@ Then, in this order, each step verified before the next:
 1. **Say what kind of problem the building is** (cantilever, lattice,
    shell, mountain), the scale it will be built at, and the twist the
    player has to discover. One paragraph, before any code.
+   Then `node tools/newmap.mjs <id> "<Landmark>, <City>" <lat> <lon> --iso
+   --city --nation --code`: every table gets its `TODO(<id>)` stub and
+   `mapcheck` tells you what is really left.
 2. **Bake the ground and the town**: add the place to
    `tools/bake_terrain.py` (river *or* sea, parks, pads, `peak` for a
    summit — with `top` the size of the *real* summit, a ridge term in
@@ -39,13 +42,17 @@ Then, in this order, each step verified before the next:
 5. **Write the builder** in `src/structure/landmarks/`, one `BlockList`
    per structure, constants in one exported object, one `BATTER` for every
    face on a hill, foundations carried below the summit if there is one,
-   coarse and bare where buried. Zero loose stones at every tier; the
-   undercut test must behave as designed; the stone count from `look.mjs`
-   under about 45k at low.
-6. **Look at it from the postcard angle** — low, from the side the
-   photographs are taken from — beside the photograph, and fill in the
-   proportion table with measured numbers. Iterate here, on one level, one
-   render a minute, until the table is right. Then the suite, once.
+   coarse and bare where buried. `node tools/blocks.mjs <id>` after every
+   change: stones under about 45k at low, taller than wide if the real
+   thing is, and the material colour line reading as the photograph does.
+   Zero loose stones at every tier; the undercut test must behave as
+   designed.
+6. **Look at it from the postcard angle** — `node tools/postcard.mjs <id>`,
+   with `--pitch --dist --height` to try others and `--survey` for the load
+   painter — beside the photograph, and fill in `docs/maps/<id>.md` with
+   measured numbers. Iterate here, on one level, one render a minute, until
+   the table is right; then set the level's `camera` to the angle that won.
+   Then the suite, once.
 7. **Interiors and the trick.** A turret if the place has a gun, on its
    own ground. Outbuildings the survey named, as a street, where the survey
    puts them.

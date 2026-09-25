@@ -18,6 +18,9 @@ them has its entry, and is the first thing to run when a level is "done":
 |---|---|
 | `tools/bake_terrain.py` | The place: lat/lon, span, zoom, and the ground's corrections — river polyline, parks, flatten pads, `sea`, `ceiling`, `peak`. |
 | `tools/survey.py` | The aerial survey, read from the bakes: the ground under the origin, the level extent, every surveyed building within the exclusion radius with its name, and a plan. Run before writing a constant (§0b). |
+| `tools/newmap.mjs` | The scaffold: one command writes a marked stub into all eleven places a level touches and runs `mapcheck`, so the list that remains is the real work. |
+| `tools/blocks.mjs` | The builder, dry, in Node: stones, the box above ground, taller-than-wide, sections, and the share of visible volume per material with its colour. A second, not a browser load. |
+| `tools/postcard.mjs` | The level from the level's own camera (or an override), HUD cleared, `--survey` for the load painter. The picture that goes beside the photograph. |
 | `tools/bake_overture.py` | Nothing per level, unless the ground is wild (forest, jungle, desert scrub): then the id goes in `WILD_COVER` so the survey's land cover is kept instead of the town's. |
 | `public/assets/terrain/<id>_{height,mask,far}.png`, `<id>.json` | Written by the bakes. Committed. |
 | `public/assets/city/<id>.json` | Written by the Overture bake: the surveyed buildings, streets and the surround. Committed. Never a synthetic fixture. |
@@ -68,6 +71,21 @@ builder (see §4).
 
 The Potala was built twice, and the second time was not more talent, it was
 two things that were on disk the whole time and nobody had looked at.
+
+Start with the scaffold, so that every table has its stub and `mapcheck`
+tells you only what is genuinely left:
+
+```
+node tools/newmap.mjs <id> "<Landmark>, <City>" <lat> <lon> \
+     --iso XXX --city CITY --nation "Nation" --code xx [--wild]
+```
+
+It writes a `TODO(<id>)`-marked entry into the terrain table, a landmark
+module of the standard shape (constants object, `courses`, `wAt`, a
+placeholder body that loads), the level record, the contract, the officer,
+the stand-off, the flag, the blurb, the running order, the fleet and the
+portrait slot, plus `docs/maps/<id>.md` with the proportion table below
+empty. Then bake (§1), and then:
 
 ```
 python3 tools/survey.py <id>            # after the bakes in §1 have run
@@ -650,7 +668,11 @@ in it is general.
 - **The stone budget is a number, not a feeling.** The level went 36k →
   55k → 40k → 50k → 43k stones across the rebuild. Above about 45k at low
   tier the rasteriser cannot screenshot it and a phone will not enjoy it.
-  Print the count from `look.mjs` after every structural change.
+  `node tools/blocks.mjs <id>` prints the count, the box above ground,
+  every section, and the material share of the visible volume with its
+  colour, in a quarter of a second and no browser; run it after every
+  structural change, and read the colour line — "58% LIMESTONE #dcc99e"
+  under a white palace is the tan base, caught before the first render.
 - **The camera is where the photographs are taken from.** Every picture of
   the Potala is from the road at the foot, looking up. The level camera was
   nine hundred metres back at a quarter radian of pitch, looking *down* on
@@ -924,10 +946,17 @@ Useful handles on `window`: `battle`, `primary`, `structures`, `terrain`,
 `__runTests()`.
 
 Before any of that, look at it from where the photographs are taken. The
-suite says whether it stands; it cannot say whether it is the place. Set
-the rig to the postcard angle — low, from the side every picture of the
-building is shot from — and put the render beside the photograph, then fill
-in the proportion table from §0b with the numbers you can now measure.
+suite says whether it stands; it cannot say whether it is the place.
+
+```
+node tools/postcard.mjs <id>                          # the level's own camera
+node tools/postcard.mjs <id> --pitch 0.1 --dist 700   # try another
+node tools/postcard.mjs <id> --survey                 # the load painter on
+```
+
+Low, from the side every picture of the building is shot from; put the
+render beside the photograph, then fill in the proportion table from §0b
+with the numbers you can now measure (`blocks.mjs` has the built ones).
 Iterate there, on one level, one screenshot a minute, until the table is
 right; only then run the suite. The Potala went through nine renders that
 way and the suite once.
