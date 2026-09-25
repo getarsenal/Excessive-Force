@@ -1,0 +1,16 @@
+{
+  "id": "pena",
+  "name": "Pena Palace, Sintra",
+  "lat": 38.78762,
+  "lon": -9.39058,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 206.601,
+  "maxElevation": 506.32,
+  "metersPerDemPixel": 3.7238,
+  "seaLevel": 263.811,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0585
+}
