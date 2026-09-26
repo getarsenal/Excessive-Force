@@ -1085,25 +1085,47 @@ export const LEVELS = {
     id: 'colosseum',
     terrain: 'colosseum',
     lat: 41.89021, lon: 12.49223,
-    name: 'COLOSSEUM',
-    place: 'Rome',
-    target: 'COLOSSEUM',
-    subtitle: 'Colosseum, Rome',
-    victory: 'TODO(colosseum) THE LINE THE END CARD LEADS WITH',
-    // TODO(colosseum) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(colosseum) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(colosseum) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(colosseum) the postcard angle
+    name: 'Colosseum, Rome',
+    place: 'Piazza del Colosseo, Rome',
+    target: 'THE COLOSSEUM',
+    subtitle: 'Anfiteatro Flavio \u00b7 Piazza del Colosseo',
+    victory: 'Thumbs Down',
+    // Rome: ochre and terracotta render, travertine, umbrella pines on the
+    // Palatine and the Oppian, the Tiber a long way off. Warm and dusty.
+    palette: {
+      urban: new THREE.Color(0xc4a482),
+      urbanAlt: new THREE.Color(0xad8560),
+      park: new THREE.Color(0x5a6e3c),
+      parkAlt: new THREE.Color(0x6a7a44),
+      road: new THREE.Color(0x74706a),
+      bank: new THREE.Color(0xb5a788),
+      bed: new THREE.Color(0x5e6848),
+      dry: new THREE.Color(0xcabb9f),
+    },
+    setting: { haze: { colour: 0xdccfb6, density: 0.00025 } },
+    // The ring is 283 by 234 at this scale and the only surveyed building
+    // within a hundred and twenty metres is the Colosseo itself; the piazza,
+    // the Meta Sudans and the foot of the Oppian are open ground anyway. The
+    // Arch of Constantine and the Temple of Venus and Roma stand beyond.
+    cityExcludeRadius: 175,
+    contextExclude: 165,
+    // From the north-west, where the Via dei Fori Imperiali arrives: the
+    // standing outer wall on the left, the break and the inner ring on the
+    // right, and the whole ring in one frame.
+    camera: { yaw: -2.30, pitch: 0.11, distance: 430, height: 34 },
     structures: (quality) => [
       { key: 'colosseum', blocks: buildColosseum(quality), primary: true, required: true, label: 'COLOSSEUM' },
     ],
     garrison: (g, origin, groundY) => populateColosseum(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(colosseum)
-    traits: { windows: false, river: false, topples: true },           // TODO(colosseum)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(colosseum) from the suite's undercut
-    brief: 'TODO(colosseum) one sentence: what the player has to find out about this building.',
+    // The cavea is a hill of rubble fill and is not the monument; the bar
+    // moves for the two rings.
+    scoreTags: ['outer', 'inner'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A ring nearly three hundred metres across does not go over; it is
+    // broken bay by bay.
+    traits: { windows: false, river: false, topples: false },
+    par: { rounds: 110, spend: 15000, minutes: 6, leverage: 2 },
+    brief: 'Eighty piers and nothing behind them. Kick two out and the bay above falls outward; where the seating still stands, it does not.',
   },
   towerbridge: {
     id: 'towerbridge',
