@@ -40,9 +40,10 @@ import { buildWatarun, populateWatarun } from '../structure/landmarks/watarun.js
 import { buildShwedagon, populateShwedagon } from '../structure/landmarks/shwedagon.js';
 import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
 import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
-import { buildTikal, populateTikal } from '../structure/landmarks/tikal.js';
-import { buildTeotihuacan, populateTeotihuacan } from '../structure/landmarks/teotihuacan.js';
-import { buildMachupicchu, populateMachupicchu } from '../structure/landmarks/machupicchu.js';
+import { buildTikal, populateTikal, buildTempleII, populateTempleII } from '../structure/landmarks/tikal.js';
+import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/landmarks/teotihuacan.js';
+import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces }
+  from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 
 /**
@@ -2056,45 +2057,109 @@ export const LEVELS = {
     place: 'Magelang',
     target: 'BOROBUDUR',
     subtitle: 'Borobudur, Magelang',
-    victory: 'TODO(borobudur) THE LINE THE END CARD LEADS WITH',
-    // TODO(borobudur) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(borobudur) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(borobudur) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(borobudur) the postcard angle
+    victory: 'Stupa-fied',
+    // The Kedu plain: paddies and volcanic soil under a wet-season sky, and
+    // dark andesite in the middle of it. Chichen's jungle palette, greener and
+    // wetter — Java is rice, not scrub.
+    palette: {
+      urban: new THREE.Color(0x5f6f3a),
+      urbanAlt: new THREE.Color(0x4f5d30),
+      park: new THREE.Color(0x3c5a2c),
+      parkAlt: new THREE.Color(0x527232),
+      road: new THREE.Color(0x726d5a),
+      bank: new THREE.Color(0xa89c7a),
+      bed: new THREE.Color(0x4f5b3a),
+      dry: new THREE.Color(0x7c8248),
+    },
+    // The survey has the monument as one 126 m outline and four sheds within
+    // 120 m, nothing else; at twice life the base is 256 m across and the
+    // park round it is a lawn to the tree line.
+    cityExcludeRadius: 210,
+    contextExclude: 200,
+    // From the north-west and low, which is where the dawn photographs are
+    // taken from, looking across the stepped pile with the crown against the
+    // sky: a mountain reads as a mountain when the eye is at the foot of it.
+    camera: { yaw: -2.35, pitch: 0.07, distance: 370, height: 26 },
     structures: (quality) => [
       { key: 'borobudur', blocks: buildBorobudur(quality), primary: true, required: true, label: 'BOROBUDUR' },
     ],
     garrison: (g, origin, groundY) => populateBorobudur(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(borobudur)
-    traits: { windows: false, river: false, topples: true },           // TODO(borobudur)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(borobudur) from the suite's undercut
-    brief: 'TODO(borobudur) one sentence: what the player has to find out about this building.',
+    // The hill is not the contract. The three round terraces, the seventy-two
+    // bells and the crown are what the bar moves for.
+    scoreTags: ['round', 'stupas', 'central'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'jungle', canopy: 2.2, canopyFrom: 270,
+      haze: { colour: 0xc9cfb6, density: 0.00030 },
+    },
+    // A terraced hill with a stone skin: no windows, no river, and nothing
+    // that can be made to fall over.
+    traits: { windows: false, river: false, topples: false },
+    // Two hundred and fifty metres square and eighty tall of rubble and
+    // andesite: about two thirds of Khufu by volume.
+    unlockScale: 12,
+    par: { rounds: 90, spend: 9000, minutes: 5, leverage: 2 },
+    brief: 'The hill is not the target. The bells and the crown stand on the top terrace, and the top terrace stands on fill.',
   },
   tikal: {
     id: 'tikal',
     terrain: 'tikal',
     lat: 17.2218, lon: -89.62339,
-    name: 'TIKAL',
+    name: 'TEMPLE I, TIKAL',
     place: 'Peten',
-    target: 'TIKAL',
-    subtitle: 'Tikal, Peten',
-    victory: 'TODO(tikal) THE LINE THE END CARD LEADS WITH',
-    // TODO(tikal) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(tikal) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(tikal) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tikal) the postcard angle
+    target: 'TEMPLE I',
+    subtitle: 'Temple of the Great Jaguar · Tikal',
+    victory: 'Combed Out',
+    // Chichen's ground: pale rock under a very dark canopy, the plaza a lawn.
+    palette: {
+      urban: new THREE.Color(0x5a683a),
+      urbanAlt: new THREE.Color(0x49562f),
+      park: new THREE.Color(0x3c5a2e),
+      parkAlt: new THREE.Color(0x4b6a33),
+      road: new THREE.Color(0x77705c),
+      bank: new THREE.Color(0xc8bb9c),
+      bed: new THREE.Color(0x55603f),
+      dry: new THREE.Color(0x7a814d),
+    },
+    // The survey has seventeen ruins within 120 m — the North Acropolis, the
+    // ball court, the Central Acropolis — with heights read off the canopy
+    // (forty to sixty metres) rather than off the stone, so as boxes they
+    // would be tower blocks. The plaza is kept clear to the trees; Temple II
+    // stands 190 m west on its own ground.
+    cityExcludeRadius: 330,
+    contextExclude: 320,
+    // From the plaza's south-west, low, with Temple I's stair and comb in
+    // three-quarter view and Temple II's back at the edge of the frame: the
+    // photograph everyone has is taken from the foot of Temple II.
+    camera: { yaw: -0.45, pitch: 0.07, distance: 300, height: 44 },
     structures: (quality) => [
-      { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TIKAL' },
+      { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TEMPLE I' },
+      // Temple II faces it across the Great Plaza. The real gap is a hundred
+      // and fifteen metres centre to centre; at two and two fifths life that
+      // would leave the two bases fourteen metres apart, so the plaza is
+      // opened out to what it is in the photograph.
+      { key: 'temple2', blocks: buildTempleII(quality), required: true, label: 'TEMPLE II', offset: { x: -190, z: 0 } },
     ],
-    garrison: (g, origin, groundY) => populateTikal(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tikal)
-    traits: { windows: false, river: false, topples: true },           // TODO(tikal)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tikal) from the suite's undercut
-    brief: 'TODO(tikal) one sentence: what the player has to find out about this building.',
+    garrison: (g, origin, groundY, sites) => {
+      populateTikal(g, origin, groundY);
+      const t = sites && sites.temple2;
+      if (t) populateTempleII(g, t.origin, t.groundY);
+    },
+    // The pyramid is the hill; the stair, the shrine and the comb are the
+    // building, and the comb is the contract.
+    scoreTags: ['stair', 'shrine', 'comb'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'jungle', canopy: 2.5, canopyFrom: 340,
+      haze: { colour: 0xc6cbb0, density: 0.00031 },
+    },
+    // A solid pyramid under a comb that goes over: the comb is what topples,
+    // and the suite's undercut is aimed at the lowest scored stone — the
+    // stair's foot — which drops the flight and not the hill.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 6,
+    par: { rounds: 70, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The pyramid is a hill and does not score. The comb on top is a wall standing on a roof: cut its foot.',
   },
   teotihuacan: {
     id: 'teotihuacan',
@@ -2104,21 +2169,53 @@ export const LEVELS = {
     place: 'Teotihuacan',
     target: 'PYRAMID OF THE SUN',
     subtitle: 'Pyramid of the Sun, Teotihuacan',
-    victory: 'TODO(teotihuacan) THE LINE THE END CARD LEADS WITH',
-    // TODO(teotihuacan) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(teotihuacan) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(teotihuacan) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(teotihuacan) the postcard angle
+    victory: 'Sunset Boulevard',
+    // The Valley of Mexico at 2,300 m in the dry season: tan earth, dust,
+    // olive scrub and nopal, grey-brown roads. Giza's sand, greyed and cooled.
+    palette: {
+      urban: new THREE.Color(0xb9a884),
+      urbanAlt: new THREE.Color(0xa3926f),
+      park: new THREE.Color(0x7c7f4f),
+      parkAlt: new THREE.Color(0x8d8a52),
+      road: new THREE.Color(0x5a544a),
+      bank: new THREE.Color(0xc2b18c),
+      bed: new THREE.Color(0x6a6b4a),
+      dry: new THREE.Color(0xd0bf98),
+    },
+    // The survey has one outline, the pyramid itself at 276 x 273 m over its
+    // aprons, and nothing else within 120 m; San Juan Teotihuacan is a
+    // kilometre off. The ceremonial zone stays open ground to the avenue.
+    cityExcludeRadius: 420,
+    contextExclude: 400,
+    // From the south-west and low, on the Avenue of the Dead, with the
+    // Adosada and the stair in front and the five bodies stepping up behind:
+    // the view every photograph of it is taken from.
+    camera: { yaw: -0.62, pitch: 0.09, distance: 470, height: 26 },
     structures: (quality) => [
-      { key: 'teotihuacan', blocks: buildTeotihuacan(quality), primary: true, required: true, label: 'PYRAMID OF THE SUN' },
+      { key: 'sun', blocks: buildTeotihuacan(quality), primary: true, required: true, label: 'PYRAMID OF THE SUN' },
+      // The Moon, at the head of the avenue: eight hundred metres north and
+      // three hundred west, coarse, for recognition and for money. (The bake
+      // levelled its pad at +780, which in the game's frame is south; the
+      // pyramid stands where the Moon stands and its own pad levels for it.)
+      { key: 'moon', blocks: buildMoon(quality), required: false, scenery: true,
+        label: 'PYRAMID OF THE MOON', offset: { x: -300, z: -780 } },
     ],
     garrison: (g, origin, groundY) => populateTeotihuacan(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(teotihuacan)
-    traits: { windows: false, river: false, topples: true },           // TODO(teotihuacan)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(teotihuacan) from the suite's undercut
-    brief: 'TODO(teotihuacan) one sentence: what the player has to find out about this building.',
+    // The pyramid and what is on and in it; the Adosada is a porch.
+    scoreTags: ['core', 'facing', 'stair', 'temple', 'tunnel'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    setting: {
+      hinterland: 'fields',
+      // Dry, high, and dusty in the afternoon.
+      haze: { colour: 0xd6cbb4, density: 0.00022 },
+    },
+    // A solid pyramid: nothing to post men in, no river, nothing that topples.
+    traits: { windows: false, river: false, topples: false },
+    // A million cubic metres of fill under the skin, plus the Moon: unlocks
+    // are fractions of all of it.
+    unlockScale: 12,
+    par: { rounds: 400, spend: 12000, minutes: 14, leverage: 2 },
+    brief: 'Nothing here falls. There is a cave under the west face with the charges walled in along it: dig in from the stair.',
   },
   machupicchu: {
     id: 'machupicchu',
@@ -2128,21 +2225,58 @@ export const LEVELS = {
     place: 'Cusco',
     target: 'MACHU PICCHU',
     subtitle: 'Machu Picchu, Cusco',
-    victory: 'TODO(machupicchu) THE LINE THE END CARD LEADS WITH',
-    // TODO(machupicchu) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(machupicchu) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(machupicchu) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(machupicchu) the postcard angle
+    victory: 'Lost City, Found Out',
+    // Cloud forest on granite, and the grass of the terraces: Rio's Tijuca
+    // palette with the Andean grass brighter and the rock paler.
+    palette: {
+      urban: new THREE.Color(0x5c6c3c),
+      urbanAlt: new THREE.Color(0x4a5a30),
+      park: new THREE.Color(0x3a5a2a),
+      parkAlt: new THREE.Color(0x4c6c2f),
+      road: new THREE.Color(0x7a746a),
+      bank: new THREE.Color(0x9a9a80),
+      bed: new THREE.Color(0x35452c),
+      dry: new THREE.Color(0x76804a),
+    },
+    // The survey has seventy-one house outlines on the summit with heights off
+    // the canopy — eight-metre boxes for walls three metres tall — so the
+    // summit is cleared and the houses the level needs are built. The level
+    // top is 180 x 342 m and the forest starts on the slopes.
+    cityExcludeRadius: 230,
+    contextExclude: 210,
+    // The ridge is the floor. No pad: the bake cut the saddle and the
+    // masonry carries its own foundations down to the rock wherever the crest
+    // falls away, which at the south end is sixty metres.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the guardhouse, south-west and above, looking north-east over the
+    // citadel with Huayna Picchu behind it: the photograph.
+    camera: { yaw: -0.45, pitch: 0.22, distance: 300, height: 18 },
     structures: (quality) => [
-      { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'MACHU PICCHU' },
+      { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'INTIHUATANA' },
+      { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: { x: 40, z: 70 } },
+      // The andenes down the south end: what the place looks like, worth nothing.
+      { key: 'terraces', blocks: buildTerraces(quality), required: false, scenery: true, label: 'TERRACES', offset: { x: 0, z: 185 } },
     ],
-    garrison: (g, origin, groundY) => populateMachupicchu(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(machupicchu)
-    traits: { windows: false, river: false, topples: true },           // TODO(machupicchu)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(machupicchu) from the suite's undercut
-    brief: 'TODO(machupicchu) one sentence: what the player has to find out about this building.',
+    garrison: (g, origin, groundY, sites) => {
+      populateMachupicchu(g, origin, groundY);
+      const t = sites && sites.torreon;
+      if (t) populateTorreon(g, t.origin, t.groundY);
+    },
+    scoreTags: ['intihuatana', 'temples', 'houses'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'forest', canopy: 2.4, canopyFrom: 175,
+      // Cloud forest: white, and thin at this height.
+      haze: { colour: 0xc8d2d4, density: 0.00016 },
+    },
+    // Dry ashlar a few courses tall on retaining walls: no windows the suite
+    // would post men in, no river within reach, and nothing tall enough to
+    // go over.
+    traits: { windows: false, river: false, topples: false },
+    unlockScale: 3,
+    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
+    brief: 'Nothing here is tall. The temples stand on the ground the terrace walls hold up: cut a wall and the fill goes, and the stone on top with it.',
   },
   greatwall: {
     id: 'greatwall',
@@ -2150,23 +2284,52 @@ export const LEVELS = {
     lat: 40.35968, lon: 116.02005,
     name: 'GREAT WALL AT BADALING',
     place: 'Beijing',
-    target: 'GREAT WALL AT BADALING',
+    target: 'GREAT WALL',
     subtitle: 'Great Wall at Badaling, Beijing',
-    victory: 'TODO(greatwall) THE LINE THE END CARD LEADS WITH',
-    // TODO(greatwall) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(greatwall) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(greatwall) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(greatwall) the postcard angle
+    victory: 'Great Fall of China',
+    // The Jundu hills in autumn: dry oak and pine scrub on grey rock, brown
+    // where the grass has gone off. Rio's forest palette, browned and dried.
+    palette: {
+      urban: new THREE.Color(0x66653f),
+      urbanAlt: new THREE.Color(0x555534),
+      park: new THREE.Color(0x475a2e),
+      parkAlt: new THREE.Color(0x5a6a32),
+      road: new THREE.Color(0x6b665e),
+      bank: new THREE.Color(0x8f8a70),
+      bed: new THREE.Color(0x45503a),
+      dry: new THREE.Color(0x8a8452),
+    },
+    // Nothing surveyed within reach: the ridge is the wall's and the forest
+    // comes up to the foot of it on both flanks.
+    cityExcludeRadius: 300,
+    contextExclude: 280,
+    // The crest is the floor. No pad: the wall carries its own footing down
+    // to the rock where the crest falls away at either end, which is what
+    // the wall does at Badaling.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the south-west, on the lit flank, looking north-east along the wall
+    // with the towers stepping away down the ridge: the picture on the ticket.
+    // The east flank is in the afternoon shadow and the wall went blue there.
+    camera: { yaw: -0.95, pitch: 0.16, distance: 400, height: 26 },
     structures: (quality) => [
-      { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL AT BADALING' },
+      { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL' },
     ],
     garrison: (g, origin, groundY) => populateGreatwall(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(greatwall)
-    traits: { windows: false, river: false, topples: true },           // TODO(greatwall)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(greatwall) from the suite's undercut
-    brief: 'TODO(greatwall) one sentence: what the player has to find out about this building.',
+    // The wall is a dyke full of rubble and does not score; the five towers do.
+    scoreTags: ['towers'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'forest', canopy: 2.0, canopyFrom: 130,
+      // Dry and high: the hills are sharp to the horizon on a clear day.
+      haze: { colour: 0xcfd3d6, density: 0.00015 },
+    },
+    // Loops the men fire from, but the suite's window test wants a wing of
+    // them; no river; the towers go over and the wall does not.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The wall is a dyke full of rubble and does not fall. The towers are hollow and stand on the slope: undercut one downhill.',
   },
 };
 
