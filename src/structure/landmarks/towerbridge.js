@@ -56,7 +56,7 @@ const S_ABUT_Z0 = ST_Z + TOWER.d / 2 + SIDE_SPAN;     // south abutment's north 
 const LENGTH = S_ABUT_Z0 + ABUT.len;                  // ~262
 const DECK_W = 18.0, LANES = 3, PLATE_L = 3.0, PLATE_T = 0.7;
 const WALK = { x: 6.0, w: 4.0, floor: 43.0, rail: 3.0, plate: 4.0, t: 0.8 };
-const CHAIN = { x: 8.6, top: 40.0, low: DECK + 4.0, seg: 3.0, t: 0.8 };
+const CHAIN = { x: 8.6, top: 34.0, low: DECK + 4.0, seg: 3.0, t: 0.8 };   // top under the walkways: the links hang from the deck, and stay below a cut through the towers
 
 /** What the garrison, the flag and the level record read. */
 export const TOWERBRIDGE = {
@@ -217,7 +217,11 @@ export function buildTowerbridge(quality) {
       const n = Math.max(2, Math.round(len / CHAIN.seg));
       const seg = len / n;
       const dir = Math.sign(zAbut - zTower);
-      for (let k = 0; k < n; k++) {
+      // A link's width clear of the tower at one end and the abutment tower
+      // at the other. A chain that touched the tower was a path for the
+      // solver's bearing walk from the deck, up the hangers and along the
+      // links into the tower top, and a tower cut clean through stood on it.
+      for (let k = 1; k < n - 1; k++) {
         const z = zTower + dir * (k + 0.5) * seg;
         const t = ((k + 0.5) / n);
         const y = CHAIN.top - (CHAIN.top - CHAIN.low) * Math.pow(t, 1.5);
