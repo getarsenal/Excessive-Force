@@ -1445,122 +1445,236 @@ export const LEVELS = {
     id: 'forbidden',
     terrain: 'forbidden',
     lat: 39.91593, lon: 116.39069,
-    name: 'FORBIDDEN CITY',
-    place: 'Beijing',
+    name: 'Forbidden City, Beijing',
+    place: 'The Outer Court, Beijing',
     target: 'FORBIDDEN CITY',
-    subtitle: 'Forbidden City, Beijing',
-    victory: 'TODO(forbidden) THE LINE THE END CARD LEADS WITH',
-    // TODO(forbidden) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(forbidden) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(forbidden) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(forbidden) the postcard angle
+    subtitle: 'The Three Great Halls \u00b7 Beijing',
+    victory: 'Harmony Disturbed',
+    // North China in a dry autumn: grey hutong tile, dust, and the thin
+    // parkland of a city that gets its rain in one month. The moat and the
+    // lakes are green-brown and still.
+    palette: {
+      urban: new THREE.Color(0xa39c91),
+      urbanAlt: new THREE.Color(0x8f877c),
+      park: new THREE.Color(0x5d7040),
+      parkAlt: new THREE.Color(0x6b7d47),
+      road: new THREE.Color(0x504e4c),
+      bank: new THREE.Color(0xc2b48f),
+      bed: new THREE.Color(0x4a5a50),
+      dry: new THREE.Color(0xcbbfa3),
+    },
+    // Beijing's air: warm and dusty, and thick enough that the hills to the
+    // west are a rumour.
+    setting: { haze: { colour: 0xd9d0bf, density: 0.00030 } },
+    // The survey has the whole Outer Court by name — the three halls, the
+    // side gates, the flanking galleries — at life size, inside 120 m. The
+    // builder lays the same halls at twice life on a terrace 460 m long, so
+    // every one of them would stand inside the marble; the radius clears the
+    // court and the town of grey courtyards begins beyond it.
+    cityExcludeRadius: 380,
+    contextExclude: 360,
+    // From the south, across the Taihemen courtyard: the view up the three
+    // flights of stairs to the Hall of Supreme Harmony that every photograph
+    // of the place is taken from. Low, so the roofs stand against the sky
+    // and the terrace is a base and not a plate.
+    camera: { yaw: 0.16, pitch: 0.13, distance: 470, height: 38 },
     structures: (quality) => [
       { key: 'forbidden', blocks: buildForbidden(quality), primary: true, required: true, label: 'FORBIDDEN CITY' },
     ],
     garrison: (g, origin, groundY) => populateForbidden(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(forbidden)
-    traits: { windows: false, river: false, topples: true },           // TODO(forbidden)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(forbidden) from the suite's undercut
-    brief: 'TODO(forbidden) one sentence: what the player has to find out about this building.',
+    // The terrace is ground; the three halls are the contract.
+    scoreTags: ['supreme', 'central', 'preserving'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    par: { rounds: 70, spend: 16000, minutes: 5, leverage: 6 },
+    brief: 'The marble terrace cannot be shot down. The roofs are the heaviest part of the halls on it, and they go over the way you lean them.',
   },
+
   gyeongbok: {
     id: 'gyeongbok',
     terrain: 'gyeongbok',
     lat: 37.57859, lon: 126.97705,
-    name: 'GYEONGBOKGUNG',
-    place: 'Seoul',
+    name: 'Gyeongbokgung, Seoul',
+    place: 'Jongno, Seoul',
     target: 'GYEONGBOKGUNG',
-    subtitle: 'Gyeongbokgung, Seoul',
-    victory: 'TODO(gyeongbok) THE LINE THE END CARD LEADS WITH',
-    // TODO(gyeongbok) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(gyeongbok) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(gyeongbok) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(gyeongbok) the postcard angle
+    subtitle: 'Geunjeongjeon \u00b7 Seoul',
+    victory: 'Throne Room Vacated',
+    // Seoul in early autumn: grey-brown blocks and dark grey roofs, the
+    // palace gardens and the wooded slope of Bugaksan behind, the stream
+    // channels dark and shallow.
+    palette: {
+      urban: new THREE.Color(0xa8a39a),
+      urbanAlt: new THREE.Color(0x958f85),
+      park: new THREE.Color(0x4a6a3a),
+      parkAlt: new THREE.Color(0x587a44),
+      road: new THREE.Color(0x4e4e52),
+      bank: new THREE.Color(0xb5aa8e),
+      bed: new THREE.Color(0x3f5548),
+      dry: new THREE.Color(0xc0b69c),
+    },
+    setting: { haze: { colour: 0xd4d8d6, density: 0.00025 } },
+    // The survey names the whole palace at life size within 120 m —
+    // Sajeongjeon, Gangnyeongjeon, Sujeongjeon, the gate — and the courtyard
+    // built here at 2.2× is 275 by 300 m, so all of it would stand inside
+    // the cloisters. Cleared to the cloister ring plus a street.
+    cityExcludeRadius: 200,
+    contextExclude: 190,
+    // From the south, over Geunjeongmun, up the courtyard to the throne hall
+    // with the mountain behind it: the view the palace was laid out for.
+    camera: { yaw: 0.06, pitch: 0.11, distance: 400, height: 30 },
     structures: (quality) => [
       { key: 'gyeongbok', blocks: buildGyeongbok(quality), primary: true, required: true, label: 'GYEONGBOKGUNG' },
     ],
     garrison: (g, origin, groundY) => populateGyeongbok(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(gyeongbok)
-    traits: { windows: false, river: false, topples: true },           // TODO(gyeongbok)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(gyeongbok) from the suite's undercut
-    brief: 'TODO(gyeongbok) one sentence: what the player has to find out about this building.',
+    // The hall and the gate. The cloisters are the garrison's cover and the
+    // terrace is ground; neither moves the bar.
+    scoreTags: ['hall', 'gate'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    par: { rounds: 60, spend: 12000, minutes: 4, leverage: 6 },
+    brief: 'The cloister ring is not the target and the terrace cannot fall; the hall and the gate are top-heavy and go over the way you lean them.',
   },
+
   watarun: {
     id: 'watarun',
     terrain: 'watarun',
     lat: 13.74378, lon: 100.48885,
-    name: 'WAT ARUN',
-    place: 'Bangkok',
+    name: 'Wat Arun, Bangkok',
+    place: 'Thonburi, Bangkok',
     target: 'WAT ARUN',
-    subtitle: 'Wat Arun, Bangkok',
-    victory: 'TODO(watarun) THE LINE THE END CARD LEADS WITH',
-    // TODO(watarun) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(watarun) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(watarun) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(watarun) the postcard angle
+    subtitle: 'Temple of Dawn \u00b7 Chao Phraya',
+    victory: 'Dawn Broken',
+    // Bangkok: a low wet city on a brown river. Warm concrete and rust roofs,
+    // hard green where anything is left to grow, and the Chao Phraya the
+    // colour of tea.
+    palette: {
+      urban: new THREE.Color(0x9a927e),
+      urbanAlt: new THREE.Color(0x847c6a),
+      park: new THREE.Color(0x4a6a34),
+      parkAlt: new THREE.Color(0x587a3c),
+      road: new THREE.Color(0x45443f),
+      bank: new THREE.Color(0x9c8f6e),
+      bed: new THREE.Color(0x5a5a43),
+      dry: new THREE.Color(0xa39a78),
+    },
+    // Fourteen degrees north and at sea level: the air is white with water.
+    setting: { haze: { colour: 0xdcd8cc, density: 0.00034 }, canopy: 1.2 },
+    // The wat's own halls — the ubosot 105 m south-west, the vihara 66 m
+    // west, the two small chapels east — are surveyed at life size. The
+    // prang at twice life fills 130 m, so the ring inside 80 m goes and the
+    // ordination hall and the outer monastery stay where they are.
+    cityExcludeRadius: 80,
+    contextExclude: 75,
+    // From the river, which is the only way anyone has ever seen it: the
+    // ferry from Tha Tien, with the prang against the western sky.
+    camera: { yaw: 1.45, pitch: 0.16, distance: 400, height: 55 },
     structures: (quality) => [
       { key: 'watarun', blocks: buildWatarun(quality), primary: true, required: true, label: 'WAT ARUN' },
     ],
     garrison: (g, origin, groundY) => populateWatarun(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(watarun)
-    traits: { windows: false, river: false, topples: true },           // TODO(watarun)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(watarun) from the suite's undercut
-    brief: 'TODO(watarun) one sentence: what the player has to find out about this building.',
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none', river: 'ghats' },
+    traits: { windows: false, river: true, topples: false },
+    // Solid brick, twice life: a tenth of Khufu's mass and a good deal of it.
+    unlockScale: 4,
+    par: { rounds: 90, spend: 14000, minutes: 5, leverage: 2 },
+    brief: 'A prang is solid and does not fall. The terraces at its foot carry the spire: undercut one side and that side comes down the steps.',
   },
+
   shwedagon: {
     id: 'shwedagon',
     terrain: 'shwedagon',
     lat: 16.79845, lon: 96.14957,
-    name: 'SHWEDAGON PAGODA',
-    place: 'Yangon',
+    name: 'Shwedagon Pagoda, Yangon',
+    place: 'Singuttara Hill, Yangon',
     target: 'SHWEDAGON PAGODA',
-    subtitle: 'Shwedagon Pagoda, Yangon',
-    victory: 'TODO(shwedagon) THE LINE THE END CARD LEADS WITH',
-    // TODO(shwedagon) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(shwedagon) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(shwedagon) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(shwedagon) the postcard angle
+    subtitle: 'The Golden Stupa \u00b7 Singuttara Hill',
+    victory: 'Gold Standard Lowered',
+    // Yangon: a wet green city of rust roofs and rain-stained concrete, the
+    // lakes brown, everything that is not built on growing.
+    palette: {
+      urban: new THREE.Color(0x8a8468),
+      urbanAlt: new THREE.Color(0x77704f),
+      park: new THREE.Color(0x3d5c2c),
+      parkAlt: new THREE.Color(0x4a6b33),
+      road: new THREE.Color(0x4a4844),
+      bank: new THREE.Color(0x9c9370),
+      bed: new THREE.Color(0x4b5a3f),
+      dry: new THREE.Color(0x9e9a6e),
+    },
+    // Monsoon air, white and heavy, and trees closing in past the town.
+    setting: { haze: { colour: 0xdad9cf, density: 0.00030 }, canopy: 1.6 },
+    // The platform is levelled by the bake, 285 by 243 m of it on the summit,
+    // and the fifty shrines the survey has on it are built here as the
+    // sixty-four small stupas and the four halls. The stupa at 1.3× fills
+    // 150 m; the radius clears the platform and the town begins down the hill.
+    cityExcludeRadius: 150,
+    contextExclude: 140,
+    groundLevel: 'bake',
+    // From the south-east, from the foot of the hill, looking up at the
+    // whole gold bell against the sky: the postcard from Kandawgyi.
+    camera: { yaw: 0.55, pitch: 0.15, distance: 560, height: 65 },
     structures: (quality) => [
       { key: 'shwedagon', blocks: buildShwedagon(quality), primary: true, required: true, label: 'SHWEDAGON PAGODA' },
     ],
     garrison: (g, origin, groundY) => populateShwedagon(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(shwedagon)
-    traits: { windows: false, river: false, topples: true },           // TODO(shwedagon)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(shwedagon) from the suite's undercut
-    brief: 'TODO(shwedagon) one sentence: what the player has to find out about this building.',
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: false, river: false, topples: false },
+    // Solid gilded brick, three hundred and seventy thousand cubic metres of
+    // it: a sixth of Khufu, and the unlocks are scaled to that.
+    unlockScale: 8,
+    par: { rounds: 120, spend: 20000, minutes: 6, leverage: 2 },
+    brief: 'The stupa is solid gilded brick and nothing about it falls. Quarry it from the terraces up; the small stupas and the halls are what shoot back.',
   },
+
   angkor: {
     id: 'angkor',
     terrain: 'angkor',
     lat: 13.41253, lon: 103.86699,
-    name: 'ANGKOR WAT',
-    place: 'Siem Reap',
+    name: 'Angkor Wat, Siem Reap',
+    place: 'Angkor, Siem Reap',
     target: 'ANGKOR WAT',
-    subtitle: 'Angkor Wat, Siem Reap',
-    victory: 'TODO(angkor) THE LINE THE END CARD LEADS WITH',
-    // TODO(angkor) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(angkor) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(angkor) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(angkor) the postcard angle
+    subtitle: 'The Temple-Mountain \u00b7 Angkor',
+    victory: 'Quincunx Cancelled',
+    // Forest floor and laterite: the ground under the canopy is red-brown
+    // earth and dark green, the moat and the basins the colour of tea.
+    palette: {
+      urban: new THREE.Color(0x6a6a42),
+      urbanAlt: new THREE.Color(0x5a5b38),
+      park: new THREE.Color(0x3b5a2e),
+      parkAlt: new THREE.Color(0x486a34),
+      road: new THREE.Color(0x8a6a4a),
+      bank: new THREE.Color(0xa8946a),
+      bed: new THREE.Color(0x4e5a3c),
+      dry: new THREE.Color(0x8b7d55),
+    },
+    // Jungle to the horizon in every direction, closing in past the moat.
+    setting: {
+      hinterland: 'jungle', canopy: 2.5, canopyFrom: 320,
+      haze: { colour: 0xcdd2b8, density: 0.00030 },
+    },
+    // The survey has the three enclosures and the libraries, all built here
+    // at 1.3× from the outer gallery to the causeway's end 280 m west, so
+    // the whole of the real footprint is inside the masonry; the radius
+    // clears it and the forest takes over beyond.
+    cityExcludeRadius: 320,
+    contextExclude: 300,
+    // From the west, down the causeway: the five towers over the galleries,
+    // which is the only picture of Angkor anyone has ever taken.
+    camera: { yaw: -1.42, pitch: 0.13, distance: 640, height: 45 },
     structures: (quality) => [
       { key: 'angkor', blocks: buildAngkor(quality), primary: true, required: true, label: 'ANGKOR WAT' },
     ],
     garrison: (g, origin, groundY) => populateAngkor(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(angkor)
-    traits: { windows: false, river: false, topples: true },           // TODO(angkor)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(angkor) from the suite's undercut
-    brief: 'TODO(angkor) one sentence: what the player has to find out about this building.',
+    // The five towers and the pyramid they stand on. The galleries are the
+    // garrison's cover and the terraces are ground.
+    scoreTags: ['towers', 'bakan'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: false, river: false, topples: false },
+    unlockScale: 4,
+    par: { rounds: 100, spend: 18000, minutes: 6, leverage: 2 },
+    brief: 'The galleries are lintels on pillars and come down a bay at a time. The towers are solid, and each stands on one corner pier of the pyramid.',
   },
+
   borobudur: {
     id: 'borobudur',
     terrain: 'borobudur',
