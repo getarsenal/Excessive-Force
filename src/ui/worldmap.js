@@ -345,7 +345,11 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       // a player is looking for.
       const num = String(p.t.no).padStart(2, '0');
       const sel = p.g.classList.contains('sel');
-      const wanted = sel || p.t.id === current || (p.t.open && !p.t.down);
+      // Nothing in the campaign is locked, so `open` is true of every contract
+      // not yet closed — twenty-eight names at once on a phone. The names that
+      // are wanted whatever the zoom are three: the selected contract, the one
+      // this match is on, and the next one in the order.
+      const wanted = sel || p.t.id === current || p.t.id === state.next?.id;
       // Fitted to the screen, or near it, nothing but those two: forty-one
       // pins at the opening zoom are dots whatever room they have, and the
       // names only start to appear once the map has been zoomed past twice
