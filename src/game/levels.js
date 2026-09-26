@@ -1202,25 +1202,48 @@ export const LEVELS = {
     id: 'segovia',
     terrain: 'segovia',
     lat: 40.94795, lon: -4.11798,
-    name: 'AQUEDUCT OF SEGOVIA',
-    place: 'Segovia',
-    target: 'AQUEDUCT OF SEGOVIA',
-    subtitle: 'Aqueduct of Segovia, Segovia',
-    victory: 'TODO(segovia) THE LINE THE END CARD LEADS WITH',
-    // TODO(segovia) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(segovia) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(segovia) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(segovia) the postcard angle
+    name: 'Aqueduct of Segovia',
+    place: 'Plaza del Azoguejo, Segovia',
+    target: 'THE AQUEDUCT',
+    subtitle: 'Acueducto romano \u00b7 Plaza del Azoguejo',
+    victory: 'Water Under the Bridge',
+    // Castile at a thousand metres: grey granite, ochre render and red tile,
+    // dry gold ground, holm oak on the slopes, the two rivers small and
+    // green in their valleys.
+    palette: {
+      urban: new THREE.Color(0xc6ae8e),
+      urbanAlt: new THREE.Color(0xad8f6a),
+      park: new THREE.Color(0x6e7442),
+      parkAlt: new THREE.Color(0x7d804a),
+      road: new THREE.Color(0x6d6862),
+      bank: new THREE.Color(0xc1b394),
+      bed: new THREE.Color(0x56664c),
+      dry: new THREE.Color(0xd2c39f),
+    },
+    // High, dry and clear: the meseta in September.
+    setting: { hinterland: 'fields', haze: { colour: 0xd6d3c8, density: 0.00017 } },
+    // The Azoguejo's houses stand hard against the aqueduct — the survey has
+    // sixty-one within a hundred and twenty metres, the nearest thirty-six
+    // metres off. The line's own footprint keeps them off the piers; this
+    // clears only the plaza itself.
+    cityExcludeRadius: 45,
+    contextExclude: 45,
+    // The ground under an aqueduct is not level, and the piers are founded
+    // twenty-six metres down to meet whatever the bake has: no pad.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the plaza, the south-west side, low: the two tiers running across
+    // the frame from the Plaza de Día Sanz to the Postigo.
+    camera: { yaw: -0.73, pitch: 0.09, distance: 400, height: 30 },
     structures: (quality) => [
-      { key: 'segovia', blocks: buildSegovia(quality), primary: true, required: true, label: 'AQUEDUCT OF SEGOVIA' },
+      { key: 'segovia', blocks: buildSegovia(quality), primary: true, required: true, label: 'AQUEDUCT' },
     ],
     garrison: (g, origin, groundY) => populateSegovia(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(segovia)
-    traits: { windows: false, river: false, topples: true },           // TODO(segovia)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(segovia) from the suite's undercut
-    brief: 'TODO(segovia) one sentence: what the player has to find out about this building.',
+    scoreTags: ['lowerpiers', 'lowerarches', 'upperpiers', 'upperarches', 'channel'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: false, river: false, topples: true },
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },
+    brief: 'An arcade shares its thrust. Take one pier and two arches go; the piers beside them are unbraced, and the chain unzips to the next wide one.',
   },
   atomium: {
     id: 'atomium',
