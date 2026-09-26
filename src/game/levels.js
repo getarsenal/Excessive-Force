@@ -27,7 +27,7 @@ import { buildAtomium, populateAtomium } from '../structure/landmarks/atomium.js
 import { buildTokyotower, populateTokyotower } from '../structure/landmarks/tokyotower.js';
 import { buildBudapest, populateBudapest } from '../structure/landmarks/budapest.js';
 import { buildSagrada, populateSagrada } from '../structure/landmarks/sagrada.js';
-import { buildEdinburgh, populateEdinburgh } from '../structure/landmarks/edinburgh.js';
+import { buildEdinburgh, populateEdinburgh, EDINBURGH } from '../structure/landmarks/edinburgh.js';
 import { buildNeuschwanstein, populateNeuschwanstein } from '../structure/landmarks/neuschwanstein.js';
 import { buildMontstmichel, populateMontstmichel } from '../structure/landmarks/montstmichel.js';
 import { buildPena, populatePena } from '../structure/landmarks/pena.js';
@@ -1209,21 +1209,42 @@ export const LEVELS = {
     place: 'Tokyo',
     target: 'TOKYO TOWER',
     subtitle: 'Tokyo Tower, Tokyo',
-    victory: 'TODO(tokyotower) THE LINE THE END CARD LEADS WITH',
-    // TODO(tokyotower) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(tokyotower) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(tokyotower) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tokyotower) the postcard angle
+    victory: 'Big in Japan, Flat in Minato',
+    // Minato: grey concrete and glass, the parks of Shiba a dark green, the
+    // roads black. A Japanese city, not a Japanese castle town: Himeji's
+    // palette with the plaster and tile taken out of it.
+    palette: {
+      urban: new THREE.Color(0xb3b0aa),
+      urbanAlt: new THREE.Color(0x9a9791),
+      park: new THREE.Color(0x4a6838),
+      parkAlt: new THREE.Color(0x5a7a40),
+      road: new THREE.Color(0x4c4d51),
+      bank: new THREE.Color(0xa9a48f),
+      bed: new THREE.Color(0x3a4c4a),
+      dry: new THREE.Color(0xbdb7a5),
+    },
+    setting: { haze: { colour: 0xd3d6d9, density: 0.00024 } },
+    // FootTown is 76 m across and the feet reach 88; the survey's own rings
+    // are the only things inside sixty metres, and the Shiba Koen office
+    // blocks start at seventy. The old 120 deleted all thirty-seven of them.
+    cityExcludeRadius: 62,
+    contextExclude: 60,
+    // From the south-east, where Zojoji's great hall stands in front of it:
+    // the photograph everybody takes, the temple roof and the tower rising
+    // orange behind it. Far enough back to hold 333 m looking up.
+    camera: { yaw: 0.75, pitch: 0.14, distance: 480, height: 125 },
     structures: (quality) => [
       { key: 'tokyotower', blocks: buildTokyotower(quality), primary: true, required: true, label: 'TOKYO TOWER' },
     ],
     garrison: (g, origin, groundY) => populateTokyotower(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tokyotower)
-    traits: { windows: false, river: false, topples: true },           // TODO(tokyotower)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tokyotower) from the suite's undercut
-    brief: 'TODO(tokyotower) one sentence: what the player has to find out about this building.',
+    // The tower, not the building between its feet.
+    scoreTags: ['legs', 'arches', 'cage', 'observatory', 'upper', 'antenna'],
+    // Shiba Park: lawns and paths with a fence round the tower's own plot.
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'none' },
+    // A lattice: no windows to post men in, and the bay is a kilometre off.
+    traits: { windows: false, river: false, topples: true },
+    par: { rounds: 40, spend: 6000, minutes: 3, leverage: 6 },
+    brief: 'The weight is the observatory at 145 m, not the antenna. The fall is decided at the feet.',
   },
   budapest: {
     id: 'budapest',
@@ -1233,21 +1254,46 @@ export const LEVELS = {
     place: 'Budapest',
     target: 'HUNGARIAN PARLIAMENT',
     subtitle: 'Hungarian Parliament, Budapest',
-    victory: 'TODO(budapest) THE LINE THE END CARD LEADS WITH',
-    // TODO(budapest) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(budapest) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(budapest) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(budapest) the postcard angle
+    victory: 'The House Is Not in Order',
+    // Pest: ochre and grey render, red tile, the Danube a working green-grey.
+    // Cologne's Rhineland palette warmed up: the same river light, yellower
+    // stucco.
+    palette: {
+      urban: new THREE.Color(0xb9ab93),
+      urbanAlt: new THREE.Color(0xa2927a),
+      park: new THREE.Color(0x4c6c36),
+      parkAlt: new THREE.Color(0x5e7e3e),
+      road: new THREE.Color(0x45464a),
+      bank: new THREE.Color(0xaea283),
+      bed: new THREE.Color(0x33473f),
+      dry: new THREE.Color(0xc2b598),
+    },
+    setting: { haze: { colour: 0xcdd1d4, density: 0.00023 } },
+    // The survey has one building inside 120 m, and it is the Országház
+    // itself; the House stands alone on its own bank with Kossuth tér east of
+    // it. The building is 323 m long, so the radius is a margin round the
+    // footprint, which the context builder measures, not a circle round it.
+    cityExcludeRadius: 100,
+    contextExclude: 90,
+    // From the Buda embankment across the Danube, a little downstream: the
+    // whole river front, the dome in the middle, the two spires beside it
+    // and a pavilion at either end. The picture on every postcard.
+    camera: { yaw: -1.30, pitch: 0.09, distance: 430, height: 48 },
     structures: (quality) => [
       { key: 'budapest', blocks: buildBudapest(quality), primary: true, required: true, label: 'HUNGARIAN PARLIAMENT' },
     ],
     garrison: (g, origin, groundY) => populateBudapest(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(budapest)
-    traits: { windows: false, river: false, topples: true },           // TODO(budapest)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(budapest) from the suite's undercut
-    brief: 'TODO(budapest) one sentence: what the player has to find out about this building.',
+    // The dome, the drum it stands on and the two spires beside it. The wings
+    // are the mass of the building and they are not the contract.
+    scoreTags: ['dome', 'drum', 'spires'],
+    // Kossuth tér: paving, the embankment wall, the statues a parliament
+    // square has.
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues', river: 'embankment' },
+    // A shell: it never topples, it has to be broken; the suite must not
+    // expect it to go over.
+    traits: { windows: true, river: true, topples: false },
+    par: { rounds: 110, spend: 16000, minutes: 5, leverage: 2 },
+    brief: 'The wings are not the building. The dome stands on sixteen piers inside the hall.',
   },
   sagrada: {
     id: 'sagrada',
@@ -1257,21 +1303,41 @@ export const LEVELS = {
     place: 'Barcelona',
     target: 'SAGRADA FAMILIA',
     subtitle: 'Sagrada Familia, Barcelona',
-    victory: 'TODO(sagrada) THE LINE THE END CARD LEADS WITH',
-    // TODO(sagrada) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(sagrada) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(sagrada) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(sagrada) the postcard angle
+    victory: 'Finished At Last',
+    // The Eixample: ochre and cream render, terracotta roofs, plane trees,
+    // dry Mediterranean light. Istanbul's warm palette with the sea taken
+    // out of it.
+    palette: {
+      urban: new THREE.Color(0xc4ad8e),
+      urbanAlt: new THREE.Color(0xad9573),
+      park: new THREE.Color(0x587040),
+      parkAlt: new THREE.Color(0x6a824a),
+      road: new THREE.Color(0x5a5752),
+      bank: new THREE.Color(0xb8a888),
+      bed: new THREE.Color(0x3b4d4a),
+      dry: new THREE.Color(0xcfbf9f),
+    },
+    setting: { haze: { colour: 0xd8d6cd, density: 0.00021 } },
+    // The basilica fills its own Eixample block; the two squares either side
+    // of it are the next blocks over, and the apartments start beyond them at
+    // a hundred metres. The old 120 took every one of the forty buildings the
+    // survey found, the school and the shop among them.
+    cityExcludeRadius: 82,
+    contextExclude: 76,
+    // From the Placa de Gaudi across the pond, north-east of the church: the
+    // Nativity front's four towers with Jesus and the Evangelists rising
+    // behind them, which is the picture of the place.
+    camera: { yaw: 2.15, pitch: 0.08, distance: 330, height: 70 },
     structures: (quality) => [
       { key: 'sagrada', blocks: buildSagrada(quality), primary: true, required: true, label: 'SAGRADA FAMILIA' },
     ],
     garrison: (g, origin, groundY) => populateSagrada(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(sagrada)
-    traits: { windows: false, river: false, topples: true },           // TODO(sagrada)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(sagrada) from the suite's undercut
-    brief: 'TODO(sagrada) one sentence: what the player has to find out about this building.',
+    // The eighteen towers. The nave is the hall they stand in.
+    scoreTags: ['nativity', 'passion', 'evangelists', 'mary', 'jesus'],
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues' },
+    traits: { windows: true, river: false, topples: true },
+    par: { rounds: 70, spend: 12000, minutes: 4, leverage: 6 },
+    brief: 'Every spire is a hollow cone on piers. The tallest stands on the four piers of the crossing.',
   },
   edinburgh: {
     id: 'edinburgh',
@@ -1281,21 +1347,56 @@ export const LEVELS = {
     place: 'Edinburgh',
     target: 'EDINBURGH CASTLE',
     subtitle: 'Edinburgh Castle, Edinburgh',
-    victory: 'TODO(edinburgh) THE LINE THE END CARD LEADS WITH',
-    // TODO(edinburgh) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(edinburgh) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(edinburgh) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(edinburgh) the postcard angle
+    victory: 'Auld Reekie, Auld Rubble',
+    // Edinburgh: grey-brown sandstone and slate under a north-sea sky, the
+    // gardens below the rock a wet green, the roads dark. Cologne's grey
+    // palette with the warmth taken out of the stone.
+    palette: {
+      urban: new THREE.Color(0x9e968a),
+      urbanAlt: new THREE.Color(0x857d72),
+      park: new THREE.Color(0x47683a),
+      parkAlt: new THREE.Color(0x587a44),
+      road: new THREE.Color(0x3d3f42),
+      bank: new THREE.Color(0x9a927c),
+      bed: new THREE.Color(0x35453f),
+      dry: new THREE.Color(0xa89f8c),
+    },
+    setting: { haze: { colour: 0xc9ced2, density: 0.00026 } },
+    // Every one of the twenty-four buildings the survey finds inside 120 m is
+    // the castle: the Palace, the Great Hall, the Barracks, the Gatehouse and
+    // the rest, which the builder lays itself. The Old Town begins at the foot
+    // of the Esplanade two hundred metres east and stays.
+    cityExcludeRadius: 200,
+    contextExclude: 190,
+    // The rock is the level. The bake cuts Castle Rock as a crag with the
+    // summit at 130 m and no structure may flatten it: every wall carries its
+    // own foundation down to meet the rock wherever the rock has fallen away,
+    // which is what the Half Moon over the Esplanade and the Palace over the
+    // southern cliff actually are.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From Princes Street Gardens, north-east and eighty-five metres below:
+    // the rock, the batteries along its rim, the Half Moon and the Palace
+    // over it, looked up at. Nearly level, so the crag fills the frame.
+    camera: { yaw: 2.55, pitch: 0.03, distance: 470, height: 18 },
     structures: (quality) => [
       { key: 'edinburgh', blocks: buildEdinburgh(quality), primary: true, required: true, label: 'EDINBURGH CASTLE' },
     ],
     garrison: (g, origin, groundY) => populateEdinburgh(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(edinburgh)
-    traits: { windows: false, river: false, topples: true },           // TODO(edinburgh)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(edinburgh) from the suite's undercut
-    brief: 'TODO(edinburgh) one sentence: what the player has to find out about this building.',
+    // The One O'Clock Gun on Mills Mount: the north rim of the summit, on the
+    // castle's own level ground behind the battery wall, the gun facing north
+    // over the gardens where the battery deploys.
+    turret: { x: EDINBURGH.gun.x, z: EDINBURGH.gun.z, yaw: Math.PI, scale: 1.25, minRange: 60 },
+    // The castle's buildings and the Half Moon; the batteries are the rim of
+    // the rock and stay as ground.
+    scoreTags: ['halfmoon', 'palace', 'greathall', 'chapel', 'gatehouse', 'barracks'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    // A fortress on a hill: walls bonded to the rock, nothing that leans.
+    // It comes down course by course or it does not come down.
+    traits: { windows: true, river: false, topples: false },
+    unlockScale: 4,
+    par: { rounds: 120, spend: 18000, minutes: 6, leverage: 2 },
+    brief: 'The Half Moon is a retaining wall. Behind it is the fill the Palace stands on.',
   },
   neuschwanstein: {
     id: 'neuschwanstein',
@@ -1305,21 +1406,50 @@ export const LEVELS = {
     place: 'Schwangau',
     target: 'NEUSCHWANSTEIN CASTLE',
     subtitle: 'Neuschwanstein Castle, Schwangau',
-    victory: 'TODO(neuschwanstein) THE LINE THE END CARD LEADS WITH',
-    // TODO(neuschwanstein) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(neuschwanstein) read tools/survey.py: what does this delete?
+    victory: 'The Fairy Tale Is Over',
+    // The Ammergau Alps: spruce forest on limestone, alpine meadow in the
+    // valley, grey rock, the Alpsee's cold green. Rio's forest palette with
+    // the tropics taken out: darker conifer greens, paler meadow, grey road.
+    palette: {
+      urban: new THREE.Color(0x8e9670),
+      urbanAlt: new THREE.Color(0x7a845e),
+      park: new THREE.Color(0x3a5c30),
+      parkAlt: new THREE.Color(0x476b38),
+      road: new THREE.Color(0x6a665e),
+      bank: new THREE.Color(0x9a9c80),
+      bed: new THREE.Color(0x3a5652),
+      dry: new THREE.Color(0x9aa075),
+    },
+    // Forest to the horizon, closing in past the castle's own clearing, and
+    // the thin blue haze of a thousand metres of altitude.
+    setting: {
+      hinterland: 'forest', canopy: 2.4, canopyFrom: 130,
+      haze: { colour: 0xc4d2df, density: 0.00014 },
+    },
+    // The survey finds fourteen buildings inside 120 m and every one is the
+    // castle or its restaurant and shop on the ridge; Hohenschwangau is a
+    // kilometre away in the valley and stays.
+    cityExcludeRadius: 120,
     contextExclude: 110,
-    // TODO(neuschwanstein) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(neuschwanstein) the postcard angle
+    // A ridge, not a pad: the bake's summit is the floor, and every wall of
+    // the castle carries its own footing down the flanks to meet the rock.
+    // The Palas stands on sixty metres of it over the gorge.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // The Marienbrücke view, from the south-east over the gorge: the Palas
+    // end-on with the round tower against it and the courtyard buildings
+    // stepping down the ridge behind.
+    camera: { yaw: 0.55, pitch: 0.10, distance: 480, height: 45 },
     structures: (quality) => [
       { key: 'neuschwanstein', blocks: buildNeuschwanstein(quality), primary: true, required: true, label: 'NEUSCHWANSTEIN CASTLE' },
     ],
     garrison: (g, origin, groundY) => populateNeuschwanstein(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(neuschwanstein)
-    traits: { windows: false, river: false, topples: true },           // TODO(neuschwanstein)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(neuschwanstein) from the suite's undercut
-    brief: 'TODO(neuschwanstein) one sentence: what the player has to find out about this building.',
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    // Two slender towers on a big block: they go over the way they lean.
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 70, spend: 12000, minutes: 4, leverage: 6 },
+    brief: 'Two slender towers on the corners of a big block. They go over the way they lean; the Palas is the counterweight.',
   },
   montstmichel: {
     id: 'montstmichel',
