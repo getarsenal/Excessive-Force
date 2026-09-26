@@ -1,0 +1,16 @@
+{
+  "id": "tikal",
+  "name": "Tikal, Peten",
+  "lat": 17.2218,
+  "lon": -89.62339,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 249.914,
+  "maxElevation": 334.35,
+  "metersPerDemPixel": 4.5631,
+  "seaLevel": 259.195,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0002
+}

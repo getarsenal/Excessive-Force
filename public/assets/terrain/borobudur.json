@@ -1,0 +1,16 @@
+{
+  "id": "borobudur",
+  "name": "Borobudur, Magelang",
+  "lat": -7.60788,
+  "lon": 110.20367,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 229.734,
+  "maxElevation": 296.886,
+  "metersPerDemPixel": 4.7353,
+  "seaLevel": 237.023,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0129
+}

@@ -1,0 +1,16 @@
+{
+  "id": "greatwall",
+  "name": "Great Wall at Badaling, Beijing",
+  "lat": 40.35968,
+  "lon": 116.02005,
+  "spanMeters": 1000.0,
+  "size": 512,
+  "minElevation": 574.382,
+  "maxElevation": 1048.379,
+  "metersPerDemPixel": 3.6403,
+  "seaLevel": 617.066,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 7000.0,
+  "farWater": 0.0021
+}

@@ -1,0 +1,17 @@
+{
+  "id": "shwedagon",
+  "name": "Shwedagon Pagoda, Yangon",
+  "lat": 16.79845,
+  "lon": 96.14957,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 3.876,
+  "maxElevation": 58.0,
+  "metersPerDemPixel": 4.5735,
+  "seaLevel": 22.251,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 23.166,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.2121
+}
