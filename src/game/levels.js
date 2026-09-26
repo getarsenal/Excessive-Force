@@ -41,8 +41,9 @@ import { buildShwedagon, populateShwedagon } from '../structure/landmarks/shweda
 import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
 import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
 import { buildTikal, populateTikal, buildTempleII, populateTempleII } from '../structure/landmarks/tikal.js';
-import { buildTeotihuacan, populateTeotihuacan } from '../structure/landmarks/teotihuacan.js';
-import { buildMachupicchu, populateMachupicchu } from '../structure/landmarks/machupicchu.js';
+import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/landmarks/teotihuacan.js';
+import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces }
+  from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 
 /**
@@ -1643,7 +1644,7 @@ export const LEVELS = {
     // From the plaza's south-west, low, with Temple I's stair and comb in
     // three-quarter view and Temple II's back at the edge of the frame: the
     // photograph everyone has is taken from the foot of Temple II.
-    camera: { yaw: -0.85, pitch: 0.12, distance: 330, height: 50 },
+    camera: { yaw: -0.45, pitch: 0.07, distance: 300, height: 44 },
     structures: (quality) => [
       { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TEMPLE I' },
       // Temple II faces it across the Great Plaza. The real gap is a hundred
@@ -1681,21 +1682,53 @@ export const LEVELS = {
     place: 'Teotihuacan',
     target: 'PYRAMID OF THE SUN',
     subtitle: 'Pyramid of the Sun, Teotihuacan',
-    victory: 'TODO(teotihuacan) THE LINE THE END CARD LEADS WITH',
-    // TODO(teotihuacan) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(teotihuacan) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(teotihuacan) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(teotihuacan) the postcard angle
+    victory: 'Sunset Boulevard',
+    // The Valley of Mexico at 2,300 m in the dry season: tan earth, dust,
+    // olive scrub and nopal, grey-brown roads. Giza's sand, greyed and cooled.
+    palette: {
+      urban: new THREE.Color(0xb9a884),
+      urbanAlt: new THREE.Color(0xa3926f),
+      park: new THREE.Color(0x7c7f4f),
+      parkAlt: new THREE.Color(0x8d8a52),
+      road: new THREE.Color(0x5a544a),
+      bank: new THREE.Color(0xc2b18c),
+      bed: new THREE.Color(0x6a6b4a),
+      dry: new THREE.Color(0xd0bf98),
+    },
+    // The survey has one outline, the pyramid itself at 276 x 273 m over its
+    // aprons, and nothing else within 120 m; San Juan Teotihuacan is a
+    // kilometre off. The ceremonial zone stays open ground to the avenue.
+    cityExcludeRadius: 420,
+    contextExclude: 400,
+    // From the south-west and low, on the Avenue of the Dead, with the
+    // Adosada and the stair in front and the five bodies stepping up behind:
+    // the view every photograph of it is taken from.
+    camera: { yaw: -0.62, pitch: 0.09, distance: 470, height: 26 },
     structures: (quality) => [
-      { key: 'teotihuacan', blocks: buildTeotihuacan(quality), primary: true, required: true, label: 'PYRAMID OF THE SUN' },
+      { key: 'sun', blocks: buildTeotihuacan(quality), primary: true, required: true, label: 'PYRAMID OF THE SUN' },
+      // The Moon, at the head of the avenue: eight hundred metres north and
+      // three hundred west, coarse, for recognition and for money. (The bake
+      // levelled its pad at +780, which in the game's frame is south; the
+      // pyramid stands where the Moon stands and its own pad levels for it.)
+      { key: 'moon', blocks: buildMoon(quality), required: false, scenery: true,
+        label: 'PYRAMID OF THE MOON', offset: { x: -300, z: -780 } },
     ],
     garrison: (g, origin, groundY) => populateTeotihuacan(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(teotihuacan)
-    traits: { windows: false, river: false, topples: true },           // TODO(teotihuacan)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(teotihuacan) from the suite's undercut
-    brief: 'TODO(teotihuacan) one sentence: what the player has to find out about this building.',
+    // The pyramid and what is on and in it; the Adosada is a porch.
+    scoreTags: ['core', 'facing', 'stair', 'temple', 'tunnel'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    setting: {
+      hinterland: 'fields',
+      // Dry, high, and dusty in the afternoon.
+      haze: { colour: 0xd6cbb4, density: 0.00022 },
+    },
+    // A solid pyramid: nothing to post men in, no river, nothing that topples.
+    traits: { windows: false, river: false, topples: false },
+    // A million cubic metres of fill under the skin, plus the Moon: unlocks
+    // are fractions of all of it.
+    unlockScale: 12,
+    par: { rounds: 400, spend: 12000, minutes: 14, leverage: 2 },
+    brief: 'Nothing here falls. There is a cave under the west face with the charges walled in along it: dig in from the stair.',
   },
   machupicchu: {
     id: 'machupicchu',
@@ -1705,21 +1738,58 @@ export const LEVELS = {
     place: 'Cusco',
     target: 'MACHU PICCHU',
     subtitle: 'Machu Picchu, Cusco',
-    victory: 'TODO(machupicchu) THE LINE THE END CARD LEADS WITH',
-    // TODO(machupicchu) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(machupicchu) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(machupicchu) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(machupicchu) the postcard angle
+    victory: 'Lost City, Found Out',
+    // Cloud forest on granite, and the grass of the terraces: Rio's Tijuca
+    // palette with the Andean grass brighter and the rock paler.
+    palette: {
+      urban: new THREE.Color(0x5c6c3c),
+      urbanAlt: new THREE.Color(0x4a5a30),
+      park: new THREE.Color(0x3a5a2a),
+      parkAlt: new THREE.Color(0x4c6c2f),
+      road: new THREE.Color(0x7a746a),
+      bank: new THREE.Color(0x9a9a80),
+      bed: new THREE.Color(0x35452c),
+      dry: new THREE.Color(0x76804a),
+    },
+    // The survey has seventy-one house outlines on the summit with heights off
+    // the canopy — eight-metre boxes for walls three metres tall — so the
+    // summit is cleared and the houses the level needs are built. The level
+    // top is 180 x 342 m and the forest starts on the slopes.
+    cityExcludeRadius: 230,
+    contextExclude: 210,
+    // The ridge is the floor. No pad: the bake cut the saddle and the
+    // masonry carries its own foundations down to the rock wherever the crest
+    // falls away, which at the south end is sixty metres.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the guardhouse, south-west and above, looking north-east over the
+    // citadel with Huayna Picchu behind it: the photograph.
+    camera: { yaw: -0.62, pitch: 0.30, distance: 380, height: 20 },
     structures: (quality) => [
-      { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'MACHU PICCHU' },
+      { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'INTIHUATANA' },
+      { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: { x: 40, z: 70 } },
+      // The andenes down the south end: what the place looks like, worth nothing.
+      { key: 'terraces', blocks: buildTerraces(quality), required: false, scenery: true, label: 'TERRACES', offset: { x: 0, z: 185 } },
     ],
-    garrison: (g, origin, groundY) => populateMachupicchu(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(machupicchu)
-    traits: { windows: false, river: false, topples: true },           // TODO(machupicchu)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(machupicchu) from the suite's undercut
-    brief: 'TODO(machupicchu) one sentence: what the player has to find out about this building.',
+    garrison: (g, origin, groundY, sites) => {
+      populateMachupicchu(g, origin, groundY);
+      const t = sites && sites.torreon;
+      if (t) populateTorreon(g, t.origin, t.groundY);
+    },
+    scoreTags: ['intihuatana', 'temples', 'houses'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'forest', canopy: 2.4, canopyFrom: 175,
+      // Cloud forest: white, and thin at this height.
+      haze: { colour: 0xc8d2d4, density: 0.00016 },
+    },
+    // Dry ashlar a few courses tall on retaining walls: no windows the suite
+    // would post men in, no river within reach, and nothing tall enough to
+    // go over.
+    traits: { windows: false, river: false, topples: false },
+    unlockScale: 3,
+    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
+    brief: 'Nothing here is tall. The temples stand on the ground the terrace walls hold up: cut a wall and the fill goes, and the stone on top with it.',
   },
   greatwall: {
     id: 'greatwall',
