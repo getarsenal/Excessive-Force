@@ -2214,8 +2214,29 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     // Not on ground the level has given to something of its own.
     if (clearings.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return;
     const y = terrain.heightAt(x, z);
-    const h = (5 + rng() * 5) * scale;
-    const conifer = rng() < 0.2;
+    // Three silhouettes, chosen by what lies beyond the town: spruce on a
+    // forest level, broadleaf and palm under a jungle, the temperate mix
+    // elsewhere. Forty-one levels from the Alps to the Nile shared one cone.
+    const hl = terrain.hinterland || 'fields';
+    const jungle = hl === 'jungle';
+    const h = (5 + rng() * 5) * scale * (jungle ? 1.3 : 1);
+    const conifer = hl === 'forest' ? rng() < 0.8 : (jungle ? false : rng() < 0.2);
+    if (jungle && rng() < 0.35) {
+      // A palm: a tall bare trunk and six fronds drooping from its crown.
+      const pt = new THREE.CylinderGeometry(0.14 * scale, 0.22 * scale, h * 0.92, 5);
+      pt.translate(x, y + h * 0.46, z);
+      trunks.push(pt);
+      for (let k = 0; k < 6; k++) {
+        const f = new THREE.BoxGeometry(h * 0.42, 0.1 * scale, h * 0.13).toNonIndexed();
+        f.translate(h * 0.22, 0, 0);
+        f.rotateZ(-0.42 - rng() * 0.25);
+        f.rotateY((k / 6) * Math.PI * 2 + rng() * 0.4);
+        f.translate(x, y + h * 0.92, z);
+        tintOne(f, 0x3e7a2e, 0.7 + rng() * 0.5);
+        crowns.push(f);
+      }
+      return;
+    }
     const t = new THREE.CylinderGeometry(0.16 * scale, 0.28 * scale,
       h * (conifer ? 0.34 : 0.56), 5);
     t.translate(x, y + h * (conifer ? 0.17 : 0.28), z);

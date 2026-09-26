@@ -567,13 +567,23 @@ export class AirWing {
         const bomb = m.getObjectByName('bomb');
         if (bomb) bomb.visible = false;
         const p = s.def.projectile;
-        this.projectiles.fire({
-          pos: m.position.clone().setY(m.position.y - 1.6),
-          vel: new THREE.Vector3(s.dir.x * s.speed, 0, s.dir.z * s.speed),
-          gravity: p.gravity, kind: 'bomb', drag: p.drag || 0, speed: s.speed,
-          warhead: s.def.warhead, owner: null, target: s.target, trail: p.trail,
-          strikeDef: s.def,
-        });
+        // A salvo goes out as one release of `n` rounds spaced back along the
+        // run, so they arrive one after another along a line through the
+        // target: the gunship's rake rather than a single crater.
+        const salvo = s.def.strike?.salvo;
+        const n = salvo ? salvo.n : 1, spread = salvo ? salvo.spread : 0;
+        for (let k = 0; k < n; k++) {
+          const back = k * spread;
+          const along = (k - (n - 1) / 2) * spread * 0.7;
+          this.projectiles.fire({
+            pos: m.position.clone().addScaledVector(s.dir, -back).setY(m.position.y - 1.6),
+            vel: new THREE.Vector3(s.dir.x * s.speed, 0, s.dir.z * s.speed),
+            gravity: p.gravity, kind: 'bomb', drag: p.drag || 0, speed: s.speed,
+            warhead: s.def.warhead, owner: null,
+            target: n > 1 ? s.target.clone().addScaledVector(s.dir, along) : s.target, trail: p.trail,
+            strikeDef: s.def,
+          });
+        }
         if (this.audio) this.audio.play('rocket', m.position, { rate: 0.7, gain: 0.5, rolloff: 900 });
       }
 

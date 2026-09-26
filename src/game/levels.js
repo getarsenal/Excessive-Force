@@ -570,6 +570,7 @@ export const LEVELS = {
       bank: new THREE.Color(0x8a8a6a),
       bed: new THREE.Color(0x35452c),
       dry: new THREE.Color(0x6d7546),
+      rock: new THREE.Color(0x6a6259),
     },
     // Nothing is built on the summit and nothing is going to be. The numbers
     // are large because the summit is: it has to be level far enough out for a
@@ -991,6 +992,7 @@ export const LEVELS = {
       bank: new THREE.Color(0xc8bb9a),
       bed: new THREE.Color(0x4d6a63),
       dry: new THREE.Color(0xb09a74),
+      rock: new THREE.Color(0x9a5d47),
     },
     // Thin air over a dry valley. At three and a half kilometres there is a
     // third less atmosphere above you than at sea level, the light is hard,
@@ -1458,6 +1460,7 @@ export const LEVELS = {
       bank: new THREE.Color(0x9a927c),
       bed: new THREE.Color(0x35453f),
       dry: new THREE.Color(0xa89f8c),
+      rock: new THREE.Color(0x5a5550),
     },
     setting: { haze: { colour: 0xc9ced2, density: 0.00026 } },
     // Every one of the twenty-four buildings the survey finds inside 120 m is

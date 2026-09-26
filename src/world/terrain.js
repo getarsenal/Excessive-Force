@@ -12,6 +12,9 @@ import * as THREE from 'three';
  * hit the ground the player is actually looking at.
  */
 
+/** The rock a steep face shows when the level's palette names none. */
+const ROCK = new THREE.Color(0x6e675f);
+
 export class Terrain {
   constructor(meta, heightData, maskData, quality, farData = null) {
     this.meta = meta;
@@ -960,6 +963,14 @@ export class Terrain {
         (this.waterLevel + margin + ripple * 0.5 - h) / (1.4 + (1 - shelf) * 2.0), 0, 1);
       tmp.lerp(P.bank, Math.pow(wet, 1.3) * 0.86);
       tmp.lerp(P.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
+      // Rock where the ground is steep. Every synthetic hill — Marpo Ri,
+      // Castle Rock, the Corcovado — was a smooth dome in the same grass;
+      // past about twenty degrees the grass gives way to the rock's own
+      // colour, which a level's palette may name (`rock`) and which is a
+      // grey-brown otherwise. `slope` is the summed rise over sixteen metres
+      // on both axes, so 5.5 is about twenty degrees and 14 about forty-five.
+      const steep = THREE.MathUtils.clamp((slope - 5.5) / 8.5, 0, 1);
+      if (steep > 0) tmp.lerp(P.rock || ROCK, steep * 0.85);
 
       // Fine mottling on top of all of it — but no octave finer than the grid
       // can carry. Noise with a three-metre period sampled at vertices seven

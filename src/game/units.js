@@ -75,6 +75,19 @@ export const UNITS = [
     blurb: 'Top-attack, fire-and-forget. Pinpoint — cut a named pier with it.',
   },
   {
+    id: 'm120', name: 'M120 MORTAR', full: 'M120 120 mm Mortar Team', tier: 'INF',
+    cost: 240, unlockFrac: 0.0,
+    tint: 0x5a6a52, model: 'infantry',
+    range: 620, reload: 7.0, setup: 3.0,
+    crew: 3, health: 120,
+    // Indirect and slow: a high arc that comes down on a roof or a terrace the
+    // guns cannot see, with a fifth of a howitzer's punch.
+    projectile: { kind: 'arc', speed: 150, gravity: 9.81, trail: 0.6 },
+    warhead: { lethal: 1.2, radius: 5.5, power: 3600, fx: 1.4, kinetic: 0.5 },
+    dispersion: 7.0,
+    blurb: '120 mm on a baseplate. Drops in from above onto whatever the guns cannot see.',
+  },
+  {
     id: 'm119', name: 'M119A3', full: 'M119A3 105 mm Howitzer', tier: 'GUN',
     cost: 700, unlockFrac: 0.038,
     tint: ARTILLERY_GREEN, model: 'M119', modelLength: 6.1,
@@ -128,6 +141,20 @@ export const UNITS = [
     warhead: { lethal: 2.8, radius: 9.0, power: 9200, fx: 2.0, kinetic: 0.7 },
     dispersion: 4.0,
     blurb: 'Armoured, self-propelled, shrugs off small arms. Sets up in seconds.',
+  },
+  {
+    id: 'stryker', name: 'STRYKER MGS', full: 'M1128 Stryker Mobile Gun System', tier: 'AFV',
+    cost: 1800, unlockFrac: 0.06,
+    tint: 0x4a5048, model: 'M109', modelLength: 9.0,
+    range: 1200, reload: 3.2, setup: 2.0,
+    crew: 0, health: 520,
+    // A tank gun, not a howitzer: nine hundred metres a second on the lowest
+    // arc there is, a small hole punched straight into one face, three times
+    // a minute. The undercutting weapon.
+    projectile: { kind: 'arc', speed: 900, gravity: 9.81, trail: 0.7, flat: true },
+    warhead: { lethal: 1.6, radius: 5.0, power: 6000, fx: 1.6, kinetic: 0.95 },
+    dispersion: 2.4,
+    blurb: '105 mm tank gun, flat and fast. Puts a small hole exactly where you point, three times a minute.',
   },
   {
     id: 'm270', name: 'M270 MLRS', full: 'M270A2 MLRS', tier: 'MRL',
@@ -199,6 +226,55 @@ export const UNITS = [
     warhead: { lethal: 90, radius: 110, power: 400000, fx: 9.5, kinetic: 0.4 },
     dispersion: 0,
     blurb: 'Eleven tonnes of high explosive on a parachute. A third of anything.',
+  },
+  {
+    id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · AGM-114 Hellfire', tier: 'AIR',
+    cost: 40000, unlockFrac: 0.05,
+    model: 'aircraft', strike: { frac: 0.05, maxR: 26, minR: 4, fx: 2.6, bite: 0.5, shock: 0.8 },
+    aircraft: { kind: 'eagle', speed: 110, height: 70, clearance: 30, runIn: 1500, offset: 30 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 110, gravity: 9.81, drag: 0.02, trail: 0.6 },
+    warhead: { lethal: 12, radius: 16, power: 30000, fx: 2.6, kinetic: 0.6 },
+    dispersion: 0,
+    blurb: 'One Hellfire on the point you tap. Small, precise, and cheap enough to use twice.',
+  },
+  {
+    id: 'ac130', name: 'AC-130', full: 'AC-130J Ghostrider · 105 mm rake', tier: 'AIR',
+    cost: 120000, unlockFrac: 0.14,
+    // A salvo: eight shells laid in a line along the run, each a tenth of a
+    // second behind the last, so the pass rakes a face rather than cratering
+    // a point.
+    model: 'aircraft', strike: { frac: 0.03, maxR: 30, minR: 6, fx: 2.0, bite: 0.55, shock: 0.9, salvo: { n: 8, spread: 14 } },
+    aircraft: { kind: 'lancer', speed: 140, height: 240, clearance: 100, runIn: 2600, offset: 50 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 140, gravity: 9.81, drag: 0.03, trail: 0.7 },
+    warhead: { lethal: 6, radius: 11, power: 14000, fx: 2.0, kinetic: 0.7 },
+    dispersion: 0,
+    blurb: 'Eight rounds of 105 mm walked along a line in one pass. A wall, not a hole.',
+  },
+  {
+    id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'AIR',
+    cost: 180000, unlockFrac: 0.2,
+    model: 'aircraft', strike: { frac: 0.16, maxR: 44, minR: 6, fx: 5.0, bite: 0.7, shock: 1.1 },
+    aircraft: { kind: 'eagle', speed: 240, height: 60, clearance: 26, runIn: 2800, offset: 20 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 240, gravity: 9.81, drag: 0.02, trail: 1.0 },
+    warhead: { lethal: 40, radius: 34, power: 150000, fx: 5.0, kinetic: 0.5 },
+    dispersion: 0,
+    blurb: 'Comes in from the sea at sixty metres and puts half a tonne exactly where you said.',
+  },
+  {
+    id: 'gbu28', name: 'BUNKER BUSTER', full: 'F-15E Strike Eagle · GBU-28 5000 lb', tier: 'AIR',
+    cost: 160000, unlockFrac: 0.2,
+    // Penetrating: a small radius and a very large charge, so it goes deep
+    // into a solid monument instead of scorching its face.
+    model: 'aircraft', strike: { frac: 0.14, maxR: 30, minR: 6, fx: 5.0, bite: 1.0, shock: 0.4 },
+    aircraft: { kind: 'eagle', speed: 230, height: 160, clearance: 60, runIn: 2400, offset: 40 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.03, trail: 0.9 },
+    warhead: { lethal: 45, radius: 24, power: 220000, fx: 5.0, kinetic: 0.9 },
+    dispersion: 0,
+    blurb: 'Two and a half tonnes that goes in before it goes off. For the things that will not fall over.',
   },
 ];
 

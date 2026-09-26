@@ -1435,6 +1435,7 @@ def bake(level_id):
         meta = json.loads(mpath.read_text())
         meta["farSpan"] = span * FAR
         meta["farWater"] = round(far, 4)
+        meta["overtureRelease"] = RELEASE      # which survey this town came from
         mpath.write_text(json.dumps(meta, indent=2))
         verify(level_id, span, meta)
     else:

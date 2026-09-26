@@ -275,7 +275,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   const pins = state.list.map((t) => {
     const g = el('g', {
       class: `wm-pin${t.down ? ' down' : ''}${t.open ? '' : ' locked'}`
-        + `${t.id === current ? ' here' : ''}`,
+        + `${t.id === current ? ' here' : ''}${t === state.next ? ' next' : ''}`,
       'data-level': t.id, tabindex: '0', role: 'button',
       'aria-label': `Contract ${t.no}, ${t.city}, ${t.title}`,
     });
@@ -492,6 +492,22 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     }
   };
 
+  /**
+   * What to bring, from what the level says it is. The brief describes the
+   * structural problem; this turns it into the one decision a player makes
+   * before the first round, which is the guns.
+   */
+  const hintFor = (lv) => {
+    const tr = lv.traits || {};
+    if (tr.topples === false && (lv.unlockScale || 1) >= 4) {
+      return 'Bring the heavy guns and the air strikes: this one is quarried, not toppled, and the bar moves by the tonne.';
+    }
+    if (tr.topples === false) {
+      return 'It will not fall over. Read the load with SURVEY and open the piece that holds the rest up.';
+    }
+    return 'Undercut one face at the foot and let the height do the work: the bar moves when the load path goes.';
+  };
+
   /** The dossier for one contract, under the map. */
   const show = (t) => {
     const rec = progress[t.id] || {};
@@ -541,6 +557,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
             <div class="wm-doss-target">${lv.target || t.title}</div>
             <div class="wm-doss-place">${lv.place || t.city} <span class="wm-coord">${dms(t.lat, t.lon)}</span></div>
             <p class="wm-doss-brief">${t.brief}</p>
+            <p class="wm-doss-hint">${hintFor(lv)}</p>
             <div class="wm-doss-cols">
               <div>
                 <div class="wm-k">Objectives</div>
@@ -681,8 +698,16 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   const paintList = () => {
     listEl.innerHTML = state.list.map((t) => {
       const rec = progress[t.id] || {};
+      // The four par marks, as four letters: rounds, spend, time, leverage.
+      // A closed contract that only said DOWN gave no reason to open it twice.
+      const par = (LEVELS[t.id] || {}).par;
+      const marks = t.down && par ? `<span class="ef-par" title="Par beaten: rounds, spend, time, leverage">`
+        + `<i class="${rec.bestShots != null && rec.bestShots <= par.rounds ? 'hit' : ''}">R</i>`
+        + `<i class="${rec.bestSpent != null && rec.bestSpent <= par.spend ? 'hit' : ''}">$</i>`
+        + `<i class="${rec.bestTime != null && rec.bestTime <= par.minutes * 60 ? 'hit' : ''}">T</i>`
+        + `<i class="${rec.bestLeverage != null && rec.bestLeverage >= par.leverage ? 'hit' : ''}">L</i></span>` : '';
       const right = t.down
-        ? `<em class="down">DOWN · ${fmtTime(rec.bestTime)}</em>`
+        ? `${marks}<em class="down">DOWN · ${fmtTime(rec.bestTime)}</em>`
         : (t === state.next ? '<em class="next">NEXT</em>'
           : (t.open ? '<em>OPEN</em>' : '<em class="locked">SEALED</em>'));
       return `<button class="ef-row${t.open ? '' : ' locked'}" type="button" data-level="${t.id}">

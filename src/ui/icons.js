@@ -305,4 +305,10 @@ export function unitIcon(id) {
     aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
+// The new arsenal borrows a pictogram from its nearest relative until it has
+// its own drawing.
+for (const [id, from] of [['m120', 'at4'], ['stryker', 'm109'], ['ah64', 'f15'], ['ac130', 'b1'], ['tomahawk', 'm142'], ['gbu28', 'f15']]) {
+  if (!BODY[id] && BODY[from]) BODY[id] = BODY[from];
+}
+
 export const ICON_IDS = Object.keys(BODY);

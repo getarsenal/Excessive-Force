@@ -12,5 +12,6 @@
   "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
   "coastline": "typed",
   "farSpan": 6300.0,
-  "farWater": 0.1761
+  "farWater": 0.1761,
+  "overtureRelease": "2026-08-19.0"
 }

@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian, the Chinese and the thirteen nations of the fourth batch are slots — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian, the Chinese and the thirteen nations of the fourth batch are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",

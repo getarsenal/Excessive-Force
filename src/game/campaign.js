@@ -64,8 +64,8 @@ export const THEATRES = [
     brief: 'Seven thousand tonnes of wrought iron standing on nothing but its '
       + 'own piers. It will not be shelled down like masonry — it has to be cut. '
       + 'Take a leg and it falls towards the gap.',
-    unlocks: ['f15'],
-    unlockLine: 'Close air support released',
+    unlocks: [],
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'agra',
@@ -78,8 +78,8 @@ export const THEATRES = [
     brief: 'A marble shell on four piers over a terrace the size of a parade '
       + 'ground. Nothing here topples. The dome has to be broken, and the piers '
       + 'under it are the only thing holding the roof up.',
-    unlocks: ['m142'],
-    unlockLine: 'HIMARS released',
+    unlocks: ['m120'],
+    unlockLine: 'M120 mortar teams released',
   },
   {
     id: 'giza',
@@ -92,8 +92,8 @@ export const THEATRES = [
     brief: 'Two and a third million cubic metres of limestone that has stood for '
       + 'four and a half thousand years. It cannot fall over. There is nothing to '
       + 'undercut and nothing to topple: it comes down by being removed.',
-    unlocks: ['m270'],
-    unlockLine: 'M270 rocket artillery released',
+    unlocks: [],
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'chichen',
@@ -107,8 +107,8 @@ export const THEATRES = [
       + 'already finished. Cut into the flank and you are not opening a core, you '
       + 'are opening the older building — and the top of the new one is standing '
       + 'on its roof.',
-    unlocks: ['b1'],
-    unlockLine: 'Heavy bomber on call',
+    unlocks: ['f15'],
+    unlockLine: 'Close air support released',
   },
   {
     id: 'pisa',
@@ -123,7 +123,7 @@ export const THEATRES = [
       + 'part that overhangs is the part the masons corrected, and it is the '
       + 'only part of the tower that is safe.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'sydney',
@@ -138,7 +138,7 @@ export const THEATRES = [
       + 'roof achieves a hole in the roof. An arch dies at its haunches, and '
       + 'the haunches are at deck level behind the glass.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'moscow',
@@ -152,8 +152,8 @@ export const THEATRES = [
       + 'here is its own column of brick standing on its own square of '
       + 'foundation, and dropping the middle one leaves eight watching. What '
       + 'they share is underneath them.',
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['ah64'],
+    unlockLine: 'Apache Hellfire strikes released',
   },
   {
     id: 'rio',
@@ -168,7 +168,7 @@ export const THEATRES = [
       + 'themselves; take both and the statue stands exactly as it did. What '
       + 'holds it up is two legs into a chapel with a door in it.',
     unlocks: [],
-    unlockLine: 'The board is clear',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   // ── The third five. Nothing new is released here either: the arsenal is
   // complete by contract five, and these are the contracts it was for.
@@ -185,8 +185,8 @@ export const THEATRES = [
       + 'beams sit on the capitals, and it has stood on friction for two and a '
       + 'half thousand years. Take the columns from under a corner and the '
       + 'corner comes down with the roof it carried.',
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['m142'],
+    unlockLine: 'HIMARS released',
   },
   {
     id: 'istanbul',
@@ -201,7 +201,7 @@ export const THEATRES = [
       + 'leaning in against them from outside; open one side and the thrust '
       + 'has nowhere to go.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'cologne',
@@ -216,7 +216,7 @@ export const THEATRES = [
       + 'doing as little work as it can get away with: cut a pier and the '
       + 'spire above it follows.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'himeji',
@@ -230,7 +230,7 @@ export const THEATRES = [
       + 'The base cannot be shot down; the keep on it can, and it is top-heavy '
       + 'by design. It goes over the way you lean it.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'petronas',
@@ -244,8 +244,8 @@ export const THEATRES = [
       + 'by a bridge that is tied to neither of them. It sits on bearings and '
       + 'slides, because the towers sway apart on a windy afternoon. Shoot it '
       + 'and it costs them nothing. Both towers are the contract.',
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['stryker'],
+    unlockLine: 'Stryker Mobile Gun System released',
   },
   {
     id: 'dubai',
@@ -260,7 +260,7 @@ export const THEATRES = [
       + 'take the core at one and the tower above it is a free body with a '
       + 'long way to fall.',
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'potala',
@@ -275,7 +275,7 @@ export const THEATRES = [
       + 'up. Nothing here leans and nothing here goes over. The white palace '
       + 'is a curtain of quarters; the red one in the middle is the contract.',
     unlocks: [],
-    unlockLine: 'The board is clear',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'colosseum',
@@ -287,7 +287,7 @@ export const THEATRES = [
     title: "BREAD AND CIRCUSES",
     brief: "An ellipse of travertine arches, three storeys high and eighty piers round. Where the cavea has gone the outer wall stands alone and two piers are all that hold a bay. Bring the ring down; the arena floor is not the contract.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'towerbridge',
@@ -298,8 +298,8 @@ export const THEATRES = [
     no: 18,
     title: "DRAWBRIDGE",
     brief: "Two granite-clad towers on piers in the Thames, tied by the walkways and carrying the side spans. The bascules between them weigh nothing you are paid for. Drop a tower and everything on it goes in the river.",
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['m270'],
+    unlockLine: 'M270 rocket artillery released',
   },
   {
     id: 'florence',
@@ -311,7 +311,7 @@ export const THEATRES = [
     title: "IL DUOMO",
     brief: "The biggest brick dome ever raised, on a drum on four piers, held in by three apses. It will not topple; it has to be opened. Take a tribune and the drum spreads.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'segovia',
@@ -323,7 +323,7 @@ export const THEATRES = [
     title: "DRY STONE",
     brief: "Twenty thousand granite blocks and no mortar, in two tiers of arches sixty metres high. Every pier braces the two beside it. Take one and the chain unzips to the next wide pier.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'atomium',
@@ -335,7 +335,7 @@ export const THEATRES = [
     title: "SPLIT THE ATOM",
     brief: "Nine steel spheres on the edges of a cube standing on a point. The spheres are the weight; the tubes, the column and three bipods are the structure. Cut what carries and the molecule comes down.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'tokyotower',
@@ -346,8 +346,8 @@ export const THEATRES = [
     no: 22,
     title: "RISING SUN",
     brief: "Three hundred and thirty metres of orange lattice on four legs, with the observatory at a hundred and fifty. Cut a leg and it goes toward the cut. The mass is low, so the fall is decided low.",
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['ac130'],
+    unlockLine: 'AC-130 gunship released',
   },
   {
     id: 'budapest',
@@ -359,7 +359,7 @@ export const THEATRES = [
     title: "HOUSE DIVIDED",
     brief: "Three hundred metres of Gothic limestone along the Danube with a dome on sixteen piers over the hall. The wings are mass and not the contract. Open the drum and the dome comes down through the hall.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'sagrada',
@@ -371,7 +371,7 @@ export const THEATRES = [
     title: "UNFINISHED BUSINESS",
     brief: "Eighteen hollow stone spires on a nave, the tallest over the crossing on four columns. Every spire stands on four piers. Take two under the Jesus tower and it comes through the roof.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'edinburgh',
@@ -383,7 +383,7 @@ export const THEATRES = [
     title: "CASTLE ROCK",
     brief: "A fortress on a volcanic plug eighty metres over the town, sheer on three sides. The Half Moon Battery is a retaining wall holding the palace up; undercut it and the palace goes onto the Esplanade. The One O'Clock Gun shoots back.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'neuschwanstein',
@@ -395,7 +395,7 @@ export const THEATRES = [
     title: "FAIRYTALE ENDING",
     brief: "A white limestone castle along a ridge above a gorge, its two towers on the corners of the Palas. The towers go over the way you lean them. The rock under the west wall is the way in.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'montstmichel',
@@ -406,8 +406,8 @@ export const THEATRES = [
     no: 27,
     title: "HIGH WATER",
     brief: "An abbey on an eighty-metre rock in a bay the tide covers. The church stands on crypts built out on the flanks. Break a crypt and the nave above it goes down the face.",
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['b1'],
+    unlockLine: 'The MOAB released',
   },
   {
     id: 'pena',
@@ -419,7 +419,7 @@ export const THEATRES = [
     title: "ROMANTIC RUIN",
     brief: "A red and yellow palace on a crag in the Sintra forest, with a round bastion on the cliff edge. The palace leans on the bastion. Take the bastion's footing and the terrace follows.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'hassan',
@@ -431,7 +431,7 @@ export const THEATRES = [
     title: "CALL TO PRAYER",
     brief: "The tallest minaret in the world on the corner of a prayer hall built out over the Atlantic. The hall roof is beams on seventy-eight columns. The minaret stands on the hall's corner piers.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'kuwait',
@@ -443,7 +443,7 @@ export const THEATRES = [
     title: "WATER TOWERS",
     brief: "Three concrete needles on a cape, two of them carrying spheres of water and restaurants. The spheres are the weight and the shafts are slender. Cut a shaft below its sphere.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'karnak',
@@ -454,8 +454,8 @@ export const THEATRES = [
     no: 31,
     title: "HYPOSTYLE",
     brief: "A hundred and thirty-four sandstone columns under architraves and roof slabs, with pylons at each end. The lintels are the load path. Kick a column out and its two lintels come down and the next column carries a cantilever.",
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['tomahawk'],
+    unlockLine: 'Tomahawk cruise missiles released',
   },
   {
     id: 'forbidden',
@@ -467,7 +467,7 @@ export const THEATRES = [
     title: "SUPREME HARMONY",
     brief: "Three timber halls under yellow-glazed roofs on one white marble terrace. The terrace is ground and cannot be shot down. The halls are top-heavy by design and go over the way you lean them.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'gyeongbok',
@@ -479,7 +479,7 @@ export const THEATRES = [
     title: "THRONE ROOM",
     brief: "A throne hall with a two-tier grey roof on a granite terrace, in a courtyard ringed by cloisters. The terrace stands; the hall on it does not. The gate is scored with it.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'watarun',
@@ -491,7 +491,7 @@ export const THEATRES = [
     title: "TEMPLE OF DAWN",
     brief: "A seventy-metre prang encrusted in porcelain, with four satellites, on the west bank of the Chao Phraya. It is solid and has to be quarried. Undercut a terrace and that side's skin sheds.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'shwedagon',
@@ -503,7 +503,7 @@ export const THEATRES = [
     title: "SIXTY TONS OF GOLD",
     brief: "A gilded brick stupa a hundred metres tall on a hill over Yangon, with sixty-four small stupas round its foot. It does not fall; it is quarried. The small stupas and the halls are the finesse.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'angkor',
@@ -514,8 +514,8 @@ export const THEATRES = [
     no: 36,
     title: "TEMPLE MOUNTAIN",
     brief: "Five towers in quincunx on a pyramid base inside three galleries and a moat. The towers stand on the bakan's corner piers. The galleries are lintels over columns, and the stone is in them.",
-    unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlocks: ['gbu28'],
+    unlockLine: 'GBU-28 bunker busters released',
   },
   {
     id: 'borobudur',
@@ -527,7 +527,7 @@ export const THEATRES = [
     title: "STONE MANDALA",
     brief: "Two million blocks of andesite in nine terraces with seventy-two bell stupas on the round ones. It is a hill with a stone skin. What scores is the top, not the hill.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'tikal',
@@ -539,7 +539,7 @@ export const THEATRES = [
     title: "ROOF COMB",
     brief: "A forty-seven-metre pyramid in nine terraces with a shrine and a hollow roof comb on top, facing its twin across the plaza. The comb stands on the shrine's back wall. Shoot its base and it topples whole.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'teotihuacan',
@@ -551,7 +551,7 @@ export const THEATRES = [
     title: "CITY OF THE GODS",
     brief: "Two hundred and twenty metres square and sixty-five high in five tiers of rubble faced in stone. Nothing here falls over; it is quarried. There is a tunnel under the centre.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'machupicchu',
@@ -563,7 +563,7 @@ export const THEATRES = [
     title: "LOST CITY",
     brief: "A citadel of dry ashlar on a saddle ridge four hundred metres over the Urubamba. Nothing is tall; the terraces are retaining walls and the temples stand on them. Work the retaining walls.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
   {
     id: 'greatwall',
@@ -575,7 +575,7 @@ export const THEATRES = [
     title: "THE WALL",
     brief: "Five hundred metres of wall along a ridge crest with five watchtowers. The wall is full of rubble and will not topple. The towers do, and they are the contract.",
     unlocks: [],
-    unlockLine: 'Nothing new — you have it all',
+    unlockLine: 'Nothing new — the arsenal is what it is',
   },
 ];
 

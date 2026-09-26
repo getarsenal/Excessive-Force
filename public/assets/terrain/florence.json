@@ -13,5 +13,6 @@
   "waterSurface": 49.7,
   "coastline": "surveyed",
   "farSpan": 6300.0,
-  "farWater": 0.0305
+  "farWater": 0.0305,
+  "overtureRelease": "2026-08-19.0"
 }
