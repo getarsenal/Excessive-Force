@@ -336,9 +336,19 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       for (let j = 0; j < pins.length; j++) {
         if (j !== i) near = Math.min(near, Math.hypot(at[i][0] - at[j][0], at[i][1] - at[j][1]));
       }
+      // A label earns its place or it is a dot. Forty-one contracts fitted
+      // to a phone put thirty names over Europe and Asia on top of each other
+      // and the map was unreadable; a dot is legible at any density, and the
+      // name comes back the moment the zoom puts eighty pixels between a pin
+      // and its nearest neighbour. The selected contract and the one open to
+      // play keep their names whatever the crowd, because those are the two
+      // a player is looking for.
       const num = String(p.t.no).padStart(2, '0');
-      const terse = near < 90 && !p.t.open && !p.t.down && !p.g.classList.contains('sel');
-      const want = terse ? num : `${num} ${p.t.city}`;
+      const sel = p.g.classList.contains('sel');
+      const wanted = sel || p.t.id === current || (p.t.open && !p.t.down);
+      const show = wanted || near >= 80;
+      p.g.classList.toggle('mute', !show);
+      const want = `${num} ${p.t.city}`;
       if (p.text.textContent !== want) p.text.textContent = want;
       const [px, py] = at[i];
       // The label is pushed off its pin, and then pulled back on if the push
@@ -380,7 +390,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     // and six contracts' names land on top of each other; the later contract
     // gives way, down if there is room and up if there is not, and its
     // leader line follows. Two passes settle a stack of three.
-    const boxes = pins.map((p) => { try { const b = p.text.getBBox(); return b && b.width ? b : null; } catch { return null; } });
+    const boxes = pins.map((p) => { if (p.g.classList.contains('mute')) return null; try { const b = p.text.getBBox(); return b && b.width ? b : null; } catch { return null; } });
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < pins.length; i++) {
         for (let j = i + 1; j < pins.length; j++) {

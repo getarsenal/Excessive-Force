@@ -1447,6 +1447,9 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 /* Pins, in screen space over the map. */
 .wm-pin { cursor: pointer; outline: none; }
 .wm-pin.off { display: none; }
+/* A crowded pin is a dot: no name, no leader, no label box. */
+.wm-pin.mute .wm-city, .wm-pin.mute .wm-lead, .wm-pin.mute rect.wm-hit, .wm-pin.mute .wm-halo { display: none; }
+.wm-pin.mute .wm-dot { r: 4; }
 /* The thing a finger actually hits. Invisible, and the only children of the
    pin that take a pointer, so the whole group behaves as one button. */
 .wm-hit { fill: transparent; }
