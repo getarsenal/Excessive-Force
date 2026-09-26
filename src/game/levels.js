@@ -1327,7 +1327,7 @@ export const LEVELS = {
     // From the Placa de Gaudi across the pond, north-east of the church: the
     // Nativity front's four towers with Jesus and the Evangelists rising
     // behind them, which is the picture of the place.
-    camera: { yaw: 2.15, pitch: 0.16, distance: 430, height: 80 },
+    camera: { yaw: 2.15, pitch: 0.09, distance: 400, height: 75 },
     structures: (quality) => [
       { key: 'sagrada', blocks: buildSagrada(quality), primary: true, required: true, label: 'SAGRADA FAMILIA' },
     ],
