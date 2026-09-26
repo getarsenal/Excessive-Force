@@ -459,7 +459,7 @@ export const FLEETS = {
   forbidden: ['rowing', 'rowing'],
   gyeongbok: [],
   watarun: ['sampan', 'sampan', 'ferry', 'country-boat'],
-  shwedagon: [],
+  shwedagon: ['sampan', 'rowing'],
   angkor: ['sampan'],
   borobudur: [],
   tikal: [],

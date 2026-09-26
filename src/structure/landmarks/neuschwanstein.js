@@ -249,7 +249,7 @@ export function populateNeuschwanstein(g, origin, groundY) {
   const kh = K.blocks[5], bw = K.blocks[6];
   for (const f of [0.25, 0.5, 0.75]) {
     g.place(f === 0.5 ? 'mg' : 'rifleman', V(kh.x0 + (kh.x1 - kh.x0) * f, kh.rows[1] + 0.3, kh.z0 + W + 0.8), Math.PI, 6, { cover: 'window' });
-    g.place(f === 0.5 ? 'mg' : 'rifleman', V(bw.x0 + (bw.x1 - bw.x0) * f, bw.rows[1] + 0.3, bw.z1 - W - 0.8), 0, 6, { cover: 'window' });
+    g.place(f === 0.5 ? 'mg' : 'rifleman', V(bw.x0 + (bw.x1 - bw.x0) * f, bw.rows[1] + 0.3, bw.z1 - W - 0.8), 0, 6, { cover: 'roof' });
   }
   // The gatehouse: anti-tank teams over the approach from the east.
   const gate = K.blocks[2];

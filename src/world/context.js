@@ -1611,9 +1611,15 @@ function bridgeLine(terrain, exclude = 66) {
         else if (t > last + 26) break;
       }
       const d = last + 16;
-      return new THREE.Vector3(near.x + nx * sign * d, 0, near.z + nz * sign * d);
+      const p = new THREE.Vector3(near.x + nx * sign * d, 0, near.z + nz * sign * d);
+      // A landing that is still wet is no landing: the search ran off the end
+      // of its nine hundred metres without finding a bank. Mont-Saint-Michel
+      // got a steel arch out of this, from the rock into open sea.
+      return terrain.isWater(p.x, p.z) ? null : p;
     };
-    return { from: bank(-1), to: bank(1) };
+    const from = bank(-1), to = bank(1);
+    if (!from || !to) return null;
+    return { from, to };
   };
 
   // The approach roads run about eighty metres past each landing before they
@@ -1629,6 +1635,7 @@ function bridgeLine(terrain, exclude = 66) {
   let pick = null, fallback = null, fallbackLo = -1;
   for (let i = 0; i < cands.length && !pick; i += 2) {
     const c = crossingAt(cands[i]);
+    if (!c) continue;
     const L = c.from.distanceTo(c.to);
     if (L < 40 || L > span * 1.6) continue;
     const lo = Math.min(Math.hypot(c.from.x, c.from.z), Math.hypot(c.to.x, c.to.z));

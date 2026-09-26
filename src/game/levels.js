@@ -1340,7 +1340,7 @@ export const LEVELS = {
     // Shiba Park: lawns and paths with a fence round the tower's own plot.
     precinct: { boundary: 'railings', ground: 'lawn', ornament: 'none' },
     // A lattice: no windows to post men in, and the bay is a kilometre off.
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: true, river: false, topples: true },
     par: { rounds: 40, spend: 6000, minutes: 3, leverage: 6 },
     brief: 'The weight is the observatory at 145 m, not the antenna. The fall is decided at the feet.',
   },
@@ -1487,7 +1487,7 @@ export const LEVELS = {
     turret: { x: EDINBURGH.gun.x, z: EDINBURGH.gun.z, yaw: Math.PI, scale: 1.25, minRange: 60 },
     // The castle's buildings and the Half Moon; the batteries are the rim of
     // the rock and stay as ground.
-    scoreTags: ['halfmoon', 'palace', 'greathall', 'chapel', 'gatehouse', 'barracks'],
+    scoreTags: ['halfmoon', 'palace', 'greathall', 'chapel', 'gatehouse', 'barracks', 'batteries'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     // A fortress on a hill: walls bonded to the rock, nothing that leans.
     // It comes down course by course or it does not come down.

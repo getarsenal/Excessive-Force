@@ -1152,6 +1152,28 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
                 drowned = float(swallowed.mean() * 100)
                 w = np.where(swallowed, 0.0, w)
                 print(f"  dropped water the cut swallowed: {drowned:.2f}% of the map")
+        # A flatten pad with a stated height is land by declaration. The
+        # survey's sea polygon is drawn to the scale of a gulf, and the Kuwait
+        # Towers stand on a point of reclaimed rock a hundred metres across
+        # that the polygon simply covers: the level's own origin came out four
+        # metres under water and the podium levelled itself into a white island.
+        # The pad's height says what the ground is there, so the water is
+        # cleared off it and the dredge below never touches it.
+        for pad in LEVELS[level_id].get("flatten", []):
+            if len(pad) < 5:
+                continue
+            px, pn, rad, feather = pad[0], pad[1], pad[2], pad[3]
+            rx, rz = (rad if isinstance(rad, (list, tuple)) else (rad, rad))
+            rx, rz = float(rx) + feather * 0.5, float(rz) + feather * 0.5
+            k = size / (2.0 * span)
+            gx = (np.arange(size) - size / 2.0) / k
+            ex = (gx[None, :] - px) / rx
+            nn = (-gx[:, None] - pn) / rz
+            on_pad = (ex * ex + nn * nn) <= 1.0
+            if (w[on_pad] > 0.5).any():
+                print(f"  cleared the water off the {rx:.0f} m pad at ({px}, {pn}): "
+                      f"{float((w[on_pad] > 0.5).mean() * 100):.0f}% of it was under the survey's sea")
+                w = np.where(on_pad, 0.0, w)
         # Replaced, not unioned: where a real shoreline exists it is the
         # shoreline, and the level's own typed river was skipped upstream.
         mask[:, :, 0] = w

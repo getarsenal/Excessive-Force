@@ -545,9 +545,14 @@ export class TestMenu {
     // has been thrown clear drags the whole height range with it and puts the
     // aim point underground.
     const standing = (i) => (st.flags[i] & 1) && !(st.flags[i] & (2 | 8));
+    // Above the ground the structure stands on. A castle on a rock carries its
+    // footing sixty metres down into the hill, and a range measured from the
+    // deepest stone put the middle of Edinburgh Castle seven metres under the
+    // Esplanade: the tap picked ground and the shells went into the rock.
+    const floor = (st.groundY ?? 0) - 0.5;
     let lo = Infinity, hi = -Infinity;
     for (let i = 0; i < st.count; i++) {
-      if (!standing(i)) continue;
+      if (!standing(i) || st.py[i] < floor) continue;
       lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
     }
     if (!isFinite(lo)) return st.origin.clone();
@@ -2714,6 +2719,7 @@ export class TestMenu {
             let lo = Infinity, hi = -Infinity;
             for (let i = 0; i < st.count; i++) {
               if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+              if (st.py[i] < (st.groundY ?? 0) - 0.5) continue;   // the footing under a hill is not a target
               lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
             }
             if (!isFinite(lo)) break;
