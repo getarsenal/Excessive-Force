@@ -41,18 +41,19 @@ const FOUND = -26.0;
 const ROUGH = -8.0;
 
 // Real metres, +x east, +z south; the origin is the summit.
-const TERRACE = { w: 60.0, d: 100.0, h: 4.0, wall: 4.0 };
+const TERRACE = { w: 50.0, d: 84.0, h: 4.0, wall: 4.0 };
 const DECK = 1.2;
 const WALL = 1.8;
 const PARAPET = 2.2;
 const BLOCKS = [
-  { tag: 'monastery', cx: -2.0, cz: -32.0, w: 30.0, d: 28.0, h: 14.0, mat: 'SANDSTONE', win: 4.6, rows: [3.0, 8.5] },
-  { tag: 'chapel', cx: 18.0, cz: -38.0, w: 10.0, d: 14.0, h: 11.0, mat: 'LIMESTONE', win: 3.5, rows: [5.0] },
+  { tag: 'monastery', cx: -4.0, cz: -27.0, w: 30.0, d: 28.0, h: 14.0, mat: 'SANDSTONE', win: 4.6, rows: [3.0, 8.5] },
+  { tag: 'chapel', cx: 17.0, cz: -33.0, w: 10.0, d: 14.0, h: 11.0, mat: 'LIMESTONE', win: 3.5, rows: [5.0] },
   { tag: 'newpalace', cx: 2.0, cz: 6.0, w: 34.0, d: 30.0, h: 16.0, mat: 'LIMESTONE', win: 4.2, rows: [3.0, 9.5], band: true },
-  { tag: 'gate', cx: 10.0, cz: 44.0, w: 14.0, d: 8.0, h: 12.0, mat: 'SANDSTONE', win: 4.0, rows: [7.0], door: 4.0 },
+  { tag: 'gate', cx: 8.0, cz: 38.0, w: 14.0, d: 8.0, h: 12.0, mat: 'SANDSTONE', win: 4.0, rows: [7.0], door: 4.0 },
 ];
-const TOWER = { cx: 18.0, cz: -22.0, w: 9.0, h: 32.0, roof: 6.0 };
-const BASTION = { cx: -26.0, cz: 40.0, r: 10.0, wall: 3.0, h: 24.0, dome: 6.0 };
+const TOWER = { cx: 17.0, cz: -18.0, w: 9.0, h: 32.0, roof: 6.0 };
+// Tangent to the terrace's west face, a hand clear of it: the palace leans on it.
+const BASTION = { cx: -35.5, cz: 34.0, r: 10.0, wall: 3.0, h: 24.0, dome: 6.0 };
 const GAP = 0.15;
 
 /** Half-width of a battered wall at height y, given its width at its top. */
@@ -152,7 +153,10 @@ export function buildPena(quality) {
   // grid, the deck a course of paving over it, a battlemented parapet.
   const deckTop = TERRACE.h + DECK;
   B.section('terraces', () => {
-    const skin = (y) => (y < ROUGH - 4.0 ? M.RUBBLE : M.LIMESTONE);
+    // One colour for the whole envelope: the ridge falls further than the
+    // survey's profile said at the south-east corner, and a bare footing
+    // band showed under the yellow wall. Coarse below the rock, still yellow.
+    const skin = () => M.LIMESTONE;
     const band = (a, b, st, ch) => courses(a, b, ch, (y, h, c) => {
       B.ring(0, 0, wAt(TERRACE.w, TERRACE.h, y), wAt(TERRACE.d, TERRACE.h, y), TERRACE.wall, y, h, st, skin(y), c % 2);
     });

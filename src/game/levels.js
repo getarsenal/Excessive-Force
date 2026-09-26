@@ -1361,7 +1361,7 @@ export const LEVELS = {
     padRadius: 0,
     // From the bay to the south-south-west, low, the way it is seen from the
     // causeway: the village up the rock, the Merveille's flank, the spire.
-    camera: { yaw: -0.35, pitch: 0.10, distance: 700, height: 30 },
+    camera: { yaw: -0.35, pitch: 0.09, distance: 520, height: 45 },
     structures: (quality) => [
       { key: 'montstmichel', blocks: buildMontstmichel(quality), primary: true, required: true, label: 'MONT-SAINT-MICHEL' },
     ],
@@ -1373,7 +1373,7 @@ export const LEVELS = {
     // Walls founded in a rock: nothing here goes over as a whole. The church
     // comes off its crypts a part at a time.
     traits: { windows: true, river: false, topples: false },
-    unlockScale: 3,
+    unlockScale: 1,
     par: { rounds: 120, spend: 18000, minutes: 7, leverage: 2 },
     brief: 'The church stands on the summit only at its nave; the choir and the north transept stand on crypts built out over the rock. Break a crypt and the church above it goes down the face.',
   },
@@ -1419,7 +1419,7 @@ export const LEVELS = {
     padRadius: 0,
     // From the south-east and low, the Cruz Alta view: the bastion and the
     // yellow palace in front, the red monastery and the clock tower behind.
-    camera: { yaw: 0.80, pitch: 0.15, distance: 420, height: 30 },
+    camera: { yaw: 0.80, pitch: 0.13, distance: 400, height: 30 },
     structures: (quality) => [
       { key: 'pena', blocks: buildPena(quality), primary: true, required: true, label: 'PENA PALACE' },
     ],
@@ -1428,7 +1428,8 @@ export const LEVELS = {
     scoreTags: ['monastery', 'chapel', 'newpalace', 'gate', 'clocktower', 'bastion'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
-    unlockScale: 2,
+    // A million cubic metres, most of it the terrace's rubble.
+    unlockScale: 5,
     par: { rounds: 70, spend: 12000, minutes: 5, leverage: 6 },
     brief: 'The round bastion stands on the cliff on its own footing and the palace leans on it. Undercut the bastion and it goes down the west face alone.',
   },
