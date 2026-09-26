@@ -1821,9 +1821,10 @@ export const LEVELS = {
     // the wall does at Badaling.
     groundLevel: 'bake',
     padRadius: 0,
-    // From the south-east, above the flank, looking north-west along the wall
+    // From the south-west, on the lit flank, looking north-east along the wall
     // with the towers stepping away down the ridge: the picture on the ticket.
-    camera: { yaw: 0.95, pitch: 0.22, distance: 420, height: 30 },
+    // The east flank is in the afternoon shadow and the wall went blue there.
+    camera: { yaw: -0.95, pitch: 0.16, distance: 400, height: 26 },
     structures: (quality) => [
       { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL' },
     ],
