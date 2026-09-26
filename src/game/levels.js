@@ -1764,7 +1764,7 @@ export const LEVELS = {
     padRadius: 0,
     // From the guardhouse, south-west and above, looking north-east over the
     // citadel with Huayna Picchu behind it: the photograph.
-    camera: { yaw: -0.62, pitch: 0.30, distance: 380, height: 20 },
+    camera: { yaw: -0.45, pitch: 0.22, distance: 300, height: 18 },
     structures: (quality) => [
       { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'INTIHUATANA' },
       { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: { x: 40, z: 70 } },
@@ -1797,23 +1797,51 @@ export const LEVELS = {
     lat: 40.35968, lon: 116.02005,
     name: 'GREAT WALL AT BADALING',
     place: 'Beijing',
-    target: 'GREAT WALL AT BADALING',
+    target: 'GREAT WALL',
     subtitle: 'Great Wall at Badaling, Beijing',
-    victory: 'TODO(greatwall) THE LINE THE END CARD LEADS WITH',
-    // TODO(greatwall) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(greatwall) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(greatwall) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(greatwall) the postcard angle
+    victory: 'Great Fall of China',
+    // The Jundu hills in autumn: dry oak and pine scrub on grey rock, brown
+    // where the grass has gone off. Rio's forest palette, browned and dried.
+    palette: {
+      urban: new THREE.Color(0x66653f),
+      urbanAlt: new THREE.Color(0x555534),
+      park: new THREE.Color(0x475a2e),
+      parkAlt: new THREE.Color(0x5a6a32),
+      road: new THREE.Color(0x6b665e),
+      bank: new THREE.Color(0x8f8a70),
+      bed: new THREE.Color(0x45503a),
+      dry: new THREE.Color(0x8a8452),
+    },
+    // Nothing surveyed within reach: the ridge is the wall's and the forest
+    // comes up to the foot of it on both flanks.
+    cityExcludeRadius: 300,
+    contextExclude: 280,
+    // The crest is the floor. No pad: the wall carries its own footing down
+    // to the rock where the crest falls away at either end, which is what
+    // the wall does at Badaling.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the south-east, above the flank, looking north-west along the wall
+    // with the towers stepping away down the ridge: the picture on the ticket.
+    camera: { yaw: 0.95, pitch: 0.22, distance: 420, height: 30 },
     structures: (quality) => [
-      { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL AT BADALING' },
+      { key: 'greatwall', blocks: buildGreatwall(quality), primary: true, required: true, label: 'GREAT WALL' },
     ],
     garrison: (g, origin, groundY) => populateGreatwall(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(greatwall)
-    traits: { windows: false, river: false, topples: true },           // TODO(greatwall)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(greatwall) from the suite's undercut
-    brief: 'TODO(greatwall) one sentence: what the player has to find out about this building.',
+    // The wall is a dyke full of rubble and does not score; the five towers do.
+    scoreTags: ['towers'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'forest', canopy: 2.0, canopyFrom: 130,
+      // Dry and high: the hills are sharp to the horizon on a clear day.
+      haze: { colour: 0xcfd3d6, density: 0.00015 },
+    },
+    // Loops the men fire from, but the suite's window test wants a wing of
+    // them; no river; the towers go over and the wall does not.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The wall is a dyke full of rubble and does not fall. The towers are hollow and stand on the slope: undercut one downhill.',
   },
 };
 
