@@ -1249,25 +1249,45 @@ export const LEVELS = {
     id: 'atomium',
     terrain: 'atomium',
     lat: 50.89494, lon: 4.34144,
-    name: 'ATOMIUM',
-    place: 'Brussels',
-    target: 'ATOMIUM',
-    subtitle: 'Atomium, Brussels',
-    victory: 'TODO(atomium) THE LINE THE END CARD LEADS WITH',
-    // TODO(atomium) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(atomium) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(atomium) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(atomium) the postcard angle
+    name: 'Atomium, Brussels',
+    place: 'Heysel, Brussels',
+    target: 'THE ATOMIUM',
+    subtitle: 'Atomium \u00b7 Heysel Plateau',
+    victory: 'Split the Atom',
+    // Brabant in the north: brick and grey render, the Heysel's plane trees
+    // and the Ossegem park, flat, damp and green. No water on the map.
+    palette: {
+      urban: new THREE.Color(0xb3a08c),
+      urbanAlt: new THREE.Color(0x9b8470),
+      park: new THREE.Color(0x4f7038),
+      parkAlt: new THREE.Color(0x5e7d40),
+      road: new THREE.Color(0x5e5d5c),
+      bank: new THREE.Color(0xa89c86),
+      bed: new THREE.Color(0x3f5648),
+      dry: new THREE.Color(0xb9b3a0),
+    },
+    setting: { haze: { colour: 0xcfd4d8, density: 0.00026 } },
+    // The Heysel is open ground: the survey has the Atomium and three sheds
+    // within a hundred and twenty metres, and the exhibition halls beyond.
+    // Two hundred metres of spheres wants the esplanade clear round it.
+    cityExcludeRadius: 150,
+    contextExclude: 140,
+    // From the south-east, square on to a lower sphere, with the two upper
+    // spheres either side of it and the whole molecule standing on its
+    // one vertex.
+    camera: { yaw: 1.36, pitch: 0.12, distance: 560, height: 95 },
     structures: (quality) => [
       { key: 'atomium', blocks: buildAtomium(quality), primary: true, required: true, label: 'ATOMIUM' },
     ],
     garrison: (g, origin, groundY) => populateAtomium(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(atomium)
-    traits: { windows: false, river: false, topples: true },           // TODO(atomium)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(atomium) from the suite's undercut
-    brief: 'TODO(atomium) one sentence: what the player has to find out about this building.',
+    // The pavilion is a shed; the molecule is the target.
+    scoreTags: ['spheres', 'tubes', 'column', 'bipods'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    // Cut a bipod and it is a tower on one leg; cut the column and it goes.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 1,
+    par: { rounds: 50, spend: 8000, minutes: 4, leverage: 6 },
+    brief: 'The mass is in the spheres and the spheres carry only themselves. The load runs down the column and three pairs of legs.',
   },
   tokyotower: {
     id: 'tokyotower',
