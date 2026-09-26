@@ -708,6 +708,74 @@ in it is general.
   having nowhere to stand a man. After a rebuild, grep the level's constants
   for every consumer and re-derive them from the builder.
 
+### 2c. What twenty-five more taught, five builders at a time
+
+The fourth batch (`docs/FOURTH_BATCH.md`) was built in one day by five
+builders in five worktrees with `tools/loosecheck.mjs` instead of a browser
+each. Every one of them ran into the same handful of things, so they are
+the engine's, not the builders':
+
+- **The solver shares a stone's load by supporter *count*, not by contact
+  area.** Every stone with a lower centre that touches it gets an equal
+  share. Three things follow, and every builder hit at least one. A solid
+  spire laid as same-count slab grids course over course has each stone
+  touching only the one under it, so nothing shares sideways and the load
+  funnels into the centre column: Wat Arun's core stone at sixty metres took
+  ninety per cent of the spire above it and crushed at load with nobody
+  firing. A coarse fill course touching a fine skin course takes a share of
+  the whole wall through its side (Karnak's pylon fill). A sliver or a stub
+  pier at the end of a course crushes under a tall load (the Hassan II
+  minaret). Until the share is weighted by bearing area, the builders'
+  answers are: change the fill grid's count every course (n, n+1, n, …) so
+  the bond spreads the load; lay a pyramid's fill on one fixed lattice for
+  every course rather than `slab()` per course, whose pitch leaks load
+  inward (Teotihuacan's centre stones took the whole hill); keep fill and
+  skin 0.15 m apart; no stone under about 0.35 of the nominal; pier-top
+  stones at least 1.25 m under a springer.
+- **`section(tag)` keeps the last range only.** Lay every stone of a tag in
+  one `section` call; a second call with the same name silently replaces
+  the first, and `scoreTags` and the garrison then see a fraction of the
+  section. `blocks.mjs`'s sections line is the check.
+- **Circles of different side counts do not nest.** `polyRing` chords sag
+  between vertices, so an inner ring on a finer polygon leaves slivers; a
+  stupa's concentric rings want the same polygon rotated half a step per
+  course, side count capped so the inner rings are stones and not slivers.
+- **Nothing spans more than 5.4 m, and the runtime flood is five rounds.**
+  A level chain of same-height plates (Tower Bridge's decks and walkways)
+  stands on `_groutBearing`'s cantilever pass, and the load-time flood
+  walks such a chain one stone a round in one direction, so the seventh
+  plate came loose as an island. Camber the plates two centimetres each
+  toward mid-span and every one has a lower neighbour.
+- **A mortar crew on masonry cannot fire.** The muzzle is a metre over the
+  stone and the occupancy grid is two-metre cells, so the arc is refused
+  before the bomb has left the pit. Dig mortars in on open ground with
+  `emplaced: true`; every high arc then clears the walls.
+- **The tests measure a building from its ground.** A castle on a rock
+  carries its footing sixty metres into the hill; a height range taken from
+  the deepest stone put the middle of Edinburgh Castle under the Esplanade,
+  the tap picked ground and the shells went into the rock. `aimPoint` and
+  the debris test now ignore stones below the structure's `groundY`.
+- **A pad with a stated height is land.** The survey draws a gulf as one
+  polygon and it covers a hundred-metre point of reclaimed rock; the Kuwait
+  Towers' origin came out four metres under water. `bake_overture` now
+  clears the water off any `flatten` pad that carries a height.
+- **A crossing whose landing is wet is no crossing.** `bridgeLine`'s bank
+  search ran off the end of its nine hundred metres and Mont-Saint-Michel
+  got a steel arch from the rock into the open sea. A landing still in the
+  water is refused.
+- **`SANDSTONE` is Agra's red and nothing else's.** As "warm stone" it
+  renders as a traffic cone; `REDSTONE` is the warm stone. `CONCRETE` is
+  grey granite. `GOLD` is structural gilding (a stupa's brick, a glazed
+  roof); `GILT` still carries nothing.
+- **On a synthetic summit the scale fights the terrain.** `top` is cut to
+  the real hilltop, so a castle built above about 1.5× walks off the rock.
+  Read the survey's summit extent before choosing the scale.
+- **`survey.py` bearings are from +z, which is south.** The game's +z is
+  south, the plan PNG is drawn +z up, and a brief that says "gatehouse
+  north" has to be checked against the survey, which won at
+  Neuschwanstein. A `flatten` or `peak.at` second coordinate is northing
+  and lands at world −z, as the playbook says above.
+
 ---
 
 ## 3. Give it interiors, and a trick
