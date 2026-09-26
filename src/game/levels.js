@@ -1401,22 +1401,50 @@ export const LEVELS = {
     place: 'Kuwait City',
     target: 'KUWAIT TOWERS',
     subtitle: 'Kuwait Towers, Kuwait City',
-    victory: 'TODO(kuwait) THE LINE THE END CARD LEADS WITH',
-    // TODO(kuwait) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(kuwait) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(kuwait) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(kuwait) the postcard angle
+    victory: 'Sphere Today, Gone Tomorrow',
+    // The Gulf shore: pale sand under everything, the corniche's watered
+    // green, roads black and new, and the sea a made turquoise. Dubai's
+    // ground, a shade paler.
+    palette: {
+      urban: new THREE.Color(0xd6c9ad),
+      urbanAlt: new THREE.Color(0xc2b193),
+      park: new THREE.Color(0x6f8a4c),
+      parkAlt: new THREE.Color(0x7f9a55),
+      road: new THREE.Color(0x4c4a48),
+      bank: new THREE.Color(0xdccaa2),
+      bed: new THREE.Color(0x3c6b73),
+      dry: new THREE.Color(0xe3d5b2),
+    },
+    // Sea on three sides and the city's towers along the bay to the
+    // south-west. Nothing here pitches a roof.
+    setting: {
+      hinterland: 'harbour',
+      downtown: { x: -1100, z: 700, radius: 520, peak: 210 },
+      haze: { colour: 0xd9d6cc, density: 0.00022 },
+      roofPitch: 0,
+    },
+    // The three stand alone on the point: within a hundred and twenty metres
+    // the survey has only the towers' own footprints and the ticket office.
+    cityExcludeRadius: 110,
+    contextExclude: 100,
+    // From the corniche to the south-west, the way every photograph has
+    // them: the two balls overlapping, the needle behind, the Gulf beyond.
+    camera: { yaw: -0.60, pitch: 0.12, distance: 520, height: 90 },
     structures: (quality) => [
       { key: 'kuwait', blocks: buildKuwait(quality), primary: true, required: true, label: 'KUWAIT TOWERS' },
     ],
     garrison: (g, origin, groundY) => populateKuwait(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(kuwait)
-    traits: { windows: false, river: false, topples: true },           // TODO(kuwait)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(kuwait) from the suite's undercut
-    brief: 'TODO(kuwait) one sentence: what the player has to find out about this building.',
+    // The towers, not the plaza they stand on.
+    scoreTags: ['tower1', 'tower2', 'tower3', 'spheres'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
+    // No floors a man stands in; the spheres are solid here. The shafts
+    // go over the way they are cut.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 1,
+    par: { rounds: 45, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The mass is the balls and the shafts are slender. Cut a shaft below its sphere and the sphere comes down whole.',
   },
+
   karnak: {
     id: 'karnak',
     terrain: 'karnak',
@@ -1425,22 +1453,49 @@ export const LEVELS = {
     place: 'Luxor',
     target: 'KARNAK TEMPLE',
     subtitle: 'Karnak Temple, Luxor',
-    victory: 'TODO(karnak) THE LINE THE END CARD LEADS WITH',
-    // TODO(karnak) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(karnak) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(karnak) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(karnak) the postcard angle
+    victory: 'Amun Down',
+    // The Nile valley in Upper Egypt: Giza's sand and dust with the green of
+    // the irrigated strip along the river instead of the plateau's scrub,
+    // and the silt-brown Nile itself. The air is the desert's, warm and thick.
+    palette: {
+      urban: new THREE.Color(0xc9b48a),
+      urbanAlt: new THREE.Color(0xb49b72),
+      park: new THREE.Color(0x6f8a48),
+      parkAlt: new THREE.Color(0x849a4c),
+      road: new THREE.Color(0x4a443c),
+      bank: new THREE.Color(0xd2bd92),
+      bed: new THREE.Color(0x6a6b4a),
+      dry: new THREE.Color(0xe0cda0),
+    },
+    setting: { haze: { colour: 0xe3d3b4, density: 0.00028 }, roofPitch: 0 },
+    // At twice life the temple runs from the Third Pylon to the First: three
+    // hundred and sixty metres east to west, two hundred and twenty-six wide.
+    // The survey has nothing here but the six-metre stubs Overture keeps for
+    // the ruins, and the precinct of Amun is a kilometre across in life, so
+    // the radius clears the whole of it and the town stays where it is.
+    cityExcludeRadius: 320,
+    contextExclude: 300,
+    // From the south-east, low, the way the Sacred Lake sees it: the Second
+    // Pylon's towers, the nave columns riding over the side roof with the
+    // clerestory between, and the First Pylon closing the far end.
+    camera: { yaw: 0.95, pitch: 0.11, distance: 480, height: 40 },
     structures: (quality) => [
       { key: 'karnak', blocks: buildKarnak(quality), primary: true, required: true, label: 'KARNAK TEMPLE' },
     ],
     garrison: (g, origin, groundY) => populateKarnak(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(karnak)
-    traits: { windows: false, river: false, topples: true },           // TODO(karnak)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(karnak) from the suite's undercut
-    brief: 'TODO(karnak) one sentence: what the player has to find out about this building.',
+    // The hall and its two pylons. The Great Court and the First Pylon are
+    // the approach, and the bar does not move for them.
+    scoreTags: ['columns', 'architraves', 'clerestory', 'roof', 'pylon2', 'pylon3'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A colonnade has no windows to post men in and nothing on it topples:
+    // the columns are cut and the roof comes down on the roof below.
+    traits: { windows: false, river: true, topples: false },
+    // A million cubic metres of sandstone, most of it in two pylons.
+    unlockScale: 6,
+    par: { rounds: 110, spend: 16000, minutes: 6, leverage: 2 },
+    brief: 'The architraves are the load path. Cut a column and its two beams and the roof on them come down; cut a tall one and the nave roof lands on the aisles.',
   },
+
   forbidden: {
     id: 'forbidden',
     terrain: 'forbidden',
