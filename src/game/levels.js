@@ -1660,7 +1660,7 @@ export const LEVELS = {
     contextExclude: 300,
     // From the west, down the causeway: the five towers over the galleries,
     // which is the only picture of Angkor anyone has ever taken.
-    camera: { yaw: -1.42, pitch: 0.13, distance: 640, height: 45 },
+    camera: { yaw: -1.42, pitch: 0.08, distance: 560, height: 42 },
     structures: (quality) => [
       { key: 'angkor', blocks: buildAngkor(quality), primary: true, required: true, label: 'ANGKOR WAT' },
     ],
