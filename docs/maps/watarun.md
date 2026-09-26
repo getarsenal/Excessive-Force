@@ -20,4 +20,4 @@ undercut low on one side takes that side's skin down the steps. `topples:
 false`, `river: true`, `unlockScale: 4`.
 
 Measured: 14.0k stones at low, 29.3k at high, 0 loose at both. Camera from the
-river, `{ yaw: 1.45, pitch: 0.16, distance: 400, height: 55 }`.
+river, `{ yaw: 1.45, pitch: 0.10, distance: 360, height: 60 }`.

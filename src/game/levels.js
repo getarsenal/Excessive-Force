@@ -1567,7 +1567,7 @@ export const LEVELS = {
     contextExclude: 75,
     // From the river, which is the only way anyone has ever seen it: the
     // ferry from Tha Tien, with the prang against the western sky.
-    camera: { yaw: 1.45, pitch: 0.16, distance: 400, height: 55 },
+    camera: { yaw: 1.45, pitch: 0.10, distance: 360, height: 60 },
     structures: (quality) => [
       { key: 'watarun', blocks: buildWatarun(quality), primary: true, required: true, label: 'WAT ARUN' },
     ],
@@ -1612,7 +1612,7 @@ export const LEVELS = {
     groundLevel: 'bake',
     // From the south-east, from the foot of the hill, looking up at the
     // whole gold bell against the sky: the postcard from Kandawgyi.
-    camera: { yaw: 0.55, pitch: 0.15, distance: 560, height: 65 },
+    camera: { yaw: 0.55, pitch: 0.07, distance: 470, height: 75 },
     structures: (quality) => [
       { key: 'shwedagon', blocks: buildShwedagon(quality), primary: true, required: true, label: 'SHWEDAGON PAGODA' },
     ],
