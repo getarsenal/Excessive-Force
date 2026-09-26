@@ -1007,8 +1007,11 @@ export class TestMenu {
         // Through the middle of the masonry, which is not always the origin:
         // Tower Bridge is built from an abutment on the bank and its towers
         // stand a hundred metres out in the river.
-        const fp = st.footprint;
-        const mid = fp ? { x: (fp.x0 + fp.x1) / 2, z: (fp.z0 + fp.z1) / 2 } : { x: st.origin.x, z: st.origin.z };
+        // Through the origin, which every builder puts inside its masonry; the
+        // footprint's centre is not always in it (the Potala's is over the
+        // terraces in front of the palace). A building that is mostly air on
+        // that line says so with `traits.opaque: false`.
+        const mid = { x: st.origin.x, z: st.origin.z };
         const hs = [0.18, 0.3, 0.42, 0.54, 0.66];
         let blocked = 0;
         for (const f of hs) {

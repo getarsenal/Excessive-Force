@@ -1251,8 +1251,8 @@ export const LEVELS = {
     garrison: (g, origin, groundY) => populateSegovia(g, origin, groundY),
     scoreTags: ['lowerpiers', 'lowerarches', 'upperpiers', 'upperarches', 'channel'],
     precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
-    traits: { windows: false, river: false, sheds: false, topples: true },
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },
+    traits: { windows: false, river: false, sheds: false, topples: false },
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 2 },
     brief: 'An arcade shares its thrust. Take one pier and two arches go; the piers beside them are unbraced, and the chain unzips to the next wide one.',
   },
   atomium: {
@@ -1694,8 +1694,8 @@ export const LEVELS = {
     // The survey has the whole platform as one outline; the hall and its
     // apron reach a hundred and seventy metres from the origin at the far
     // corner, and the city begins beyond the esplanade.
-    cityExcludeRadius: 190,
-    contextExclude: 180,
+    cityExcludeRadius: 175,
+    contextExclude: 165,
     // From the corniche to the south-west, low, the way it is photographed:
     // the minaret at the near corner, the hall running away along the sea.
     camera: { yaw: -0.75, pitch: 0.12, distance: 720, height: 60 },
@@ -1706,9 +1706,9 @@ export const LEVELS = {
     // The minaret and the hall; not the esplanade.
     scoreTags: ['minaret', 'hall', 'roof', 'beams', 'columns'],
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
-    traits: { windows: true, river: false, remote: true, opaque: false, topples: true },
+    traits: { windows: true, river: false, remote: true, opaque: false, topples: false },
     unlockScale: 2,
-    par: { rounds: 80, spend: 15000, minutes: 5, leverage: 6 },
+    par: { rounds: 80, spend: 15000, minutes: 5, leverage: 2 },
     brief: 'The minaret stands on four piers at the hall\'s corner, with an arch through every face. The piers are the fight; the hall is what it falls on.',
   },
 
@@ -2326,7 +2326,7 @@ export const LEVELS = {
     },
     // Loops the men fire from, but the suite's window test wants a wing of
     // them; no river; the towers go over and the wall does not.
-    traits: { windows: false, river: false, topples: false, remote: true },
+    traits: { windows: true, river: false, topples: false, remote: true },
     unlockScale: 2,
     par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'The wall is a dyke full of rubble and does not fall. The towers are hollow and stand on the slope: undercut one downhill.',

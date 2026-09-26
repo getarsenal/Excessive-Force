@@ -396,8 +396,9 @@ export function populateMontstmichel(g, origin, groundY) {
   for (const x of [L.x0 + 8.0, L.x1 - 8.0]) {
     g.place('at', V(x, 3.0 * K.scale + 0.3, L.z1 - K.wall / 2 - 0.6), 0, 6, { cover: 'window' });
   }
-  // Mortars on the Merveille's deck, between the cloister and the roof.
-  for (const z of [Mv.z0 + 6.0, Mv.z1 - 6.0]) {
-    g.place('mortar', V(C.x1 + 3.0 * K.scale * 0 + 4.0, Mv.top + 0.6, z), 0, 7, { cover: 'roof' });
+  // Mortars dug in on the summit's west terrace, clear of the nave: a crew on
+  // the Merveille's deck had the deck in the muzzle's cell and never fired.
+  for (const z of [-8.0 * K.scale, 8.0 * K.scale]) {
+    g.place('mortar', V(K.nave.x0 - 9.0 * K.scale, 0.3, z), -Math.PI / 2, 7, { cover: 'roof', emplaced: true });
   }
 }
