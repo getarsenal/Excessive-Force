@@ -1377,22 +1377,48 @@ export const LEVELS = {
     place: 'Casablanca',
     target: 'HASSAN II MOSQUE',
     subtitle: 'Hassan II Mosque, Casablanca',
-    victory: 'TODO(hassan) THE LINE THE END CARD LEADS WITH',
-    // TODO(hassan) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(hassan) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(hassan) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(hassan) the postcard angle
+    victory: 'Last Call to Prayer',
+    // The white city on the Atlantic: pale render and limewash under
+    // everything, the corniche's watered green, and a cold grey-green sea.
+    palette: {
+      urban: new THREE.Color(0xd9d2c2),
+      urbanAlt: new THREE.Color(0xc4bba8),
+      park: new THREE.Color(0x5f7f48),
+      parkAlt: new THREE.Color(0x6e8c50),
+      road: new THREE.Color(0x4e4c49),
+      bank: new THREE.Color(0xcfc4a8),
+      bed: new THREE.Color(0x35585e),
+      dry: new THREE.Color(0xe0d8c4),
+    },
+    // Ocean on two sides, the medina and the port to the east and the new
+    // town's towers to the south-east. Flat roofs.
+    setting: {
+      hinterland: 'harbour',
+      downtown: { x: 1000, z: 1100, radius: 520, peak: 115 },
+      haze: { colour: 0xc9d3d8, density: 0.00020 },
+      roofPitch: 0,
+    },
+    // The survey has the whole platform as one outline; the hall and its
+    // apron reach a hundred and seventy metres from the origin at the far
+    // corner, and the city begins beyond the esplanade.
+    cityExcludeRadius: 190,
+    contextExclude: 180,
+    // From the corniche to the south-west, low, the way it is photographed:
+    // the minaret at the near corner, the hall running away along the sea.
+    camera: { yaw: -0.75, pitch: 0.12, distance: 720, height: 60 },
     structures: (quality) => [
       { key: 'hassan', blocks: buildHassan(quality), primary: true, required: true, label: 'HASSAN II MOSQUE' },
     ],
     garrison: (g, origin, groundY) => populateHassan(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(hassan)
-    traits: { windows: false, river: false, topples: true },           // TODO(hassan)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(hassan) from the suite's undercut
-    brief: 'TODO(hassan) one sentence: what the player has to find out about this building.',
+    // The minaret and the hall; not the esplanade.
+    scoreTags: ['minaret', 'hall', 'roof', 'beams', 'columns'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 80, spend: 15000, minutes: 5, leverage: 6 },
+    brief: 'The minaret stands on four piers at the hall\'s corner, with an arch through every face. The piers are the fight; the hall is what it falls on.',
   },
+
   kuwait: {
     id: 'kuwait',
     terrain: 'kuwait',
