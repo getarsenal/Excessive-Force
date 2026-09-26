@@ -1278,7 +1278,7 @@ export const LEVELS = {
     // From the Buda embankment across the Danube, a little downstream: the
     // whole river front, the dome in the middle, the two spires beside it
     // and a pavilion at either end. The picture on every postcard.
-    camera: { yaw: -1.35, pitch: 0.15, distance: 600, height: 50 },
+    camera: { yaw: -1.30, pitch: 0.09, distance: 430, height: 48 },
     structures: (quality) => [
       { key: 'budapest', blocks: buildBudapest(quality), primary: true, required: true, label: 'HUNGARIAN PARLIAMENT' },
     ],
@@ -1303,21 +1303,41 @@ export const LEVELS = {
     place: 'Barcelona',
     target: 'SAGRADA FAMILIA',
     subtitle: 'Sagrada Familia, Barcelona',
-    victory: 'TODO(sagrada) THE LINE THE END CARD LEADS WITH',
-    // TODO(sagrada) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(sagrada) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(sagrada) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(sagrada) the postcard angle
+    victory: 'Finished At Last',
+    // The Eixample: ochre and cream render, terracotta roofs, plane trees,
+    // dry Mediterranean light. Istanbul's warm palette with the sea taken
+    // out of it.
+    palette: {
+      urban: new THREE.Color(0xc4ad8e),
+      urbanAlt: new THREE.Color(0xad9573),
+      park: new THREE.Color(0x587040),
+      parkAlt: new THREE.Color(0x6a824a),
+      road: new THREE.Color(0x5a5752),
+      bank: new THREE.Color(0xb8a888),
+      bed: new THREE.Color(0x3b4d4a),
+      dry: new THREE.Color(0xcfbf9f),
+    },
+    setting: { haze: { colour: 0xd8d6cd, density: 0.00021 } },
+    // The basilica fills its own Eixample block; the two squares either side
+    // of it are the next blocks over, and the apartments start beyond them at
+    // a hundred metres. The old 120 took every one of the forty buildings the
+    // survey found, the school and the shop among them.
+    cityExcludeRadius: 82,
+    contextExclude: 76,
+    // From the Placa de Gaudi across the pond, north-east of the church: the
+    // Nativity front's four towers with Jesus and the Evangelists rising
+    // behind them, which is the picture of the place.
+    camera: { yaw: 2.15, pitch: 0.16, distance: 430, height: 80 },
     structures: (quality) => [
       { key: 'sagrada', blocks: buildSagrada(quality), primary: true, required: true, label: 'SAGRADA FAMILIA' },
     ],
     garrison: (g, origin, groundY) => populateSagrada(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(sagrada)
-    traits: { windows: false, river: false, topples: true },           // TODO(sagrada)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(sagrada) from the suite's undercut
-    brief: 'TODO(sagrada) one sentence: what the player has to find out about this building.',
+    // The eighteen towers. The nave is the hall they stand in.
+    scoreTags: ['nativity', 'passion', 'evangelists', 'mary', 'jesus'],
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues' },
+    traits: { windows: true, river: false, topples: true },
+    par: { rounds: 70, spend: 12000, minutes: 4, leverage: 6 },
+    brief: 'Every spire is a hollow cone on piers. The tallest stands on the four piers of the crossing.',
   },
   edinburgh: {
     id: 'edinburgh',
