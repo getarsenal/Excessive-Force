@@ -6,7 +6,7 @@ description: Add a new landmark level (map) to Excessive Force. Use whenever the
 # Adding a map
 
 Read `docs/NEW_MAP_PLAYBOOK.md` first, in full. It is the record of what
-worked and what broke on the sixteen existing maps, and it names every file
+worked and what broke on the forty-one existing maps, and it names every file
 a level touches. Do not reconstruct that from the code. §0b and §2b are the
 Potala, which was built twice; read those twice.
 
@@ -45,8 +45,9 @@ Then, in this order, each step verified before the next:
    coarse and bare where buried. `node tools/blocks.mjs <id>` after every
    change: stones under about 45k at low, taller than wide if the real
    thing is, and the material colour line reading as the photograph does.
-   Zero loose stones at every tier; the undercut test must behave as
-   designed.
+   `node tools/loosecheck.mjs <id> low` and `high` after every change too:
+   zero loose stones at every tier, without a browser; the undercut test
+   must behave as designed.
 6. **Look at it from the postcard angle** — `node tools/postcard.mjs <id>`,
    with `--pitch --dist --height` to try others and `--survey` for the load
    painter — beside the photograph, and fill in `docs/maps/<id>.md` with

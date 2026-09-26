@@ -1,0 +1,17 @@
+{
+  "id": "kuwait",
+  "name": "Kuwait Towers, Kuwait City",
+  "lat": 29.38988,
+  "lon": 48.0028,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -18.48,
+  "maxElevation": 16.608,
+  "metersPerDemPixel": 4.1625,
+  "seaLevel": -0.075,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.015,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.7151
+}

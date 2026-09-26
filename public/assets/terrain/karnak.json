@@ -1,0 +1,17 @@
+{
+  "id": "karnak",
+  "name": "Karnak Temple, Luxor",
+  "lat": 25.71877,
+  "lon": 32.65721,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 60.643,
+  "maxElevation": 90.661,
+  "metersPerDemPixel": 8.6081,
+  "seaLevel": 68.045,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 73.258,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0556
+}

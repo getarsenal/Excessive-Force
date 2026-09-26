@@ -1,0 +1,17 @@
+{
+  "id": "watarun",
+  "name": "Wat Arun, Bangkok",
+  "lat": 13.74378,
+  "lon": 100.48885,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -2.854,
+  "maxElevation": 12.6,
+  "metersPerDemPixel": 4.6405,
+  "seaLevel": 2.497,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 3.694,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0824
+}

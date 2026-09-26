@@ -1,0 +1,16 @@
+{
+  "id": "gyeongbok",
+  "name": "Gyeongbokgung, Seoul",
+  "lat": 37.57859,
+  "lon": 126.97705,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 29.151,
+  "maxElevation": 55.757,
+  "metersPerDemPixel": 3.7861,
+  "seaLevel": 37.241,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0653
+}

@@ -1,0 +1,17 @@
+{
+  "id": "angkor",
+  "name": "Angkor Wat, Siem Reap",
+  "lat": 13.41253,
+  "lon": 103.86699,
+  "spanMeters": 1000.0,
+  "size": 512,
+  "minElevation": 3.008,
+  "maxElevation": 49.394,
+  "metersPerDemPixel": 9.294,
+  "seaLevel": 21.466,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 25.014,
+  "coastline": "surveyed",
+  "farSpan": 7000.0,
+  "farWater": 0.0724
+}
