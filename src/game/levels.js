@@ -40,7 +40,7 @@ import { buildWatarun, populateWatarun } from '../structure/landmarks/watarun.js
 import { buildShwedagon, populateShwedagon } from '../structure/landmarks/shwedagon.js';
 import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
 import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
-import { buildTikal, populateTikal } from '../structure/landmarks/tikal.js';
+import { buildTikal, populateTikal, buildTempleII, populateTempleII } from '../structure/landmarks/tikal.js';
 import { buildTeotihuacan, populateTeotihuacan } from '../structure/landmarks/teotihuacan.js';
 import { buildMachupicchu, populateMachupicchu } from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
@@ -1569,45 +1569,109 @@ export const LEVELS = {
     place: 'Magelang',
     target: 'BOROBUDUR',
     subtitle: 'Borobudur, Magelang',
-    victory: 'TODO(borobudur) THE LINE THE END CARD LEADS WITH',
-    // TODO(borobudur) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(borobudur) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(borobudur) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(borobudur) the postcard angle
+    victory: 'Stupa-fied',
+    // The Kedu plain: paddies and volcanic soil under a wet-season sky, and
+    // dark andesite in the middle of it. Chichen's jungle palette, greener and
+    // wetter — Java is rice, not scrub.
+    palette: {
+      urban: new THREE.Color(0x5f6f3a),
+      urbanAlt: new THREE.Color(0x4f5d30),
+      park: new THREE.Color(0x3c5a2c),
+      parkAlt: new THREE.Color(0x527232),
+      road: new THREE.Color(0x726d5a),
+      bank: new THREE.Color(0xa89c7a),
+      bed: new THREE.Color(0x4f5b3a),
+      dry: new THREE.Color(0x7c8248),
+    },
+    // The survey has the monument as one 126 m outline and four sheds within
+    // 120 m, nothing else; at twice life the base is 256 m across and the
+    // park round it is a lawn to the tree line.
+    cityExcludeRadius: 210,
+    contextExclude: 200,
+    // From the north-west and low, which is where the dawn photographs are
+    // taken from, looking across the stepped pile with the crown against the
+    // sky: a mountain reads as a mountain when the eye is at the foot of it.
+    camera: { yaw: -2.35, pitch: 0.07, distance: 370, height: 26 },
     structures: (quality) => [
       { key: 'borobudur', blocks: buildBorobudur(quality), primary: true, required: true, label: 'BOROBUDUR' },
     ],
     garrison: (g, origin, groundY) => populateBorobudur(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(borobudur)
-    traits: { windows: false, river: false, topples: true },           // TODO(borobudur)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(borobudur) from the suite's undercut
-    brief: 'TODO(borobudur) one sentence: what the player has to find out about this building.',
+    // The hill is not the contract. The three round terraces, the seventy-two
+    // bells and the crown are what the bar moves for.
+    scoreTags: ['round', 'stupas', 'central'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'jungle', canopy: 2.2, canopyFrom: 270,
+      haze: { colour: 0xc9cfb6, density: 0.00030 },
+    },
+    // A terraced hill with a stone skin: no windows, no river, and nothing
+    // that can be made to fall over.
+    traits: { windows: false, river: false, topples: false },
+    // Two hundred and fifty metres square and eighty tall of rubble and
+    // andesite: about two thirds of Khufu by volume.
+    unlockScale: 12,
+    par: { rounds: 90, spend: 9000, minutes: 5, leverage: 2 },
+    brief: 'The hill is not the target. The bells and the crown stand on the top terrace, and the top terrace stands on fill.',
   },
   tikal: {
     id: 'tikal',
     terrain: 'tikal',
     lat: 17.2218, lon: -89.62339,
-    name: 'TIKAL',
+    name: 'TEMPLE I, TIKAL',
     place: 'Peten',
-    target: 'TIKAL',
-    subtitle: 'Tikal, Peten',
-    victory: 'TODO(tikal) THE LINE THE END CARD LEADS WITH',
-    // TODO(tikal) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(tikal) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(tikal) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tikal) the postcard angle
+    target: 'TEMPLE I',
+    subtitle: 'Temple of the Great Jaguar · Tikal',
+    victory: 'Combed Out',
+    // Chichen's ground: pale rock under a very dark canopy, the plaza a lawn.
+    palette: {
+      urban: new THREE.Color(0x5a683a),
+      urbanAlt: new THREE.Color(0x49562f),
+      park: new THREE.Color(0x3c5a2e),
+      parkAlt: new THREE.Color(0x4b6a33),
+      road: new THREE.Color(0x77705c),
+      bank: new THREE.Color(0xc8bb9c),
+      bed: new THREE.Color(0x55603f),
+      dry: new THREE.Color(0x7a814d),
+    },
+    // The survey has seventeen ruins within 120 m — the North Acropolis, the
+    // ball court, the Central Acropolis — with heights read off the canopy
+    // (forty to sixty metres) rather than off the stone, so as boxes they
+    // would be tower blocks. The plaza is kept clear to the trees; Temple II
+    // stands 190 m west on its own ground.
+    cityExcludeRadius: 330,
+    contextExclude: 320,
+    // From the plaza's south-west, low, with Temple I's stair and comb in
+    // three-quarter view and Temple II's back at the edge of the frame: the
+    // photograph everyone has is taken from the foot of Temple II.
+    camera: { yaw: -0.85, pitch: 0.12, distance: 330, height: 50 },
     structures: (quality) => [
-      { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TIKAL' },
+      { key: 'tikal', blocks: buildTikal(quality), primary: true, required: true, label: 'TEMPLE I' },
+      // Temple II faces it across the Great Plaza. The real gap is a hundred
+      // and fifteen metres centre to centre; at two and two fifths life that
+      // would leave the two bases fourteen metres apart, so the plaza is
+      // opened out to what it is in the photograph.
+      { key: 'temple2', blocks: buildTempleII(quality), required: true, label: 'TEMPLE II', offset: { x: -190, z: 0 } },
     ],
-    garrison: (g, origin, groundY) => populateTikal(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tikal)
-    traits: { windows: false, river: false, topples: true },           // TODO(tikal)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tikal) from the suite's undercut
-    brief: 'TODO(tikal) one sentence: what the player has to find out about this building.',
+    garrison: (g, origin, groundY, sites) => {
+      populateTikal(g, origin, groundY);
+      const t = sites && sites.temple2;
+      if (t) populateTempleII(g, t.origin, t.groundY);
+    },
+    // The pyramid is the hill; the stair, the shrine and the comb are the
+    // building, and the comb is the contract.
+    scoreTags: ['stair', 'shrine', 'comb'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    setting: {
+      hinterland: 'jungle', canopy: 2.5, canopyFrom: 340,
+      haze: { colour: 0xc6cbb0, density: 0.00031 },
+    },
+    // A solid pyramid under a comb that goes over: the comb is what topples,
+    // and the suite's undercut is aimed at the lowest scored stone — the
+    // stair's foot — which drops the flight and not the hill.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 6,
+    par: { rounds: 70, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The pyramid is a hill and does not score. The comb on top is a wall standing on a roof: cut its foot.',
   },
   teotihuacan: {
     id: 'teotihuacan',
