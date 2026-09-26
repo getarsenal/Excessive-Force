@@ -1085,121 +1085,218 @@ export const LEVELS = {
     id: 'colosseum',
     terrain: 'colosseum',
     lat: 41.89021, lon: 12.49223,
-    name: 'COLOSSEUM',
-    place: 'Rome',
-    target: 'COLOSSEUM',
-    subtitle: 'Colosseum, Rome',
-    victory: 'TODO(colosseum) THE LINE THE END CARD LEADS WITH',
-    // TODO(colosseum) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(colosseum) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(colosseum) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(colosseum) the postcard angle
+    name: 'Colosseum, Rome',
+    place: 'Piazza del Colosseo, Rome',
+    target: 'THE COLOSSEUM',
+    subtitle: 'Anfiteatro Flavio \u00b7 Piazza del Colosseo',
+    victory: 'Thumbs Down',
+    // Rome: ochre and terracotta render, travertine, umbrella pines on the
+    // Palatine and the Oppian, the Tiber a long way off. Warm and dusty.
+    palette: {
+      urban: new THREE.Color(0xc4a482),
+      urbanAlt: new THREE.Color(0xad8560),
+      park: new THREE.Color(0x5a6e3c),
+      parkAlt: new THREE.Color(0x6a7a44),
+      road: new THREE.Color(0x74706a),
+      bank: new THREE.Color(0xb5a788),
+      bed: new THREE.Color(0x5e6848),
+      dry: new THREE.Color(0xcabb9f),
+    },
+    setting: { haze: { colour: 0xdccfb6, density: 0.00025 } },
+    // The ring is 283 by 234 at this scale and the only surveyed building
+    // within a hundred and twenty metres is the Colosseo itself; the piazza,
+    // the Meta Sudans and the foot of the Oppian are open ground anyway. The
+    // Arch of Constantine and the Temple of Venus and Roma stand beyond.
+    cityExcludeRadius: 175,
+    contextExclude: 165,
+    // From the north-west, where the Via dei Fori Imperiali arrives: the
+    // standing outer wall on the left, the break and the inner ring on the
+    // right, and the whole ring in one frame.
+    camera: { yaw: -2.30, pitch: 0.11, distance: 430, height: 34 },
     structures: (quality) => [
       { key: 'colosseum', blocks: buildColosseum(quality), primary: true, required: true, label: 'COLOSSEUM' },
     ],
     garrison: (g, origin, groundY) => populateColosseum(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(colosseum)
-    traits: { windows: false, river: false, topples: true },           // TODO(colosseum)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(colosseum) from the suite's undercut
-    brief: 'TODO(colosseum) one sentence: what the player has to find out about this building.',
+    // The cavea is a hill of rubble fill and is not the monument; the bar
+    // moves for the two rings.
+    scoreTags: ['outer', 'inner'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A ring nearly three hundred metres across does not go over; it is
+    // broken bay by bay.
+    traits: { windows: false, river: false, topples: false },
+    par: { rounds: 110, spend: 15000, minutes: 6, leverage: 2 },
+    brief: 'Eighty piers and nothing behind them. Kick two out and the bay above falls outward; where the seating still stands, it does not.',
   },
   towerbridge: {
     id: 'towerbridge',
     terrain: 'towerbridge',
     lat: 51.5076, lon: -0.0761,
-    name: 'TOWER BRIDGE',
-    place: 'London',
+    name: 'Tower Bridge, London',
+    place: 'Tower Hill, London',
     target: 'TOWER BRIDGE',
-    subtitle: 'Tower Bridge, London',
-    victory: 'TODO(towerbridge) THE LINE THE END CARD LEADS WITH',
-    // TODO(towerbridge) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(towerbridge) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(towerbridge) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(towerbridge) the postcard angle
+    subtitle: 'Tower Bridge \u00b7 the Pool of London',
+    victory: 'Drawbridge Down',
+    // The default ground is London: brick dust, parkland, the Thames a wet
+    // silt green. This is London.
+    // The origin is on Tower Hill with the Tower of London fifty-seven
+    // metres north of it; the survey has forty-five of its buildings within
+    // a hundred and twenty metres, the White Tower and the Wakefield Tower
+    // among them. The bridge's own footprint keeps the town off its deck;
+    // this clears only the approach.
+    cityExcludeRadius: 38,
+    contextExclude: 38,
+    // From the north bank downstream — St Katharine's — looking across at
+    // the north tower with the bridge running away to Bermondsey behind it.
+    camera: { yaw: -2.20, pitch: 0.12, distance: 400, height: 55 },
     structures: (quality) => [
       { key: 'towerbridge', blocks: buildTowerbridge(quality), primary: true, required: true, label: 'TOWER BRIDGE' },
     ],
     garrison: (g, origin, groundY) => populateTowerbridge(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(towerbridge)
-    traits: { windows: false, river: false, topples: true },           // TODO(towerbridge)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(towerbridge) from the suite's undercut
-    brief: 'TODO(towerbridge) one sentence: what the player has to find out about this building.',
+    // The towers and what ties them; the piers, the abutments and the decks
+    // are the ground the fight is on.
+    scoreTags: ['northtower', 'southtower', 'walkways'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none', river: 'embankment' },
+    traits: { windows: true, river: true, topples: true },
+    par: { rounds: 90, spend: 14000, minutes: 5, leverage: 6 },
+    brief: 'The spans rest on the towers and the walkways tie them. Cut a pier and the tower, the walkway ends and both spans on it go into the river.',
   },
   florence: {
     id: 'florence',
     terrain: 'florence',
     lat: 43.77313, lon: 11.256,
-    name: 'FLORENCE CATHEDRAL',
-    place: 'Florence',
-    target: 'FLORENCE CATHEDRAL',
-    subtitle: 'Florence Cathedral, Florence',
-    victory: 'TODO(florence) THE LINE THE END CARD LEADS WITH',
-    // TODO(florence) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(florence) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(florence) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(florence) the postcard angle
+    name: 'Santa Maria del Fiore, Florence',
+    place: 'Piazza del Duomo, Florence',
+    target: 'THE DUOMO',
+    subtitle: 'Cattedrale di Santa Maria del Fiore \u00b7 Piazza del Duomo',
+    victory: 'Dome, Sweet Dome',
+    // Tuscany: ochre render and terracotta roofs packed tight round the
+    // piazza, the Arno olive-green at the map's edge, cypress on the hills.
+    palette: {
+      urban: new THREE.Color(0xc2a07f),
+      urbanAlt: new THREE.Color(0xa87e5c),
+      park: new THREE.Color(0x5f7040),
+      parkAlt: new THREE.Color(0x6d7c46),
+      road: new THREE.Color(0x77706a),
+      bank: new THREE.Color(0xb6a98d),
+      bed: new THREE.Color(0x60684a),
+      dry: new THREE.Color(0xc8bda4),
+    },
+    setting: { haze: { colour: 0xd9cfb4, density: 0.00027 } },
+    // The piazza is tight: the survey has seventy-nine buildings within a
+    // hundred and twenty metres, the Baptistery eighty metres west among
+    // them. The cathedral's own footprint keeps the houses off its walls;
+    // this only clears the piazza round the façade and lets the Baptistery
+    // stand where it does.
+    cityExcludeRadius: 62,
+    contextExclude: 62,
+    // From the south-east, over the roofs: the dome on the right with the
+    // tribunes under it, the nave running away to the campanile and the
+    // façade on the left. The origin is mid-nave, so the frame is centred on
+    // the whole length of the building rather than on the dome.
+    camera: { yaw: 0.72, pitch: 0.12, distance: 430, height: 64 },
     structures: (quality) => [
-      { key: 'florence', blocks: buildFlorence(quality), primary: true, required: true, label: 'FLORENCE CATHEDRAL' },
+      { key: 'florence', blocks: buildFlorence(quality), primary: true, required: true, label: 'THE DUOMO' },
     ],
     garrison: (g, origin, groundY) => populateFlorence(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(florence)
-    traits: { windows: false, river: false, topples: true },           // TODO(florence)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(florence) from the suite's undercut
-    brief: 'TODO(florence) one sentence: what the player has to find out about this building.',
+    // The nave and the tribunes are where the men are; the bar moves for
+    // the dome and what it stands on, and for Giotto's tower.
+    scoreTags: ['dome', 'drum', 'lantern', 'crossing', 'campanile'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A shell: the dome comes down in a sheet, it does not go over.
+    traits: { windows: true, river: false, topples: false },
+    par: { rounds: 130, spend: 18000, minutes: 7, leverage: 2 },
+    brief: 'The dome bears on the drum and the drum on eight piers. Take one corner out and the dome comes down in a sheet.',
   },
   segovia: {
     id: 'segovia',
     terrain: 'segovia',
     lat: 40.94795, lon: -4.11798,
-    name: 'AQUEDUCT OF SEGOVIA',
-    place: 'Segovia',
-    target: 'AQUEDUCT OF SEGOVIA',
-    subtitle: 'Aqueduct of Segovia, Segovia',
-    victory: 'TODO(segovia) THE LINE THE END CARD LEADS WITH',
-    // TODO(segovia) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(segovia) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(segovia) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(segovia) the postcard angle
+    name: 'Aqueduct of Segovia',
+    place: 'Plaza del Azoguejo, Segovia',
+    target: 'THE AQUEDUCT',
+    subtitle: 'Acueducto romano \u00b7 Plaza del Azoguejo',
+    victory: 'Water Under the Bridge',
+    // Castile at a thousand metres: grey granite, ochre render and red tile,
+    // dry gold ground, holm oak on the slopes, the two rivers small and
+    // green in their valleys.
+    palette: {
+      urban: new THREE.Color(0xc6ae8e),
+      urbanAlt: new THREE.Color(0xad8f6a),
+      park: new THREE.Color(0x6e7442),
+      parkAlt: new THREE.Color(0x7d804a),
+      road: new THREE.Color(0x6d6862),
+      bank: new THREE.Color(0xc1b394),
+      bed: new THREE.Color(0x56664c),
+      dry: new THREE.Color(0xd2c39f),
+    },
+    // High, dry and clear: the meseta in September.
+    setting: { hinterland: 'fields', haze: { colour: 0xd6d3c8, density: 0.00017 } },
+    // The Azoguejo's houses stand hard against the aqueduct — the survey has
+    // sixty-one within a hundred and twenty metres, the nearest thirty-six
+    // metres off. The line's own footprint keeps them off the piers; this
+    // clears only the plaza itself.
+    cityExcludeRadius: 45,
+    contextExclude: 45,
+    // The ground under an aqueduct is not level, and the piers are founded
+    // twenty-six metres down to meet whatever the bake has: no pad.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the plaza, the south-west side, low: the two tiers running across
+    // the frame from the Plaza de Día Sanz to the Postigo.
+    camera: { yaw: -0.73, pitch: 0.09, distance: 400, height: 30 },
     structures: (quality) => [
-      { key: 'segovia', blocks: buildSegovia(quality), primary: true, required: true, label: 'AQUEDUCT OF SEGOVIA' },
+      { key: 'segovia', blocks: buildSegovia(quality), primary: true, required: true, label: 'AQUEDUCT' },
     ],
     garrison: (g, origin, groundY) => populateSegovia(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(segovia)
-    traits: { windows: false, river: false, topples: true },           // TODO(segovia)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(segovia) from the suite's undercut
-    brief: 'TODO(segovia) one sentence: what the player has to find out about this building.',
+    scoreTags: ['lowerpiers', 'lowerarches', 'upperpiers', 'upperarches', 'channel'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    traits: { windows: false, river: false, topples: true },
+    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },
+    brief: 'An arcade shares its thrust. Take one pier and two arches go; the piers beside them are unbraced, and the chain unzips to the next wide one.',
   },
   atomium: {
     id: 'atomium',
     terrain: 'atomium',
     lat: 50.89494, lon: 4.34144,
-    name: 'ATOMIUM',
-    place: 'Brussels',
-    target: 'ATOMIUM',
-    subtitle: 'Atomium, Brussels',
-    victory: 'TODO(atomium) THE LINE THE END CARD LEADS WITH',
-    // TODO(atomium) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(atomium) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(atomium) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(atomium) the postcard angle
+    name: 'Atomium, Brussels',
+    place: 'Heysel, Brussels',
+    target: 'THE ATOMIUM',
+    subtitle: 'Atomium \u00b7 Heysel Plateau',
+    victory: 'Split the Atom',
+    // Brabant in the north: brick and grey render, the Heysel's plane trees
+    // and the Ossegem park, flat, damp and green. No water on the map.
+    palette: {
+      urban: new THREE.Color(0xb3a08c),
+      urbanAlt: new THREE.Color(0x9b8470),
+      park: new THREE.Color(0x4f7038),
+      parkAlt: new THREE.Color(0x5e7d40),
+      road: new THREE.Color(0x5e5d5c),
+      bank: new THREE.Color(0xa89c86),
+      bed: new THREE.Color(0x3f5648),
+      dry: new THREE.Color(0xb9b3a0),
+    },
+    setting: { haze: { colour: 0xcfd4d8, density: 0.00026 } },
+    // The Heysel is open ground: the survey has the Atomium and three sheds
+    // within a hundred and twenty metres, and the exhibition halls beyond.
+    // Two hundred metres of spheres wants the esplanade clear round it.
+    cityExcludeRadius: 150,
+    contextExclude: 140,
+    // From the south-east, square on to a lower sphere, with the two upper
+    // spheres either side of it and the whole molecule standing on its
+    // one vertex.
+    camera: { yaw: 1.36, pitch: 0.12, distance: 560, height: 95 },
     structures: (quality) => [
       { key: 'atomium', blocks: buildAtomium(quality), primary: true, required: true, label: 'ATOMIUM' },
     ],
     garrison: (g, origin, groundY) => populateAtomium(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(atomium)
-    traits: { windows: false, river: false, topples: true },           // TODO(atomium)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(atomium) from the suite's undercut
-    brief: 'TODO(atomium) one sentence: what the player has to find out about this building.',
+    // The pavilion is a shed; the molecule is the target.
+    scoreTags: ['spheres', 'tubes', 'column', 'bipods'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    // Cut a bipod and it is a tower on one leg; cut the column and it goes.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 1,
+    par: { rounds: 50, spend: 8000, minutes: 4, leverage: 6 },
+    brief: 'The mass is in the spheres and the spheres carry only themselves. The load runs down the column and three pairs of legs.',
   },
   tokyotower: {
     id: 'tokyotower',
