@@ -1353,22 +1353,53 @@ export const LEVELS = {
     place: 'Sintra',
     target: 'PENA PALACE',
     subtitle: 'Pena Palace, Sintra',
-    victory: 'TODO(pena) THE LINE THE END CARD LEADS WITH',
-    // TODO(pena) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(pena) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(pena) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(pena) the postcard angle
+    victory: 'The Pena Drops',
+    // The Serra de Sintra: granite under a wet Atlantic forest, moss and
+    // fern on every wall, the town's stone a grey-green. Nothing here is a
+    // desert colour.
+    palette: {
+      urban: new THREE.Color(0x7c8a5c),
+      urbanAlt: new THREE.Color(0x66744a),
+      park: new THREE.Color(0x3d5a2e),
+      parkAlt: new THREE.Color(0x4a6a35),
+      road: new THREE.Color(0x6b655e),
+      bank: new THREE.Color(0x8a8a6a),
+      bed: new THREE.Color(0x35452c),
+      dry: new THREE.Color(0x8d9367),
+    },
+    // Forest to every horizon, closing in past the palace's own crag; a thin
+    // sea mist, because the Atlantic is ten kilometres west and the serra
+    // makes its own weather.
+    setting: {
+      hinterland: 'forest', canopy: 2.4, canopyFrom: 110,
+      haze: { colour: 0xc6d2d6, density: 0.00016 },
+    },
+    // The fifteen outlines the survey finds within a hundred and twenty
+    // metres are the palace's own parts, all rebuilt here at 1.8; the
+    // bastion stands a hundred metres out at the south-west corner.
+    cityExcludeRadius: 130,
+    contextExclude: 120,
+    // A summit. The bake's crag is the floor, nothing is flattened, and the
+    // terrace carries its own footing twenty-six metres down to meet the rock
+    // where the ridge falls away at either end.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the south-east and low, the Cruz Alta view: the bastion and the
+    // yellow palace in front, the red monastery and the clock tower behind.
+    camera: { yaw: 0.80, pitch: 0.15, distance: 420, height: 30 },
     structures: (quality) => [
       { key: 'pena', blocks: buildPena(quality), primary: true, required: true, label: 'PENA PALACE' },
     ],
     garrison: (g, origin, groundY) => populatePena(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(pena)
-    traits: { windows: false, river: false, topples: true },           // TODO(pena)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(pena) from the suite's undercut
-    brief: 'TODO(pena) one sentence: what the player has to find out about this building.',
+    // The palace, not the terrace it stands on.
+    scoreTags: ['monastery', 'chapel', 'newpalace', 'gate', 'clocktower', 'bastion'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 70, spend: 12000, minutes: 5, leverage: 6 },
+    brief: 'The round bastion stands on the cliff on its own footing and the palace leans on it. Undercut the bastion and it goes down the west face alone.',
   },
+
   hassan: {
     id: 'hassan',
     terrain: 'hassan',
