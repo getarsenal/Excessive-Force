@@ -304,8 +304,11 @@ export function populateAngkor(g, origin, groundY) {
         Math.atan2(sx, 0), 8, { cover: 'roof' });
     }
   }
-  // Mortars on the second terrace, east of the pyramid.
+  // Mortars dug in on the lawn between the second and outer enclosures, north
+  // of the pyramid. A crew on a terrace has the terrace's own stone in the
+  // muzzle's cell and the arc is refused before the bomb has left the pit;
+  // on open ground every high arc clears the galleries.
   for (let i = 0; i < 4; i++) {
-    g.place('mortar', V(T.cx + T.w / 2 - T.depth - 6.0, T.terrace + 0.3, (i - 1.5) * 14), Math.PI / 2, 9, { cover: 'roof' });
+    g.place('mortar', V(SECOND.cx * S + (i - 1.5) * 16, 0.3, -(SECOND.d / 2 + 18) * S), 0, 9, { cover: 'roof', emplaced: true });
   }
 }

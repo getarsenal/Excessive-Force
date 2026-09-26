@@ -343,8 +343,12 @@ export function populateGyeongbok(g, origin, groundY) {
         Math.atan2(sx, sz), 8, { cover: 'roof' });
     }
   }
-  // Mortars on the terrace behind the hall.
-  for (let i = 0; i < 3; i++) {
-    g.place('mortar', V((i - 1) * 14, K.terraceH + 0.5, -(H.d / 2 + 6)), Math.PI, 9, { cover: 'roof' });
+  // Mortars dug in on the courtyard's paving, in the south-east and south-west
+  // corners inside the cloister: open ground, so every high arc clears the
+  // cloister roof, where a crew on the terrace had the terrace in the way.
+  for (const sx of [-1, 1]) {
+    for (let i = 0; i < 2; i++) {
+      g.place('mortar', V(sx * (COURT.w / 2 - 16) * S, 0.3, (COURT.cz + COURT.d / 2 - 28 - i * 10) * S), 0, 9, { cover: 'roof', emplaced: true });
+    }
   }
 }
