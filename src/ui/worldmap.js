@@ -346,7 +346,12 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       const num = String(p.t.no).padStart(2, '0');
       const sel = p.g.classList.contains('sel');
       const wanted = sel || p.t.id === current || (p.t.open && !p.t.down);
-      const show = wanted || near >= 80;
+      // Fitted to the screen, or near it, nothing but those two: forty-one
+      // pins at the opening zoom are dots whatever room they have, and the
+      // names only start to appear once the map has been zoomed past twice
+      // the fitted scale — and then only where there is room for them.
+      const zoomed = view.k > kFit * 2.2;
+      const show = wanted || (zoomed && near >= 80);
       p.g.classList.toggle('mute', !show);
       const want = `${num} ${p.t.city}`;
       if (p.text.textContent !== want) p.text.textContent = want;
