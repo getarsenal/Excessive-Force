@@ -1329,22 +1329,55 @@ export const LEVELS = {
     place: 'Normandy',
     target: 'MONT-SAINT-MICHEL',
     subtitle: 'Mont-Saint-Michel, Normandy',
-    victory: 'TODO(montstmichel) THE LINE THE END CARD LEADS WITH',
-    // TODO(montstmichel) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(montstmichel) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(montstmichel) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(montstmichel) the postcard angle
+    victory: 'Michel, Ma Belle',
+    // A granite rock in a tidal bay: grey stone village, salt-marsh green on
+    // the polders, the sands a pale grey-fawn and the sea a cold grey-green.
+    palette: {
+      urban: new THREE.Color(0xb3ab99),
+      urbanAlt: new THREE.Color(0x9e957f),
+      park: new THREE.Color(0x6d7f4a),
+      parkAlt: new THREE.Color(0x7a8c52),
+      road: new THREE.Color(0x6a665f),
+      bank: new THREE.Color(0xc2b89a),
+      bed: new THREE.Color(0x5a6e6a),
+      dry: new THREE.Color(0xcfc6a8),
+    },
+    // Water to every horizon at high tide, and Channel air: cool, damp,
+    // never quite clear.
+    setting: {
+      hinterland: 'harbour',
+      haze: { colour: 0xc8d2d8, density: 0.00020 },
+    },
+    // The abbey's own outlines lie within forty metres of the summit and are
+    // rebuilt here at 1.3; the village — seventy houses, hotels and towers
+    // the survey has by name — begins seventy metres out on the south-east
+    // benches and is kept, on its own streets, inside its own ramparts.
+    cityExcludeRadius: 70,
+    contextExclude: 65,
+    // A summit. The bake's rock is the floor and nothing is flattened; the
+    // church, the crypts and the Merveille carry their footings down to
+    // meet it, thirty-six metres under the nave floor on the north face.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the bay to the south-south-west, low, the way it is seen from the
+    // causeway: the village up the rock, the Merveille's flank, the spire.
+    camera: { yaw: -0.35, pitch: 0.10, distance: 700, height: 30 },
     structures: (quality) => [
       { key: 'montstmichel', blocks: buildMontstmichel(quality), primary: true, required: true, label: 'MONT-SAINT-MICHEL' },
     ],
     garrison: (g, origin, groundY) => populateMontstmichel(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(montstmichel)
-    traits: { windows: false, river: false, topples: true },           // TODO(montstmichel)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(montstmichel) from the suite's undercut
-    brief: 'TODO(montstmichel) one sentence: what the player has to find out about this building.',
+    // The church, its spire and the Merveille: not the crypts under them,
+    // which are the trick, and not the lodgings.
+    scoreTags: ['church', 'spire', 'merveille'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none' },
+    // Walls founded in a rock: nothing here goes over as a whole. The church
+    // comes off its crypts a part at a time.
+    traits: { windows: true, river: false, topples: false },
+    unlockScale: 3,
+    par: { rounds: 120, spend: 18000, minutes: 7, leverage: 2 },
+    brief: 'The church stands on the summit only at its nave; the choir and the north transept stand on crypts built out over the rock. Break a crypt and the church above it goes down the face.',
   },
+
   pena: {
     id: 'pena',
     terrain: 'pena',
