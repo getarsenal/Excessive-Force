@@ -1131,25 +1131,34 @@ export const LEVELS = {
     id: 'towerbridge',
     terrain: 'towerbridge',
     lat: 51.5076, lon: -0.0761,
-    name: 'TOWER BRIDGE',
-    place: 'London',
+    name: 'Tower Bridge, London',
+    place: 'Tower Hill, London',
     target: 'TOWER BRIDGE',
-    subtitle: 'Tower Bridge, London',
-    victory: 'TODO(towerbridge) THE LINE THE END CARD LEADS WITH',
-    // TODO(towerbridge) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(towerbridge) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(towerbridge) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(towerbridge) the postcard angle
+    subtitle: 'Tower Bridge \u00b7 the Pool of London',
+    victory: 'Drawbridge Down',
+    // The default ground is London: brick dust, parkland, the Thames a wet
+    // silt green. This is London.
+    // The origin is on Tower Hill with the Tower of London fifty-seven
+    // metres north of it; the survey has forty-five of its buildings within
+    // a hundred and twenty metres, the White Tower and the Wakefield Tower
+    // among them. The bridge's own footprint keeps the town off its deck;
+    // this clears only the approach.
+    cityExcludeRadius: 38,
+    contextExclude: 38,
+    // From the north bank downstream — St Katharine's — looking across at
+    // the north tower with the bridge running away to Bermondsey behind it.
+    camera: { yaw: -2.20, pitch: 0.12, distance: 400, height: 55 },
     structures: (quality) => [
       { key: 'towerbridge', blocks: buildTowerbridge(quality), primary: true, required: true, label: 'TOWER BRIDGE' },
     ],
     garrison: (g, origin, groundY) => populateTowerbridge(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(towerbridge)
-    traits: { windows: false, river: false, topples: true },           // TODO(towerbridge)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(towerbridge) from the suite's undercut
-    brief: 'TODO(towerbridge) one sentence: what the player has to find out about this building.',
+    // The towers and what ties them; the piers, the abutments and the decks
+    // are the ground the fight is on.
+    scoreTags: ['northtower', 'southtower', 'walkways'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none', river: 'embankment' },
+    traits: { windows: true, river: true, topples: true },
+    par: { rounds: 90, spend: 14000, minutes: 5, leverage: 6 },
+    brief: 'The spans rest on the towers and the walkways tie them. Cut a pier and the tower, the walkway ends and both spans on it go into the river.',
   },
   florence: {
     id: 'florence',
