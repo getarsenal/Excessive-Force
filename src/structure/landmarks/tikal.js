@@ -273,7 +273,9 @@ function populateTemple(g, K, origin, groundY, opts) {
   }
   if (opts.mortars) {
     for (const sz of [-1, 1]) {
-      g.place('mortar', V(-d * (K.base.hx * 0.35), K.ledges[0].y + 1.0, sz * K.base.hz * 0.5), -front, 7, { cover: 'roof' });
+      // Dug in on the plaza in front of the stair: a crew on a ledge has the
+      // ledge in the muzzle's cell and never gets a shot off.
+      g.place('mortar', V(-d * (K.base.hx + 14), 0.3, sz * K.base.hz * 0.5), -front, 7, { cover: 'roof', emplaced: true });
     }
   }
 }

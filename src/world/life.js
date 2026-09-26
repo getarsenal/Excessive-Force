@@ -261,6 +261,7 @@ export class Life {
   _buildBoats(scene, n, fleet) {
     if (n <= 0 || !fleet || !fleet.length) return null;
     const chains = this._waterways();
+    this.channels = chains.length;
     if (!chains.length) return null;
     const grand = chains.reduce((a, c) => a + c.total, 0);
     // As many boats as there is water for. Six on three hundred metres of

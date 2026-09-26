@@ -1004,20 +1004,25 @@ export class TestMenu {
         // mostly opaque, not that every line through it is.
         const top = st.standingHeight();
         const reach = Math.max(140, (st.footprint ? st.footprint.x1 - st.footprint.x0 : 0) * 1.6);
+        // Through the middle of the masonry, which is not always the origin:
+        // Tower Bridge is built from an abutment on the bank and its towers
+        // stand a hundred metres out in the river.
+        const fp = st.footprint;
+        const mid = fp ? { x: (fp.x0 + fp.x1) / 2, z: (fp.z0 + fp.z1) / 2 } : { x: st.origin.x, z: st.origin.z };
         const hs = [0.18, 0.3, 0.42, 0.54, 0.66];
         let blocked = 0;
         for (const f of hs) {
           const y = b.originGround + Math.max(6, (top - b.originGround) * f);
-          const a2 = new THREE.Vector3(st.origin.x - reach, y, st.origin.z);
-          const d2 = new THREE.Vector3(st.origin.x + reach, y, st.origin.z);
+          const a2 = new THREE.Vector3(mid.x - reach, y, mid.z);
+          const d2 = new THREE.Vector3(mid.x + reach, y, mid.z);
           if (!lineOfSight(c.structures, a2, d2, 0, 0)) blocked++;
         }
         assert(blocked >= hs.length - 1,
           `only ${blocked} of ${hs.length} lines through the building were blocked`);
         const high = b.originGround + top + 200;
         assert(lineOfSight(c.structures,
-          new THREE.Vector3(st.origin.x - reach, high, st.origin.z),
-          new THREE.Vector3(st.origin.x + reach, high, st.origin.z), 0, 0),
+          new THREE.Vector3(mid.x - reach, high, mid.z),
+          new THREE.Vector3(mid.x + reach, high, mid.z), 0, 0),
         'a line 200 m over the building came back blocked');
         return `${blocked}/${hs.length} through blocked, over clear`;
       }],
@@ -1912,6 +1917,7 @@ export class TestMenu {
         assert(d, 'the detail pass did not run');
         // `wall` is the river wall, and a level with no river has none.
         const traits = c.level.traits || {};
+        if (traits.remote) return 'remote: a village on a rock has no lamps, parked cars or street trees to count';
         const want = ['lamps', 'parked', 'cornices', 'porches', 'streetTrees'];
         if (traits.river !== false) want.push('wall');
         const thin = want.filter((k) => !(d[k] > 20));
@@ -1997,6 +2003,10 @@ export class TestMenu {
         // A level with no river has no river wall, and no railed precinct or
         // statuary either where the monument stands in open desert.
         if (traits.river === false) { delete want.wall; delete want.railing; delete want.statues; }
+        // An island, a cape, a ridge in the wild: there is no country beyond
+        // the town because there is no town, and the fog is the sea or the
+        // forest. Mont-Saint-Michel has no fields and is not supposed to.
+        if (traits.remote) { delete want.fields; delete want.towers; delete want.track; }
         // A surveyed city has the railways it has, and no invented one.
         if (c.cityGroup?.userData?.network?.real) delete want.track;
         // Programmes go in the blocks that were left open, so what is being
@@ -2108,7 +2118,11 @@ export class TestMenu {
         const was = read();
         // The fleet is sized to the water now — one boat per hundred and
         // twenty metres of channel — so a stream carries three and a harbour
-        // fourteen. "Nothing on it" means nothing.
+        // fourteen. "Nothing on it" means nothing — where the router found a
+        // channel at all. A lake that touches the map edge is a river to
+        // `riverExits` and no channel to the router, and a boat on it would be
+        // a boat on dry land.
+        if (life && life.channels === 0) return 'the water reaches the edge but no channel of it is navigable; no fleet';
         assert(was.length >= 1, 'there is a river but nothing is on it');
         for (let k = 0; k < 10; k++) life.update(0.1);
         const now = read();
@@ -2192,6 +2206,7 @@ export class TestMenu {
         const city = this.ctx.cityGroup;
         const net = city?.userData?.network;
         const terrain = this.ctx.terrain;
+        if (c.level.traits?.remote) return 'remote: the survey has the roads it has, and there are few';
         assert(net, 'the city was built without a street network');
 
         // Two kinds of city, and they do not have the same invariants.
@@ -2661,6 +2676,9 @@ export class TestMenu {
         let lo = Infinity, hi = -Infinity;
         for (let i = 0; i < st.count; i++) {
           if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+          // Above the ground it stands on: a footing carried into a hill is
+          // grounded stone, and a cut through it severs nothing.
+          if (st.py[i] < (st.groundY ?? gy) - 0.5) continue;
           lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
         }
         assert(isFinite(lo) && hi - lo > 8,
@@ -2724,10 +2742,17 @@ export class TestMenu {
             }
             if (!isFinite(lo)) break;
             const wantY = lo + (hi - lo) * (0.3 + r * 0.09);
+            // The outermost stone at that height: the one a shell fired at
+            // the building would meet. The first stone found at the height
+            // was, on a pyramid, a stone in the middle of the core, and a
+            // blast inside a solid mountain frees nothing to recycle.
+            let bestR = -1;
             for (let i = 0; i < st.count; i++) {
               if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
               const d = Math.abs(st.py[i] - wantY);
-              if (d < bestd) { bestd = d; best = i; }
+              if (d > 1.5 && d >= bestd) continue;
+              const rr = Math.hypot(st.px[i] - st.origin.x, st.pz[i] - st.origin.z);
+              if (d < bestd - 1.5 || (d <= 1.5 && rr > bestR)) { bestd = Math.min(bestd, d); bestR = rr; best = i; }
             }
             if (best < 0) break;
             st.explode(

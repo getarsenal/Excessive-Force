@@ -349,7 +349,7 @@ export function populateBorobudur(g, origin, groundY) {
     // little further in than the middle of a side does.
     spots.forEach(([x, z], k) => {
       const type = i < 2 ? (k % 2 ? 'rifleman' : 'mg') : (i < 4 ? (k % 2 ? 'rifleman' : 'at') : (k % 2 ? 'sniper' : 'rifleman'));
-      g.place(type, V(x, t.top + 1.0, z), facing(x, z), 7, { cover: 'roof' });
+      g.place(type, V(x, t.top + 1.0, z), facing(x, z), 7, { cover: 'arcade' });   // the gallery walk, walled both sides
     });
   });
   // The round terraces: snipers among the bells, and the mortars on the

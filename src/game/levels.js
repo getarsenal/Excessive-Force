@@ -1156,7 +1156,7 @@ export const LEVELS = {
     // The towers and what ties them; the piers, the abutments and the decks
     // are the ground the fight is on.
     scoreTags: ['northtower', 'southtower', 'walkways'],
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none', river: 'embankment' },
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues', river: 'embankment' },
     traits: { windows: true, river: true, topples: true },
     par: { rounds: 90, spend: 14000, minutes: 5, leverage: 6 },
     brief: 'The spans rest on the towers and the walkways tie them. Cut a pier and the tower, the walkway ends and both spans on it go into the river.',
@@ -1294,7 +1294,7 @@ export const LEVELS = {
     scoreTags: ['spheres', 'tubes', 'column', 'bipods'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     // Cut a bipod and it is a tower on one leg; cut the column and it goes.
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: true, river: false, topples: true },
     unlockScale: 1,
     par: { rounds: 50, spend: 8000, minutes: 4, leverage: 6 },
     brief: 'The mass is in the spheres and the spheres carry only themselves. The load runs down the column and three pairs of legs.',
@@ -1600,7 +1600,7 @@ export const LEVELS = {
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none' },
     // Walls founded in a rock: nothing here goes over as a whole. The church
     // comes off its crypts a part at a time.
-    traits: { windows: true, river: false, topples: false },
+    traits: { windows: true, river: false, remote: true, topples: false },
     unlockScale: 1,
     par: { rounds: 120, spend: 18000, minutes: 7, leverage: 2 },
     brief: 'The church stands on the summit only at its nave; the choir and the north transept stand on crypts built out over the rock. Break a crypt and the church above it goes down the face.',
@@ -1706,7 +1706,7 @@ export const LEVELS = {
     // The minaret and the hall; not the esplanade.
     scoreTags: ['minaret', 'hall', 'roof', 'beams', 'columns'],
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
-    traits: { windows: true, river: false, topples: true },
+    traits: { windows: true, river: false, remote: true, topples: true },
     unlockScale: 2,
     par: { rounds: 80, spend: 15000, minutes: 5, leverage: 6 },
     brief: 'The minaret stands on four piers at the hall\'s corner, with an arch through every face. The piers are the fight; the hall is what it falls on.',
@@ -1758,9 +1758,9 @@ export const LEVELS = {
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
     // No floors a man stands in; the spheres are solid here. The shafts
     // go over the way they are cut.
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: false, river: false, topples: false, remote: true },
     unlockScale: 1,
-    par: { rounds: 45, spend: 9000, minutes: 4, leverage: 6 },
+    par: { rounds: 45, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'The mass is the balls and the shafts are slender. Cut a shaft below its sphere and the sphere comes down whole.',
   },
 
@@ -1805,7 +1805,7 @@ export const LEVELS = {
     // The hall and its two pylons. The Great Court and the First Pylon are
     // the approach, and the bar does not move for them.
     scoreTags: ['columns', 'architraves', 'clerestory', 'roof', 'pylon2', 'pylon3'],
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    precinct: { boundary: 'railings', ground: 'sand', ornament: 'statues' },
     // A colonnade has no windows to post men in and nothing on it topples:
     // the columns are cut and the roof comes down on the roof below.
     traits: { windows: false, river: true, topples: false },
@@ -2156,7 +2156,7 @@ export const LEVELS = {
     // A solid pyramid under a comb that goes over: the comb is what topples,
     // and the suite's undercut is aimed at the lowest scored stone — the
     // stair's foot — which drops the flight and not the hill.
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: false, river: false, remote: true, topples: true },
     unlockScale: 6,
     par: { rounds: 70, spend: 9000, minutes: 4, leverage: 6 },
     brief: 'The pyramid is a hill and does not score. The comb on top is a wall standing on a roof: cut its foot.',
@@ -2273,7 +2273,7 @@ export const LEVELS = {
     // Dry ashlar a few courses tall on retaining walls: no windows the suite
     // would post men in, no river within reach, and nothing tall enough to
     // go over.
-    traits: { windows: false, river: false, topples: false },
+    traits: { windows: false, river: false, remote: true, topples: false },
     unlockScale: 3,
     par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'Nothing here is tall. The temples stand on the ground the terrace walls hold up: cut a wall and the fill goes, and the stone on top with it.',
@@ -2326,9 +2326,9 @@ export const LEVELS = {
     },
     // Loops the men fire from, but the suite's window test wants a wing of
     // them; no river; the towers go over and the wall does not.
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: false, river: false, topples: false, remote: true },
     unlockScale: 2,
-    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 6 },
+    par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'The wall is a dyke full of rubble and does not fall. The towers are hollow and stand on the slope: undercut one downhill.',
   },
 };

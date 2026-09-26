@@ -464,6 +464,6 @@ export const FLEETS = {
   borobudur: [],
   tikal: [],
   teotihuacan: [],
-  machupicchu: [],
+  machupicchu: ['country-boat'],
   greatwall: [],
 };

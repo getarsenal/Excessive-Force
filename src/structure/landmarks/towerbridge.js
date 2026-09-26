@@ -226,7 +226,11 @@ export function buildTowerbridge(quality) {
           // The hanger, from the deck to the link.
           const hangerTop = y - CHAIN.t / 2;
           B.add(x, (DECK + hangerTop) / 2, z, 0.2, (hangerTop - DECK) / 2 - 0.01, 0.2, M.RAILING);
-          B.add(x, y, z, CHAIN.t / 2, CHAIN.t / 2, B.shrink(seg / 2), M.STEEL);
+          // RAILING, not STEEL: a chain is in tension and nothing may rest on
+          // it. As a stack of steel links it was a bearing path from the tower
+          // top down to the abutment, and the top of a tower cut clean through
+          // stood on its own chains.
+          B.add(x, y, z, CHAIN.t / 2, CHAIN.t / 2, B.shrink(seg / 2), M.RAILING);
         }
       }
     };

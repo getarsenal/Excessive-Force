@@ -331,7 +331,7 @@ export function populateTeotihuacan(g, origin, groundY) {
   for (let i = 0; i < 4; i++) {
     const z = (i - 1.5) * (K.adosada.width / 5);
     if (Math.abs(z) < K.stairW / 2 + 2) continue;
-    g.place(i % 2 ? 'rifleman' : 'mg', V(-(K.base / 2 + K.adosada.out - 6), K.adosada.top + 1.0, z), -Math.PI / 2, 7, { cover: 'roof' });
+    g.place(i % 2 ? 'rifleman' : 'mg', V(-(K.base / 2 + K.adosada.out - 6), K.adosada.top + 1.0, z), -Math.PI / 2, 7, { cover: 'arcade' });   // in the Adosada's recess under the first body
   }
   // The summit: mortars behind the temple, snipers at the edge.
   for (const [x, z] of [[K.temple.w * 0.9, 0], [-K.temple.w * 0.9, 0], [0, K.temple.w * 0.9]]) {
