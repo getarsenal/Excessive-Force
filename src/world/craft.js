@@ -456,7 +456,7 @@ export const FLEETS = {
   hassan: ['fishing', 'fishing', 'dhow'],
   kuwait: ['dhow', 'dhow', 'yacht'],
   karnak: ['felucca', 'felucca', 'river-cruise'],
-  forbidden: [],
+  forbidden: ['rowing', 'rowing'],
   gyeongbok: [],
   watarun: ['sampan', 'sampan', 'ferry', 'country-boat'],
   shwedagon: [],

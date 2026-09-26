@@ -228,7 +228,9 @@ export function populateWatarun(g, origin, groundY) {
       const a = (i - (n - 1) / 2) * ((T.half * 2 - 2 * inset - 4) / n);
       if (Math.abs(Math.abs(a) - STAIRS.off * S) < STAIRS.w * S * 0.6) continue;   // a stair comes up here
       const x = ax * (T.half - inset) - az * a, z = az * (T.half - inset) + ax * a;
-      g.place(type, V(x, T.top + 0.4, z), Math.atan2(ax, az), 7, { cover: 'roof' });
+      // The lowest terrace's men stand in the niches under the terrace above,
+      // which is the cover a prang has: an arcade, not a window.
+      g.place(type, V(x, T.top + 0.4, z), Math.atan2(ax, az), 7, { cover: t === 0 ? 'arcade' : 'roof' });
     }
   };
   for (let i = 0; i < 3; i++) walk(0, i, 3, i === 1 ? 'mg' : 'rifleman');

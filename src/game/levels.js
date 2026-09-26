@@ -1572,7 +1572,7 @@ export const LEVELS = {
       { key: 'watarun', blocks: buildWatarun(quality), primary: true, required: true, label: 'WAT ARUN' },
     ],
     garrison: (g, origin, groundY) => populateWatarun(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none', river: 'ghats' },
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues', river: 'ghats' },
     traits: { windows: false, river: true, topples: false },
     // Solid brick, twice life: a tenth of Khufu's mass and a good deal of it.
     unlockScale: 4,
