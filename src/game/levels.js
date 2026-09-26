@@ -1155,25 +1155,48 @@ export const LEVELS = {
     id: 'florence',
     terrain: 'florence',
     lat: 43.77313, lon: 11.256,
-    name: 'FLORENCE CATHEDRAL',
-    place: 'Florence',
-    target: 'FLORENCE CATHEDRAL',
-    subtitle: 'Florence Cathedral, Florence',
-    victory: 'TODO(florence) THE LINE THE END CARD LEADS WITH',
-    // TODO(florence) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(florence) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(florence) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(florence) the postcard angle
+    name: 'Santa Maria del Fiore, Florence',
+    place: 'Piazza del Duomo, Florence',
+    target: 'THE DUOMO',
+    subtitle: 'Cattedrale di Santa Maria del Fiore \u00b7 Piazza del Duomo',
+    victory: 'Dome, Sweet Dome',
+    // Tuscany: ochre render and terracotta roofs packed tight round the
+    // piazza, the Arno olive-green at the map's edge, cypress on the hills.
+    palette: {
+      urban: new THREE.Color(0xc2a07f),
+      urbanAlt: new THREE.Color(0xa87e5c),
+      park: new THREE.Color(0x5f7040),
+      parkAlt: new THREE.Color(0x6d7c46),
+      road: new THREE.Color(0x77706a),
+      bank: new THREE.Color(0xb6a98d),
+      bed: new THREE.Color(0x60684a),
+      dry: new THREE.Color(0xc8bda4),
+    },
+    setting: { haze: { colour: 0xd9cfb4, density: 0.00027 } },
+    // The piazza is tight: the survey has seventy-nine buildings within a
+    // hundred and twenty metres, the Baptistery eighty metres west among
+    // them. The cathedral's own footprint keeps the houses off its walls;
+    // this only clears the piazza round the façade and lets the Baptistery
+    // stand where it does.
+    cityExcludeRadius: 62,
+    contextExclude: 62,
+    // From the south-east, over the roofs: the dome on the right with the
+    // tribunes under it, the nave running away to the campanile and the
+    // façade on the left. The origin is mid-nave, so the frame is centred on
+    // the whole length of the building rather than on the dome.
+    camera: { yaw: 0.72, pitch: 0.12, distance: 430, height: 64 },
     structures: (quality) => [
-      { key: 'florence', blocks: buildFlorence(quality), primary: true, required: true, label: 'FLORENCE CATHEDRAL' },
+      { key: 'florence', blocks: buildFlorence(quality), primary: true, required: true, label: 'THE DUOMO' },
     ],
     garrison: (g, origin, groundY) => populateFlorence(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(florence)
-    traits: { windows: false, river: false, topples: true },           // TODO(florence)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(florence) from the suite's undercut
-    brief: 'TODO(florence) one sentence: what the player has to find out about this building.',
+    // The nave and the tribunes are where the men are; the bar moves for
+    // the dome and what it stands on, and for Giotto's tower.
+    scoreTags: ['dome', 'drum', 'lantern', 'crossing', 'campanile'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A shell: the dome comes down in a sheet, it does not go over.
+    traits: { windows: true, river: false, topples: false },
+    par: { rounds: 130, spend: 18000, minutes: 7, leverage: 2 },
+    brief: 'The dome bears on the drum and the drum on eight piers. Take one corner out and the dome comes down in a sheet.',
   },
   segovia: {
     id: 'segovia',
