@@ -1,0 +1,17 @@
+{
+  "id": "machupicchu",
+  "name": "Machu Picchu, Cusco",
+  "lat": -13.16313,
+  "lon": -72.54495,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 1850.991,
+  "maxElevation": 2759.707,
+  "metersPerDemPixel": 4.6518,
+  "seaLevel": 1869.883,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 1869.059,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0164
+}

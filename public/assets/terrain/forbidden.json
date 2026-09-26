@@ -1,0 +1,17 @@
+{
+  "id": "forbidden",
+  "name": "Forbidden City, Beijing",
+  "lat": 39.91593,
+  "lon": 116.39069,
+  "spanMeters": 1100.0,
+  "size": 512,
+  "minElevation": 37.271,
+  "maxElevation": 56.059,
+  "metersPerDemPixel": 7.3283,
+  "seaLevel": 45.273,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 48.595,
+  "coastline": "surveyed",
+  "farSpan": 7700.0,
+  "farWater": 0.0433
+}

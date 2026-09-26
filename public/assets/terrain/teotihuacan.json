@@ -1,0 +1,16 @@
+{
+  "id": "teotihuacan",
+  "name": "Pyramid of the Sun, Teotihuacan",
+  "lat": 19.69245,
+  "lon": -98.84366,
+  "spanMeters": 1100.0,
+  "size": 512,
+  "minElevation": 2278.031,
+  "maxElevation": 2338.913,
+  "metersPerDemPixel": 8.9958,
+  "seaLevel": 2283.935,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 7700.0,
+  "farWater": 0.0002
+}

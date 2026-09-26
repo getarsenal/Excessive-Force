@@ -1,0 +1,17 @@
+{
+  "id": "montstmichel",
+  "name": "Mont-Saint-Michel, Normandy",
+  "lat": 48.63601,
+  "lon": -1.51141,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -4.793,
+  "maxElevation": 80.0,
+  "metersPerDemPixel": 3.157,
+  "seaLevel": -0.005,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.001,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.5335
+}

@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian and the Chinese are slots — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian, the Chinese and the thirteen nations of the fourth batch are slots — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -330,175 +330,175 @@
       "file": "it-officer.png",
       "nation": "Italy",
       "defends": "the Colosseum",
-      "look": "TODO(colosseum) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Italian Generale in dark blue service dress with gold braid, peaked cap, sunglasses, a hand on the hilt of a ceremonial sword."
     },
     "towerbridge": {
       "id": "uk-officer",
       "file": "uk-officer.png",
       "nation": "United Kingdom",
       "defends": "the Tower Bridge",
-      "look": "TODO(towerbridge) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "British Field Marshal in khaki service dress, red gorget patches, peaked cap with the crossed batons, swagger stick under the arm."
     },
     "florence": {
       "id": "it-officer",
       "file": "it-officer.png",
       "nation": "Italy",
       "defends": "the Florence Cathedral",
-      "look": "TODO(florence) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Italian Generale in dark blue service dress with gold braid, peaked cap, sunglasses, a hand on the hilt of a ceremonial sword."
     },
     "segovia": {
       "id": "es-officer",
       "file": "es-officer.png",
       "nation": "Spain",
       "defends": "the Aqueduct of Segovia",
-      "look": "TODO(segovia) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Spanish Capitán General in dark green dress uniform with a red sash, peaked cap with gold oak leaves, arms folded."
     },
     "atomium": {
       "id": "be-officer",
       "file": "be-officer.png",
       "nation": "Belgium",
       "defends": "the Atomium",
-      "look": "TODO(atomium) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Belgian Luitenant-generaal in dark green dress uniform with red collar tabs and gold stars, beret in hand."
     },
     "tokyotower": {
       "id": "jp-officer",
       "file": "jp-officer.png",
       "nation": "Japan",
       "defends": "the Tokyo Tower",
-      "look": "TODO(tokyotower) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Japanese Taishō in olive dress uniform with a peaked cap and white gloves, standing very straight."
     },
     "budapest": {
       "id": "hu-officer",
       "file": "hu-officer.png",
       "nation": "Hungary",
       "defends": "the Hungarian Parliament",
-      "look": "TODO(budapest) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Hungarian Vezérezredes in dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind."
     },
     "sagrada": {
       "id": "es-officer",
       "file": "es-officer.png",
       "nation": "Spain",
       "defends": "the Sagrada Familia",
-      "look": "TODO(sagrada) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Spanish Capitán General in dark green dress uniform with a red sash, peaked cap with gold oak leaves, arms folded."
     },
     "edinburgh": {
       "id": "uk-officer",
       "file": "uk-officer.png",
       "nation": "United Kingdom",
       "defends": "the Edinburgh Castle",
-      "look": "TODO(edinburgh) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "British Field Marshal in Highland dress: kilt, glengarry with a red hackle, service tunic, medals, jaw set."
     },
     "neuschwanstein": {
       "id": "de-officer",
       "file": "de-officer.png",
       "nation": "Germany",
       "defends": "the Neuschwanstein Castle",
-      "look": "TODO(neuschwanstein) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "German General in grey dress uniform with gold collar tabs and red stripes on the trousers, peaked cap, iron expression."
     },
     "montstmichel": {
       "id": "fr-officer",
       "file": "fr-officer.png",
       "nation": "France",
       "defends": "the Mont-Saint-Michel",
-      "look": "TODO(montstmichel) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "French Maréchal in dark blue dress uniform with oak-leaf kepi and seven stars, gloved hand raised in refusal."
     },
     "pena": {
       "id": "pt-officer",
       "file": "pt-officer.png",
       "nation": "Portugal",
       "defends": "the Pena Palace",
-      "look": "TODO(pena) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Portuguese General in dark green dress uniform with a red-and-green sash and gold shoulder boards, peaked cap."
     },
     "hassan": {
       "id": "ma-officer",
       "file": "ma-officer.png",
       "nation": "Morocco",
       "defends": "the Hassan II Mosque",
-      "look": "TODO(hassan) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Moroccan Général de Corps d'Armée in dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap."
     },
     "kuwait": {
       "id": "kw-officer",
       "file": "kw-officer.png",
       "nation": "Kuwait",
       "defends": "the Kuwait Towers",
-      "look": "TODO(kuwait) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Kuwaiti Farīq Awwal in khaki service dress with gold shoulder boards and a red beret, sunglasses."
     },
     "karnak": {
       "id": "eg-officer",
       "file": "eg-officer.png",
       "nation": "Egypt",
       "defends": "the Karnak Temple",
-      "look": "TODO(karnak) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Egyptian Field Marshal in khaki dress uniform with crossed batons and eagle, red collar tabs, peaked cap, swagger stick."
     },
     "forbidden": {
       "id": "cn-officer",
       "file": "cn-officer.png",
       "nation": "China",
       "defends": "the Forbidden City",
-      "look": "TODO(forbidden) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Chinese Shàngjiàng in olive dress uniform with gold shoulder boards and red collar, peaked cap with a red star."
     },
     "gyeongbok": {
       "id": "kr-officer",
       "file": "kr-officer.png",
       "nation": "South Korea",
       "defends": "the Gyeongbokgung",
-      "look": "TODO(gyeongbok) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "South Korean Daejang in dark green dress uniform with four silver stars, peaked cap, white gloves."
     },
     "watarun": {
       "id": "th-officer",
       "file": "th-officer.png",
       "nation": "Thailand",
       "defends": "the Wat Arun",
-      "look": "TODO(watarun) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Thai Phon Ek in white dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile."
     },
     "shwedagon": {
       "id": "mm-officer",
       "file": "mm-officer.png",
       "nation": "Myanmar",
       "defends": "the Shwedagon Pagoda",
-      "look": "TODO(shwedagon) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Myanmar Bogyoke in olive dress uniform with red collar and gold epaulettes, peaked cap, medals."
     },
     "angkor": {
       "id": "kh-officer",
       "file": "kh-officer.png",
       "nation": "Cambodia",
       "defends": "the Angkor Wat",
-      "look": "TODO(angkor) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Cambodian Oudom Seney in dark olive dress uniform with red collar tabs and gold stars, peaked cap."
     },
     "borobudur": {
       "id": "id-officer",
       "file": "id-officer.png",
       "nation": "Indonesia",
       "defends": "the Borobudur",
-      "look": "TODO(borobudur) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Indonesian Jenderal in dark green dress uniform with four gold stars, peaked cap, red-and-white cord."
     },
     "tikal": {
       "id": "gt-officer",
       "file": "gt-officer.png",
       "nation": "Guatemala",
       "defends": "the Tikal",
-      "look": "TODO(tikal) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Guatemalan General de División in olive dress uniform with gold epaulettes and a blue-white sash, peaked cap."
     },
     "teotihuacan": {
       "id": "mx-officer",
       "file": "mx-officer.png",
       "nation": "Mexico",
       "defends": "the Pyramid of the Sun",
-      "look": "TODO(teotihuacan) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Mexican General de División in dark green dress uniform with gold oak leaves, peaked cap, a hand on his belt."
     },
     "machupicchu": {
       "id": "pe-officer",
       "file": "pe-officer.png",
       "nation": "Peru",
       "defends": "the Machu Picchu",
-      "look": "TODO(machupicchu) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Peruvian General de Ejército in red-and-white sash over dark dress uniform, peaked cap with gold laurels."
     },
     "greatwall": {
       "id": "cn-officer",
       "file": "cn-officer.png",
       "nation": "China",
       "defends": "the Great Wall at Badaling",
-      "look": "TODO(greatwall) the officer's uniform, rank insignia and bearing, for the artist."
+      "look": "Chinese Shàngjiàng in olive dress uniform with gold shoulder boards and red collar, peaked cap with a red star, fur-lined greatcoat."
     }
   }
 }

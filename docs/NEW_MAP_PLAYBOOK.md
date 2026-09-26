@@ -19,6 +19,7 @@ them has its entry, and is the first thing to run when a level is "done":
 | `tools/bake_terrain.py` | The place: lat/lon, span, zoom, and the ground's corrections — river polyline, parks, flatten pads, `sea`, `ceiling`, `peak`. |
 | `tools/survey.py` | The aerial survey, read from the bakes: the ground under the origin, the level extent, every surveyed building within the exclusion radius with its name, and a plan. Run before writing a constant (§0b). |
 | `tools/newmap.mjs` | The scaffold: one command writes a marked stub into all eleven places a level touches and runs `mapcheck`, so the list that remains is the real work. |
+| `tools/loosecheck.mjs` | The support solver, dry, in Node: every stone it frees at a tier, by section, in a second. The same question `loose.mjs` asks the running game, without the browser; run it at `low` and `high` after every structural change. |
 | `tools/blocks.mjs` | The builder, dry, in Node: stones, the box above ground, taller-than-wide, sections, and the share of visible volume per material with its colour. A second, not a browser load. |
 | `tools/postcard.mjs` | The level from the level's own camera (or an override), HUD cleared, `--survey` for the load painter. The picture that goes beside the photograph. |
 | `tools/wateraudit.mjs` | Is the water right: share above its own surface, pits below it, pieces and whether they reach the edge, buildings on water, and every boat position over ground or through a plot. |
@@ -985,9 +986,17 @@ way and the suite once.
 Two probes worth reaching for before the whole suite:
 
 ```
-node tools/loose.mjs <id> low             # where the loose stones are, not how many
+node tools/loosecheck.mjs <id> low        # the solver in Node: every loose stone, by section, in a second
+node tools/loose.mjs <id> low             # the same in the running game, if you doubt the first
 node tools/look.mjs /tmp/out/<id> <id>    # three views, plus the blind ranks
 ```
+
+`loosecheck.mjs` is the one to reach for first. It builds the level's
+structures, stands each on flat ground and runs `solveStability` once,
+which is exactly what the game does at load; the twenty-five of the fourth
+batch were built to zero loose stones without a browser being opened
+until the postcard. It agrees with the suite on every level it was checked
+against.
 
 `loose.mjs` prints each detached stone's section, height, distance from the
 origin and size, which usually names the bug without opening the builder:
@@ -1055,7 +1064,11 @@ conflict. The garrison lives in the landmark module as
 adding methods to `defenders.js` at once would not merge. The box has cores
 for three browsers in total, so each builder runs one at a time and none
 while its own suite is up. `docs/THIRD_FIVE.md` is the brief that was
-handed over, and is the model for the next batch.
+handed over; `docs/FOURTH_BATCH.md` is the twenty-five that followed, built
+five builders at a time with `loosecheck.mjs` instead of a browser each, the
+bakes committed to the branch as they finished and merged into each
+worktree, and the contracts, cast, flags, fleets and blurbs written in the
+main checkout while the masonry was laid.
 
 ## 8. The request, and what it turns into
 
