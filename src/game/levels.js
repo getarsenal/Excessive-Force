@@ -1556,22 +1556,55 @@ export const LEVELS = {
     place: 'Normandy',
     target: 'MONT-SAINT-MICHEL',
     subtitle: 'Mont-Saint-Michel, Normandy',
-    victory: 'TODO(montstmichel) THE LINE THE END CARD LEADS WITH',
-    // TODO(montstmichel) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(montstmichel) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(montstmichel) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(montstmichel) the postcard angle
+    victory: 'Michel, Ma Belle',
+    // A granite rock in a tidal bay: grey stone village, salt-marsh green on
+    // the polders, the sands a pale grey-fawn and the sea a cold grey-green.
+    palette: {
+      urban: new THREE.Color(0xb3ab99),
+      urbanAlt: new THREE.Color(0x9e957f),
+      park: new THREE.Color(0x6d7f4a),
+      parkAlt: new THREE.Color(0x7a8c52),
+      road: new THREE.Color(0x6a665f),
+      bank: new THREE.Color(0xc2b89a),
+      bed: new THREE.Color(0x5a6e6a),
+      dry: new THREE.Color(0xcfc6a8),
+    },
+    // Water to every horizon at high tide, and Channel air: cool, damp,
+    // never quite clear.
+    setting: {
+      hinterland: 'harbour',
+      haze: { colour: 0xc8d2d8, density: 0.00020 },
+    },
+    // The abbey's own outlines lie within forty metres of the summit and are
+    // rebuilt here at 1.3; the village — seventy houses, hotels and towers
+    // the survey has by name — begins seventy metres out on the south-east
+    // benches and is kept, on its own streets, inside its own ramparts.
+    cityExcludeRadius: 70,
+    contextExclude: 65,
+    // A summit. The bake's rock is the floor and nothing is flattened; the
+    // church, the crypts and the Merveille carry their footings down to
+    // meet it, thirty-six metres under the nave floor on the north face.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the bay to the south-south-west, low, the way it is seen from the
+    // causeway: the village up the rock, the Merveille's flank, the spire.
+    camera: { yaw: -0.35, pitch: 0.09, distance: 520, height: 45 },
     structures: (quality) => [
       { key: 'montstmichel', blocks: buildMontstmichel(quality), primary: true, required: true, label: 'MONT-SAINT-MICHEL' },
     ],
     garrison: (g, origin, groundY) => populateMontstmichel(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(montstmichel)
-    traits: { windows: false, river: false, topples: true },           // TODO(montstmichel)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(montstmichel) from the suite's undercut
-    brief: 'TODO(montstmichel) one sentence: what the player has to find out about this building.',
+    // The church, its spire and the Merveille: not the crypts under them,
+    // which are the trick, and not the lodgings.
+    scoreTags: ['church', 'spire', 'merveille'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none' },
+    // Walls founded in a rock: nothing here goes over as a whole. The church
+    // comes off its crypts a part at a time.
+    traits: { windows: true, river: false, topples: false },
+    unlockScale: 1,
+    par: { rounds: 120, spend: 18000, minutes: 7, leverage: 2 },
+    brief: 'The church stands on the summit only at its nave; the choir and the north transept stand on crypts built out over the rock. Break a crypt and the church above it goes down the face.',
   },
+
   pena: {
     id: 'pena',
     terrain: 'pena',
@@ -1580,22 +1613,54 @@ export const LEVELS = {
     place: 'Sintra',
     target: 'PENA PALACE',
     subtitle: 'Pena Palace, Sintra',
-    victory: 'TODO(pena) THE LINE THE END CARD LEADS WITH',
-    // TODO(pena) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(pena) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(pena) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(pena) the postcard angle
+    victory: 'The Pena Drops',
+    // The Serra de Sintra: granite under a wet Atlantic forest, moss and
+    // fern on every wall, the town's stone a grey-green. Nothing here is a
+    // desert colour.
+    palette: {
+      urban: new THREE.Color(0x7c8a5c),
+      urbanAlt: new THREE.Color(0x66744a),
+      park: new THREE.Color(0x3d5a2e),
+      parkAlt: new THREE.Color(0x4a6a35),
+      road: new THREE.Color(0x6b655e),
+      bank: new THREE.Color(0x8a8a6a),
+      bed: new THREE.Color(0x35452c),
+      dry: new THREE.Color(0x8d9367),
+    },
+    // Forest to every horizon, closing in past the palace's own crag; a thin
+    // sea mist, because the Atlantic is ten kilometres west and the serra
+    // makes its own weather.
+    setting: {
+      hinterland: 'forest', canopy: 2.4, canopyFrom: 110,
+      haze: { colour: 0xc6d2d6, density: 0.00016 },
+    },
+    // The fifteen outlines the survey finds within a hundred and twenty
+    // metres are the palace's own parts, all rebuilt here at 1.8; the
+    // bastion stands a hundred metres out at the south-west corner.
+    cityExcludeRadius: 130,
+    contextExclude: 120,
+    // A summit. The bake's crag is the floor, nothing is flattened, and the
+    // terrace carries its own footing twenty-six metres down to meet the rock
+    // where the ridge falls away at either end.
+    groundLevel: 'bake',
+    padRadius: 0,
+    // From the south-east and low, the Cruz Alta view: the bastion and the
+    // yellow palace in front, the red monastery and the clock tower behind.
+    camera: { yaw: 0.80, pitch: 0.13, distance: 400, height: 30 },
     structures: (quality) => [
       { key: 'pena', blocks: buildPena(quality), primary: true, required: true, label: 'PENA PALACE' },
     ],
     garrison: (g, origin, groundY) => populatePena(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(pena)
-    traits: { windows: false, river: false, topples: true },           // TODO(pena)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(pena) from the suite's undercut
-    brief: 'TODO(pena) one sentence: what the player has to find out about this building.',
+    // The palace, not the terrace it stands on.
+    scoreTags: ['monastery', 'chapel', 'newpalace', 'gate', 'clocktower', 'bastion'],
+    precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
+    traits: { windows: true, river: false, topples: true },
+    // A million cubic metres, most of it the terrace's rubble.
+    unlockScale: 5,
+    par: { rounds: 70, spend: 12000, minutes: 5, leverage: 6 },
+    brief: 'The round bastion stands on the cliff on its own footing and the palace leans on it. Undercut the bastion and it goes down the west face alone.',
   },
+
   hassan: {
     id: 'hassan',
     terrain: 'hassan',
@@ -1604,22 +1669,48 @@ export const LEVELS = {
     place: 'Casablanca',
     target: 'HASSAN II MOSQUE',
     subtitle: 'Hassan II Mosque, Casablanca',
-    victory: 'TODO(hassan) THE LINE THE END CARD LEADS WITH',
-    // TODO(hassan) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(hassan) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(hassan) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(hassan) the postcard angle
+    victory: 'Last Call to Prayer',
+    // The white city on the Atlantic: pale render and limewash under
+    // everything, the corniche's watered green, and a cold grey-green sea.
+    palette: {
+      urban: new THREE.Color(0xd9d2c2),
+      urbanAlt: new THREE.Color(0xc4bba8),
+      park: new THREE.Color(0x5f7f48),
+      parkAlt: new THREE.Color(0x6e8c50),
+      road: new THREE.Color(0x4e4c49),
+      bank: new THREE.Color(0xcfc4a8),
+      bed: new THREE.Color(0x35585e),
+      dry: new THREE.Color(0xe0d8c4),
+    },
+    // Ocean on two sides, the medina and the port to the east and the new
+    // town's towers to the south-east. Flat roofs.
+    setting: {
+      hinterland: 'harbour',
+      downtown: { x: 1000, z: 1100, radius: 520, peak: 115 },
+      haze: { colour: 0xc9d3d8, density: 0.00020 },
+      roofPitch: 0,
+    },
+    // The survey has the whole platform as one outline; the hall and its
+    // apron reach a hundred and seventy metres from the origin at the far
+    // corner, and the city begins beyond the esplanade.
+    cityExcludeRadius: 190,
+    contextExclude: 180,
+    // From the corniche to the south-west, low, the way it is photographed:
+    // the minaret at the near corner, the hall running away along the sea.
+    camera: { yaw: -0.75, pitch: 0.12, distance: 720, height: 60 },
     structures: (quality) => [
       { key: 'hassan', blocks: buildHassan(quality), primary: true, required: true, label: 'HASSAN II MOSQUE' },
     ],
     garrison: (g, origin, groundY) => populateHassan(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(hassan)
-    traits: { windows: false, river: false, topples: true },           // TODO(hassan)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(hassan) from the suite's undercut
-    brief: 'TODO(hassan) one sentence: what the player has to find out about this building.',
+    // The minaret and the hall; not the esplanade.
+    scoreTags: ['minaret', 'hall', 'roof', 'beams', 'columns'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
+    traits: { windows: true, river: false, topples: true },
+    unlockScale: 2,
+    par: { rounds: 80, spend: 15000, minutes: 5, leverage: 6 },
+    brief: 'The minaret stands on four piers at the hall\'s corner, with an arch through every face. The piers are the fight; the hall is what it falls on.',
   },
+
   kuwait: {
     id: 'kuwait',
     terrain: 'kuwait',
@@ -1628,22 +1719,50 @@ export const LEVELS = {
     place: 'Kuwait City',
     target: 'KUWAIT TOWERS',
     subtitle: 'Kuwait Towers, Kuwait City',
-    victory: 'TODO(kuwait) THE LINE THE END CARD LEADS WITH',
-    // TODO(kuwait) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(kuwait) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(kuwait) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(kuwait) the postcard angle
+    victory: 'Sphere Today, Gone Tomorrow',
+    // The Gulf shore: pale sand under everything, the corniche's watered
+    // green, roads black and new, and the sea a made turquoise. Dubai's
+    // ground, a shade paler.
+    palette: {
+      urban: new THREE.Color(0xd6c9ad),
+      urbanAlt: new THREE.Color(0xc2b193),
+      park: new THREE.Color(0x6f8a4c),
+      parkAlt: new THREE.Color(0x7f9a55),
+      road: new THREE.Color(0x4c4a48),
+      bank: new THREE.Color(0xdccaa2),
+      bed: new THREE.Color(0x3c6b73),
+      dry: new THREE.Color(0xe3d5b2),
+    },
+    // Sea on three sides and the city's towers along the bay to the
+    // south-west. Nothing here pitches a roof.
+    setting: {
+      hinterland: 'harbour',
+      downtown: { x: -1100, z: 700, radius: 520, peak: 210 },
+      haze: { colour: 0xd9d6cc, density: 0.00022 },
+      roofPitch: 0,
+    },
+    // The three stand alone on the point: within a hundred and twenty metres
+    // the survey has only the towers' own footprints and the ticket office.
+    cityExcludeRadius: 110,
+    contextExclude: 100,
+    // From the corniche to the south-west, the way every photograph has
+    // them: the two balls overlapping, the needle behind, the Gulf beyond.
+    camera: { yaw: -0.60, pitch: 0.12, distance: 520, height: 90 },
     structures: (quality) => [
       { key: 'kuwait', blocks: buildKuwait(quality), primary: true, required: true, label: 'KUWAIT TOWERS' },
     ],
     garrison: (g, origin, groundY) => populateKuwait(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(kuwait)
-    traits: { windows: false, river: false, topples: true },           // TODO(kuwait)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(kuwait) from the suite's undercut
-    brief: 'TODO(kuwait) one sentence: what the player has to find out about this building.',
+    // The towers, not the plaza they stand on.
+    scoreTags: ['tower1', 'tower2', 'tower3', 'spheres'],
+    precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
+    // No floors a man stands in; the spheres are solid here. The shafts
+    // go over the way they are cut.
+    traits: { windows: false, river: false, topples: true },
+    unlockScale: 1,
+    par: { rounds: 45, spend: 9000, minutes: 4, leverage: 6 },
+    brief: 'The mass is the balls and the shafts are slender. Cut a shaft below its sphere and the sphere comes down whole.',
   },
+
   karnak: {
     id: 'karnak',
     terrain: 'karnak',
@@ -1652,22 +1771,49 @@ export const LEVELS = {
     place: 'Luxor',
     target: 'KARNAK TEMPLE',
     subtitle: 'Karnak Temple, Luxor',
-    victory: 'TODO(karnak) THE LINE THE END CARD LEADS WITH',
-    // TODO(karnak) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(karnak) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(karnak) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(karnak) the postcard angle
+    victory: 'Amun Down',
+    // The Nile valley in Upper Egypt: Giza's sand and dust with the green of
+    // the irrigated strip along the river instead of the plateau's scrub,
+    // and the silt-brown Nile itself. The air is the desert's, warm and thick.
+    palette: {
+      urban: new THREE.Color(0xc9b48a),
+      urbanAlt: new THREE.Color(0xb49b72),
+      park: new THREE.Color(0x6f8a48),
+      parkAlt: new THREE.Color(0x849a4c),
+      road: new THREE.Color(0x4a443c),
+      bank: new THREE.Color(0xd2bd92),
+      bed: new THREE.Color(0x6a6b4a),
+      dry: new THREE.Color(0xe0cda0),
+    },
+    setting: { haze: { colour: 0xe3d3b4, density: 0.00028 }, roofPitch: 0 },
+    // At twice life the temple runs from the Third Pylon to the First: three
+    // hundred and sixty metres east to west, two hundred and twenty-six wide.
+    // The survey has nothing here but the six-metre stubs Overture keeps for
+    // the ruins, and the precinct of Amun is a kilometre across in life, so
+    // the radius clears the whole of it and the town stays where it is.
+    cityExcludeRadius: 320,
+    contextExclude: 300,
+    // From the south-east, low, the way the Sacred Lake sees it: the Second
+    // Pylon's towers, the nave columns riding over the side roof with the
+    // clerestory between, and the First Pylon closing the far end.
+    camera: { yaw: 0.95, pitch: 0.11, distance: 480, height: 40 },
     structures: (quality) => [
       { key: 'karnak', blocks: buildKarnak(quality), primary: true, required: true, label: 'KARNAK TEMPLE' },
     ],
     garrison: (g, origin, groundY) => populateKarnak(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(karnak)
-    traits: { windows: false, river: false, topples: true },           // TODO(karnak)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(karnak) from the suite's undercut
-    brief: 'TODO(karnak) one sentence: what the player has to find out about this building.',
+    // The hall and its two pylons. The Great Court and the First Pylon are
+    // the approach, and the bar does not move for them.
+    scoreTags: ['columns', 'architraves', 'clerestory', 'roof', 'pylon2', 'pylon3'],
+    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // A colonnade has no windows to post men in and nothing on it topples:
+    // the columns are cut and the roof comes down on the roof below.
+    traits: { windows: false, river: true, topples: false },
+    // A million cubic metres of sandstone, most of it in two pylons.
+    unlockScale: 6,
+    par: { rounds: 110, spend: 16000, minutes: 6, leverage: 2 },
+    brief: 'The architraves are the load path. Cut a column and its two beams and the roof on them come down; cut a tall one and the nave roof lands on the aisles.',
   },
+
   forbidden: {
     id: 'forbidden',
     terrain: 'forbidden',
