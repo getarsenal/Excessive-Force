@@ -241,7 +241,8 @@ export function populateKuwait(g, origin, groundY) {
   for (const T of K.towers.slice(0, 2)) {
     const sp = T.spheres[0];
     for (const sx of [-1, 1]) {
-      g.place('sniper', V(T.x + sx * 5.5, sp.top + 0.3, T.z), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 8, { cover: 'roof' });
+      // One at the restaurant's window, one on the sphere's crown.
+      g.place('sniper', V(T.x + sx * 5.5, sp.top + 0.3, T.z), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 8, { cover: sx > 0 ? 'window' : 'roof' });
     }
   }
 }

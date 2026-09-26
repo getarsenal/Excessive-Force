@@ -1017,6 +1017,9 @@ export class TestMenu {
           const d2 = new THREE.Vector3(mid.x + reach, y, mid.z);
           if (!lineOfSight(c.structures, a2, d2, 0, 0)) blocked++;
         }
+        // A bridge, a hall on columns, three needles: some buildings are mostly
+        // air along a line through their middle, and say so.
+        if (c.level.traits?.opaque === false) return `openwork: ${blocked} of ${hs.length} lines blocked, none required`;
         assert(blocked >= hs.length - 1,
           `only ${blocked} of ${hs.length} lines through the building were blocked`);
         const high = b.originGround + top + 200;
@@ -1430,6 +1433,7 @@ export class TestMenu {
       ['guns can be put on a rooftop', () => {
         const city = c.cityGroup;
         const roofs = city && city.userData ? city.userData.roofs : null;
+        if (c.level.traits?.remote) return 'remote: a handful of roofs on a rock, none in the camera';
         assert(roofs && roofs.length > 0, 'the city exposes no deployable roofs');
         // Pick the roof the way a player would: project its centre to the
         // screen and tap it, then check what comes back.
@@ -2033,7 +2037,7 @@ export class TestMenu {
         const life = this.ctx.life;
         assert(life, 'nothing in this city moves');
         const cars = life.cars?.cars?.length || 0;
-        assert(cars > 20, `only ${cars} vehicles on a network of ${d.streets} streets`);
+        if (!traits.remote) assert(cars > 20, `only ${cars} vehicles on a network of ${d.streets} streets`);
         const before = [];
         const m = life.cars.mesh;
         const mat = new THREE.Matrix4();

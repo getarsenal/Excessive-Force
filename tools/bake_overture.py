@@ -1152,6 +1152,31 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
                 drowned = float(swallowed.mean() * 100)
                 w = np.where(swallowed, 0.0, w)
                 print(f"  dropped water the cut swallowed: {drowned:.2f}% of the map")
+        # Tidal flats. The survey draws the bay of Mont-Saint-Michel at high
+        # water, a polygon to the dyke; the game has one waterline, and at that
+        # line the whole level was sea with a rock in it and nowhere for a
+        # battery to stand. `dryAbove` on the level says how far above the
+        # surface a surveyed-wet cell has to be to be sand, and the channels
+        # below it stay wet.
+        dry_above = LEVELS[level_id].get("dryAbove")
+        if dry_above is not None and (w > 0.5).any():
+            surf_t = _water_surface(w, height, size)
+            flats = (w > 0.5) & (height > surf_t + float(dry_above))
+            print(f"  tidal flats: {float(flats.mean() * 100):.1f}% of the map is surveyed water "
+                  f"more than {dry_above} m over the surface at {surf_t:.2f} m; dried")
+            w = np.where(flats, 0.0, w)
+        # Or the tide is simply out. The tiles fill a bay flat at its own
+        # surface, so there is no height to dry the flats by; `dryWithin` says
+        # the sand is dry for this many metres round the origin, and the sea
+        # begins beyond it.
+        dry_within = LEVELS[level_id].get("dryWithin")
+        if dry_within is not None:
+            k = size / (2.0 * span)
+            gx = (np.arange(size) - size / 2.0) / k
+            rr = np.hypot(gx[None, :], gx[:, None])
+            near = (w > 0.5) & (rr < float(dry_within))
+            print(f"  low tide: dried {float(near.mean() * 100):.1f}% of the map within {dry_within} m of the origin")
+            w = np.where(near, 0.0, w)
         # A flatten pad with a stated height is land by declaration. The
         # survey's sea polygon is drawn to the scale of a gulf, and the Kuwait
         # Towers stand on a point of reclaimed rock a hundred metres across

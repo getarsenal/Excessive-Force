@@ -324,7 +324,8 @@ export function populateTeotihuacan(g, origin, groundY) {
     if (i < 2) spots.push([r, r], [-r, r], [r, -r], [-r, -r]);
     for (const [x, z] of spots) {
       if (x < 0 && Math.abs(z) < K.stairW / 2 + 2) continue;      // not on the stair
-      g.place(type, V(x, t.y + 1.0, z), Math.atan2(x, z), 7, { cover: 'roof' });
+      // The lowest tread's men stand in the talud's recess under the tablero above: an arcade's cover.
+      g.place(type, V(x, t.y + 1.0, z), Math.atan2(x, z), 7, { cover: i === 0 ? 'arcade' : 'roof' });
     }
   });
   // The Adosada's top, facing west down the avenue.

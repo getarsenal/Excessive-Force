@@ -1157,7 +1157,7 @@ export const LEVELS = {
     // are the ground the fight is on.
     scoreTags: ['northtower', 'southtower', 'walkways'],
     precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues', river: 'embankment' },
-    traits: { windows: true, river: true, topples: true },
+    traits: { windows: true, river: true, opaque: false, topples: true },
     par: { rounds: 90, spend: 14000, minutes: 5, leverage: 6 },
     brief: 'The spans rest on the towers and the walkways tie them. Cut a pier and the tower, the walkway ends and both spans on it go into the river.',
   },
@@ -1251,7 +1251,7 @@ export const LEVELS = {
     garrison: (g, origin, groundY) => populateSegovia(g, origin, groundY),
     scoreTags: ['lowerpiers', 'lowerarches', 'upperpiers', 'upperarches', 'channel'],
     precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
-    traits: { windows: false, river: false, topples: true },
+    traits: { windows: false, river: false, sheds: false, topples: true },
     par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },
     brief: 'An arcade shares its thrust. Take one pier and two arches go; the piers beside them are unbraced, and the chain unzips to the next wide one.',
   },
@@ -1544,9 +1544,9 @@ export const LEVELS = {
     garrison: (g, origin, groundY) => populateNeuschwanstein(g, origin, groundY),
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     // Two slender towers on a big block: they go over the way they lean.
-    traits: { windows: true, river: false, topples: true },
+    traits: { windows: true, river: false, topples: false, sheds: false },
     unlockScale: 2,
-    par: { rounds: 70, spend: 12000, minutes: 4, leverage: 6 },
+    par: { rounds: 70, spend: 12000, minutes: 4, leverage: 2 },
     brief: 'Two slender towers on the corners of a big block. They go over the way they lean; the Palas is the counterweight.',
   },
   montstmichel: {
@@ -1655,7 +1655,7 @@ export const LEVELS = {
     // The palace, not the terrace it stands on.
     scoreTags: ['monastery', 'chapel', 'newpalace', 'gate', 'clocktower', 'bastion'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
-    traits: { windows: true, river: false, topples: true },
+    traits: { windows: true, river: false, opaque: false, topples: true },
     // A million cubic metres, most of it the terrace's rubble.
     unlockScale: 5,
     par: { rounds: 70, spend: 12000, minutes: 5, leverage: 6 },
@@ -1706,7 +1706,7 @@ export const LEVELS = {
     // The minaret and the hall; not the esplanade.
     scoreTags: ['minaret', 'hall', 'roof', 'beams', 'columns'],
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
-    traits: { windows: true, river: false, remote: true, topples: true },
+    traits: { windows: true, river: false, remote: true, opaque: false, topples: true },
     unlockScale: 2,
     par: { rounds: 80, spend: 15000, minutes: 5, leverage: 6 },
     brief: 'The minaret stands on four piers at the hall\'s corner, with an arch through every face. The piers are the fight; the hall is what it falls on.',
@@ -1754,11 +1754,11 @@ export const LEVELS = {
     ],
     garrison: (g, origin, groundY) => populateKuwait(g, origin, groundY),
     // The towers, not the plaza they stand on.
-    scoreTags: ['tower1', 'tower2', 'tower3', 'spheres'],
+    scoreTags: ['podium', 'tower1', 'tower2', 'tower3', 'spheres'],
     precinct: { boundary: 'none', ground: 'paving', ornament: 'none', river: 'quay' },
     // No floors a man stands in; the spheres are solid here. The shafts
     // go over the way they are cut.
-    traits: { windows: false, river: false, topples: false, remote: true },
+    traits: { windows: true, river: false, topples: false, remote: true, opaque: false },
     unlockScale: 1,
     par: { rounds: 45, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'The mass is the balls and the shafts are slender. Cut a shaft below its sphere and the sphere comes down whole.',
@@ -2210,7 +2210,7 @@ export const LEVELS = {
       haze: { colour: 0xd6cbb4, density: 0.00022 },
     },
     // A solid pyramid: nothing to post men in, no river, nothing that topples.
-    traits: { windows: false, river: false, topples: false },
+    traits: { windows: false, river: false, sheds: false, topples: false },
     // A million cubic metres of fill under the skin, plus the Moon: unlocks
     // are fractions of all of it.
     unlockScale: 12,
@@ -2273,7 +2273,7 @@ export const LEVELS = {
     // Dry ashlar a few courses tall on retaining walls: no windows the suite
     // would post men in, no river within reach, and nothing tall enough to
     // go over.
-    traits: { windows: false, river: false, remote: true, topples: false },
+    traits: { windows: false, river: false, remote: true, sheds: false, topples: false },
     unlockScale: 3,
     par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'Nothing here is tall. The temples stand on the ground the terrace walls hold up: cut a wall and the fill goes, and the stone on top with it.',

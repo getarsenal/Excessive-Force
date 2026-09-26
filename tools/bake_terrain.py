@@ -514,6 +514,13 @@ LEVELS = {
         # The bay at high water: everything on the flats is under it, and the
         # Mont is an island with the causeway running off the map.
         "sea": {"level": 5.0, "depth": 6.0, "shore": 1.2},
+        # Low water: the survey's bay is dried where the sand stands more than
+        # this over the sea, and the Couesnon's channels stay wet.
+        "dryAbove": 1.5,
+        # And the tide out: sand for five hundred metres round the rock, the
+        # sea beyond it. The bay's floor is one flat plane in the tiles, so
+        # there is no height to dry it by; the guns stand on the sand.
+        "dryWithin": 520.0,
         "parks": [],
         # The rock, eighty metres, with the abbey on the summit and the village
         # climbing the south-east face on the benches.

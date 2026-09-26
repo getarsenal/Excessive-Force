@@ -38,7 +38,11 @@ html, body {
   overscroll-behavior: none;
 }
 
-#game-canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+/* The box is the viewport by CSS, not by the drawing buffer. A canvas with
+   `inset: 0` and no width takes its intrinsic size — the buffer's — so when
+   the frame governor drew fewer pixels the element itself shrank to nine
+   tenths of the screen and the rest was black. */
+#game-canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
 
 #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
 #ui > * { pointer-events: auto; }
