@@ -1209,21 +1209,42 @@ export const LEVELS = {
     place: 'Tokyo',
     target: 'TOKYO TOWER',
     subtitle: 'Tokyo Tower, Tokyo',
-    victory: 'TODO(tokyotower) THE LINE THE END CARD LEADS WITH',
-    // TODO(tokyotower) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(tokyotower) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(tokyotower) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(tokyotower) the postcard angle
+    victory: 'Big in Japan, Flat in Minato',
+    // Minato: grey concrete and glass, the parks of Shiba a dark green, the
+    // roads black. A Japanese city, not a Japanese castle town: Himeji's
+    // palette with the plaster and tile taken out of it.
+    palette: {
+      urban: new THREE.Color(0xb3b0aa),
+      urbanAlt: new THREE.Color(0x9a9791),
+      park: new THREE.Color(0x4a6838),
+      parkAlt: new THREE.Color(0x5a7a40),
+      road: new THREE.Color(0x4c4d51),
+      bank: new THREE.Color(0xa9a48f),
+      bed: new THREE.Color(0x3a4c4a),
+      dry: new THREE.Color(0xbdb7a5),
+    },
+    setting: { haze: { colour: 0xd3d6d9, density: 0.00024 } },
+    // FootTown is 76 m across and the feet reach 88; the survey's own rings
+    // are the only things inside sixty metres, and the Shiba Koen office
+    // blocks start at seventy. The old 120 deleted all thirty-seven of them.
+    cityExcludeRadius: 62,
+    contextExclude: 60,
+    // From the south-east, where Zojoji's great hall stands in front of it:
+    // the photograph everybody takes, the temple roof and the tower rising
+    // orange behind it. Far enough back to hold 333 m looking up.
+    camera: { yaw: 0.75, pitch: 0.14, distance: 480, height: 125 },
     structures: (quality) => [
       { key: 'tokyotower', blocks: buildTokyotower(quality), primary: true, required: true, label: 'TOKYO TOWER' },
     ],
     garrison: (g, origin, groundY) => populateTokyotower(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(tokyotower)
-    traits: { windows: false, river: false, topples: true },           // TODO(tokyotower)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(tokyotower) from the suite's undercut
-    brief: 'TODO(tokyotower) one sentence: what the player has to find out about this building.',
+    // The tower, not the building between its feet.
+    scoreTags: ['legs', 'arches', 'cage', 'observatory', 'upper', 'antenna'],
+    // Shiba Park: lawns and paths with a fence round the tower's own plot.
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'none' },
+    // A lattice: no windows to post men in, and the bay is a kilometre off.
+    traits: { windows: false, river: false, topples: true },
+    par: { rounds: 40, spend: 6000, minutes: 3, leverage: 6 },
+    brief: 'The weight is the observatory at 145 m, not the antenna. The fall is decided at the feet.',
   },
   budapest: {
     id: 'budapest',
@@ -1233,21 +1254,46 @@ export const LEVELS = {
     place: 'Budapest',
     target: 'HUNGARIAN PARLIAMENT',
     subtitle: 'Hungarian Parliament, Budapest',
-    victory: 'TODO(budapest) THE LINE THE END CARD LEADS WITH',
-    // TODO(budapest) palette and setting for anywhere that is not a temperate river city
-    //   (copy the nearest neighbour's and change what differs).
-    cityExcludeRadius: 120,          // TODO(budapest) read tools/survey.py: what does this delete?
-    contextExclude: 110,
-    // TODO(budapest) on a summit: groundLevel: 'bake' and padRadius: 0.
-    camera: { yaw: 0.05, pitch: 0.12, distance: 320, height: 30 },   // TODO(budapest) the postcard angle
+    victory: 'The House Is Not in Order',
+    // Pest: ochre and grey render, red tile, the Danube a working green-grey.
+    // Cologne's Rhineland palette warmed up: the same river light, yellower
+    // stucco.
+    palette: {
+      urban: new THREE.Color(0xb9ab93),
+      urbanAlt: new THREE.Color(0xa2927a),
+      park: new THREE.Color(0x4c6c36),
+      parkAlt: new THREE.Color(0x5e7e3e),
+      road: new THREE.Color(0x45464a),
+      bank: new THREE.Color(0xaea283),
+      bed: new THREE.Color(0x33473f),
+      dry: new THREE.Color(0xc2b598),
+    },
+    setting: { haze: { colour: 0xcdd1d4, density: 0.00023 } },
+    // The survey has one building inside 120 m, and it is the Országház
+    // itself; the House stands alone on its own bank with Kossuth tér east of
+    // it. The building is 323 m long, so the radius is a margin round the
+    // footprint, which the context builder measures, not a circle round it.
+    cityExcludeRadius: 100,
+    contextExclude: 90,
+    // From the Buda embankment across the Danube, a little downstream: the
+    // whole river front, the dome in the middle, the two spires beside it
+    // and a pavilion at either end. The picture on every postcard.
+    camera: { yaw: -1.35, pitch: 0.15, distance: 600, height: 50 },
     structures: (quality) => [
       { key: 'budapest', blocks: buildBudapest(quality), primary: true, required: true, label: 'HUNGARIAN PARLIAMENT' },
     ],
     garrison: (g, origin, groundY) => populateBudapest(g, origin, groundY),
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },   // TODO(budapest)
-    traits: { windows: false, river: false, topples: true },           // TODO(budapest)
-    par: { rounds: 60, spend: 8000, minutes: 4, leverage: 6 },         // TODO(budapest) from the suite's undercut
-    brief: 'TODO(budapest) one sentence: what the player has to find out about this building.',
+    // The dome, the drum it stands on and the two spires beside it. The wings
+    // are the mass of the building and they are not the contract.
+    scoreTags: ['dome', 'drum', 'spires'],
+    // Kossuth tér: paving, the embankment wall, the statues a parliament
+    // square has.
+    precinct: { boundary: 'railings', ground: 'lawn', ornament: 'statues', river: 'embankment' },
+    // A shell: it never topples, it has to be broken; the suite must not
+    // expect it to go over.
+    traits: { windows: true, river: true, topples: false },
+    par: { rounds: 110, spend: 16000, minutes: 5, leverage: 2 },
+    brief: 'The wings are not the building. The dome stands on sixteen piers inside the hall.',
   },
   sagrada: {
     id: 'sagrada',
