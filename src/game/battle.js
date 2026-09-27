@@ -123,6 +123,35 @@ export class Battle {
     // flying consequence happens, because that is the only place that knows
     // a pilot has turned for home or a canopy has come apart.
     this.air.onAirEvent = (kind, data) => this.onEvent(kind, data);
+    // What the town stands to along a line, for a helicopter picking a
+    // height: the airlift is handed it per delivery, the Apache needs it on
+    // any call.
+    this.air.ceilingAlong = (ax, az, bx, bz) => this.ceilingAlong(ax, az, bx, bz);
+    // The Apache's chain gun: the air wing knows where the helicopter is
+    // and when it fires; the garrison is here. `pick` is the live defender
+    // nearest the aim point, `fire` is one burst on it.
+    this.air.gunner = {
+      pick: (c, reach) => {
+        let best = null, bd = reach * reach;
+        for (const d of this.garrison.defenders) {
+          if (!d.alive) continue;
+          const dd = d.pos.distanceToSquared(c);
+          if (dd < bd) { bd = dd; best = d; }
+        }
+        return best ? best.pos : null;
+      },
+      fire: (from, to, g) => {
+        for (let k = 0; k < 3; k++) this.tracerFX.fire(from, to, { look: 'chaingun' }, k === 0);
+        const killed = this.garrison.splash(to, g.radius, g.power);
+        if (killed) {
+          this.defendersKilled += killed;
+          this.money += killed * MONEY_PER_DEFENDER;
+          this.onEvent('bounty', { point: to, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
+        }
+        if (this.audio) this.audio.play('mg', from, { gain: 0.34, rolloff: 500, rate: 0.62, cooldown: 0.2 });
+        return killed;
+      },
+    };
     this._setupHealthBars();
     this._setupTargetMarker();
     this._setupGhost();
@@ -775,7 +804,7 @@ export class Battle {
     this.shotsFired++;
     this.selectedUnitId = null;
     if (flak > 0) this.onEvent('flak', { def, guns: flak });
-    this.onEvent('strike', { def, point: at, eta: sortie.releaseAt + sortie.fall });
+    this.onEvent('strike', { def, point: at, eta: sortie.loiter ? sortie.loiter.eta : sortie.releaseAt + sortie.fall });
     return sortie;
   }
 
@@ -1593,8 +1622,11 @@ export class Battle {
     // The column stands over the site for the rest of the level, and it is
     // the thing you see from across the map. A bomb earns a bigger one than a
     // shell does, so this is not clamped to the shell's ceiling.
-    this.fx.dustColumn(point.x, Math.max(point.y, groundY), point.z, w.fx * 0.52);
-    if (this.fires) this.fires.ignite(point.x, point.y, point.z, 3 + st.frac * 6, 40 + st.frac * 80);
+    // Not for a rocket: thirty-eight standing columns is a fog, not a picture.
+    if (!st.loiter) {
+      this.fx.dustColumn(point.x, Math.max(point.y, groundY), point.z, w.fx * 0.52);
+      if (this.fires) this.fires.ignite(point.x, point.y, point.z, 3 + st.frac * 6, 40 + st.frac * 80);
+    }
     if (this.life) this.life.startle(point.x, point.z, 300 + w.fx * 60);
     if (nearGround && this.craters) this.craters.add(point.x, groundY, point.z, rMax * 0.9);
     const camDist = this.camera.position.distanceTo(point);
@@ -1628,7 +1660,10 @@ export class Battle {
       };
       if (wait > 60) setTimeout(boom, wait); else boom();
     }
-    this.onEvent('strikehit', { def: proj.strikeDef, point, destroyed, radius: rMax });
+    // Rounds from a sortie that fires many add up and are reported when it
+    // leaves; a bomb reports itself.
+    if (proj.sortie) { proj.sortie.stones = (proj.sortie.stones || 0) + destroyed; proj.sortie.kills = (proj.sortie.kills || 0) + killed; }
+    else this.onEvent('strikehit', { def: proj.strikeDef, point, destroyed, radius: rMax });
   }
 
   _onImpact(hit) {

@@ -45,6 +45,7 @@ const LOOK = {
   sniper: { color: 0x62d8ff, core: 0xffffff, speed: 780, len: 16.0, width: 0.30, flash: 1.5 },
   at: { color: 0xff3a12, core: 0xffc078, speed: 210, len: 5.0, width: 0.62, flash: 2.6 },
   mortar: { color: 0xff3a12, core: 0xffc078, speed: 220, len: 4.5, width: 0.56, flash: 2.4 },
+  chaingun: { color: 0xffc23a, core: 0xfff4d8, speed: 820, len: 15.0, width: 0.42, flash: 1.8 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 

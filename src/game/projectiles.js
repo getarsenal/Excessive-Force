@@ -270,6 +270,9 @@ export class Projectile {
     this.drag = opts.drag ?? 0;
     // The unit definition behind an air-dropped bomb, for the strike logic.
     this.strikeDef = opts.strikeDef ?? null;
+    // The sortie that fired it, for a weapon that fires many rounds and
+    // reports once: the Apache's rockets add their stones to the sortie.
+    this.sortie = opts.sortie ?? null;
     this.age = 0;
     this.alive = true;
     this._trailAcc = 0;

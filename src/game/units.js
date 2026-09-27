@@ -230,13 +230,25 @@ export const UNITS = [
   {
     id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · AGM-114 Hellfire', tier: 'AIR',
     cost: 40000, unlockFrac: 0.05,
-    model: 'aircraft', strike: { frac: 0.05, maxR: 26, minR: 4, fx: 2.6, bite: 0.5, shock: 0.8 },
-    aircraft: { kind: 'apache', speed: 70, height: 70, clearance: 30, runIn: 900, offset: 30 },
+    // Not a bomber. It comes in low, stops at a stand-off off the camera's
+    // side of the target, and works it for as long as it has time on
+    // station: 70 mm rockets in pairs, small and accurate, and the 30 mm
+    // chain gun on whoever is near the aim point. It is in the garrison's
+    // airspace the whole time, so it can be shot down, and if it is, it
+    // comes down. `strike` sizes each rocket, not the sortie.
+    model: 'aircraft', strike: { loiter: true, frac: 0.01, maxR: 5, minR: 2, fx: 1.1, bite: 0.6, shock: 0.6 },
+    aircraft: {
+      kind: 'apache', speed: 80, height: 30, clearance: 25, runIn: 900, offset: 60,
+      station: 30,          // seconds it stays
+      standoff: 300,        // metres out from the aim point it hovers
+      rockets: 38, pair: 2, every: 1.5, spread: 1.2, muzzle: 480,
+      gun: { every: 2.6, burst: 12, reach: 45, radius: 2.4, power: 2600 },
+    },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 70, gravity: 9.81, drag: 0.02, trail: 0.6 },
-    warhead: { lethal: 12, radius: 16, power: 30000, fx: 2.6, kinetic: 0.6 },
+    projectile: { kind: 'bomb', speed: 480, gravity: 9.81, drag: 0, trail: 0.8 },
+    warhead: { lethal: 4, radius: 6, power: 5200, fx: 1.1, kinetic: 0.5 },
     dispersion: 0,
-    blurb: 'One Hellfire on the point you tap. Small, precise, and cheap enough to use twice.',
+    blurb: 'Hovers off the target for thirty seconds: rockets in pairs on your point, the chain gun on the garrison. Can be shot down.',
   },
   {
     id: 'ac130', name: 'AC-130', full: 'AC-130J Ghostrider · 105 mm rake', tier: 'AIR',

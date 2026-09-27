@@ -424,6 +424,7 @@ export class AirWing {
    *                          low pass is low but not through the tower
    */
   call(def, target, ceiling, opts = {}) {
+    if (def.aircraft?.station) return this._callLoiter(def, target, ceiling, opts);
     const a = def.aircraft;
     const p = def.projectile;
     // Run in from behind the camera, across the target, and out the far side.
@@ -541,6 +542,16 @@ export class AirWing {
       }
       return;
     }
+    if (s.loiter) {
+      if (s.hits === 1 && this.onAirEvent) this.onAirEvent('underfire', { def: s.def, loiter: true });
+      if (s.hp <= 0 && s.loiter.phase !== 'down') {
+        s.loiter.phase = 'down';
+        s.loiter.fall = 0;
+        s.smoking = true;
+        if (this.onAirEvent) this.onAirEvent('shotdown', { def: s.def });
+      }
+      return;
+    }
     if (s.released) { if (s.hp <= 0) s.smoking = true; return; }
     // Still carrying. The bomb walks off the point, and a pilot who has taken
     // enough goes home with it.
@@ -577,6 +588,8 @@ export class AirWing {
         this._updateLift(s, dt);
       } else if (s.heli) {
         this._updateHeli(s, dt);
+      } else if (s.loiter) {
+        this._updateLoiter(s, dt);
       } else {
         // Straight and level, then a climbing turn away once past the target.
         if (s.t > s.pullUpAt) {
@@ -633,8 +646,10 @@ export class AirWing {
         if (this.audio) this.audio.play('rocket', m.position, { rate: 0.7, gain: 0.5, rolloff: 900 });
       }
 
-      // Rotors and props turn on whatever has them.
-      for (const c of m.children) {
+      // Rotors and props turn on a strike airframe. The lift and the Chinook
+      // turn their own in their own updates; doing it here as well ran them
+      // at twice the speed.
+      if (!s.lift && !s.heli) for (const c of m.children) {
         if (c.name === 'prop') c.rotation.z += 38 * dt;
         else if (c.name === 'rotorA') c.rotation.y += 22 * dt;
         else if (c.name === 'tailrotor') c.rotation.x += 60 * dt;
@@ -660,18 +675,18 @@ export class AirWing {
         if (d < 2400) {
           this.audio.play('rocket', m.position, {
             rate: s.heli ? 0.3 : s.lift ? 0.36 : STRIKE_RATE[s.def.aircraft.kind] ?? 0.55,
-            gain: s.heli ? 0.42 : s.lift ? 0.4 : 0.55, rolloff: s.heli ? 900 : 1400,
+            gain: s.heli || s.loiter ? 0.42 : s.lift ? 0.4 : 0.55, rolloff: s.heli || s.loiter ? 900 : 1400,
           });
         }
       }
 
       // Gone once it is well past and climbing away — and, for a transport,
       // once its loads are down and the canopies are gone.
-      if (!s.lift && !s.heli) s.life = s.t - s.pullUpAt;
+      if (!s.lift && !s.heli && !s.loiter) s.life = s.t - s.pullUpAt;
       if (s.lift) {
         if (s.life > 22 && s.lift.allDown) s.done = true;
         else if (s.life > 30) m.visible = false;
-      } else if (s.heli) {
+      } else if (s.heli || s.loiter) {
         // Ends itself.
       } else if (s.life > 14 || m.position.y > s.alt + 1600) s.done = true;
     }
@@ -855,7 +870,9 @@ const CHUTE = { troopRate: 11.5, cargoRate: 10.0, freeFall: 0.7, open: 0.5, stic
  * so it is tougher and still the one that suffers. A canopy is a canopy: it
  * takes a while to shoot away with small arms, and no time at all under flak.
  */
-const AIRFRAME = { jet: 100, transport: 220, heli: 170 };
+// The Apache is built to be shot at and stays in the flak for half a minute;
+// it takes about twice what the Chinook does before it goes down.
+const AIRFRAME = { jet: 100, transport: 220, heli: 170, gunship: 340 };
 const CANOPY = { troop: 195, cargo: 340 };
 /** How far off a bomb goes, in metres, per point of damage taken before release. */
 const JINK_PER_HP = 0.55;
@@ -1821,3 +1838,184 @@ export function makeTomahawk() {
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
   return g;
 }
+
+/**
+ * An attack helicopter on station.
+ *
+ * Everything else the air wing flies is a pass: in, drop, out. An Apache
+ * is not a bomber. It comes in low from behind the camera, slows to a
+ * hover at a stand-off from the aim point on the player's side of it, and
+ * works the target for its time on station: 70 mm rockets in pairs, small
+ * and accurate, walked onto the point the player marked, and bursts from
+ * the 30 mm chain gun on whichever defender is nearest that point. It is
+ * in the garrison's airspace the whole time and is the easiest thing in
+ * the sky to hit, so it can be shot down, and a helicopter that is shot
+ * down comes down. When the time is up, or the rockets are gone, it turns
+ * and leaves, and says what it did.
+ */
+AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts = {}) {
+  const a = def.aircraft;
+  const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+  const dl = Math.hypot(dx, dz) || 1;
+  const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
+  const side = new THREE.Vector3(-dir.z, 0, dir.x);
+  const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+  const along = this.ceilingAlong || (() => -Infinity);
+  // The station: out on the camera's side, a little off the line of sight so
+  // it does not sit in front of the lens, level with the target or a little
+  // over it, and clear of whatever the town has built under it.
+  const station = target.clone().addScaledVector(dir, -a.standoff).addScaledVector(side, a.offset || 0);
+  station.y = Math.max(target.y + a.height, ground(station.x, station.z) + 40,
+    along(station.x, station.z, station.x, station.z) + a.clearance);
+  const start = station.clone().addScaledVector(dir, -a.runIn);
+  const cruise = Math.max(station.y, along(start.x, start.z, station.x, station.z) + 30, ground(start.x, start.z) + 60);
+  start.y = cruise;
+  const model = makeAirframe(def);
+  model.rotation.order = 'YXZ';
+  model.position.copy(start);
+  model.rotation.y = Math.atan2(dir.x, dir.z);
+  model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
+  this.scene.add(model);
+  const eta = a.runIn / a.speed + 6;
+  const s = {
+    def, model, dir, side, alt: cruise, target: target.clone(),
+    speed: a.speed, t: 0, released: true, climb: 0, roar: 0, life: 0,
+    flak: opts.flak || 0, hp: AIRFRAME.gunship, hits: 0, jink: 0,
+    stones: 0, kills: 0,
+    loiter: {
+      phase: 'inbound', station, cruise, eta, time: 0,
+      vel: new THREE.Vector3(dir.x * a.speed, 0, dir.z * a.speed),
+      rockets: a.rockets, nextRocket: 0.8, nextGun: 1.6, pod: 0,
+    },
+    releaseAt: eta, fall: 0, pullUpAt: Infinity,
+  };
+  this.sorties.push(s);
+  return s;
+};
+
+AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
+  const L = s.loiter, m = s.model, a = s.def.aircraft;
+  const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+  const face = (x, z, rate) => {
+    const want = Math.atan2(x - m.position.x, z - m.position.z);
+    let d = want - m.rotation.y;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    m.rotation.y += d * Math.min(1, dt * rate);
+  };
+
+  if (L.phase === 'inbound') {
+    const st = L.station;
+    const dx = st.x - m.position.x, dz = st.z - m.position.z;
+    const dist = Math.hypot(dx, dz);
+    // The speed it should have for the distance left, so it arrives slowing.
+    const want = Math.min(a.speed, Math.max(6, dist / 2.2));
+    const ux = dist > 0.01 ? dx / dist : s.dir.x, uz = dist > 0.01 ? dz / dist : s.dir.z;
+    L.vel.x += (ux * want - L.vel.x) * Math.min(1, dt * 1.4);
+    L.vel.z += (uz * want - L.vel.z) * Math.min(1, dt * 1.4);
+    m.position.x += L.vel.x * dt;
+    m.position.z += L.vel.z * dt;
+    // Down from cruise to the station height over the last stretch.
+    const k = THREE.MathUtils.clamp((dist - 40) / 400, 0, 1);
+    const alt = st.y + (L.cruise - st.y) * k;
+    m.position.y += (alt - m.position.y) * Math.min(1, dt * 1.2);
+    const sp = Math.hypot(L.vel.x, L.vel.z);
+    // Nose down to go, nose up to stop: the one gesture that reads as a
+    // helicopter from a kilometre away.
+    const pitch = THREE.MathUtils.clamp(sp / a.speed * 0.22 - (sp < want ? 0 : 0.1), -0.12, 0.22);
+    m.rotation.x += (pitch - m.rotation.x) * Math.min(1, dt * 2);
+    face(dist > 60 ? st.x : s.target.x, dist > 60 ? st.z : s.target.z, 1.6);
+    // Taken from a little way out: the hover eases the last of it in, and a
+    // helicopter crawling the final fifty metres under fire is a target.
+    if (dist < 25) {
+      L.phase = 'station';
+      L.time = 0;
+      if (this.onAirEvent) this.onAirEvent('onstation', { def: s.def, time: a.station });
+    }
+  } else if (L.phase === 'station') {
+    L.time += dt;
+    // Holding a hover, which is never quite still.
+    const st = L.station;
+    m.position.x += (st.x + Math.sin(L.time * 0.7) * 1.4 - m.position.x) * Math.min(1, dt * 1.5);
+    m.position.z += (st.z + Math.cos(L.time * 0.53) * 1.1 - m.position.z) * Math.min(1, dt * 1.5);
+    m.position.y += (st.y + Math.sin(L.time * 1.1) * 0.6 - m.position.y) * Math.min(1, dt * 1.5);
+    m.rotation.x += (-0.03 - m.rotation.x) * Math.min(1, dt * 2);
+    m.rotation.z = Math.sin(L.time * 0.9) * 0.03;
+    face(s.target.x, s.target.z, 2.5);
+
+    // Rockets: a pair at a time, one from each pod, on the marked point.
+    L.nextRocket -= dt;
+    if (L.rockets > 0 && L.nextRocket <= 0) {
+      L.nextRocket = a.every;
+      for (let k = 0; k < a.pair && L.rockets > 0; k++, L.rockets--) this._loiterRocket(s, k);
+      if (this.audio) this.audio.play('rocket', m.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
+    }
+    // The gun, on the nearest defender to the point, if there is one near it.
+    L.nextGun -= dt;
+    if (L.nextGun <= 0 && this.gunner) {
+      L.nextGun = a.gun.every;
+      const to = this.gunner.pick(s.target, a.gun.reach);
+      if (to) {
+        const from = this._v.set(0, -1.0, 6.2).applyEuler(m.rotation).add(m.position).clone();
+        s.kills += this.gunner.fire(from, to.clone(), a.gun) || 0;
+      }
+    }
+    if (L.time > a.station || (L.rockets <= 0 && L.time > a.station * 0.5)) {
+      L.phase = 'egress';
+      L.out = 0;
+      L.reported = true;
+      if (this.onAirEvent) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
+    }
+  } else if (L.phase === 'egress') {
+    // Turn back the way it came and go, climbing.
+    L.out += dt;
+    const back = this._v.copy(s.dir).multiplyScalar(-1).addScaledVector(s.side, 0.4).normalize();
+    face(m.position.x + back.x * 100, m.position.z + back.z * 100, 1.2);
+    const fwd = Math.min(a.speed, 8 + L.out * 9);
+    m.position.x += Math.sin(m.rotation.y) * fwd * dt;
+    m.position.z += Math.cos(m.rotation.y) * fwd * dt;
+    m.position.y += Math.min(12, 2 + L.out * 2) * dt;
+    m.rotation.x += (0.18 - m.rotation.x) * Math.min(1, dt * 1.5);
+    if (L.out > 22) s.done = true;
+  } else if (L.phase === 'down') {
+    // Tail rotor gone: it spins, and it falls.
+    L.fall += dt;
+    m.rotation.y += (2 + L.fall * 2.5) * dt;
+    m.rotation.z = Math.min(0.5, m.rotation.z + dt * 0.3);
+    L.vy = (L.vy || 0) - 9.81 * dt * 0.8;
+    m.position.y += L.vy * dt;
+    m.position.x += L.vel.x * 0.2 * dt;
+    m.position.z += L.vel.z * 0.2 * dt;
+    if (this.fx) this.fx.trail(m.position, 4.0);
+    const g = ground(m.position.x, m.position.z);
+    if (m.position.y <= g + 1.5 || L.fall > 12) {
+      const p = m.position.clone(); p.y = Math.max(p.y, g);
+      if (this.fx) this.fx.strikeBlast(p, 1.6, { groundY: g });
+      if (this.audio) this.audio.play('explosion', p, { gain: 0.8, rolloff: 900 });
+      if (this.onAirEvent && !L.reported && L.rockets < a.rockets) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
+      m.visible = false;
+      s.done = true;
+    }
+  }
+};
+
+/** One 70 mm rocket from the pod on side `k`, on a flat, fast line to the mark. */
+AirWing.prototype._loiterRocket = function _loiterRocket(s, k) {
+  const m = s.model, a = s.def.aircraft, p = s.def.projectile, L = s.loiter;
+  const podX = (L.pod++ % 2 === 0 ? 1 : -1) * 2.45;
+  const from = new THREE.Vector3(podX, -0.52, 2.2).applyEuler(m.rotation).add(m.position);
+  // Small and accurate: a metre or so of scatter at the mark.
+  const r = a.spread * Math.sqrt(Math.random()), t = Math.random() * Math.PI * 2;
+  const to = s.target.clone();
+  to.x += Math.cos(t) * r; to.y += (Math.random() - 0.5) * a.spread; to.z += Math.sin(t) * r;
+  const d = to.clone().sub(from);
+  const T = d.length() / a.muzzle;
+  // The velocity that lands it on the mark under gravity in that time.
+  const vel = d.multiplyScalar(1 / T);
+  vel.y += 0.5 * p.gravity * T;
+  this.projectiles.fire({
+    pos: from, vel, gravity: p.gravity, kind: 'bomb', drag: 0, speed: a.muzzle,
+    warhead: s.def.warhead, owner: null, target: to, trail: p.trail,
+    strikeDef: s.def, sortie: s,
+  });
+  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, vel.clone().normalize(), 0.8);
+};

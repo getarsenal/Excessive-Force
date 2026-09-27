@@ -620,10 +620,19 @@ async function boot() {
         hud.feed(`FLAK OVER TARGET · ${data.guns} GUN${data.guns > 1 ? 'S' : ''}`, 'warn');
         break;
       case 'underfire':
-        hud.feed(`${data.def.name} TAKING FIRE ON THE RUN`, 'bad');
+        hud.feed(`${data.def.name} TAKING FIRE${data.loiter ? '' : ' ON THE RUN'}`, 'bad');
         break;
       case 'aborted':
         hud.feed(`${data.def.name} DRIVEN OFF — NO DROP`, 'bad');
+        break;
+      case 'onstation':
+        hud.feed(`${data.def.name} ON STATION · ${Math.round(data.time)} s`, 'big');
+        break;
+      case 'offstation':
+        hud.feed(`${data.def.name} OFF STATION — ${data.stones} STONES · ${data.kills} KILLED`, 'big');
+        break;
+      case 'shotdown':
+        hud.feed(`${data.def.name} SHOT DOWN`, 'bad');
         break;
       case 'transporthit':
         hud.feed('TRANSPORT HIT — STICKS DUMPED SHORT', 'bad');
