@@ -328,6 +328,52 @@ export class Structure {
    * the graph into "who is below me" and "who is above me", which is what the
    * load pass walks.
    */
+  /**
+   * The bearing edges: for every stone, the touching stones under it, and how
+   * much of its footprint each one carries.
+   *
+   * `belowArea` is the plan overlap of the two footprints, and it is what the
+   * load pass shares a stone's weight by. It used to be shared by count —
+   * every supporter an equal part, whatever it touched — and that put ninety
+   * per cent of a spire on the one stone under its axis and the whole of a
+   * pier's springer on a sliver at its edge, and crushed both at load with
+   * nobody firing. Twenty-five builders worked round it in the masonry; this
+   * is the rule they were working round. Footprints are the conservative
+   * yaw-expanded boxes adjacency itself uses, floored at a twentieth of a
+   * square metre so a corner contact still counts for something.
+   */
+  _finishBelow(n, under) {
+    const below = new Array(n);
+    let belowEdges = 0;
+    for (let i = 0; i < n; i++) {
+      const out = [];
+      for (const j of under(i)) {
+        if (this.py[j] < this.py[i] - Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
+      }
+      below[i] = out;
+      belowEdges += out.length;
+    }
+    this.belowStart = new Int32Array(n + 1);
+    this.belowList = new Int32Array(belowEdges);
+    this.belowArea = new Float32Array(belowEdges);
+    let cursor = 0;
+    for (let i = 0; i < n; i++) {
+      this.belowStart[i] = cursor;
+      const ci = Math.abs(Math.cos(this.ry[i])), si = Math.abs(Math.sin(this.ry[i]));
+      const axi = this.hx[i] * ci + this.hz[i] * si, azi = this.hx[i] * si + this.hz[i] * ci;
+      for (const j of below[i]) {
+        const cj = Math.abs(Math.cos(this.ry[j])), sj = Math.abs(Math.sin(this.ry[j]));
+        const axj = this.hx[j] * cj + this.hz[j] * sj, azj = this.hx[j] * sj + this.hz[j] * cj;
+        const ox = Math.min(this.px[i] + axi, this.px[j] + axj) - Math.max(this.px[i] - axi, this.px[j] - axj);
+        const oz = Math.min(this.pz[i] + azi, this.pz[j] + azj) - Math.max(this.pz[i] - azi, this.pz[j] - azj);
+        this.belowList[cursor] = j;
+        this.belowArea[cursor] = Math.max(0.05, ox > 0 && oz > 0 ? ox * oz : 0);
+        cursor++;
+      }
+    }
+    this.belowStart[n] = cursor;
+  }
+
   _buildAdjacency() {
     const n = this.count;
 
@@ -414,25 +460,7 @@ export class Structure {
 
     // Directed "below" lists: j supports i when j's centre is meaningfully
     // lower and their footprints overlap in plan.
-    const below = new Array(n);
-    let belowEdges = 0;
-    for (let i = 0; i < n; i++) {
-      const out = [];
-      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
-        const j = this.adjList[a];
-        if (this.py[j] < this.py[i] - Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
-      }
-      below[i] = out;
-      belowEdges += out.length;
-    }
-    this.belowStart = new Int32Array(n + 1);
-    this.belowList = new Int32Array(belowEdges);
-    cursor = 0;
-    for (let i = 0; i < n; i++) {
-      this.belowStart[i] = cursor;
-      for (const j of below[i]) this.belowList[cursor++] = j;
-    }
-    this.belowStart[n] = cursor;
+    this._finishBelow(n, (i) => this.adjList.subarray(this.adjStart[i], this.adjStart[i + 1]));
 
     // Same-course neighbours, which is how a lintel or a slab carries across a
     // gap. Deliberately excludes anything above: masonry spans sideways, it
@@ -976,24 +1004,7 @@ export class Structure {
 
     // The "below" lists must agree with the new graph or load will route
     // through joints the support pass no longer believes in.
-    const below = new Array(n);
-    let belowEdges = 0;
-    for (let i = 0; i < n; i++) {
-      const out = [];
-      for (const j of lists[i]) {
-        if (this.py[j] < this.py[i] - Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
-      }
-      below[i] = out;
-      belowEdges += out.length;
-    }
-    this.belowStart = new Int32Array(n + 1);
-    this.belowList = new Int32Array(belowEdges);
-    cursor = 0;
-    for (let i = 0; i < n; i++) {
-      this.belowStart[i] = cursor;
-      for (const j of below[i]) this.belowList[cursor++] = j;
-    }
-    this.belowStart[n] = cursor;
+    this._finishBelow(n, (i) => lists[i]);
 
     this.groutedEdges = extra.size;
     this.culledStones = culled;
@@ -2328,16 +2339,17 @@ export class Structure {
       // never a path for anything above them.
       const s0 = this.belowStart[i];
       const s1 = this.belowStart[i + 1];
-      let supporters = 0;
+      // Shared by how much of the stone each supporter carries, not by how
+      // many there are: see `_finishBelow`.
+      let carried = 0;
       for (let a = s0; a < s1; a++) {
         const j = this.belowList[a];
-        if (reach[j] && this.structural[j]) supporters++;
+        if (reach[j] && this.structural[j]) carried += this.belowArea[a];
       }
-      if (supporters === 0) continue;
-      const share = total / supporters;
+      if (carried <= 0) continue;
       for (let a = s0; a < s1; a++) {
         const j = this.belowList[a];
-        if (reach[j] && this.structural[j]) load[j] += share;
+        if (reach[j] && this.structural[j]) load[j] += total * (this.belowArea[a] / carried);
       }
     }
 

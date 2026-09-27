@@ -31,7 +31,10 @@ for (const sp of specs) {
     for (const [k, [a, b]] of Object.entries(st.tagRanges || {})) if (i >= a && i < b) tag = k;
     loose.push({ tag, y: +st.py[i].toFixed(1), r: +Math.hypot(st.px[i], st.pz[i]).toFixed(1), h: [+st.hx[i].toFixed(2), +st.hy[i].toFixed(2), +st.hz[i].toFixed(2)] });
   }
-  console.log(`${sp.key}: ${st.count} stones, ${loose.length} loose`);
+  let crushed = 0;
+  for (let i = 0; i < st.count; i++) if ((st.flags[i] & 1) && st.health[i] <= 0) crushed++;
+  console.log(`${sp.key}: ${st.count} stones, ${loose.length} loose, ${crushed} crushed at load`);
+  bad += crushed;
   for (const b of loose.slice(0, 25)) console.log(`   ${b.tag.padEnd(12)} y ${String(b.y).padStart(6)}  r ${String(b.r).padStart(6)}  ${b.h.join(' x ')}`);
   if (loose.length > 25) console.log(`   … and ${loose.length - 25} more`);
   bad += loose.length;
