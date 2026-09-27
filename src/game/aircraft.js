@@ -24,9 +24,13 @@ import * as THREE from 'three';
  * Both are built nose along +Z, which is the axis the sortie flies down.
  */
 
+/** The pitch of the roar for each airframe: the rocket clip slowed down. */
+const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62 };
+
 /** Dark grey, the way both of them are actually painted. */
 const EAGLE_GREY = 0x565b61;
 const LANCER_GREY = 0x3a3e43;
+const HERCULES_GREY = 0x6d7378;
 
 function part(geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
   const m = new THREE.Mesh(geo, mat);
@@ -393,7 +397,8 @@ export class AirWing {
     const alt = Math.max(target.y + a.height, ceiling + a.clearance);
     const drop = alt - target.y;
     const rel = solveRelease(drop, a.speed, p.gravity, p.drag || 0);
-    const model = def.aircraft.kind === 'lancer' ? makeLancer() : makeEagle();
+    const build = { lancer: makeLancer, apache: makeApache, ghostrider: makeGhostrider, tomahawk: makeTomahawk }[def.aircraft.kind];
+    const model = build ? build() : makeEagle();
     // Yaw first, then pitch about the aircraft's own lateral axis, then roll
     // about its nose. In the default order the pitch is about the world's x
     // axis, which is nose-up flying north, a roll flying east and nose-down
@@ -566,6 +571,9 @@ export class AirWing {
         }
         const bomb = m.getObjectByName('bomb');
         if (bomb) bomb.visible = false;
+        // A cruise missile has nothing to let go of: the airframe is the
+        // round, and from here the projectile is what the player watches.
+        if (s.def.aircraft.consumed) { m.visible = false; s.done = true; }
         const p = s.def.projectile;
         // A salvo goes out as one release of `n` rounds spaced back along the
         // run, so they arrive one after another along a line through the
@@ -587,6 +595,13 @@ export class AirWing {
         if (this.audio) this.audio.play('rocket', m.position, { rate: 0.7, gain: 0.5, rolloff: 900 });
       }
 
+      // Rotors and props turn on whatever has them.
+      for (const c of m.children) {
+        if (c.name === 'prop') c.rotation.z += 38 * dt;
+        else if (c.name === 'rotorA') c.rotation.y += 22 * dt;
+        else if (c.name === 'tailrotor') c.rotation.x += 60 * dt;
+      }
+
       // Engine smoke and the roar. The roar is the rocket clip pitched down,
       // played on a short cycle while the aircraft is anywhere near.
       if (this.fx && this.quality.name !== 'low') {
@@ -606,7 +621,7 @@ export class AirWing {
         const d = this.camera.position.distanceTo(m.position);
         if (d < 2400) {
           this.audio.play('rocket', m.position, {
-            rate: s.heli ? 0.3 : s.lift ? 0.36 : s.def.aircraft.kind === 'lancer' ? 0.42 : 0.55,
+            rate: s.heli ? 0.3 : s.lift ? 0.36 : STRIKE_RATE[s.def.aircraft.kind] ?? 0.55,
             gain: s.heli ? 0.42 : s.lift ? 0.4 : 0.55, rolloff: s.heli ? 900 : 1400,
           });
         }
@@ -647,9 +662,9 @@ export class AirWing {
  * two are: lofted body, surfaces for the wing and tail, cylinders for the
  * nacelles. The props are spun by the sortie.
  */
-export function makeHercules() {
+export function makeHercules({ gunship = false } = {}) {
   const g = new THREE.Group();
-  const grey = new THREE.MeshStandardMaterial({ color: 0x6d7378, roughness: 0.7, metalness: 0.25 });
+  const grey = new THREE.MeshStandardMaterial({ color: HERCULES_GREY, roughness: 0.7, metalness: 0.25 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.5, metalness: 0.5 });
   const black = new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.9 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x1f2a36, roughness: 0.18, metalness: 0.8 });
@@ -670,11 +685,14 @@ export function makeHercules() {
   ], 14), grey, 0, 0, 0));
   // Flight deck glazing: the wrap of windows over the nose.
   g.add(part(new THREE.BoxGeometry(3.3, 0.7, 1.6), glass, 0, 1.25, 11.9));
-  // The open cargo hold, and the ramp down under the tail.
-  g.add(part(new THREE.BoxGeometry(3.2, 2.5, 1.2), black, 0, 0.25, -7.6));
-  const ramp = part(new THREE.BoxGeometry(3.3, 0.24, 4.4), grey, 0, -1.55, -9.6);
-  ramp.rotation.x = -0.42;
-  g.add(ramp);
+  // The open cargo hold, and the ramp down under the tail. A gunship flies
+  // with its ramp up: it is not delivering anything.
+  if (!gunship) {
+    g.add(part(new THREE.BoxGeometry(3.2, 2.5, 1.2), black, 0, 0.25, -7.6));
+    const ramp = part(new THREE.BoxGeometry(3.3, 0.24, 4.4), grey, 0, -1.55, -9.6);
+    ramp.rotation.x = -0.42;
+    g.add(ramp);
+  }
   // Main gear pods down both sides of the belly.
   for (const s of [-1, 1]) g.add(part(new THREE.BoxGeometry(1.1, 1.3, 6.8), grey, s * 2.55, -1.55, 1.0, 0, 0, 0));
 
@@ -1458,3 +1476,310 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
 
 function ux0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.x / l : Math.sin(H.yaw); }
 function uz0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.z / l : Math.cos(H.yaw); }
+
+/**
+ * AH-64E Apache. 15.1 m of fuselage under a 14.6 m rotor, nose along +Z.
+ *
+ * What makes it read as an Apache from the game's distance: the two stepped
+ * cockpits in flat-paned glass, the sensor turret on the nose with the chain
+ * gun under it, the engines slung high either side of the body with their
+ * exhausts turned out, the mast with the Longbow radome on top, the stub
+ * wings hung with Hellfire racks and rocket pods, and the tail rotor set
+ * high on the left of the fin. Painted the Army's helicopter drab.
+ *
+ * `rotorA` and `tailrotor` are spun by the sortie; the first Hellfire is
+ * named `bomb` and is the one that leaves the rail.
+ */
+export function makeApache() {
+  const g = new THREE.Group();
+  const drab = new THREE.MeshStandardMaterial({ color: 0x3a3f36, roughness: 0.8, metalness: 0.2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.55, metalness: 0.45 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.9 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.16, metalness: 0.82 });
+  const olive = new THREE.MeshStandardMaterial({ color: 0x4d5445, roughness: 0.75, metalness: 0.2 });
+
+  // The body: a narrow, deep fuselage. The sensor nose, the two cockpits
+  // stepping up, the engine bay where it is widest, and the boom drawn out
+  // to the fin with a rise in it.
+  g.add(part(loft([
+    { z: 7.25, w: 0.42, h: 0.50, y: -0.10, n: 2.2 },
+    { z: 6.40, w: 0.98, h: 1.30, y: 0.00, n: 2.6 },
+    { z: 5.10, w: 1.14, h: 1.78, y: 0.16, n: 3.0 },
+    { z: 3.70, w: 1.22, h: 2.10, y: 0.34, n: 3.2 },
+    { z: 2.30, w: 1.40, h: 2.00, y: 0.28, n: 3.2 },
+    { z: 0.20, w: 1.32, h: 1.70, y: 0.24, n: 3.0 },
+    { z: -2.00, w: 1.00, h: 1.22, y: 0.36, n: 2.8 },
+    { z: -4.60, w: 0.70, h: 0.86, y: 0.52, n: 2.6 },
+    { z: -7.00, w: 0.56, h: 0.70, y: 0.70, n: 2.4 },
+    { z: -8.30, w: 0.40, h: 0.56, y: 0.80, n: 2.2 },
+  ], 12), drab, 0, 0, 0));
+
+  // The cockpits: flat panes, the gunner low and forward, the pilot behind
+  // and above him, a windscreen leaning back over the gunner.
+  g.add(part(new THREE.BoxGeometry(1.10, 0.74, 1.30), glass, 0, 0.78, 5.55));
+  g.add(part(new THREE.BoxGeometry(1.16, 0.80, 1.40), glass, 0, 1.14, 3.95));
+  const screen = part(new THREE.BoxGeometry(1.00, 0.08, 0.95), glass, 0, 0.92, 6.30);
+  screen.rotation.x = -0.75;
+  g.add(screen);
+  // The canopy frame between the two seats, and the roof over the pilot.
+  g.add(part(new THREE.BoxGeometry(1.18, 0.86, 0.14), drab, 0, 1.0, 4.72));
+  g.add(part(new THREE.BoxGeometry(1.16, 0.10, 1.50), drab, 0, 1.56, 3.95));
+
+  // The nose: the TADS/PNVS turret, a drum across the nose with the sensor
+  // windows in its face, and the M230 chain gun on its cradle under it.
+  g.add(part(new THREE.CylinderGeometry(0.44, 0.44, 0.86, 14), dark, 0, -0.08, 6.95, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.BoxGeometry(0.34, 0.30, 0.22), glass, -0.22, -0.02, 7.32));
+  g.add(part(new THREE.BoxGeometry(0.30, 0.26, 0.22), glass, 0.24, -0.06, 7.32));
+  g.add(part(new THREE.BoxGeometry(0.46, 0.34, 0.90), dark, 0, -0.98, 4.90));
+  g.add(part(new THREE.CylinderGeometry(0.05, 0.06, 1.70, 8), black, 0, -1.02, 5.85, Math.PI / 2 - 0.04, 0, 0));
+  g.add(part(new THREE.BoxGeometry(0.16, 0.20, 0.24), dark, 0, -1.02, 6.60));
+
+  // The engines: two nacelles high on the shoulders behind the cockpit, an
+  // intake screen on the front of each, the exhaust turned out through the
+  // infrared suppressor at the back.
+  for (const s of [-1, 1]) {
+    g.add(part(loft([
+      { z: 3.00, w: 0.74, h: 0.74, n: 2.3 },
+      { z: 1.60, w: 0.86, h: 0.88, n: 2.6 },
+      { z: -0.40, w: 0.80, h: 0.82, n: 2.6 },
+      { z: -1.30, w: 0.66, h: 0.70, n: 2.4 },
+    ], 10), drab, s * 1.18, 0.92, 0));
+    g.add(part(new THREE.CylinderGeometry(0.30, 0.30, 0.10, 12), black, s * 1.18, 0.92, 3.02, Math.PI / 2, 0, 0));
+    const ex = part(new THREE.BoxGeometry(0.62, 0.50, 0.70), dark, s * 1.42, 0.92, -1.60);
+    ex.rotation.y = s * 0.55;
+    g.add(ex);
+    // The fairing that ties the nacelle to the body.
+    g.add(part(new THREE.BoxGeometry(0.60, 0.70, 3.40), drab, s * 0.78, 0.85, 0.80));
+  }
+
+  // The mast, the rotor head and the Longbow radome on top of it.
+  g.add(part(new THREE.CylinderGeometry(0.16, 0.22, 1.10, 10), dark, 0, 1.85, 1.60));
+  g.add(part(new THREE.CylinderGeometry(0.62, 0.66, 0.34, 16), drab, 0, 2.86, 1.60));
+  const rotor = new THREE.Group();
+  rotor.add(part(new THREE.CylinderGeometry(0.34, 0.40, 0.44, 12), dark, 0, 0, 0));
+  for (let k = 0; k < 4; k++) {
+    const holder = new THREE.Group();
+    holder.add(part(new THREE.BoxGeometry(6.90, 0.07, 0.53), black, 3.75, 0.06, 0));
+    // The swept tips, which are the one thing that says Apache from above.
+    const tip = part(new THREE.BoxGeometry(0.60, 0.06, 0.40), black, 7.35, 0.06, -0.14);
+    tip.rotation.y = 0.35;
+    holder.add(tip);
+    holder.rotation.y = (k / 4) * Math.PI * 2;
+    rotor.add(holder);
+  }
+  rotor.add(part(new THREE.CylinderGeometry(7.4, 7.4, 0.04, 28),
+    new THREE.MeshBasicMaterial({ color: 0x1c1e20, transparent: true, opacity: 0.18, depthWrite: false }), 0, 0.06, 0));
+  rotor.position.set(0, 2.42, 1.60);
+  rotor.name = 'rotorA';
+  g.add(rotor);
+
+  // The stub wings and what hangs off them: a four-round Hellfire rack on
+  // each inboard pylon, a nineteen-shot rocket pod on each outboard one.
+  const wing = surface({ span: 2.05, root: 1.10, tip: 0.86, sweep: 0.12, thick: 0.17, ridge: 0.4 });
+  pair(g, wing, drab, 0.70, 0.22, 1.85);
+  let hellfire = 0;
+  for (const s of [-1, 1]) {
+    for (const [x, outboard] of [[1.55, false], [2.45, true]]) {
+      // The pylon: a swept plate hanging from the wing.
+      g.add(part(new THREE.BoxGeometry(0.14, 0.52, 0.86), drab, s * x, -0.10, 1.35));
+      if (!outboard) {
+        // The M299 rail: a beam with the four missiles two over two.
+        g.add(part(new THREE.BoxGeometry(0.62, 0.16, 1.30), dark, s * x, -0.40, 1.30));
+        for (const dx of [-0.22, 0.22]) {
+          for (const dy of [-0.16, -0.60]) {
+            const m = part(new THREE.CylinderGeometry(0.09, 0.09, 1.63, 10), olive, s * x + dx, -0.40 + dy, 1.20, Math.PI / 2, 0, 0);
+            // Seeker dome, fins fore and aft.
+            const round = new THREE.Group();
+            round.add(m);
+            round.add(part(new THREE.SphereGeometry(0.09, 10, 8), glass, s * x + dx, -0.40 + dy, 2.02));
+            for (let k = 0; k < 4; k++) {
+              const a = k * Math.PI / 2 + Math.PI / 4;
+              round.add(part(new THREE.BoxGeometry(0.02, 0.16, 0.22), dark,
+                s * x + dx + Math.cos(a) * 0.14, -0.40 + dy + Math.sin(a) * 0.14, 0.50, 0, 0, a));
+              round.add(part(new THREE.BoxGeometry(0.02, 0.12, 0.18), dark,
+                s * x + dx + Math.cos(a) * 0.13, -0.40 + dy + Math.sin(a) * 0.13, 1.72, 0, 0, a));
+            }
+            if (hellfire++ === 0) round.name = 'bomb';
+            g.add(round);
+          }
+        }
+      } else {
+        // The M261 pod: a drum with the nineteen tubes read as a dark face.
+        g.add(part(new THREE.CylinderGeometry(0.24, 0.24, 1.68, 14), olive, s * x, -0.52, 1.20, Math.PI / 2, 0, 0));
+        g.add(part(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 14), black, s * x, -0.52, 2.05, Math.PI / 2, 0, 0));
+      }
+    }
+  }
+
+  // The tail: the fin standing up from the end of the boom, the stabilator
+  // at its foot, and the tail rotor high on the left of the fin.
+  const fin = surface({ span: 2.05, root: 1.55, tip: 0.85, sweep: 0.55, thick: 0.22 });
+  const finMesh = new THREE.Mesh(fin, drab);
+  finMesh.position.set(0, 0.95, -6.90);
+  finMesh.rotation.z = Math.PI / 2;
+  finMesh.castShadow = true;
+  g.add(finMesh);
+  const stab = surface({ span: 1.70, root: 0.92, tip: 0.66, sweep: 0.20, thick: 0.14 });
+  pair(g, stab, drab, 0.22, 0.70, -7.20);
+  const tail = new THREE.Group();
+  tail.add(part(new THREE.CylinderGeometry(0.16, 0.16, 0.30, 10), dark, 0, 0, 0, 0, 0, Math.PI / 2));
+  // Four blades in the Apache's off-square X, two pairs fifty-five degrees apart.
+  for (const a of [0, 0.96, Math.PI, Math.PI + 0.96]) {
+    const holder = new THREE.Group();
+    holder.add(part(new THREE.BoxGeometry(0.06, 1.38, 0.24), black, 0, 0.72, 0));
+    holder.rotation.x = a;
+    tail.add(holder);
+  }
+  tail.add(part(new THREE.CylinderGeometry(1.42, 1.42, 0.04, 20),
+    new THREE.MeshBasicMaterial({ color: 0x1c1e20, transparent: true, opacity: 0.18, depthWrite: false }), 0, 0, 0, 0, 0, Math.PI / 2));
+  tail.position.set(-0.36, 2.55, -7.55);
+  tail.name = 'tailrotor';
+  g.add(tail);
+  // The gearbox fairing the tail rotor sits on.
+  g.add(part(new THREE.BoxGeometry(0.30, 0.50, 0.70), drab, -0.10, 2.55, -7.55));
+
+  // The undercarriage: two tall struts forward with the wheels on the
+  // outside of them, a drag brace back to the belly, and the tail wheel.
+  for (const s of [-1, 1]) {
+    g.add(part(new THREE.CylinderGeometry(0.06, 0.07, 1.30, 8), dark, s * 1.10, -1.05, 4.10, 0, 0, s * 0.18));
+    g.add(part(new THREE.CylinderGeometry(0.04, 0.04, 1.70, 8), dark, s * 0.95, -1.05, 3.30, 0.95, 0, s * 0.12));
+    g.add(part(new THREE.CylinderGeometry(0.34, 0.34, 0.22, 14), black, s * 1.28, -1.68, 4.10, 0, 0, Math.PI / 2));
+    g.add(part(new THREE.CylinderGeometry(0.16, 0.16, 0.24, 10), dark, s * 1.28, -1.68, 4.10, 0, 0, Math.PI / 2));
+  }
+  g.add(part(new THREE.CylinderGeometry(0.04, 0.05, 0.60, 8), dark, 0, 0.05, -6.40));
+  g.add(part(new THREE.CylinderGeometry(0.16, 0.16, 0.14, 10), black, 0, -0.30, -6.40, 0, 0, Math.PI / 2));
+
+  // Pitot, wire cutters, antennas: the fuzz that stops it looking moulded.
+  g.add(part(new THREE.CylinderGeometry(0.012, 0.012, 0.9, 6), dark, 0.42, 0.55, 7.10, Math.PI / 2, 0, 0));
+  g.add(part(new THREE.BoxGeometry(0.06, 0.55, 0.10), dark, 0, 1.98, 3.00, -0.6, 0, 0));
+  g.add(part(new THREE.BoxGeometry(0.06, 0.32, 0.20), dark, 0, 1.05, -3.60));
+  g.add(part(new THREE.BoxGeometry(0.06, 0.22, 0.18), dark, 0.30, -0.55, -1.40));
+
+  g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
+  return g;
+}
+
+/**
+ * AC-130J Ghostrider: a Hercules with its hold shut, painted gunship grey,
+ * and armed down the left side, which is the side it fights from.
+ *
+ * The 30 mm GAU-23 is forward of the wheel well, the 105 mm howitzer aft of
+ * the wing, both out of the port side at right angles to the run, so the
+ * aircraft is seen to be shooting sideways while it rakes the line. The
+ * sensor balls hang under the nose and off the port side by the crew door,
+ * the satcom radome rides the spine behind the wing, and the wingtips carry
+ * the Precision Strike Package pods. Props are named `prop` like the
+ * transport's and spin the same way.
+ */
+export function makeGhostrider() {
+  const g = makeHercules({ gunship: true });
+  const grey = new THREE.MeshStandardMaterial({ color: 0x484e53, roughness: 0.68, metalness: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.55, metalness: 0.45 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x0b0c0d, roughness: 0.9 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.16, metalness: 0.82 });
+  // Repaint: everything in the transport's grey goes gunship grey, the
+  // glazing, gear and props keep their own.
+  g.traverse((m) => {
+    if (m.isMesh && m.material && m.material.color && m.material.color.getHex() === HERCULES_GREY) m.material = grey;
+  });
+
+  // The 30 mm: a cradle through the skin, the barrel out past the fuselage
+  // wall with its muzzle brake, a blast deflector plate on the skin aft of it.
+  g.add(part(new THREE.BoxGeometry(0.6, 0.7, 0.9), dark, -2.05, -0.55, 6.2));
+  g.add(part(new THREE.CylinderGeometry(0.075, 0.085, 1.6, 10), black, -2.95, -0.55, 6.2, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.CylinderGeometry(0.11, 0.11, 0.3, 10), dark, -3.62, -0.55, 6.2, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.BoxGeometry(0.08, 1.2, 1.6), dark, -2.24, -0.55, 5.1));
+
+  // The 105 mm: the M102's barrel, longer and heavier, out of the aft port
+  // side with the recoil housing inboard and a flared muzzle.
+  g.add(part(new THREE.BoxGeometry(0.7, 0.9, 1.3), dark, -2.0, -0.45, -5.6));
+  g.add(part(new THREE.CylinderGeometry(0.1, 0.12, 2.5, 12), black, -3.4, -0.45, -5.6, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.CylinderGeometry(0.16, 0.13, 0.4, 12), dark, -4.55, -0.45, -5.6, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.BoxGeometry(0.08, 1.4, 2.0), dark, -2.24, -0.45, -6.6));
+
+  // Sensors: the ball under the chin, the second on the port side forward,
+  // the flat panel of the electro-optical suite on the crew door.
+  g.add(part(new THREE.SphereGeometry(0.52, 14, 10), dark, 0, -2.15, 11.6));
+  g.add(part(new THREE.BoxGeometry(0.5, 0.3, 0.3), glass, 0, -2.2, 12.05));
+  g.add(part(new THREE.SphereGeometry(0.46, 14, 10), dark, -2.45, -1.0, 8.4));
+  g.add(part(new THREE.BoxGeometry(0.28, 0.24, 0.3), glass, -2.85, -1.0, 8.4));
+  g.add(part(new THREE.BoxGeometry(0.1, 1.5, 1.0), dark, -2.2, 0.3, 8.6));
+
+  // The satcom radome on the spine, and the antenna farm ahead of it.
+  g.add(part(loft([
+    { z: -1.0, w: 1.6, h: 0.1, y: 2.2, n: 2.4 },
+    { z: -2.0, w: 1.9, h: 0.8, y: 2.35, n: 2.4 },
+    { z: -3.2, w: 1.6, h: 0.5, y: 2.3, n: 2.4 },
+    { z: -3.8, w: 0.6, h: 0.1, y: 2.2, n: 2.2 },
+  ], 12), grey, 0, 0, 0));
+  for (const z of [10.6, 9.2, 7.6, 4.8, -5.0, -6.2]) g.add(part(new THREE.BoxGeometry(0.06, 0.34, 0.26), dark, 0.2, 2.35, z));
+  for (const z of [6.4, -4.2]) g.add(part(new THREE.BoxGeometry(0.06, 0.3, 0.22), dark, 0.4, -2.35, z));
+
+  // Wingtip pods and the wing-mounted flare dispensers.
+  for (const s of [-1, 1]) {
+    g.add(part(new THREE.CylinderGeometry(0.36, 0.3, 3.4, 12), grey, s * 22.0, 1.95, 1.2, Math.PI / 2, 0, 0));
+    g.add(part(new THREE.SphereGeometry(0.3, 10, 8), dark, s * 22.0, 1.95, 2.9));
+    g.add(part(new THREE.BoxGeometry(0.9, 0.36, 0.6), dark, s * 6.9, -1.6, -1.2));
+  }
+  g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
+  return g;
+}
+
+/**
+ * BGM-109 Tomahawk in cruise: 5.56 m of half-metre tube, the wings out,
+ * the four tail fins in an X, the engine's inlet scooped from under the
+ * belly, nose along +Z. White, with the dark seeker window on the nose and
+ * the burner lit at the tail. There is nothing to release: at the aim
+ * point the missile itself becomes the round.
+ */
+export function makeTomahawk() {
+  const g = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xd9dbd6, roughness: 0.5, metalness: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.55, metalness: 0.45 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1c2733, roughness: 0.16, metalness: 0.82 });
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffb060, toneMapped: false });
+
+  // The tube: an ogive nose, a constant half-metre body, a short boat-tail.
+  g.add(part(loft([
+    { z: 2.78, w: 0.04, h: 0.04, n: 2.0 },
+    { z: 2.40, w: 0.24, h: 0.24, n: 2.0 },
+    { z: 1.90, w: 0.44, h: 0.44, n: 2.0 },
+    { z: 1.40, w: 0.52, h: 0.52, n: 2.0 },
+    { z: -2.10, w: 0.52, h: 0.52, n: 2.0 },
+    { z: -2.60, w: 0.42, h: 0.42, n: 2.0 },
+    { z: -2.78, w: 0.30, h: 0.30, n: 2.0 },
+  ], 16), white, 0, 0, 0));
+  // The seeker window on the nose, and the panel lines of the payload bay.
+  g.add(part(new THREE.CylinderGeometry(0.19, 0.24, 0.16, 16), glass, 0, 0, 2.22, Math.PI / 2, 0, 0));
+  for (const z of [1.35, -0.55, -1.90]) g.add(part(new THREE.CylinderGeometry(0.265, 0.265, 0.03, 16), dark, 0, 0, z, Math.PI / 2, 0, 0));
+
+  // The wings, swung out from the mid-body: 2.67 m across, thin and square.
+  const wing = surface({ span: 1.08, root: 0.56, tip: 0.44, sweep: 0.10, thick: 0.05, ridge: 0.45 });
+  pair(g, wing, white, 0.24, -0.03, 0.55);
+
+  // The inlet: the scoop under the belly behind the wings that feeds the
+  // turbofan, with the exhaust pipe out of the tail.
+  g.add(part(loft([
+    { z: -0.60, w: 0.30, h: 0.04, y: -0.26, n: 2.6 },
+    { z: -0.95, w: 0.32, h: 0.24, y: -0.36, n: 2.8 },
+    { z: -2.20, w: 0.30, h: 0.22, y: -0.34, n: 2.8 },
+    { z: -2.50, w: 0.20, h: 0.12, y: -0.30, n: 2.4 },
+  ], 10), white, 0, 0, 0));
+  g.add(part(new THREE.BoxGeometry(0.26, 0.16, 0.04), dark, 0, -0.37, -0.95));
+  g.add(part(new THREE.CylinderGeometry(0.13, 0.15, 0.30, 14), dark, 0, 0, -2.85, Math.PI / 2, 0, 0));
+  const flame = new THREE.ConeGeometry(0.11, 0.9, 10);
+  flame.rotateX(-Math.PI / 2);
+  g.add(part(flame, glow, 0, 0, -3.35));
+
+  // Four tail fins in an X, each a small swept panel out of the boat-tail.
+  const fin = surface({ span: 0.58, root: 0.46, tip: 0.30, sweep: 0.16, thick: 0.04 });
+  for (let k = 0; k < 4; k++) {
+    const f = new THREE.Mesh(fin, white);
+    f.position.set(0, 0, -2.25);
+    f.rotation.z = Math.PI / 4 + k * Math.PI / 2;
+    f.castShadow = true;
+    g.add(f);
+  }
+  g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
+  return g;
+}

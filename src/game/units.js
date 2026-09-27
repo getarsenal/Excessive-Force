@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { makeStryker } from './vehicles.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
@@ -145,7 +146,8 @@ export const UNITS = [
   {
     id: 'stryker', name: 'STRYKER MGS', full: 'M1128 Stryker Mobile Gun System', tier: 'AFV',
     cost: 1800, unlockFrac: 0.06,
-    tint: 0x4a5048, model: 'M109', modelLength: 9.0,
+    // Built in code until there is a model file: see `vehicles.js`.
+    model: 'procedural', build: makeStryker, modelLength: 6.95,
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
     // A tank gun, not a howitzer: nine hundred metres a second on the lowest
@@ -231,9 +233,9 @@ export const UNITS = [
     id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · AGM-114 Hellfire', tier: 'AIR',
     cost: 40000, unlockFrac: 0.05,
     model: 'aircraft', strike: { frac: 0.05, maxR: 26, minR: 4, fx: 2.6, bite: 0.5, shock: 0.8 },
-    aircraft: { kind: 'eagle', speed: 110, height: 70, clearance: 30, runIn: 1500, offset: 30 },
+    aircraft: { kind: 'apache', speed: 70, height: 70, clearance: 30, runIn: 900, offset: 30 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 110, gravity: 9.81, drag: 0.02, trail: 0.6 },
+    projectile: { kind: 'bomb', speed: 70, gravity: 9.81, drag: 0.02, trail: 0.6 },
     warhead: { lethal: 12, radius: 16, power: 30000, fx: 2.6, kinetic: 0.6 },
     dispersion: 0,
     blurb: 'One Hellfire on the point you tap. Small, precise, and cheap enough to use twice.',
@@ -245,9 +247,9 @@ export const UNITS = [
     // second behind the last, so the pass rakes a face rather than cratering
     // a point.
     model: 'aircraft', strike: { frac: 0.03, maxR: 30, minR: 6, fx: 2.0, bite: 0.55, shock: 0.9, salvo: { n: 8, spread: 14 } },
-    aircraft: { kind: 'lancer', speed: 140, height: 240, clearance: 100, runIn: 2600, offset: 50 },
+    aircraft: { kind: 'ghostrider', speed: 130, height: 240, clearance: 100, runIn: 2400, offset: 50 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 140, gravity: 9.81, drag: 0.03, trail: 0.7 },
+    projectile: { kind: 'bomb', speed: 130, gravity: 9.81, drag: 0.03, trail: 0.7 },
     warhead: { lethal: 6, radius: 11, power: 14000, fx: 2.0, kinetic: 0.7 },
     dispersion: 0,
     blurb: 'Eight rounds of 105 mm walked along a line in one pass. A wall, not a hole.',
@@ -256,7 +258,7 @@ export const UNITS = [
     id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'AIR',
     cost: 180000, unlockFrac: 0.2,
     model: 'aircraft', strike: { frac: 0.16, maxR: 44, minR: 6, fx: 5.0, bite: 0.7, shock: 1.1 },
-    aircraft: { kind: 'eagle', speed: 240, height: 60, clearance: 26, runIn: 2800, offset: 20 },
+    aircraft: { kind: 'tomahawk', speed: 240, height: 60, clearance: 26, runIn: 2800, offset: 20, consumed: true },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'bomb', speed: 240, gravity: 9.81, drag: 0.02, trail: 1.0 },
     warhead: { lethal: 40, radius: 34, power: 150000, fx: 5.0, kinetic: 0.5 },
@@ -358,6 +360,26 @@ export class ModelLibrary {
     });
 
     // Wrap so callers can rotate the wrapper without fighting the normalisation.
+    const wrapper = new THREE.Group();
+    wrapper.add(root);
+    this.cache.set(key, wrapper);
+    return wrapper;
+  }
+
+  /**
+   * A model built in code rather than loaded: already at true scale, so it
+   * is only centred in plan and put on the ground, and cached under its
+   * unit id like the files are.
+   */
+  wrap(root, id) {
+    const key = `proc:${id}`;
+    if (this.cache.has(key)) return this.cache.get(key);
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const centre = box.getCenter(new THREE.Vector3());
+    root.position.x -= centre.x;
+    root.position.z -= centre.z;
+    root.position.y -= box.min.y;
     const wrapper = new THREE.Group();
     wrapper.add(root);
     this.cache.set(key, wrapper);

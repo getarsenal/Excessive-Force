@@ -998,9 +998,9 @@ export class Battle {
       }
       return;
     }
-    const wrapper = await this.models.load(
-      def.modelFile || def.model, def.modelLength, { tint: def.tint },
-    );
+    const wrapper = def.build
+      ? this.models.wrap(def.build(), def.id)
+      : await this.models.load(def.modelFile || def.model, def.modelLength, { tint: def.tint });
     if (!unit.alive) return;
     const inst = this.models.instance(wrapper);
     inst.rotation.y = def.modelYaw ?? 0;

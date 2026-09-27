@@ -342,13 +342,16 @@ export class Structure {
    * yaw-expanded boxes adjacency itself uses, floored at a twentieth of a
    * square metre so a corner contact still counts for something.
    */
-  _finishBelow(n, under) {
+  _finishBelow(n, under, filter = true) {
     const below = new Array(n);
     let belowEdges = 0;
     for (let i = 0; i < n; i++) {
       const out = [];
       for (const j of under(i)) {
-        if (this.py[j] < this.py[i] - Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
+        // `filter` keeps the edges that point downward. The cantilever grout
+        // has already chosen its edges, some of them sideways, and passes
+        // them through as they are.
+        if (!filter || this.py[j] < this.py[i] - Math.min(this.hy[i], this.hy[j]) * 0.5) out.push(j);
       }
       below[i] = out;
       belowEdges += out.length;
@@ -1189,16 +1192,10 @@ export class Structure {
     // Fold the new bearing edges back into both graphs. They have to reach the
     // adjacency list too, or spanning and island connectivity disagree with
     // what the support pass now believes.
-    let belowEdges = 0;
-    for (let i = 0; i < n; i++) belowEdges += below[i].length;
-    this.belowStart = new Int32Array(n + 1);
-    this.belowList = new Int32Array(belowEdges);
-    let cursor = 0;
-    for (let i = 0; i < n; i++) {
-      this.belowStart[i] = cursor;
-      for (const j of below[i]) this.belowList[cursor++] = j;
-    }
-    this.belowStart[n] = cursor;
+    // Through `_finishBelow` so every edge has its bearing area: a list
+    // rebuilt without them read as NaN in the load pass on every level that
+    // needed a cantilever hold.
+    this._finishBelow(n, (i) => below[i], false);
 
     const adj = new Array(n);
     let adjEdges = 0;
@@ -1213,7 +1210,7 @@ export class Structure {
     // Symmetric: a stone that bears on another is a neighbour of it.
     this.adjStart = new Int32Array(n + 1);
     this.adjList = new Int32Array(adjEdges);
-    cursor = 0;
+    let cursor = 0;
     for (let i = 0; i < n; i++) {
       this.adjStart[i] = cursor;
       for (const j of adj[i]) this.adjList[cursor++] = j;
