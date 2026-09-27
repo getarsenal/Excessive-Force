@@ -51,7 +51,7 @@ export const PLACES = [
   { id: 'victoriamemorial', landmark: 'Victoria Memorial', city: 'Kolkata', lat: 22.54484, lon: 88.34257, iso: 'IND', code: 'in', clime: 'tropical' },
   { id: 'hawamahal', landmark: 'Hawa Mahal', city: 'Jaipur', lat: 26.92389, lon: 75.82667, iso: 'IND', code: 'in', clime: 'desert' },
   { id: 'redfort', landmark: 'Red Fort', city: 'Delhi', lat: 28.65611, lon: 77.24111, iso: 'IND', code: 'in', clime: 'desert' },
-  { id: 'gatewayindia', landmark: 'Gateway of India', city: 'Mumbai', lat: 18.92197, lon: 72.83465, iso: 'IND', code: 'in', clime: 'tropical', coast: true },
+  { id: 'gatewayindia', landmark: 'Gateway of India', city: 'Mumbai', lat: 18.92197, lon: 72.83408, iso: 'IND', code: 'in', clime: 'tropical', coast: true, pad: 130, padH: 2.0 },
   { id: 'osaka', landmark: 'Osaka Castle', city: 'Osaka', lat: 34.68725, lon: 135.52586, iso: 'JPN', code: 'jp', clime: 'subtropical', hill: true },
   { id: 'kinkakuji', landmark: 'Kinkaku-ji', city: 'Kyoto', lat: 35.03937, lon: 135.72924, iso: 'JPN', code: 'jp', clime: 'subtropical', remote: true },
   { id: 'juche', landmark: 'Juche Tower', city: 'Pyongyang', lat: 39.01722, lon: 125.76361, iso: 'PRK', code: 'kp', clime: 'temperate', river: true },

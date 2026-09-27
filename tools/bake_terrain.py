@@ -1057,12 +1057,12 @@ LEVELS = {
     "gatewayindia": {
         "name": "Gateway of India, Mumbai",
         "lat": 18.92197,
-        "lon": 72.83465,
+        "lon": 72.83408,
         "span": 900.0,
         "zoom": 15,
         "ceiling": "auto",
         "parks": [],
-        "flatten": [[0, 0, [70, 70], 30]],
+        "flatten": [[0, 0, [130, 130], 30, 2]],
     },
     "osaka": {
         "name": "Osaka Castle, Osaka",

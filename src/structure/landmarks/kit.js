@@ -135,13 +135,19 @@ class Kit {
     const pitch = this.stone * coarse;
     if (R < pitch * 1.2) { B.add(cx, y + h / 2, cz, Math.max(0.2, R * 0.8), B.shrink(h / 2), Math.max(0.2, R * 0.8), mat); return; }
     const n = Math.ceil(R / pitch) + 1;
+    let laid = 0;
     for (let i = -n; i < n; i++) {
       for (let j = -n; j < n; j++) {
         const px = (i + 0.5) * pitch, pz = (j + 0.5) * pitch;
         if (Math.hypot(px, pz) + pitch * 0.62 > R) continue;
         B.add(cx + px, y + h / 2, cz + pz, B.shrink(pitch / 2), B.shrink(h / 2), B.shrink(pitch / 2), mat);
+        laid++;
       }
     }
+    // A disc between one and two pitches across has no cell wholly inside
+    // it, and laid nothing: at the finest tier every column of the
+    // Brandenburg Gate was empty and the attic stood on air. One stone, then.
+    if (!laid) B.add(cx, y + h / 2, cz, Math.max(0.2, R * 0.75), B.shrink(h / 2), Math.max(0.2, R * 0.75), mat);
   }
 
   /** One round course: a ring whose outer face is at R, `W` thick. */
@@ -287,7 +293,7 @@ class Kit {
     // go. A grid of piers ten metres apart in the world is what carries a
     // real one.
     const piers = [];
-    if (!round && (floorsAt.length || p.roof === 'flat' || p.roof === undefined)) {
+    if (floorsAt.length || (!round && (p.roof === 'flat' || p.roof === undefined))) {
       const P = 10 / S;
       const iw = w * taper - 2 * wall, id = d * taper - 2 * wall;
       const nx = Math.floor(iw / P), nz = Math.floor(id / P);
@@ -297,6 +303,12 @@ class Kit {
           piers.push([cx - iw / 2 + (i * iw) / (nx + 1), nz ? cz - id / 2 + (j * id) / (nz + 1) : cz]);
         }
         if (nx === 0) for (let j = 1; j <= nz; j++) piers.push([cx, cz - id / 2 + (j * id) / (nz + 1)]);
+      }
+      // In a round room, only the piers that stand clear of the wall.
+      if (round) {
+        for (let k = piers.length - 1; k >= 0; k--) {
+          if (Math.hypot(piers[k][0] - cx, piers[k][1] - cz) > iw / 2 - Math.max(1.0, this.stone)) piers.splice(k, 1);
+        }
       }
     }
     const pw = Math.max(1.0, this.stone * 0.7);

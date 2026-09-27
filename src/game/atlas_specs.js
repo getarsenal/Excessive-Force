@@ -414,7 +414,7 @@ export const SPECS = {
     ],
   },
   gatewayindia: {
-    S: 3.0, yaw: 0.3, mat: M.LIMESTONE,
+    S: 2.2, yaw: 0.3, mat: M.LIMESTONE,
     parts: [
       { t: 'arch', tag: 'gateway', x: 0, z: 0, w: 22, d: 15, h: 17, span: 8.5, spring: 7.5, pointed: true, axis: 'z', mat: M.LIMESTONE, attic: { cap: 'dome', w: 8, d: 8, h: 5, round: true } },
       ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => ({ t: 'tower', tag: 'turrets', x: sx * 13.4, z: sz * 6, w: 4.2, h: 21, sides: 8, cap: 'dome', capH: 3, capMat: M.LIMESTONE, mat: M.LIMESTONE, floors: 1 })),
@@ -487,7 +487,7 @@ export const SPECS = {
     ],
   },
   registan: {
-    S: 1.0, yaw: 0.2, mat: M.LIMESTONE, domeMat: M.VERDE,
+    S: 1.3, yaw: 0.2, mat: M.LIMESTONE, domeMat: M.VERDE,
     parts: [
       // Three madrasas round the square: Ulugh Beg west, Sher-Dor east, Tilya-Kori north.
       ...[[-60, 0, 'x'], [60, 0, 'x'], [0, -60, 'z']].flatMap(([x, z, ax], i) => {
@@ -496,12 +496,12 @@ export const SPECS = {
         const out = x < 0 ? -1 : x > 0 ? 1 : -1;
         const bx = along ? x + out * 34 : x, bz = along ? z : z - 34;
         return [
-          { t: 'arch', tag, x, z, w: along ? 12 : 34, d: along ? 34 : 12, h: 34, span: 14, spring: 14, pointed: true, axis: along ? 'x' : 'z', mat: M.LIMESTONE },
+          { t: 'arch', tag, x, z, w: along ? 12 : 34, d: along ? 34 : 12, h: 34, span: 14, spring: 14, pointed: true, solid: true, axis: along ? 'x' : 'z', mat: M.LIMESTONE },
           { t: 'hall', tag, x: bx, z: bz, w: along ? 55.4 : 70, d: along ? 70 : 55.4, h: 14, roof: 'flat', mat: M.LIMESTONE, storey: 7 },
           ...[-1, 1].map((s) => ({ t: 'tower', tag: `${tag}minarets`, x: along ? x + out * 12 : x + s * 36, z: along ? z + s * 36 : z - 12, w: 6, h: 33, round: true, cap: 'flat', capH: 1, mat: M.LIMESTONE, floors: 1 })),
         ];
       }),
-      { t: 'dome', tag: 'tilyakoridome', x: 22, z: -95, y0: 14.3, r: 9, drumH: 6, h: 10, mat: M.LIMESTONE, domeMat: M.VERDE, lantern: false },
+      { t: 'dome', tag: 'tilyakoridome', x: 22, z: -95, y0: 14.8, r: 9, drumH: 6, h: 10, mat: M.LIMESTONE, domeMat: M.VERDE, lantern: false },
     ],
   },
   flametowers: {

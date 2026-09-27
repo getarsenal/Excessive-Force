@@ -488,7 +488,10 @@ function levelRecord(P, i) {
       yaw: spec.yaw ?? 0.45,
       pitch: 0.12,
       distance: Math.round(clamp(Math.max(w, d) * 1.5 + H * 0.9, 260, 820)),
-      height: Math.round(clamp(H * 0.35, 25, 160)),
+      // High enough to see over the town: a supertall in a business district
+      // has towers of its own round it, and a camera at a third of its height
+      // looked at the side of the nearest one.
+      height: Math.round(clamp(Math.max(H * (H > 150 ? 0.6 : 0.35), clamp(Math.max(w, d) * 1.5 + H * 0.9, 260, 820) * 0.2), 30, 240)),
     },
     structures: (quality) => [
       { key: P.id, blocks: buildKit(spec, quality), primary: true, required: true, label: target },
