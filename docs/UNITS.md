@@ -71,7 +71,10 @@ player's target: `battle.setTarget` calls `air.retarget`. A record with
 Shot down, either one falls and explodes. Rounds carry their sortie, so
 the feed reports stones and kills once, when it leaves. `loiterStatus()`
 is what the HUD pill under the target card reads: one aircraft icon and
-one run-down clock per aircraft on station.
+one run-down clock per aircraft on station, three to a row in call order,
+the rest behind a +N toggle, closing up as they expire. The gunship
+flies 450 m out and 300 m up; the camera tilts up past its lowest orbit
+(`CameraRig.orbitFloor`) so it can be watched.
 
 Names the sortie looks for: `prop` and `rotorA` are spun, `tailrotor` too;
 `bomb` is the child hidden at release. `aircraft.consumed` means the

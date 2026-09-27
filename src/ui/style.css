@@ -529,9 +529,9 @@ html, body {
 }
 #status.on { opacity: 1; }
 /* The pill of aircraft on station takes the right-hand half of the row the
-   status line uses; with it up, the line drops one row rather than run
-   underneath it. */
-body.loitering #status { top: calc(var(--hud-top) + var(--rail-step) + 44px); }
+   status line uses, and opened it is several rows deep; with it up, the
+   line sits just under wherever the pill ends rather than run under it. */
+body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 
 /* ── Prompt ──────────────────────────────────────────────────────────── */
 #prompt {
@@ -572,12 +572,31 @@ body.loitering #status { top: calc(var(--hud-top) + var(--rail-step) + 44px); }
    the time it has left, the lit wedge shrinking round the face to grey the
    way a kitchen timer runs down; it goes amber in the last fifth, and the
    aircraft is dimmed while it is still on its way in. */
-#loiters {
+#loiters { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+/* Three to a row. The first row always shows, with a +N toggle when there
+   are more; opened, the rest hang under it in rows of three. The order is
+   the order they were called in, so as the earliest run out the later ones
+   move up and the rows close up behind them. */
+.lo-row {
   display: flex; align-items: center; gap: 10px;
   padding: 4px 11px 4px 8px; border-radius: 999px;
   background: var(--panel); border: 1px solid var(--edge);
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
+.lo-row[hidden] { display: none; }
+.lo-more {
+  font-family: inherit; font-size: 10px; letter-spacing: 0.08em; font-weight: 600;
+  color: var(--text); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--edge); border-radius: 999px;
+  padding: 0 8px; min-height: 24px; min-width: 40px; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+}
+.lo-more[hidden] { display: none; }
+.lo-more i {
+  width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid currentColor; transition: transform 0.12s ease;
+}
+#loiters.open .lo-more i { transform: rotate(180deg); }
 .lo-item { display: flex; align-items: center; gap: 4px; }
 .lo-item img { width: 32px; height: 20px; object-fit: contain; display: block; }
 .lo-item.inbound img { opacity: 0.55; }

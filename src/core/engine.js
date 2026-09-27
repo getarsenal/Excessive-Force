@@ -430,7 +430,11 @@ export class CameraRig {
     this.pitch = opts.pitch ?? 0.62;
     this.desiredYaw = this.yaw;
     this.desiredPitch = this.pitch;
-    this.minPitch = 0.06;
+    // Below `orbitFloor` the camera stops going round and starts looking up:
+    // it stays at its lowest orbit and tilts the view into the sky, so the
+    // gunship circling three hundred metres over the target can be watched.
+    this.orbitFloor = 0.06;
+    this.minPitch = -0.85;
     this.maxPitch = 1.42;
 
     this.enabled = true;
@@ -759,9 +763,10 @@ export class CameraRig {
     const gh = this.groundHeight(this.target.x, this.target.z);
     if (this.target.y < gh + 2) this.target.y = gh + 2;
 
-    const cp = Math.cos(this.pitch);
+    const orbit = Math.max(this.pitch, this.orbitFloor);
+    const cp = Math.cos(orbit);
     const ox = Math.sin(this.yaw) * cp * this.distance;
-    const oy = Math.sin(this.pitch) * this.distance;
+    const oy = Math.sin(orbit) * this.distance;
     const oz = Math.cos(this.yaw) * cp * this.distance;
 
     this.camera.position.set(this.target.x + ox, this.target.y + oy, this.target.z + oz);
@@ -771,6 +776,8 @@ export class CameraRig {
     if (this.camera.position.y < camGround + 6) this.camera.position.y = camGround + 6;
 
     this.camera.lookAt(this.target);
+    // Past the floor, the rest of the drag is the eye going up.
+    if (this.pitch < this.orbitFloor) this.camera.rotateX(this.orbitFloor - this.pitch);
 
     if (shakeVec && (shakeVec.x || shakeVec.y)) {
       // The shake belongs to the building, not to the lens.

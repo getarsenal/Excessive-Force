@@ -805,6 +805,27 @@ export class HUD {
     const now = performance.now();
     if (now - (this._loiterAt || 0) < 200) return;
     this._loiterAt = now;
+    const PER_ROW = 3;
+    if (!this._loiterMore) {
+      // Built once: the first row with its toggle, and a holder for the rest.
+      const first = document.createElement('div');
+      first.className = 'lo-row';
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'lo-more';
+      more.hidden = true;
+      more.innerHTML = '<span></span><i aria-hidden="true"></i>';
+      more.addEventListener('click', () => {
+        this._loitersOpen = !this._loitersOpen;
+        this._loiterSig = '';
+        this._loiterAt = 0;
+        this._syncLoiters(b);
+      });
+      box.appendChild(first);
+      this._loiterFirst = first;
+      this._loiterMore = more;
+      this._loiterRows = [];
+    }
     const list = b.air.loiterStatus(this._loiterList || (this._loiterList = []));
     const items = this._loiterItems || (this._loiterItems = new Map());
     const live = new Set();
@@ -816,7 +837,6 @@ export class HUD {
         el.className = 'lo-item';
         el.title = e.sortie.def.full;
         el.innerHTML = `<img src="assets/icons/${e.id}.png" alt="${e.sortie.def.name}" draggable="false"><span class="lo-clock"></span>`;
-        box.appendChild(el);
         items.set(e.sortie, el);
       }
       el.classList.toggle('inbound', e.inbound);
@@ -824,8 +844,42 @@ export class HUD {
       el.lastChild.style.setProperty('--f', e.left.toFixed(3));
     }
     for (const [s, el] of items) if (!live.has(s)) { el.remove(); items.delete(s); }
+
+    // Rows, in call order: rebuilt only when who is on station changes, or
+    // the toggle does, not five times a second.
+    const open = !!this._loitersOpen && list.length > PER_ROW;
+    const sig = `${open}|${list.map((e) => e.sortie.t0 ?? (e.sortie.t0 = Math.random())).join(',')}`;
+    if (sig !== this._loiterSig) {
+      this._loiterSig = sig;
+      const first = this._loiterFirst, more = this._loiterMore;
+      for (let i = 0; i < Math.min(PER_ROW, list.length); i++) first.appendChild(items.get(list[i].sortie));
+      first.appendChild(more);
+      const extra = list.length - PER_ROW;
+      more.hidden = extra <= 0;
+      if (extra > 0) more.firstChild.textContent = `+${extra}`;
+      box.classList.toggle('open', open);
+      const need = open ? Math.ceil(extra / PER_ROW) : 0;
+      while (this._loiterRows.length < Math.ceil(Math.max(0, extra) / PER_ROW)) {
+        const row = document.createElement('div');
+        row.className = 'lo-row';
+        box.appendChild(row);
+        this._loiterRows.push(row);
+      }
+      this._loiterRows.forEach((row, r) => {
+        row.hidden = r >= need;
+        for (let i = PER_ROW * (r + 1); i < Math.min(list.length, PER_ROW * (r + 2)); i++) {
+          row.appendChild(items.get(list[i].sortie));
+        }
+        if (r >= need) row.replaceChildren();
+      });
+      if (!open) {
+        // Folded, the hidden ones are not in the page at all.
+        for (let i = PER_ROW; i < list.length; i++) items.get(list[i].sortie).remove();
+      }
+    }
     box.hidden = items.size === 0;
     document.body.classList.toggle('loitering', items.size > 0);
+    if (items.size) document.body.style.setProperty('--lo-bottom', `${Math.round(box.getBoundingClientRect().bottom)}px`);
   }
 
   /**

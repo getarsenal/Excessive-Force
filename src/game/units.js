@@ -260,7 +260,7 @@ export const UNITS = [
     model: 'aircraft', strike: { loiter: true, frac: 0.015, maxR: 7, minR: 3, fx: 1.8, bite: 0.6, shock: 0.9 },
     aircraft: {
       kind: 'ghostrider', orbit: true, speed: 110, runIn: 2000,
-      station: 75, radius: 520, height: 420,
+      station: 75, radius: 450, height: 300,
       shells: 30, every: 2.4, spread: 1.8, muzzle: 500,
     },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
