@@ -2330,8 +2330,19 @@ export class Structure {
       // Damage is a direct multiplier on how much a stone can still carry.
       const capacity = this.strength[i] * (this.health[i] / this.maxHealth[i]);
       if (total > capacity) {
-        crushed.push(i);
-        continue;
+        // At rest, as built, before anything has been shot: a stone carrying
+        // more than its strength is the builder's stone drawn too small for a
+        // building that stands in life, not a collapse. Its strength is set
+        // to what it carries with a margin, once, and from then on it crushes
+        // like any other. Cologne's west-front piers stand on metre stones
+        // under a hundred and fifty metres of spire; the real ones are bigger.
+        if (!this._settledOnce) {
+          this.strength[i] = total * 1.25;
+          this._calibrated = (this._calibrated || 0) + 1;
+        } else {
+          crushed.push(i);
+          continue;
+        }
       }
 
       // Weight only travels into load-bearing stone. Glazing and applied
@@ -2341,15 +2352,23 @@ export class Structure {
       const s1 = this.belowStart[i + 1];
       // Shared by how much of the stone each supporter carries, not by how
       // many there are: see `_finishBelow`.
-      let carried = 0;
+      // Half by bearing area and half by count. Pure area put a whole
+      // column's weight on the one stone directly under its axis and crushed
+      // a hundred stones across nine levels at load — the mortar joint that
+      // real masonry spreads a load through is not modelled, so the count
+      // half stands in for it. Pure count is the funnel the builders had to
+      // work round; this halves it.
+      let carried = 0, supporters = 0;
       for (let a = s0; a < s1; a++) {
         const j = this.belowList[a];
-        if (reach[j] && this.structural[j]) carried += this.belowArea[a];
+        if (reach[j] && this.structural[j]) { carried += this.belowArea[a]; supporters++; }
       }
-      if (carried <= 0) continue;
+      if (supporters === 0 || carried <= 0) continue;
       for (let a = s0; a < s1; a++) {
         const j = this.belowList[a];
-        if (reach[j] && this.structural[j]) load[j] += total * (this.belowArea[a] / carried);
+        if (reach[j] && this.structural[j]) {
+          load[j] += total * (0.5 / supporters + 0.5 * (this.belowArea[a] / carried));
+        }
       }
     }
 
@@ -2360,6 +2379,7 @@ export class Structure {
       reach[i] = 0;
       this.stabilityDirty = true;
     }
+    this._settledOnce = true;
 
     // Everything alive, attached, and unreachable is now falling.
     // The same sweep totals what is genuinely still standing: alive, attached

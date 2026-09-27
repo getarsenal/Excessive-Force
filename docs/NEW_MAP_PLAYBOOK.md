@@ -715,8 +715,11 @@ builders in five worktrees with `tools/loosecheck.mjs` instead of a browser
 each. Every one of them ran into the same handful of things, so they are
 the engine's, not the builders':
 
-- **The solver shares a stone's load by supporter *count*, not by contact
-  area.** Every stone with a lower centre that touches it gets an equal
+- **The solver shared a stone's load by supporter *count*, not by contact
+  area** (fixed after the batch: it is now half by bearing area and half by
+  count, and a stone drawn too small for the load it carries as built is
+  sized up once at rest rather than crushed; the workarounds below are no
+  longer needed but do no harm). Every stone with a lower centre that touches it gets an equal
   share. Three things follow, and every builder hit at least one. A solid
   spire laid as same-count slab grids course over course has each stone
   touching only the one under it, so nothing shares sideways and the load

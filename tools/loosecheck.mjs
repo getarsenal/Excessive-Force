@@ -33,7 +33,7 @@ for (const sp of specs) {
   }
   let crushed = 0;
   for (let i = 0; i < st.count; i++) if ((st.flags[i] & 1) && st.health[i] <= 0) crushed++;
-  console.log(`${sp.key}: ${st.count} stones, ${loose.length} loose, ${crushed} crushed at load`);
+  console.log(`${sp.key}: ${st.count} stones, ${loose.length} loose, ${crushed} crushed at load, ${st._calibrated || 0} sized up at rest`);
   bad += crushed;
   for (const b of loose.slice(0, 25)) console.log(`   ${b.tag.padEnd(12)} y ${String(b.y).padStart(6)}  r ${String(b.r).padStart(6)}  ${b.h.join(' x ')}`);
   if (loose.length > 25) console.log(`   … and ${loose.length - 25} more`);
