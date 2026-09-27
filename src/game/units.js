@@ -239,30 +239,35 @@ export const UNITS = [
     model: 'aircraft', strike: { loiter: true, frac: 0.01, maxR: 5, minR: 2, fx: 1.1, bite: 0.6, shock: 0.6 },
     aircraft: {
       kind: 'apache', speed: 80, height: 30, clearance: 25, runIn: 900, offset: 60,
-      station: 30,          // seconds it stays
+      station: 45,          // seconds it stays
       standoff: 300,        // metres out from the aim point it hovers
-      rockets: 38, pair: 2, every: 1.5, spread: 1.2, muzzle: 480,
+      rockets: 38, pair: 2, every: 2.2, spread: 1.2, muzzle: 480,
       gun: { every: 2.6, burst: 12, reach: 45, radius: 2.4, power: 2600 },
     },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'bomb', speed: 480, gravity: 9.81, drag: 0, trail: 0.8 },
     warhead: { lethal: 4, radius: 6, power: 5200, fx: 1.1, kinetic: 0.5 },
     dispersion: 0,
-    blurb: 'Hovers off the target for thirty seconds: rockets in pairs on your point, the chain gun on the garrison. Can be shot down.',
+    blurb: 'Forty-five seconds on station: rockets in pairs on your point, the chain gun on the garrison. Follows your target. Can be shot down.',
   },
   {
-    id: 'ac130', name: 'AC-130', full: 'AC-130J Ghostrider · 105 mm rake', tier: 'AIR',
+    id: 'ac130', name: 'AC-130', full: 'AC-130J Ghostrider · 105 mm', tier: 'AIR',
     cost: 120000, unlockFrac: 0.14,
-    // A salvo: eight shells laid in a line along the run, each a tenth of a
-    // second behind the last, so the pass rakes a face rather than cratering
-    // a point.
-    model: 'aircraft', strike: { frac: 0.03, maxR: 30, minR: 6, fx: 2.0, bite: 0.55, shock: 0.9, salvo: { n: 8, spread: 14 } },
-    aircraft: { kind: 'ghostrider', speed: 130, height: 240, clearance: 100, runIn: 2400, offset: 50 },
+    // A gunship, not a bomber: a banked orbit high over the target for a
+    // minute and a quarter, the 105 mm howitzer firing down its port side
+    // in direct fire, one round every couple of seconds. It follows the
+    // target when the player moves it. `strike` sizes each round.
+    model: 'aircraft', strike: { loiter: true, frac: 0.015, maxR: 7, minR: 3, fx: 1.8, bite: 0.6, shock: 0.9 },
+    aircraft: {
+      kind: 'ghostrider', orbit: true, speed: 110, runIn: 2000,
+      station: 75, radius: 520, height: 420,
+      shells: 30, every: 2.4, spread: 1.8, muzzle: 500,
+    },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 130, gravity: 9.81, drag: 0.03, trail: 0.7 },
-    warhead: { lethal: 6, radius: 11, power: 14000, fx: 2.0, kinetic: 0.7 },
+    projectile: { kind: 'bomb', speed: 500, gravity: 9.81, drag: 0, trail: 0.6 },
+    warhead: { lethal: 6, radius: 9, power: 9000, fx: 1.8, kinetic: 0.7 },
     dispersion: 0,
-    blurb: 'Eight rounds of 105 mm walked along a line in one pass. A wall, not a hole.',
+    blurb: 'Circles high over the target for seventy-five seconds, 105 mm down its port side in direct fire. Follows your target.',
   },
   {
     id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'SEA',

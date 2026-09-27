@@ -50,6 +50,7 @@ export class HUD {
       strikebar: document.getElementById('strikebar'),
       prompt: document.getElementById('prompt'),
       targetcard: document.getElementById('targetcard'),
+      loiters: document.getElementById('loiters'),
       tcSection: document.getElementById('tc-section'),
       tcHeight: document.getElementById('tc-height'),
       tcGuns: document.getElementById('tc-guns'),
@@ -790,6 +791,41 @@ export class HUD {
     } else {
       this.el.targetcard.hidden = true;
     }
+    this._syncLoiters(b);
+  }
+
+  /**
+   * The aircraft on station, under the target card: one icon and one clock
+   * each. Written five times a second rather than every frame — a clock
+   * face moving a degree a frame is a style write for nothing.
+   */
+  _syncLoiters(b) {
+    const box = this.el.loiters;
+    if (!box || !b.air || !b.air.loiterStatus) return;
+    const now = performance.now();
+    if (now - (this._loiterAt || 0) < 200) return;
+    this._loiterAt = now;
+    const list = b.air.loiterStatus(this._loiterList || (this._loiterList = []));
+    const items = this._loiterItems || (this._loiterItems = new Map());
+    const live = new Set();
+    for (const e of list) {
+      live.add(e.sortie);
+      let el = items.get(e.sortie);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'lo-item';
+        el.title = e.sortie.def.full;
+        el.innerHTML = `<img src="assets/icons/${e.id}.png" alt="${e.sortie.def.name}" draggable="false"><span class="lo-clock"></span>`;
+        box.appendChild(el);
+        items.set(e.sortie, el);
+      }
+      el.classList.toggle('inbound', e.inbound);
+      el.classList.toggle('low', !e.inbound && e.left < 0.2);
+      el.lastChild.style.setProperty('--f', e.left.toFixed(3));
+    }
+    for (const [s, el] of items) if (!live.has(s)) { el.remove(); items.delete(s); }
+    box.hidden = items.size === 0;
+    document.body.classList.toggle('loitering', items.size > 0);
   }
 
   /**

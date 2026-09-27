@@ -528,6 +528,10 @@ html, body {
   max-width: 60vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #status.on { opacity: 1; }
+/* The pill of aircraft on station takes the right-hand half of the row the
+   status line uses; with it up, the line drops one row rather than run
+   underneath it. */
+body.loitering #status { top: calc(var(--hud-top) + var(--rail-step) + 44px); }
 
 /* ── Prompt ──────────────────────────────────────────────────────────── */
 #prompt {
@@ -550,10 +554,42 @@ html, body {
      used to be pinned at a guessed 92px: correct on the phone it was guessed
      on, and straight through the readouts on a notched one in standalone,
      where the bar is sixty points taller. */
-  position: absolute; right: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step));
-  width: 178px; max-width: calc(100vw - var(--ui-pad) * 2);
-  background: var(--panel); border: 1px solid var(--edge); z-index: 19;
+  /* Level with the TEST button: the same top, and folded the same forty-four
+     pixels, so the two bottoms line up across the screen. It lives in the
+     right-hand column now, which is what places it. */
+  width: 178px; max-width: calc(100vw - var(--ui-pad) * 2); min-height: 44px;
+  background: var(--panel); border: 1px solid var(--edge);
   padding: 9px 11px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#hud-right {
+  position: absolute; right: var(--ui-pad); top: var(--hud-top); z-index: 19;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  pointer-events: none;
+}
+#hud-right > * { pointer-events: auto; }
+#hud-right > [hidden] { display: none; }
+/* Aircraft on station: a pill, one aircraft and one clock each. The clock is
+   the time it has left, the lit wedge shrinking round the face to grey the
+   way a kitchen timer runs down; it goes amber in the last fifth, and the
+   aircraft is dimmed while it is still on its way in. */
+#loiters {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 11px 4px 8px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--edge);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+.lo-item { display: flex; align-items: center; gap: 4px; }
+.lo-item img { width: 32px; height: 20px; object-fit: contain; display: block; }
+.lo-item.inbound img { opacity: 0.55; }
+.lo-clock {
+  --f: 1;
+  width: 17px; height: 17px; border-radius: 50%;
+  border: 1.5px solid rgba(216, 222, 229, 0.55);
+  background: conic-gradient(#d8dee5 calc(var(--f) * 1turn), rgba(120, 128, 138, 0.28) 0);
+}
+.lo-item.low .lo-clock {
+  border-color: rgba(255, 176, 64, 0.8);
+  background: conic-gradient(#ffb040 calc(var(--f) * 1turn), rgba(120, 128, 138, 0.28) 0);
 }
 /* The header is the collapse control. A readout this size sits over a third
    of a phone's view, and the three numbers on it are worth a glance rather
@@ -582,7 +618,7 @@ html, body {
   font-style: normal; color: var(--dim); letter-spacing: 0.08em;
 }
 
-#targetcard.collapsed { padding-bottom: 6px; }
+#targetcard.collapsed { padding: 10px 11px; }
 #targetcard.collapsed .tc-title { margin-bottom: 0; }
 #targetcard.collapsed .tc-caret { transform: rotate(-90deg); }
 #targetcard.collapsed .tc-full { display: none; }

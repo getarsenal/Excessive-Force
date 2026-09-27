@@ -50,16 +50,28 @@ sortie picks the builder by `aircraft.kind`:
 `makeAirframe(def)` is the one switch over these, used by the sortie and
 by the icon renderer, so a card shows exactly what flies.
 
-The Apache is the one strike that is not a pass. A record with
-`aircraft.station` is flown by `_callLoiter` and `_updateLoiter`: in low
-from behind the camera, a hover at `standoff` metres off the mark on the
-player's side of it, `station` seconds of work, then out. It fires
-`rockets` in `pair`s every `every` seconds with `spread` metres of scatter,
-each sized by `strike` as its own small blast, and a chain-gun burst every
-`gun.every` seconds on the defender nearest the mark through the
-`gunner` hooks the battle gives the air wing. It has its own armour
-(`AIRFRAME.gunship`); shot down, it spins in and explodes. Rounds carry
-their sortie, so the feed reports stones and kills once, when it leaves.
+Two strikes are not a pass but stay on station, and both follow the
+player's target: `battle.setTarget` calls `air.retarget`. A record with
+`aircraft.station` is flown by `_callLoiter` and `_updateLoiter`.
+
+- **Apache** (45 s): hovers at `standoff` metres off the mark on the
+  camera's side, each one in its own slot round the target so several
+  never share the same air. On a new target it climbs over whatever
+  `ceilingAlong` says stands on the route, crosses, and comes down to
+  work: `rockets` in `pair`s every `every` seconds with `spread` metres of
+  scatter, and a chain-gun burst every `gun.every` seconds on the defender
+  nearest the mark through the `gunner` hooks the battle gives the air
+  wing. Armour `AIRFRAME.gunship`.
+- **AC-130** (75 s, `aircraft.orbit`): joins a banked left-hand orbit of
+  `radius` at `height` over the mark on a tangent from behind the camera,
+  and fires `shells` from the 105 mm on its port side (+x) straight down
+  at the mark every `every` seconds. The orbit's centre drifts after a new
+  target. Armour `AIRFRAME.ac130`.
+
+Shot down, either one falls and explodes. Rounds carry their sortie, so
+the feed reports stones and kills once, when it leaves. `loiterStatus()`
+is what the HUD pill under the target card reads: one aircraft icon and
+one run-down clock per aircraft on station.
 
 Names the sortie looks for: `prop` and `rotorA` are spun, `tailrotor` too;
 `bomb` is the child hidden at release. `aircraft.consumed` means the

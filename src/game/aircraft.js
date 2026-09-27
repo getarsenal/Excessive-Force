@@ -872,7 +872,7 @@ const CHUTE = { troopRate: 11.5, cargoRate: 10.0, freeFall: 0.7, open: 0.5, stic
  */
 // The Apache is built to be shot at and stays in the flak for half a minute;
 // it takes about twice what the Chinook does before it goes down.
-const AIRFRAME = { jet: 100, transport: 220, heli: 170, gunship: 340 };
+const AIRFRAME = { jet: 100, transport: 220, heli: 170, gunship: 340, ac130: 900 };
 const CANOPY = { troop: 195, cargo: 340 };
 /** How far off a bomb goes, in metres, per point of damage taken before release. */
 const JINK_PER_HP = 0.55;
@@ -1740,25 +1740,25 @@ export function makeGhostrider() {
 
   // The 30 mm: a cradle through the skin, the barrel out past the fuselage
   // wall with its muzzle brake, a blast deflector plate on the skin aft of it.
-  g.add(part(new THREE.BoxGeometry(0.6, 0.7, 0.9), dark, -2.05, -0.55, 6.2));
-  g.add(part(new THREE.CylinderGeometry(0.075, 0.085, 1.6, 10), black, -2.95, -0.55, 6.2, 0, 0, Math.PI / 2));
-  g.add(part(new THREE.CylinderGeometry(0.11, 0.11, 0.3, 10), dark, -3.62, -0.55, 6.2, 0, 0, Math.PI / 2));
-  g.add(part(new THREE.BoxGeometry(0.08, 1.2, 1.6), dark, -2.24, -0.55, 5.1));
+  g.add(part(new THREE.BoxGeometry(0.6, 0.7, 0.9), dark, 2.05, -0.55, 6.2));
+  g.add(part(new THREE.CylinderGeometry(0.075, 0.085, 1.6, 10), black, 2.95, -0.55, 6.2, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.CylinderGeometry(0.11, 0.11, 0.3, 10), dark, 3.62, -0.55, 6.2, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.BoxGeometry(0.08, 1.2, 1.6), dark, 2.24, -0.55, 5.1));
 
   // The 105 mm: the M102's barrel, longer and heavier, out of the aft port
   // side with the recoil housing inboard and a flared muzzle.
-  g.add(part(new THREE.BoxGeometry(0.7, 0.9, 1.3), dark, -2.0, -0.45, -5.6));
-  g.add(part(new THREE.CylinderGeometry(0.1, 0.12, 2.5, 12), black, -3.4, -0.45, -5.6, 0, 0, Math.PI / 2));
-  g.add(part(new THREE.CylinderGeometry(0.16, 0.13, 0.4, 12), dark, -4.55, -0.45, -5.6, 0, 0, Math.PI / 2));
-  g.add(part(new THREE.BoxGeometry(0.08, 1.4, 2.0), dark, -2.24, -0.45, -6.6));
+  g.add(part(new THREE.BoxGeometry(0.7, 0.9, 1.3), dark, 2.0, -0.45, -5.6));
+  g.add(part(new THREE.CylinderGeometry(0.1, 0.12, 2.5, 12), black, 3.4, -0.45, -5.6, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.CylinderGeometry(0.16, 0.13, 0.4, 12), dark, 4.55, -0.45, -5.6, 0, 0, Math.PI / 2));
+  g.add(part(new THREE.BoxGeometry(0.08, 1.4, 2.0), dark, 2.24, -0.45, -6.6));
 
   // Sensors: the ball under the chin, the second on the port side forward,
   // the flat panel of the electro-optical suite on the crew door.
   g.add(part(new THREE.SphereGeometry(0.52, 14, 10), dark, 0, -2.15, 11.6));
   g.add(part(new THREE.BoxGeometry(0.5, 0.3, 0.3), glass, 0, -2.2, 12.05));
-  g.add(part(new THREE.SphereGeometry(0.46, 14, 10), dark, -2.45, -1.0, 8.4));
-  g.add(part(new THREE.BoxGeometry(0.28, 0.24, 0.3), glass, -2.85, -1.0, 8.4));
-  g.add(part(new THREE.BoxGeometry(0.1, 1.5, 1.0), dark, -2.2, 0.3, 8.6));
+  g.add(part(new THREE.SphereGeometry(0.46, 14, 10), dark, 2.45, -1.0, 8.4));
+  g.add(part(new THREE.BoxGeometry(0.28, 0.24, 0.3), glass, 2.85, -1.0, 8.4));
+  g.add(part(new THREE.BoxGeometry(0.1, 1.5, 1.0), dark, 2.2, 0.3, 8.6));
 
   // The satcom radome on the spine, and the antenna farm ahead of it.
   g.add(part(loft([
@@ -1840,18 +1840,25 @@ export function makeTomahawk() {
 }
 
 /**
- * An attack helicopter on station.
+ * Aircraft on station: the Apache and the AC-130.
  *
- * Everything else the air wing flies is a pass: in, drop, out. An Apache
- * is not a bomber. It comes in low from behind the camera, slows to a
- * hover at a stand-off from the aim point on the player's side of it, and
- * works the target for its time on station: 70 mm rockets in pairs, small
- * and accurate, walked onto the point the player marked, and bursts from
- * the 30 mm chain gun on whichever defender is nearest that point. It is
- * in the garrison's airspace the whole time and is the easiest thing in
- * the sky to hit, so it can be shot down, and a helicopter that is shot
- * down comes down. When the time is up, or the rockets are gone, it turns
- * and leaves, and says what it did.
+ * Everything else the air wing flies is a pass: in, drop, out. These two
+ * stay, for `station` seconds, and work whatever the player has designated.
+ * Designate something else and they go to it: `retarget` is called by the
+ * battle whenever the target changes.
+ *
+ * The Apache hovers at a stand-off on the player's side of the target, each
+ * one in its own slot around it so two of them never share the same air,
+ * and when the target moves it climbs over whatever stands between here and
+ * the new slot, crosses, and comes back down to work: 70 mm rockets in
+ * pairs, small and accurate, and the 30 mm on the defender nearest the mark.
+ *
+ * The AC-130 flies a banked left-hand orbit high over the target with its
+ * guns on the inside of the turn, which is the only way a gunship can shoot,
+ * and puts 105 mm shells down its port side straight at the mark. Its orbit
+ * follows the target when it changes.
+ *
+ * Both are in the garrison's airspace the whole time and can be shot down.
  */
 AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts = {}) {
   const a = def.aircraft;
@@ -1859,81 +1866,153 @@ AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts 
   const dl = Math.hypot(dx, dz) || 1;
   const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
   const side = new THREE.Vector3(-dir.z, 0, dir.x);
-  const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
-  const along = this.ceilingAlong || (() => -Infinity);
-  // The station: out on the camera's side, a little off the line of sight so
-  // it does not sit in front of the lens, level with the target or a little
-  // over it, and clear of whatever the town has built under it.
-  const station = target.clone().addScaledVector(dir, -a.standoff).addScaledVector(side, a.offset || 0);
-  station.y = Math.max(target.y + a.height, ground(station.x, station.z) + 40,
-    along(station.x, station.z, station.x, station.z) + a.clearance);
-  const start = station.clone().addScaledVector(dir, -a.runIn);
-  const cruise = Math.max(station.y, along(start.x, start.z, station.x, station.z) + 30, ground(start.x, start.z) + 60);
-  start.y = cruise;
   const model = makeAirframe(def);
   model.rotation.order = 'YXZ';
-  model.position.copy(start);
-  model.rotation.y = Math.atan2(dir.x, dir.z);
   model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
   this.scene.add(model);
-  const eta = a.runIn / a.speed + 6;
   const s = {
-    def, model, dir, side, alt: cruise, target: target.clone(),
+    def, model, dir, side, target: target.clone(),
     speed: a.speed, t: 0, released: true, climb: 0, roar: 0, life: 0,
-    flak: opts.flak || 0, hp: AIRFRAME.gunship, hits: 0, jink: 0,
-    stones: 0, kills: 0,
-    loiter: {
-      phase: 'inbound', station, cruise, eta, time: 0,
+    flak: opts.flak || 0, hits: 0, jink: 0, stones: 0, kills: 0,
+    fall: 0, pullUpAt: Infinity,
+  };
+  if (a.orbit) {
+    // Join the orbit on a tangent that runs away from the camera, so the
+    // gunship arrives from behind the player and turns in over the target.
+    const R = a.radius;
+    const theta = Math.atan2(dir.x, -dir.z);
+    const alt = Math.max(target.y + a.height, (ceiling || 0) + 150);
+    const entry = new THREE.Vector3(target.x + R * Math.cos(theta), alt, target.z + R * Math.sin(theta));
+    const tangent = new THREE.Vector3(Math.sin(theta), 0, -Math.cos(theta));
+    model.position.copy(entry).addScaledVector(tangent, -a.runIn);
+    model.rotation.y = Math.atan2(tangent.x, tangent.z);
+    s.hp = AIRFRAME.ac130;
+    s.alt = alt;
+    s.loiter = {
+      phase: 'inbound', orbit: true, centre: target.clone(), theta, entry, tangent,
+      eta: a.runIn / a.speed, time: 0, shells: a.shells, nextShell: 1.0,
+    };
+  } else {
+    s.slot = this.sorties.filter((o) => o.loiter && !o.loiter.orbit && !o.done
+      && o.loiter.phase !== 'egress' && o.loiter.phase !== 'down').length;
+    const station = this._stationFor(s, target);
+    const start = station.clone().addScaledVector(dir, -a.runIn);
+    const along = this.ceilingAlong || (() => -Infinity);
+    const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+    const cruise = Math.max(station.y, along(start.x, start.z, station.x, station.z) + 30, ground(start.x, start.z) + 60);
+    start.y = cruise;
+    model.position.copy(start);
+    model.rotation.y = Math.atan2(dir.x, dir.z);
+    s.hp = AIRFRAME.gunship;
+    s.alt = cruise;
+    s.loiter = {
+      phase: 'inbound', station, cruise, eta: a.runIn / a.speed + 6, time: 0,
       vel: new THREE.Vector3(dir.x * a.speed, 0, dir.z * a.speed),
       rockets: a.rockets, nextRocket: 0.8, nextGun: 1.6, pod: 0,
-    },
-    releaseAt: eta, fall: 0, pullUpAt: Infinity,
-  };
+    };
+  }
+  s.releaseAt = s.loiter.eta;
   this.sorties.push(s);
   return s;
 };
 
+/**
+ * Where an Apache hovers to work `target`: out on the camera's side at the
+ * stand-off, turned round the target by its slot so a second and a third
+ * take the air beside the first rather than the same air, and high enough
+ * to be clear of whatever the town has built under it.
+ */
+AirWing.prototype._stationFor = function _stationFor(s, target) {
+  const a = s.def.aircraft;
+  const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+  const dl = Math.hypot(dx, dz) || 1;
+  const turn = [0, 0.55, -0.55, 1.1, -1.1, 1.6][s.slot % 6] + (a.offset || 0) / a.standoff;
+  const c = Math.cos(turn), sn = Math.sin(turn);
+  const ux = dx / dl, uz = dz / dl;
+  const rx = ux * c - uz * sn, rz = ux * sn + uz * c;
+  const station = target.clone();
+  station.x -= rx * a.standoff;
+  station.z -= rz * a.standoff;
+  const along = this.ceilingAlong || (() => -Infinity);
+  const ground = this.terrain ? this.terrain.heightAt(station.x, station.z) : 0;
+  station.y = Math.max(target.y + a.height, ground + 40,
+    along(station.x, station.z, station.x, station.z) + a.clearance);
+  return station;
+};
+
+/** The target has changed: everything on station goes to it. */
+AirWing.prototype.retarget = function retarget(point) {
+  if (!point) return;
+  for (const s of this.sorties) {
+    const L = s.loiter;
+    if (!L || s.done || L.phase === 'egress' || L.phase === 'down') continue;
+    s.target = point.clone();
+    if (L.orbit) continue;                       // the orbit drifts after it
+    L.station = this._stationFor(s, point);
+    if (L.phase === 'station' || L.phase === 'transit') {
+      L.phase = 'transit';
+      L.vel = L.vel || new THREE.Vector3();
+      L.route = 0;
+    }
+  }
+};
+
 AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
+  if (s.loiter.orbit) { this._updateOrbit(s, dt); return; }
   const L = s.loiter, m = s.model, a = s.def.aircraft;
   const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+  const along = this.ceilingAlong || (() => -Infinity);
   const face = (x, z, rate) => {
     const want = Math.atan2(x - m.position.x, z - m.position.z);
     let d = want - m.rotation.y;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     m.rotation.y += d * Math.min(1, dt * rate);
   };
-
-  if (L.phase === 'inbound') {
-    const st = L.station;
+  // Flying to a point: slow to arrive, nose down to go, and never lower
+  // than what stands along the rest of the way.
+  const flyTo = (st, top) => {
     const dx = st.x - m.position.x, dz = st.z - m.position.z;
     const dist = Math.hypot(dx, dz);
-    // The speed it should have for the distance left, so it arrives slowing.
     const want = Math.min(a.speed, Math.max(6, dist / 2.2));
-    const ux = dist > 0.01 ? dx / dist : s.dir.x, uz = dist > 0.01 ? dz / dist : s.dir.z;
+    const ux = dist > 0.01 ? dx / dist : 0, uz = dist > 0.01 ? dz / dist : 0;
     L.vel.x += (ux * want - L.vel.x) * Math.min(1, dt * 1.4);
     L.vel.z += (uz * want - L.vel.z) * Math.min(1, dt * 1.4);
-    m.position.x += L.vel.x * dt;
-    m.position.z += L.vel.z * dt;
-    // Down from cruise to the station height over the last stretch.
-    const k = THREE.MathUtils.clamp((dist - 40) / 400, 0, 1);
-    const alt = st.y + (L.cruise - st.y) * k;
-    m.position.y += (alt - m.position.y) * Math.min(1, dt * 1.2);
+    // Climb first: it does not move sideways into something taller than it.
+    const low = m.position.y < top - 4;
+    const k = low ? 0.25 : 1;
+    m.position.x += L.vel.x * dt * k;
+    m.position.z += L.vel.z * dt * k;
+    const fin = THREE.MathUtils.clamp((dist - 40) / 300, 0, 1);
+    const alt = Math.max(st.y + (top - st.y) * fin, dist > 60 ? top : st.y);
+    m.position.y += THREE.MathUtils.clamp(alt - m.position.y, -12 * dt, 16 * dt);
     const sp = Math.hypot(L.vel.x, L.vel.z);
-    // Nose down to go, nose up to stop: the one gesture that reads as a
-    // helicopter from a kilometre away.
-    const pitch = THREE.MathUtils.clamp(sp / a.speed * 0.22 - (sp < want ? 0 : 0.1), -0.12, 0.22);
+    const pitch = THREE.MathUtils.clamp(sp / a.speed * 0.22, -0.12, 0.22);
     m.rotation.x += (pitch - m.rotation.x) * Math.min(1, dt * 2);
     face(dist > 60 ? st.x : s.target.x, dist > 60 ? st.z : s.target.z, 1.6);
-    // Taken from a little way out: the hover eases the last of it in, and a
-    // helicopter crawling the final fifty metres under fire is a target.
+    return dist;
+  };
+
+  if (L.phase === 'inbound' || L.phase === 'transit') {
+    // The ceiling along what is left of the route, looked at twice a second.
+    L.look = (L.look || 0) - dt;
+    if (L.look <= 0) {
+      L.look = 0.5;
+      const st = L.station;
+      L.top = Math.max(st.y, along(m.position.x, m.position.z, st.x, st.z) + a.clearance,
+        ground(m.position.x, m.position.z) + 30);
+    }
+    if (L.phase === 'transit') L.time += dt;     // the clock runs on station, moving or not
+    const dist = flyTo(L.station, L.top ?? L.station.y);
     if (dist < 25) {
+      const first = L.phase === 'inbound';
       L.phase = 'station';
-      L.time = 0;
-      if (this.onAirEvent) this.onAirEvent('onstation', { def: s.def, time: a.station });
+      if (first) {
+        L.time = 0;
+        if (this.onAirEvent) this.onAirEvent('onstation', { def: s.def, time: a.station });
+      }
     }
   } else if (L.phase === 'station') {
     L.time += dt;
-    // Holding a hover, which is never quite still.
     const st = L.station;
     m.position.x += (st.x + Math.sin(L.time * 0.7) * 1.4 - m.position.x) * Math.min(1, dt * 1.5);
     m.position.z += (st.z + Math.cos(L.time * 0.53) * 1.1 - m.position.z) * Math.min(1, dt * 1.5);
@@ -1942,14 +2021,12 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
     m.rotation.z = Math.sin(L.time * 0.9) * 0.03;
     face(s.target.x, s.target.z, 2.5);
 
-    // Rockets: a pair at a time, one from each pod, on the marked point.
     L.nextRocket -= dt;
     if (L.rockets > 0 && L.nextRocket <= 0) {
       L.nextRocket = a.every;
       for (let k = 0; k < a.pair && L.rockets > 0; k++, L.rockets--) this._loiterRocket(s, k);
       if (this.audio) this.audio.play('rocket', m.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
     }
-    // The gun, on the nearest defender to the point, if there is one near it.
     L.nextGun -= dt;
     if (L.nextGun <= 0 && this.gunner) {
       L.nextGun = a.gun.every;
@@ -1959,14 +2036,14 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
         s.kills += this.gunner.fire(from, to.clone(), a.gun) || 0;
       }
     }
-    if (L.time > a.station || (L.rockets <= 0 && L.time > a.station * 0.5)) {
-      L.phase = 'egress';
-      L.out = 0;
-      L.reported = true;
-      if (this.onAirEvent) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
-    }
+  }
+  if ((L.phase === 'station' || L.phase === 'transit')
+    && (L.time > a.station || (L.rockets <= 0 && L.time > a.station * 0.8))) {
+    L.phase = 'egress';
+    L.out = 0;
+    L.reported = true;
+    if (this.onAirEvent) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
   } else if (L.phase === 'egress') {
-    // Turn back the way it came and go, climbing.
     L.out += dt;
     const back = this._v.copy(s.dir).multiplyScalar(-1).addScaledVector(s.side, 0.4).normalize();
     face(m.position.x + back.x * 100, m.position.z + back.z * 100, 1.2);
@@ -1977,45 +2054,140 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
     m.rotation.x += (0.18 - m.rotation.x) * Math.min(1, dt * 1.5);
     if (L.out > 22) s.done = true;
   } else if (L.phase === 'down') {
-    // Tail rotor gone: it spins, and it falls.
-    L.fall += dt;
-    m.rotation.y += (2 + L.fall * 2.5) * dt;
-    m.rotation.z = Math.min(0.5, m.rotation.z + dt * 0.3);
-    L.vy = (L.vy || 0) - 9.81 * dt * 0.8;
-    m.position.y += L.vy * dt;
-    m.position.x += L.vel.x * 0.2 * dt;
-    m.position.z += L.vel.z * 0.2 * dt;
-    if (this.fx) this.fx.trail(m.position, 4.0);
-    const g = ground(m.position.x, m.position.z);
-    if (m.position.y <= g + 1.5 || L.fall > 12) {
-      const p = m.position.clone(); p.y = Math.max(p.y, g);
-      if (this.fx) this.fx.strikeBlast(p, 1.6, { groundY: g });
-      if (this.audio) this.audio.play('explosion', p, { gain: 0.8, rolloff: 900 });
-      if (this.onAirEvent && !L.reported && L.rockets < a.rockets) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
-      m.visible = false;
-      s.done = true;
-    }
+    this._fallLoiter(s, dt, 2 + L.fall * 2.5);
   }
 };
 
-/** One 70 mm rocket from the pod on side `k`, on a flat, fast line to the mark. */
-AirWing.prototype._loiterRocket = function _loiterRocket(s, k) {
-  const m = s.model, a = s.def.aircraft, p = s.def.projectile, L = s.loiter;
+/** The gunship's orbit, and its guns. */
+AirWing.prototype._updateOrbit = function _updateOrbit(s, dt) {
+  const L = s.loiter, m = s.model, a = s.def.aircraft;
+  const R = a.radius;
+  const bank = -0.32;                            // left wing down, into the turn
+  if (L.phase === 'inbound') {
+    m.position.addScaledVector(L.tangent, a.speed * dt);
+    const along = this._v.copy(L.entry).sub(m.position).dot(L.tangent);
+    // Roll into the turn over the last few seconds of the run.
+    m.rotation.z = bank * THREE.MathUtils.clamp(1 - along / (a.speed * 4), 0, 1);
+    if (along <= 0) {
+      L.phase = 'station';
+      L.time = 0;
+      if (this.onAirEvent) this.onAirEvent('onstation', { def: s.def, time: a.station });
+    }
+    return;
+  }
+  if (L.phase === 'station') {
+    L.time += dt;
+    // The centre of the orbit drifts after the target rather than jumping,
+    // so a new designation is a gentle shift of the whole circle.
+    L.centre.x += (s.target.x - L.centre.x) * Math.min(1, dt * 0.25);
+    L.centre.z += (s.target.z - L.centre.z) * Math.min(1, dt * 0.25);
+    const wantY = Math.max(s.target.y + a.height, s.alt);
+    m.position.y += (wantY - m.position.y) * Math.min(1, dt * 0.3);
+    L.theta -= (a.speed / R) * dt;
+    m.position.x = L.centre.x + R * Math.cos(L.theta);
+    m.position.z = L.centre.z + R * Math.sin(L.theta);
+    m.rotation.y = Math.atan2(Math.sin(L.theta), -Math.cos(L.theta));
+    m.rotation.x = 0;
+    m.rotation.z = bank;
+    // The 105: out of the port side, a straight line down to the mark.
+    L.nextShell -= dt;
+    if (L.shells > 0 && L.nextShell <= 0) {
+      L.nextShell = a.every;
+      L.shells--;
+      this._gunshipShell(s);
+    }
+    if (L.time > a.station || L.shells <= 0) {
+      L.phase = 'egress';
+      L.out = 0;
+      L.reported = true;
+      if (this.onAirEvent) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
+    }
+  } else if (L.phase === 'egress') {
+    L.out += dt;
+    m.rotation.z += (0 - m.rotation.z) * Math.min(1, dt * 0.8);
+    const h = m.rotation.y;
+    m.position.x += Math.sin(h) * a.speed * dt;
+    m.position.z += Math.cos(h) * a.speed * dt;
+    m.position.y += 6 * dt;
+    if (L.out > 25) s.done = true;
+  } else if (L.phase === 'down') {
+    this._fallLoiter(s, dt, 0.4, a.speed * 0.6);
+  }
+};
+
+/** Shot down: it spins or it dives, and it burns all the way in. */
+AirWing.prototype._fallLoiter = function _fallLoiter(s, dt, spin, forward = 0) {
+  const L = s.loiter, m = s.model, a = s.def.aircraft;
+  const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+  L.fall += dt;
+  m.rotation.y += spin * dt;
+  m.rotation.z = Math.max(-0.9, Math.min(0.9, m.rotation.z - dt * 0.3));
+  if (forward) m.rotation.x = Math.min(0.6, m.rotation.x + dt * 0.12);
+  L.vy = (L.vy || 0) - 9.81 * dt * 0.8;
+  m.position.y += L.vy * dt;
+  const v = L.vel || { x: 0, z: 0 };
+  m.position.x += (forward ? Math.sin(m.rotation.y) * forward : v.x * 0.2) * dt;
+  m.position.z += (forward ? Math.cos(m.rotation.y) * forward : v.z * 0.2) * dt;
+  if (this.fx) this.fx.trail(m.position, 4.0);
+  const g = ground(m.position.x, m.position.z);
+  if (m.position.y <= g + 1.5 || L.fall > 20) {
+    const p = m.position.clone(); p.y = Math.max(p.y, g);
+    if (this.fx) this.fx.strikeBlast(p, a.orbit ? 2.4 : 1.6, { groundY: g });
+    if (this.audio) this.audio.play('explosion', p, { gain: 0.8, rolloff: 900 });
+    const fired = a.orbit ? L.shells < a.shells : L.rockets < a.rockets;
+    if (this.onAirEvent && !L.reported && fired) this.onAirEvent('offstation', { def: s.def, stones: s.stones, kills: s.kills });
+    m.visible = false;
+    s.done = true;
+  }
+};
+
+/** One 70 mm rocket from the pod on alternating sides, on a fast line to the mark. */
+AirWing.prototype._loiterRocket = function _loiterRocket(s) {
+  const m = s.model, a = s.def.aircraft, L = s.loiter;
   const podX = (L.pod++ % 2 === 0 ? 1 : -1) * 2.45;
   const from = new THREE.Vector3(podX, -0.52, 2.2).applyEuler(m.rotation).add(m.position);
-  // Small and accurate: a metre or so of scatter at the mark.
-  const r = a.spread * Math.sqrt(Math.random()), t = Math.random() * Math.PI * 2;
+  this._shoot(s, from, a.spread, a.muzzle);
+  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(s.target).sub(from).normalize(), 0.8);
+};
+
+/** One 105 mm round from the gunship's howitzer, down to the mark. */
+AirWing.prototype._gunshipShell = function _gunshipShell(s) {
+  const m = s.model, a = s.def.aircraft;
+  const from = new THREE.Vector3(4.7, -0.45, -5.6).applyEuler(m.rotation).add(m.position);
+  this._shoot(s, from, a.spread, a.muzzle);
+  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(s.target).sub(from).normalize(), 1.6);
+  if (this.audio) this.audio.play('gun', m.position, { rate: 0.8, gain: 0.7, rolloff: 1600 });
+};
+
+/** A round on a ballistic line that lands on the mark, give or take `spread`. */
+AirWing.prototype._shoot = function _shoot(s, from, spread, muzzle) {
+  const p = s.def.projectile;
+  const r = spread * Math.sqrt(Math.random()), t = Math.random() * Math.PI * 2;
   const to = s.target.clone();
-  to.x += Math.cos(t) * r; to.y += (Math.random() - 0.5) * a.spread; to.z += Math.sin(t) * r;
+  to.x += Math.cos(t) * r; to.y += (Math.random() - 0.5) * spread; to.z += Math.sin(t) * r;
   const d = to.clone().sub(from);
-  const T = d.length() / a.muzzle;
-  // The velocity that lands it on the mark under gravity in that time.
+  const T = d.length() / muzzle;
   const vel = d.multiplyScalar(1 / T);
   vel.y += 0.5 * p.gravity * T;
   this.projectiles.fire({
-    pos: from, vel, gravity: p.gravity, kind: 'bomb', drag: 0, speed: a.muzzle,
+    pos: from, vel, gravity: p.gravity, kind: 'bomb', drag: 0, speed: muzzle,
     warhead: s.def.warhead, owner: null, target: to, trail: p.trail,
     strikeDef: s.def, sortie: s,
   });
-  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, vel.clone().normalize(), 0.8);
+};
+
+/**
+ * What is on station, for the HUD: one entry per aircraft still working,
+ * with the share of its time it has left. Inbound counts as all of it.
+ */
+AirWing.prototype.loiterStatus = function loiterStatus(out = []) {
+  out.length = 0;
+  for (const s of this.sorties) {
+    const L = s.loiter;
+    if (!L || s.done || L.phase === 'egress' || L.phase === 'down') continue;
+    const a = s.def.aircraft;
+    const left = L.phase === 'inbound' ? 1 : Math.max(0, 1 - L.time / a.station);
+    out.push({ sortie: s, id: s.def.id, left, inbound: L.phase === 'inbound' });
+  }
+  return out;
 };

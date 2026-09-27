@@ -150,6 +150,11 @@
     <!-- Contextual prompt -->
     <div id="prompt" hidden></div>
 
+    <!-- The right-hand column under the readouts: the designated target, and
+         under it whatever aircraft are on station with the time they have
+         left. One column, so the pill closes up under the card when the card
+         is folded or gone. -->
+    <div id="hud-right">
     <!-- Selected-target readout -->
     <div id="targetcard" hidden>
       <button class="tc-title" id="tc-toggle" type="button" aria-expanded="true"
@@ -161,6 +166,8 @@
       <div class="tc-row"><span>Section</span><b id="tc-section">—</b></div>
       <div class="tc-row"><span>Height</span><b id="tc-height">—</b></div>
       <div class="tc-row"><span>Guns on target</span><b id="tc-guns">0</b></div>
+    </div>
+    <div id="loiters" hidden aria-label="Aircraft on station"></div>
     </div>
 
     <!-- Sound lives in the pause menu now; the rail it used to share with

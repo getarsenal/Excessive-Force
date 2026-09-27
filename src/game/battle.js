@@ -1103,6 +1103,8 @@ export class Battle {
     this.targetMarker.position.copy(point);
     this.targetMarker.visible = true;
     this.pulse(point, 0xff6a4d, 9, true);
+    // Whatever is on station goes to it.
+    if (this.air) this.air.retarget(this.target);
     this.onEvent('target', { point, label });
   }
 
