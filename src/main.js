@@ -27,6 +27,7 @@ import { HUD } from './ui/hud.js';
 import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
+import { CollapseClip } from './ui/clip.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
@@ -534,6 +535,19 @@ async function boot() {
     qualityId: quality.id,
   });
   attachUnitTips(hud, battle);
+  // The collapse, filmed for the player to share. The game holds still while
+  // the clip is being watched, and picks up where it was when it is closed.
+  let clipWasPaused = false;
+  const clip = new CollapseClip({
+    canvas: engine.renderer.domElement, audio,
+    place: () => battle.level?.subtitle || battle.level?.name || '',
+    onModal: (open) => {
+      if (open) { clipWasPaused = testMenu.paused; testMenu.paused = true; }
+      else testMenu.paused = clipWasPaused;
+    },
+  });
+  hud.setClip(clip);
+  window.__clip = clip;     // for the harness and the console
   const unitCard = new UnitCard(battle, {
     onSell: (u) => battle.sellUnit(u),
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
@@ -730,6 +744,7 @@ async function boot() {
       audio.rumble(1, where);
       engine.addShake(0.8);
       hud.feed('STRUCTURE COLLAPSING', 'big');
+      clip.trigger(island.mass);
       // Half speed for two seconds, eased back. Long enough to read what is
       // happening, short enough not to feel like a cutscene.
       testMenu.dramaticPause(2.0, 0.45);
@@ -1376,6 +1391,7 @@ async function boot() {
     engine.sun.position.set(
       rig.target.x + SUN_OFFSET.x, rig.target.y + SUN_OFFSET.y, rig.target.z + SUN_OFFSET.z);
     engine.render();
+    clip.frame();
 
     frames++; fpsAcc += dtMs;
     if (fpsAcc > 420) { fps = Math.round(1000 / (fpsAcc / frames)); frames = 0; fpsAcc = 0; }

@@ -916,8 +916,29 @@ export class HUD {
     el.hidden = false;
   }
 
+  /**
+   * The collapse clip: a button over the dock for half a minute once one is
+   * ready, and one on the report at the end for as long as there is a clip.
+   */
+  setClip(clip) {
+    this.clip = clip;
+    const btn = document.getElementById('clip-btn');
+    const ec = document.getElementById('ec-clip');
+    if (btn) btn.addEventListener('click', () => clip.open());
+    if (ec) ec.addEventListener('click', () => clip.open());
+    clip.onReady = () => {
+      if (ec) ec.hidden = false;
+      if (!btn || document.body.classList.contains('ended')) return;
+      btn.hidden = false;
+      clearTimeout(this._clipTimer);
+      this._clipTimer = setTimeout(() => { btn.hidden = true; }, 30000);
+    };
+  }
+
   showEnd(kind, summary, opts = {}) {
     this.el.endcard.hidden = false;
+    const ecClip = document.getElementById('ec-clip');
+    if (ecClip) ecClip.hidden = !this.clip?.best;
     // Everything else goes away.
     //
     // The card is one more thing inside `#ui`, so the whole battle interface
