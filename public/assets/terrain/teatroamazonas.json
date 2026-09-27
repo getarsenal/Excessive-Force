@@ -1,0 +1,18 @@
+{
+  "id": "teatroamazonas",
+  "name": "Teatro Amazonas, Manaus",
+  "lat": -3.13028,
+  "lon": -60.02333,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 6.217,
+  "maxElevation": 46.45,
+  "metersPerDemPixel": 4.7702,
+  "seaLevel": 15.508,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 21.804,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.3589,
+  "overtureRelease": "2026-08-19.0"
+}

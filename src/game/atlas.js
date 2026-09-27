@@ -467,7 +467,9 @@ function levelRecord(P, i) {
   if (cl.roofPitch != null) setting.roofPitch = cl.roofPitch;
   if (WILD[P.id]) setting.hinterland = WILD[P.id];
   else if (P.coast) setting.hinterland = 'harbour';
-  if (FLEET[P.id]) setting.fleet = FLEET[P.id];
+  // Every level carries boats; the router puts them only on water it can
+  // navigate, so a dry map shows none and a wet one is never empty.
+  setting.fleet = FLEET[P.id] || (P.clime === 'tropical' ? ['sampan', 'country-boat'] : ['rowing', 'river-cruise']);
   const stones = 5000;
   return {
     id: P.id,
@@ -498,7 +500,9 @@ function levelRecord(P, i) {
     // the kit lays hollow walls on wide footings, and what goes over goes
     // over as part of taking it apart. The river and the lines-blocked tests
     // are about hand-made precincts and openwork these do not have.
-    traits: { windows, river: false, topples: false, remote: !!P.remote, opaque: false },
+    // A solid mass (a stupa's dome on its terraces) holds round a shell hole
+    // rather than dropping loose stone; its spec says so.
+    traits: { windows, river: false, topples: false, remote: !!P.remote, opaque: false, ...(spec.sheds === false ? { sheds: false } : {}) },
     unlockScale: 1,
     par: { rounds: Math.round(40 + stones / 150), spend: 14000, minutes: 5, leverage: 2 },
     brief: W[3],

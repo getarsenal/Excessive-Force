@@ -1,0 +1,13 @@
+{
+  "id": "skytower",
+  "name": "Sky Tower, Auckland",
+  "lat": -36.84846,
+  "lon": 174.76218,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -1.775,
+  "maxElevation": 34.295,
+  "metersPerDemPixel": 3.8229,
+  "seaLevel": 2.097,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

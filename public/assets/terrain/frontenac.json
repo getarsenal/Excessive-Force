@@ -1,0 +1,18 @@
+{
+  "id": "frontenac",
+  "name": "Ch\u00e2teau Frontenac, Quebec City",
+  "lat": 46.81194,
+  "lon": -71.20528,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -0.5,
+  "maxElevation": 105.128,
+  "metersPerDemPixel": 3.2696,
+  "seaLevel": 4.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 4.0,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.2561,
+  "overtureRelease": "2026-08-19.0"
+}

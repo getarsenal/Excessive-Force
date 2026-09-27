@@ -19,7 +19,7 @@ export const PLACES = [
   { id: 'ulm', landmark: 'Ulm Minster', city: 'Ulm', lat: 48.39852, lon: 9.99183, iso: 'DEU', code: 'de', clime: 'temperate', river: true },
   { id: 'brandenburg', landmark: 'Brandenburg Gate', city: 'Berlin', lat: 52.51628, lon: 13.37770, iso: 'DEU', code: 'de', clime: 'temperate' },
   { id: 'stephansdom', landmark: "St. Stephen's Cathedral", city: 'Vienna', lat: 48.20849, lon: 16.37321, iso: 'AUT', code: 'at', clime: 'temperate' },
-  { id: 'hohensalzburg', landmark: 'Hohensalzburg Fortress', city: 'Salzburg', lat: 47.79494, lon: 13.04748, iso: 'AUT', code: 'at', clime: 'alpine', hill: true, river: true },
+  { id: 'hohensalzburg', landmark: 'Hohensalzburg Fortress', city: 'Salzburg', lat: 47.79494, lon: 13.04748, iso: 'AUT', code: 'at', clime: 'alpine', hill: true, river: true, remote: true },
   { id: 'versailles', landmark: 'Palace of Versailles', city: 'Versailles', lat: 48.80490, lon: 2.12037, iso: 'FRA', code: 'fr', clime: 'temperate' },
   { id: 'chambord', landmark: 'Château de Chambord', city: 'Chambord', lat: 47.61610, lon: 1.51704, iso: 'FRA', code: 'fr', clime: 'temperate', remote: true },
   { id: 'seville', landmark: 'Seville Cathedral', city: 'Seville', lat: 37.38583, lon: -5.99333, iso: 'ESP', code: 'es', clime: 'mediterranean' },

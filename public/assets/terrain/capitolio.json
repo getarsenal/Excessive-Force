@@ -1,0 +1,18 @@
+{
+  "id": "capitolio",
+  "name": "El Capitolio, Havana",
+  "lat": 23.13528,
+  "lon": -82.35944,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -2.133,
+  "maxElevation": 29.333,
+  "metersPerDemPixel": 4.3931,
+  "seaLevel": 6.114,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 9.901,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.3945,
+  "overtureRelease": "2026-08-19.0"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "cartagena",
+  "name": "Castillo San Felipe de Barajas, Cartagena",
+  "lat": 10.42278,
+  "lon": -75.53972,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -9.79,
+  "maxElevation": 41.999,
+  "metersPerDemPixel": 4.6985,
+  "seaLevel": 0.235,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

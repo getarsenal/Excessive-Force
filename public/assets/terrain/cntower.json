@@ -1,0 +1,18 @@
+{
+  "id": "cntower",
+  "name": "CN Tower, Toronto",
+  "lat": 43.64256,
+  "lon": -79.38706,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 70.288,
+  "maxElevation": 93.882,
+  "metersPerDemPixel": 3.4571,
+  "seaLevel": 74.844,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 74.844,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.4489,
+  "overtureRelease": "2026-08-19.0"
+}

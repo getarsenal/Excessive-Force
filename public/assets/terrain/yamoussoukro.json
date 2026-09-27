@@ -1,0 +1,18 @@
+{
+  "id": "yamoussoukro",
+  "name": "Basilica of Our Lady of Peace, Yamoussoukro",
+  "lat": 6.81194,
+  "lon": -5.29667,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 183.147,
+  "maxElevation": 218.849,
+  "metersPerDemPixel": 4.7436,
+  "seaLevel": 188.492,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 190.276,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0211,
+  "overtureRelease": "2026-08-19.0"
+}

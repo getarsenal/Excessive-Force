@@ -381,7 +381,7 @@ export const SPECS = {
     ],
   },
   boudhanath: {
-    S: 1.5, yaw: 0.3, mat: M.TILE,
+    S: 1.5, yaw: 0.3, mat: M.TILE, sheds: false,
     parts: [
       { t: 'steps', tag: 'terraces', base: true, x: 0, z: 0, w: 100, h: 9, n: 3, wTop: 64, mat: M.TILE, posts: true },
       { t: 'dome', tag: 'dome', x: 0, z: 0, y0: 9, r: 28, drumH: 0, h: 16, profile: 'round', mat: M.TILE, domeMat: M.TILE, lantern: false },

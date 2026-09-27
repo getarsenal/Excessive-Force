@@ -1617,6 +1617,8 @@ export class TestMenu {
         this.clearUnits();
         let far = 160;
         for (let i = 0; i < st.count; i++) {
+          // The building's own far edge, not a stone an earlier test threw.
+          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
           if (st.pz[i] - st.origin.z > far) far = st.pz[i] - st.origin.z;
         }
         this.spawnAt('at4', 1, 0, far + 70);
