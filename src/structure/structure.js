@@ -3780,9 +3780,16 @@ export class Structure {
       // meant a phone never split anything at all — the tower came down as one
       // welded column, slid into its own crater and lay there with every stone
       // in perfect register, which is the shape of the building it used to be.
+      //
+      // And it is a guard on *this* island, not on the loop. `break` here
+      // stopped the sweep at the first small island it met while the world
+      // was over budget, and the world is over budget for as long as a
+      // collapse keeps its debris moving — so the three-thousand-stone slab
+      // of the Burj lying behind that pebble in iteration order was never
+      // reached, and lay on the ground in one piece for the whole test.
       if (island.members.length < 64
           && this.physics.dynamicSet.size > this.physics.activeBudget
-          && this.physics.reclaim(32) <= 0) break;
+          && this.physics.reclaim(32) <= 0) continue;
       const body = island.body;
       if (!PhysicsWorld.alive(body)) continue;
       // A clump this size already reads as rubble. Splitting further multiplies
