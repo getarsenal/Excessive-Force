@@ -105,7 +105,7 @@ const body = PLACES.map((p) => {
         "span": 900.0,
         "zoom": 15,${p.hill ? '' : '\n        "ceiling": "auto",'}
         "parks": [],
-        "flatten": [[0, 0, [${pad}, ${pad}], 30]],
+        "flatten": [[0, 0, [${pad}, ${pad}], 30${p.padH != null ? `, ${p.padH}` : ''}]],
     },
 `;
 }).join('');

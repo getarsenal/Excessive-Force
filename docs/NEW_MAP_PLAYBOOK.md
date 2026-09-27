@@ -1141,6 +1141,85 @@ bakes committed to the branch as they finished and merged into each
 worktree, and the contracts, cast, flags, fleets and blurbs written in the
 main checkout while the masonry was laid.
 
+### Many maps at once: the kit and the catalogue
+
+The first forty-one levels are a module each. The next fifty-nine are data:
+a map there is one row in each of three files, and nothing else is edited.
+
+| File | What the row says |
+|---|---|
+| `src/game/atlas_places.js` | where: id, landmark, city, lat/lon, ISO, officer code, climate, and `hill` / `coast` / `river` / `remote` |
+| `src/game/atlas_specs.js` | what: the building as kit parts at real metres, `S`, and the camera's `yaw` |
+| `src/game/atlas.js` `WORDS` | what is said: victory line, contract title, blurb, brief, the three stand-off lines |
+
+`atlas.js` turns those into every table a level lives in: the level record
+(palette, haze and precinct by climate; camera, exclusion radius and par
+off the building's own footprint), `LEVEL_ORDER` and `LEVEL_BLURB`, the
+campaign contract (numbered on from the last hand-made one), the officer,
+`DEFENDER_OF`, the stand-off, the flag site at the building's highest
+point, and the fleet. A nation the game has not met before gets its
+officer and its flag in `NEW_OFFICERS`, the flag as a few drawing steps
+(`drawFlagSpec`).
+
+**The kit** (`src/structure/landmarks/kit.js`) is ten parts: `hall`,
+`tower`, `dome`, `needle`, `tiers`, `steps`, `colonnade`, `curtain`,
+`arch`, `box`. Each lays stone by the rules in section 2 and declares its
+garrison posts as it goes — a man in a window opening standing on a floor
+course, one on a flat roof's edge, one between columns, one on a terrace,
+sandbagged teams round the foot — and `populateKit` crews them and digs
+three mortars in off the footprint. What the kit learned:
+
+- **Stone is sized in the world.** 1.8 m at high whatever `S` is, so a
+  shell bites the same on a gatehouse at 3x and a supertall at 0.5x. A
+  spec that comes out over the tier's budget (5,200 at low, scaled by the
+  square of the block scale) is laid again in bigger stone until it fits.
+- **Anything a post stands on is a fixed thickness**, not a course: floor
+  courses, roof slabs, gallery ledges. A course is a different height at
+  each tier, and a man posted on the low tier's roof floats over the high
+  tier's.
+- **A wide floor needs columns.** A slab spans five metres from what bears
+  it; a hall seventy metres across with three floors in it was three
+  plates hanging off their edges. `walls` puts a pier grid ten world metres
+  apart under any wide floor or flat roof.
+- **A hip steps in no faster than its ring is thick.** Otherwise the next
+  course lands inside the ring below, on nothing, and the build-time grout
+  culls it without a word.
+- **The build-time cull is silent.** `Structure` removes stones that have
+  nothing under them within reach before the solver ever sees them, so
+  "zero loose" can hide a missing roof. `kitcheck --solve` reports the cull
+  and the grouted-edge count; a clean spec is zero loose, zero crushed,
+  zero culled.
+- **A tower thinner than two and a half low-tier stones is laid solid.**
+  A hollow ring of three stones round is not a wall.
+- **A building standing in water gets a declared pad.** `pad` and `padH`
+  on the place write a flatten pad with a height, which the bake treats as
+  land and the level (`groundLevel: 'bake'`) stands on: the Belém Tower's
+  platform in the Tagus. Check the bake log for `!!` lines; the origin
+  under water is the one a batch turns up, and it is either that or a
+  coordinate a moat's width off the building (Osaka: `survey.py` named the
+  keep 33 m west of where the catalogue had it).
+- **A solid mass says `sheds: false`.** A stupa's dome holds round a shell
+  hole rather than dropping single stones, so the debris test has nothing
+  to recycle; the spec says so and the trait follows.
+- **A spire standing back from its tower's edge gets a gallery**: the tower
+  is floored over and the spire stands on the floor, which is also the
+  only roof post a cathedral with gabled roofs has.
+
+The workflow for a new batch:
+
+```
+# 1. rows in atlas_places.js, atlas_specs.js and atlas.js WORDS
+node tools/atlas.mjs                    # terrain-bake entries into bake_terrain.py
+python3 tools/bake_overture.py <id>...  # two at a time: 4.6 GB each, three OOM the box
+node tools/kitcheck.mjs <id>... --solve # the building, dry: stones, posts, loose/crushed/culled
+node tools/kitcheck.mjs --solve --tier high
+node tools/atlas.mjs --scripts          # the stand-offs into docs/SCRIPTS.md
+python3 tools/placeholder.py            # silhouettes for officers not yet drawn, and the manifest
+node tools/recon.mjs <id>,<id>,...      # the dossier photographs
+node tools/mapcheck.mjs <id>...
+sh tools/suiteall.sh <id>...
+```
+
 ## 8. The request, and what it turns into
 
 When the ask is *"make a map for X in Y"*, the deliverable is all of the

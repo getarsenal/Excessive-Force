@@ -11,6 +11,8 @@
  *   coast  sea or a big lake at hand (the fleet and the precinct's quay)
  *   river  a river through the map
  *   remote a site with little town round it (the street-furniture tests)
+ *   pad    the bake's levelled pad, metres across (default 70), and
+ *   padH   its height: land by declaration, for a building standing in water
  */
 export const PLACES = [
   // Europe
@@ -33,7 +35,7 @@ export const PLACES = [
   { id: 'hallgrimskirkja', landmark: 'Hallgrímskirkja', city: 'Reykjavík', lat: 64.14200, lon: -21.92667, iso: 'ISL', code: 'is', clime: 'nordic' },
   { id: 'trakai', landmark: 'Trakai Island Castle', city: 'Trakai', lat: 54.65222, lon: 24.93361, iso: 'LTU', code: 'lt', clime: 'nordic', coast: true, remote: true },
   { id: 'winterpalace', landmark: 'Winter Palace', city: 'Saint Petersburg', lat: 59.94056, lon: 30.31389, iso: 'RUS', code: 'ru', clime: 'nordic', river: true },
-  { id: 'belem', landmark: 'Belém Tower', city: 'Lisbon', lat: 38.69158, lon: -9.21599, iso: 'PRT', code: 'pt', clime: 'mediterranean', coast: true },
+  { id: 'belem', landmark: 'Belém Tower', city: 'Lisbon', lat: 38.69158, lon: -9.21599, iso: 'PRT', code: 'pt', clime: 'mediterranean', coast: true, pad: 112, padH: 1.0 },
   { id: 'salisbury', landmark: 'Salisbury Cathedral', city: 'Salisbury', lat: 51.06508, lon: -1.79745, iso: 'GBR', code: 'uk', clime: 'temperate' },
   { id: 'windsor', landmark: 'Windsor Castle', city: 'Windsor', lat: 51.48389, lon: -0.60444, iso: 'GBR', code: 'uk', clime: 'temperate', river: true },
   { id: 'nidaros', landmark: 'Nidaros Cathedral', city: 'Trondheim', lat: 63.42694, lon: 10.39694, iso: 'NOR', code: 'no', clime: 'nordic', river: true },
@@ -50,7 +52,7 @@ export const PLACES = [
   { id: 'hawamahal', landmark: 'Hawa Mahal', city: 'Jaipur', lat: 26.92389, lon: 75.82667, iso: 'IND', code: 'in', clime: 'desert' },
   { id: 'redfort', landmark: 'Red Fort', city: 'Delhi', lat: 28.65611, lon: 77.24111, iso: 'IND', code: 'in', clime: 'desert' },
   { id: 'gatewayindia', landmark: 'Gateway of India', city: 'Mumbai', lat: 18.92197, lon: 72.83465, iso: 'IND', code: 'in', clime: 'tropical', coast: true },
-  { id: 'osaka', landmark: 'Osaka Castle', city: 'Osaka', lat: 34.68731, lon: 135.52621, iso: 'JPN', code: 'jp', clime: 'subtropical' },
+  { id: 'osaka', landmark: 'Osaka Castle', city: 'Osaka', lat: 34.68725, lon: 135.52586, iso: 'JPN', code: 'jp', clime: 'subtropical', hill: true },
   { id: 'kinkakuji', landmark: 'Kinkaku-ji', city: 'Kyoto', lat: 35.03937, lon: 135.72924, iso: 'JPN', code: 'jp', clime: 'subtropical', remote: true },
   { id: 'juche', landmark: 'Juche Tower', city: 'Pyongyang', lat: 39.01722, lon: 125.76361, iso: 'PRK', code: 'kp', clime: 'temperate', river: true },
   { id: 'monas', landmark: 'National Monument', city: 'Jakarta', lat: -6.17539, lon: 106.82718, iso: 'IDN', code: 'id', clime: 'tropical' },

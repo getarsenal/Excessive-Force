@@ -40,6 +40,11 @@ on one level, fix the batch, then run the sixteen once. `suiteall.sh` rewrites
 of a batch still in flight is the previous run's — check the file's mtime
 before believing a failure.
 
+Levels 42 to 100 are the catalogue, generated from data by
+`src/game/atlas.js` (see "Many maps at once" in the playbook); their order
+is `src/game/atlas_places.js`. `node tools/kitcheck.mjs <id> --solve` is the
+building dry, and a level there is new rows in three files, not a module.
+
 Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
 `chichen`, `pisa`, `sydney`, `moscow`, `rio`, `athens`, `istanbul`,
 `cologne`, `himeji`, `petronas`, `dubai`, `potala`. Tiers: `low` (phones;
@@ -124,7 +129,9 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
-- `src/game/levels.js` level records · `src/structure/landmarks/` the
+- `src/structure/landmarks/kit.js` the landmark kit · `src/game/atlas*.js`
+  the catalogue's places, specs and words ·
+  `src/game/levels.js` level records · `src/structure/landmarks/` the
   masonry · `src/structure/builder.js` the block vocabulary ·
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift

@@ -506,6 +506,9 @@ function levelRecord(P, i) {
     unlockScale: 1,
     par: { rounds: Math.round(40 + stones / 150), spend: 14000, minutes: 5, leverage: 2 },
     brief: W[3],
+    // A pad the bake declared land is levelled to its own height, not to the
+    // water round it.
+    ...(P.padH != null ? { groundLevel: 'bake' } : {}),
     atlas: i,
   };
 }

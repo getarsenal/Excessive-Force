@@ -912,7 +912,7 @@ LEVELS = {
         "zoom": 15,
         "ceiling": "auto",
         "parks": [],
-        "flatten": [[0, 0, [70, 70], 30]],
+        "flatten": [[0, 0, [112, 112], 30, 1]],
     },
     "salisbury": {
         "name": "Salisbury Cathedral, Salisbury",
@@ -1066,11 +1066,10 @@ LEVELS = {
     },
     "osaka": {
         "name": "Osaka Castle, Osaka",
-        "lat": 34.68731,
-        "lon": 135.52621,
+        "lat": 34.68725,
+        "lon": 135.52586,
         "span": 900.0,
         "zoom": 15,
-        "ceiling": "auto",
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
     },
