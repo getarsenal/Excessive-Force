@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { isReleased } from './campaign.js';
-import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh } from './units.js';
+import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam } from './units.js';
 
 /** How long a lift package stays open after the first unit is placed. */
 const LIFT_WINDOW = 8;
@@ -837,8 +837,10 @@ export class Battle {
     const drop = {
       def, pos, yaw: Math.atan2(aim.x - pos.x, aim.z - pos.z),
       group: new THREE.Group(), model: null, marker: null,
+      // Under the canopy a mortarman is just a man: the kneel and the raised
+      // round belong to the emplacement, which forms up when he lands.
       figure: (k) => makeInfantryMesh(k === 0 ? 0x4a5340 : 0x3f4738,
-        { weapon: def.id, role: k === 0 ? 'gunner' : 'second' }),
+        { weapon: def.id === 'm120' ? null : def.id, role: def.id === 'm120' ? 'second' : k === 0 ? 'gunner' : 'second' }),
     };
     if (def.model !== 'infantry') {
       // The vehicle or gun is loaded now, so it is on the platform when the
@@ -1014,6 +1016,12 @@ export class Battle {
 
   async _attachModel(unit) {
     const def = unit.def;
+    if (def.id === 'm120') {
+      // A mortar is a crew and a tube, not two men carrying something: the
+      // whole emplacement, laid toward the target like the unit.
+      unit.group.add(makeMortarTeam());
+      return;
+    }
     if (def.model === 'infantry') {
       // A fire team: the gunner and his number two, carrying this unit's own
       // weapon, so a line of AT4s and a line of Javelins are not the same
