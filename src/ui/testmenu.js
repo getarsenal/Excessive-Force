@@ -3043,9 +3043,18 @@ export class TestMenu {
         btn.click();
         assert(hud.openDrawer === 'units',
           'with nothing armed the button no longer opens the drawer');
+        // And the strikes are in their own drawer: every unit with a strike
+        // under STRIKES, nothing else there, and nothing of theirs left
+        // among the guns.
+        const inBar = (bar) => [...document.querySelectorAll(`#${bar} .unit-card`)].map((el) => el.dataset.id);
+        const strikes = inBar('strikebar'), ground = inBar('buildbar');
+        assert(strikes.length > 0 && strikes.every((k) => UNITS_BY_ID[k].strike),
+          `the strikes drawer holds ${strikes.join(', ') || 'nothing'}`);
+        assert(ground.every((k) => !UNITS_BY_ID[k].strike),
+          `a strike is still in the units drawer: ${ground.filter((k) => UNITS_BY_ID[k].strike).join(', ')}`);
         hud.setDrawer(null);
         b2.selectedUnitId = was;
-        return 'armed, put away in one tap, drawer on the next';
+        return `armed, put away in one tap, drawer on the next; ${ground.length} units, ${strikes.length} strikes`;
       }],
 
       ['the governor sheds shading before stones', () => {

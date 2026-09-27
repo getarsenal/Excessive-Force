@@ -101,7 +101,15 @@
          actually looking at. -->
     <div id="drawers">
       <section class="drawer" id="drawer-units" hidden>
-        <nav id="buildbar"></nav>
+        <nav id="buildbar" class="cardbar"></nav>
+      </section>
+      <!-- Strikes: everything that arrives from outside the battery — the
+           aircraft, and the Tomahawk from the ship offshore. They are a
+           different decision from a gun on the ground (paid once, one pass,
+           and the flak decides how much of it lands), so they get a drawer
+           of their own rather than a tail on the end of the gun line. -->
+      <section class="drawer" id="drawer-strikes" hidden>
+        <nav id="strikebar" class="cardbar"></nav>
       </section>
       <section class="drawer" id="drawer-orders" hidden>
         <div class="dr-title">ORDERS</div>
@@ -120,6 +128,10 @@
       <button class="dock-btn" id="dock-units" data-drawer="units" title="Units">
         <span class="db-icon" id="dock-units-icon"></span>
         <span class="db-label">UNITS</span>
+      </button>
+      <button class="dock-btn" id="dock-strikes" data-drawer="strikes" title="Strikes">
+        <span class="db-icon" id="dock-strikes-icon"></span>
+        <span class="db-label">STRIKES</span>
       </button>
       <button class="dock-btn" id="dock-orders" data-drawer="orders" title="Orders">
         <span class="db-icon"></span>

@@ -192,7 +192,7 @@ function engine(group, mat, glow, x, y, z, r, len, flame) {
 }
 
 /** F-15E Strike Eagle. 19.4 m long, 13.1 m span, nose along +Z. */
-export function makeEagle() {
+export function makeEagle({ store } = {}) {
   const g = new THREE.Group();
   const grey = new THREE.MeshStandardMaterial({ color: EAGLE_GREY, roughness: 0.62, metalness: 0.35 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.5, metalness: 0.5 });
@@ -263,15 +263,54 @@ export function makeEagle() {
 
   // The bomb on a pylon under the wing root, until it is dropped.
   const bomb = new THREE.Group();
-  bomb.add(part(loft([
-    { z: 1.6, w: 0.10, h: 0.10, n: 2 }, { z: 1.2, w: 0.34, h: 0.34, n: 2 },
-    { z: -0.9, w: 0.36, h: 0.36, n: 2 }, { z: -1.5, w: 0.22, h: 0.22, n: 2 },
-  ], 8), new THREE.MeshStandardMaterial({ color: 0x5e6b3a, roughness: 0.6 }), 0, 0, 0));
-  bomb.add(part(new THREE.BoxGeometry(0.10, 0.5, 0.9), dark, 0, 0.42, 0.1));
-  bomb.position.set(0, -1.02, 0.4);
+  const olive = new THREE.MeshStandardMaterial({ color: 0x5e6b3a, roughness: 0.6 });
+  if (store === 'gbu28') {
+    // GBU-28: 5.8 m of 0.37 m gun barrel bored out and filled, which is what
+    // the first ones were. Longer than the Eagle's belly is deep, so it rides
+    // the centreline further down and further forward, with the laser seeker
+    // and its canards on the nose and four fins on the tail.
+    bomb.add(part(loft([
+      { z: 3.0, w: 0.10, h: 0.10, n: 2 }, { z: 2.55, w: 0.34, h: 0.34, n: 2 },
+      { z: 2.2, w: 0.38, h: 0.38, n: 2 }, { z: -2.5, w: 0.38, h: 0.38, n: 2 },
+      { z: -2.85, w: 0.28, h: 0.28, n: 2 },
+    ], 10), olive, 0, 0, 0));
+    bomb.add(part(new THREE.CylinderGeometry(0.2, 0.2, 0.12, 10).rotateX(Math.PI / 2), dark, 0, 0, 3.0));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      bomb.add(part(new THREE.BoxGeometry(0.03, 0.34, 0.36), dark,
+        Math.cos(a) * 0.3, Math.sin(a) * 0.3, 2.05, 0, 0, a - Math.PI / 2));
+      bomb.add(part(new THREE.BoxGeometry(0.03, 0.62, 0.7), dark,
+        Math.cos(a) * 0.42, Math.sin(a) * 0.42, -2.35, 0, 0, a - Math.PI / 2));
+    }
+    bomb.add(part(new THREE.BoxGeometry(0.10, 0.36, 2.2), dark, 0, 0.32, 0.2));
+    bomb.position.set(0, -1.15, 0.9);
+  } else {
+    bomb.add(part(loft([
+      { z: 1.6, w: 0.10, h: 0.10, n: 2 }, { z: 1.2, w: 0.34, h: 0.34, n: 2 },
+      { z: -0.9, w: 0.36, h: 0.36, n: 2 }, { z: -1.5, w: 0.22, h: 0.22, n: 2 },
+    ], 8), olive, 0, 0, 0));
+    bomb.add(part(new THREE.BoxGeometry(0.10, 0.5, 0.9), dark, 0, 0.42, 0.1));
+    bomb.position.set(0, -1.02, 0.4);
+  }
   bomb.name = 'bomb';
   g.add(bomb);
   return g;
+}
+
+/**
+ * The airframe a strike flies, by its record: `aircraft.kind` picks the
+ * builder and `aircraft.store` what the Eagle carries. Exported so the card
+ * icons are rendered from exactly what the sortie draws.
+ */
+export function makeAirframe(def) {
+  const a = def.aircraft || {};
+  switch (a.kind) {
+    case 'lancer': return makeLancer();
+    case 'apache': return makeApache();
+    case 'ghostrider': return makeGhostrider();
+    case 'tomahawk': return makeTomahawk();
+    default: return makeEagle({ store: a.store });
+  }
 }
 
 /** B-1B Lancer, wings swept. 44.5 m long, 24.1 m span, nose along +Z. */
@@ -397,8 +436,7 @@ export class AirWing {
     const alt = Math.max(target.y + a.height, ceiling + a.clearance);
     const drop = alt - target.y;
     const rel = solveRelease(drop, a.speed, p.gravity, p.drag || 0);
-    const build = { lancer: makeLancer, apache: makeApache, ghostrider: makeGhostrider, tomahawk: makeTomahawk }[def.aircraft.kind];
-    const model = build ? build() : makeEagle();
+    const model = makeAirframe(def);
     // Yaw first, then pitch about the aircraft's own lateral axis, then roll
     // about its nose. In the default order the pitch is about the world's x
     // axis, which is nose-up flying north, a roll flying east and nose-down

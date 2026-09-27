@@ -1080,11 +1080,16 @@ async function boot() {
     // last two rather than leaving the air wing — the two the badges promise
     // and the only ones you cannot reach any other way from the keyboard —
     // pickable by mouse alone.
-    let n = parseInt(e.key, 10);
-    if (e.key === '0') n = 10;
-    else if (e.key === '-') n = 11;
+    //
+    // Two drawers now, so two rows: the ground units on the bare keys, the
+    // strikes with Shift, or on the bare keys while the STRIKES drawer is
+    // open. By code rather than key, because Shift-1 is '!' on one layout
+    // and something else on the next.
+    const dm = /^Digit(\d)$/.exec(e.code);
+    const n = dm ? (+dm[1] || 10) : e.code === 'Minus' ? 11 : 0;
     if (n >= 1 && n <= 11) {
-      const id = [...hud.cards.keys()][n - 1];
+      const row = (e.shiftKey || hud.openDrawer === 'strikes') ? hud.bars.strikes : hud.bars.units;
+      const id = row[n - 1];
       if (id && battle.selectUnit(id)) {
         hud.status(UNITS_BY_ID[id].strike
           ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);

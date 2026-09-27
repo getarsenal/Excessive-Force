@@ -286,13 +286,17 @@ const BODY = {
 };
 
 /**
- * The units with a real picture: the guns, the vehicles and the two aircraft
+ * The units with a real picture: the guns, the vehicles and every aircraft
  * are rendered from the game's own models by `tools/icons.mjs`, so the card
- * shows exactly what lands; the four infantry teams are the artist's, a
- * soldier with the actual weapon, cropped to the same 512×320 slot. The
- * pictograms below stay as the fallback for anything without a file.
+ * shows exactly what lands; the infantry teams and the Tomahawk are the
+ * artist's, cropped to the same 512×320 slot. The pictograms below stay as
+ * the fallback for anything without a file.
  */
-export const IMAGE_ICONS = new Set(['at4', 'gustaf', 'rpg32', 'javelin', 'm119', 'm777', 'm109', 'm270', 'm142', 'f15', 'b1']);
+export const IMAGE_ICONS = new Set([
+  'at4', 'gustaf', 'rpg32', 'javelin', 'm120',
+  'm119', 'm777', 'm109', 'stryker', 'm270', 'm142',
+  'f15', 'b1', 'ah64', 'ac130', 'tomahawk', 'gbu28',
+]);
 
 /** Inline markup for a unit id, or null if it has no icon. */
 export function unitIcon(id) {

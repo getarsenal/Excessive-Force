@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { makeStryker } from './vehicles.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
@@ -146,8 +145,7 @@ export const UNITS = [
   {
     id: 'stryker', name: 'STRYKER MGS', full: 'M1128 Stryker Mobile Gun System', tier: 'AFV',
     cost: 1800, unlockFrac: 0.06,
-    // Built in code until there is a model file: see `vehicles.js`.
-    model: 'procedural', build: makeStryker, modelLength: 6.95,
+    tint: ARTILLERY_GREEN, model: 'M1128', modelLength: 8.6,
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
     // A tank gun, not a howitzer: nine hundred metres a second on the lowest
@@ -255,7 +253,7 @@ export const UNITS = [
     blurb: 'Eight rounds of 105 mm walked along a line in one pass. A wall, not a hole.',
   },
   {
-    id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'AIR',
+    id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'SEA',
     cost: 180000, unlockFrac: 0.2,
     model: 'aircraft', strike: { frac: 0.16, maxR: 44, minR: 6, fx: 5.0, bite: 0.7, shock: 1.1 },
     aircraft: { kind: 'tomahawk', speed: 240, height: 60, clearance: 26, runIn: 2800, offset: 20, consumed: true },
@@ -271,7 +269,7 @@ export const UNITS = [
     // Penetrating: a small radius and a very large charge, so it goes deep
     // into a solid monument instead of scorching its face.
     model: 'aircraft', strike: { frac: 0.14, maxR: 30, minR: 6, fx: 5.0, bite: 1.0, shock: 0.4 },
-    aircraft: { kind: 'eagle', speed: 230, height: 160, clearance: 60, runIn: 2400, offset: 40 },
+    aircraft: { kind: 'eagle', store: 'gbu28', speed: 230, height: 160, clearance: 60, runIn: 2400, offset: 40 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.03, trail: 0.9 },
     warhead: { lethal: 45, radius: 24, power: 220000, fx: 5.0, kinetic: 0.9 },

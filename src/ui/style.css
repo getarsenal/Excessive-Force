@@ -245,6 +245,7 @@ html, body {
   transition: filter 0.14s, transform 0.14s;
 }
 #dock-units { background-image: url(./dock/units.png); }
+#dock-strikes { background-image: url(./dock/strikes.png); }
 #dock-orders { background-image: url(./dock/orders.png); }
 #dock-view { background-image: url(./dock/view.png); }
 #dock-menu { background-image: url(./dock/menu.png); }
@@ -260,14 +261,14 @@ html, body {
    is the only place the choice is visible, so it cannot be subtle — and a
    badge that says UNITS is exactly the wrong thing to be showing, so the art
    comes off and the disc goes back to being a frame round the weapon. */
-#dock-units.armed {
+#dock-units.armed, #dock-strikes.armed {
   background-image: none;
   background: rgba(10, 13, 17, 0.68); border: 1px solid var(--accent); color: var(--accent);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   filter: none;
 }
-#dock-units.armed .db-icon { display: flex; }
-#dock-units.armed .db-label { display: block; color: var(--accent); }
+#dock-units.armed .db-icon, #dock-strikes.armed .db-icon { display: flex; }
+#dock-units.armed .db-label, #dock-strikes.armed .db-label { display: block; color: var(--accent); }
 .db-icon { align-items: center; justify-content: center; height: 22px; }
 .db-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .db-icon img, .db-icon canvas { max-width: 30px; max-height: 22px; object-fit: contain; }
@@ -309,7 +310,7 @@ html, body {
 /* The unit drawer gets a tray of its own rather than eleven cards floating
    loose over the map — and a top and bottom border, so a row that scrolls
    sideways reads as one strip with more of itself off the edge. */
-#drawer-units {
+#drawer-units, #drawer-strikes {
   background: rgba(10, 13, 17, 0.62);
   border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge);
   padding: 8px 0 7px;
@@ -326,14 +327,14 @@ html, body {
 .dr-row button.wait { color: var(--dim); opacity: 0.6; }
 .dr-row button.unaffordable { color: var(--danger); }
 
-#buildbar {
+.cardbar {
   display: flex; gap: 6px; padding: 0 var(--ui-pad);
   overflow-x: auto; overflow-y: visible;
   scrollbar-width: none;
   justify-content: safe center;
   align-items: stretch;
 }
-#buildbar::-webkit-scrollbar { display: none; }
+.cardbar::-webkit-scrollbar { display: none; }
 
 .unit-card {
   flex: 0 0 auto; width: clamp(78px, 20vw, 104px);

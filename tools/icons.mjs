@@ -7,7 +7,8 @@
 // model with a margin, lit and framed the same for every unit.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
-const ids = (process.argv[2] || 'm119,m777,m109,m270,m142,f15,b1').split(',');
+// The Tomahawk and the infantry teams are drawn art, not renders: leave them out.
+const ids = (process.argv[2] || 'm119,m777,m109,stryker,m270,m142,f15,b1,ah64,ac130,gbu28').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 900, height: 700 } });
@@ -23,6 +24,8 @@ const out = await page.evaluate(async (ids) => {
   scene.add(new THREE.HemisphereLight(0xe6eef8, 0x5a5248, 2.0));
   const sun = new THREE.DirectionalLight(0xfff2dc, 3.4); sun.position.set(-3, 5, 4); scene.add(sun);
   const rim = new THREE.DirectionalLight(0x9fc4ff, 1.4); rim.position.set(4, 2.5, -3); scene.add(rim);
+  // Only on for a card taken from below: the belly is otherwise in its own shadow.
+  const under = new THREE.DirectionalLight(0xe8eef4, 0); under.position.set(-2, -5, 3); scene.add(under);
   const W = 1024, H = 640;
   const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4 });
   rt.texture.colorSpace = THREE.SRGBColorSpace;
@@ -31,14 +34,21 @@ const out = await page.evaluate(async (ids) => {
   for (const id of ids) {
     const def = UNITS_BY_ID[id];
     let obj;
-    if (def.model === 'aircraft') obj = id === 'b1' ? air.makeLancer() : air.makeEagle();
+    if (def.model === 'aircraft') obj = air.makeAirframe(def);
     else obj = B.models.instance(await B.models.load(def.model, def.modelLength, { tint: def.tint }));
     obj.rotation.y = def.modelYaw ?? 0;
+    // The blur discs a spinning rotor or prop is drawn as are for motion; on
+    // a still card they are a dark smear across the picture.
+    obj.traverse((m) => { if (m.isMesh && m.material?.transparent && m.material.opacity < 0.5) m.visible = false; });
     const g = new THREE.Group(); g.add(obj); scene.add(g); g.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(g);
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
     const r = Math.hypot(size.x, size.z) * 0.5 + size.y * 0.25;
-    const az = def.model === 'aircraft' ? -0.95 : -0.78, el = def.model === 'aircraft' ? 0.42 : 0.3;
+    // The bunker buster is the Eagle with a different store under it, so its
+    // card is taken from below, where the store is.
+    const az = def.model === 'aircraft' ? -0.95 : -0.78;
+    const el = id === 'gbu28' ? -0.32 : def.model === 'aircraft' ? 0.42 : 0.3;
+    under.intensity = el < 0 ? 3.2 : 0;
     const d = (r / Math.tan((cam.fov * Math.PI) / 360)) * 0.98;
     cam.position.set(c.x + Math.sin(az) * Math.cos(el) * d, c.y + Math.sin(el) * d, c.z + Math.cos(az) * Math.cos(el) * d);
     cam.lookAt(c); cam.updateProjectionMatrix();

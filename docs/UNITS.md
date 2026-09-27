@@ -8,7 +8,7 @@ for something that sits on the ground).
 ## Ground models
 
 The towed guns and the self-propelled pieces are GLB files in
-`public/assets/` (M119, M777, M109, M270, M142), loaded by `Models.load`
+`public/assets/` (M119, M777, M109, M1128, M270, M142), loaded by `Models.load`
 in `units.js`, Draco-compressed, normalised so the longest dimension is
 `modelLength` metres, centred in plan, floored, and repainted the battery's
 green with the source material's luminance kept so panel lines still read.
@@ -17,13 +17,19 @@ The convention is **nose along +Z, gun along +Z**. The two towed guns were
 modelled trail-to-muzzle along X and carry a `modelYaw` to turn them; a
 self-propelled piece modelled nose-forward needs none.
 
-A unit with no file is built in code. `src/game/vehicles.js` has the
-Stryker MGS: `model: 'procedural', build: makeStryker` in its record, and
-`Models.wrap` centres and floors what the function returns without
-rescaling, because it is drawn in metres already. To replace it with a
-model, drop `public/assets/<file>.glb` in, set `model: '<file>'`,
-`modelLength: 6.95`, a `tint`, and delete the `build` line. The procedural
-hull stays in `vehicles.js` for the next unit that has no file yet.
+A supplied model is prepared before it goes in. The M1128 came as a
+28 MB Sketchfab export: 235,000 triangles, 15 MB of textures, and the
+spec-gloss material extension three.js no longer reads. The game repaints
+every vehicle and drops its maps, so the textures, UVs and normals go
+(`@gltf-transform`: strip, weld, meshopt simplify to a fifth, Draco); the
+result is 150 KB, flat-shaded, which suits armour. Check the facing with
+`node tools/icons.mjs <id>` before wiring it: the gun should point the way
+the Paladin's does.
+
+A unit with no file can be built in code. `src/game/vehicles.js` keeps
+the procedural Stryker for that pattern: `model: 'procedural', build: fn`
+in a record, and `Models.wrap` centres and floors what the function
+returns without rescaling, because it is drawn in metres already.
 
 ## Airframes
 
@@ -34,12 +40,15 @@ sortie picks the builder by `aircraft.kind`:
 
 | kind | builder | who flies it |
 |---|---|---|
-| `eagle` | `makeEagle` | F-15E, GBU-28 |
+| `eagle` | `makeEagle({ store })` | F-15E; GBU-28 with `store: 'gbu28'` |
 | `lancer` | `makeLancer` | B-1B |
 | `apache` | `makeApache` | AH-64E |
 | `ghostrider` | `makeGhostrider` | AC-130J |
 | `tomahawk` | `makeTomahawk` | BGM-109 |
 | (lift) | `makeHercules`, `makeChinook` | the airlift |
+
+`makeAirframe(def)` is the one switch over these, used by the sortie and
+by the icon renderer, so a card shows exactly what flies.
 
 Names the sortie looks for: `prop` and `rotorA` are spun, `tailrotor` too;
 `bomb` is the child hidden at release. `aircraft.consumed` means the
@@ -48,12 +57,29 @@ projectile carries on. `strike.salvo { n, spread }` releases `n` rounds
 spaced back along the run. `STRIKE_RATE` at the top of the file is the
 pitch of each one's roar.
 
+## Units and Strikes
+
+The dock has two weapon drawers. UNITS holds everything that is placed on
+the ground; STRIKES holds every record with a `strike`, the aircraft and
+the Tomahawk. The split is by that field, not by tier, so a new strike
+lands in the right drawer without a list to update. The armed weapon is
+worn by the button it came from, and tapping that button puts it away.
+Number keys pick from UNITS; Shift with a number, or a number while the
+STRIKES drawer is open, picks from STRIKES. The STRIKES badge in
+`src/ui/dock/strikes.png` is drawn on the ORDERS disc to match the set;
+drop finished art over it at 192 × 192.
+
 ## Icons
 
-`src/ui/icons.js` draws the roster's 512 × 320 silhouettes in code; a new
-unit borrows a body via the `BODY` aliases until it has its own drawing.
-The six added in the fourth batch (`m120`, `stryker`, `ah64`, `ac130`,
-`tomahawk`, `gbu28`) all borrow.
+Every unit has a 512 × 320 PNG in `public/assets/icons/`, listed in
+`IMAGE_ICONS` in `src/ui/icons.js`. The infantry teams (the M120 among
+them) and the Tomahawk are drawn art, trimmed to the artwork and centred
+in the slot. The guns, vehicles and aircraft are rendered from the game's
+own models by `node tools/icons.mjs [ids]` with the dev server up: rotor
+and prop blur discs are hidden, and the bunker buster is shot from below
+with an under-light so its card shows the store that makes it different
+from the F-15's. The vector pictograms in the same file remain the
+fallback for a unit with no PNG.
 
 ## Looking at a model
 

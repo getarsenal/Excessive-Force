@@ -47,6 +47,7 @@ export class HUD {
       target: document.getElementById('hud-target'),
       objectives: document.getElementById('hud-objectives'),
       buildbar: document.getElementById('buildbar'),
+      strikebar: document.getElementById('strikebar'),
       prompt: document.getElementById('prompt'),
       targetcard: document.getElementById('targetcard'),
       tcSection: document.getElementById('tc-section'),
@@ -72,6 +73,8 @@ export class HUD {
       dock: document.getElementById('dock'),
       dockUnits: document.getElementById('dock-units'),
       dockUnitsIcon: document.getElementById('dock-units-icon'),
+      dockStrikes: document.getElementById('dock-strikes'),
+      dockStrikesIcon: document.getElementById('dock-strikes-icon'),
       dockOrders: document.getElementById('dock-orders'),
       dockView: document.getElementById('dock-view'),
       dockMenu: document.getElementById('dock-menu'),
@@ -309,7 +312,11 @@ export class HUD {
         // is wearing the weapon's own icon and name by then, so tapping it to
         // put that weapon away is the reading it already suggests; the drawer
         // is one more tap, where it was before.
-        if (btn.dataset.drawer === 'units' && this.openDrawer !== 'units'
+        //
+        // Only the button that is wearing the weapon puts it away. With a
+        // gun armed, STRIKES opens its drawer as it always does, and picking
+        // an aircraft there swaps one weapon for the other.
+        if (btn.classList.contains('armed') && this.openDrawer !== btn.dataset.drawer
           && this.onDisarm()) return;
         this.setDrawer(btn.dataset.drawer);
       });
@@ -322,25 +329,35 @@ export class HUD {
   }
 
   /**
-   * What the UNITS button is holding.
+   * What the UNITS and STRIKES buttons are holding.
    *
-   * With the drawer shut this is the only place the armed weapon shows, so it
-   * wears the unit's own icon and its name — a player who has just picked a
-   * Paladin and closed the drawer to look at the map must not have to reopen
-   * it to find out what a tap is about to cost them.
+   * With the drawer shut this is the only place the armed weapon shows, so
+   * the button it came from wears the unit's own icon and its name — a player
+   * who has just picked a Paladin and closed the drawer to look at the map
+   * must not have to reopen it to find out what a tap is about to cost them.
+   * The other button keeps its badge.
    */
   syncDock(id) {
-    const btn = this.el.dockUnits, icon = this.el.dockUnitsIcon;
-    if (!btn || !icon) return;
     const u = id ? UNITS_BY_ID[id] : null;
-    btn.classList.toggle('armed', !!u);
-    const label = btn.querySelector('.db-label');
-    if (label) label.textContent = u ? u.name : 'UNITS';
-    if (this._dockIconId === (u ? u.id : null)) return;
-    this._dockIconId = u ? u.id : null;
-    // Nothing when nothing is armed: the badge underneath is the picture then,
-    // and a second drawing behind it would only be something to go wrong.
-    icon.innerHTML = u ? (unitIcon(u.id) || '') : '';
+    const holder = u ? (u.strike ? 'strikes' : 'units') : null;
+    this._dockIconIds = this._dockIconIds || {};
+    for (const [key, btn, icon] of [
+      ['units', this.el.dockUnits, this.el.dockUnitsIcon],
+      ['strikes', this.el.dockStrikes, this.el.dockStrikesIcon],
+    ]) {
+      if (!btn || !icon) continue;
+      const mine = holder === key;
+      btn.classList.toggle('armed', mine);
+      const label = btn.querySelector('.db-label');
+      if (label) label.textContent = mine ? u.name : key.toUpperCase();
+      const want = mine ? u.id : null;
+      if (this._dockIconIds[key] === want) continue;
+      this._dockIconIds[key] = want;
+      // Nothing when nothing is armed: the badge underneath is the picture
+      // then, and a second drawing behind it would only be something to go
+      // wrong.
+      icon.innerHTML = mine ? (unitIcon(u.id) || '') : '';
+    }
   }
 
   /**
@@ -515,17 +532,28 @@ export class HUD {
     }
   }
 
+  /**
+   * The cards, in two drawers: the guns and the teams on the ground under
+   * UNITS, everything that comes in from outside the battery under STRIKES.
+   * `bars` is each drawer's order, which is also what the number keys index:
+   * the ground units by default, the strikes with Shift or with that drawer
+   * open. Each card's number is its place in its own drawer.
+   */
   _buildBar() {
-    const frag = document.createDocumentFragment();
+    this.bars = { units: [], strikes: [] };
+    const frags = { units: document.createDocumentFragment(), strikes: document.createDocumentFragment() };
     for (const u of UNITS) {
+      const bar = u.strike && this.el.strikebar ? 'strikes' : 'units';
+      this.bars[bar].push(u.id);
       const card = document.createElement('button');
       card.className = 'unit-card locked';
       card.dataset.id = u.id;
       card.title = `${u.full} — ${u.blurb}`;
+      const n = this.bars[bar].length;
 
       card.innerHTML = `
         <div class="uc-tier">${u.tier}</div>
-        <div class="uc-key">${this.cards.size + 1}</div>
+        <div class="uc-key">${bar === 'strikes' ? '⇧' : ''}${n}</div>
         <div class="uc-icon">${unitIcon(u.id) || ''}</div>
         <div class="uc-name">${u.name}</div>
         <div class="uc-cost">$${u.cost.toLocaleString()}</div>
@@ -537,9 +565,10 @@ export class HUD {
       });
 
       this.cards.set(u.id, card);
-      frag.appendChild(card);
+      frags[bar].appendChild(card);
     }
-    this.el.buildbar.appendChild(frag);
+    this.el.buildbar.appendChild(frags.units);
+    if (this.el.strikebar) this.el.strikebar.appendChild(frags.strikes);
   }
 
   /**
