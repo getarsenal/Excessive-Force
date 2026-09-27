@@ -1859,7 +1859,13 @@ export class Garrison {
 
       // A crew that has dug in takes a third less: the sandbags are real.
       const damage = d.def.damage * this.damageScale * (best.dugIn ? 0.65 : 1);
-      shots.push({ from: d.muzzle, to: best.pos, hit, damage, unit: best, defender: d });
+      // Drawn to the point the line of sight was checked to, not to the
+      // man's feet: the tracer went to the ground at the unit's base while
+      // the check went to its chest, and over a low roof or the corner of a
+      // wall the drawn line dipped through a building the check had cleared.
+      const aim = best.pos.clone();
+      aim.y += 1.1;
+      shots.push({ from: d.muzzle, to: aim, hit, damage, unit: best, defender: d });
       if (hit) best.health -= damage;
 
       // Face what you are shooting at, so the instanced soldier reads right.
@@ -1917,8 +1923,13 @@ export class Garrison {
       const spread = t.kind === 'chute' ? 1 + 1.6 * (((d.airSeed + t.seed) * 1.0) % 1) : 1;
       const score = d2 * (t.kind === 'aircraft' ? 0.35 : spread);
       if (score >= bestScore) continue;
-      // A canopy and a helicopter both come down among the buildings and can
-      // be masked by them; a jet crossing high over the top cannot.
+      // Nothing in the air is shot at through a building. The town's own
+      // blocks are asked about every target — a street-level crew under a
+      // gunship circling three hundred metres up still has an office block
+      // in the way often enough, and on a dense map two air shots in five
+      // were going straight through one — and the landmark's masonry about
+      // anything low enough to be masked by it: a canopy, a helicopter.
+      if (this.city && this.city.blocks(d.muzzle, t.pos)) continue;
       if ((t.kind === 'chute' || t.heli) && structures
           && !lineOfSight(structures, d.muzzle, t.pos, 1.2, 0.0)) continue;
       best = t; bestScore = score;

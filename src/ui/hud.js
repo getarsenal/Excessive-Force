@@ -317,8 +317,13 @@ export class HUD {
         // Only the button that is wearing the weapon puts it away. With a
         // gun armed, STRIKES opens its drawer as it always does, and picking
         // an aircraft there swaps one weapon for the other.
-        if (btn.classList.contains('armed') && this.openDrawer !== btn.dataset.drawer
-          && this.onDisarm()) return;
+        //
+        // Read from the battle, not from the button's `armed` class: that is
+        // painted on the next frame, and a tap straight after picking a
+        // weapon opened the drawer instead of putting the weapon away.
+        const held = this.battle.selectedUnitId && UNITS_BY_ID[this.battle.selectedUnitId];
+        const mine = held && (held.strike ? 'strikes' : 'units') === btn.dataset.drawer;
+        if (mine && this.openDrawer !== btn.dataset.drawer && this.onDisarm()) return;
         this.setDrawer(btn.dataset.drawer);
       });
     }
