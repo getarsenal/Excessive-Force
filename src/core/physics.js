@@ -227,8 +227,13 @@ export class PhysicsWorld {
     ));
     ray.origin.x = lx; ray.origin.y = foot - 0.05; ray.origin.z = lz;
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
+    // Fixed colliders only, and no further than `_probeStands` looks. This
+    // used to accept anything within a metre, falling stone included, so a
+    // frozen stone with rubble sliding past under it was "standing" to the
+    // sweep and hanging to `_findSupport`, and the two never agreed: the
+    // sweep left it in the sky for the rest of the match.
     return !!this.world.castRay(
-      ray, AIR_UNDER, true, undefined, undefined, undefined, body, undefined);
+      ray, 0.5, true, this.fixedOnly, undefined, undefined, body, undefined);
   }
 
   /**
