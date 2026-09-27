@@ -1,0 +1,18 @@
+{
+  "id": "osaka",
+  "name": "Osaka Castle, Osaka",
+  "lat": 34.68731,
+  "lon": 135.52621,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -50.573,
+  "maxElevation": 31.912,
+  "metersPerDemPixel": 3.9282,
+  "seaLevel": 2.119,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 4.431,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0908,
+  "overtureRelease": "2026-08-19.0"
+}

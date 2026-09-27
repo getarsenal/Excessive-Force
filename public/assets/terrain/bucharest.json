@@ -1,0 +1,18 @@
+{
+  "id": "bucharest",
+  "name": "Palace of the Parliament, Bucharest",
+  "lat": 44.42749,
+  "lon": 26.08745,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 61.412,
+  "maxElevation": 92.035,
+  "metersPerDemPixel": 3.4117,
+  "seaLevel": 68.888,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 70.209,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0577,
+  "overtureRelease": "2026-08-19.0"
+}

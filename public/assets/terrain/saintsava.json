@@ -1,0 +1,17 @@
+{
+  "id": "saintsava",
+  "name": "Church of Saint Sava, Belgrade",
+  "lat": 44.79806,
+  "lon": 20.46889,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 85.392,
+  "maxElevation": 136.176,
+  "metersPerDemPixel": 3.39,
+  "seaLevel": 91.636,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.1039,
+  "overtureRelease": "2026-08-19.0"
+}

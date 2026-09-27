@@ -1,0 +1,18 @@
+{
+  "id": "helsinki",
+  "name": "Helsinki Cathedral, Helsinki",
+  "lat": 60.17028,
+  "lon": 24.95222,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 8.484,
+  "maxElevation": 38.313,
+  "metersPerDemPixel": 2.3764,
+  "seaLevel": 16.843,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 17.115,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.4992,
+  "overtureRelease": "2026-08-19.0"
+}

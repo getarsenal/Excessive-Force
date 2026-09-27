@@ -1,0 +1,18 @@
+{
+  "id": "juche",
+  "name": "Juche Tower, Pyongyang",
+  "lat": 39.01722,
+  "lon": 125.76361,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 0.935,
+  "maxElevation": 29.178,
+  "metersPerDemPixel": 3.7118,
+  "seaLevel": 3.386,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 5.435,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1215,
+  "overtureRelease": "2026-08-19.0"
+}

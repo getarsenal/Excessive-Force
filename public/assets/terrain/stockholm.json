@@ -1,0 +1,18 @@
+{
+  "id": "stockholm",
+  "name": "Stockholm Palace, Stockholm",
+  "lat": 59.32683,
+  "lon": 18.07161,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 1.155,
+  "maxElevation": 31.141,
+  "metersPerDemPixel": 2.4371,
+  "seaLevel": 5.018,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 6.912,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.2008,
+  "overtureRelease": "2026-08-19.0"
+}

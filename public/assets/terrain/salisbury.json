@@ -1,0 +1,18 @@
+{
+  "id": "salisbury",
+  "name": "Salisbury Cathedral, Salisbury",
+  "lat": 51.06508,
+  "lon": -1.79745,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 40.229,
+  "maxElevation": 64.771,
+  "metersPerDemPixel": 3.0022,
+  "seaLevel": 44.065,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 44.729,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0226,
+  "overtureRelease": "2026-08-19.0"
+}

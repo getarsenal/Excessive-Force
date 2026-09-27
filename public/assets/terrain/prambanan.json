@@ -1,0 +1,17 @@
+{
+  "id": "prambanan",
+  "name": "Prambanan, Yogyakarta",
+  "lat": -7.75202,
+  "lon": 110.49147,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 136.705,
+  "maxElevation": 165.081,
+  "metersPerDemPixel": 4.7337,
+  "seaLevel": 142.998,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0038,
+  "overtureRelease": "2026-08-19.0"
+}

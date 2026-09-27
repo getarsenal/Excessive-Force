@@ -1,0 +1,18 @@
+{
+  "id": "lotustower",
+  "name": "Lotus Tower, Colombo",
+  "lat": 6.92722,
+  "lon": 79.85833,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -12.644,
+  "maxElevation": 24.189,
+  "metersPerDemPixel": 4.7424,
+  "seaLevel": 5.522,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 6.849,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.4692,
+  "overtureRelease": "2026-08-19.0"
+}

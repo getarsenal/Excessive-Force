@@ -1,0 +1,17 @@
+{
+  "id": "bran",
+  "name": "Bran Castle, Bran",
+  "lat": 45.5149,
+  "lon": 25.36725,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 732.737,
+  "maxElevation": 1043.274,
+  "metersPerDemPixel": 3.3476,
+  "seaLevel": 742.945,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0017,
+  "overtureRelease": "2026-08-19.0"
+}

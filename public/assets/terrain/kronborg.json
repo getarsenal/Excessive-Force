@@ -1,0 +1,18 @@
+{
+  "id": "kronborg",
+  "name": "Kronborg Castle, Helsing\u00f8r",
+  "lat": 56.03897,
+  "lon": 12.62165,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -20.0,
+  "maxElevation": 1.539,
+  "metersPerDemPixel": 2.6687,
+  "seaLevel": -19.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -14.0,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.5921,
+  "overtureRelease": "2026-08-19.0"
+}

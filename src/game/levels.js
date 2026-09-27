@@ -45,6 +45,7 @@ import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/l
 import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces }
   from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
+import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB } from './atlas.js';
 
 /**
  * Par.
@@ -2336,6 +2337,9 @@ export const LEVELS = {
   },
 };
 
+// The catalogue: fifty-nine more, generated from data. See atlas.js.
+Object.assign(LEVELS, ATLAS_LEVELS);
+
 export const DEFAULT_LEVEL = 'westminster';
 
 /**
@@ -2347,7 +2351,7 @@ export const DEFAULT_LEVEL = 'westminster';
  * cantilever, a dome, a lattice, and a mountain.
  */
 export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio',
-  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala', 'colosseum', 'towerbridge', 'florence', 'segovia', 'atomium', 'tokyotower', 'budapest', 'sagrada', 'edinburgh', 'neuschwanstein', 'montstmichel', 'pena', 'hassan', 'kuwait', 'karnak', 'forbidden', 'gyeongbok', 'watarun', 'shwedagon', 'angkor', 'borobudur', 'tikal', 'teotihuacan', 'machupicchu', 'greatwall'];
+  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala', 'colosseum', 'towerbridge', 'florence', 'segovia', 'atomium', 'tokyotower', 'budapest', 'sagrada', 'edinburgh', 'neuschwanstein', 'montstmichel', 'pena', 'hassan', 'kuwait', 'karnak', 'forbidden', 'gyeongbok', 'watarun', 'shwedagon', 'angkor', 'borobudur', 'tikal', 'teotihuacan', 'machupicchu', 'greatwall', ...ATLAS_ORDER];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {
@@ -2392,6 +2396,7 @@ export const LEVEL_BLURB = {
   teotihuacan: "Sixty-five metres of rubble faced in stone, in five tiers. Nothing falls; there is a tunnel under the centre.",
   machupicchu: "Dry ashlar on a saddle ridge. Nothing is tall; the terraces hold the temples up.",
   greatwall: "Five hundred metres of wall along a ridge with five towers. The wall will not topple; the towers are the score.",
+  ...ATLAS_BLURB,
 };
 
 /** Ordered level records, for menus. */

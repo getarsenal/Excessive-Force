@@ -1,0 +1,18 @@
+{
+  "id": "wildgoose",
+  "name": "Giant Wild Goose Pagoda, Xi'an",
+  "lat": 34.21944,
+  "lon": 108.95917,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 412.886,
+  "maxElevation": 439.627,
+  "metersPerDemPixel": 3.9503,
+  "seaLevel": 418.63,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 420.753,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0153,
+  "overtureRelease": "2026-08-19.0"
+}

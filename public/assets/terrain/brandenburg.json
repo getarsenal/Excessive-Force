@@ -1,0 +1,18 @@
+{
+  "id": "brandenburg",
+  "name": "Brandenburg Gate, Berlin",
+  "lat": 52.51628,
+  "lon": 13.3777,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 23.687,
+  "maxElevation": 51.045,
+  "metersPerDemPixel": 2.9072,
+  "seaLevel": 28.249,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 31.744,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0453,
+  "overtureRelease": "2026-08-19.0"
+}

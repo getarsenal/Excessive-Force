@@ -1,0 +1,18 @@
+{
+  "id": "gatewayindia",
+  "name": "Gateway of India, Mumbai",
+  "lat": 18.92197,
+  "lon": 72.83465,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -11.977,
+  "maxElevation": 18.012,
+  "metersPerDemPixel": 4.5192,
+  "seaLevel": -0.296,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -0.014,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.8292,
+  "overtureRelease": "2026-08-19.0"
+}

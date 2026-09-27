@@ -1,0 +1,17 @@
+{
+  "id": "warsaw",
+  "name": "Palace of Culture and Science, Warsaw",
+  "lat": 52.23177,
+  "lon": 21.00597,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 109.36,
+  "maxElevation": 126.339,
+  "metersPerDemPixel": 2.926,
+  "seaLevel": 112.185,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0494,
+  "overtureRelease": "2026-08-19.0"
+}

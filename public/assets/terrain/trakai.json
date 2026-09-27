@@ -1,0 +1,18 @@
+{
+  "id": "trakai",
+  "name": "Trakai Island Castle, Trakai",
+  "lat": 54.65222,
+  "lon": 24.93361,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 139.5,
+  "maxElevation": 158.881,
+  "metersPerDemPixel": 2.7639,
+  "seaLevel": 143.461,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 144.0,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1305,
+  "overtureRelease": "2026-08-19.0"
+}

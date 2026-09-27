@@ -1,0 +1,17 @@
+{
+  "id": "alhambra",
+  "name": "Alhambra, Granada",
+  "lat": 37.17607,
+  "lon": -3.58811,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 669.768,
+  "maxElevation": 900.085,
+  "metersPerDemPixel": 3.8065,
+  "seaLevel": 680.213,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0735,
+  "overtureRelease": "2026-08-19.0"
+}

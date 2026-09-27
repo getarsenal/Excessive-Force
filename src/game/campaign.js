@@ -1,3 +1,4 @@
+import { atlasContracts } from './atlas.js';
 import { LEVELS, LEVEL_ORDER } from './levels.js';
 import { loadProgress, getChallenge } from '../ui/levelselect.js';
 
@@ -578,6 +579,8 @@ export const THEATRES = [
     unlockLine: 'Nothing new — the arsenal is what it is',
   },
 ];
+// The catalogue's contracts, numbered on from the last hand-made one.
+THEATRES.push(...atlasContracts(THEATRES.length + 1));
 
 /** The contract for a level id, if that level is one. */
 export function theatreOf(id) {

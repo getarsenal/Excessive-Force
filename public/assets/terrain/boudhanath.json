@@ -1,0 +1,17 @@
+{
+  "id": "boudhanath",
+  "name": "Boudhanath Stupa, Kathmandu",
+  "lat": 27.7215,
+  "lon": 85.362,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 1305.789,
+  "maxElevation": 1345.416,
+  "metersPerDemPixel": 4.229,
+  "seaLevel": 1311.962,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0241,
+  "overtureRelease": "2026-08-19.0"
+}

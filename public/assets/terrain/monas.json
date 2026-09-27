@@ -1,0 +1,18 @@
+{
+  "id": "monas",
+  "name": "National Monument, Jakarta",
+  "lat": -6.17539,
+  "lon": 106.82718,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -19.625,
+  "maxElevation": 25.851,
+  "metersPerDemPixel": 4.7496,
+  "seaLevel": -1.061,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 1.871,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.071,
+  "overtureRelease": "2026-08-19.0"
+}

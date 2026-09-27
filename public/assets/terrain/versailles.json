@@ -1,0 +1,18 @@
+{
+  "id": "versailles",
+  "name": "Palace of Versailles, Versailles",
+  "lat": 48.8049,
+  "lon": 2.12037,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 108.928,
+  "maxElevation": 138.314,
+  "metersPerDemPixel": 3.1465,
+  "seaLevel": 113.051,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 115.566,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0355,
+  "overtureRelease": "2026-08-19.0"
+}

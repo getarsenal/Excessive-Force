@@ -1,0 +1,13 @@
+{
+  "id": "registan",
+  "name": "Registan, Samarkand",
+  "lat": 39.65472,
+  "lon": 66.97583,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 681.06,
+  "maxElevation": 730.343,
+  "metersPerDemPixel": 3.6781,
+  "seaLevel": 698.858,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

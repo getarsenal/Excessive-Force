@@ -1,0 +1,18 @@
+{
+  "id": "stephansdom",
+  "name": "St. Stephen's Cathedral, Vienna",
+  "lat": 48.20849,
+  "lon": 16.37321,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 155.457,
+  "maxElevation": 182.639,
+  "metersPerDemPixel": 3.1837,
+  "seaLevel": 161.476,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 162.409,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1264,
+  "overtureRelease": "2026-08-19.0"
+}

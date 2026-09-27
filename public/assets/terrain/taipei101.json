@@ -1,0 +1,17 @@
+{
+  "id": "taipei101",
+  "name": "Taipei 101, Taipei",
+  "lat": 25.03361,
+  "lon": 121.565,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -19.406,
+  "maxElevation": 44.733,
+  "metersPerDemPixel": 4.3285,
+  "seaLevel": 7.325,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0578,
+  "overtureRelease": "2026-08-19.0"
+}

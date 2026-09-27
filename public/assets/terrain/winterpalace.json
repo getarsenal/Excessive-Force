@@ -1,0 +1,18 @@
+{
+  "id": "winterpalace",
+  "name": "Winter Palace, Saint Petersburg",
+  "lat": 59.94056,
+  "lon": 30.31389,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 1.237,
+  "maxElevation": 32.903,
+  "metersPerDemPixel": 2.3929,
+  "seaLevel": 9.931,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 13.19,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1817,
+  "overtureRelease": "2026-08-19.0"
+}

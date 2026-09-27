@@ -1,0 +1,18 @@
+{
+  "id": "chillon",
+  "name": "Ch\u00e2teau de Chillon, Montreux",
+  "lat": 46.41417,
+  "lon": 6.9275,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 366.499,
+  "maxElevation": 457.13,
+  "metersPerDemPixel": 3.2937,
+  "seaLevel": 371.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 370.999,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.233,
+  "overtureRelease": "2026-08-19.0"
+}

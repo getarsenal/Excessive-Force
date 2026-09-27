@@ -1,0 +1,17 @@
+{
+  "id": "minarpakistan",
+  "name": "Minar-e-Pakistan, Lahore",
+  "lat": 31.5925,
+  "lon": 74.30944,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 183.997,
+  "maxElevation": 227.305,
+  "metersPerDemPixel": 4.0693,
+  "seaLevel": 205.748,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0373,
+  "overtureRelease": "2026-08-19.0"
+}

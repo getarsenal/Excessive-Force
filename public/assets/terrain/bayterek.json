@@ -1,0 +1,17 @@
+{
+  "id": "bayterek",
+  "name": "Bayterek Tower, Astana",
+  "lat": 51.12833,
+  "lon": 71.43056,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 337.271,
+  "maxElevation": 353.128,
+  "metersPerDemPixel": 2.9981,
+  "seaLevel": 342.078,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0604,
+  "overtureRelease": "2026-08-19.0"
+}

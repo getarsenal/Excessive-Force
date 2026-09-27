@@ -1,0 +1,18 @@
+{
+  "id": "hallgrimskirkja",
+  "name": "Hallgr\u00edmskirkja, Reykjav\u00edk",
+  "lat": 64.142,
+  "lon": -21.92667,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -1.0,
+  "maxElevation": 128.712,
+  "metersPerDemPixel": 2.0836,
+  "seaLevel": 5.047,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 67.992,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.6085,
+  "overtureRelease": "2026-08-19.0"
+}

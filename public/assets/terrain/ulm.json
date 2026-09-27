@@ -1,0 +1,18 @@
+{
+  "id": "ulm",
+  "name": "Ulm Minster, Ulm",
+  "lat": 48.39852,
+  "lon": 9.99183,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -32772.5,
+  "maxElevation": -28765.545,
+  "metersPerDemPixel": 3.1719,
+  "seaLevel": -32768.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": -32768.0,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0351,
+  "overtureRelease": "2026-08-19.0"
+}

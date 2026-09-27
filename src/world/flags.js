@@ -39,6 +39,7 @@ import { TIKAL } from '../structure/landmarks/tikal.js';
 import { TEOTIHUACAN } from '../structure/landmarks/teotihuacan.js';
 import { MACHUPICCHU } from '../structure/landmarks/machupicchu.js';
 import { GREATWALL } from '../structure/landmarks/greatwall.js';
+import { ATLAS_FLAG_SITES, ATLAS_PATTERNS } from '../game/atlas.js';
 
 /**
  * Flags on the landmarks.
@@ -152,6 +153,7 @@ export const FLAG_SITES = {
   teotihuacan: [{ key: 'teotihuacan', ...TEOTIHUACAN.flag, pattern: 'mexico', w: 9, h: 6, pole: 10 }],
   machupicchu: [{ key: 'machupicchu', ...MACHUPICCHU.flag, pattern: 'peru', w: 9, h: 6, pole: 10 }],
   greatwall: [{ key: 'greatwall', ...GREATWALL.flag, pattern: 'china', w: 9, h: 6, pole: 10 }],
+  ...ATLAS_FLAG_SITES,
 };
 
 /** The cloth's pattern, drawn once into a small canvas. */
@@ -390,6 +392,8 @@ PATTERNS.uae = (ctx, w, h) => {
   ctx.fillStyle = '#1c1c1c'; ctx.fillRect(0, (h * 2) / 3, w, h / 3);
   ctx.fillStyle = '#ff0000'; ctx.fillRect(0, 0, w / 4, h);
 };
+
+Object.assign(PATTERNS, ATLAS_PATTERNS);
 
 function patternTexture(name, w, h) {
   const c = document.createElement('canvas');

@@ -1,0 +1,18 @@
+{
+  "id": "malbork",
+  "name": "Malbork Castle, Malbork",
+  "lat": 54.04003,
+  "lon": 19.02785,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -1.743,
+  "maxElevation": 20.234,
+  "metersPerDemPixel": 2.8053,
+  "seaLevel": 2.0,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 2.757,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0291,
+  "overtureRelease": "2026-08-19.0"
+}

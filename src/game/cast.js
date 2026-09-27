@@ -1,3 +1,4 @@
+import { ATLAS_CAST, ATLAS_DEFENDER_OF, ATLAS_STANDOFF } from './atlas.js';
 /**
  * The commanders.
  *
@@ -171,6 +172,7 @@ export const CAST = {
     rank: 'General de Ejército', name: 'Ernesto Quispe Huamán', nation: 'Peru', side: 'right',
     colours: ['#d91023', '#f4f2ec', '#d91023'],
   },
+  ...ATLAS_CAST,
 };
 
 /** Which defender holds each level. */
@@ -204,6 +206,7 @@ export const DEFENDER_OF = {
   teotihuacan: 'mx',
   machupicchu: 'pe',
   greatwall: 'cn',
+  ...ATLAS_DEFENDER_OF,
 };
 
 /**
@@ -423,4 +426,5 @@ export const STANDOFF = {
     { who: 'cn', line: "长城两千年没被攻破过。你不过是又一个北方来的蛮子。" },
     { who: 'us', line: "From the north? Son, I'm from Ohio. Fire." },
   ],
+  ...ATLAS_STANDOFF,
 };

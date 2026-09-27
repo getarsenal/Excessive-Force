@@ -1,0 +1,18 @@
+{
+  "id": "chambord",
+  "name": "Ch\u00e2teau de Chambord, Chambord",
+  "lat": 47.6161,
+  "lon": 1.51704,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 73.377,
+  "maxElevation": 98.351,
+  "metersPerDemPixel": 3.2204,
+  "seaLevel": 76.306,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 78.211,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0311,
+  "overtureRelease": "2026-08-19.0"
+}

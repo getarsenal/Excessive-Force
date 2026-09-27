@@ -1,0 +1,18 @@
+{
+  "id": "shanghaitower",
+  "name": "Shanghai Tower, Shanghai",
+  "lat": 31.23556,
+  "lon": 121.50111,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -32.578,
+  "maxElevation": 27.885,
+  "metersPerDemPixel": 4.0848,
+  "seaLevel": -0.564,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 1.079,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1072,
+  "overtureRelease": "2026-08-19.0"
+}

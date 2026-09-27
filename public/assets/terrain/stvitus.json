@@ -1,0 +1,18 @@
+{
+  "id": "stvitus",
+  "name": "St. Vitus Cathedral, Prague",
+  "lat": 50.09088,
+  "lon": 14.40063,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 187.496,
+  "maxElevation": 332.883,
+  "metersPerDemPixel": 3.065,
+  "seaLevel": 188.341,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 196.055,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.0456,
+  "overtureRelease": "2026-08-19.0"
+}

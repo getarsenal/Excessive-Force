@@ -1,0 +1,17 @@
+{
+  "id": "milan",
+  "name": "Milan Cathedral, Milan",
+  "lat": 45.46417,
+  "lon": 9.19039,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 119.119,
+  "maxElevation": 144.27,
+  "metersPerDemPixel": 3.3506,
+  "seaLevel": 121.63,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0199,
+  "overtureRelease": "2026-08-19.0"
+}

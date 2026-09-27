@@ -1,0 +1,17 @@
+{
+  "id": "kinkakuji",
+  "name": "Kinkaku-ji, Kyoto",
+  "lat": 35.03937,
+  "lon": 135.72924,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 69.78,
+  "maxElevation": 127.805,
+  "metersPerDemPixel": 3.9115,
+  "seaLevel": 75.601,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0316,
+  "overtureRelease": "2026-08-19.0"
+}

@@ -499,6 +499,419 @@
       "nation": "China",
       "defends": "the Great Wall at Badaling",
       "look": "Chinese Shàngjiàng in olive dress uniform with gold shoulder boards and red collar, peaked cap with a red star, fur-lined greatcoat."
+    },
+    "milan": {
+      "id": "it-generale",
+      "file": "it-generale.png",
+      "nation": "Italy",
+      "defends": "Milan Cathedral, Milan",
+      "look": "Generale of Italy in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "stvitus": {
+      "id": "cz-armadni-general",
+      "file": "cz-armadni-general.png",
+      "nation": "Czechia",
+      "defends": "St. Vitus Cathedral, Prague",
+      "look": "Armádní generál of Czechia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "ulm": {
+      "id": "de-general",
+      "file": "de-general.png",
+      "nation": "Germany",
+      "defends": "Ulm Minster, Ulm",
+      "look": "General of Germany in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "brandenburg": {
+      "id": "de-general",
+      "file": "de-general.png",
+      "nation": "Germany",
+      "defends": "Brandenburg Gate, Berlin",
+      "look": "General of Germany in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "stephansdom": {
+      "id": "at-general",
+      "file": "at-general.png",
+      "nation": "Austria",
+      "defends": "St. Stephen's Cathedral, Vienna",
+      "look": "General of Austria in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "hohensalzburg": {
+      "id": "at-general",
+      "file": "at-general.png",
+      "nation": "Austria",
+      "defends": "Hohensalzburg Fortress, Salzburg",
+      "look": "General of Austria in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "versailles": {
+      "id": "fr-marshal",
+      "file": "fr-marshal.png",
+      "nation": "France",
+      "defends": "Palace of Versailles, Versailles",
+      "look": "Maréchal of France in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "chambord": {
+      "id": "fr-marshal",
+      "file": "fr-marshal.png",
+      "nation": "France",
+      "defends": "Château de Chambord, Chambord",
+      "look": "Maréchal of France in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "seville": {
+      "id": "es-capitan-general",
+      "file": "es-capitan-general.png",
+      "nation": "Spain",
+      "defends": "Seville Cathedral, Seville",
+      "look": "Capitán General of Spain in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "alhambra": {
+      "id": "es-capitan-general",
+      "file": "es-capitan-general.png",
+      "nation": "Spain",
+      "defends": "Alhambra, Granada",
+      "look": "Capitán General of Spain in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "malbork": {
+      "id": "pl-general-broni",
+      "file": "pl-general-broni.png",
+      "nation": "Poland",
+      "defends": "Malbork Castle, Malbork",
+      "look": "Generał broni of Poland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "warsaw": {
+      "id": "pl-general-broni",
+      "file": "pl-general-broni.png",
+      "nation": "Poland",
+      "defends": "Palace of Culture and Science, Warsaw",
+      "look": "Generał broni of Poland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "bran": {
+      "id": "ro-general-de-armata",
+      "file": "ro-general-de-armata.png",
+      "nation": "Romania",
+      "defends": "Bran Castle, Bran",
+      "look": "General de armată of Romania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "bucharest": {
+      "id": "ro-general-de-armata",
+      "file": "ro-general-de-armata.png",
+      "nation": "Romania",
+      "defends": "Palace of the Parliament, Bucharest",
+      "look": "General de armată of Romania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "kronborg": {
+      "id": "dk-general",
+      "file": "dk-general.png",
+      "nation": "Denmark",
+      "defends": "Kronborg Castle, Helsingør",
+      "look": "General of Denmark in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "stockholm": {
+      "id": "se-general",
+      "file": "se-general.png",
+      "nation": "Sweden",
+      "defends": "Stockholm Palace, Stockholm",
+      "look": "General of Sweden in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "hallgrimskirkja": {
+      "id": "is-skipherra",
+      "file": "is-skipherra.png",
+      "nation": "Iceland",
+      "defends": "Hallgrímskirkja, Reykjavík",
+      "look": "Skipherra of Iceland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "trakai": {
+      "id": "lt-generolas",
+      "file": "lt-generolas.png",
+      "nation": "Lithuania",
+      "defends": "Trakai Island Castle, Trakai",
+      "look": "Generolas of Lithuania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "winterpalace": {
+      "id": "ru-marshal",
+      "file": "ru-marshal.png",
+      "nation": "Russia",
+      "defends": "Winter Palace, Saint Petersburg",
+      "look": "Marshal of Russia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "belem": {
+      "id": "pt-general",
+      "file": "pt-general.png",
+      "nation": "Portugal",
+      "defends": "Belém Tower, Lisbon",
+      "look": "General of Portugal in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "salisbury": {
+      "id": "uk-field-marshal",
+      "file": "uk-field-marshal.png",
+      "nation": "United Kingdom",
+      "defends": "Salisbury Cathedral, Salisbury",
+      "look": "F.M. of United Kingdom in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "windsor": {
+      "id": "uk-field-marshal",
+      "file": "uk-field-marshal.png",
+      "nation": "United Kingdom",
+      "defends": "Windsor Castle, Windsor",
+      "look": "F.M. of United Kingdom in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "nidaros": {
+      "id": "no-general",
+      "file": "no-general.png",
+      "nation": "Norway",
+      "defends": "Nidaros Cathedral, Trondheim",
+      "look": "General of Norway in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "helsinki": {
+      "id": "fi-kenraali",
+      "file": "fi-kenraali.png",
+      "nation": "Finland",
+      "defends": "Helsinki Cathedral, Helsinki",
+      "look": "Kenraali of Finland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "chillon": {
+      "id": "ch-korpskommandant",
+      "file": "ch-korpskommandant.png",
+      "nation": "Switzerland",
+      "defends": "Château de Chillon, Montreux",
+      "look": "Korpskommandant of Switzerland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "saintsava": {
+      "id": "rs-general",
+      "file": "rs-general.png",
+      "nation": "Serbia",
+      "defends": "Church of Saint Sava, Belgrade",
+      "look": "Generál of Serbia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "taipei101": {
+      "id": "tw-shangjiang",
+      "file": "tw-shangjiang.png",
+      "nation": "Taiwan",
+      "defends": "Taipei 101, Taipei",
+      "look": "Shàngjiàng of Taiwan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "shanghaitower": {
+      "id": "cn-shangjiang",
+      "file": "cn-shangjiang.png",
+      "nation": "China",
+      "defends": "Shanghai Tower, Shanghai",
+      "look": "Shàngjiàng of China in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "wildgoose": {
+      "id": "cn-shangjiang",
+      "file": "cn-shangjiang.png",
+      "nation": "China",
+      "defends": "Giant Wild Goose Pagoda, Xi'an",
+      "look": "Shàngjiàng of China in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "landmark81": {
+      "id": "vn-dai-tuong",
+      "file": "vn-dai-tuong.png",
+      "nation": "Vietnam",
+      "defends": "Landmark 81, Ho Chi Minh City",
+      "look": "Đại tướng of Vietnam in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "boudhanath": {
+      "id": "np-pradhan-senapati",
+      "file": "np-pradhan-senapati.png",
+      "nation": "Nepal",
+      "defends": "Boudhanath Stupa, Kathmandu",
+      "look": "Pradhan Senapati of Nepal in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "victoriamemorial": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Victoria Memorial, Kolkata",
+      "look": "Maharaja-Gen. of India in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "hawamahal": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Hawa Mahal, Jaipur",
+      "look": "Maharaja-Gen. of India in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "redfort": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Red Fort, Delhi",
+      "look": "Maharaja-Gen. of India in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "gatewayindia": {
+      "id": "in-maharaja-general",
+      "file": "in-maharaja-general.png",
+      "nation": "India",
+      "defends": "Gateway of India, Mumbai",
+      "look": "Maharaja-Gen. of India in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "osaka": {
+      "id": "jp-taisho",
+      "file": "jp-taisho.png",
+      "nation": "Japan",
+      "defends": "Osaka Castle, Osaka",
+      "look": "Taishō of Japan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "kinkakuji": {
+      "id": "jp-taisho",
+      "file": "jp-taisho.png",
+      "nation": "Japan",
+      "defends": "Kinkaku-ji, Kyoto",
+      "look": "Taishō of Japan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "juche": {
+      "id": "kp-chasu",
+      "file": "kp-chasu.png",
+      "nation": "North Korea",
+      "defends": "Juche Tower, Pyongyang",
+      "look": "Chasu of North Korea in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "monas": {
+      "id": "id-jenderal",
+      "file": "id-jenderal.png",
+      "nation": "Indonesia",
+      "defends": "National Monument, Jakarta",
+      "look": "Jenderal of Indonesia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "prambanan": {
+      "id": "id-jenderal",
+      "file": "id-jenderal.png",
+      "nation": "Indonesia",
+      "defends": "Prambanan, Yogyakarta",
+      "look": "Jenderal of Indonesia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "minarpakistan": {
+      "id": "pk-general",
+      "file": "pk-general.png",
+      "nation": "Pakistan",
+      "defends": "Minar-e-Pakistan, Lahore",
+      "look": "General of Pakistan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "lotustower": {
+      "id": "lk-general",
+      "file": "lk-general.png",
+      "nation": "Sri Lanka",
+      "defends": "Lotus Tower, Colombo",
+      "look": "General of Sri Lanka in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "bayterek": {
+      "id": "kz-armiya-generaly",
+      "file": "kz-armiya-generaly.png",
+      "nation": "Kazakhstan",
+      "defends": "Bayterek Tower, Astana",
+      "look": "Armiya generaly of Kazakhstan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "registan": {
+      "id": "uz-general-polkovnik",
+      "file": "uz-general-polkovnik.png",
+      "nation": "Uzbekistan",
+      "defends": "Registan, Samarkand",
+      "look": "General-polkovnik of Uzbekistan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "flametowers": {
+      "id": "az-general-polkovnik",
+      "file": "az-general-polkovnik.png",
+      "nation": "Azerbaijan",
+      "defends": "Flame Towers, Baku",
+      "look": "General-polkovnik of Azerbaijan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "azadi": {
+      "id": "ir-sarlashkar",
+      "file": "ir-sarlashkar.png",
+      "nation": "Iran",
+      "defends": "Azadi Tower, Tehran",
+      "look": "Sarlashkar of Iran in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "kingdomcentre": {
+      "id": "sa-fariq-awwal",
+      "file": "sa-fariq-awwal.png",
+      "nation": "Saudi Arabia",
+      "defends": "Kingdom Centre, Riyadh",
+      "look": "Fariq Awwal of Saudi Arabia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "baalbek": {
+      "id": "lb-imad",
+      "file": "lb-imad.png",
+      "nation": "Lebanon",
+      "defends": "Temple of Bacchus, Baalbek",
+      "look": "Imad of Lebanon in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "ur": {
+      "id": "iq-fariq-awwal",
+      "file": "iq-fariq-awwal.png",
+      "nation": "Iraq",
+      "defends": "Ziggurat of Ur, Nasiriyah",
+      "look": "Fariq Awwal of Iraq in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "djoser": {
+      "id": "eg-field-marshal",
+      "file": "eg-field-marshal.png",
+      "nation": "Egypt",
+      "defends": "Pyramid of Djoser, Saqqara",
+      "look": "Mushir of Egypt in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "yamoussoukro": {
+      "id": "ci-general-de-corps-d-armee",
+      "file": "ci-general-de-corps-d-armee.png",
+      "nation": "Côte d'Ivoire",
+      "defends": "Basilica of Our Lady of Peace, Yamoussoukro",
+      "look": "Général de corps d'armée of Côte d'Ivoire in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "cntower": {
+      "id": "ca-general",
+      "file": "ca-general.png",
+      "nation": "Canada",
+      "defends": "CN Tower, Toronto",
+      "look": "General of Canada in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "frontenac": {
+      "id": "ca-general",
+      "file": "ca-general.png",
+      "nation": "Canada",
+      "defends": "Château Frontenac, Quebec City",
+      "look": "General of Canada in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "capitolio": {
+      "id": "cu-general-de-cuerpo-de-ejercito",
+      "file": "cu-general-de-cuerpo-de-ejercito.png",
+      "nation": "Cuba",
+      "defends": "El Capitolio, Havana",
+      "look": "General de Cuerpo de Ejército of Cuba in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "bellasartes": {
+      "id": "mx-general",
+      "file": "mx-general.png",
+      "nation": "Mexico",
+      "defends": "Palacio de Bellas Artes, Mexico City",
+      "look": "Gral. de División of Mexico in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "teatroamazonas": {
+      "id": "br-marechal",
+      "file": "br-marechal.png",
+      "nation": "Brazil",
+      "defends": "Teatro Amazonas, Manaus",
+      "look": "Marechal of Brazil in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "obelisco": {
+      "id": "ar-teniente-general",
+      "file": "ar-teniente-general.png",
+      "nation": "Argentina",
+      "defends": "Obelisco, Buenos Aires",
+      "look": "Teniente General of Argentina in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "cartagena": {
+      "id": "co-general",
+      "file": "co-general.png",
+      "nation": "Colombia",
+      "defends": "Castillo San Felipe de Barajas, Cartagena",
+      "look": "General of Colombia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+    },
+    "skytower": {
+      "id": "nz-lieutenant-general",
+      "file": "nz-lieutenant-general.png",
+      "nation": "New Zealand",
+      "defends": "Sky Tower, Auckland",
+      "look": "Lieutenant General of New Zealand in dress uniform; placeholder silhouette in the flag's colours until drawn."
     }
   }
 }

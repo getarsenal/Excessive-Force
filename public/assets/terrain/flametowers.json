@@ -1,0 +1,13 @@
+{
+  "id": "flametowers",
+  "name": "Flame Towers, Baku",
+  "lat": 40.35944,
+  "lon": 49.82611,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -29.88,
+  "maxElevation": 72.227,
+  "metersPerDemPixel": 3.6403,
+  "seaLevel": -23.718,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

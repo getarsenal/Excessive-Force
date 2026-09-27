@@ -1,0 +1,18 @@
+{
+  "id": "victoriamemorial",
+  "name": "Victoria Memorial, Kolkata",
+  "lat": 22.54484,
+  "lon": 88.34257,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -6.376,
+  "maxElevation": 24.396,
+  "metersPerDemPixel": 4.4122,
+  "seaLevel": 3.901,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 5.642,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1272,
+  "overtureRelease": "2026-08-19.0"
+}

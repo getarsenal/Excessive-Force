@@ -1,0 +1,18 @@
+{
+  "id": "landmark81",
+  "name": "Landmark 81, Ho Chi Minh City",
+  "lat": 10.795,
+  "lon": 106.72194,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": -10.293,
+  "maxElevation": 16.338,
+  "metersPerDemPixel": 4.6928,
+  "seaLevel": -0.062,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "waterSurface": 0.493,
+  "coastline": "surveyed",
+  "farSpan": 6300.0,
+  "farWater": 0.1744,
+  "overtureRelease": "2026-08-19.0"
+}
