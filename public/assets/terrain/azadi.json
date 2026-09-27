@@ -1,0 +1,13 @@
+{
+  "id": "azadi",
+  "name": "Azadi Tower, Tehran",
+  "lat": 35.69972,
+  "lon": 51.33806,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 1158.598,
+  "maxElevation": 1199.579,
+  "metersPerDemPixel": 3.8796,
+  "seaLevel": 1172.312,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}

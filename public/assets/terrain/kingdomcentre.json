@@ -1,0 +1,13 @@
+{
+  "id": "kingdomcentre",
+  "name": "Kingdom Centre, Riyadh",
+  "lat": 24.71139,
+  "lon": 46.67444,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 609.842,
+  "maxElevation": 640.758,
+  "metersPerDemPixel": 4.3398,
+  "seaLevel": 619.94,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain"
+}
