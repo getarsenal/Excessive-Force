@@ -117,12 +117,12 @@ export class PhysicsWorld {
    * Flip a stone from fixed to dynamic. Rapier keeps the collider, so this is
    * far cheaper than destroying and recreating the body.
    */
-  promote(body, impulse) {
+  promote(body, impulse, force = false) {
     if (body.bodyType() !== this.rapier.RigidBodyType.Fixed) {
       if (impulse) body.applyImpulse(impulse, true);
       return true;
     }
-    if (this.dynamicSet.size >= this.activeBudget) return false;
+    if (!force && this.dynamicSet.size >= this.activeBudget) return false;
 
     body.setBodyType(this.rapier.RigidBodyType.Dynamic, true);
     body.setLinearDamping(0.08);
@@ -594,7 +594,20 @@ export class PhysicsWorld {
         // be released at all: it hangs there for the rest of the match. One
         // brick vanishing out of a rubble field is not something anyone will
         // notice; one brick hanging in the sky is the thing people photograph.
-        if (!this._discard(body)) { this._auditCursor++; continue; }
+        if (!this._discard(body)) {
+          // A welded section has no chunk to destroy, so it cannot be
+          // culled; and with the budget full through a long collapse it
+          // could not be woken either, so seventeen stones of Cologne's
+          // spire hung at ninety metres with ninety strikes against them.
+          // It goes over the budget instead: one body too many for a few
+          // seconds is invisible, and the sweep reclaims it once it lands.
+          if (!this.promote(body, undefined, true)) { this._auditCursor++; continue; }
+          body.__hangStrikes = 0;
+          list[idx] = list[list.length - 1];
+          list.pop();
+          woke++; st.woke++;
+          continue;
+        }
         list[idx] = list[list.length - 1];
         list.pop();
         st.culled++;
