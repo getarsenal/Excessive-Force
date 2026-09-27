@@ -76,9 +76,9 @@ the Tomahawk. The split is by that field, not by tier, so a new strike
 lands in the right drawer without a list to update. The armed weapon is
 worn by the button it came from, and tapping that button puts it away.
 Number keys pick from UNITS; Shift with a number, or a number while the
-STRIKES drawer is open, picks from STRIKES. The STRIKES badge in
-`src/ui/dock/strikes.png` is drawn on the ORDERS disc to match the set;
-drop finished art over it at 192 × 192.
+STRIKES drawer is open, picks from STRIKES. The badge in
+`src/ui/dock/strikes.png` is the supplied art, cut tight to its disc and
+resampled to 192 × 192 like the other four, so the circles match.
 
 ## Icons
 
