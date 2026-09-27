@@ -244,9 +244,14 @@ export class PhysicsWorld {
     // else. Two subtractions; no query.
     if (body.__supGround) {
       if (!this.groundAt) return true;
-      const t = body.translation();
-      const g = this.groundAt(t.x, t.z);
-      return !isFinite(g) || t.y - this._reachOf(body) <= g + AIR_UNDER + 0.5;
+      // The arithmetic used to be the body's whole reach plus a metre and a
+      // half, which called a stone grounded with two metres of air under it;
+      // and "grounded" is also what a hit on a collider that could not be
+      // resolved is recorded as, so a stone that froze on something since
+      // removed could sit in the sky with the ground's own exemption. The
+      // support probe answers with the same arithmetic for a stone that is
+      // really on the terrain, and with rays for one that is not.
+      return !!this._findSupport(body);
     }
     const h = body.__supCol;
     if (h === undefined || h === null) return false;
