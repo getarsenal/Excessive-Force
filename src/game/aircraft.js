@@ -503,8 +503,12 @@ export class AirWing {
       // out is left alone — the shooting is about the run, and tracer chasing
       // a dot at three thousand metres is noise.
       if (!(s.climb > 0.9)) {
+        // A helicopter is low and slow enough for anything with a barrel to
+        // have a go at; the fixed-wing aircraft are the AA gun's alone.
+        const heli = !!(s.heli || (s.loiter && !s.loiter.orbit));
         out.push({ kind: 'aircraft', sortie: s, pos: s.model.position,
-          transport: !!(s.lift || s.heli) });
+          transport: !!(s.lift || s.heli), heli,
+          hover: heli && !!(s.loiter ? s.loiter.phase === 'station' : s.heli.phase === 'hover' || s.heli.phase === 'lower' || s.heli.phase === 'hold') });
       }
       if (!s.lift) continue;
       for (const L of s.lift.loads) {
@@ -872,7 +876,7 @@ const CHUTE = { troopRate: 11.5, cargoRate: 10.0, freeFall: 0.7, open: 0.5, stic
  */
 // The Apache is built to be shot at and stays in the flak for half a minute;
 // it takes about twice what the Chinook does before it goes down.
-const AIRFRAME = { jet: 100, transport: 220, heli: 170, gunship: 340, ac130: 900 };
+const AIRFRAME = { jet: 100, transport: 220, heli: 170, gunship: 480, ac130: 900 };
 const CANOPY = { troop: 195, cargo: 340 };
 /** How far off a bomb goes, in metres, per point of damage taken before release. */
 const JINK_PER_HP = 0.55;

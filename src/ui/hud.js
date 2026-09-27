@@ -543,8 +543,22 @@ export class HUD {
   _buildBar() {
     this.bars = { units: [], strikes: [] };
     const frags = { units: document.createDocumentFragment(), strikes: document.createDocumentFragment() };
-    for (const u of UNITS) {
+    // The strikes in two groups: what stays on station, then what makes one
+    // pass, each cheapest first. A label opens each group.
+    const loiters = (u) => !!u.aircraft?.station;
+    const strikes = UNITS.filter((u) => u.strike)
+      .sort((a, b) => (loiters(b) - loiters(a)) || (a.cost - b.cost));
+    const order = [...UNITS.filter((u) => !u.strike), ...strikes];
+    let group = null;
+    for (const u of order) {
       const bar = u.strike && this.el.strikebar ? 'strikes' : 'units';
+      if (bar === 'strikes' && loiters(u) !== group) {
+        group = loiters(u);
+        const tag = document.createElement('div');
+        tag.className = 'cb-group';
+        tag.textContent = group ? 'LOITERING' : 'SINGLE USE';
+        frags.strikes.appendChild(tag);
+      }
       this.bars[bar].push(u.id);
       const card = document.createElement('button');
       card.className = 'unit-card locked';

@@ -68,6 +68,16 @@ player's target: `battle.setTarget` calls `air.retarget`. A record with
   at the mark every `every` seconds. The orbit's centre drifts after a new
   target. Armour `AIRFRAME.ac130`.
 
+Every crew in the garrison shoots at a helicopter (the Apache, and the
+Chinook on a delivery), with line of sight, and a hovering one is easier
+to hit; aeroplanes are still the AA gun's alone. Small arms do their
+`heliDamage` to one, a fraction of what they do to a canopy, because it
+is armoured; rockets and field guns carry an `airAim` that makes a hit
+the exception. The AA gun is what brings an Apache down, so clearing the
+flak first is what keeps one on station: at Westminster a full garrison
+downs it after about 36 s of its 45, and with the flak gone it flies its
+whole station and goes home.
+
 Shot down, either one falls and explodes. Rounds carry their sortie, so
 the feed reports stones and kills once, when it leaves. `loiterStatus()`
 is what the HUD pill under the target card reads: one aircraft icon and
@@ -87,7 +97,8 @@ pitch of each one's roar.
 
 The dock has two weapon drawers. UNITS holds everything that is placed on
 the ground; STRIKES holds every record with a `strike`, the aircraft and
-the Tomahawk. The split is by that field, not by tier, so a new strike
+the Tomahawk, in two labelled groups, LOITERING (anything with
+`aircraft.station`) then SINGLE USE, each cheapest first. The split is by that field, not by tier, so a new strike
 lands in the right drawer without a list to update. The armed weapon is
 worn by the button it came from, and tapping that button puts it away.
 Number keys pick from UNITS; Shift with a number, or a number while the

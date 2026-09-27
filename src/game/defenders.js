@@ -56,24 +56,27 @@ export const DEFENDER_TYPES = {
     // A rifle cannot touch an aeroplane and every army in history has fired
     // at descending parachutes with one anyway. One man is nearly nothing;
     // a garrison of them over a drop zone is not.
-    air: 'chute', airDamage: 1.6,
+    air: 'chute', airDamage: 1.6, heliDamage: 0.5,
   },
   mg: {
     key: 'mg', look: 'mg',
     name: 'MG Nest', health: 78, damage: 2.4, rof: 0.11, burst: 7, burstGap: 2.6,
     range: 330, accuracy: 0.38, colour: 0x54452f, threat: 3, eye: 0.95,
-    air: 'chute', airDamage: 3.0,
+    air: 'chute', airDamage: 3.0, heliDamage: 1.0,
   },
   sniper: {
     key: 'sniper', look: 'sniper',
     name: 'Sniper', health: 34, damage: 17, rof: 4.2, range: 430,
     accuracy: 0.72, colour: 0x3e4634, threat: 4, eye: 1.1,
-    air: 'chute', airDamage: 9,
+    air: 'chute', airDamage: 9, heliDamage: 2.5,
   },
   at: {
     key: 'at', look: 'at',
     name: 'AT Team', health: 90, damage: 88, rof: 8.0, range: 340,
     accuracy: 0.62, colour: 0x4a3c2c, threat: 8, eye: 1.3,
+    // A rocket at a helicopter: a hit is a bad day, not the end of one, and
+    // an unguided one at something in the air misses more than it hits.
+    airDamage: 40, airAim: 0.6,
   },
   /**
    * A field gun, dug in behind the line.
@@ -87,6 +90,8 @@ export const DEFENDER_TYPES = {
   fieldgun: {
     key: 'fieldgun', look: 'fieldgun',
     name: 'Field Gun', health: 155, damage: 135, rof: 9.5, range: 470,
+    // Laid for the ground. Against a helicopter it is a lucky shot.
+    airDamage: 45, airAim: 0.2,
     accuracy: 0.6, colour: 0x4a5238, threat: 10, eye: 1.05, emplaced: true,
   },
   /**
@@ -1886,11 +1891,14 @@ export class Garrison {
    */
   _acquireAir(d, air, structures) {
     if (!air || !air.length) return null;
+    // Every crew shoots at a helicopter: it hangs low over the town for half
+    // a minute, and a rifle, a machine gun, a rocket or a field gun can all
+    // reach it. An aeroplane is still the AA gun's alone, and a canopy still
+    // needs something with a sight.
     const mode = d.def.air;
-    if (!mode) return null;
     let best = null, bestScore = Infinity;
     for (const t of air) {
-      if (t.kind === 'aircraft' && mode !== 'all') continue;
+      if (t.kind === 'aircraft' ? (mode !== 'all' && !t.heli) : !mode) continue;
       const reach = airReach(d.def, t.kind);
       const dx = t.pos.x - d.muzzle.x, dy = t.pos.y - d.muzzle.y, dz = t.pos.z - d.muzzle.z;
       if (dy < 1.0) continue;                       // on the ground, or below him
@@ -1909,7 +1917,9 @@ export class Garrison {
       const spread = t.kind === 'chute' ? 1 + 1.6 * (((d.airSeed + t.seed) * 1.0) % 1) : 1;
       const score = d2 * (t.kind === 'aircraft' ? 0.35 : spread);
       if (score >= bestScore) continue;
-      if (t.kind === 'chute' && structures
+      // A canopy and a helicopter both come down among the buildings and can
+      // be masked by them; a jet crossing high over the top cannot.
+      if ((t.kind === 'chute' || t.heli) && structures
           && !lineOfSight(structures, d.muzzle, t.pos, 1.2, 0.0)) continue;
       best = t; bestScore = score;
     }
@@ -1929,9 +1939,13 @@ export class Garrison {
       (t.pos.x - d.muzzle.x) ** 2 + (t.pos.y - d.muzzle.y) ** 2 + (t.pos.z - d.muzzle.z) ** 2);
     // Deflection. A jet crossing at two hundred and forty knots is a hard
     // shot and a canopy is very nearly a stationary one.
-    const lead = t.kind === 'aircraft' ? 0.5 : 0.78;
-    const hit = Math.random() < d.def.accuracy * (1 - 0.55 * (dist / reach)) * lead;
-    const damage = (d.def.airDamage || d.def.damage) * this.damageScale;
+    // A helicopter holding a hover is nearly as easy as a canopy.
+    const lead = t.kind === 'aircraft' ? (t.hover ? 0.72 : 0.5) : 0.78;
+    const hit = Math.random() < d.def.accuracy * (1 - 0.55 * (dist / reach)) * lead * (d.def.airAim ?? 1);
+    // A helicopter is armoured against small arms: a rifle round that would
+    // kill a man under a canopy dents a cockpit. `heliDamage` is what each
+    // weapon does to one; rockets, field guns and flak keep their weight.
+    const damage = ((t.heli && d.def.heliDamage) || d.def.airDamage || d.def.damage) * this.damageScale;
     // Where the round actually goes.
     //
     // Every tracer used to be drawn from the muzzle to the target whether it
