@@ -14,7 +14,7 @@ import { buildFieldWorks } from './world/works.js';
 import { CoastalTurret } from './game/turret.js';
 import { Structure } from './structure/structure.js';
 import {
-  resolveStartLevel, recordResult, marksFor, loadProgress, nextTarget, goToLevel,
+  resolveStartLevel, recordResult, marksFor, loadProgress, nextTarget, goToLevel, getChallenge,
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
 import { recordTheatre, releaseNoteFor } from './game/campaign.js';
@@ -541,6 +541,7 @@ async function boot() {
   const clip = new CollapseClip({
     canvas: engine.renderer.domElement, audio,
     place: () => battle.level?.subtitle || battle.level?.name || '',
+    context: () => ({ level: battle.level?.id, rounds: battle.collapseRounds ?? battle.shotsFired }),
     onModal: (open) => {
       if (open) { clipWasPaused = testMenu.paused; testMenu.paused = true; }
       else testMenu.paused = clipWasPaused;
@@ -744,6 +745,9 @@ async function boot() {
       audio.rumble(1, where);
       engine.addShake(0.8);
       hud.feed('STRUCTURE COLLAPSING', 'big');
+      // The rounds it took, counted at the moment the first big section went:
+      // what a shared clip boasts and what a challenge is scored on.
+      if (battle.collapseRounds == null) battle.collapseRounds = battle.shotsFired;
       clip.trigger(island.mass);
       // Half speed for two seconds, eased back. Long enough to read what is
       // happening, short enough not to feel like a cutscene.
@@ -1123,6 +1127,11 @@ async function boot() {
 
   const firstPrompt = () => {
     hud.status(`${TAP} the tower to designate a target`, 4);
+    const ch = getChallenge();
+    if (ch && ch.level === level.id) {
+      hud.challenge = ch;
+      hud.feed(`CHALLENGE · BRING IT DOWN IN UNDER ${ch.rounds} ROUNDS`, 'big');
+    }
     // And then, once, the thing the game had never said out loud: that the
     // building is a load path and the player can see it. The mechanic was
     // always there — ninety stones out of five thousand, cut on the right

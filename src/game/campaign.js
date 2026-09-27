@@ -1,5 +1,5 @@
 import { LEVELS, LEVEL_ORDER } from './levels.js';
-import { loadProgress } from '../ui/levelselect.js';
+import { loadProgress, getChallenge } from '../ui/levelselect.js';
 
 /**
  * The campaign.
@@ -693,11 +693,26 @@ function closedCount() {
 export function releasedUnits() {
   const out = new Set(['at4', 'gustaf', 'rpg32', 'javelin', 'm119', 'm777']);
   const prog = loadProgress();
+  const upTo = challengeUpTo();
   for (const t of THEATRES) {
-    if (!prog[t.id]?.won) continue;
+    if (!prog[t.id]?.won && !(t.no < upTo)) continue;
     for (const u of t.unlocks) out.add(u);
   }
   return out;
+}
+
+/**
+ * A challenge link: somebody shared a collapse, and whoever opens it plays
+ * that level with the arsenal the campaign would have handed over by then,
+ * whatever their own save says. Otherwise a friend opening Moscow from a
+ * clip on a fresh phone gets the six starting weapons and a lost cause.
+ * For this page load only; it is not written to the save.
+ */
+function challengeUpTo() {
+  const challenge = getChallenge();
+  if (!challenge) return -Infinity;
+  const t = THEATRES.find((k) => k.id === challenge.level);
+  return t ? t.no : -Infinity;
 }
 
 export function isReleased(unitId) {

@@ -2,6 +2,14 @@ import { LEVELS, DEFAULT_LEVEL, LEVEL_BLURB, levelList } from '../game/levels.js
 import { suppressNextOpening } from './opening.js';
 
 /**
+ * The challenge a shared link carried in (`?level=…&c=rounds`), for this page
+ * load only: which level, and the rounds the sharer took to bring it down.
+ */
+let challenge = null;
+export function setChallenge(c) { challenge = c; }
+export function getChallenge() { return challenge; }
+
+/**
  * The record of what has been brought down, and how a level gets started.
  *
  * The screen that used to live here — a grid of four cards — is now the
@@ -142,6 +150,16 @@ export async function resolveStartLevel() {
     explicit = new URLSearchParams(window.location.search).get('level');
   } catch { /* no location in some embeds */ }
   if (explicit && LEVELS[explicit]) {
+    // `&c=` is a challenge: the rounds the sharer took to bring it down.
+    try {
+      const u = new URL(window.location.href);
+      const c = parseInt(u.searchParams.get('c'), 10);
+      if (c > 0) {
+        setChallenge({ level: explicit, rounds: c });
+        u.searchParams.delete('c');
+        window.history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
+      }
+    } catch { /* no URL in some embeds */ }
     // And then take it out of the address bar.
     //
     // `?level=` is how the game navigates to a level and how a shared link

@@ -40,12 +40,14 @@ export class CollapseClip {
    * @param {HTMLCanvasElement} o.canvas  the game's WebGL canvas
    * @param {object} [o.audio]            the game's audio, for its limiter
    * @param {() => string} [o.place]      the level's name, for the corner
+   * @param {() => object} [o.context]    { level, rounds } at the moment it fell
    * @param {(open: boolean) => void} [o.onModal]  pause while the viewer is up
    */
   constructor(o) {
     this.canvas = o.canvas;
     this.audio = o.audio || null;
     this.place = o.place || (() => '');
+    this.context = o.context || (() => ({}));
     this.onModal = o.onModal || (() => {});
     this.type = pickType();
     this.enabled = !!this.type && typeof HTMLCanvasElement !== 'undefined'
@@ -95,6 +97,7 @@ export class CollapseClip {
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     const place = this.place();
+    const ctx = this.context() || {};
     rec.onstop = () => {
       if (tap) { try { A.limiter.disconnect(tap); } catch { /* already gone */ } }
       for (const t of stream.getTracks()) t.stop();
@@ -102,7 +105,10 @@ export class CollapseClip {
       const blob = new Blob(chunks, { type: this.type.split(';')[0] });
       if (blob.size < 20000) return;                    // nothing worth keeping
       if (this.best) URL.revokeObjectURL(this.best.url);
-      this.best = { blob, url: URL.createObjectURL(blob), ext: this.type.startsWith('video/mp4') ? 'mp4' : 'webm', weight, place };
+      this.best = {
+        blob, url: URL.createObjectURL(blob), ext: this.type.startsWith('video/mp4') ? 'mp4' : 'webm',
+        weight, place, level: ctx.level, rounds: ctx.rounds,
+      };
       if (this.onReady) this.onReady(this.best);
     };
     rec.start(500);
@@ -207,6 +213,26 @@ export class CollapseClip {
     this.onModal(false);
   }
 
+  /**
+   * The link that goes with the clip: straight into the same level, carrying
+   * the rounds it took, so whoever watches it is one tap from trying to beat
+   * it. Always the public address, so a link shared from the app works for
+   * someone who only has a browser.
+   */
+  get link() {
+    const b = this.best;
+    if (!b || !b.level) return 'https://getarsenal.app/';
+    return `https://getarsenal.app/?level=${encodeURIComponent(b.level)}${b.rounds > 0 ? `&c=${b.rounds}` : ''}`;
+  }
+
+  get caption() {
+    const b = this.best || {};
+    const what = b.place ? b.place.split(' · ')[0] : 'It';
+    return b.rounds > 0
+      ? `${what} came down in ${b.rounds} round${b.rounds === 1 ? '' : 's'}. Can you do it in fewer?`
+      : `${what}, brought down in Excessive Force.`;
+  }
+
   async share() {
     if (!this.best) return;
     const file = new File([this.best.blob], this.fileName, { type: this.best.blob.type });
@@ -214,7 +240,7 @@ export class CollapseClip {
       await navigator.share({
         files: [file],
         title: 'Excessive Force',
-        text: `${this.best.place ? `${this.best.place}, ` : ''}brought down in Excessive Force. getarsenal.app`,
+        text: `${this.caption} ${this.link}`,
       });
     } catch (e) {
       // Cancelling the sheet is not an error worth saying anything about.

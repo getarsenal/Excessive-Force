@@ -966,6 +966,11 @@ export class HUD {
       ['Defenders neutralised', summary.defendersKilled],
       ['Units lost', summary.unitsLost],
       ['Rounds fired', summary.shotsFired],
+      ...(this.battle.collapseRounds != null ? [['Came down in', `${this.battle.collapseRounds} rounds`]] : []),
+      ...(this.challenge && won ? [['Challenge', this.battle.collapseRounds == null ? `— vs ${this.challenge.rounds}`
+        : this.battle.collapseRounds < this.challenge.rounds ? `BEATEN · ${this.battle.collapseRounds} vs ${this.challenge.rounds}`
+          : this.battle.collapseRounds === this.challenge.rounds ? `MATCHED · ${this.challenge.rounds}`
+            : `${this.battle.collapseRounds} vs ${this.challenge.rounds}`]] : []),
       ['Spent', `$${summary.spent.toLocaleString()}`],
       ['Time', `${mins}:${String(secs).padStart(2, '0')}`],
     ];
