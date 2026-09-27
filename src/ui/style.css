@@ -371,6 +371,11 @@ html, body {
   font-size: 10px; font-weight: 600; letter-spacing: 0.07em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* A phone card holds about seven wide letters at 10px, and the strikes are
+   named by the aircraft that flies them now: B-1 LANCER, F-15E GBU-28. The
+   longest name in the roster fits at this size, so anything past seven
+   takes it rather than an ellipsis. */
+.uc-name.long { font-size: 8.5px; letter-spacing: 0.03em; }
 .uc-cost { font-size: 11px; color: var(--money); font-variant-numeric: tabular-nums; }
 .uc-tier {
   position: absolute; top: 3px; left: 4px; font-size: 8px;

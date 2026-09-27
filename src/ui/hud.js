@@ -555,7 +555,7 @@ export class HUD {
         <div class="uc-tier">${u.tier}</div>
         <div class="uc-key">${bar === 'strikes' ? '⇧' : ''}${n}</div>
         <div class="uc-icon">${unitIcon(u.id) || ''}</div>
-        <div class="uc-name">${u.name}</div>
+        <div class="uc-name${u.name.length > 7 ? ' long' : ''}">${u.name}</div>
         <div class="uc-cost">$${u.cost.toLocaleString()}</div>
         <div class="uc-lock">LOCKED</div>`;
 

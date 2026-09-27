@@ -153,7 +153,7 @@ export const THEATRES = [
       + 'foundation, and dropping the middle one leaves eight watching. What '
       + 'they share is underneath them.',
     unlocks: ['ah64'],
-    unlockLine: 'Apache Hellfire strikes released',
+    unlockLine: 'AH-64 Apache released',
   },
   {
     id: 'rio',
@@ -407,7 +407,7 @@ export const THEATRES = [
     title: "HIGH WATER",
     brief: "An abbey on an eighty-metre rock in a bay the tide covers. The church stands on crypts built out on the flanks. Break a crypt and the nave above it goes down the face.",
     unlocks: ['b1'],
-    unlockLine: 'The MOAB released',
+    unlockLine: 'B-1 Lancer strikes released',
   },
   {
     id: 'pena',
@@ -515,7 +515,7 @@ export const THEATRES = [
     title: "TEMPLE MOUNTAIN",
     brief: "Five towers in quincunx on a pyramid base inside three galleries and a moat. The towers stand on the bakan's corner piers. The galleries are lintels over columns, and the stone is in them.",
     unlocks: ['gbu28'],
-    unlockLine: 'GBU-28 bunker busters released',
+    unlockLine: 'F-15E with the GBU-28 released',
   },
   {
     id: 'borobudur',

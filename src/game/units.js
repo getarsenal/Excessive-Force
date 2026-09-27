@@ -217,7 +217,7 @@ export const UNITS = [
     blurb: 'One pass, one 500-pounder, a tenth of the building. It will not fell a tower on its own.',
   },
   {
-    id: 'b1', name: 'MOAB', full: 'B-1B Lancer · GBU-43/B MOAB', tier: 'AIR',
+    id: 'b1', name: 'B-1 LANCER', full: 'B-1B Lancer · GBU-43/B MOAB', tier: 'AIR',
     cost: 250000, unlockFrac: 0.25,
     model: 'aircraft', strike: { frac: 0.35, maxR: 120, minR: 18, fx: 9.5 },
     aircraft: { kind: 'lancer', speed: 210, height: 330, clearance: 150, runIn: 3200, offset: 60 },
@@ -228,7 +228,7 @@ export const UNITS = [
     blurb: 'Eleven tonnes of high explosive on a parachute. A third of anything.',
   },
   {
-    id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · AGM-114 Hellfire', tier: 'AIR',
+    id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · Hydra 70 rockets and 30 mm', tier: 'AIR',
     cost: 40000, unlockFrac: 0.05,
     // Not a bomber. It comes in low, stops at a stand-off off the camera's
     // side of the target, and works it for as long as it has time on
@@ -276,7 +276,7 @@ export const UNITS = [
     blurb: 'Comes in from the sea at sixty metres and puts half a tonne exactly where you said.',
   },
   {
-    id: 'gbu28', name: 'BUNKER BUSTER', full: 'F-15E Strike Eagle · GBU-28 5000 lb', tier: 'AIR',
+    id: 'gbu28', name: 'F-15E GBU-28', full: 'F-15E Strike Eagle · GBU-28 5000 lb', tier: 'AIR',
     cost: 160000, unlockFrac: 0.2,
     // Penetrating: a small radius and a very large charge, so it goes deep
     // into a solid monument instead of scorching its face.
