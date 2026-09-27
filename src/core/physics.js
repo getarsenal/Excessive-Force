@@ -227,13 +227,8 @@ export class PhysicsWorld {
     ));
     ray.origin.x = lx; ray.origin.y = foot - 0.05; ray.origin.z = lz;
     ray.dir.x = 0; ray.dir.y = -1; ray.dir.z = 0;
-    // Fixed colliders only, and no further than `_probeStands` looks. This
-    // used to accept anything within a metre, falling stone included, so a
-    // frozen stone with rubble sliding past under it was "standing" to the
-    // sweep and hanging to `_findSupport`, and the two never agreed: the
-    // sweep left it in the sky for the rest of the match.
     return !!this.world.castRay(
-      ray, 0.5, true, this.fixedOnly, undefined, undefined, body, undefined);
+      ray, AIR_UNDER, true, undefined, undefined, undefined, body, undefined);
   }
 
   /**
@@ -271,7 +266,13 @@ export class PhysicsWorld {
     // the pile it stood on was cleared out from under it, say. Cheap enough to
     // ask outright, and only ever asked of the small minority of frozen debris
     // that is not simply lying on the terrain.
-    return this._overSomething(body);
+    //
+    // And the same question the sweep's critics ask. `_overSomething` alone
+    // accepts anything within a metre under the foot, falling stone
+    // included, so a frozen stone with rubble sliding past beneath it read
+    // as standing here and as hanging to `_findSupport`, and the sweep left
+    // it in the sky for the rest of the match. Both have to agree.
+    return this._overSomething(body) && !!this._findSupport(body);
   }
 
   /**
