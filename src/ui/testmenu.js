@@ -1615,15 +1615,24 @@ export class TestMenu {
         // this failed for having nowhere to put a man rather than for anything
         // to do with health bars.
         this.clearUnits();
-        let far = 160;
-        for (let i = 0; i < st.count; i++) {
-          // The building's own far edge, not a stone an earlier test threw.
-          if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
-          if (st.pz[i] - st.origin.z > far) far = st.pz[i] - st.origin.z;
+        // Clear of the building on each side in turn: a landmark in a river
+        // (the Belém Tower) has water to the south, and a spawn in water is
+        // refused like one in masonry.
+        const tried = [];
+        for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          let far = 160;
+          for (let i = 0; i < st.count; i++) {
+            // The building's own far edge, not a stone an earlier test threw.
+            if (!(st.flags[i] & 1) || (st.flags[i] & 10)) continue;
+            const along = (st.px[i] - st.origin.x) * ax + (st.pz[i] - st.origin.z) * az;
+            if (along > far) far = along;
+          }
+          this.spawnAt('at4', 1, Math.atan2(ax, az), far + 70);
+          tried.push(Math.round(far + 70));
+          if (b.units.some((x) => x.alive)) break;
         }
-        this.spawnAt('at4', 1, 0, far + 70);
         const u = b.units.find((x) => x.alive);
-        assert(u, `no unit to test the bar on (tried ${Math.round(far + 70)} m out)`);
+        assert(u, `no unit to test the bar on (tried ${tried.join(', ')} m out)`);
         b._updateHealthBars();
         assert(b.hpFill.count === 0, 'an undamaged unit is showing a damage bar');
         u.health = u.maxHealth * 0.4;

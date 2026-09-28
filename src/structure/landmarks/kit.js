@@ -606,7 +606,7 @@ class Kit {
       }
       this.peak(cx, top, cz);
     });
-    this.groundRing(cx, cz, 2 * r0, 2 * r0, true);
+    if (y0 < 1) this.groundRing(cx, cz, 2 * r0, 2 * r0, true);
   }
 
   /** A pagoda: storeys stepping in, each with its eaves. */
@@ -974,7 +974,9 @@ export function populateKit(L, g, origin, groundY, opts = {}) {
   }
   i = 0;
   for (const q of thin(by('ground'), cap.ground ?? 8)) {
-    g.place(i % 2 ? 'rifleman' : 'at', V(q.x, 0.3, q.z), q.facing, 12, { cover: 'ground', sandbags: true });
+    // Nine metres: a post is judged by its distance from the stone it is
+    // pinned to, and more than ten is a man with nothing to stand behind.
+    g.place(i % 2 ? 'rifleman' : 'at', V(q.x, 0.3, q.z), q.facing, 9, { cover: 'ground', sandbags: true });
     i++;
   }
   // The mortars, off the footprint in three directions.

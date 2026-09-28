@@ -35,7 +35,7 @@ export const PLACES = [
   { id: 'hallgrimskirkja', landmark: 'Hallgrímskirkja', city: 'Reykjavík', lat: 64.14200, lon: -21.92667, iso: 'ISL', code: 'is', clime: 'nordic' },
   { id: 'trakai', landmark: 'Trakai Island Castle', city: 'Trakai', lat: 54.65222, lon: 24.93361, iso: 'LTU', code: 'lt', clime: 'nordic', coast: true, remote: true },
   { id: 'winterpalace', landmark: 'Winter Palace', city: 'Saint Petersburg', lat: 59.94056, lon: 30.31389, iso: 'RUS', code: 'ru', clime: 'nordic', river: true },
-  { id: 'belem', landmark: 'Belém Tower', city: 'Lisbon', lat: 38.69158, lon: -9.21599, iso: 'PRT', code: 'pt', clime: 'mediterranean', coast: true, pad: 112, padH: 1.0 },
+  { id: 'belem', landmark: 'Belém Tower', city: 'Lisbon', lat: 38.69158, lon: -9.21599, iso: 'PRT', code: 'pt', clime: 'mediterranean', coast: true, remote: true, pad: 112, padH: 1.0 },
   { id: 'salisbury', landmark: 'Salisbury Cathedral', city: 'Salisbury', lat: 51.06508, lon: -1.79745, iso: 'GBR', code: 'uk', clime: 'temperate' },
   { id: 'windsor', landmark: 'Windsor Castle', city: 'Windsor', lat: 51.48389, lon: -0.60444, iso: 'GBR', code: 'uk', clime: 'temperate', river: true },
   { id: 'nidaros', landmark: 'Nidaros Cathedral', city: 'Trondheim', lat: 63.42694, lon: 10.39694, iso: 'NOR', code: 'no', clime: 'nordic', river: true },
