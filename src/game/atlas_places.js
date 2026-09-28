@@ -25,7 +25,8 @@ export const TUTORIAL_PLACE = {
   iso: 'USA', code: 'us', clime: 'desert', remote: true,
   // An easy garrison, and money enough to try everything once.
   garrison: { cap: { window: 3, roof: 3, arcade: 0, ground: 2 }, mortars: 1, flak: 1 },
-  startMoney: 20000, unlockAll: true, intros: false, fieldWorksShare: 0.1,
+  // Everything open and everything free, the Apache and the bomber too.
+  startMoney: 20000, unlockAll: true, freeBuild: true, intros: false, fieldWorksShare: 0.1,
 };
 
 export const PLACES = [

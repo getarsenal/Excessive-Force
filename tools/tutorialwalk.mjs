@@ -27,6 +27,15 @@ await page.click('#buildbar .unit-card[data-id="m119"]'); await page.waitForTime
 // Deploy where the ring is, then designate the tower where its ring is.
 const ringAt = async () => page.evaluate(() => { const r = document.querySelector('.tut-ring').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
 let [x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(6);
-[x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(7);
+// The airlift: the package window, then the aircraft, then the gun on the ground.
+const title = () => page.evaluate(() => document.querySelector('.tut-title')?.textContent);
+let seen = new Set();
+for (let k = 0; k < 120 && (await title()) !== 'DESIGNATE'; k++) {
+  const t = await title();
+  if (!seen.has(t)) { seen.add(t); await shot(`6-${t.toLowerCase()}`); }
+  await page.waitForTimeout(1000);
+}
+await shot('7-designate');
+[x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(8);
 console.log('level', await page.evaluate(() => location.search), 'money', await page.evaluate(() => document.getElementById('hud-money').textContent));
 await b.close();

@@ -59,12 +59,18 @@ export class Tutorial {
       { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar is what still stands — get it under 10%.', ok: true },
       { el: null, title: 'LOOK AROUND', text: 'Drag to orbit. Pinch or scroll to zoom.', ok: true,
         done: () => this.yaw0 != null && Math.abs(this.rig.yaw - this.yaw0) > 0.35 },
-      { el: '#topbar .tb-block:first-child', title: 'FUNDS', text: 'Pays for guns and strikes. Damage earns it back.', ok: true },
+      { el: '#topbar .tb-block:first-child', title: 'FUNDS', text: 'Pays for guns and strikes; damage earns more. Everything is free in Boot Camp.', ok: true },
       { el: '#dock-units', title: 'UNITS', text: 'Your guns and troops. Tap to open.', done: () => h.openDrawer === 'units' || armedGun() },
       { el: '#buildbar .unit-card[data-id="m119"]', fallback: '#dock-units', title: 'M119 HOWITZER',
         text: 'Cheapest gun. Light shell, fast reload. Tap to arm.', done: () => armedGun() || this._deployed() },
       { world: () => this.groundAt, fallback: '#dock-units', title: 'DEPLOY',
-        text: 'Tap open ground. The ring is its reach.', done: () => this._deployed() },
+        text: 'Tap open ground. The ring is its reach.', done: () => this._placed() },
+      { world: () => this._dropAt(), title: 'AIRLIFT',
+        text: 'Guns come by air. Everything placed in the next 8 s ships on one aircraft — place more now.',
+        done: () => this._inbound() || this._deployed() },
+      { world: () => this._liftAt() || this._dropAt(), title: 'INBOUND',
+        text: 'A C-130 drops it by parachute; heavy guns hang under a Chinook. Flak can shoot them down.',
+        done: () => this._deployed() },
       { world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.', done: () => !!b.target },
       { el: '#targetcard', title: 'TARGET CARD', text: 'What you hit, how high, and how many guns are on it.', ok: true },
       { el: '#survey-btn', title: 'SURVEY', text: 'Paints the load. Red stone holds the rest up — cut it.', done: () => h.survey },
@@ -85,6 +91,13 @@ export class Tutorial {
 
   _isStrike(id) { return !!UNITS_BY_ID[id]?.strike; }
   _deployed() { return this.battle.units.some((u) => u.alive); }
+  _placed() { return this.battle.pending.length > 0 || this._deployed(); }
+  _inbound() { return !!this.battle.air?.sorties.some((s) => s.lift); }
+  _dropAt() { const d = this.battle.pending[0]; return d ? d.pos : this.groundAt; }
+  _liftAt() {
+    const s = this.battle.air?.sorties.find((x) => x.lift);
+    return s?.model ? s.model.getWorldPosition(this._w || (this._w = new THREE.Vector3())) : null;
+  }
   _striking() {
     const a = this.battle.air;
     return !!a && (a.sorties.some((s) => !s.lift) || (a.loiterStatus && a.loiterStatus().length > 0));

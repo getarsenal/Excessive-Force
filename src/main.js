@@ -425,12 +425,12 @@ async function boot() {
   });
   // So a shell landing can scatter whatever was sitting on the roofs.
   battle.life = life;
-  // A level can set its own terms: Boot Camp starts with money for
-  // everything, the whole arsenal open, and guns that arrive when placed
-  // rather than twenty seconds later under a parachute.
+  // A level can set its own terms: Boot Camp opens the whole arsenal and
+  // charges nothing for it. The guns still come in by air — that is one of
+  // the things it teaches.
   if (level.startMoney) battle.money = level.startMoney;
   if (level.unlockAll) battle.unlockAll = true;
-  if (level.id === 'tutorial') battle.airlift = false;
+  if (level.freeBuild) battle.freeBuild = true;
 
   // The real soldier from FIREBASE, flattened into one instanceable geometry.
   // Loaded after the garrison is posted rather than before it, so a slow or

@@ -520,6 +520,7 @@ function levelRecord(P, i) {
     brief: W[3],
     ...(P.startMoney ? { startMoney: P.startMoney } : {}),
     ...(P.unlockAll ? { unlockAll: true } : {}),
+    ...(P.freeBuild ? { freeBuild: true } : {}),
     ...(P.intros === false ? { intros: false } : {}),
     ...(P.fieldWorksShare != null ? { fieldWorksShare: P.fieldWorksShare } : {}),
     // A pad the bake declared land is levelled to its own height, not to the
