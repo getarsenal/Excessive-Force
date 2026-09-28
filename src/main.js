@@ -1219,7 +1219,7 @@ async function boot() {
   let tutorial = null;
   const firstPrompt = () => {
     if (level.id === 'tutorial') {
-      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level });
+      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio });
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
@@ -1248,7 +1248,7 @@ async function boot() {
     // The HUD stays out of the way until the two of them have had their say.
     uiEl.classList.add('standoff');
     standoff = new Standoff({
-      level, rig, groundY,
+      level, rig, groundY, audio,
       onDone: () => {
         standoff = null;
         uiEl.classList.add('hud-fade');

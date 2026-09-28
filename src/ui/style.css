@@ -1980,3 +1980,11 @@ body.cine #cine i { height: 9vh; }
 .wm-mark-fig b { font-size: 14px; color: #e8eef6; }
 .wm-mark.beat .wm-mark-fig b { color: #e0a33c; }
 .wm-rec-foot { margin-top: 6px; font-size: 11px; color: #6c7a88; letter-spacing: 0.04em; }
+
+/* The generals type. A cursor rides the end of the line while the keys are
+   going, and goes when the bell rings (typewriter.js). */
+.so-text.typing::after, .tut-gen-line.typing::after {
+  content: '\258C'; margin-left: 1px; color: currentColor; opacity: 0.8;
+  animation: tw-caret 0.5s steps(1) infinite;
+}
+@keyframes tw-caret { 50% { opacity: 0; } }

@@ -1,3 +1,4 @@
+import { Typewriter } from './typewriter.js';
 import { CAST, DEFENDER_OF, STANDOFF } from '../game/cast.js';
 import { TAP } from './pointer.js';
 
@@ -48,6 +49,8 @@ export class Standoff {
     this.groundY = o.groundY;
     this.lines = o.lines || STANDOFF[o.level.id] || STANDOFF.westminster;
     this.onDone = o.onDone || (() => {});
+    // The keys under the lines: see typewriter.js.
+    this.tw = new Typewriter(o.audio || null);
     this.done = false;
     this.t = 0;
     this.beat = -1;
@@ -82,6 +85,7 @@ export class Standoff {
     this.fig = { left: root.querySelector('.so-fig.left'), right: root.querySelector('.so-fig.right') };
     this.bubble = { left: root.querySelector('.so-bubble.left'), right: root.querySelector('.so-bubble.right') };
     root.addEventListener('pointerup', (e) => {
+      this.tw.resume();
       if (e.target.classList.contains('so-skip')) return;
       this.advance();
     });
@@ -139,6 +143,7 @@ export class Standoff {
     b.querySelector('.so-ghost').textContent = line.line;
     b.querySelector('.so-text').textContent = '';
     this._typing = { el: b.querySelector('.so-text'), text: line.line, n: 0, acc: 0 };
+    this._typing.el.classList.add('typing');
     b.classList.add('in');
   }
 
@@ -186,7 +191,13 @@ export class Standoff {
     if (ty && ty.n < ty.text.length) {
       ty.acc += dt * 40;
       const n = Math.min(ty.text.length, Math.floor(ty.acc));
-      if (n !== ty.n) { ty.n = n; ty.el.textContent = ty.text.slice(0, n); }
+      if (n !== ty.n) {
+        ty.n = n;
+        ty.el.textContent = ty.text.slice(0, n);
+        this.tw.key(ty.text[n - 1]);
+        // The last letter: the carriage comes back and the bell rings.
+        if (n >= ty.text.length) { ty.el.classList.remove('typing'); this.tw.ding(); }
+      }
     }
     if (this.beat < 0) {
       if (this.t >= BEAT.enter) this._startBeat(0);

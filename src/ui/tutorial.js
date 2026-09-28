@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { UNITS_BY_ID } from '../game/units.js';
+import { Typewriter } from './typewriter.js';
 
 /**
  * Boot Camp: the guided first level.
@@ -183,7 +184,23 @@ export class Tutorial {
    * read it), so the two are never on screen together.
    */
   say(line, after = null) {
-    this.genLine.textContent = line;
+    // Typed out under the keys, like the stand-offs: see typewriter.js.
+    this.tw = this.tw || new Typewriter(this.audio || null);
+    this.tw.resume();
+    clearInterval(this._typeT);
+    this.genLine.textContent = '';
+    this.genLine.classList.add('typing');
+    let n = 0;
+    this._typeT = setInterval(() => {
+      n++;
+      this.genLine.textContent = line.slice(0, n);
+      this.tw.key(line[n - 1]);
+      if (n >= line.length) {
+        clearInterval(this._typeT);
+        this.genLine.classList.remove('typing');
+        this.tw.ding();
+      }
+    }, 25);
     this.gen.hidden = false;
     this.talking = true;
     this._after = after;
@@ -193,6 +210,8 @@ export class Tutorial {
 
   hush() {
     clearTimeout(this._genT);
+    clearInterval(this._typeT);
+    if (this.genLine) this.genLine.classList.remove('typing');
     if (this.gen) this.gen.hidden = true;
     this.talking = false;
     const after = this._after;
