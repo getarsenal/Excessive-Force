@@ -1,4 +1,5 @@
 import { TAP } from './pointer.js';
+import { menuMusic } from './music.js';
 
 /**
  * The opening.
@@ -71,25 +72,6 @@ export function shouldPlayOpening() {
   return true;
 }
 
-/**
- * One shot of a sound file.
- *
- * `playbackRate` is doing real work here rather than saving a download: the
- * explosion sample at half speed is an octave down and four times as long,
- * which is the difference between a shell landing and a howitzer opening up
- * somewhere behind the horizon.
- */
-function thump(src, { rate = 1, gain = 1, delay = 0 } = {}) {
-  setTimeout(() => {
-    try {
-      const a = new Audio(src);
-      a.volume = Math.max(0, Math.min(1, gain));
-      a.playbackRate = rate;
-      a.play().catch(() => { /* no gesture yet, or no audio at all */ });
-    } catch { /* Audio unavailable */ }
-  }, delay);
-}
-
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -138,6 +120,10 @@ export async function runOpening() {
     window.addEventListener('keydown', go);
   });
   gate.classList.add('out');
+  // That tap is the page's permission to make sound: spend it on the menu
+  // music now, so it is buffered and allowed to play the moment the menu
+  // arrives instead of waiting for the next tap there.
+  menuMusic.unlock();
 
   // From here a tap ends the whole opening rather than stepping to the next
   // beat. Someone skipping a title sequence is not asking to be shown the
@@ -192,9 +178,6 @@ export async function runOpening() {
   // ── 3. The slam.
   if (!bailed) {
     title.hidden = false;
-    // A long way off, under the approach: the explosion sample at half speed,
-    // so the card opens on something that is already in the air.
-    thump('assets/explosion.mp3', { rate: 0.5, gain: 0.3 });
     // One frame of it sitting still at full size before it is let go, or the
     // browser starts the transition from wherever the layout happened to be.
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -207,8 +190,7 @@ export async function runOpening() {
         title.classList.add('hit');
         stage.classList.add('shake-2');
         flash.classList.add('on', 'hard');
-        thump('assets/explosion.mp3', { rate: 0.34, gain: 0.95 });
-        thump('assets/cannon.mp3', { rate: 0.6, gain: 0.7, delay: 40 });
+        // Silent now: the slam is seen, and the menu music is what is heard.
         setTimeout(() => flash.classList.remove('on', 'hard'), 130);
       }, 400);
       await hold(1900);

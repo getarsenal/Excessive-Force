@@ -46,13 +46,49 @@ class MenuMusic {
     return a;
   }
 
+  /** Start fetching now, well before anything wants to play it. */
+  preload() {
+    if (typeof Audio === 'undefined' || this._suite()) return;
+    const a = this._load();
+    if (a && !this._fetching) { this._fetching = true; try { a.load(); } catch { /* ignore */ } }
+  }
+
+  _suite() {
+    try { return localStorage.getItem('tt.suite') === '1'; } catch { return false; }
+  }
+
+  /**
+   * Spend a user gesture on the music element.
+   *
+   * A phone will not start sound without a tap, and it will not really fetch
+   * a media file either until something has tried to play it. Playing it
+   * muted inside the gesture, and pausing it straight away unless the menu
+   * already wants it, does both: the element is unlocked for the rest of the
+   * session and the track is buffering, so the menu's own play() starts at
+   * once instead of eight seconds later.
+   */
+  unlock() {
+    if (this._unlocked || this._suite()) return;
+    const a = this._load();
+    if (!a) return;
+    this._unlocked = true;
+    a.muted = true;
+    const p = a.play();
+    const after = () => {
+      a.muted = false;
+      if (!this.want || !this.enabled) { a.pause(); a.volume = 0; }
+    };
+    if (p && p.then) p.then(after).catch(() => { a.muted = false; this._unlocked = false; });
+    else after();
+  }
+
   play() {
     this.want = true;
     if (!this.enabled || (typeof localStorage !== 'undefined' && localStorage.getItem('tt.suite') === '1')) return;
     const a = this._load();
     preloadEagle();
     if (!a) return;
-    const start = () => a.play().then(() => this._fadeTo(VOLUME, 1800)).catch(() => {
+    const start = () => a.play().then(() => this._fadeTo(VOLUME, 500)).catch(() => {
       // Not allowed yet: the first touch anywhere is permission.
       const retry = () => { window.removeEventListener('pointerdown', retry, true); if (this.want) start(); };
       window.addEventListener('pointerdown', retry, true);
@@ -108,4 +144,16 @@ export function eagle(hold = 950) {
     eagleEl.play().catch(() => {});
   } catch { /* no audio */ }
   return new Promise((r) => setTimeout(r, hold));
+}
+
+// The first touch anywhere unlocks the music, whichever screen it lands on.
+if (typeof window !== 'undefined') {
+  window.__menuMusic = menuMusic;     // for the console and the harness
+  const first = () => {
+    window.removeEventListener('pointerdown', first, true);
+    window.removeEventListener('keydown', first, true);
+    menuMusic.unlock();
+  };
+  window.addEventListener('pointerdown', first, true);
+  window.addEventListener('keydown', first, true);
 }

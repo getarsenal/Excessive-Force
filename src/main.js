@@ -37,6 +37,7 @@ import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
+import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
 import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS } from './game/career.js';
 
@@ -88,6 +89,12 @@ async function boot() {
   // the window before that await; the await itself still throws.
   const physicsReady = initPhysics();
   physicsReady.catch(() => { /* surfaced at the await below */ });
+
+  // The menu music starts down the wire now too, when the menu is where this
+  // load is going (a `?level=` link goes straight into a level).
+  try {
+    if (!new URLSearchParams(location.search).has('level')) menuMusic.preload();
+  } catch { /* no location */ }
 
   if (shouldPlayOpening()) await runOpening();
 
