@@ -6,8 +6,10 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
 
 ## Working rules
 
-- Every task goes all the way to production: verified, committed, `main`
-  fast-forwarded, deploy run confirmed green. Do not stop to ask.
+- Every task goes all the way to production. **Deploy first, then test**:
+  once it builds (`npx vite build`), commit, fast-forward `main` and confirm
+  the deploy run green, so the owner has it immediately; then run the suite
+  and fix what it finds in a follow-up deploy. Do not stop to ask.
 - Develop on the branch the session names (most recently
   `claude/excessive-force-handoff-i40ha3`). Deploy is
   `git push origin <branch>:main`. The remote is
