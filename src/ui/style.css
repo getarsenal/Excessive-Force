@@ -1862,7 +1862,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 
 .tut-ring2 { border-style: dashed; }
 .tut-gen {
-  position: absolute; left: 12px; bottom: 92px; display: flex; align-items: flex-end; gap: 8px;
+  position: absolute; left: 12px; bottom: 150px; display: flex; align-items: flex-end; gap: 8px;
   max-width: min(420px, calc(100vw - 24px)); pointer-events: none;
 }
 .tut-gen-face { width: 92px; height: auto; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); }
@@ -1872,4 +1872,4 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px;
 }
 .tut-gen-body b { font-size: 10px; letter-spacing: 0.16em; color: #ff8a8a; }
-@media (max-width: 700px) { .tut-gen { bottom: 84px; } .tut-gen-face { width: 64px; } }
+@media (max-width: 700px) { .tut-gen { bottom: 140px; } .tut-gen-face { width: 64px; } }

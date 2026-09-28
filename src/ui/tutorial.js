@@ -43,16 +43,27 @@ export class Tutorial {
     this.towerAt = new THREE.Vector3(o.origin.x + aim.x, o.groundY + aim.y, o.origin.z + aim.z);
     const yaw = L.camera?.yaw ?? 0.5;
     // Inside the ground the town was cleared from, just off the buildings.
-    const out = Math.min(150, Math.max(45, (L.cityExcludeRadius ?? 80) - 28));
-    this.groundAt = new THREE.Vector3(o.origin.x + Math.sin(yaw) * out, o.groundY, o.origin.z + Math.cos(yaw) * out);
-    // The row: from one side of that spot to the other, across the camera.
-    const cx = Math.cos(yaw), cz = -Math.sin(yaw);
-    this.rowFrom = this.groundAt.clone().add(new THREE.Vector3(cx * 45, 0, cz * 45));
-    this.rowTo = this.groundAt.clone().add(new THREE.Vector3(-cx * 45, 0, -cz * 45));
+    // Open ground off to one side, clear of the trench line round the tower
+    // and the garden inside it, still well inside the cleared practice ground.
+    const R = Math.max(60, (L.cityExcludeRadius ?? 80) - 20);
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);        // toward the camera
+    const sx = Math.cos(yaw), sz = -Math.sin(yaw);       // to the camera's right
+    const at = (f, r) => {
+      const x = o.origin.x + fx * f + sx * r, z = o.origin.z + fz * f + sz * r;
+      return new THREE.Vector3(x, o.groundY, z);
+    };
+    // Level with the tower, out to its side: on screen that is the middle
+    // band, clear of the dock — a ring nearer the camera sits under the
+    // buttons, and a tap on it is a tap on UNITS.
+    this.groundAt = at(0, R * 0.7);
+    // The battery: a row on the other flank.
+    this.rowFrom = at(0, -R * 0.4);
+    this.rowTo = at(0, -R * 0.8);
     this.yaw0 = null;
     this.i = -1;
     this._build();
     this.steps = this._steps();
+    if (typeof window !== 'undefined') window.__tutorial = this;   // for the harness and the console
     this.next();
   }
 
