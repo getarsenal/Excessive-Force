@@ -21,7 +21,7 @@
  * first launch and from the front door's BOOT CAMP card after that.
  */
 export const TUTORIAL_PLACE = {
-  id: 'tutorial', landmark: 'Range Control', city: 'Fort Irwin', lat: 35.26270, lon: -116.68470,
+  id: 'tutorial', landmark: 'Boot Camp', city: 'Fort Irwin', lat: 35.26270, lon: -116.68470,
   iso: 'USA', code: 'us', clime: 'desert', remote: true,
   // An easy garrison, and money enough to try everything once.
   garrison: { cap: { window: 3, roof: 3, arcade: 0, ground: 2 }, mortars: 1, flak: 1 },
