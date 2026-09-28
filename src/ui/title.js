@@ -267,7 +267,16 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'armoury':
           openSheet('ARMOURY', armouryHtml(), 'armoury');
           break;
-        case 'unit': el.classList.toggle('open'); break;
+        case 'unit': {
+          // One open at a time, brought into view whole.
+          const was = el.classList.contains('open');
+          sheetIn.querySelectorAll('.tt-unit.open').forEach((n) => n.classList.remove('open'));
+          if (!was) {
+            el.classList.add('open');
+            requestAnimationFrame(() => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+          }
+          break;
+        }
         case 'commanders':
           openSheet('COMMANDERS', commandersHtml(), 'cmdrs');
           break;
