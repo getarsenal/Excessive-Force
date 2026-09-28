@@ -1882,3 +1882,74 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   .tut-card { font-size: 15px; }
 }
 .ef-card.ef-boot { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 12px; }
+
+/* ── The beauty pass ───────────────────────────────────────────────────── */
+/* 1. The loader stands in front of the place it is loading. */
+.load-bg {
+  position: absolute; inset: -6%; background: center / cover no-repeat; opacity: 0;
+  filter: blur(3px) brightness(0.34) saturate(1.15); transition: opacity 1.2s ease;
+  animation: ken-burns 32s ease-in-out infinite alternate;
+}
+.load-bg.on { opacity: 1; }
+.load-inner { position: relative; }
+.load-fill { background: linear-gradient(90deg, #e0a33c, #ffd27a); box-shadow: 0 0 12px rgba(255,197,61,0.7); }
+.load-bar { height: 3px; border-radius: 2px; }
+@keyframes ken-burns {
+  from { transform: scale(1.04) translate(-1.5%, 0.5%); }
+  to   { transform: scale(1.14) translate(1.5%, -1.5%); }
+}
+/* 2. The front door's contract photograph breathes. */
+.ef-hero-art img { animation: ken-burns 26s ease-in-out infinite alternate; transform-origin: 60% 45%; }
+/* 3. The next contract on the map sends out a ping. */
+.wm-ping { fill: none; stroke: #e0a33c; stroke-width: 2; opacity: 0; pointer-events: none; }
+.wm-pin.next .wm-ping, .wm-pin.here .wm-ping {
+  transform-box: fill-box; transform-origin: center; animation: wm-ping 2.4s ease-out infinite;
+}
+@keyframes wm-ping { 0% { transform: scale(0.5); opacity: 0.9; } 100% { transform: scale(3.2); opacity: 0; } }
+/* 4. The picture is framed: a soft vignette, drawn once by the compositor. */
+#vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(ellipse at 50% 46%, rgba(0,0,0,0) 58%, rgba(0,0,0,0.30) 88%, rgba(0,0,0,0.46) 100%);
+}
+/* 5. The collapse beat gets letterbox bars. */
+#cine { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+#cine i { position: absolute; left: 0; right: 0; height: 0; background: #000; transition: height 0.35s ease; }
+#cine i:first-child { top: 0; }
+#cine i:last-child { bottom: 0; }
+body.cine #cine i { height: 9vh; }
+/* 6. The integrity bar shines where it was hit. */
+.integrity-fill { position: relative; overflow: hidden; }
+.integrity-fill::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.75), transparent);
+  opacity: 0;
+}
+.integrity-fill.sheen-a::after { animation: sheen-a 0.7s ease-out; }
+.integrity-fill.sheen-b::after { animation: sheen-b 0.7s ease-out; }
+@keyframes sheen-a { from { left: -40%; opacity: 1; } to { left: 110%; opacity: 0; } }
+@keyframes sheen-b { from { left: -40%; opacity: 1; } to { left: 110%; opacity: 0; } }
+/* 7. The feed slides in; the big lines glow. */
+.feed-line { animation: feed-in 0.26s cubic-bezier(.2,.9,.3,1.2) both; }
+.feed-line.big { text-shadow: 0 0 14px rgba(224,163,60,0.65); }
+@keyframes feed-in { from { transform: translateX(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 8. A drawer's cards rise into place one after another. */
+.drawer:not([hidden]) .unit-card { animation: card-rise 0.3s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(var(--i, 0) * 28ms); }
+@keyframes card-rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 9. The report comes up line by line. */
+#endcard:not([hidden]) .ec-inner > * { animation: ec-in 0.4s ease-out both; }
+#endcard:not([hidden]) .ec-inner > *:nth-child(2) { animation-delay: 0.08s; }
+#endcard:not([hidden]) .ec-inner > *:nth-child(3) { animation-delay: 0.16s; }
+#endcard:not([hidden]) .ec-inner > *:nth-child(4) { animation-delay: 0.24s; }
+#endcard:not([hidden]) .ec-inner > *:nth-child(5) { animation-delay: 0.32s; }
+#endcard:not([hidden]) .ec-inner > *:nth-child(n+6) { animation-delay: 0.4s; }
+#endcard:not([hidden]) .ec-mark.won { animation: mark-pop 0.5s 0.5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes ec-in { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes mark-pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .load-bg, .ef-hero-art img, .wm-ping, .feed-line, .unit-card, #endcard * { animation: none !important; }
+}
+
+/* The music switch sits beside the gear; struck through when off. */
+.ef-tools { display: flex; gap: 8px; }
+.ef-music.off { opacity: 0.45; position: relative; }
+.ef-music.off::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: 2px; background: currentColor; transform: rotate(-35deg); }

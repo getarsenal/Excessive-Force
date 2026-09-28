@@ -3758,6 +3758,9 @@ export class TestMenu {
   dramaticPause(seconds, scale) {
     if (this.paused) return;
     this._drama = { left: seconds, total: seconds, scale, from: this.timeScale };
+    // The beat is framed: bars slide in top and bottom for as long as time
+    // is slowed, the way a film cuts to the moment.
+    if (typeof document !== 'undefined') document.body.classList.add('cine');
   }
 
   refresh() {
@@ -3773,6 +3776,7 @@ export class TestMenu {
       d.left -= dt;
       if (d.left <= 0) {
         this.timeScale = d.from;
+        if (typeof document !== 'undefined') document.body.classList.remove('cine');
         this._drama = null;
       } else {
         // Snap down, then ease back over the last third of the beat.

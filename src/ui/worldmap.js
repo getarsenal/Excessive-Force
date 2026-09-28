@@ -9,6 +9,7 @@ import { openingEnabled, setOpeningEnabled } from './opening.js';
 import { QUALITY_IDS, setQuality, detectQuality } from '../core/quality.js';
 import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
+import { menuMusic } from './music.js';
 
 /** 51.4994, -0.1246 → 51°29′58″N 0°07′29″W, the way a target folder has it. */
 const dms = (lat, lon) => {
@@ -114,6 +115,7 @@ const fmtTime = (t) => {
  */
 export async function showWorldMap({ current = null, canResume = false } = {}) {
   const world = await loadWorld();
+  menuMusic.play();
   const state = campaignState();
   const progress = loadProgress();
   // Boot Camp on the map: contract 00 at Fort Irwin, always open. It is not a
@@ -146,6 +148,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   }).join('');
   const tons = Math.round(tonnage).toLocaleString();
   const gear = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>';
+  const note = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>';
   const chev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
   root.innerHTML = `
     <div class="ef" data-view="door">
@@ -155,7 +158,10 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
           <img class="ef-logo" src="./logo-512.png" alt="" width="512" height="512">
           <span>EXCESSIVE FORCE</span>
         </div>
-        <button class="ef-gear" id="ef-gear" type="button" aria-label="Records and settings">${gear}</button>
+        <div class="ef-tools">
+          <button class="ef-gear ef-music${menuMusic.enabled ? '' : ' off'}" id="ef-music" type="button" aria-label="Music on or off">${note}</button>
+          <button class="ef-gear" id="ef-gear" type="button" aria-label="Records and settings">${gear}</button>
+        </div>
       </header>
       <div class="ef-banner" id="ef-banner">NEXT CONTRACT</div>
       <main class="ef-body">
@@ -300,6 +306,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     const parts = {
       lead: el('line', { class: 'wm-lead' }),
       halo: el('circle', { class: 'wm-halo', r: 13 }),
+      ping: el('circle', { class: 'wm-ping', r: 13 }),
       dot: el('circle', { class: 'wm-dot', r: 5 }),
       // Small, deliberately: London and Paris are a dozen pixels apart at the
       // opening zoom, and two finger-sized discs there would be one target.
@@ -310,7 +317,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       text: el('text', { class: 'wm-city' }),
     };
     parts.text.textContent = `${String(t.no).padStart(2, '0')} ${t.city}`;
-    g.append(parts.lead, parts.halo, parts.dot, parts.hit, parts.box, parts.text);
+    g.append(parts.lead, parts.ping, parts.halo, parts.dot, parts.hit, parts.box, parts.text);
     pinG.appendChild(g);
     return { t, g, ...parts };
   });
@@ -814,7 +821,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   }
 
   return new Promise((resolve) => {
-    const finish = (id) => { cleanup(); root.remove(); resolve(id); };
+    const finish = (id) => { menuMusic.stop(); cleanup(); root.remove(); resolve(id); };
 
     // ── Panning, pinching, and telling a tap from a drag.
     //
@@ -940,6 +947,11 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     root.querySelector('#ef-torecords').addEventListener('click', () => setView('records'));
     root.querySelector('#ef-boot').addEventListener('click', () => finish('tutorial'));
     root.querySelector('#ef-gear').addEventListener('click', () => setView('records'));
+    root.querySelector('#ef-music').addEventListener('click', (e) => {
+      const on = !menuMusic.enabled;
+      menuMusic.enabled = on;
+      e.currentTarget.classList.toggle('off', !on);
+    });
     backBtn.addEventListener('click', () => {
       setView(viewName === 'dossier' ? 'map' : 'door');
     });

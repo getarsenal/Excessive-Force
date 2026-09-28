@@ -568,6 +568,7 @@ export class HUD {
       const card = document.createElement('button');
       card.className = 'unit-card locked';
       card.dataset.id = u.id;
+      card.style.setProperty('--i', this.bars[bar].length - 1);
       card.title = `${u.full} — ${u.blurb}`;
       const n = this.bars[bar].length;
 
@@ -691,9 +692,14 @@ export class HUD {
     const integ = 1 - done;
     const pct = Math.round(done * 100);
     const w = `${Math.max(0, integ * 100).toFixed(2)}%`;
-    if (this.el.integrity.__w !== w) { this.el.integrity.__w = w; this.el.integrity.style.width = w; }
+    if (this.el.integrity.__w !== w) {
+      // A sheen runs along the bar each time it drops: two identical
+      // animations taken in turn, so a new hit restarts it without a reflow.
+      if (this.el.integrity.__w) this._sheen = this._sheen === 'sheen-a' ? 'sheen-b' : 'sheen-a';
+      this.el.integrity.__w = w; this.el.integrity.style.width = w;
+    }
     setText(this.el.integrityPct, `${pct}%`);
-    const cls = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}`;
+    const cls = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}${this._sheen ? ` ${this._sheen}` : ''}`;
     if (this.el.integrity.className !== cls) this.el.integrity.className = cls;
 
     // Per-objective breakdown, so "what is left to do" is never a guess. Only

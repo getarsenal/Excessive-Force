@@ -96,6 +96,14 @@ async function boot() {
   console.log('[tumble] level', level.id, '·', level.name);
   const sub = document.querySelector('.load-sub');
   if (sub) sub.textContent = level.name.toUpperCase();
+  // The place itself behind the loader: its dossier photograph, dark and
+  // drifting, so the wait is spent looking at where you are going.
+  const loadBg = document.getElementById('load-bg');
+  if (loadBg) {
+    const img = new Image();
+    img.onload = () => { loadBg.style.backgroundImage = `url(${img.src})`; loadBg.classList.add('on'); };
+    img.src = `assets/recon/${level.id}.jpg`;
+  }
 
   await progress(6, 'starting physics');
   // The two commanders fetch while the world builds, so the stand-off never

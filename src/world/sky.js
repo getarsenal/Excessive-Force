@@ -77,6 +77,13 @@ const SKY_FRAG = /* glsl */`
                 cover * 0.88);
     }
 
+    // Golden hour along the horizon on the sun's side: a warm band that
+    // hugs the skyline and fades out round the compass, which is what a
+    // late-afternoon sky does and a gradient dome does not.
+    vec2 sunXZ = normalize(uSunDir.xz + vec2(1e-4));
+    float side = max(dot(normalize(dir.xz + vec2(1e-4)), sunXZ), 0.0);
+    col += uSunColor * pow(side, 2.5) * exp(-abs(h) * 11.0) * 0.16;
+
     float sd = max(dot(dir, normalize(uSunDir)), 0.0);
     // Disc, then forward scatter, then a broad warm bias across that half of
     // the sky — which is what stops the dome looking like a colour ramp.
