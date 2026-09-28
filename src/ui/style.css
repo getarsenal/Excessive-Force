@@ -1953,3 +1953,4 @@ body.cine #cine i { height: 9vh; }
 .ef-tools { display: flex; gap: 8px; }
 .ef-music.off { opacity: 0.45; position: relative; }
 .ef-music.off::after { content: ''; position: absolute; left: 22%; right: 22%; top: 50%; height: 2px; background: currentColor; transform: rotate(-35deg); }
+.ef-boot .ef-card-name { white-space: nowrap; }
