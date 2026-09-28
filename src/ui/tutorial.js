@@ -142,7 +142,8 @@ export class Tutorial {
       <div class="tut-ring" hidden></div>
       <div class="tut-gen" hidden>
         <img class="tut-gen-face" src="assets/characters/us-general.png" alt="">
-        <div class="tut-gen-body"><b>GEN. BUCK HOLLISTER</b><span class="tut-gen-line"></span></div>
+        <div class="tut-gen-body"><b>GEN. BUCK HOLLISTER</b><span class="tut-gen-line"></span>
+          <button type="button" class="tut-gen-ok">CARRY ON</button></div>
       </div>
       <div class="tut-ring tut-ring2" hidden></div>
       <div class="tut-card">
@@ -159,6 +160,7 @@ export class Tutorial {
     this.genLine = root.querySelector('.tut-gen-line');
     root.querySelector('.tut-skip').addEventListener('click', () => this.finish('skipped'));
     root.querySelector('.tut-ok').addEventListener('click', () => this.next());
+    root.querySelector('.tut-gen-ok').addEventListener('click', () => this.hush());
     this._v = new THREE.Vector3();
   }
 
@@ -175,12 +177,27 @@ export class Tutorial {
     if (s.say) this.say(s.say);
   }
 
-  /** The General has something to add. Seven seconds, then he wanders off. */
-  say(line) {
+  /**
+   * The General has something to add, and he gets the floor: the step's
+   * card and ring wait until he has finished (CARRY ON, or long enough to
+   * read it), so the two are never on screen together.
+   */
+  say(line, after = null) {
     this.genLine.textContent = line;
     this.gen.hidden = false;
+    this.talking = true;
+    this._after = after;
     clearTimeout(this._genT);
-    this._genT = setTimeout(() => { if (this.gen) this.gen.hidden = true; }, 7000);
+    this._genT = setTimeout(() => this.hush(), 3500 + line.length * 45);
+  }
+
+  hush() {
+    clearTimeout(this._genT);
+    if (this.gen) this.gen.hidden = true;
+    this.talking = false;
+    const after = this._after;
+    this._after = null;
+    if (after) after();
   }
 
   /** Where the current step points, as a screen rectangle, or null. */
@@ -210,6 +227,9 @@ export class Tutorial {
     if (!s) return;
     // Brought down before the walkthrough got there: that is the point of it.
     if (this.battle.state === 'won') { this.finish('done'); return; }
+    // One voice at a time: while the General talks, the step waits.
+    this.card.hidden = this.ring.hidden = this.talking;
+    if (this.talking) { this.ring2.hidden = true; return; }
     if (s.done && s.done()) { this.next(); return; }
     const r = this._rect(s);
     const pad = 6;
@@ -251,13 +271,14 @@ export class Tutorial {
     markTutorialSeen(how === 'done' ? 'done' : 'skipped');
     if (how === 'done') {
       this.hud.feed('BOOT CAMP COMPLETE', 'big');
-      this.say("Well, hell. You broke it. Your mother would be proud, or at least not surprised. Now go start a war.");
       const root = this.root;
       this.ring.hidden = true; this.ring2.hidden = true; this.card.hidden = true;
-      setTimeout(() => root.remove(), 7000);
-    } else if (this.root) {
-      this.root.remove();
+      this.root = null;
+      this.say("Well, hell. You broke it. Your mother would be proud, or at least not surprised. Now go start a war.",
+        () => root.remove());
+      return;
     }
+    if (this.root) this.root.remove();
     this.root = null;
   }
 }

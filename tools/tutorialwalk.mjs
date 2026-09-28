@@ -16,24 +16,27 @@ await page.goto('http://localhost:5177/', { waitUntil: 'load', timeout: 300000 }
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && !document.getElementById('ui').hidden, null, { timeout: 400000 });
 await page.waitForTimeout(3000);
 const shot = async (n) => { await page.screenshot({ path: `${out}-${n}.png` }); console.log('shot', n, await page.evaluate(() => document.querySelector('.tut-title')?.textContent + ' | ' + document.querySelector('.tut-count')?.textContent)); };
-await shot(1);
-const ok = () => page.click('.tut-ok');
+await shot('0-general'); await hush(); await page.waitForTimeout(300); await shot(1);
+// The General has the floor first; CARRY ON, then the step.
+const hush = async () => { if (await page.evaluate(() => !document.querySelector('.tut-gen').hidden)) { await page.click('.tut-gen-ok'); await page.waitForTimeout(300); } };
+const ok = async () => { await hush(); await page.click('.tut-ok'); };
 await ok(); await page.waitForTimeout(400); await shot(2);           // look around
 await ok(); await page.waitForTimeout(400); await ok();                // funds
 await page.waitForTimeout(400); await shot(3);                         // units
-await page.click('#dock-units'); await page.waitForTimeout(600); await shot(4);
+await hush(); await page.click('#dock-units'); await page.waitForTimeout(600); await shot(4);
 
-await page.click('#buildbar .unit-card[data-id="m119"]'); await page.waitForTimeout(600); await shot(5);
+await hush(); await page.click('#buildbar .unit-card[data-id="m119"]'); await page.waitForTimeout(300); await hush(); await page.waitForTimeout(600); await shot(5);
 // Deploy where the ring is, then designate the tower where its ring is.
 const ringAt = async () => page.evaluate(() => { const r = document.querySelector('.tut-ring').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
 console.log('deploy spot', await page.evaluate(() => { const t = window.__tutorial, b = window.battle; const p = t.groundAt.clone(); p.y = window.terrain.heightAt(p.x, p.z); return JSON.stringify({ at: [p.x.toFixed(0), p.z.toFixed(0)], ok: b.validPlacement(p, null), sel: b.selectedUnitId, ring: [...document.querySelectorAll('.tut-ring')].map((r) => r.getBoundingClientRect().y.toFixed(0)) }); }));
-let [x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(6);
+await hush(); let [x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(6);
 // The airlift: the package window, then the aircraft, then the gun on the ground.
 const title = () => page.evaluate(() => document.querySelector('.tut-title')?.textContent);
 let seen = new Set();
 for (let k = 0; k < 120 && (await title()) !== 'DESIGNATE'; k++) {
   const t = await title();
   if (!seen.has(t)) { seen.add(t); await shot(`6-${t.toLowerCase().replace(/ /g, '-')}`); }
+  await hush();
   if (t === 'A BATTERY') {
     // Press on the solid ring, drag to the dashed one, let go.
     const [a, b2] = await page.evaluate(() => [...document.querySelectorAll('.tut-ring')].map((r) => { const q = r.getBoundingClientRect(); return [q.x + q.width / 2, q.y + q.height / 2]; }));
@@ -47,6 +50,6 @@ for (let k = 0; k < 120 && (await title()) !== 'DESIGNATE'; k++) {
   await page.waitForTimeout(300);
 }
 await shot('7-designate');
-[x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(8);
+await hush(); [x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(8);
 console.log('level', await page.evaluate(() => location.search), 'money', await page.evaluate(() => document.getElementById('hud-money').textContent));
 await b.close();

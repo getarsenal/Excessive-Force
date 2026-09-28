@@ -1831,45 +1831,54 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .fault-buttons { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
 
 /* ── Boot Camp: the guided walkthrough ─────────────────────────────────── */
+/* One voice at a time, and both loud: the step card is big and lit, the
+   General takes the middle of the screen when he speaks. */
 #tut { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 .tut-ring {
-  position: absolute; left: 0; top: 0; border: 3px solid #ffc53d; border-radius: 12px;
-  box-shadow: 0 0 0 4px rgba(255,197,61,0.25), 0 0 22px rgba(255,197,61,0.55);
-  animation: tut-pulse 1.1s ease-in-out infinite; will-change: transform;
+  position: absolute; left: 0; top: 0; border: 4px solid #ffc53d; border-radius: 12px;
+  box-shadow: 0 0 0 4px rgba(255,197,61,0.3), 0 0 28px rgba(255,197,61,0.7);
+  animation: tut-pulse 1s ease-in-out infinite; will-change: transform;
 }
 .tut-ring.round { border-radius: 50%; }
+.tut-ring2 { border-style: dashed; }
 @keyframes tut-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(255,197,61,0.35), 0 0 14px rgba(255,197,61,0.45); opacity: 1; }
-  50% { box-shadow: 0 0 0 12px rgba(255,197,61,0), 0 0 30px rgba(255,197,61,0.8); opacity: 0.75; }
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255,197,61,0.4), 0 0 16px rgba(255,197,61,0.5); opacity: 1; }
+  50% { box-shadow: 0 0 0 16px rgba(255,197,61,0), 0 0 36px rgba(255,197,61,0.9); opacity: 0.8; }
 }
 .tut-card {
-  position: absolute; left: 0; top: 0; width: min(300px, calc(100vw - 20px)); pointer-events: auto;
-  background: rgba(10,16,23,0.94); border: 1px solid #ffc53d; border-radius: 10px; padding: 10px 12px 11px;
-  color: #e8eef6; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.5); will-change: transform;
+  position: absolute; left: 0; top: 0; width: min(360px, calc(100vw - 20px)); pointer-events: auto;
+  background: #0b1219; border: 2px solid #ffc53d; border-radius: 12px; padding: 12px 14px 14px;
+  color: #f2f6fa; font: 16px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 10px 34px rgba(0,0,0,0.65), 0 0 24px rgba(255,197,61,0.25);
+  will-change: transform;
 }
-.tut-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.tut-title { color: #ffc53d; letter-spacing: 0.14em; font-size: 12px; }
-.tut-count { color: #7d8b99; font-size: 11px; margin-left: auto; }
-.tut-skip { background: none; border: 0; color: #7d8b99; font: inherit; font-size: 11px; letter-spacing: 0.1em; cursor: pointer; padding: 2px 0 2px 6px; }
-.tut-skip:hover { color: #e8eef6; }
-.tut-text { color: #cfd8e2; }
-.tut-ok {
-  margin-top: 8px; background: #ffc53d; color: #111; border: 0; border-radius: 6px; padding: 6px 12px;
-  font: 600 12px/1 system-ui, sans-serif; letter-spacing: 0.1em; cursor: pointer;
+.tut-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tut-title { color: #ffc53d; letter-spacing: 0.14em; font-size: 15px; }
+.tut-count { color: #8a98a6; font-size: 12px; margin-left: auto; }
+.tut-skip { background: none; border: 0; color: #8a98a6; font: inherit; font-size: 12px; letter-spacing: 0.1em; cursor: pointer; padding: 2px 0 2px 6px; }
+.tut-skip:hover { color: #f2f6fa; }
+.tut-text { color: #e4ebf2; }
+.tut-ok, .tut-gen-ok {
+  margin-top: 10px; background: #ffc53d; color: #111; border: 0; border-radius: 7px; padding: 9px 16px;
+  font: 700 13px/1 system-ui, sans-serif; letter-spacing: 0.12em; cursor: pointer; pointer-events: auto; align-self: flex-start;
+}
+.tut-gen {
+  position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%);
+  display: flex; align-items: flex-end; gap: 12px; width: min(620px, calc(100vw - 24px));
+  pointer-events: auto; animation: tut-gen-in 0.18s ease-out;
+}
+@keyframes tut-gen-in { from { transform: translate(-50%, -46%); opacity: 0.4; } to { transform: translate(-50%, -50%); opacity: 1; } }
+.tut-gen-face { width: 150px; height: auto; flex: 0 0 auto; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.7)); }
+.tut-gen-body {
+  background: #0b1219; border: 2px solid #d4313f; border-left: 6px solid #d4313f; border-radius: 12px;
+  padding: 12px 16px 14px; color: #f2f6fa; font: 18px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px;
+  box-shadow: 0 10px 34px rgba(0,0,0,0.65), 0 0 24px rgba(212,49,63,0.3);
+}
+.tut-gen-body b { font-size: 12px; letter-spacing: 0.18em; color: #ff8a8a; }
+@media (max-width: 700px) {
+  .tut-gen-face { width: 92px; }
+  .tut-gen-body { font-size: 16px; }
+  .tut-card { font-size: 15px; }
 }
 .ef-card.ef-boot { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 12px; }
-
-.tut-ring2 { border-style: dashed; }
-.tut-gen {
-  position: absolute; left: 12px; bottom: 150px; display: flex; align-items: flex-end; gap: 8px;
-  max-width: min(420px, calc(100vw - 24px)); pointer-events: none;
-}
-.tut-gen-face { width: 92px; height: auto; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); }
-.tut-gen-body {
-  background: rgba(10,16,23,0.94); border: 1px solid #b22234; border-left: 4px solid #b22234; border-radius: 10px;
-  padding: 8px 11px; color: #e8eef6; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px;
-}
-.tut-gen-body b { font-size: 10px; letter-spacing: 0.16em; color: #ff8a8a; }
-@media (max-width: 700px) { .tut-gen { bottom: 140px; } .tut-gen-face { width: 64px; } }
