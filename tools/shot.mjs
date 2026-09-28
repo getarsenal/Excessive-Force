@@ -57,6 +57,9 @@ let ready = false;
 try {
   await page.waitForFunction(
     () => document.getElementById('loading')?.style.display === 'none',
+    // The options are the third argument; in the second they are the
+    // function's argument, and the wait was Playwright's thirty seconds.
+    null,
     { timeout: 180000 },
   );
   ready = true;
