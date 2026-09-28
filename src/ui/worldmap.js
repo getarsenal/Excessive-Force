@@ -162,6 +162,10 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
               <span class="ef-card-name">RECORDS</span>
               <span class="ef-card-sub" id="ef-last">and settings</span>
             </button>
+            <button class="ef-card ef-boot" id="ef-boot" type="button">
+              <span class="ef-card-name">BOOT CAMP</span>
+              <span class="ef-card-sub">The controls, one at a time &middot; Fort Irwin</span>
+            </button>
           </div>
         </section>
 
@@ -920,6 +924,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     hero.addEventListener('click', () => setView('dossier'));
     root.querySelector('#ef-tomap').addEventListener('click', () => setView('map'));
     root.querySelector('#ef-torecords').addEventListener('click', () => setView('records'));
+    root.querySelector('#ef-boot').addEventListener('click', () => finish('tutorial'));
     root.querySelector('#ef-gear').addEventListener('click', () => setView('records'));
     backBtn.addEventListener('click', () => {
       setView(viewName === 'dossier' ? 'map' : 'door');

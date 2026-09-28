@@ -955,6 +955,7 @@ export function populateKit(L, g, origin, groundY, opts = {}) {
   };
   const by = (kind) => L.posts.filter((q) => q.kind === kind);
   const cap = opts.cap ?? {};
+  const mortars = opts.mortars ?? 3;
   let i = 0;
   for (const q of thin(by('window'), cap.window ?? 16)) {
     const type = q.high && i % 3 === 0 ? 'sniper' : i % 3 === 1 ? 'mg' : 'rifleman';
@@ -983,7 +984,16 @@ export function populateKit(L, g, origin, groundY, opts = {}) {
   const b = L.box;
   const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
   const hx = (b.x1 - b.x0) / 2 + 12, hz = (b.z1 - b.z0) / 2 + 12;
-  for (const [x, z] of [[cx - hx, cz + hz * 0.3], [cx + hx, cz - hz * 0.3], [cx + hx * 0.3, cz - hz]]) {
+  for (const [x, z] of [[cx - hx, cz + hz * 0.3], [cx + hx, cz - hz * 0.3], [cx + hx * 0.3, cz - hz]].slice(0, mortars)) {
     g.place('mortar', V(x, 0.4, z), 0, 24, { cover: 'ground', emplaced: true, sandbags: true });
+  }
+  // Flak on two opposite corners, in the open. The field works site their
+  // own pits on the diagonals out in the town, where one can have the
+  // landmark itself between it and the sky it is meant to cover; these stand
+  // off the footprint with nothing taller than a sandbag round them.
+  if (opts.flak !== 0) {
+    for (const [sx, sz] of [[1, 1], [-1, -1]].slice(0, opts.flak ?? 2)) {
+      g.place('aa', V(cx + sx * hx, 0.4, cz + sz * hz), Math.atan2(sx, sz), 24, { cover: 'ground', emplaced: true, sandbags: true });
+    }
   }
 }

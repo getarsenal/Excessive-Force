@@ -1829,3 +1829,33 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   color: var(--dim); padding: 6px 9px 0; word-break: break-all; text-align: left;
 }
 .fault-buttons { display: flex; gap: 8px; justify-content: center; margin-top: 14px; }
+
+/* ── Boot Camp: the guided walkthrough ─────────────────────────────────── */
+#tut { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.tut-ring {
+  position: absolute; left: 0; top: 0; border: 3px solid #ffc53d; border-radius: 12px;
+  box-shadow: 0 0 0 4px rgba(255,197,61,0.25), 0 0 22px rgba(255,197,61,0.55);
+  animation: tut-pulse 1.1s ease-in-out infinite; will-change: transform;
+}
+.tut-ring.round { border-radius: 50%; }
+@keyframes tut-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255,197,61,0.35), 0 0 14px rgba(255,197,61,0.45); opacity: 1; }
+  50% { box-shadow: 0 0 0 12px rgba(255,197,61,0), 0 0 30px rgba(255,197,61,0.8); opacity: 0.75; }
+}
+.tut-card {
+  position: absolute; left: 0; top: 0; width: min(300px, calc(100vw - 20px)); pointer-events: auto;
+  background: rgba(10,16,23,0.94); border: 1px solid #ffc53d; border-radius: 10px; padding: 10px 12px 11px;
+  color: #e8eef6; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5); will-change: transform;
+}
+.tut-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.tut-title { color: #ffc53d; letter-spacing: 0.14em; font-size: 12px; }
+.tut-count { color: #7d8b99; font-size: 11px; margin-left: auto; }
+.tut-skip { background: none; border: 0; color: #7d8b99; font: inherit; font-size: 11px; letter-spacing: 0.1em; cursor: pointer; padding: 2px 0 2px 6px; }
+.tut-skip:hover { color: #e8eef6; }
+.tut-text { color: #cfd8e2; }
+.tut-ok {
+  margin-top: 8px; background: #ffc53d; color: #111; border: 0; border-radius: 6px; padding: 6px 12px;
+  font: 600 12px/1 system-ui, sans-serif; letter-spacing: 0.1em; cursor: pointer;
+}
+.ef-card.ef-boot { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 12px; }

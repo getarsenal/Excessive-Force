@@ -115,7 +115,27 @@ const poly = (r, n, rot = 0, x = 0, z = 0) => Array.from({ length: n }, (_, i) =
   return [x + Math.cos(a) * r, z + Math.sin(a) * r];
 });
 
+/** The shipping containers of a training range: a solid steel box each. */
+const connex = (x, z, y0, mat, along = 'x') => ({
+  t: 'steps', tag: 'connexes', x, z, y0, n: 1, h: 2.6, w: along === 'x' ? 12.2 : 2.44, d: along === 'x' ? 2.44 : 12.2,
+  mat, coarse: 1.0, ground: false,
+});
+
 export const SPECS = {
+  // ── Boot Camp ───────────────────────────────────────────────────────────
+  tutorial: {
+    S: 1.6, yaw: 0.55, mat: M.CONCRETE,
+    parts: [
+      { t: 'hall', tag: 'operations', x: 0, z: 9, w: 22, d: 12, h: 7, roof: 'flat', mat: M.LIMESTONE, storey: 3.5 },
+      { t: 'tower', tag: 'tower', x: 0, z: -4, w: 7, h: 22, cap: 'flat', capH: 0.8, capW: 10.4, mat: M.CONCRETE, floors: 2, storey: 5.5, roofPosts: false },
+      { t: 'hall', tag: 'cab', x: 0, z: -4, y0: 22.8, w: 10, d: 10, h: 3.6, roof: 'flat', roofH: 0.6, mat: M.CURTAIN, storey: 3.6, floors: 0, floorBelow: true, ground: false },
+      connex(26, -10, 0, M.SANDSTONE), connex(26, -7, 0, M.VERDE), connex(26, -7, 2.6, M.LIMESTONE),
+      connex(26, -4, 0, M.VERDE), connex(26, 2, 0, M.SANDSTONE), connex(26, 5, 0, M.LIMESTONE), connex(26, 5, 2.6, M.SANDSTONE),
+      connex(-22, -8, 0, M.VERDE, 'z'), connex(-25, -8, 0, M.SANDSTONE, 'z'), connex(-25, -8, 2.6, M.VERDE, 'z'),
+    ],
+  },
+
+  // ── The catalogue ──
   // ── Europe ──────────────────────────────────────────────────────────────
   milan: {
     S: 1.1, yaw: 0.45, mat: M.MARBLE, roofMat: M.MARBLE,
@@ -354,7 +374,9 @@ export const SPECS = {
     ],
   },
   shanghaitower: {
-    S: 0.5, yaw: -0.4, mat: M.CURTAIN,
+    // Jin Mao and the World Financial Centre are a street away and taller
+    // than the aim point: cleared, or they take every round meant for it.
+    S: 0.5, yaw: -0.4, mat: M.CURTAIN, clear: 180,
     parts: [
       { t: 'tower', tag: 'tower', x: 0, z: 0, w: 76, h: 560, round: true, taper: 0.58, cap: 'flat', capH: 2, mat: M.CURTAIN, storey: 36, floors: 3 },
       { t: 'tower', tag: 'crown', x: 0, z: 0, y0: 562, w: 30, h: 50, round: true, taper: 0.7, cap: 'none', mat: M.STEEL, ground: false, roofPosts: false, windows: false, floors: 0 },
@@ -513,7 +535,7 @@ export const SPECS = {
     ],
   },
   azadi: {
-    S: 2.0, yaw: 0.3, mat: M.MARBLE,
+    S: 2.0, yaw: 0.3, mat: M.MARBLE, sheds: false,
     parts: [
       { t: 'arch', tag: 'arch', x: 0, z: 0, w: 60, d: 42, h: 30, span: 22, spring: 10, pointed: true, axis: 'z', mat: M.MARBLE },
       { t: 'hall', tag: 'crown', x: 0, z: 0, y0: 31, w: 26, d: 26, h: 12, roof: 'flat', mat: M.MARBLE, storey: 6, ground: false },
@@ -528,7 +550,7 @@ export const SPECS = {
     ],
   },
   baalbek: {
-    S: 1.6, yaw: 0.6, mat: M.LIMESTONE,
+    S: 1.6, yaw: 0.6, mat: M.LIMESTONE, sheds: false,
     parts: [
       { t: 'colonnade', tag: 'temple', x: 0, z: 0, w: 35, d: 66, podH: 5, colH: 19, colW: 1.9, bay: 4.4, rows: 'ring', entH: 3, roof: 'gable', roofH: 6, cella: { w: 23, d: 44, wall: 2 }, mat: M.LIMESTONE },
       { t: 'steps', tag: 'stair', base: true, x: 0, z: 39, w: 20, d: 12, h: 4.6, n: 3, wTop: 20, dTop: 4, mat: M.LIMESTONE, posts: true, ground: false },
@@ -587,7 +609,7 @@ export const SPECS = {
     ],
   },
   bellasartes: {
-    S: 1.3, yaw: 0.35, mat: M.MARBLE,
+    S: 1.3, yaw: 0.35, mat: M.MARBLE, sheds: false,
     parts: domed({ r: 14, drumH: 30, domeH: 17, mat: M.MARBLE, domeMat: M.GOLD, lanternMat: M.GOLD, lanternH: 7, profile: 'bell',
       arms: { len: 32, w: 28, h: 25, roof: 'flat', roofH: 1.2, storey: 8.3 },
       corners: { w: 9, h: 29, cap: 'dome', capH: 7, capMat: M.GOLD } }),

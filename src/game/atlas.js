@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLACES } from './atlas_places.js';
+import { PLACES, TUTORIAL_PLACE } from './atlas_places.js';
 import { SPECS } from './atlas_specs.js';
 import { buildKit, layoutKit, populateKit } from '../structure/landmarks/kit.js';
 
@@ -194,6 +194,11 @@ export function drawFlagSpec(ctx, w, h, spec) {
 
 /** Pattern drawers for the new nations, by the name the flag sites use. */
 export const ATLAS_PATTERNS = Object.fromEntries(Object.entries(NEW_OFFICERS).map(([code, o]) => [`atlas-${code}`, (ctx, w, h) => drawFlagSpec(ctx, w, h, o.flag)]));
+// The home flag, for Boot Camp: thirteen stripes and the canton.
+ATLAS_PATTERNS.usa = (ctx, w, h) => drawFlagSpec(ctx, w, h, [
+  ['h', Array.from({ length: 13 }, (_, i) => (i % 2 ? '#ffffff' : '#b22234'))],
+  ['rect', '#3c3b6e', 0, 0, 0.4, 7 / 13],
+]);
 
 const slug = (s) => s.toLowerCase().replace(/ł/g, 'l').replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -210,6 +215,10 @@ export const ATLAS_CAST = Object.fromEntries(Object.entries(NEW_OFFICERS).map(([
  * the American.
  */
 const WORDS = {
+  tutorial: ['Qualified', 'BOOT CAMP',
+    'A range tower and a container yard in the Mojave. Learn the controls here.',
+    'The range control tower at Fort Irwin and the container yard round it. A light garrison and money for everything: bring the tower down.',
+    'Welcome to Fort Irwin. Everything here is ours, so break it properly.', 'Yes, General.', 'Tower first. Show me.'],
   milan: ['Ciao, Duomo', 'THE MARBLE MOUNTAIN',
     'A marble nave between four aisles, the spire over the crossing. The aisle roofs are where the guns are.',
     'Six centuries of marble: a nave and four aisles under a flat roof walk, the crossing spire with the Madonnina on it. The aisle roofs are the gun platforms; the crossing piers hold the spire.',
@@ -482,8 +491,8 @@ function levelRecord(P, i) {
     victory: W[0],
     palette: Object.fromEntries(PAL_KEYS.map((k, j) => [k, C(cl.palette[j])])),
     setting,
-    cityExcludeRadius: Math.round(reach + 30),
-    contextExclude: Math.round(reach + 18),
+    cityExcludeRadius: Math.round(spec.clear ?? reach + 30),
+    contextExclude: Math.round((spec.clear ?? reach + 30) - 12),
     camera: {
       yaw: spec.yaw ?? 0.45,
       pitch: 0.12,
@@ -496,7 +505,7 @@ function levelRecord(P, i) {
     structures: (quality) => [
       { key: P.id, blocks: buildKit(spec, quality), primary: true, required: true, label: target },
     ],
-    garrison: (g, origin, groundY) => populateKit(L, g, origin, groundY),
+    garrison: (g, origin, groundY) => populateKit(L, g, origin, groundY, P.garrison || {}),
     scoreTags: L.tags,
     precinct: { boundary: 'none', ground: cl.ground, ornament: 'none' },
     // Every catalogued building is won by breaking it, not by leaning it:
@@ -509,6 +518,10 @@ function levelRecord(P, i) {
     unlockScale: 1,
     par: { rounds: Math.round(40 + stones / 150), spend: 14000, minutes: 5, leverage: 2 },
     brief: W[3],
+    ...(P.startMoney ? { startMoney: P.startMoney } : {}),
+    ...(P.unlockAll ? { unlockAll: true } : {}),
+    ...(P.intros === false ? { intros: false } : {}),
+    ...(P.fieldWorksShare != null ? { fieldWorksShare: P.fieldWorksShare } : {}),
     // A pad the bake declared land is levelled to its own height, not to the
     // water round it.
     ...(P.padH != null ? { groundLevel: 'bake' } : {}),
@@ -519,6 +532,8 @@ function levelRecord(P, i) {
 /** Level records, keyed by id, in catalogue order. */
 export const ATLAS_LEVELS = Object.fromEntries(PLACES.map((P, i) => [P.id, levelRecord(P, i)]));
 export const ATLAS_ORDER = PLACES.map((P) => P.id);
+/** Boot Camp: a level record like the rest, outside the campaign's order. */
+export const TUTORIAL_LEVEL = levelRecord(TUTORIAL_PLACE, -1);
 export const ATLAS_BLURB = Object.fromEntries(PLACES.map((P) => [P.id, WORDS[P.id][2]]));
 
 /** Contracts, numbered from `first`. */
@@ -544,8 +559,8 @@ export const ATLAS_STANDOFF = Object.fromEntries(PLACES.map((P) => {
   return [P.id, [{ who: 'us', line: W[4] }, { who: P.code, line: W[5] }, { who: 'us', line: W[6] }]];
 }));
 
-export const ATLAS_FLAG_SITES = Object.fromEntries(PLACES.map((P) => {
+export const ATLAS_FLAG_SITES = Object.fromEntries([...PLACES, TUTORIAL_PLACE].map((P) => {
   const L = layoutOf(P.id);
-  const pattern = OLD_PATTERN[P.code] || `atlas-${P.code}`;
+  const pattern = OLD_PATTERN[P.code] || (P.code === 'us' ? 'usa' : `atlas-${P.code}`);
   return [P.id, [{ key: P.id, x: L.top.x, y: L.top.y, z: L.top.z, pattern, w: 9, h: 6, pole: 10 }]];
 }));

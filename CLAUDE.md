@@ -17,6 +17,11 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   model identifier in a commit message, code comment or asset.
 - Do not edit source or run heavy probes while a harness suite is running:
   the dev server's reload corrupts the run.
+- **Keep the tutorial current.** Boot Camp (`src/ui/tutorial.js`, level
+  `tutorial`) teaches the real HUD by pulsing its real buttons. Any change
+  to the HUD, the dock, the arsenal, targeting, strikes or the win rules
+  updates the tutorial's steps in the same commit, and the tutorial's own
+  suite run (`sh tools/suiteall.sh tutorial`) stays green.
 
 ## Verify
 

@@ -13,12 +13,26 @@
  *   remote a site with little town round it (the street-furniture tests)
  *   pad    the bake's levelled pad, metres across (default 70), and
  *   padH   its height: land by declaration, for a building standing in water
+ *   zoom   the DEM zoom, where the tile server has a hole at 15 (Ulm: blank to 14)
  */
+/**
+ * Boot Camp: the tutorial, at the Army's desert training centre in the Mojave.
+ * Not in the campaign's order and not a contract; opened on a new player's
+ * first launch and from the front door's BOOT CAMP card after that.
+ */
+export const TUTORIAL_PLACE = {
+  id: 'tutorial', landmark: 'Range Control', city: 'Fort Irwin', lat: 35.26270, lon: -116.68470,
+  iso: 'USA', code: 'us', clime: 'desert', remote: true,
+  // An easy garrison, and money enough to try everything once.
+  garrison: { cap: { window: 3, roof: 3, arcade: 0, ground: 2 }, mortars: 1, flak: 1 },
+  startMoney: 20000, unlockAll: true, intros: false, fieldWorksShare: 0.1,
+};
+
 export const PLACES = [
   // Europe
   { id: 'milan', landmark: 'Milan Cathedral', city: 'Milan', lat: 45.46417, lon: 9.19039, iso: 'ITA', code: 'it', clime: 'mediterranean' },
   { id: 'stvitus', landmark: 'St. Vitus Cathedral', city: 'Prague', lat: 50.09088, lon: 14.40063, iso: 'CZE', code: 'cz', clime: 'temperate', hill: true },
-  { id: 'ulm', landmark: 'Ulm Minster', city: 'Ulm', lat: 48.39852, lon: 9.99183, iso: 'DEU', code: 'de', clime: 'temperate', river: true },
+  { id: 'ulm', landmark: 'Ulm Minster', city: 'Ulm', lat: 48.39852, lon: 9.99183, iso: 'DEU', code: 'de', clime: 'temperate', river: true, zoom: 13 },
   { id: 'brandenburg', landmark: 'Brandenburg Gate', city: 'Berlin', lat: 52.51628, lon: 13.37770, iso: 'DEU', code: 'de', clime: 'temperate' },
   { id: 'stephansdom', landmark: "St. Stephen's Cathedral", city: 'Vienna', lat: 48.20849, lon: 16.37321, iso: 'AUT', code: 'at', clime: 'temperate' },
   { id: 'hohensalzburg', landmark: 'Hohensalzburg Fortress', city: 'Salzburg', lat: 47.79494, lon: 13.04748, iso: 'AUT', code: 'at', clime: 'alpine', hill: true, river: true, remote: true },
@@ -26,7 +40,7 @@ export const PLACES = [
   { id: 'chambord', landmark: 'Château de Chambord', city: 'Chambord', lat: 47.61610, lon: 1.51704, iso: 'FRA', code: 'fr', clime: 'temperate', remote: true },
   { id: 'seville', landmark: 'Seville Cathedral', city: 'Seville', lat: 37.38583, lon: -5.99333, iso: 'ESP', code: 'es', clime: 'mediterranean' },
   { id: 'alhambra', landmark: 'Alhambra', city: 'Granada', lat: 37.17607, lon: -3.58811, iso: 'ESP', code: 'es', clime: 'mediterranean', hill: true },
-  { id: 'malbork', landmark: 'Malbork Castle', city: 'Malbork', lat: 54.04003, lon: 19.02785, iso: 'POL', code: 'pl', clime: 'temperate', river: true },
+  { id: 'malbork', landmark: 'Malbork Castle', city: 'Malbork', lat: 54.04003, lon: 19.02785, iso: 'POL', code: 'pl', clime: 'temperate', river: true, zoom: 13 },
   { id: 'warsaw', landmark: 'Palace of Culture and Science', city: 'Warsaw', lat: 52.23177, lon: 21.00597, iso: 'POL', code: 'pl', clime: 'temperate' },
   { id: 'bran', landmark: 'Bran Castle', city: 'Bran', lat: 45.51490, lon: 25.36725, iso: 'ROU', code: 'ro', clime: 'alpine', hill: true, remote: true },
   { id: 'bucharest', landmark: 'Palace of the Parliament', city: 'Bucharest', lat: 44.42749, lon: 26.08745, iso: 'ROU', code: 'ro', clime: 'temperate' },
@@ -37,7 +51,7 @@ export const PLACES = [
   { id: 'winterpalace', landmark: 'Winter Palace', city: 'Saint Petersburg', lat: 59.94056, lon: 30.31389, iso: 'RUS', code: 'ru', clime: 'nordic', river: true },
   { id: 'belem', landmark: 'Belém Tower', city: 'Lisbon', lat: 38.69158, lon: -9.21599, iso: 'PRT', code: 'pt', clime: 'mediterranean', coast: true, remote: true, pad: 112, padH: 1.0 },
   { id: 'salisbury', landmark: 'Salisbury Cathedral', city: 'Salisbury', lat: 51.06508, lon: -1.79745, iso: 'GBR', code: 'uk', clime: 'temperate' },
-  { id: 'windsor', landmark: 'Windsor Castle', city: 'Windsor', lat: 51.48389, lon: -0.60444, iso: 'GBR', code: 'uk', clime: 'temperate', river: true },
+  { id: 'windsor', landmark: 'Windsor Castle', city: 'Windsor', lat: 51.48389, lon: -0.60444, iso: 'GBR', code: 'uk', clime: 'temperate', river: true, zoom: 13 },
   { id: 'nidaros', landmark: 'Nidaros Cathedral', city: 'Trondheim', lat: 63.42694, lon: 10.39694, iso: 'NOR', code: 'no', clime: 'nordic', river: true },
   { id: 'helsinki', landmark: 'Helsinki Cathedral', city: 'Helsinki', lat: 60.17028, lon: 24.95222, iso: 'FIN', code: 'fi', clime: 'nordic', coast: true },
   { id: 'chillon', landmark: 'Château de Chillon', city: 'Montreux', lat: 46.41417, lon: 6.92750, iso: 'CHE', code: 'ch', clime: 'alpine', coast: true },
@@ -54,7 +68,7 @@ export const PLACES = [
   { id: 'gatewayindia', landmark: 'Gateway of India', city: 'Mumbai', lat: 18.92197, lon: 72.83408, iso: 'IND', code: 'in', clime: 'tropical', coast: true, pad: 130, padH: 2.0 },
   { id: 'osaka', landmark: 'Osaka Castle', city: 'Osaka', lat: 34.68725, lon: 135.52586, iso: 'JPN', code: 'jp', clime: 'subtropical', hill: true },
   { id: 'kinkakuji', landmark: 'Kinkaku-ji', city: 'Kyoto', lat: 35.03937, lon: 135.72924, iso: 'JPN', code: 'jp', clime: 'subtropical', remote: true },
-  { id: 'juche', landmark: 'Juche Tower', city: 'Pyongyang', lat: 39.01722, lon: 125.76361, iso: 'PRK', code: 'kp', clime: 'temperate', river: true },
+  { id: 'juche', landmark: 'Juche Tower', city: 'Pyongyang', lat: 39.01722, lon: 125.76361, iso: 'PRK', code: 'kp', clime: 'temperate', river: true, zoom: 13 },
   { id: 'monas', landmark: 'National Monument', city: 'Jakarta', lat: -6.17539, lon: 106.82718, iso: 'IDN', code: 'id', clime: 'tropical' },
   { id: 'prambanan', landmark: 'Prambanan', city: 'Yogyakarta', lat: -7.75202, lon: 110.49147, iso: 'IDN', code: 'id', clime: 'tropical', remote: true },
   { id: 'minarpakistan', landmark: 'Minar-e-Pakistan', city: 'Lahore', lat: 31.59250, lon: 74.30944, iso: 'PAK', code: 'pk', clime: 'desert' },

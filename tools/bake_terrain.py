@@ -742,7 +742,7 @@ LEVELS = {
         "lat": 48.39852,
         "lon": 9.99183,
         "span": 900.0,
-        "zoom": 15,
+        "zoom": 13,
         "ceiling": "auto",
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
@@ -820,7 +820,7 @@ LEVELS = {
         "lat": 54.04003,
         "lon": 19.02785,
         "span": 900.0,
-        "zoom": 15,
+        "zoom": 13,
         "ceiling": "auto",
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
@@ -929,7 +929,7 @@ LEVELS = {
         "lat": 51.48389,
         "lon": -0.60444,
         "span": 900.0,
-        "zoom": 15,
+        "zoom": 13,
         "ceiling": "auto",
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
@@ -1088,7 +1088,7 @@ LEVELS = {
         "lat": 39.01722,
         "lon": 125.76361,
         "span": 900.0,
-        "zoom": 15,
+        "zoom": 13,
         "ceiling": "auto",
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
@@ -1301,6 +1301,16 @@ LEVELS = {
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
     },
+    "tutorial": {
+        "name": "Range Control, Fort Irwin",
+        "lat": 35.2627,
+        "lon": -116.6847,
+        "span": 900.0,
+        "zoom": 15,
+        "ceiling": "auto",
+        "parks": [],
+        "flatten": [[0, 0, [70, 70], 30]],
+    },
     # --- end atlas ---
 }
 
@@ -1336,6 +1346,11 @@ def fetch_tile(z: int, x: int, y: int) -> np.ndarray:
         try:
             raw = urllib.request.urlopen(url, timeout=40).read()
             img = Image.open(io.BytesIO(raw)).convert("RGB")
+            # A tile that decodes to -32768 m everywhere is a blank, not the
+            # ground: the server sends one now and then, and cached it becomes
+            # a level thirty kilometres under the sea (Ulm, until it was found).
+            if not np.asarray(img).any():
+                raise ValueError("blank tile")
             TILE_CACHE.mkdir(parents=True, exist_ok=True)
             cached.write_bytes(raw)
             return np.asarray(img).astype(np.float64)

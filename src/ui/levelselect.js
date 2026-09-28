@@ -189,6 +189,14 @@ export async function resolveStartLevel() {
   // something has explicitly asked for it — a shared link, or the game's own
   // navigation on the way to the next target, both of which name the level in
   // the URL and are handled above.
+  // A new player's first launch goes to Boot Camp, once. After that it is
+  // the BOOT CAMP card on the front door, for anyone who wants it.
+  const { tutorialSeen, markTutorialSeen } = await import('./tutorial.js');
+  if (!tutorialSeen() && Object.keys(loadProgress()).length === 0 && LEVELS.tutorial) {
+    markTutorialSeen('offered');
+    try { localStorage.setItem(AUTOSTART_KEY, '1'); } catch { /* no storage */ }
+    return LEVELS.tutorial;
+  }
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
   const { showWorldMap } = await import('./worldmap.js');

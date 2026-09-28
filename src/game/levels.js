@@ -45,7 +45,7 @@ import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/l
 import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces }
   from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
-import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB } from './atlas.js';
+import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB, TUTORIAL_LEVEL } from './atlas.js';
 
 /**
  * Par.
@@ -2339,6 +2339,8 @@ export const LEVELS = {
 
 // The catalogue: fifty-nine more, generated from data. See atlas.js.
 Object.assign(LEVELS, ATLAS_LEVELS);
+// Boot Camp: playable by id, never in the running order.
+LEVELS.tutorial = TUTORIAL_LEVEL;
 
 export const DEFAULT_LEVEL = 'westminster';
 

@@ -35,6 +35,7 @@ import { CityFire } from './game/cityfire.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
+import { Tutorial } from './ui/tutorial.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 
 const statusEl = document.getElementById('load-status');
@@ -99,7 +100,8 @@ async function boot() {
   await progress(6, 'starting physics');
   // The two commanders fetch while the world builds, so the stand-off never
   // opens on an empty stage.
-  const castReady = introsEnabled() ? preloadCast(level.id) : Promise.resolve();
+  const intros = introsEnabled() && level.intros !== false;
+  const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
 
   const canvas = document.getElementById('game-canvas');
@@ -389,7 +391,11 @@ async function boot() {
   // has to go unmanned it should be the far end of the line rather than the
   // top of the tower.
   {
-    const manned = garrison.populateFieldWorks(fieldWorks.posts);
+    // A level can man only part of the belt: Boot Camp is a lesson, not a siege.
+    const share = level.fieldWorksShare ?? 1;
+    const every = Math.max(1, Math.round(1 / Math.max(share, 0.01)));
+    const posts = fieldWorks.posts.filter((_, i) => i % every === 0);
+    const manned = garrison.populateFieldWorks(posts);
     console.log(`[tumble] field works: ${fieldWorks.counts.trenchBays} bays, `
       + `${fieldWorks.counts.gunPits} gun pits, `
       + `${manned} of ${fieldWorks.posts.length} positions manned`);
@@ -419,6 +425,12 @@ async function boot() {
   });
   // So a shell landing can scatter whatever was sitting on the roofs.
   battle.life = life;
+  // A level can set its own terms: Boot Camp starts with money for
+  // everything, the whole arsenal open, and guns that arrive when placed
+  // rather than twenty seconds later under a parachute.
+  if (level.startMoney) battle.money = level.startMoney;
+  if (level.unlockAll) battle.unlockAll = true;
+  if (level.id === 'tutorial') battle.airlift = false;
 
   // The real soldier from FIREBASE, flattened into one instanceable geometry.
   // Loaded after the garrison is posted rather than before it, so a slow or
@@ -1125,7 +1137,12 @@ async function boot() {
     }
   });
 
+  let tutorial = null;
   const firstPrompt = () => {
+    if (level.id === 'tutorial') {
+      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level });
+      return;
+    }
     hud.status(`${TAP} the tower to designate a target`, 4);
     const ch = getChallenge();
     if (ch && ch.level === level.id) {
@@ -1145,7 +1162,7 @@ async function boot() {
   };
   const uiEl = document.getElementById('ui');
   let standoff = null;
-  if (introsEnabled()) {
+  if (intros) {
     await castReady;
     // The HUD stays out of the way until the two of them have had their say.
     uiEl.classList.add('standoff');
@@ -1374,6 +1391,7 @@ async function boot() {
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     hud.update(rawDt);
+    if (tutorial) tutorial.update();
     // One finger belongs to the weapon while one is armed. Set here rather
     // than in the selection handler because a unit can be deselected from
     // half a dozen places — a keypress, a deploy, a win — and a camera left

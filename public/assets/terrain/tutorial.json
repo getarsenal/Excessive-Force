@@ -1,0 +1,17 @@
+{
+  "id": "tutorial",
+  "name": "Range Control, Fort Irwin",
+  "lat": 35.2627,
+  "lon": -116.6847,
+  "spanMeters": 900.0,
+  "size": 512,
+  "minElevation": 737.808,
+  "maxElevation": 771.477,
+  "metersPerDemPixel": 3.9007,
+  "seaLevel": 741.36,
+  "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
+  "coastline": "typed",
+  "farSpan": 6300.0,
+  "farWater": 0.0015,
+  "overtureRelease": "2026-08-19.0"
+}
