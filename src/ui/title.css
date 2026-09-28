@@ -477,3 +477,17 @@
   #title *, #title::after { animation: none !important; transition: none !important; }
   .tt-slide.on { opacity: 1; }
 }
+
+/* Into a battle: the eagle screams, the screen goes white-hot and falls away. */
+#title.launch .tt-shell { animation: tt-launch 0.95s cubic-bezier(0.5, 0, 0.8, 0.4) both; }
+#title.launch .tt-flash {
+  animation: tt-launch-flash 0.95s ease-out both;
+  background: radial-gradient(80% 60% at 50% 55%, rgba(255, 236, 200, 0.95), rgba(255, 140, 60, 0.5) 45%, rgba(255, 120, 40, 0) 75%);
+}
+@keyframes tt-launch {
+  0% { transform: none; }
+  12% { transform: translate(-4px, 2px) scale(1.01); }
+  24% { transform: translate(3px, -2px) scale(1.015); }
+  100% { transform: scale(1.12); opacity: 0; filter: blur(6px); }
+}
+@keyframes tt-launch-flash { 0% { opacity: 0; } 14% { opacity: 1; } 100% { opacity: 0.2; } }

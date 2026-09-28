@@ -23,7 +23,7 @@ import {
   commander, setCommanderName, rankFor, insignia, SLOT_IDS, slotInfo, activeSlot,
   switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today,
 } from '../game/career.js';
-import { menuMusic } from './music.js';
+import { menuMusic, eagle } from './music.js';
 import { showWorldMap, HOME } from './worldmap.js';
 import './title.css';
 
@@ -137,7 +137,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       <div class="tt-hero">
         <img class="tt-logo" src="./logo-512.png" alt="" width="512" height="512">
         <h1 class="tt-name"><span>EXCESSIVE</span><span class="f">FORCE</span></h1>
-        <p class="tt-tag">Real landmarks. Real ground. <em>Your guns.</em></p>
+        <p class="tt-tag">Real landmarks. Real ground. <em>Freedom, delivered.</em></p>
       </div>
       <nav class="tt-menu">
         ${items.map((it, k) => `
@@ -210,11 +210,17 @@ export function showTitle({ current = null, canResume = false } = {}) {
       if ('level' in act && act.level) menuMusic.stop();
       resolve(act);
     };
+    // Into a battle: the eagle, a flash, and then the level.
+    let launching = false;
     const go = (level, how) => {
+      if (launching) return;
+      launching = true;
       try {
         if (how === 'resume') sessionStorage.setItem('tt.resume', level);
       } catch { /* private mode */ }
-      done({ level });
+      root.classList.add('launch');
+      menuMusic.stop(900);
+      eagle().then(() => done({ level }));
     };
     const sheet = root.querySelector('.tt-sheet');
     const sheetIn = root.querySelector('.tt-sheet-in');
@@ -460,8 +466,15 @@ function wireHtml(state, prog, tons, daily, dT) {
     'POSTCARD SALES COLLAPSE, ALONG WITH THE SUBJECTS',
     'ARCHITECTS INSIST THE LOAD PATH WAS PERFECTLY ADEQUATE',
     'GARRISONS REQUEST HARD HATS',
+    'FREEDOM NOW AVAILABLE IN 155 MM',
+    'BALD EAGLE POPULATION REPORTS RECORD MORALE',
+    'CONGRESS APPROVES ANOTHER ROUND. AND ANOTHER. AND ANOTHER',
+    'LOCAL MAN CALLS IT "A BIT MUCH"; COMMANDER CALLS IT "A START"',
+    'PENTAGON DENIES HAVING TOO MANY HOWITZERS; ORDERS MORE',
+    'ALLIES ASK IF THIS IS STRICTLY NECESSARY. IT IS NOT',
+    'SUBTLETY OFFICIALLY RETIRED WITH FULL HONOURS',
   ];
-  const f = [...flavour].sort(() => Math.random() - 0.5).slice(0, 4);
+  const f = [...flavour].sort(() => Math.random() - 0.5).slice(0, 6);
   const all = [];
   for (let i = 0; i < Math.max(lines.length, f.length); i++) {
     if (lines[i]) all.push(lines[i]);

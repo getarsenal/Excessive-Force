@@ -2,7 +2,8 @@
  * The menu music: one looping track under the front door and the campaign
  * map, faded in, and faded out when a level starts.
  *
- * The file is `public/assets/audio/menu.mp3` (or .ogg, .m4a). Until it is
+ * The file is `public/assets/audio/menu.mp3` (or .ogg, .m4a): American patriotic
+ * metal, re-encoded from the owner's 256k upload to 128k for phones. Until it is
  * there, nothing happens: the element fails to load and is dropped. Browsers
  * refuse to start sound before the page has been touched, so a refused start
  * waits for the first tap and tries again. The choice to mute it is kept.
@@ -49,6 +50,7 @@ class MenuMusic {
     this.want = true;
     if (!this.enabled || (typeof localStorage !== 'undefined' && localStorage.getItem('tt.suite') === '1')) return;
     const a = this._load();
+    preloadEagle();
     if (!a) return;
     const start = () => a.play().then(() => this._fadeTo(VOLUME, 1800)).catch(() => {
       // Not allowed yet: the first touch anywhere is permission.
@@ -80,3 +82,30 @@ class MenuMusic {
 }
 
 export const menuMusic = new MenuMusic();
+
+/**
+ * The eagle. One screech as the player commits to a battle — the nod to the
+ * flag on every gun in the arsenal, and to the whole idea of the game, which
+ * is that this is a great deal more force than anybody needed. It rides the
+ * menu music's switch, which is the only sound control the menus have, and
+ * resolves once it has had its moment so a page about to navigate does not
+ * cut it off mid-cry.
+ */
+let eagleEl = null;
+export function preloadEagle() {
+  if (eagleEl || typeof Audio === 'undefined') return;
+  eagleEl = new Audio('assets/audio/eagle.mp3');
+  eagleEl.preload = 'auto';
+  eagleEl.volume = 0.95;
+}
+
+export function eagle(hold = 950) {
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('tt.suite') === '1') return Promise.resolve();
+  if (!menuMusic.enabled) return Promise.resolve();
+  preloadEagle();
+  try {
+    eagleEl.currentTime = 0;
+    eagleEl.play().catch(() => {});
+  } catch { /* no audio */ }
+  return new Promise((r) => setTimeout(r, hold));
+}

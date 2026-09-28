@@ -9,7 +9,7 @@ import { openingEnabled, setOpeningEnabled } from './opening.js';
 import { QUALITY_IDS, setQuality, detectQuality } from '../core/quality.js';
 import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
-import { menuMusic } from './music.js';
+import { menuMusic, eagle } from './music.js';
 
 /**
  * The par marks: R, $, T and L on the contract list, and the same four
@@ -843,7 +843,20 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   }
 
   return new Promise((resolve) => {
-    const finish = (id) => { if (id !== HOME) menuMusic.stop(); cleanup(); root.remove(); resolve(id); };
+    let leaving = false;
+    const finish = (id) => {
+      if (leaving) return;
+      if (id && id !== HOME) {
+        // Into a battle: the eagle has its moment before the level loads.
+        leaving = true;
+        menuMusic.stop(900);
+        root.classList.add('launch');
+        eagle().then(() => { cleanup(); root.remove(); resolve(id); });
+        return;
+      }
+      if (id !== HOME) menuMusic.stop();
+      cleanup(); root.remove(); resolve(id);
+    };
 
     // ── Panning, pinching, and telling a tap from a drag.
     //
