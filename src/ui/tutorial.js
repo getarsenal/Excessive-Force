@@ -71,7 +71,10 @@ export class Tutorial {
       { world: () => this._liftAt() || this._dropAt(), title: 'INBOUND',
         text: 'A C-130 drops it by parachute; heavy guns hang under a Chinook. Flak can shoot them down.',
         done: () => this._deployed() },
-      { world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.', done: () => !!b.target },
+      // A gun stays armed after it is placed, and a tap with one armed is a
+      // placement: put it away, so the tap on the tower is a designation.
+      { world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.', done: () => !!b.target,
+        enter: () => { b.selectedUnitId = null; h.closeDrawer?.(); h.hidePrompt?.(); } },
       { el: '#targetcard', title: 'TARGET CARD', text: 'What you hit, how high, and how many guns are on it.', ok: true },
       { el: '#survey-btn', title: 'SURVEY', text: 'Paints the load. Red stone holds the rest up — cut it.', done: () => h.survey },
       { el: '#survey-btn', title: 'SURVEY OFF', text: 'Tap again to see the stone. V on a keyboard.', done: () => !h.survey, ok: true },
@@ -131,6 +134,7 @@ export class Tutorial {
     this.root.querySelector('.tut-count').textContent = `${this.i + 1}/${this.steps.length}`;
     this.root.querySelector('.tut-ok').hidden = !s.ok;
     if (s.title === 'LOOK AROUND') this.yaw0 = this.rig.yaw;
+    if (s.enter) s.enter();
   }
 
   /** Where the current step points, as a screen rectangle, or null. */

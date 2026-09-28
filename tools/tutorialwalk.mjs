@@ -33,7 +33,9 @@ let seen = new Set();
 for (let k = 0; k < 120 && (await title()) !== 'DESIGNATE'; k++) {
   const t = await title();
   if (!seen.has(t)) { seen.add(t); await shot(`6-${t.toLowerCase()}`); }
-  await page.waitForTimeout(1000);
+  // Headless runs a frame a second; move game time on so the lift flies.
+  await page.evaluate(() => window.__fastForward && window.__fastForward(2));
+  await page.waitForTimeout(300);
 }
 await shot('7-designate');
 [x, y] = await ringAt(); await page.mouse.click(x, y); await page.waitForTimeout(1500); await shot(8);
