@@ -116,6 +116,20 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   const world = await loadWorld();
   const state = campaignState();
   const progress = loadProgress();
+  // Boot Camp on the map: contract 00 at Fort Irwin, always open. It is not a
+  // contract — nothing unlocks, it is not counted, and winning it does not
+  // set the United States alight — but it is where a player looks for it.
+  const boot = LEVELS.tutorial;
+  if (boot) {
+    const rec = progress.tutorial || {};
+    state.list.unshift({
+      id: 'tutorial', iso: 'USA', lx: 40, ly: -14, city: 'FORT IRWIN',
+      lon: boot.lon, lat: boot.lat, no: 0, title: 'BOOT CAMP', brief: boot.brief,
+      unlocks: [], unlockLine: 'Training: the whole arsenal, on loan',
+      down: false, open: true, runs: rec.runs || 0, bestScore: rec.bestScore || 0,
+      bestTime: rec.bestTime ?? null, met: {}, boot: true,
+    });
+  }
   // A country that has just fallen is drawn as it was and then set alight, so
   // the player watches the result happen rather than arriving to find it done.
   const burning = pendingBurn();
@@ -353,7 +367,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       // not yet closed — twenty-eight names at once on a phone. The names that
       // are wanted whatever the zoom are three: the selected contract, the one
       // this match is on, and the next one in the order.
-      const wanted = sel || p.t.id === current || p.t.id === state.next?.id;
+      const wanted = sel || p.t.boot || p.t.id === current || p.t.id === state.next?.id;
       // Fitted to the screen, or near it, nothing but those two: forty-one
       // pins at the opening zoom are dots whatever room they have, and the
       // names only start to appear once the map has been zoomed past twice
