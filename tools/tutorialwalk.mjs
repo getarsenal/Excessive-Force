@@ -16,10 +16,11 @@ await page.goto('http://localhost:5177/', { waitUntil: 'load', timeout: 300000 }
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && !document.getElementById('ui').hidden, null, { timeout: 400000 });
 await page.waitForTimeout(3000);
 const shot = async (n) => { await page.screenshot({ path: `${out}-${n}.png` }); console.log('shot', n, await page.evaluate(() => document.querySelector('.tut-title')?.textContent + ' | ' + document.querySelector('.tut-count')?.textContent)); };
-await shot('0-general'); await hush(); await page.waitForTimeout(300); await shot(1);
+await shot('0-general');
 // The General has the floor first; CARRY ON, then the step.
-const hush = async () => { if (await page.evaluate(() => !document.querySelector('.tut-gen').hidden)) { await page.click('.tut-gen-ok'); await page.waitForTimeout(300); } };
+const hush = async () => { if (await page.evaluate(() => { const t = window.__tutorial; if (t && t.talking) { t.hush(); return true; } return false; })) await page.waitForTimeout(300); };
 const ok = async () => { await hush(); await page.click('.tut-ok'); };
+await hush(); await page.waitForTimeout(300); await shot(1);
 await ok(); await page.waitForTimeout(400); await shot(2);           // look around
 await ok(); await page.waitForTimeout(400); await ok();                // funds
 await page.waitForTimeout(400); await shot(3);                         // units
