@@ -11,6 +11,25 @@ import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { menuMusic } from './music.js';
 
+/**
+ * The par marks: R, $, T and L on the contract list, and the same four
+ * spelled out on every dossier. One table, so the letters, the words and the
+ * sums that light them cannot drift apart.
+ */
+const PAR_MARKS = [
+  { k: 'R', name: 'ROUNDS', what: 'Bring it down firing no more shells than par.',
+    best: (r) => r.bestShots ?? null, par: (p) => p.rounds, beat: (v, p) => v <= p.rounds, fmt: (v) => `${v}` },
+  { k: '$', name: 'BUDGET', what: 'Spend no more than par on guns and strikes.',
+    best: (r) => r.bestSpent ?? null, par: (p) => `$${p.spend.toLocaleString()}`, beat: (v, p) => v <= p.spend,
+    fmt: (v) => `$${Math.round(v).toLocaleString()}` },
+  { k: 'T', name: 'CLOCK', what: 'Bring it down inside par time.',
+    best: (r) => r.bestTime ?? null, par: (p) => `${p.minutes}:00`, beat: (v, p) => v <= p.minutes * 60,
+    fmt: (v) => `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}` },
+  { k: 'L', name: 'LEVERAGE', what: 'Stone that fell for every stone you shot out. Find the load path.',
+    best: (r) => r.bestLeverage ?? null, par: (p) => `${p.leverage}\u00d7`, beat: (v, p) => v >= p.leverage,
+    fmt: (v) => `${Math.round(v * 10) / 10}\u00d7` },
+];
+
 /** 51.4994, -0.1246 → 51°29′58″N 0°07′29″W, the way a target folder has it. */
 const dms = (lat, lon) => {
   const one = (v, pos, neg) => {
@@ -200,6 +219,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
             <div class="wm-hint">DRAG TO PAN · PINCH OR SCROLL TO ZOOM</div>
           </div>
           <div class="ef-list-k">CONTRACTS</div>
+          <div class="ef-legend"><i>R</i> rounds <i>$</i> budget <i>T</i> clock <i>L</i> leverage <span>· lit when you beat par</span></div>
           <div class="ef-list" id="ef-list"></div>
         </section>
 
@@ -545,25 +565,21 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     // A record that only says a contract was closed cannot tell a player they
     // have got better at it, which is the only reason to open one twice.
     const par = lv.par;
-    const cell = (label, value, parValue, beat) =>
-      `<div class="${beat ? 'beat' : ''}"><span>${label}</span><b>${value}</b>`
-      + (parValue != null ? `<i>par ${parValue}</i>` : '') + '</div>';
-    const record = rec.runs
-      ? `<div class="wm-rec">
-           ${cell('Rounds', rec.bestShots ?? '—', par?.rounds,
-    par && rec.bestShots != null && rec.bestShots <= par.rounds)}
-           ${cell('Spent', rec.bestSpent != null ? `$${rec.bestSpent.toLocaleString()}` : '—',
-    par ? `$${par.spend.toLocaleString()}` : null,
-    par && rec.bestSpent != null && rec.bestSpent <= par.spend)}
-           ${cell('Time', fmtTime(rec.bestTime), par ? `${par.minutes}:00` : null,
-    par && rec.bestTime != null && rec.bestTime <= par.minutes * 60)}
-           ${cell('Leverage', rec.bestLeverage != null
-    ? `${Math.round(rec.bestLeverage * 10) / 10}\u00d7` : '\u2014',
-  par ? `\u2265${par.leverage}\u00d7` : null,
-  par && rec.bestLeverage != null && rec.bestLeverage >= par.leverage)}
-           ${cell('Attempts', rec.runs, null, false)}
-         </div>`
-      : '<div class="wm-rec none">NO ATTEMPTS ON RECORD</div>';
+    // The four par marks, spelled out: the same four letters the contract
+    // list lights, what each one asks, the par, and the best this player has
+    // done. Shown before the first attempt as well, so the target is known
+    // going in rather than discovered on the report.
+    const markRows = PAR_MARKS.map((m) => {
+      const best = m.best(rec);
+      const beat = !!par && best != null && m.beat(best, par);
+      return `<div class="wm-mark${beat ? ' beat' : ''}">
+        <i class="wm-mark-k">${m.k}</i>
+        <div class="wm-mark-body"><b>${m.name}</b><span>${m.what}</span></div>
+        <div class="wm-mark-fig"><em>par ${par ? m.par(par) : '—'}</em><b>${best != null ? m.fmt(best) : '—'}</b></div>
+      </div>`;
+    }).join('');
+    const record = `<div class="wm-marks">${markRows}</div>`
+      + `<div class="wm-rec-foot">${rec.runs ? `${rec.runs} attempt${rec.runs === 1 ? '' : 's'} on record · lit marks are par beaten` : 'No attempts yet · beat par to light a mark'}</div>`;
     const status = t.down ? 'closed' : (t.open ? 'active' : 'sealed');
     const stamp = t.down ? 'CLOSED' : (t.open ? 'ACTIVE' : 'SEALED');
     const cmdr = CAST[DEFENDER_OF[t.id]];
@@ -589,7 +605,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
                 <ul class="wm-doss-obj">${objectives}</ul>
               </div>
               <div>
-                <div class="wm-k">Record</div>
+                <div class="wm-k">Par marks</div>
                 ${record}
               </div>
             </div>
@@ -726,11 +742,11 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       // The four par marks, as four letters: rounds, spend, time, leverage.
       // A closed contract that only said DOWN gave no reason to open it twice.
       const par = (LEVELS[t.id] || {}).par;
-      const marks = t.down && par ? `<span class="ef-par" title="Par beaten: rounds, spend, time, leverage">`
-        + `<i class="${rec.bestShots != null && rec.bestShots <= par.rounds ? 'hit' : ''}">R</i>`
-        + `<i class="${rec.bestSpent != null && rec.bestSpent <= par.spend ? 'hit' : ''}">$</i>`
-        + `<i class="${rec.bestTime != null && rec.bestTime <= par.minutes * 60 ? 'hit' : ''}">T</i>`
-        + `<i class="${rec.bestLeverage != null && rec.bestLeverage >= par.leverage ? 'hit' : ''}">L</i></span>` : '';
+      const marks = t.down && par ? `<span class="ef-par">` + PAR_MARKS.map((m) => {
+        const best = m.best(rec);
+        const hit = best != null && m.beat(best, par);
+        return `<i class="${hit ? 'hit' : ''}" title="${m.name}: ${hit ? 'par beaten' : `par ${m.par(par)}`}">${m.k}</i>`;
+      }).join('') + '</span>' : '';
       const right = t.down
         ? `${marks}<em class="down">DOWN · ${fmtTime(rec.bestTime)}</em>`
         : (t === state.next ? '<em class="next">NEXT</em>'
