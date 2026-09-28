@@ -16,6 +16,8 @@
   inset: 0;
   z-index: 65;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-y;
   background: #05070a;
   color: var(--ink);
   font-family: 'Oswald', system-ui, sans-serif;
@@ -156,8 +158,13 @@
 .tt-menu {
   grid-area: menu; align-self: end;
   display: flex; flex-direction: column; gap: 5px;
-  min-height: 0; max-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 4px 4px 4px 0; margin-right: -4px;
+  min-height: 0; max-height: 100%;
+  /* Up and down only, and no rubber band: the list is part of the page, not
+     a card floating over it. The items nudge sideways on a press, and a list
+     that could scroll sideways let a thumb drag the whole thing about. */
+  overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none; touch-action: pan-y;
+  padding: 4px 8px 4px 0;
   max-width: 560px; width: 100%;
 }
 .tt-item {
@@ -173,12 +180,16 @@
 }
 @keyframes tt-item-in { from { opacity: 0; transform: translateX(-26px); } }
 .tt-item:hover, .tt-item:focus-visible {
-  transform: translateX(6px);
   border-left-color: var(--o);
   background: linear-gradient(90deg, rgba(224, 108, 52, 0.22), rgba(9, 13, 19, 0.7) 60%);
   outline: none;
 }
-.tt-item:active { transform: translateX(3px) scale(0.99); }
+.tt-item:active { transform: scale(0.985); }
+/* The sideways lean is for a mouse. A phone keeps :hover after a tap, and a
+   list whose rows stay shoved to the right reads as something you can drag. */
+@media (hover: hover) and (pointer: fine) {
+  .tt-item:hover, .tt-item:focus-visible { transform: translateX(6px); }
+}
 .tt-no { font-style: normal; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--dim); width: 20px; flex: 0 0 auto; }
 .tt-lbl { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .tt-lbl b {
@@ -195,7 +206,7 @@
   color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tt-arrow { font-size: 26px; line-height: 1; color: var(--dim); transition: transform 0.18s ease, color 0.18s ease; }
-.tt-item:hover .tt-arrow { transform: translateX(4px); color: var(--o2); }
+.tt-item:hover .tt-arrow { color: var(--o2); }
 
 .tt-item.primary {
   min-height: 64px;
@@ -212,7 +223,7 @@
 @keyframes tt-sheen { 0%, 70% { left: -60%; } 100% { left: 130%; } }
 .tt-item.primary .tt-lbl b { font-size: 25px; font-weight: 700; letter-spacing: 0.16em; }
 .tt-item.primary .tt-lbl em, .tt-item.primary .tt-no, .tt-item.primary .tt-arrow { color: rgba(20, 9, 4, 0.72); }
-.tt-item.primary:hover { transform: translateX(6px); background: linear-gradient(100deg, #ff8a48, #ef7434 45%, #c55422 100%); }
+.tt-item.primary:hover { background: linear-gradient(100deg, #ff8a48, #ef7434 45%, #c55422 100%); }
 .tt-item.hot .tt-no::before {
   content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; vertical-align: 1px;
   background: var(--o2); border-radius: 50%; box-shadow: 0 0 0 0 rgba(255, 154, 77, 0.8);
@@ -335,7 +346,10 @@
   background: none; border: 1px solid var(--line); color: var(--mute);
 }
 .tt-x:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.3); }
-.tt-sh-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px 20px; }
+.tt-sh-body {
+  overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none; touch-action: pan-y; padding: 12px 16px 20px;
+}
 
 /* Armoury. */
 .tt-arm-intro { margin: 0 0 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--mute); }
@@ -454,7 +468,7 @@
   .tt-side {
     grid-area: side; display: flex; flex-direction: column; justify-content: flex-end;
     align-self: end; justify-self: end; width: min(420px, 100%);
-    max-height: 100%; overflow-y: auto; padding-bottom: 4px;
+    max-height: 100%; overflow-x: hidden; overflow-y: auto; overscroll-behavior: none; padding-bottom: 4px;
     animation: tt-in 0.8s ease 0.6s both;
   }
   .tt-menu { grid-area: menu; align-self: end; max-width: none; }
