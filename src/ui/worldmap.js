@@ -132,7 +132,10 @@ const fmtTime = (t) => {
  * Show the map and resolve with the level the player picked, or null if they
  * backed out to a match already in progress.
  */
-export async function showWorldMap({ current = null, canResume = false } = {}) {
+/** What the map resolves with when the player backs out to the title. */
+export const HOME = '__home';
+
+export async function showWorldMap({ current = null, canResume = false, view: startView = null, home = false } = {}) {
   const world = await loadWorld();
   menuMusic.play();
   const state = campaignState();
@@ -662,7 +665,8 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
     banner.textContent = name === 'dossier' && selected
       ? `CONTRACT ${String(selected.no).padStart(2, '0')} · ${selected.iso} · ${selected.city.toUpperCase()}`
       : BANNERS[name];
-    backBtn.hidden = name === 'door';
+    // With a title screen behind it, the door has somewhere to go back to.
+    backBtn.hidden = name === 'door' && !home;
     paintFoot();
     if (name === 'map') {
       // The stage has no size until its view is on screen, and the camera is
@@ -822,6 +826,8 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   paintFoot();
 
   const burnT = burning ? byIso.get(burning) : null;
+  if (!burnT && startView && startView !== 'door') setView(startView);
+  else setView('door');
   if (burnT) {
     // A contract just closed, so the map is where the player wants to be: the
     // country going up is the whole reward and it does not play on a card.
@@ -837,7 +843,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
   }
 
   return new Promise((resolve) => {
-    const finish = (id) => { menuMusic.stop(); cleanup(); root.remove(); resolve(id); };
+    const finish = (id) => { if (id !== HOME) menuMusic.stop(); cleanup(); root.remove(); resolve(id); };
 
     // ── Panning, pinching, and telling a tap from a drag.
     //
@@ -969,10 +975,11 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       e.currentTarget.classList.toggle('off', !on);
     });
     backBtn.addEventListener('click', () => {
+      if (home && (viewName === 'door' || (viewName === startView && startView !== 'dossier'))) { finish(HOME); return; }
       setView(viewName === 'dossier' ? 'map' : 'door');
     });
     goBtn.addEventListener('click', () => {
-      if (viewName === 'records') { setView('door'); return; }
+      if (viewName === 'records') { if (home && startView === 'records') finish(HOME); else setView('door'); return; }
       if (!selected) { setView('map'); return; }
       if (!selected.open) { setView('map'); return; }
       finish(selected.id);
@@ -1002,7 +1009,7 @@ export async function showWorldMap({ current = null, canResume = false } = {}) {
       setFreeDeploy(!freeDeploy());
       cleanup();
       root.remove();
-      showWorldMap({ current, canResume }).then(resolve);
+      showWorldMap({ current, canResume, view: startView, home }).then(resolve);
     });
     root.querySelector('#wm-back')?.addEventListener('click', () => finish(null));
 

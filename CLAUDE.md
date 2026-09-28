@@ -148,7 +148,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   package · `src/game/aircraft.js` air strikes and the airlift (the C-130,
   the parachutes, what the flak does to both) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
-  `src/ui/` HUD, level select, stand-off, test panel ·
+  `src/ui/` HUD, level select, stand-off, test panel · `src/ui/title.js`
+  the title screen in front of the contract card (continue, daily strike,
+  battles in progress, armoury, commanders, the war wire) ·
+  `src/game/battlesave.js` battles saved mid-fight and resumed ·
+  `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
   surveyed graph · `tools/shot.mjs` the harness.

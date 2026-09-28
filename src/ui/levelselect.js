@@ -199,8 +199,8 @@ export async function resolveStartLevel() {
   }
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';
-  const { showWorldMap } = await import('./worldmap.js');
-  const id = await showWorldMap({});
+  const { openFrontDoor } = await import('./title.js');
+  const id = await openFrontDoor({});
   if (loading) loading.style.display = '';
   try { localStorage.setItem(AUTOSTART_KEY, '1'); } catch { /* no storage */ }
   // Chosen from the front door: no reload needed, this is the first boot —

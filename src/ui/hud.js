@@ -27,6 +27,7 @@ export class HUD {
     this.onNextTarget = opts.onNextTarget || (() => {});
     this.onKeepGoing = opts.onKeepGoing || (() => {});
     this.onPickTarget = opts.onPickTarget || (() => {});
+    this.onHome = opts.onHome || (() => this.onPickTarget());
     this.onFireMode = opts.onFireMode || (() => {});
     this.onSmoke = opts.onSmoke || (() => {});
     this.onPause = opts.onPause || (() => {});
@@ -387,6 +388,7 @@ export class HUD {
     menu.querySelector('#menu-resume').addEventListener('click', () => open(false));
     menu.querySelector('#menu-restart').addEventListener('click', () => this.onRestart());
     menu.querySelector('#menu-targets').addEventListener('click', () => { open(false); this.onPickTarget(); });
+    menu.querySelector('#menu-home')?.addEventListener('click', () => { open(false); this.onHome(); });
     const snd = menu.querySelector('#menu-sound');
     snd.addEventListener('click', () => {
       if (this.el.sound) this.el.sound.click();

@@ -37,6 +37,8 @@ import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
+import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS } from './game/career.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -115,7 +117,16 @@ async function boot() {
     selftest = sessionStorage.getItem('tt.selftest') === '1';
     sessionStorage.removeItem('tt.selftest');
   } catch { /* private mode */ }
-  const intros = introsEnabled() && level.intros !== false && !selftest;
+  // Back into a battle in progress, from the front door (see battlesave.js).
+  let resumeSnap = null;
+  try {
+    if (sessionStorage.getItem('tt.resume') === level.id) resumeSnap = battleFor(level.id);
+    sessionStorage.removeItem('tt.resume');
+  } catch { /* private mode */ }
+  // Today's daily strike, if this load is one.
+  const daily = selftest ? null : takeDailyRun(level.id);
+  const dailyMod = daily ? DAILY_MODS.find((m) => m.id === daily.mod) : null;
+  const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
 
@@ -446,6 +457,11 @@ async function boot() {
   if (level.startMoney) battle.money = level.startMoney;
   if (level.unlockAll) battle.unlockAll = true;
   if (level.freeBuild) battle.freeBuild = true;
+  if (dailyMod) {
+    if (dailyMod.id === 'chest') battle.money *= 2;
+    if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
+    if (dailyMod.id === 'arsenal') battle.unlockAll = true;
+  }
 
   // The real soldier from FIREBASE, flattened into one instanceable geometry.
   // Loaded after the garrison is posted rather than before it, so a slow or
@@ -528,7 +544,7 @@ async function boot() {
     // Through `goToLevel` rather than a bare reload: the level is no longer in
     // the address bar by the time anyone can press this, so a reload would
     // land on the map.
-    onRestart: () => goToLevel(level.id),
+    onRestart: () => { battleOver = true; clearBattle(level.id); goToLevel(level.id); },
     onNextTarget: () => goToLevel(nextTarget(level.id).id),
     // The win is already banked; this just lets play carry on against
     // whatever is still standing.
@@ -541,6 +557,7 @@ async function boot() {
       // looking at the world.
       const wasPaused = testMenu.paused;
       testMenu.paused = true;
+      keepBattle();
       try {
         const { showWorldMap } = await import('./ui/worldmap.js');
         const id = await showWorldMap({ current: level.id, canResume: true });
@@ -549,6 +566,28 @@ async function boot() {
         testMenu.paused = wasPaused;
       }
       // Picking the level already in play, or backing out, just closes it.
+    },
+    // The title screen, over a battle that holds and is saved while it is up.
+    onHome: async () => {
+      const wasPaused = testMenu.paused;
+      testMenu.paused = true;
+      keepBattle();
+      try {
+        const { openFrontDoor } = await import('./ui/title.js');
+        const id = await openFrontDoor({ current: level.id, canResume: true });
+        if (id && id !== level.id) { goToLevel(id); return; }
+        if (id === level.id) {
+          let daily = null;
+          try {
+            daily = sessionStorage.getItem('tt.dailyrun');
+            sessionStorage.removeItem('tt.resume');
+          } catch { /* private mode */ }
+          // The daily is this contract under today's terms: a fresh start.
+          if (daily) { battleOver = true; clearBattle(level.id); goToLevel(id); return; }
+        }
+      } finally {
+        testMenu.paused = wasPaused;
+      }
     },
     onToggleSound: (on) => audio.setEnabled(on),
     onFireMode: (m) => battle.setFireMode(m),
@@ -714,6 +753,19 @@ async function boot() {
       // Read *before* the result is banked, because banking it rewrites the
       // best — ask afterwards and every run is a personal best.
       case 'win':
+        battleOver = true;
+        clearBattle(level.id);
+        if (dailyMod) {
+          setTimeout(() => {
+            if (dailyMet(dailyMod.id, battle.summary())) {
+              const streak = markDailyDone(daily.date);
+              hud.feed(`DAILY STRIKE COMPLETE · ${streak}-DAY STREAK`, 'big');
+            } else {
+              hud.feed('DAILY STRIKE MISSED · TOO SLOW FOR BLITZ', 'bad');
+            }
+            endDailyRun();
+          }, 1500);
+        }
         // Let the collapse actually finish before covering it with a panel —
         // the tower coming down is the thing the player came for.
         hud.feed('STRUCTURE FAILING', 'big');
@@ -729,6 +781,8 @@ async function boot() {
         }, 7000);
         break;
       case 'flattened':
+        battleOver = true;
+        clearBattle(level.id);
         hud.feed('NOTHING LEFT STANDING', 'big');
         setTimeout(() => {
           const sum = battle.summary();
@@ -746,6 +800,9 @@ async function boot() {
         }, 3000);
         break;
       case 'lose':
+        battleOver = true;
+        clearBattle(level.id);
+        if (dailyMod) endDailyRun();
         setTimeout(() => {
           recordResult(level.id, false, data);
           recordTheatre(level.id, false, data);
@@ -1159,6 +1216,8 @@ async function boot() {
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
+    if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
+    if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     const ch = getChallenge();
     if (ch && ch.level === level.id) {
       hud.challenge = ch;
@@ -1220,9 +1279,33 @@ async function boot() {
     console.warn('[tumble] shader pre-compile skipped:', err?.message || err);
   }
 
+  // The battle as it was left, before the player sees the board.
+  if (resumeSnap) {
+    try {
+      restoreBattle(resumeSnap, { battle, structures });
+      for (const st of structures) st.solveStability(true);
+      console.log(`[tumble] resumed ${level.id}: ${resumeSnap.units.length} units, $${resumeSnap.money}`);
+    } catch (err) {
+      console.warn('[tumble] could not resume the battle', err);
+    }
+  }
+
   document.getElementById('loading').style.display = 'none';
   uiEl.hidden = false;
   if (!standoff) firstPrompt();
+
+  // Written down while it is being fought, so a phone call or a closed tab
+  // does not cost the battle. Boot Camp and regression runs are not kept.
+  let battleOver = false;
+  const keepBattle = () => {
+    if (battleOver || level.id === 'tutorial' || selftest) return;
+    try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
+    try { saveBattle(snapshotBattle({ level, battle, structures })); } catch (err) { console.warn('[tumble] battle not saved', err); }
+  };
+  window.__keepBattle = keepBattle;
+  setInterval(keepBattle, 10000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) keepBattle(); });
+  window.addEventListener('pagehide', keepBattle);
 
   const governor = new AdaptiveGovernor(quality, engine);
   const perfEl = document.getElementById('perf');

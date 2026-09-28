@@ -114,7 +114,7 @@ export class Tutorial {
       { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',
         text: 'LOITERING stays on station; SINGLE USE is one pass. Tap one, then the tower.', done: () => this._striking() },
       { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts.', ok: true },
-      { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, quality, and back to the map.', ok: true },
+      { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
       { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls.', done: () => b.state === 'won',
         say: "Stop admiring it and knock the damn thing over. I've got a tee time." },
     ];

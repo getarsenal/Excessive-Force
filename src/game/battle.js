@@ -1014,6 +1014,21 @@ export class Battle {
     return unit;
   }
 
+  /** Where a saved unit was standing, as a deploy point. See battlesave.js. */
+  restorePoint(u) {
+    const p = new THREE.Vector3(u.x, u.y, u.z);
+    p.onRoof = u.r === 1;
+    p.onDeck = u.k === 1;
+    return p;
+  }
+
+  /** A saved unit, back on the ground: no money, no lift, no placement check. */
+  restoreUnit(id, pos) {
+    const def = UNITS_BY_ID[id];
+    if (!def || def.strike) return null;
+    return this._spawn(def, pos);
+  }
+
   async _attachModel(unit) {
     const def = unit.def;
     if (def.id === 'm120') {

@@ -2076,6 +2076,9 @@ export class Structure {
   }
 
   /** Remove a stone from the world entirely. */
+  /** Is stone `i` still part of the world (standing, loose or fallen)? */
+  isAlive(i) { return !!(this.flags[i] & ALIVE); }
+
   destroyChunk(i, from) {
     if (!(this.flags[i] & ALIVE)) return;
     this.flags[i] &= ~ALIVE;
