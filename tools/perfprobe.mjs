@@ -40,7 +40,8 @@ const r = await page.evaluate(([n, secs, warm]) => {
   wrap(g, '_acquireAir', 'garrison.air');
   if (g.city) wrap(g.city, 'blocks', 'city.blocks');
   wrap(window.physics, 'step', 'physics.step');
-  for (const s of window.structures) { wrap(s, 'solveStability', 'solve'); wrap(s, 'maintainIslands', 'islands'); wrap(s, 'syncTransforms', 'sync'); }
+  for (const k of ['reclaim', 'demote', '_findSupport', '_overSomething', 'recycleSettled', 'auditFrozen']) wrap(window.physics, k, 'physics.' + k);
+  for (const s of window.structures) { wrap(s, 'solveStability', 'solve'); wrap(s, 'maintainIslands', 'islands'); wrap(s, 'syncTransforms', 'sync'); wrap(s, 'fragmentIsland', 'fragment'); }
   if (bt.projectiles) wrap(bt.projectiles, 'update', 'projectiles');
   for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(bt))) {
     if (/^_?update[A-Z]/.test(k) && typeof bt[k] === 'function') wrap(bt, k, 'bt.' + k);

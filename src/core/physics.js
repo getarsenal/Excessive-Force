@@ -661,16 +661,33 @@ export class PhysicsWorld {
    */
   reclaim(wanted) {
     if (this.dynamicSet.size + wanted <= this.activeBudget) return wanted;
+    // A sweep that came up short is not repeated for a few steps.
+    //
+    // Nothing it could free changes inside a step — what it condemns goes at
+    // the top of the next one, and a body that could not be frozen a moment
+    // ago still cannot — but it was being asked again and again: once for
+    // every small section on the map by the fragmenter, every frame, each ask
+    // a support probe on every sleeping body in the set. Late in a long
+    // battle on a phone's budget that was fifty milliseconds a frame spent
+    // getting the same answer, and the game ran at a dozen frames a second.
+    if (this.stepCount < (this._dryUntil ?? -1)) {
+      return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
+    }
     let freed = 0;
     const need = this.dynamicSet.size + wanted - this.activeBudget;
+    const retryAt = this.stepCount - 30;
 
     // Three passes, in order of how happy we are about the outcome.
     //
     // First, bodies Rapier has put to sleep, standing on something: freezing
     // one of those is free of consequence.
+    // A body that could not be frozen is not probed again for half a second:
+    // the support test on a welded section is a ray per stone.
     for (const body of this.dynamicSet) {
       if (freed >= need) break;
-      if (body.isSleeping() && this.demote(body)) freed++;
+      if (!body.isSleeping() || body.__noDemote > retryAt) continue;
+      if (this.demote(body)) freed++;
+      else body.__noDemote = this.stepCount;
     }
 
     // Second, bodies that have stopped without being asleep.
@@ -695,9 +712,11 @@ export class PhysicsWorld {
         const v = body.linvel(), w = body.angvel();
         if (Math.hypot(v.x, v.y, v.z) > 0.34) continue;
         if (Math.hypot(w.x, w.y, w.z) > 0.5) continue;
+        if (body.__doomed) continue;
         tried++;
+        if (body.__noDemote > retryAt) { slow.push(body); continue; }
         if (this.demote(body)) freed++;
-        else slow.push(body);
+        else { body.__noDemote = this.stepCount; slow.push(body); }
       }
     }
 
@@ -733,6 +752,7 @@ export class PhysicsWorld {
         this._condemn(slow[i]);
       }
     }
+    if (freed < need) this._dryUntil = this.stepCount + 4;
     return Math.min(wanted, this.activeBudget - this.dynamicSet.size);
   }
 
