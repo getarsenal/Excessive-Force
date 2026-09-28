@@ -431,7 +431,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
         p.box.setAttribute('width', (bb.width + 12).toFixed(1));
         p.box.setAttribute('height', (bb.height + 10).toFixed(1));
       }
-      for (const c of [p.halo, p.dot, p.hit]) {
+      for (const c of [p.halo, p.ping, p.dot, p.hit]) {
         c.setAttribute('cx', px.toFixed(1));
         c.setAttribute('cy', py.toFixed(1));
       }
