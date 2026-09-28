@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * The arsenal.
@@ -297,6 +298,81 @@ export const UNITS = [
 
 export const UNITS_BY_ID = Object.fromEntries(UNITS.map((u) => [u.id, u]));
 
+/**
+ * One mesh per material, for a model that never moves inside itself.
+ *
+ * A towed gun off its GLB is a dozen meshes, and a fire team built in code is
+ * two men of twenty limbs, helmet, webbing and tube apiece: forty-odd draw
+ * calls for one card in the build bar. Seventy units on the ground was five
+ * hundred draw calls of a five-hundred-and-seventy-call frame, and on a phone
+ * that is the frame. Nothing inside a unit is animated — the group is turned
+ * and the group is moved — so each is baked here into as many meshes as it has
+ * distinct materials, which for anything the player owns is four or five.
+ *
+ * Materials are matched by what they draw with, not by identity: every figure
+ * builds its own olive cloth, and forty identical cloths are one.
+ * `userData` that tests and the game read off the parts (`weapon`, `role`) is
+ * kept on empty markers under the result, which draw nothing.
+ */
+export function flattenModel(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const groups = new Map();
+  const keep = [];
+  const marks = [];
+  const keyOf = (m) => [m.type, m.color?.getHexString(), m.emissive?.getHexString(),
+    (m.roughness ?? 0).toFixed(2), (m.metalness ?? 0).toFixed(2), m.map?.uuid ?? '',
+    m.transparent ? m.opacity.toFixed(2) : '', m.side, m.vertexColors ? 1 : 0].join('|');
+  root.traverse((o) => {
+    if (o !== root && o.userData && (o.userData.weapon || o.userData.role)) marks.push(o);
+    if (!o.isMesh) return;
+    if (!o.visible || Array.isArray(o.material) || o.isInstancedMesh || o.isSkinnedMesh
+        || o.geometry.morphAttributes?.position) { keep.push(o); return; }
+    const k = keyOf(o.material);
+    let gr = groups.get(k);
+    if (!gr) groups.set(k, gr = { material: o.material, parts: [], shadow: false });
+    const g = o.geometry.clone();
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    gr.parts.push(g);
+    gr.shadow = gr.shadow || o.castShadow;
+  });
+  if (keep.length) return root;          // something in it is not ours to bake
+  const out = new THREE.Group();
+  for (const gr of groups.values()) {
+    // mergeGeometries wants the same attributes and indexing on every part.
+    let names = null;
+    for (const g of gr.parts) {
+      const n = Object.keys(g.attributes);
+      names = names ? names.filter((x) => n.includes(x)) : n;
+    }
+    const indexed = gr.parts.every((g) => g.index);
+    const parts = gr.parts.map((g0) => {
+      const g = indexed ? g0 : (g0.index ? g0.toNonIndexed() : g0);
+      for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n);
+      g.morphAttributes = {};
+      g.clearGroups();
+      return g;
+    });
+    const merged = mergeGeometries(parts, false);
+    if (!merged) return root;
+    const mesh = new THREE.Mesh(merged, gr.material);
+    mesh.castShadow = gr.shadow;
+    mesh.receiveShadow = true;
+    out.add(mesh);
+  }
+  for (const m of marks) {
+    const tag = new THREE.Object3D();
+    tag.userData = { ...m.userData };
+    out.add(tag);
+  }
+  out.userData = { ...root.userData };
+  // The parts were baked into the root's own frame; it keeps its place.
+  out.position.copy(root.position);
+  out.quaternion.copy(root.quaternion);
+  out.scale.copy(root.scale);
+  return out;
+}
+
 /** Shared GLB cache with Draco decoding. */
 export class ModelLibrary {
   constructor() {
@@ -376,7 +452,7 @@ export class ModelLibrary {
 
     // Wrap so callers can rotate the wrapper without fighting the normalisation.
     const wrapper = new THREE.Group();
-    wrapper.add(root);
+    wrapper.add(flattenModel(root));
     this.cache.set(key, wrapper);
     return wrapper;
   }
@@ -396,7 +472,7 @@ export class ModelLibrary {
     root.position.z -= centre.z;
     root.position.y -= box.min.y;
     const wrapper = new THREE.Group();
-    wrapper.add(root);
+    wrapper.add(flattenModel(root));
     this.cache.set(key, wrapper);
     return wrapper;
   }

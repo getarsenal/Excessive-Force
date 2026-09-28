@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { isReleased } from './campaign.js';
-import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam } from './units.js';
+import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
 
 /** How long a lift package stays open after the first unit is placed. */
 const LIFT_WINDOW = 8;
@@ -1019,20 +1019,23 @@ export class Battle {
     if (def.id === 'm120') {
       // A mortar is a crew and a tube, not two men carrying something: the
       // whole emplacement, laid toward the target like the unit.
-      unit.group.add(makeMortarTeam());
+      unit.group.add(flattenModel(makeMortarTeam()));
       return;
     }
     if (def.model === 'infantry') {
       // A fire team: the gunner and his number two, carrying this unit's own
       // weapon, so a line of AT4s and a line of Javelins are not the same
       // picture on the ground.
+      // Baked into one mesh a material: see `flattenModel`.
+      const team = new THREE.Group();
       for (let i = 0; i < 2; i++) {
         const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738,
           { weapon: def.id, role: i === 0 ? 'gunner' : 'second' });
         m.position.set((i - 0.5) * 1.3, 0, (i % 2) * 0.7);
         m.rotation.y = (Math.random() - 0.5) * 0.3;
-        unit.group.add(m);
+        team.add(m);
       }
+      unit.group.add(flattenModel(team));
       return;
     }
     const wrapper = def.build

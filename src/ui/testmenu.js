@@ -3682,13 +3682,59 @@ export class TestMenu {
     ];
   }
 
+  /**
+   * RUN ALL, from the panel.
+   *
+   * The suite takes the level apart and puts it back: it clears the board,
+   * fast-forwards minutes of physics, knocks stones out and fires every gun
+   * in the arsenal. Run in one synchronous block on a battle already in
+   * progress — seventy units, sixty shells in the air, a garrison of two
+   * hundred — that is minutes of a frozen main thread, and a phone does not
+   * wait minutes: the page was killed and the player lost the battle and the
+   * results together. So a board with anything on it is restarted first, and
+   * the suite runs on the fresh one a test at a time, yielding between them
+   * so the page stays alive and the panel shows where it has got to.
+   */
   runTests() {
-    this.testOut.innerHTML = '<div class="tm-test running">running…</div>';
-    // Let the "running" line paint before the suite blocks the thread.
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const rows = [];
-      let pass = 0, fail = 0;
-      for (const [name, fn] of this.tests()) {
+    if (this._running) return this.lastResults;
+    const b = this.ctx.battle;
+    const busy = b.units.some((u) => u.alive) || b.pending.length > 0
+      || this.ctx.structures.some((st) => st.destroyedCount > 0);
+    if (busy) {
+      const ok = typeof confirm !== 'function' || confirm(
+        'The self-tests take the level apart. Restart this level and run them on a fresh board?\n\nThis battle will be lost.');
+      if (!ok) return this.lastResults;
+      try {
+        sessionStorage.setItem('tt.selftest', '1');
+        const u = new URL(location.href);
+        u.searchParams.set('level', this.ctx.level.id);
+        location.href = u.toString();
+      } catch { location.reload(); }
+      return this.lastResults;
+    }
+    this.runTestsLive();
+    return this.lastResults;
+  }
+
+  /** The suite, a test at a time, with the clock held as the harness holds it. */
+  async runTestsLive() {
+    if (this._running) return;
+    this._running = true;
+    const b = this.ctx.battle;
+    const lift = b.airlift;
+    b.airlift = false;               // the tests place batteries and expect them there
+    if (this.holdClock) this.holdClock(true);
+    const rows = [];
+    let pass = 0, fail = 0;
+    const list = this.tests();
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const [name, fn] = list[i];
+        this.testOut.innerHTML = `<div class="tm-test running">running ${i + 1} of ${list.length} · ${name}</div>`
+          + rows.join('');
+        // A breath between tests: the progress line paints, and the browser
+        // sees a page that is alive rather than one that has hung.
+        await new Promise((r) => setTimeout(r, 16));
         let ok = true, detail = '';
         const t0 = performance.now();
         try {
@@ -3705,13 +3751,16 @@ export class TestMenu {
           <i>${detail}</i>
           <u>${ms.toFixed(0)}ms</u></div>`);
       }
+    } finally {
       rows.unshift(`<div class="tm-test summary ${fail ? 'fail' : 'pass'}">
         ${pass} passed, ${fail} failed</div>`);
       this.testOut.innerHTML = rows.join('');
       this.lastResults = { pass, fail };
       console.log(`[tumble] self tests: ${pass} passed, ${fail} failed`);
-    }));
-    return this.lastResults;
+      b.airlift = lift;
+      if (this.holdClock) this.holdClock(false);
+      this._running = false;
+    }
   }
 
   /** Synchronous variant, for the headless harness. */

@@ -76,6 +76,9 @@ and every boat position over ground or through a building (must be none). `node 
 blind ranks — both are quicker than the whole suite while building.
 `sh tools/suiteall.sh <level>...` runs the suite over several levels and
 prints one line each.
+`node tools/perfprobe.mjs <level> [units] [seconds] [warm-up]` puts an army
+on the ground, runs the fight and prints milliseconds per simulated second
+for each system and the draw calls with and without the units.
 
 ## The real world
 

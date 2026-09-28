@@ -108,7 +108,14 @@ async function boot() {
   await progress(6, 'starting physics');
   // The two commanders fetch while the world builds, so the stand-off never
   // opens on an empty stage.
-  const intros = introsEnabled() && level.intros !== false;
+  // RUN ALL on a battle in progress restarts the level to run the suite on a
+  // fresh board (see `TestMenu.runTests`); this is that load.
+  let selftest = false;
+  try {
+    selftest = sessionStorage.getItem('tt.selftest') === '1';
+    sessionStorage.removeItem('tt.selftest');
+  } catch { /* private mode */ }
+  const intros = introsEnabled() && level.intros !== false && !selftest;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
 
@@ -1487,6 +1494,22 @@ recordResult(level.id, true, sum);
   // The headless harness drives the same suite the panel does, so a regression
   // fails CI and the in-game panel identically.
   window.__runTests = () => testMenu.runTestsSync();
+
+  // The panel holds the clock for its run the way `tt.suite` does for the
+  // harness, and lets it go again when the run is over.
+  testMenu.holdClock = (on) => {
+    suiteHold = on;
+    testMenu.paused = on;
+    governor.frozen = on;
+  };
+  if (selftest) {
+    const go = () => {
+      if (document.getElementById('loading')?.style.display !== 'none') { setTimeout(go, 400); return; }
+      testMenu.toggle(true);
+      testMenu.runTestsLive();
+    };
+    setTimeout(go, 800);
+  }
 }
 
 boot().catch((err) => {
