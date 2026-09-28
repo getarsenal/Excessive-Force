@@ -124,17 +124,21 @@ const connex = (x, z, y0, mat, along = 'x') => ({
 export const SPECS = {
   // ── Boot Camp ───────────────────────────────────────────────────────────
   tutorial: {
-    // Finer than the catalogue's stone, so the lesson lasts the lesson: at
-    // the kit's own size the whole yard was seven hundred stones and came
-    // down before the walkthrough reached the strikes.
-    S: 1.6, yaw: 0.55, mat: M.CONCRETE, fine: 0.6,
+    // Finer than the catalogue's stone, so the lesson lasts the lesson, and
+    // a real tower: sixty metres of concrete under a glass cab, a hundred in
+    // the game. The ground is cleared three hundred metres round it — it is a
+    // practice ground, and a battery wants room to be laid out in a row.
+    S: 1.6, yaw: 0.55, mat: M.CONCRETE, fine: 0.7, clear: 300, budget: 1.4,
     parts: [
-      { t: 'hall', tag: 'operations', x: 0, z: 9, w: 22, d: 12, h: 7, roof: 'flat', mat: M.LIMESTONE, storey: 3.5 },
-      { t: 'tower', tag: 'tower', x: 0, z: -4, w: 8, h: 22, wall: 1.8, cap: 'flat', capH: 0.8, capW: 10.4, mat: M.CONCRETE, floors: 2, storey: 5.5, roofPosts: false },
-      { t: 'hall', tag: 'cab', x: 0, z: -4, y0: 22.8, w: 10, d: 10, h: 3.6, roof: 'flat', roofH: 0.6, mat: M.CURTAIN, storey: 3.6, floors: 0, floorBelow: true, ground: false },
-      connex(26, -10, 0, M.SANDSTONE), connex(26, -7, 0, M.VERDE), connex(26, -7, 2.6, M.LIMESTONE),
-      connex(26, -4, 0, M.VERDE), connex(26, 2, 0, M.SANDSTONE), connex(26, 5, 0, M.LIMESTONE), connex(26, 5, 2.6, M.SANDSTONE),
-      connex(-22, -8, 0, M.VERDE, 'z'), connex(-25, -8, 0, M.SANDSTONE, 'z'), connex(-25, -8, 2.6, M.VERDE, 'z'),
+      { t: 'hall', tag: 'operations', x: 0, z: 18, w: 34, d: 16, h: 10.5, roof: 'flat', mat: M.LIMESTONE, storey: 3.5 },
+      { t: 'tower', tag: 'tower', x: 0, z: -6, w: 13, h: 60, wall: 2.2, cap: 'flat', capH: 1.0, capW: 17, mat: M.CONCRETE, floors: 4, storey: 6, roofPosts: false },
+      { t: 'hall', tag: 'cab', x: 0, z: -6, y0: 61, w: 16.4, d: 16.4, h: 5, roof: 'flat', roofH: 0.8, mat: M.CURTAIN, storey: 5, floors: 0, floorBelow: true, ground: false },
+      { t: 'tower', tag: 'mast', x: 0, z: -6, y0: 66.8, w: 1.6, h: 12, cap: 'spire', capH: 3, mat: M.STEEL, capMat: M.STEEL, ground: false, roofPosts: false, windows: false, floors: 0 },
+      connex(32, -18, 0, M.SANDSTONE), connex(32, -15, 0, M.VERDE), connex(32, -15, 2.6, M.LIMESTONE),
+      connex(32, -12, 0, M.VERDE), connex(32, -3, 0, M.SANDSTONE), connex(32, 0, 0, M.LIMESTONE), connex(32, 0, 2.6, M.SANDSTONE),
+      connex(32, 9, 0, M.VERDE), connex(32, 12, 0, M.SANDSTONE), connex(32, 12, 2.6, M.VERDE),
+      connex(-28, -16, 0, M.VERDE, 'z'), connex(-31, -16, 0, M.SANDSTONE, 'z'), connex(-31, -16, 2.6, M.VERDE, 'z'),
+      connex(-34, -16, 0, M.LIMESTONE, 'z'), connex(-28, 4, 0, M.SANDSTONE, 'z'), connex(-31, 4, 0, M.VERDE, 'z'),
     ],
   },
 

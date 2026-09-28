@@ -523,6 +523,7 @@ function levelRecord(P, i) {
     ...(P.freeBuild ? { freeBuild: true } : {}),
     ...(P.intros === false ? { intros: false } : {}),
     ...(P.fieldWorksShare != null ? { fieldWorksShare: P.fieldWorksShare } : {}),
+    ...(P.aim ? { tutorialAim: { x: P.aim.x * spec.S, y: P.aim.y * spec.S, z: P.aim.z * spec.S } } : {}),
     // A pad the bake declared land is levelled to its own height, not to the
     // water round it.
     ...(P.padH != null ? { groundLevel: 'bake' } : {}),

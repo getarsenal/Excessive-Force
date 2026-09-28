@@ -1859,3 +1859,17 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   font: 600 12px/1 system-ui, sans-serif; letter-spacing: 0.1em; cursor: pointer;
 }
 .ef-card.ef-boot { grid-column: 1 / -1; min-height: 0; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 12px; }
+
+.tut-ring2 { border-style: dashed; }
+.tut-gen {
+  position: absolute; left: 12px; bottom: 92px; display: flex; align-items: flex-end; gap: 8px;
+  max-width: min(420px, calc(100vw - 24px)); pointer-events: none;
+}
+.tut-gen-face { width: 92px; height: auto; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); }
+.tut-gen-body {
+  background: rgba(10,16,23,0.94); border: 1px solid #b22234; border-left: 4px solid #b22234; border-radius: 10px;
+  padding: 8px 11px; color: #e8eef6; font: 13px/1.35 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px;
+}
+.tut-gen-body b { font-size: 10px; letter-spacing: 0.16em; color: #ff8a8a; }
+@media (max-width: 700px) { .tut-gen { bottom: 84px; } .tut-gen-face { width: 64px; } }

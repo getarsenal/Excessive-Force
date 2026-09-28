@@ -27,6 +27,8 @@ export const TUTORIAL_PLACE = {
   garrison: { cap: { window: 3, roof: 3, arcade: 0, ground: 2 }, mortars: 1, flak: 1 },
   // Everything open and everything free, the Apache and the bomber too.
   startMoney: 20000, unlockAll: true, freeBuild: true, intros: false, fieldWorksShare: 0.1,
+  // Where the walkthrough says to tap: the tower's shaft, in the spec's metres.
+  aim: { x: 0, y: 30, z: -6 },
 };
 
 export const PLACES = [
