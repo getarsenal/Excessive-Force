@@ -2204,7 +2204,7 @@ export class Structure {
    * so the next tick re-runs and the failure propagates. That loop is the
    * progressive collapse.
    */
-  solveStability(force = false) {
+  solveStability(force = false, minGap = 0) {
     // A periodic re-check, on top of the event-driven one.
     //
     // The solver runs when something marks it dirty, which is the right design
@@ -2221,6 +2221,14 @@ export class Structure {
       const due = (this.clock || 0) - (this._lastSolve || 0) > 1.0;
       if (!due || (this.islands.size === 0 && this.destroyedCount === 0)) return 0;
     }
+    // Under fire, something marks the building dirty on nearly every step,
+    // and a full solve of a low-tier Florence is several milliseconds on a
+    // desktop and a phone's whole frame budget on a phone. The frame loop asks
+    // for a minimum gap on the smaller tiers: a section that loses its footing
+    // is noticed a tenth of a second later, which nobody can see, instead of
+    // the solve running sixty times a second. It stays dirty until then.
+    // `fastForward` asks for no gap, so the suite is solved to the step.
+    if (minGap > 0 && !force && (this.clock || 0) - (this._lastSolve || 0) < minGap) return 0;
     this._lastSolve = this.clock || 0;
     this.stabilityDirty = false;
 

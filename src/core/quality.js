@@ -25,6 +25,8 @@ export function hasWasmSimd() {
 const TIERS = {
   low: {
     name: 'low',
+    // Least seconds between stability solves in play (see main.js).
+    solveGap: 0.1,
     activeBodies: 420,
     blockScale: 1.55,      // bigger stones => fewer chunks in the same tower
     settleFrames: 26,      // recycle sleeping debris sooner
@@ -39,6 +41,7 @@ const TIERS = {
   },
   medium: {
     name: 'medium',
+    solveGap: 0.05,
     activeBodies: 1100,
     blockScale: 1.2,
     settleFrames: 40,
@@ -53,6 +56,7 @@ const TIERS = {
   },
   high: {
     name: 'high',
+    solveGap: 0,
     activeBodies: 2600,
     blockScale: 1.0,
     settleFrames: 70,
@@ -67,6 +71,7 @@ const TIERS = {
   },
   ultra: {
     name: 'ultra',
+    solveGap: 0,
     activeBodies: 5000,
     blockScale: 0.85,
     settleFrames: 110,

@@ -1382,7 +1382,7 @@ async function boot() {
       physics.recycleSettled(quality.settleFrames);
       physics.auditFrozen();
       physics.cullRunaways(terrain.span * 1.6);
-      for (const s of structures) { s.solveStability(); s.maintainIslands(dt); s.tickLean(dt); }
+      for (const s of structures) { s.solveStability(false, quality.solveGap || 0); s.maintainIslands(dt); s.tickLean(dt); }
     }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;
 
