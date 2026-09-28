@@ -124,10 +124,13 @@ const connex = (x, z, y0, mat, along = 'x') => ({
 export const SPECS = {
   // ── Boot Camp ───────────────────────────────────────────────────────────
   tutorial: {
-    S: 1.6, yaw: 0.55, mat: M.CONCRETE,
+    // Finer than the catalogue's stone, so the lesson lasts the lesson: at
+    // the kit's own size the whole yard was seven hundred stones and came
+    // down before the walkthrough reached the strikes.
+    S: 1.6, yaw: 0.55, mat: M.CONCRETE, fine: 0.6,
     parts: [
       { t: 'hall', tag: 'operations', x: 0, z: 9, w: 22, d: 12, h: 7, roof: 'flat', mat: M.LIMESTONE, storey: 3.5 },
-      { t: 'tower', tag: 'tower', x: 0, z: -4, w: 7, h: 22, cap: 'flat', capH: 0.8, capW: 10.4, mat: M.CONCRETE, floors: 2, storey: 5.5, roofPosts: false },
+      { t: 'tower', tag: 'tower', x: 0, z: -4, w: 8, h: 22, wall: 1.8, cap: 'flat', capH: 0.8, capW: 10.4, mat: M.CONCRETE, floors: 2, storey: 5.5, roofPosts: false },
       { t: 'hall', tag: 'cab', x: 0, z: -4, y0: 22.8, w: 10, d: 10, h: 3.6, roof: 'flat', roofH: 0.6, mat: M.CURTAIN, storey: 3.6, floors: 0, floorBelow: true, ground: false },
       connex(26, -10, 0, M.SANDSTONE), connex(26, -7, 0, M.VERDE), connex(26, -7, 2.6, M.LIMESTONE),
       connex(26, -4, 0, M.VERDE), connex(26, 2, 0, M.SANDSTONE), connex(26, 5, 0, M.LIMESTONE), connex(26, 5, 2.6, M.SANDSTONE),

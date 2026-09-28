@@ -1208,7 +1208,10 @@ export class TestMenu {
         const label = b.targetLabel;
         b.clearTarget();
         const before = b.shotsFired;
-        if (b.units.filter((u) => u.alive).length === 0) this.spawnRing(2);
+        // Its own two guns, whatever an earlier test left standing: a lone
+        // survivor with nothing in its arc (a man with a rocket on a spit of
+        // land at Kronborg) fires nothing and proves nothing either way.
+        if (b.units.filter((u) => u.alive).length < 2) this.spawnRing(2);
         c.fastForward(14);
         const fired = b.shotsFired - before;
         if (hadTarget) b.setTarget(hadTarget, label);
