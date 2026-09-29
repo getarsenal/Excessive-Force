@@ -512,7 +512,7 @@ export const SPECS = {
     S: 1, budget: 2.4, fine: 0.7, yaw: 0.35, mat: M.CONCRETE,
     parts: [
       { t: 'hall', tag: 'podium', x: 0, z: 0, w: 80, d: 80, h: 18, roof: 'flat', mat: M.CONCRETE, storey: 6 },
-      { t: 'needle', tag: 'tower', x: 0, z: 0, y0: 19, r0: 11, r1: 7, h: 230, mat: M.CONCRETE, podMat: M.MADDER, pods: [{ y: 190, r: 26, h: 30 }], mast: 100 },
+      { t: 'needle', tag: 'tower', x: 0, z: 0, y0: 19, r0: 15, r1: 10, h: 230, mat: M.CONCRETE, podMat: M.MADDER, pods: [{ y: 190, r: 26, h: 30 }], mast: 100 },
     ],
   },
   bayterek: {
