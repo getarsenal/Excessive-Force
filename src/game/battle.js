@@ -1931,7 +1931,13 @@ export class Battle {
     // to an aeroplane or a canopy. Neither needs to know the other's business.
     for (const sh of shots) if (sh.air && sh.hit) this.air.hitAir(sh.air, sh.damage);
     this.garrison.updateMortars(dt, this.projectiles, this.units);
-    if (this.turret) this.turret.update(dt, this.units, this.projectiles, this);
+    // The turret is the garrison's heaviest gun, and holds its fire with the
+    // rest of it: a test that has silenced the garrison to watch the battery
+    // work had the One O'Clock Gun still shelling it to pieces.
+    if (this.turret) {
+      if (this.garrison?.fireEnabled === false) this.turret.update(dt, [], this.projectiles, this);
+      else this.turret.update(dt, this.units, this.projectiles, this);
+    }
     this.garrison.sync();
     this.tracerFX.update(dt);
     this._updateRings(dt);

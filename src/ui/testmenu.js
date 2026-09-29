@@ -1253,17 +1253,18 @@ export class TestMenu {
         const hadTarget = b.target ? b.target.clone() : null;
         const label = b.targetLabel;
         b.clearTarget();
-        const before = b.shotsFired;
         // Its own two guns, whatever an earlier test left standing: a lone
         // survivor with nothing in its arc (a man with a rocket on a spit of
         // land at Kronborg) fires nothing and proves nothing either way.
+        // Let what is already in the air land first: the mortar test before
+        // this one leaves a salvo in flight, and four bombs arriving in one
+        // frame is more than a gun has, invulnerable or not — the guns were
+        // dead before they could fire, and the count of the living was taken
+        // before they died.
+        c.fastForward(4);
+        const before = b.shotsFired;
         if (b.units.filter((u) => u.alive).length < 2) this.spawnRing(2);
-        // Whether our guns fire, not whether they live: a garrison that can see
-        // out — Edinburgh's hundred and sixty, with mortars — can kill a
-        // battery still setting up inside the fourteen seconds.
-        const inv = b.invulnerable;
-        b.invulnerable = true;
-        try { c.fastForward(14); } finally { b.invulnerable = inv; }
+        c.fastForward(14);
         const fired = b.shotsFired - before;
         if (hadTarget) b.setTarget(hadTarget, label);
         const why = b.units.filter((u) => u.alive)
