@@ -129,7 +129,7 @@ function guessTier() {
 }
 
 /** A phone, by any of the signals that survive on one. */
-function isMobile() {
+export function isMobile() {
   const ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
     || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);

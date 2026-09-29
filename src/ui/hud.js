@@ -1,4 +1,5 @@
 import { feedback } from './feedback.js';
+import { power } from '../core/power.js';
 import { UNITS, UNITS_BY_ID } from '../game/units.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
@@ -405,6 +406,13 @@ export class HUD {
       const label = () => { hap.textContent = feedback.haptics ? 'HAPTICS: ON' : 'HAPTICS: OFF'; };
       label();
       hap.addEventListener('click', () => { feedback.haptics = !feedback.haptics; label(); });
+    }
+    // Thirty frames in battle and a few behind a menu (see power.js).
+    const saver = menu.querySelector('#menu-saver');
+    if (saver) {
+      const label = () => { saver.textContent = power.saver ? 'BATTERY SAVER: ON' : 'BATTERY SAVER: OFF'; };
+      label();
+      saver.addEventListener('click', () => { power.saver = !power.saver; label(); });
     }
     const opening = menu.querySelector('#menu-opening');
     if (opening) {

@@ -561,6 +561,9 @@ function startFx(canvas, flash) {
   };
   const tick = (now) => {
     raf = requestAnimationFrame(tick);
+    // Thirty frames: tracers and embers do not need more, and every frame of
+    // this canvas is also a frame of the blurred glass over it.
+    if (now - last < 30) return;
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (!live || document.hidden) return;

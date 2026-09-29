@@ -127,6 +127,17 @@ export function goToLevel(id, opts = {}) {
   params.set('level', id);
   if (opts.test) params.set('test', '1'); else params.delete('test');
   try { localStorage.setItem(AUTOSTART_KEY, '1'); } catch { /* no storage */ }
+  // The loader goes up and the level in play is taken down before the next
+  // one is asked for: on a phone the two do not fit at once (see main.js).
+  const ld = document.getElementById('loading');
+  if (ld) {
+    ld.style.display = '';
+    const fill = document.getElementById('load-fill');
+    if (fill) fill.style.width = '2%';
+    const st = document.getElementById('load-status');
+    if (st) st.textContent = 'moving out';
+  }
+  try { window.__releaseLevel?.(); } catch { /* going anyway */ }
   window.location.search = params.toString();
 }
 

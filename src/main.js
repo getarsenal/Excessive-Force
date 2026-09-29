@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { detectQuality, setQuality, AdaptiveGovernor } from './core/quality.js';
+import { power, recoverFromCrash, armBoot } from './core/power.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
 import { Audio } from './core/audio.js';
@@ -108,6 +109,10 @@ async function boot() {
     }
   } catch { /* private mode */ }
 
+  // The last level load died on screen: a tier down before anything is
+  // built, or the phone runs out the same way again (see power.js).
+  const recovered = recoverFromCrash();
+  if (recovered) console.warn('[tumble] last load died; quality', recovered.from, '->', recovered.to);
   const quality = detectQuality();
   console.log('[tumble] quality', quality.id, '· wasm simd', quality.simd,
     '· body budget', quality.activeBodies);
@@ -137,6 +142,7 @@ async function boot() {
   // reach is Westminster.
   const level = await resolveStartLevel();
   console.log('[tumble] level', level.id, '·', level.name);
+  armBoot(level.id);
   const sub = document.querySelector('.load-sub');
   if (sub) sub.textContent = level.name.toUpperCase();
   // The place itself behind the loader: its dossier photograph, dark and
@@ -601,6 +607,7 @@ async function boot() {
       // looking at the world.
       const wasPaused = testMenu.paused;
       testMenu.paused = true;
+      coveredBy++;
       keepBattle();
       try {
         const { showWorldMap } = await import('./ui/worldmap.js');
@@ -608,6 +615,7 @@ async function boot() {
         if (id && id !== level.id) { goToLevel(id); return; }
       } finally {
         testMenu.paused = wasPaused;
+        coveredBy--;
       }
       // Picking the level already in play, or backing out, just closes it.
     },
@@ -615,6 +623,7 @@ async function boot() {
     onHome: async () => {
       const wasPaused = testMenu.paused;
       testMenu.paused = true;
+      coveredBy++;
       keepBattle();
       try {
         const { openFrontDoor } = await import('./ui/title.js');
@@ -634,6 +643,7 @@ async function boot() {
         }
       } finally {
         testMenu.paused = wasPaused;
+        coveredBy--;
       }
     },
     // The readouts fly the camera: the target's name back to the target, UNITS
@@ -650,7 +660,7 @@ async function boot() {
     onToggleSound: (on) => audio.setEnabled(on),
     onFireMode: (m) => battle.setFireMode(m),
     onSmoke: () => battle.placeSmoke(),
-    onPause: (p) => { testMenu.paused = p; },
+    onPause: (p) => { testMenu.paused = p; menuOpen = p; },
     onQuality: (id) => { if (setQuality(id)) goToLevel(level.id); },
     // The survey goes on every structure on the map, not just the contract:
     // at Giza the answer to "what is holding Khafre up" is Khafre.
@@ -1384,12 +1394,15 @@ async function boot() {
 
   stopTips();
   document.getElementById('loading').style.display = 'none';
+  if (recovered) hud.feed(`LAST LOAD RAN OUT OF MEMORY · QUALITY ${recovered.to.toUpperCase()}`, 'big');
   uiEl.hidden = false;
   if (!standoff) firstPrompt();
 
   // Written down while it is being fought, so a phone call or a closed tab
   // does not cost the battle. Boot Camp and regression runs are not kept.
   let battleOver = false;
+  // The frame loop's pacing and its end (see power.js and `release` below).
+  let released = false, menuOpen = false, coveredBy = 0;
   const keepBattle = () => {
     if (battleOver || level.id === 'tutorial' || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
@@ -1572,9 +1585,16 @@ async function boot() {
   };
 
   function frame() {
+    if (released) return;
     requestAnimationFrame(frame);
     const now = performance.now();
+    // Paced (see power.js): thirty frames on the battery saver, a few behind
+    // a menu. The time skipped is not work the device failed to do, so the
+    // governor is told the frame took what it would have unpaced.
+    const gap = power.gap({ menu: menuOpen, covered: coveredBy > 0, over: battleOver });
+    if (gap && now - last < gap - 3) return;
     const dtMs = now - last;
+    const workMs = gap ? Math.max(0, dtMs - gap + 1000 / 60) : dtMs;
     const rawDt = Math.min(dtMs / 1000, 0.05);
     const dt = testMenu.paused ? 0 : rawDt * testMenu.timeScale;
     last = now;
@@ -1591,7 +1611,7 @@ async function boot() {
     // three quarters of a second on an idle box and several on a loaded one.
     // Cologne's hanging rubble was the last test still flipping on it.
     if (!suiteHold) {
-      physics.setBudget(governor.update(dtMs));
+      physics.setBudget(governor.update(workMs));
       physics.step(dt);
       physics.recycleSettled(quality.settleFrames);
       physics.auditFrozen();
@@ -1708,6 +1728,7 @@ async function boot() {
    */
   engine.renderer.domElement.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
+    if (released) return;
     console.error('[tumble] webgl context lost');
     hud.showFault('the graphics context was lost',
       'the browser took the GPU back — usually because it ran out of memory');
@@ -1715,6 +1736,27 @@ async function boot() {
   engine.renderer.domElement.addEventListener('webglcontextrestored', () => {
     console.warn('[tumble] webgl context restored');
   });
+
+  // Leaving: give everything back before the next page asks for it.
+  //
+  // Moving to another level is a full page load, and a phone browser keeps the
+  // page being left — its graphics context, its physics heap, its audio — alive
+  // until the next one is up, and longer if it decides to cache it for the back
+  // button. Two levels' worth of memory at once is more than a phone has, and
+  // the next level died loading and was loaded again, over and over. So the
+  // old one is taken down first, and a page brought back from that cache is
+  // simply loaded fresh.
+  const release = () => {
+    if (released) return;
+    released = true;
+    try { engine.renderer.dispose(); } catch { /* going anyway */ }
+    try { engine.renderer.forceContextLoss(); } catch { /* going anyway */ }
+    try { physics.dead = true; physics.world.free(); } catch { /* going anyway */ }
+    try { if (audio.ctx) audio.ctx.close(); } catch { /* going anyway */ }
+  };
+  window.__releaseLevel = release;
+  window.addEventListener('pagehide', release);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) window.location.reload(); });
 
   frame();
 
