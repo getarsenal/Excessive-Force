@@ -418,7 +418,7 @@ export const SPECS = {
     parts: [
       { t: 'steps', tag: 'terraces', base: true, x: 0, z: 0, w: 100, h: 9, n: 3, wTop: 64, mat: M.TILE, posts: true },
       { t: 'dome', tag: 'dome', x: 0, z: 0, y0: 9, r: 28, drumH: 0, h: 16, profile: 'round', mat: M.TILE, domeMat: M.TILE, lantern: false },
-      { t: 'tower', tag: 'harmika', x: 0, z: 0, y0: 24.5, w: 9, h: 6, cap: 'flat', capH: 0.8, mat: M.GOLD, ground: false, windows: false, floors: 0, roofPosts: false },
+      { t: 'tower', tag: 'harmika', x: 0, z: 0, y0: 24, w: 9, h: 6, cap: 'flat', capH: 0.8, mat: M.GOLD, ground: false, windows: false, floors: 0, roofPosts: false },
       { t: 'tower', tag: 'spire', x: 0, z: 0, y0: 31.3, w: 7, h: 12, taper: 0.4, cap: 'spire', capH: 5, capMat: M.GOLD, mat: M.GOLD, ground: false, windows: false, floors: 0, roofPosts: false },
       ...[[1, 0], [-1, 0], [0, 1], [0, -1]].map(([sx, sz]) => ({ t: 'arch', tag: 'gates', x: sx * 58, z: sz * 58, w: sz ? 10 : 6, d: sz ? 6 : 10, h: 8, span: 3.6, spring: 3.4, axis: sz ? 'z' : 'x', mat: M.TILE })),
     ],
@@ -662,3 +662,81 @@ export const SPECS = {
     ],
   },
 };
+
+/**
+ * Game scale.
+ *
+ * The rows above are the buildings at their real size, and the sixteen
+ * original levels are not: the Elizabeth Tower is built at 193 m against its
+ * real 96, the Taj Mahal at 196 against 73, Himeji at 129 against 46. A game
+ * about bringing buildings down needs buildings that fill the sky, and the
+ * catalogue at true size put Chambord at 55 m and the Winter Palace at 22 in
+ * the same campaign as those, where they read as models.
+ *
+ * So each is scaled for the game here, by one rule: anything under 250 m
+ * is built at up to 2.6 times its real height, less the taller it is
+ * (2.4 times at 55 m real, 1.8 at 100, 1.25 at 240), counting whatever scale
+ * its row already gives it, and nothing grows past about 420 m across, which
+ * is the widest original site; supertalls stay at their real height, which
+ * is already the point of them. A level standing on a baked pad is held
+ * inside the pad. The stone budget grows with the area (up to three times),
+ * so a bigger building is more stone, not the same stone in bigger blocks.
+ * Explicit clearance radii grow with it.
+ */
+export const GAME_SCALE = {
+  milan: 1.62,
+  stvitus: 1.62,
+  ulm: 1.48,
+  brandenburg: 1.18,
+  stephansdom: 1.45,
+  hohensalzburg: 1.97,
+  versailles: 2.32,
+  chambord: 2.40,
+  seville: 1.80,
+  alhambra: 1.44,
+  malbork: 2.06,
+  warsaw: 1.25,
+  bran: 1.30,
+  bucharest: 2.50,
+  kronborg: 1.89,
+  stockholm: 2.60,
+  hallgrimskirkja: 1.16,
+  trakai: 1.62,
+  winterpalace: 2.33,
+  salisbury: 1.52,
+  windsor: 2.26,
+  nidaros: 1.64,
+  helsinki: 1.28,
+  chillon: 1.62,
+  saintsava: 1.75,
+  landmark81: 1.67,
+  boudhanath: 1.70,
+  victoriamemorial: 1.78,
+  redfort: 1.34,
+  gatewayindia: 1.18,
+  osaka: 1.21,
+  juche: 1.20,
+  monas: 1.01,
+  prambanan: 1.43,
+  registan: 1.33,
+  flametowers: 1.40,
+  azadi: 1.26,
+  kingdomcentre: 1.25,
+  baalbek: 1.62,
+  ur: 1.18,
+  djoser: 2.27,
+  yamoussoukro: 2.05,
+  frontenac: 1.70,
+  capitolio: 1.89,
+  bellasartes: 1.86,
+  teatroamazonas: 1.08,
+  cartagena: 2.46,
+  skytower: 1.11,
+};
+for (const [id, g] of Object.entries(GAME_SCALE)) {
+  const s = SPECS[id];
+  if (!s || !(g > 1)) continue;
+  s.S *= g;
+  if (s.clear) s.clear *= g;
+  s.budget = (s.budget ?? 1) * Math.min(g * g, 3);
+}
