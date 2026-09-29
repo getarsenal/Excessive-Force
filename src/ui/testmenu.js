@@ -656,6 +656,17 @@ export class TestMenu {
     st.stabilityDirty = true;
   }
 
+  /** A ring of a named gun at a given radius; see spawnRing. */
+  _spawnRingWith(id, n, radius) {
+    const keep = this._spawnId;
+    this._spawnId = id;
+    try {
+      let placed = 0;
+      for (let k = 0; k < 8 && placed < n; k++) placed += this.spawnAt(id, n - placed, (k / 8) * Math.PI * 2, radius);
+      return placed;
+    } finally { this._spawnId = keep; }
+  }
+
   spawnRing(n) {
     const b = this.ctx.battle;
     const id = this._spawnId || UNITS[0].id;
@@ -670,7 +681,15 @@ export class TestMenu {
       b.money = money; b.unlockAll = unlock;
       return 1;
     }
-    const radius = Math.min(def.range * 0.7, 170);
+    let radius = Math.min(def.range * 0.7, 170);
+    // Outside the building, and with a gun that reaches over it from there:
+    // at game scale the Winter Palace is 420 m across and an infantry team's
+    // ring at 170 m was inside it.
+    const clear = this._clearRange(radius);
+    if (clear > radius) {
+      radius = clear;
+      if (radius > def.range * 0.8) return this._spawnRingWith('m119', n, radius);
+    }
     let placed = 0;
     for (let a = 0; a < 64 && placed < n; a++) {
       const ang = (a / 64) * Math.PI * 2 + placed * 0.7;
@@ -754,7 +773,9 @@ export class TestMenu {
     const o = st.origin;
     const reach = Math.hypot(Math.max(Math.abs(f.x0 - o.x), Math.abs(f.x1 - o.x)),
       Math.max(Math.abs(f.z0 - o.z), Math.abs(f.z1 - o.z)));
-    return Math.max(range, reach + 45);
+    // Past the trench belt too: it is dug round the building, and a battery
+    // parked behind its berm spends the test shelling sandbags.
+    return Math.max(range, reach + 90);
   }
 
   spawnSomewhere(id, n, range) {

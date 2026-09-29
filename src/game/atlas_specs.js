@@ -582,7 +582,7 @@ export const SPECS = {
 
   // ── Africa ──────────────────────────────────────────────────────────────
   djoser: {
-    S: 1.0, yaw: 0.5, mat: M.LIMESTONE,
+    S: 1.0, budget: 1.6, yaw: 0.5, mat: M.LIMESTONE,
     parts: [
       { t: 'steps', tag: 'pyramid', x: 0, z: 0, w: 121, d: 109, h: 62, n: 6, wTop: 36, dTop: 26, batter: 0.15, mat: M.LIMESTONE, coarse: 1.8 },
       { t: 'colonnade', tag: 'colonnade', x: 0, z: 90, w: 60, d: 14, podH: 0.6, colH: 6.6, colW: 1.6, bay: 4.2, rows: 'twin', roof: 'flat', mat: M.LIMESTONE },
@@ -725,7 +725,7 @@ export const GAME_SCALE = {
   kingdomcentre: 1.25,
   baalbek: 1.62,
   ur: 1.18,
-  djoser: 2.27,
+  djoser: 1.7,           // a solid pyramid: past this its blocks outgrew what a 155 mm round can break
   yamoussoukro: 2.05,
   frontenac: 1.70,
   capitolio: 1.89,
