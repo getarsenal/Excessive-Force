@@ -1258,10 +1258,17 @@ export class TestMenu {
         // survivor with nothing in its arc (a man with a rocket on a spit of
         // land at Kronborg) fires nothing and proves nothing either way.
         if (b.units.filter((u) => u.alive).length < 2) this.spawnRing(2);
-        c.fastForward(14);
+        // Whether our guns fire, not whether they live: a garrison that can see
+        // out — Edinburgh's hundred and sixty, with mortars — can kill a
+        // battery still setting up inside the fourteen seconds.
+        const inv = b.invulnerable;
+        b.invulnerable = true;
+        try { c.fastForward(14); } finally { b.invulnerable = inv; }
         const fired = b.shotsFired - before;
         if (hadTarget) b.setTarget(hadTarget, label);
-        assert(fired > 0, 'no rounds went out in 14 s with guns deployed');
+        const why = b.units.filter((u) => u.alive)
+          .map((u) => `${u.def.id} ${u.state}${u.hold ? ` (${u.hold})` : ''}${u.idle ? ' idle' : ''}`).join(', ');
+        assert(fired > 0, `no rounds went out in 14 s with guns deployed: ${why}`);
         return `${fired} rounds`;
       })],
 
@@ -1828,6 +1835,14 @@ export class TestMenu {
             if (Math.abs(st2.px[i] - d.pos.x) > 2.6) continue;
             if (Math.abs(st2.pz[i] - d.pos.z) > 2.6) continue;
             under.push(i);
+          }
+          // And the stone he is pinned to, when it is the one underfoot: a
+          // deck slab long enough to reach him from eight metres away is his
+          // floor, and it is not within 2.6 m of him by its centre.
+          const a = d.chunk;
+          if (a >= 0 && (st2.flags[a] & 1) && !(st2.flags[a] & 10) && !under.includes(a)) {
+            const top = st2.py[a] + st2.hy[a];
+            if (top <= d.pos.y + 0.35 && top > d.pos.y - 0.6) under.push(a);
           }
           return under;
         };

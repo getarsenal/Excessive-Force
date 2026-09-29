@@ -52,6 +52,9 @@ const WALL = 1.8;
 // the arrangement the real ridge has.
 const SHIFT = -15.0;
 
+// A breastwork, in unstretched metres: a metre high once it has been stretched.
+const BREAST = 0.4;
+
 const wAt = (wTop, top, y) => wTop + 2 * BATTER * (top - y);
 
 // Real metres, x east, z south, the courtyard's summit at y 0.
@@ -59,8 +62,8 @@ const BLOCKS = [
   { tag: 'palas', x0: -84, x1: -26, z0: 0, z1: 46, top: 30.0, found: -58, roof: 14.0, rows: [3.5, 9.0, 14.5, 20.0, 25.5], mat: 'MARBLE', cross: 2, turrets: true },
   { tag: 'squaretower', x0: -9, x1: 3, z0: -27, z1: -15, top: 38.0, found: -6, roof: 7.0, rows: [6, 14, 22, 30, 34], mat: 'MARBLE', tower: true },
   { tag: 'gatehouse', x0: 31, x1: 52, z0: -32, z1: 1, top: 16.0, found: -16, roof: 6.0, rows: [3.5, 9.0], mat: 'REDSTONE' },
-  { tag: 'gatehouse', x0: 46, x1: 52, z0: -32, z1: -26, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true },
-  { tag: 'gatehouse', x0: 46, x1: 52, z0: -5, z1: 1, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true },
+  { tag: 'gatehouse', x0: 46, x1: 52, z0: -32, z1: -26, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true, battlement: true },
+  { tag: 'gatehouse', x0: 46, x1: 52, z0: -5, z1: 1, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true, battlement: true },
   { tag: 'knightshouse', x0: -32, x1: -6, z0: -18, z1: -2, top: 15.0, found: -12, roof: 8.0, rows: [3.5, 9.0], mat: 'MARBLE' },
   { tag: 'bower', x0: -22, x1: 3, z0: 11, z1: 27, top: 13.0, found: -6, roof: 5.0, rows: [3.5, 8.5], mat: 'MARBLE' },
 ];
@@ -174,7 +177,16 @@ export function buildNeuschwanstein(quality) {
           Math.min(3.0, Math.min(w, d) / 2 - WALL - 0.4), r - 0.5, 0.5, stone * 1.3, mat, 0);
       }
     });
-    if (b.tower) {
+    if (b.battlement) {
+      // The Torbau's corner towers are battlemented, not roofed: a flat top
+      // over the walls and a breastwork round it, low enough after the
+      // stretch that a man's eye is over it, merlons at the corners.
+      B.slab(cx, b.top + 0.15, cz, w, 0.3, d, 99, mat);
+      courses(b.top + 0.3, b.top + 0.3 + BREAST, BREAST, (y, h) => B.ring(cx, cz, w, d, 0.5, y, h, stone, mat, 0));
+      for (const [ex, ez] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        B.slab(cx + ex * (w / 2 - 0.5), b.top + 0.3 + BREAST + 0.2, cz + ez * (d / 2 - 0.5), 1.0, 0.4, 1.0, 99, mat);
+      }
+    } else if (b.tower) {
       B.slab(cx, b.top + course * 0.3, cz, w - WALL * 2 + 0.1, course * 0.6, d - WALL * 2 + 0.1, stone * 1.2, mat);
       roof(cx, cz, w - 0.8, d - 0.8, b.top + course * 0.6, b.roof);
       B.pinnacle(cx, cz, b.top + b.roof + course * 0.6, 2.0, 1.0, stone * 0.6, M.GILT);
@@ -314,8 +326,14 @@ export function populateNeuschwanstein(g, origin, groundY) {
   // The Knights' House north face, the Bower south face.
   [0.25, 0.5, 0.75].forEach((f, k) => at(k === 1 ? 'mg' : 'rifleman', 5, 'z0', f, 1));
   [0.25, 0.5, 0.75].forEach((f, k) => at(k === 1 ? 'mg' : 'rifleman', 6, 'z1', f, 1));
-  // The gatehouse: anti-tank teams over the approach from the east.
+  // The gatehouse: anti-tank teams over the approach from the east, and a
+  // man on each of its battlemented corner towers.
   [0.3, 0.7].forEach((f) => at('at', 2, 'x1', f, 1));
+  for (const i of [3, 4]) {
+    const b = blocks[i];
+    const x = (b.x0 + b.x1) / 2 + 1.2, z = (b.z0 + b.z1) / 2;
+    g.place(i === 3 ? 'mg' : 'rifleman', V(x * S, (b.top + 0.3) * SV + 0.05, z * S), Math.PI / 2, 3, { cover: 'roof' });
+  }
   // Mortars in the courtyard.
   for (const [x, z] of [[0, -2], [12, 4], [-12, 4]]) {
     g.place('mortar', V((x + SHIFT) * S, 0.4, z * S), 0, 20, { cover: 'ground', emplaced: true, sandbags: true });

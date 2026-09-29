@@ -637,8 +637,10 @@ export class Garrison {
     // move further still. The two drift apart, and a man whose recorded anchor
     // is ten metres away is a man who survives the destruction of the masonry
     // under his feet and keeps firing from thin air.
+    // The stone under his feet if there is one — the nearest stone was as
+    // often the railing beside him, which is not what he falls with.
     if (!emplaced) {
-      const re = this._nearestStone(d.pos, Math.max(maxDist, 9));
+      const re = this._footingStone(d.pos) || this._nearestStone(d.pos, Math.max(maxDist, 9));
       if (re) { d.structure = re.structure; d.chunk = re.chunk; }
     }
     this.defenders.push(d);
@@ -726,7 +728,11 @@ export class Garrison {
   }
 
   /** Is there a standing stone under these feet, its top within a hand of them? */
-  _footingAt(p) {
+  _footingAt(p) { return !!this._footingStone(p); }
+
+  /** The standing stone under these feet, its top nearest them: `{ structure, chunk }` or null. */
+  _footingStone(p) {
+    let best = null, bestGap = Infinity;
     for (const s of this.structures) {
       for (let i = 0; i < s.count; i++) {
         if (!(s.flags[i] & 1)) continue;
@@ -736,10 +742,12 @@ export class Garrison {
         if (dx * dx + dz * dz > (s.hx[i] + s.hz[i]) ** 2) continue;
         const c = Math.cos(s.ry[i]), n = Math.sin(s.ry[i]);
         const lx = dx * c - dz * n, lz = dx * n + dz * c;
-        if (Math.abs(lx) <= s.hx[i] + 0.2 && Math.abs(lz) <= s.hz[i] + 0.2) return true;
+        if (Math.abs(lx) > s.hx[i] + 0.2 || Math.abs(lz) > s.hz[i] + 0.2) continue;
+        const gap = Math.abs(top - p.y);
+        if (gap < bestGap) { bestGap = gap; best = { structure: s, chunk: i }; }
       }
     }
-    return false;
+    return best;
   }
 
   _settleIntoPosition(d) {
