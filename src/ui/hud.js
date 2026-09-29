@@ -175,6 +175,7 @@ export class HUD {
       });
     }
     if (this.el.ecTargets) this.el.ecTargets.addEventListener('click', () => this.onPickTarget());
+    document.getElementById('ec-home')?.addEventListener('click', () => this.onHome());
 
     this._promptTimer = 0;
     this._lastUnlocked = new Set();

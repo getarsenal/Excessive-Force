@@ -923,10 +923,17 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 
 /* ── End card ────────────────────────────────────────────────────────── */
 #endcard {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  /* Scrolls when the report is taller than the screen, which on a phone it
+     always is: centred with align-items the card overflowed both ends and
+     the title and the bottom buttons were out of reach. The inner margin:auto
+     still centres it when it fits. */
+  position: absolute; inset: 0; display: flex; justify-content: center;
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top, 0px) + 22px) 0 calc(env(safe-area-inset-bottom, 0px) + 28px);
   background: rgba(5, 7, 10, 0.82); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
   animation: fadeIn 0.7s ease;
 }
+#endcard .ec-inner { margin: auto 0; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .ec-inner { text-align: center; width: min(86vw, 430px); }
 .ec-title {
@@ -963,8 +970,9 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 .ec-mark.won { border-color: rgba(224, 163, 60, 0.62); }
 .ec-mark.won .em-got { color: var(--warn); }
 .ec-mark .em-best {
-  position: absolute; top: 7px; right: 8px;
-  font-size: 8px; letter-spacing: 0.14em; color: var(--warn);
+  /* A tab on the card's top edge, clear of the label on the narrowest card. */
+  position: absolute; top: -7px; right: 8px; padding: 1px 5px;
+  font-size: 8px; letter-spacing: 0.14em; color: #140904; background: var(--warn); border-radius: 3px;
 }
 
 /* The buttons had no rules at all, so four native controls ran into each other

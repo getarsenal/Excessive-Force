@@ -618,8 +618,11 @@ async function boot() {
       keepBattle();
       try {
         const { openFrontDoor } = await import('./ui/title.js');
-        const id = await openFrontDoor({ current: level.id, canResume: true });
+        // A finished battle has nothing to go back to: the title's first line
+        // is the next contract, and choosing this one again starts it afresh.
+        const id = await openFrontDoor({ current: level.id, canResume: !battleOver });
         if (id && id !== level.id) { goToLevel(id); return; }
+        if (id === level.id && battleOver) { goToLevel(id); return; }
         if (id === level.id) {
           let daily = null;
           try {
