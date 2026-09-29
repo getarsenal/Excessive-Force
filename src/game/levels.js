@@ -1537,13 +1537,13 @@ export const LEVELS = {
     contextExclude: 110,
     // A ridge, not a pad: the bake's summit is the floor, and every wall of
     // the castle carries its own footing down the flanks to meet the rock.
-    // The Palas stands on sixty metres of it over the gorge.
+    // The Palas stands on ninety metres of it over the gorge.
     groundLevel: 'bake',
     padRadius: 0,
     // The Marienbrücke view, from the south-east over the gorge: the Palas
     // end-on with the round tower against it and the courtyard buildings
-    // stepping down the ridge behind.
-    camera: { yaw: 0.55, pitch: 0.10, distance: 480, height: 45 },
+    // stepping down the ridge behind. Stood back for the castle's height.
+    camera: { yaw: 0.55, pitch: 0.12, distance: 600, height: 80 },
     structures: (quality) => [
       { key: 'neuschwanstein', blocks: buildNeuschwanstein(quality), primary: true, required: true, label: 'NEUSCHWANSTEIN CASTLE' },
     ],

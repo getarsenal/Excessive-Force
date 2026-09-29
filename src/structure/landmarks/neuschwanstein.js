@@ -31,9 +31,19 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * CONCRETE for the grey footing in the rock, SLATE roofs, GILT finials.
  */
 
-// One and a half times life, as Edinburgh: the ridge is the survey's and the
-// castle already overhangs it at this size.
-const S = 1.5;
+// In plan, a little over one and a half times life: the ridge is the
+// survey's, two hundred metres of level top, and the castle fills it end to
+// end at this size — any bigger and the gatehouse is off the east end and the
+// Palas is standing on nothing over the gorge.
+//
+// Upward, two and a half times. Neuschwanstein is a height: slender towers
+// and a sheer white wall over a drop, and at one and a half times it stood on
+// its ridge in a landscape of real mountains like a model left on a hillside.
+// Everything above the courtyard is stretched; everything below it — the
+// footing in the rock — keeps the plan's scale, because the rock beside it is
+// the real rock and does not stretch.
+const S = 1.6;
+const SV = 2.5;
 const STONE_FINENESS = 0.9;
 const BATTER = 0.05;
 const WALL = 1.8;
@@ -62,13 +72,14 @@ const shifted = (b) => ({ ...b, x0: b.x0 + SHIFT, x1: b.x1 + SHIFT });
 /** What the garrison, the flag and the level record read (world metres). */
 export const NEUSCHWANSTEIN = {
   scale: S,
-  blocks: BLOCKS.map(shifted).map((b) => ({ ...b, x0: b.x0 * S, x1: b.x1 * S, z0: b.z0 * S, z1: b.z1 * S, top: b.top * S, rows: b.rows.map((r) => r * S) })),
-  north: { x: (NORTH.x + SHIFT) * S, z: NORTH.z * S, r: NORTH.r * S, top: NORTH.top * S, rows: NORTH.rows.map((r) => r * S) },
+  up: SV,
+  blocks: BLOCKS.map(shifted).map((b) => ({ ...b, x0: b.x0 * S, x1: b.x1 * S, z0: b.z0 * S, z1: b.z1 * S, top: b.top * SV, rows: b.rows.map((r) => r * SV) })),
+  north: { x: (NORTH.x + SHIFT) * S, z: NORTH.z * S, r: NORTH.r * S, top: NORTH.top * SV, rows: NORTH.rows.map((r) => r * SV) },
   wall: WALL * S,
   /** Rooflines a man can be posted on, low to high. */
-  galleries: [16.0 * S, 30.0 * S, 38.0 * S, 55.0 * S],
+  galleries: [16.0 * SV, 30.0 * SV, 38.0 * SV, 55.0 * SV],
   // The flag flies from the north tower's roof.
-  flag: { x: (NORTH.x + SHIFT) * S, y: (NORTH.roof + 0.5) * S, z: NORTH.z * S },
+  flag: { x: (NORTH.x + SHIFT) * S, y: (NORTH.roof + 0.5) * SV, z: NORTH.z * S },
 };
 
 export function buildNeuschwanstein(quality) {
@@ -76,14 +87,18 @@ export function buildNeuschwanstein(quality) {
   B.joint = JOINT / S;
   const s = Math.min(quality.blockScale, 1.3) * STONE_FINENESS;
   const stone = 1.9 * s;
-  const course = 1.3 * s;
+  // Courses are laid thinner by the stretch, so they come out of it the height
+  // a course should be rather than as standing slabs.
+  const course = 1.3 * s * (S / SV);
   const courses = (y0, y1, nominal, fn) => {
     const n = Math.max(1, Math.round((y1 - y0) / nominal));
     const ch = (y1 - y0) / n;
     for (let c = 0; c < n; c++) fn(y0 + c * ch, ch, c);
   };
   /** Coarse in the rock, the face's own grain above the summit. */
-  const grain = (y, found) => (y < found + 3.0 ? 3.2 : y < -1.0 ? 1.8 : 1.0);
+  // Under the summit nothing is stretched, so the footing's courses are laid at
+  // the unstretched height.
+  const grain = (y, found) => (y < found + 3.0 ? 3.2 * SV / S : y < -1.0 ? 1.8 * SV / S : 1.0);
   /** Grey footing under the summit, the building's own stone above it. */
   const skin = (y, mat) => (y < -1.0 ? M.CONCRETE : mat);
 
@@ -138,18 +153,25 @@ export function buildNeuschwanstein(quality) {
         const ch = Math.min(course * g, b.top - y);
         const h = (b.top - (y + ch) < course * 0.5) ? b.top - y : ch;
         const c = Math.round((y - b.found) / course);
-        B.ring(cx, cz, wAt(w, b.top, y), wAt(d, b.top, y), WALL + (g > 1 ? 0.6 : 0), y, h, stone * g, skin(y, mat), c % 2 ? 0.5 : 0);
+        // In a window row the stones are short, so that a window cut from them
+        // is a window: cut from stones longer than it is wide, whether it was
+        // there at all depended on where a joint happened to fall.
+        const inRow = b.rows.some((r) => y + h / 2 > r && y + h / 2 < r + 2.4);
+        B.ring(cx, cz, wAt(w, b.top, y), wAt(d, b.top, y), WALL + (g > 1 ? 0.6 : 0), y, h, inRow ? 0.9 : stone * g, skin(y, mat), c % 2 ? 0.5 : 0);
         if (y >= -1.0 && b.cross) {
           for (let k = 1; k <= b.cross; k++) {
             B.slab(b.x0 + (w * k) / (b.cross + 1), y + h / 2, cz, WALL, h, d - WALL * 2 - 0.1, stone, mat);
           }
         }
-        for (const r of b.rows) {
-          if (Math.abs(y - (r - 0.4)) < h * 0.5 && y > 0) {
-            B.ring(cx, cz, w - WALL * 2 + 0.1, d - WALL * 2 + 0.1, Math.min(3.0, Math.min(w, d) / 2 - WALL - 0.4), y, h, stone * 1.3, mat, 0);
-          }
-        }
         y += h;
+      }
+      // A floor under each window row, its top on the row and its edge on
+      // the wall at that height — the wall is battered, and a floor sized for
+      // the wall-head stood a metre clear of it lower down.
+      for (const r of b.rows) {
+        if (r <= 0) continue;
+        B.ring(cx, cz, wAt(w, b.top, r) - WALL * 2 + 0.1, wAt(d, b.top, r) - WALL * 2 + 0.1,
+          Math.min(3.0, Math.min(w, d) / 2 - WALL - 0.4), r - 0.5, 0.5, stone * 1.3, mat, 0);
       }
     });
     if (b.tower) {
@@ -200,12 +222,14 @@ export function buildNeuschwanstein(quality) {
         const c = Math.round((y - NORTH.found) / course);
         const r = NORTH.r + BATTER * (NORTH.top - y);
         const sides = 12;
-        B.polyRing(cx, cz, BlockList.circle(r, sides, (c % 2) * (Math.PI / sides)), 1.4 + (g > 1 ? 0.5 : 0), y, h, stone * g, skin(y, M.MARBLE), 0);
-        // A floor a course under each window row, filling to the shaft.
-        if (NORTH.rows.some((row) => Math.abs(y - (row - 0.4)) < h * 0.5)) {
-          B.polyRing(cx, cz, BlockList.circle(r - 1.4 - 1.05, sides, (c % 2) * (Math.PI / sides)), 2.1, y, h, stone * 1.2, M.MARBLE, 0);
-        }
+        const inRow = NORTH.rows.some((row) => y + h / 2 > row && y + h / 2 < row + 2.4);
+        B.polyRing(cx, cz, BlockList.circle(r, sides, (c % 2) * (Math.PI / sides)), 1.4 + (g > 1 ? 0.5 : 0), y, h, inRow ? 0.8 : stone * g, skin(y, M.MARBLE), 0);
         y += h;
+      }
+      // A floor under each window row, out to the wall at that height.
+      for (const row of NORTH.rows) {
+        const r = NORTH.r + BATTER * (NORTH.top - row);
+        B.polyRing(cx, cz, BlockList.circle(r - 0.7 - 1.05, 12, 0), 2.1, row - 0.5, 0.5, stone * 1.2, M.MARBLE, 0);
       }
     });
     B.slab(cx, NORTH.top + course * 0.3, cz, NORTH.r * 1.3, course * 0.6, NORTH.r * 1.3, stone * 1.2, M.MARBLE);
@@ -213,49 +237,85 @@ export function buildNeuschwanstein(quality) {
     B.pinnacle(cx, cz, NORTH.roof, 2.4, 1.0, stone * 0.6, M.GILT);
   });
 
-  B.scaleAll(S);
+  stretch(B);
   return B;
 }
 
 /**
- * The garrison. Riflemen in the Palas's south and west windows over the
- * gorge, snipers at the tops of the two towers, machine guns in the Knights'
- * House and the Bower looking out from the courtyard's flanks, anti-tank
- * teams in the gatehouse over the approach, and a mortar section in the
- * courtyard.
+ * The scale, applied: S across, S down into the rock, SV up from the summit.
+ * A stone that straddles the summit has its bottom and its top mapped
+ * separately, so the courses stay stacked on each other.
+ */
+function stretch(B) {
+  const up = (y) => (y > 0 ? y * SV : y * S);
+  for (const b of B.blocks) {
+    const y0 = up(b.y - b.hy), y1 = up(b.y + b.hy);
+    b.x *= S; b.z *= S; b.hx *= S; b.hz *= S;
+    b.y = (y0 + y1) / 2; b.hy = (y1 - y0) / 2;
+  }
+}
+
+/**
+ * The garrison. Riflemen at the Palas's windows over the gorge and the
+ * valley, snipers at the top storeys of the two towers, machine guns at the
+ * Knights' House and the Bower looking out from the courtyard's flanks,
+ * anti-tank teams at the gatehouse over the approach, and mortars in the
+ * courtyard. Every man is posted on a window the builder really cut, on the
+ * floor under it, a pace inside the wall at that height: the walls are
+ * battered, and a man posted a fixed distance in from the wall-head was
+ * inside the masonry on every storey below the top one.
  */
 export function populateNeuschwanstein(g, origin, groundY) {
-  const K = NEUSCHWANSTEIN;
   const V = (x, y, z) => new THREE.Vector3(origin.x + x, groundY + y, origin.z + z);
-  const W = K.wall;
-  const palas = K.blocks[0];
-  // The Palas: the south face at the third and fourth storeys, the west end.
-  for (const f of [0.15, 0.3, 0.45, 0.6, 0.75, 0.9]) {
-    g.place(f === 0.45 ? 'mg' : 'rifleman', V(palas.x0 + (palas.x1 - palas.x0) * f, palas.rows[3] + 0.3, palas.z1 - W - 0.8), 0, 6, { cover: 'window' });
-    g.place('rifleman', V(palas.x0 + (palas.x1 - palas.x0) * f, palas.rows[2] + 0.3, palas.z0 + W + 0.8), Math.PI, 6, { cover: 'window' });
-  }
-  for (const f of [0.3, 0.7]) {
-    g.place('rifleman', V(palas.x0 + W + 0.8, palas.rows[3] + 0.3, palas.z0 + (palas.z1 - palas.z0) * f), -Math.PI / 2, 6, { cover: 'window' });
-  }
-  // The towers: snipers at the top storey.
-  const sq = K.blocks[1];
-  for (const [nx, nz] of [[1, 0], [-1, 0], [0, -1]]) {
-    g.place('sniper', V((sq.x0 + sq.x1) / 2 + nx * ((sq.x1 - sq.x0) / 2 - W - 0.8), sq.rows[4] + 0.3, (sq.z0 + sq.z1) / 2 + nz * ((sq.z1 - sq.z0) / 2 - W - 0.8)), Math.atan2(nx, nz), 6, { cover: 'window' });
-  }
-  for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
-    g.place('sniper', V(K.north.x + Math.cos(a) * (K.north.r - 1.4 * S - 0.7), K.north.rows[4] + 0.3, K.north.z + Math.sin(a) * (K.north.r - 1.4 * S - 0.7)), Math.atan2(Math.cos(a), Math.sin(a)), 6, { cover: 'window' });
+  const blocks = BLOCKS.map(shifted);
+  /**
+   * A man at a window of block `i` on face `face` ('x0' west, 'x1' east,
+   * 'z0' north, 'z1' south), `frac` of the way along it, at window row `row`.
+   */
+  const at = (type, i, face, frac, row, cover = 'window') => {
+    const b = blocks[i];
+    const r = b.rows[row];
+    const w = b.x1 - b.x0, d = b.z1 - b.z0;
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    const onZ = face[0] === 'z';
+    const half = onZ ? w / 2 : d / 2;
+    // The window nearest the fraction asked for: they are every 4.5 m, at 1.25 past each multiple.
+    let along = (frac - 0.5) * 2 * (half - 2.6);
+    along = Math.round((along - 1.25) / 4.5) * 4.5 + 1.25;
+    if (Math.abs(along) > half - 2.6) along -= Math.sign(along) * 4.5;
+    // Not on a cross wall: the window beside it, toward the middle.
+    if (onZ && b.cross) {
+      for (let k = 1; k <= b.cross; k++) {
+        const xw = b.x0 + (w * k) / (b.cross + 1) - cx;
+        if (Math.abs(along - xw) < WALL / 2 + 0.8) along -= Math.sign(along || 1) * 4.5;
+      }
+    }
+    // A pace inside the wall's inner face at chest height.
+    const inner = (onZ ? wAt(d, b.top, r + 1.2) : wAt(w, b.top, r + 1.2)) / 2 - WALL - 0.6;
+    const sign = face[1] === '1' ? 1 : -1;
+    const x = onZ ? cx + along : cx + sign * inner;
+    const z = onZ ? cz + sign * inner : cz + along;
+    const facing = onZ ? (sign > 0 ? 0 : Math.PI) : (sign > 0 ? Math.PI / 2 : -Math.PI / 2);
+    g.place(type, V(x * S, r * SV + 0.05, z * S), facing, 3, { cover });
+  };
+  // The Palas: the south face over the valley, the north face, the west end over the gorge.
+  [0.1, 0.3, 0.5, 0.7, 0.9].forEach((f, k) => at(k === 2 ? 'mg' : 'rifleman', 0, 'z1', f, 3));
+  [0.2, 0.5, 0.8].forEach((f) => at('rifleman', 0, 'z0', f, 2));
+  [0.3, 0.7].forEach((f) => at('rifleman', 0, 'x0', f, 3));
+  // The square tower's top storey, three faces.
+  for (const face of ['x1', 'x0', 'z0']) at('sniper', 1, face, 0.5, 4);
+  // The north tower's top storey: its windows are at the diagonals.
+  const nx = NORTH.x + SHIFT, nz = NORTH.z;
+  const row = NORTH.rows[4];
+  const nr = NORTH.r + BATTER * (NORTH.top - row) - 0.7 - 0.9;
+  for (const a of [Math.PI / 4, (3 * Math.PI) / 4, -Math.PI / 4, (-3 * Math.PI) / 4]) {
+    g.place('sniper', V((nx + Math.cos(a) * nr) * S, row * SV + 0.05, (nz + Math.sin(a) * nr) * S), Math.atan2(Math.cos(a), Math.sin(a)), 3, { cover: 'window' });
   }
   // The Knights' House north face, the Bower south face.
-  const kh = K.blocks[5], bw = K.blocks[6];
-  for (const f of [0.25, 0.5, 0.75]) {
-    g.place(f === 0.5 ? 'mg' : 'rifleman', V(kh.x0 + (kh.x1 - kh.x0) * f, kh.rows[1] + 0.3, kh.z0 + W + 0.8), Math.PI, 6, { cover: 'window' });
-    g.place(f === 0.5 ? 'mg' : 'rifleman', V(bw.x0 + (bw.x1 - bw.x0) * f, bw.rows[1] + 0.3, bw.z1 - W - 0.8), 0, 6, { cover: 'roof' });
-  }
+  [0.25, 0.5, 0.75].forEach((f, k) => at(k === 1 ? 'mg' : 'rifleman', 5, 'z0', f, 1));
+  [0.25, 0.5, 0.75].forEach((f, k) => at(k === 1 ? 'mg' : 'rifleman', 6, 'z1', f, 1));
   // The gatehouse: anti-tank teams over the approach from the east.
-  const gate = K.blocks[2];
-  for (const f of [0.3, 0.7]) {
-    g.place('at', V(gate.x1 - W - 0.8, gate.rows[1] + 0.3, gate.z0 + (gate.z1 - gate.z0) * f), Math.PI / 2, 6, { cover: 'window' });
-  }
+  [0.3, 0.7].forEach((f) => at('at', 2, 'x1', f, 1));
   // Mortars in the courtyard.
   for (const [x, z] of [[0, -2], [12, 4], [-12, 4]]) {
     g.place('mortar', V((x + SHIFT) * S, 0.4, z * S), 0, 20, { cover: 'ground', emplaced: true, sandbags: true });
