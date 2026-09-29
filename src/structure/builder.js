@@ -282,6 +282,27 @@ export class BlockList {
      * on that alone.
      */
     this.joint = JOINT;
+    /** Arches: see `hold`. */
+    this.holds = null;
+  }
+
+  /**
+   * Declare an arch: the stones at `members` (block indices) stand only while
+   * each of the `ends` (arrays of block indices, the springings) still has a
+   * stone on it standing on the ground.
+   *
+   * The support solver lets a stone stand on anything under it, and a running
+   * bond puts half of every stone over the joint below — so from each side of
+   * a gap the courses step out half a stone at a time, and over a span of
+   * several courses the two staircases meet in the middle. That is a corbel
+   * vault, and it is right for a wall with a door in it. It is wrong for an
+   * arcade, which carries its load on the arches and nothing else: take a pier
+   * out and the two arches on it have lost a springing, and no amount of
+   * bonding in the spandrel over them holds them up.
+   */
+  hold(members, ...ends) {
+    if (!members.length || ends.some((e) => !e.length)) return;
+    (this.holds || (this.holds = [])).push({ members, ends });
   }
 
   shrink(half) {

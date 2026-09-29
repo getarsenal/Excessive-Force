@@ -237,6 +237,13 @@ export class Structure {
     this._spanBudget = new Float32Array(n);
     this._bearing = new Uint8Array(n);   // supported from directly below
     this._stress = new Float32Array(n);  // last computed bearing stress, Pa
+    // Arches (see `BlockList.hold`): stones that stand only while both their
+    // springings do, and the mask of those whose arch has lost one.
+    this.holds = (blockList.holds || []).map((h) => ({
+      members: Int32Array.from(h.members),
+      ends: h.ends.map((e) => Int32Array.from(e)),
+    }));
+    this._veto = this.holds.length ? new Uint8Array(n) : null;
 
     // How far each stone can carry load sideways. A flat slab is a beam and
     // spans; a cube is a wall stone and barely does.
@@ -2265,23 +2272,58 @@ export class Structure {
     // in it the second round changes nothing and stops.
     const byHeight = this.heightOrder;
     const bearing = this._bearing;
-    bearing.fill(0);
-    for (let round = 0; round < 5; round++) {
-      let changed = false;
-      for (let k = n - 1; k >= 0; k--) {
-        const i = byHeight[k];
-        if (reach[i] || !(this.flags[i] & ALIVE)) continue;
-        if (this.flags[i] & (FREE | ISLAND)) continue;
-        if (this.flags[i] & GROUNDED) {
-          reach[i] = 1; bearing[i] = 1; changed = true; continue;
-        }
-        for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
-          if (reach[this.belowList[a]]) {
-            reach[i] = 1; bearing[i] = 1; changed = true; break;
+    const veto = this._veto;
+    const walk = () => {
+      reach.fill(0);
+      bearing.fill(0);
+      for (let round = 0; round < 5; round++) {
+        let changed = false;
+        for (let k = n - 1; k >= 0; k--) {
+          const i = byHeight[k];
+          if (reach[i] || !(this.flags[i] & ALIVE)) continue;
+          if (this.flags[i] & (FREE | ISLAND)) continue;
+          if (veto && veto[i]) continue;
+          if (this.flags[i] & GROUNDED) {
+            reach[i] = 1; bearing[i] = 1; changed = true; continue;
+          }
+          for (let a = this.belowStart[i]; a < this.belowStart[i + 1]; a++) {
+            if (reach[this.belowList[a]]) {
+              reach[i] = 1; bearing[i] = 1; changed = true; break;
+            }
           }
         }
+        if (!changed) break;
       }
-      if (!changed) break;
+    };
+    walk();
+
+    // Arches. An arch whose springing has nothing standing under it is down,
+    // whatever the bond in the spandrel over it says, and what stood on it
+    // has to be asked again — which can bring down the pier on top and the
+    // arches on that, so it goes round until nothing more is cut.
+    if (veto) {
+      veto.fill(0);
+      for (let pass = 0; pass < 6; pass++) {
+        let cut = false;
+        for (const h of this.holds) {
+          let held = true;
+          for (const e of h.ends) {
+            let any = false;
+            for (let q = 0; q < e.length; q++) if (bearing[e[q]]) { any = true; break; }
+            if (!any) { held = false; break; }
+          }
+          if (held) continue;
+          const m = h.members;
+          for (let q = 0; q < m.length; q++) {
+            const j = m[q];
+            if (veto[j]) continue;
+            veto[j] = 1;
+            if (bearing[j]) cut = true;
+          }
+        }
+        if (!cut) break;
+        walk();
+      }
     }
 
     // Spanning, measured in metres of reach rather than in stones.
@@ -2311,6 +2353,7 @@ export class Structure {
           const j = this.sideList[a];
           if (!(this.flags[j] & ALIVE)) continue;
           if (this.flags[j] & (FREE | ISLAND)) continue;
+          if (veto && veto[j]) continue;
           const step = Math.hypot(this.px[j] - this.px[i], this.pz[j] - this.pz[i]);
           // A stone's own reach caps what it can pass on: a deep slab relays
           // further than a thin course of wall stones.
@@ -2444,7 +2487,11 @@ export class Structure {
       // because one piece of ornament came loose, so it is reserved for a
       // section big enough that "the building is going over" is a fair
       // description of what just happened.
-      if (group.length > WELD_THRESHOLD
+      // An arch that has lost a springing does not lean off the other one; it
+      // falls, so it never waits on the lean.
+      let arch = false;
+      if (veto) for (const i of group) if (veto[i]) { arch = true; break; }
+      if (!arch && group.length > WELD_THRESHOLD
           && groupMass > this._significantLoad * 3
           && this._restingCount(group, reach) >= 4
           && !this._deferredTooLong(group)) {

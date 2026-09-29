@@ -162,6 +162,10 @@ export class PhysicsWorld {
     if (!sup) return false;
     if (!this._overSomething(body)) return false;
     body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
+    if (body.__loose) {
+      body.__loose = false;
+      for (let c = 0, n = body.numColliders(); c < n; c++) body.collider(c)?.setFriction(0.92);
+    }
     this.dynamicSet.delete(body);
     const owner = this.owners.get(body.handle);
     if (owner) { owner.dynamic = false; owner.settled = true; }
@@ -950,7 +954,21 @@ export class PhysicsWorld {
     for (const body of this.dynamicSet) {
       const owner = this.owners.get(body.handle);
       if (!owner) continue;
-      if (body.isSleeping()) {
+      // Asleep, or awake and going nowhere. A row of loose stones jammed end
+      // to end between two walls is a flat arch as far as the contact solver
+      // is concerned, and it holds one up in the air indefinitely, trembling
+      // too much ever to sleep — so "not moving" is the test, not "asleep".
+      // Single stones only: a welded section easing over on the lean is slow
+      // for seconds at a time and is not stuck.
+      let still = body.isSleeping();
+      if (!still && body.numColliders() === 1) {
+        const v = body.linvel();
+        if (v.x * v.x + v.y * v.y + v.z * v.z < 0.04) {
+          const w = body.angvel();
+          still = w.x * w.x + w.y * w.y + w.z * w.z < 0.04;
+        }
+      }
+      if (still) {
         owner.settleTimer = (owner.settleTimer || 0) + 1;
         if (owner.settleTimer > settleFrames) toDemote.push(body);
       } else {
@@ -963,13 +981,34 @@ export class PhysicsWorld {
     if (toDemote.length > 160) toDemote.length = 160;
     for (const b of toDemote) {
       if (this.demote(b)) { n++; continue; }
-      // Refused: asleep in clear air, which is not settled but stuck. Wake it
-      // and let gravity have another go, then re-test after another spell.
+      // Refused: at rest in clear air, which is not settled but stuck. Waking
+      // it is not enough when it is wedged — it wakes into the same jam — so
+      // the grip comes off as well, and it is started on its way down. The
+      // grip goes back when it freezes, on whatever it lands on.
       const owner = this.owners.get(b.handle);
       if (owner) owner.settleTimer = 0;
-      b.wakeUp();
+      // Loosened once and still there, with clear air under it: it is not
+      // resting on anything, it is jammed by its corners between two stones
+      // that are still standing, which no amount of friction taken away will
+      // undo. It crumbles, which is what a wedged block under that load does.
+      if (b.__loose && owner && owner.chunk !== undefined && owner.structure?.destroyChunk
+          && b.numColliders() === 1 && !this._overSomething(b)) {
+        owner.structure.destroyChunk(owner.chunk);
+        continue;
+      }
+      this._loosen(b);
     }
     return n;
+  }
+
+  /** Take the friction off a stuck body and start it falling. */
+  _loosen(body) {
+    if (!body.__loose) {
+      body.__loose = true;
+      for (let c = 0, n = body.numColliders(); c < n; c++) body.collider(c)?.setFriction(0.05);
+    }
+    const v = body.linvel();
+    body.setLinvel({ x: v.x, y: Math.min(v.y, -1.5), z: v.z }, true);
   }
 
   /**

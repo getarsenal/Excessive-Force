@@ -230,6 +230,49 @@ export function buildSegovia(quality) {
     });
   });
 
+  // ── The arches, declared. Every stone of a tier whose centre is over the
+  // clear span of a bay stands only while the tops of both piers under that
+  // bay do: the ring, the haunches and spandrel over it and, on the upper
+  // tier, the channel. Stones over a pier stand on the pier. Without this the
+  // bonded spandrel stepped out half a stone a course from both crowns, met
+  // over a pier that had been shot away, and held the whole bay up — and the
+  // upper tier and the channel on top of it — with nothing under it.
+  const inRange = (tag) => { const r = B.tagRanges[tag]; return (i) => i >= r[0] && i < r[1]; };
+  const sOf = (b) => b.x * UX + b.z * UZ;
+  const pierAlongAt = (k) => PIER_ALONG * (isWide(k) ? 1.5 : 1);
+  const pierOf = (s) => Math.round(s / PITCH);
+  const bayOf = (s) => {
+    const k = Math.floor(s / PITCH);
+    if (k < -BAYS_EACH_SIDE || k >= BAYS_EACH_SIDE) return null;
+    if (s - k * PITCH < pierAlongAt(k) / 2 || (k + 1) * PITCH - s < pierAlongAt(k + 1) / 2) return null;
+    return k;
+  };
+  const topsOf = (tag, springY) => {
+    const isTag = inRange(tag);
+    const tops = new Map();
+    B.blocks.forEach((b, i) => {
+      if (!isTag(i) || b.y + b.hy < springY - 0.2) return;
+      const k = pierOf(sOf(b));
+      if (!tops.has(k)) tops.set(k, []);
+      tops.get(k).push(i);
+    });
+    return tops;
+  };
+  const declare = (tags, tops) => {
+    const bays = new Map();
+    const isTag = tags.map(inRange);
+    B.blocks.forEach((b, i) => {
+      if (!isTag.some((f) => f(i))) return;
+      const k = bayOf(sOf(b));
+      if (k === null) return;
+      if (!bays.has(k)) bays.set(k, []);
+      bays.get(k).push(i);
+    });
+    for (const [k, members] of bays) B.hold(members, tops.get(k) || [], tops.get(k + 1) || []);
+  };
+  declare(['lowerarches'], topsOf('lowerpiers', LOWER_SPRING));
+  declare(['upperarches', 'channel'], topsOf('upperpiers', UPPER_SPRING));
+
   B.scaleAll(S);
   return B;
 }
