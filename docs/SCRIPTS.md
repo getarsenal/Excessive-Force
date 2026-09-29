@@ -561,7 +561,7 @@ Defender: **Shàngjiàng Lin Chih-ming**, Taiwan. Level id `taipei101`.
 
 Defender: **Shàngjiàng Wen Jiahao**, China. Level id `shanghaitower`.
 
-- US: Second tallest building on Earth. Let's go for a new record: tallest pile.
+- US: Third tallest building on Earth. Let's go for a new record: tallest pile.
 - CN: 上海中心扭转了一百二十度来抵御台风。你扭不动它。 *(Shanghai Tower twists a hundred and twenty degrees against the typhoons. You cannot twist it.)*
 - US: Not twisting it. Just the bottom bit. Gravity does the rest.
 

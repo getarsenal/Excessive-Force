@@ -330,7 +330,7 @@ const WORDS = {
   shanghaitower: ['Shang-High and Dry', 'THE SUPERTALL',
     'Six hundred metres of glass tapering as it rises, over the Huangpu.',
     'The tallest building in China: a round glass tower tapering from its podium to a crown six hundred metres up. Most of it is the concrete core, and that is the target.',
-    "Second tallest building on Earth. Let's go for a new record: tallest pile.", '上海中心扭转了一百二十度来抵御台风。你扭不动它。', "Not twisting it. Just the bottom bit. Gravity does the rest."],
+    "Third tallest building on Earth. Let's go for a new record: tallest pile.", '上海中心扭转了一百二十度来抵御台风。你扭不动它。', "Not twisting it. Just the bottom bit. Gravity does the rest."],
   wildgoose: ['Wild Goose Chased', 'THE WILD GOOSE PAGODA',
     'A seven-storey brick pagoda on a platform, stepping in storey by storey.',
     'Seven storeys of brick built for the scriptures Xuanzang carried back from India, stepping in with each storey, on its square platform.',

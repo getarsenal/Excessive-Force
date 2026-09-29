@@ -242,7 +242,8 @@ export const SPECS = {
     ],
   },
   warsaw: {
-    S: 0.8, yaw: 0.3, mat: M.LIMESTONE, roofMat: M.LIMESTONE,
+    // Full size among its real neighbours: see shanghaitower.
+    S: 1, yaw: 0.3, mat: M.LIMESTONE, roofMat: M.LIMESTONE,
     parts: [
       { t: 'tower', tag: 'tower', x: 0, z: 0, w: 42, d: 42, h: 120, cap: 'flat', capH: 1.5, mat: M.LIMESTONE, floors: 3, taper: 0.8 },
       { t: 'tower', tag: 'tower', x: 0, z: 0, y0: 121.5, w: 22, h: 45, cap: 'flat', capH: 1, mat: M.LIMESTONE, ground: false, roofPosts: false },
@@ -372,18 +373,21 @@ export const SPECS = {
 
   // ── Asia ────────────────────────────────────────────────────────────────
   taipei101: {
-    S: 0.6, yaw: 0.5, mat: M.CURTAIN,
+    // Full size, 508 m to the tip, like every skyline landmark: see shanghaitower.
+    S: 1, yaw: 0.5, mat: M.CURTAIN,
     parts: [
       { t: 'tower', tag: 'base', x: 0, z: 0, w: 58, h: 90, taper: 0.72, cap: 'flat', capH: 2, mat: M.CURTAIN, storey: 11, floors: 2 },
       ...Array.from({ length: 8 }, (_, i) => ({ t: 'tower', tag: 'segments', x: 0, z: 0, y0: 92 + i * 34, w: 36, h: 32, taper: 1.18, cap: 'flat', capH: 2, mat: M.CURTAIN, ground: false, storey: 16, floors: i % 3 === 0 ? 1 : 0, roofPosts: i === 7 })),
       { t: 'tower', tag: 'crown', x: 0, z: 0, y0: 364, w: 20, h: 26, cap: 'flat', capH: 1, mat: M.CURTAIN, ground: false, roofPosts: false },
-      { t: 'tower', tag: 'spire', x: 0, z: 0, y0: 391, w: 6, h: 10, cap: 'spire', capH: 60, capMat: M.MAST, mat: M.STEEL, ground: false, roofPosts: false, windows: false, floors: 0 },
+      { t: 'tower', tag: 'spire', x: 0, z: 0, y0: 391, w: 6, h: 10, cap: 'spire', capH: 107, capMat: M.MAST, mat: M.STEEL, ground: false, roofPosts: false, windows: false, floors: 0 },
     ],
   },
   shanghaitower: {
-    // Jin Mao and the World Financial Centre are a street away and taller
-    // than the aim point: cleared, or they take every round meant for it.
-    S: 0.5, yaw: -0.4, mat: M.CURTAIN, clear: 180,
+    // Full size. At half it stood 306 m among neighbours surveyed at their
+    // real heights, and the World Financial Centre (492 m, a street away)
+    // and Jin Mao (420 m) both stood over the third tallest building on
+    // Earth. A skyline landmark is built at its real height or not at all.
+    S: 1, yaw: -0.4, mat: M.CURTAIN, clear: 180,
     parts: [
       { t: 'tower', tag: 'tower', x: 0, z: 0, w: 76, h: 560, round: true, taper: 0.58, cap: 'flat', capH: 2, mat: M.CURTAIN, storey: 36, floors: 3 },
       { t: 'tower', tag: 'crown', x: 0, z: 0, y0: 562, w: 30, h: 50, round: true, taper: 0.7, cap: 'none', mat: M.STEEL, ground: false, roofPosts: false, windows: false, floors: 0 },
@@ -502,7 +506,8 @@ export const SPECS = {
     ],
   },
   lotustower: {
-    S: 0.8, yaw: 0.35, mat: M.CONCRETE,
+    // Full size among its real neighbours: see shanghaitower.
+    S: 1, yaw: 0.35, mat: M.CONCRETE,
     parts: [
       { t: 'hall', tag: 'podium', x: 0, z: 0, w: 80, d: 80, h: 18, roof: 'flat', mat: M.CONCRETE, storey: 6 },
       { t: 'needle', tag: 'tower', x: 0, z: 0, y0: 19, r0: 11, r1: 7, h: 230, mat: M.CONCRETE, podMat: M.MADDER, pods: [{ y: 190, r: 26, h: 30 }], mast: 100 },
@@ -591,7 +596,8 @@ export const SPECS = {
 
   // ── The Americas and Oceania ────────────────────────────────────────────
   cntower: {
-    S: 0.55, yaw: 0.4, mat: M.CONCRETE,
+    // Full size among its real neighbours: see shanghaitower.
+    S: 1, yaw: 0.4, mat: M.CONCRETE,
     parts: [
       { t: 'needle', tag: 'tower', x: 0, z: 0, r0: 20, r1: 8, h: 450, mat: M.CONCRETE, podMat: M.CONCRETE, pods: [{ y: 335, r: 26, h: 32 }, { y: 440, r: 11, h: 8 }], mast: 100 },
       { t: 'hall', tag: 'base', x: 0, z: 60, w: 80, d: 40, h: 16, roof: 'flat', mat: M.CONCRETE, storey: 8 },
