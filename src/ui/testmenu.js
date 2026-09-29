@@ -711,17 +711,26 @@ export class TestMenu {
     const c = this.ctx, b = c.battle, st = b.primary;
     const aim = new THREE.Vector3(st.origin.x, b.originGround + 40, st.origin.z);
     const others = c.structures.filter((s) => s !== st);
-    const out = [];
+    const out = [], screened = [];
     const tries = [Math.PI, 0, Math.PI / 2, -Math.PI / 2];
     for (let i = 1; i < 24; i++) tries.push((i / 24) * Math.PI * 2);
+    // The town counts too. In Lujiazui the first clear bearing put the battery
+    // twenty-five metres behind a 120 m office tower, and twenty-eight rounds
+    // went into its facade: a legitimate position a player would move out of,
+    // and not what a test of "do shells arrive" is asking about. Bearings the
+    // city screens are kept, after the open ones, for maps where every line
+    // crosses a roof.
+    const city = b.cityBlocker;
     for (const a of tries) {
       const from = new THREE.Vector3(
         st.origin.x + Math.sin(a) * range, b.originGround + 3,
         st.origin.z + Math.cos(a) * range,
       );
-      if (lineOfSight(others, from, aim, 0, 0)) out.push(a);
+      if (!lineOfSight(others, from, aim, 0, 0)) continue;
+      if (city && city.blocks(from, aim)) screened.push(a); else out.push(a);
     }
-    return out.length ? out : [Math.PI];
+    const all = out.concat(screened);
+    return all.length ? all : [Math.PI];
   }
 
   /**

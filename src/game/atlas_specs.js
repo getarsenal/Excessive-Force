@@ -506,8 +506,10 @@ export const SPECS = {
     ],
   },
   lotustower: {
-    // Full size among its real neighbours: see shanghaitower.
-    S: 1, yaw: 0.35, mat: M.CONCRETE,
+    // Full size among its real neighbours: see shanghaitower. A needle at
+    // full height in the ordinary budget was a few big stones across, and
+    // sixteen rounds cut it through; it gets more and finer stone.
+    S: 1, budget: 2.4, fine: 0.7, yaw: 0.35, mat: M.CONCRETE,
     parts: [
       { t: 'hall', tag: 'podium', x: 0, z: 0, w: 80, d: 80, h: 18, roof: 'flat', mat: M.CONCRETE, storey: 6 },
       { t: 'needle', tag: 'tower', x: 0, z: 0, y0: 19, r0: 11, r1: 7, h: 230, mat: M.CONCRETE, podMat: M.MADDER, pods: [{ y: 190, r: 26, h: 30 }], mast: 100 },
@@ -596,8 +598,10 @@ export const SPECS = {
 
   // ── The Americas and Oceania ────────────────────────────────────────────
   cntower: {
-    // Full size among its real neighbours: see shanghaitower.
-    S: 1, yaw: 0.4, mat: M.CONCRETE,
+    // Full size among its real neighbours: see shanghaitower. A needle at
+    // full height in the ordinary budget was a few big stones across, and
+    // sixteen rounds cut it through; it gets more and finer stone.
+    S: 1, budget: 2.4, yaw: 0.4, mat: M.CONCRETE,
     parts: [
       { t: 'needle', tag: 'tower', x: 0, z: 0, r0: 20, r1: 8, h: 450, mat: M.CONCRETE, podMat: M.CONCRETE, pods: [{ y: 335, r: 26, h: 32 }, { y: 440, r: 11, h: 8 }], mast: 100 },
       { t: 'hall', tag: 'base', x: 0, z: 60, w: 80, d: 40, h: 16, roof: 'flat', mat: M.CONCRETE, storey: 8 },
