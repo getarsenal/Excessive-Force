@@ -39,6 +39,7 @@ export const MATERIALS = {
   GOLD: 23,      // gilded brick: a stupa's bell, a palace's glazed yellow roof — structural, unlike GILT
   ASHLAR: 24,    // Craigleith sandstone, grey-brown and sooted: Edinburgh
   SCOTSLATE: 25, // Ballachulish slate, near black
+  GRANITE: 26,   // the Chausey granite of Mont-Saint-Michel, a pale warm grey
 };
 
 /**
@@ -257,6 +258,9 @@ export const MATERIAL_PROPS = {
   [MATERIALS.ASHLAR]:    { density: 2.35, strength: 1.00, toughness: 100, color: 0x8e8474, structural: true },
   // Scottish slate is nearly black; SLATE is the blue-grey Welsh kind.
   [MATERIALS.SCOTSLATE]: { density: 2.70, strength: 0.55, toughness: 55,  color: 0x4a4e55, structural: true },
+  // Granite from the Chausey islands, weathered by the sea to a pale warm
+  // grey: the Mont, which LIMESTONE made into a sandcastle.
+  [MATERIALS.GRANITE]:   { density: 2.65, strength: 1.10, toughness: 110, color: 0xa7a293, structural: true },
 };
 
 

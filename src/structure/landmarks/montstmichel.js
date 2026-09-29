@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
+import { PLAN } from './montstmichel_plan.js';
 
 /**
  * Mont-Saint-Michel: the abbey on the summit of the rock.
@@ -32,7 +33,15 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * LIMESTONE for the granite, SLATE for the roofs, GILT for the archangel.
  */
 
+// In plan, 1.3 times life: the summit is eighty-eight metres by ninety-two
+// and the abbey fills it. Upward from the summit, 1.9 times: the Mont is a
+// pyramid that ends in a needle, and at 1.3 all round the abbey sat on its
+// rock like a chapel on a hill. Below the summit nothing is stretched — the
+// crypts and the Merveille stand against the real rock — and the village and
+// the ramparts round the foot are laid at their real size on their real
+// ground, after the stretch.
 const S = 1.3;
+const SV = 1.9;
 const STONE_FINENESS = 0.9;
 // The footings, in real metres under the summit; the rock under each part is
 // nearer than this everywhere, so the courses below are buried.
@@ -53,29 +62,37 @@ const CLOISTER = { x0: -38.0, x1: -12.0, z0: -43.0, z1: -25.0, h: 5.5, arch: 2.2
 const LOGIS = { x0: -10.0, x1: 30.0, z0: 12.0, z1: 30.0, top: 0.0, h: 12.0 };
 const GAP = 0.15;
 
+/** Where the builder put the church's windows, for the garrison. */
+const POSTS = { nave: [], choir: [], sill: 8.0, deck: 2.0 };
+
 /** What the garrison, the flag and the level record read. */
 export const MONTSTMICHEL = {
   scale: S,
-  nave: { x0: NAVE.x0 * S, x1: NAVE.x1 * S, z0: NAVE.z0 * S, z1: NAVE.z1 * S, top: NAVE.h * S },
+  up: SV,
+  nave: { x0: NAVE.x0 * S, x1: NAVE.x1 * S, z0: NAVE.z0 * S, z1: NAVE.z1 * S, top: NAVE.h * SV },
   crossing: { x0: CROSSING.x0 * S, x1: CROSSING.x1 * S, z0: CROSSING.z0 * S, z1: CROSSING.z1 * S },
-  choir: { x0: CHOIR.x0 * S, x1: CHOIR.x1 * S, z0: CHOIR.z0 * S, z1: CHOIR.z1 * S, top: CHOIR.h * S },
-  tower: { cx: TOWER.cx * S, cz: TOWER.cz * S, w: TOWER.w * S, top: TOWER.top * S },
-  merveille: { x0: MERVEILLE.x0 * S, x1: MERVEILLE.x1 * S, z0: MERVEILLE.z0 * S, z1: MERVEILLE.z1 * S, top: MERVEILLE.top * S,
+  choir: { x0: CHOIR.x0 * S, x1: CHOIR.x1 * S, z0: CHOIR.z0 * S, z1: CHOIR.z1 * S, top: CHOIR.h * SV },
+  tower: { cx: TOWER.cx * S, cz: TOWER.cz * S, w: TOWER.w * S, top: TOWER.top * SV },
+  merveille: { x0: MERVEILLE.x0 * S, x1: MERVEILLE.x1 * S, z0: MERVEILLE.z0 * S, z1: MERVEILLE.z1 * S, top: MERVEILLE.top * SV,
     windows: MERVEILLE.windows.map((y) => y * S), wall: MERVEILLE.wall * S },
-  cloister: { x0: CLOISTER.x0 * S, x1: CLOISTER.x1 * S, z0: CLOISTER.z0 * S, z1: CLOISTER.z1 * S, floor: MERVEILLE.top * S },
-  logis: { x0: LOGIS.x0 * S, x1: LOGIS.x1 * S, z0: LOGIS.z0 * S, z1: LOGIS.z1 * S, top: (LOGIS.top + LOGIS.h) * S },
+  cloister: { x0: CLOISTER.x0 * S, x1: CLOISTER.x1 * S, z0: CLOISTER.z0 * S, z1: CLOISTER.z1 * S, floor: MERVEILLE.top * SV },
+  logis: { x0: LOGIS.x0 * S, x1: LOGIS.x1 * S, z0: LOGIS.z0 * S, z1: LOGIS.z1 * S, top: (LOGIS.top + LOGIS.h) * SV },
   wall: WALL * S,
   /** Rooflines a man can be posted on, low to high. */
-  galleries: [MERVEILLE.top * S, NAVE.h * S, TOWER.top * S],
+  galleries: [MERVEILLE.top * SV, NAVE.h * SV, TOWER.top * SV],
+  plan: PLAN,
   // The flag flies from the tower's top, beside the spire's foot.
-  flag: { x: (TOWER.cx + TOWER.w / 2 - 1.0) * S, y: (TOWER.top + 0.5) * S, z: (TOWER.cz + TOWER.w / 2 - 1.0) * S },
+  flag: { x: (TOWER.cx + TOWER.w / 2 - 1.0) * S, y: (TOWER.top + 0.5) * SV, z: (TOWER.cz + TOWER.w / 2 - 1.0) * S },
 };
 
 export function buildMontstmichel(quality) {
   const B = new BlockList();
   B.joint = JOINT / S;
-  const s = quality.blockScale * STONE_FINENESS;
+  // The same stone from high up: a desktop lays the abbey much as a phone does.
+  const s = Math.max(1.0, quality.blockScale) * STONE_FINENESS;
   const stone = 1.4 * s;
+  // The stretch makes a course half as tall again, which at this size is a
+  // big abbey's big stones rather than a slab.
   const course = 1.0 * s;
   const rough = stone * 3.0, roughCourse = course * 3.0;
   /** Equal courses, never a sliver. */
@@ -146,10 +163,10 @@ export function buildMontstmichel(quality) {
     face('z', x1 - wall / 2, za0, za1, 1, gaps.e, 'e');
   };
   /** Buried masonry is coarse and bare; the face's own grain above the rock. */
-  const grain = (y) => (y < ROUGH ? { st: rough, co: roughCourse, mat: M.RUBBLE } : { st: stone, co: course, mat: M.LIMESTONE });
+  const grain = (y) => (y < ROUGH ? { st: rough, co: roughCourse, mat: M.RUBBLE } : { st: stone, co: course, mat: M.GRANITE });
   const walls = (x0, x1, z0, z1, wall, y0, y1, fn) => {
     if (y0 < ROUGH) courses(y0, Math.min(ROUGH, y1), roughCourse, (y, h, c) => fn(y, h, c, rough, M.RUBBLE));
-    if (y1 > ROUGH) courses(Math.max(ROUGH, y0), y1, course, (y, h, c) => fn(y, h, c, stone, M.LIMESTONE));
+    if (y1 > ROUGH) courses(Math.max(ROUGH, y0), y1, course, (y, h, c) => fn(y, h, c, stone, M.GRANITE));
   };
   /**
    * A gable roof: courses of two runs stepping in from the eaves by less
@@ -168,14 +185,14 @@ export function buildMontstmichel(quality) {
       const thick = Math.min(step * 1.3 + 0.4, half);
       if (half <= thick) {
         // The ridge: one run closes it.
-        if (along === 'x') B.slab((x0 + x1) / 2, y + ch / 2, (z0 + z1) / 2, x1 - x0, ch, Math.max(2 * half, stone * 0.6), stone, M.SLATE);
-        else B.slab((x0 + x1) / 2, y + ch / 2, (z0 + z1) / 2, Math.max(2 * half, stone * 0.6), ch, z1 - z0, stone, M.SLATE);
+        if (along === 'x') B.slab((x0 + x1) / 2, y + ch / 2, (z0 + z1) / 2, x1 - x0, ch, Math.max(2 * half, stone * 0.6), stone, M.SCOTSLATE);
+        else B.slab((x0 + x1) / 2, y + ch / 2, (z0 + z1) / 2, Math.max(2 * half, stone * 0.6), ch, z1 - z0, stone, M.SCOTSLATE);
         return;
       }
       for (const side of [-1, 1]) {
         const c = along === 'x' ? (z0 + z1) / 2 + side * (half - thick / 2) : (x0 + x1) / 2 + side * (half - thick / 2);
-        if (along === 'x') run('x', c, x0, x1, y, ch, thick, stone, M.SLATE);
-        else run('z', c, z0, z1, y, ch, thick, stone, M.SLATE);
+        if (along === 'x') run('x', c, x0, x1, y, ch, thick, stone, M.SCOTSLATE);
+        else run('z', c, z0, z1, y, ch, thick, stone, M.SCOTSLATE);
       }
     }
   };
@@ -222,7 +239,7 @@ export function buildMontstmichel(quality) {
       w: wins(z0, z1, 6.0, 2.2, MARGIN), e: wins(z0, z1, 6.0, 2.2, MARGIN),
     } : {};
     // Buttresses: a pilaster standing proud between the windows.
-    box(x0, x1, z0, z1, WALL, y, ch, c, stone, M.LIMESTONE, g, lintel ? 0.8 : 0, 0, omit,
+    box(x0, x1, z0, z1, WALL, y, ch, c, stone, M.GRANITE, g, lintel ? 0.8 : 0, 0, omit,
       (name, yy) => (yy < h - course * 1.2 ? 0 : 0.2));
   };
   B.section('church', () => {
@@ -234,9 +251,32 @@ export function buildMontstmichel(quality) {
       churchBox(CROSSING.x0, CROSSING.x1, NAVE.z1 + GAP, CROSSING.z1, CROSSING.h, 'n', y, h, c);
       // The crossing itself: the tower's foot, plain, west and east faces only
       // (the nave and choir walls meet the arms).
-      box(CROSSING.x0, CROSSING.x1, NAVE.z0, NAVE.z1, WALL, y, h, c, stone, M.LIMESTONE, {}, 0, 0, 'n s');
+      box(CROSSING.x0, CROSSING.x1, NAVE.z0, NAVE.z1, WALL, y, h, c, stone, M.GRANITE, {}, 0, 0, 'n s');
     });
     courses(0, CHOIR.h, course, (y, h, c) => churchBox(CHOIR.x0, CHOIR.x1, CHOIR.z0, CHOIR.z1, CHOIR.h, 'w', y, h, c));
+    // A gallery round the inside of the nave and the choir at the window
+    // sills, and a floor in the belfry under its openings: what a man at a
+    // window stands on.
+    B.ring((NAVE.x0 + NAVE.x1) / 2, 0, NAVE.x1 - NAVE.x0 - 2 * WALL + 0.1, NAVE.z1 - NAVE.z0 - 2 * WALL + 0.1, 2.4, winY - 0.6, 0.6, stone * 1.3, M.GRANITE);
+    B.ring((CHOIR.x0 + CHOIR.x1) / 2, 0, CHOIR.x1 - CHOIR.x0 - 2 * WALL + 0.1, CHOIR.z1 - CHOIR.z0 - 2 * WALL + 0.1, 2.4, winY - 0.6, 0.6, stone * 1.3, M.GRANITE);
+    B.ring(TOWER.cx, TOWER.cz, TOWER.w - 2 * WALL + 0.1, TOWER.w - 2 * WALL + 0.1, 2.2, TOWER.top - 8.6, 0.6, stone * 1.3, M.GRANITE);
+    // Where the windows fell, for the garrison: it depends on the stone size.
+    POSTS.nave = wins(NAVE.x0, NAVE.x1, 6.0, 2.2, MARGIN).map(([p, q]) => (p + q) / 2);
+    POSTS.choir = wins(CHOIR.x0, CHOIR.x1, 6.0, 2.2, MARGIN).map(([p, q]) => (p + q) / 2);
+    POSTS.sill = winY;
+    POSTS.deck = MERVEILLE.top + course * 0.6;
+    // Pinnacles on the wall-heads over every buttress, nave and choir, and a
+    // ring of them round the choir's east end: the flamboyant silhouette the
+    // Mont is known by, standing on the walls it tops.
+    for (const [x0, x1, zs] of [[NAVE.x0, NAVE.x1, [NAVE.z0, NAVE.z1]], [CHOIR.x0, CHOIR.x1, [CHOIR.z0, CHOIR.z1]]]) {
+      for (let x = x0 + 3.0; x < x1 - 1.0; x += 6.0) {
+        for (const z of zs) {
+          const zc = z < 0 ? z + WALL / 2 : z - WALL / 2;
+          B.pinnacle(x, zc, NAVE.h, 5.5, 1.5, stone * 0.6, M.GRANITE);
+        }
+      }
+    }
+    for (const z of [-4.5, 0, 4.5]) B.pinnacle(CHOIR.x1 - WALL / 2, z, CHOIR.h, 6.5, 1.5, stone * 0.6, M.GRANITE);
     // The roofs.
     gable(NAVE.x0, NAVE.x1, NAVE.z0, NAVE.z1, NAVE.h, ROOF.rise, 'x');
     gable(CHOIR.x0, CHOIR.x1, CHOIR.z0, CHOIR.z1, CHOIR.h, ROOF.rise, 'x');
@@ -250,7 +290,7 @@ export function buildMontstmichel(quality) {
       const bel = yc > T.top - 8.0 && yc < T.top - 3.0;
       const lintel = !bel && y < T.top - 3.0 + 0.02 && y + h > T.top - 3.0 - 0.02;
       const g = bel || lintel ? { n: [[T.cx - 1.2, T.cx + 1.2]], s: [[T.cx - 1.2, T.cx + 1.2]], w: [[T.cz - 1.2, T.cz + 1.2]], e: [[T.cz - 1.2, T.cz + 1.2]] } : {};
-      box(T.cx - T.w / 2, T.cx + T.w / 2, T.cz - T.w / 2, T.cz + T.w / 2, WALL, y, h, c, stone, M.LIMESTONE, g, lintel ? 0.8 : 0, yc > T.top - course * 1.1 ? 0.25 : 0);
+      box(T.cx - T.w / 2, T.cx + T.w / 2, T.cz - T.w / 2, T.cz + T.w / 2, WALL, y, h, c, stone, M.GRANITE, g, lintel ? 0.8 : 0, yc > T.top - course * 1.1 ? 0.25 : 0);
     });
   });
 
@@ -262,11 +302,11 @@ export function buildMontstmichel(quality) {
     const close = 4;
     courses(T.top, T.top + close * course, course, (y, h, c) => {
       const wl = Math.min(T.w / 2, WALL + (T.w / 2 - WALL) * ((c + 1) / close));
-      if (wl >= T.w / 2 - 0.3) B.slab(T.cx, y + h / 2, T.cz, T.w, h, T.w, stone, M.LIMESTONE);
-      else box(T.cx - T.w / 2, T.cx + T.w / 2, T.cz - T.w / 2, T.cz + T.w / 2, wl, y, h, c, stone, M.LIMESTONE);
+      if (wl >= T.w / 2 - 0.3) B.slab(T.cx, y + h / 2, T.cz, T.w, h, T.w, stone, M.GRANITE);
+      else box(T.cx - T.w / 2, T.cx + T.w / 2, T.cz - T.w / 2, T.cz + T.w / 2, wl, y, h, c, stone, M.GRANITE);
     });
     const sy = T.top + close * course;
-    B.spire(T.cx, T.cz, sy, SPIRE.top, SPIRE.base, SPIRE.tip, course * 0.9, stone * 0.9, M.LIMESTONE, 0.4);
+    B.spire(T.cx, T.cz, sy, SPIRE.top, SPIRE.base, SPIRE.tip, course * 0.9, stone * 0.9, M.GRANITE, 0.4);
     B.pinnacle(T.cx, T.cz, SPIRE.top, SPIRE.angel, 1.6, stone * 0.6, M.GILT);
   });
 
@@ -301,14 +341,14 @@ export function buildMontstmichel(quality) {
     });
     // The floors: galleries a stone and a half wide inside the walls.
     for (const fy of Mv.floors) {
-      B.ring((Mv.x0 + Mv.x1) / 2, (Mv.z0 + Mv.z1) / 2, Mv.x1 - Mv.x0 - 2 * Mv.wall - 2 * GAP, Mv.z1 - Mv.z0 - 2 * Mv.wall - 2 * GAP, stone * 1.6, fy - course * 0.3, course * 0.6, stone, M.SLATE);
+      B.ring((Mv.x0 + Mv.x1) / 2, (Mv.z0 + Mv.z1) / 2, Mv.x1 - Mv.x0 - 2 * Mv.wall - 2 * GAP, Mv.z1 - Mv.z0 - 2 * Mv.wall - 2 * GAP, stone * 1.6, fy - course * 0.3, course * 0.6, stone, M.SCOTSLATE);
     }
     // The deck: one course over the whole top, every stone within span of a
     // wall or a cross wall.
     const dw = Mv.x1 - Mv.x0, dd = Mv.z1 - Mv.z0;
     const nx = Math.round(dw / (stone * 1.1)), nz = Math.round(dd / (stone * 1.1));
     for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
-      B.add(Mv.x0 + (i + 0.5) * dw / nx, Mv.top + course * 0.3, Mv.z0 + (k + 0.5) * dd / nz, B.shrink(dw / nx / 2), B.shrink(course * 0.3), B.shrink(dd / nz / 2), M.LIMESTONE);
+      B.add(Mv.x0 + (i + 0.5) * dw / nx, Mv.top + course * 0.3, Mv.z0 + (k + 0.5) * dd / nz, B.shrink(dw / nx / 2), B.shrink(course * 0.3), B.shrink(dd / nz / 2), M.GRANITE);
     }
     // The refectory's roof over the east half.
     gable(CLOISTER.x1 + 2.0, Mv.x1, Mv.z0, Mv.z1, Mv.top + course * 0.6, ROOF.rise * 0.7, 'x');
@@ -327,10 +367,10 @@ export function buildMontstmichel(quality) {
         n: wins(C.x0, C.x1, 4.0, C.arch, MARGIN), s: wins(C.x0, C.x1, 4.0, C.arch, MARGIN),
         w: wins(C.z0, C.z1, 4.0, C.arch, MARGIN), e: wins(C.z0, C.z1, 4.0, C.arch, MARGIN),
       } : {};
-      box(C.x0, C.x1, C.z0, C.z1, 1.6, y, h, c, stone, M.LIMESTONE, g, lintel ? 0.7 : 0);
+      box(C.x0, C.x1, C.z0, C.z1, 1.6, y, h, c, stone, M.GRANITE, g, lintel ? 0.7 : 0);
     });
     // A lean-to roof round the walk: one course, inside the arcade.
-    B.ring((C.x0 + C.x1) / 2, (C.z0 + C.z1) / 2, C.x1 - C.x0 - 0.4, C.z1 - C.z0 - 0.4, 3.6, y0 + C.h, course * 0.6, stone, M.SLATE);
+    B.ring((C.x0 + C.x1) / 2, (C.z0 + C.z1) / 2, C.x1 - C.x0 - 0.4, C.z1 - C.z0 - 0.4, 3.6, y0 + C.h, course * 0.6, stone, M.SCOTSLATE);
   });
 
   // ── The abbot's lodgings on the south face, a plain range founded down
@@ -348,57 +388,177 @@ export function buildMontstmichel(quality) {
     gable(L.x0, L.x1, L.z0, L.z1, L.top + L.h, ROOF.rise * 0.6, 'x');
   });
 
-  B.scaleAll(S);
+  stretch(B);
+  // Laid at the rock's own size, on its own ground.
+  B.joint = JOINT;
+  village(B);
+  ramparts(B);
   return B;
 }
 
 /**
- * The garrison. Riflemen at the Merveille's windows on all three storeys,
- * looking north over the bay; machine guns in the church's windows; snipers
- * in the tower's belfry openings; anti-tank teams in the cloister's arcade
- * and at the lodgings' windows on the south, where the causeway comes up;
- * mortars on the Merveille's deck between the cloister and the refectory.
+ * The scale, applied: S across, S down into the rock, SV up from the summit.
+ * A stone that straddles the summit has its bottom and top mapped separately,
+ * so the courses stay stacked on each other.
+ */
+function stretch(B) {
+  const up = (y) => (y > 0 ? y * SV : y * S);
+  for (const b of B.blocks) {
+    const y0 = up(b.y - b.hy), y1 = up(b.y + b.hy);
+    b.x *= S; b.z *= S; b.hx *= S; b.hz *= S;
+    b.y = (y0 + y1) / 2; b.hy = (y1 - y0) / 2;
+  }
+}
+
+/** A run of stones along a direction (ux, uz) from centre (cx, cz), world metres. */
+function runAlong(B, cx, cz, ux, uz, a0, a1, off, y, h, thick, st, mat) {
+  const len = a1 - a0;
+  if (len < 0.3) return;
+  const n = Math.max(1, Math.round(len / st));
+  const ry = Math.atan2(ux, uz);
+  for (let i = 0; i < n; i++) {
+    const m = a0 + (i + 0.5) * (len / n);
+    B.add(cx + ux * m + uz * off, y + h / 2, cz + uz * m - ux * off, B.shrink(thick / 2), B.shrink(h / 2), B.shrink(len / n / 2), mat, ry);
+  }
+}
+
+/** Equal courses between two heights. */
+function coursesOf(y0, y1, nominal, fn) {
+  const n = Math.max(1, Math.round((y1 - y0) / nominal));
+  const ch = (y1 - y0) / n;
+  for (let c = 0; c < n; c++) fn(y0 + c * ch, ch, c);
+}
+
+/**
+ * The village: every surveyed house on the benches, a granite box from the
+ * ground the bake has under it up to eaves over its highest ground, a steep
+ * slate gable and a stack. Coarse stone whatever the tier: seventy houses in
+ * fine stone would cost more than the abbey.
+ */
+function village(B) {
+  B.section('village', () => {
+    const st = 2.6, co = 1.7, t = 1.2;
+    PLAN.houses.forEach((h, k) => {
+      const ux = Math.sin(h.ry), uz = Math.cos(h.ry);
+      const L = h.len, W = h.wid;
+      const eaves = h.grade + Math.max(5.0, h.h * 0.8);
+      // Under the ground the house stands on, the footing is laid in blocks
+      // three times the size: nobody sees it, and there is a lot of it.
+      const split = Math.max(h.found + 1, Math.min(h.grade - 1.0, eaves - co));
+      const lay = (y, ch, c, sz) => {
+        const odd = c % 2 === 1;
+        const su = odd ? L / 2 - t : L / 2, sv = odd ? W / 2 : W / 2 - t;
+        for (const side of [-1, 1]) {
+          runAlong(B, h.cx, h.cz, ux, uz, -su, su, side * (W / 2 - t / 2), y, ch, t, sz, M.GRANITE);
+          runAlong(B, h.cx, h.cz, uz, -ux, -sv, sv, side * (L / 2 - t / 2) * -1, y, ch, t, sz, M.GRANITE);
+        }
+      };
+      if (split > h.found + 0.5) coursesOf(h.found, split, co * 2.6, (y, ch, c) => lay(y, ch, c, st * 2.2));
+      coursesOf(split, eaves, co, (y, ch, c) => lay(y, ch, c, st));
+      // The roof: slate stepping in from both eaves to the ridge, steep.
+      const rc = 0.9, step = 0.75;
+      let half = W / 2 + 0.3, y = eaves, c = 0;
+      while (half > 1.2 && c < 12) {
+        for (const side of [-1, 1]) runAlong(B, h.cx, h.cz, ux, uz, -L / 2, L / 2, side * (half - 0.8), y, rc, 1.6, st * 1.4, M.SCOTSLATE);
+        half -= step; y += rc; c++;
+      }
+      runAlong(B, h.cx, h.cz, ux, uz, -L / 2, L / 2, 0, y, rc, Math.max(0.8, half * 2), st * 1.4, M.SCOTSLATE);
+      // A stack on one gable, alternating ends so the street does not repeat.
+      const e = (k % 2 ? 1 : -1) * (L / 2 - t / 2);
+      B.add(h.cx + ux * e, y + rc + 0.9, h.cz + uz * e, 0.7, 0.9, 0.6, M.GRANITE, h.ry);
+    });
+  });
+}
+
+/**
+ * The ramparts round the foot of the rock, through the surveyed towers from
+ * Tour Gabriel in the west round the south to the Tour du Nord: stretches of
+ * wall carried down to the ground under them and up to a walk above their own
+ * highest ground, with a breastwork and merlons; round towers with a
+ * battlemented top at each named tower.
+ */
+function ramparts(B) {
+  B.section('ramparts', () => {
+    const st = 2.4, co = 1.6, t = 3.0;
+    for (const r of PLAN.ramparts) {
+      const dx = r.x1 - r.x0, dz = r.z1 - r.z0, L = Math.hypot(dx, dz);
+      const ux = dx / L, uz = dz / L, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+      // Outward is away from the rock.
+      const out = (uz * cx - ux * cz) > 0 ? 1 : -1;
+      const split = Math.max(r.found + 1, r.top - 9.0);
+      if (split > r.found + 0.5) coursesOf(r.found, split, co * 2.6, (y, ch) => runAlong(B, cx, cz, ux, uz, -L / 2 - 0.6, L / 2 + 0.6, 0, y, ch, t, st * 2.2, M.GRANITE));
+      coursesOf(split, r.top, co, (y, ch) => runAlong(B, cx, cz, ux, uz, -L / 2 - 0.6, L / 2 + 0.6, 0, y, ch, t, st, M.GRANITE));
+      runAlong(B, cx, cz, ux, uz, -L / 2 - 0.3, L / 2 + 0.3, out * (t / 2 - 0.4), r.top, 1.0, 0.8, st, M.GRANITE);
+      for (let u = -L / 2 + 1.0; u < L / 2 - 0.4; u += 3.2) {
+        runAlong(B, cx, cz, ux, uz, u, u + 1.4, out * (t / 2 - 0.4), r.top + 1.0, 0.9, 0.8, 99, M.GRANITE);
+      }
+    }
+    for (const w of PLAN.towers) {
+      const split = Math.max(w.found + 1, w.top - 14.0);
+      if (split > w.found + 0.5) coursesOf(w.found, split, co * 2.6, (y, ch, c) => B.polyRing(w.x, w.z, BlockList.circle(w.r, 8, (c % 2) * Math.PI / 8), 2.2, y, ch, st * 2.2, M.GRANITE));
+      coursesOf(split, w.top, co, (y, ch, c) => B.polyRing(w.x, w.z, BlockList.circle(w.r, 12, (c % 2) * Math.PI / 12), 1.8, y, ch, st, M.GRANITE));
+      B.slab(w.x, w.top - 0.4, w.z, w.r * 1.45, 0.8, w.r * 1.45, 99, M.GRANITE);
+      coursesOf(w.top, w.top + 1.0, 1.0, (y, ch) => B.polyRing(w.x, w.z, BlockList.circle(w.r + 0.2, 14, 0), 0.8, y, ch, st, M.GRANITE));
+    }
+  });
+}
+
+/**
+ * The garrison, on things that are there and looking out of them: the
+ * ramparts' walks in the gaps between merlons and the tops of their towers;
+ * the edge of the Merveille's deck beside the cloister, over the bay; the
+ * galleries inside the nave and the choir, at windows the builder cut; the
+ * belfry's floor at its openings; mortars dug in on the summit west of the
+ * church.
  */
 export function populateMontstmichel(g, origin, groundY) {
   const K = MONTSTMICHEL;
   const V = (x, y, z) => new THREE.Vector3(origin.x + x, groundY + y, origin.z + z);
-  const Mv = K.merveille;
-  // The Merveille's north face: three rows, five men each.
-  Mv.windows.forEach((wy, r) => {
-    for (let i = 0; i < 5; i++) {
-      const x = Mv.x0 + (i + 0.5) * (Mv.x1 - Mv.x0) / 5;
-      g.place(r === 1 && i % 2 ? 'mg' : 'rifleman', V(x, wy + 0.3, Mv.z0 + Mv.wall / 2 + 0.6), Math.PI, 6, { cover: 'window' });
-    }
+  const face = (dx, dz) => Math.atan2(dx, dz);
+
+  // The ramparts: a man in a gap on every third stretch, facing off the rock.
+  PLAN.ramparts.forEach((r, i) => {
+    if (i % 3 !== 1 || !r.post) return;
+    const dx = r.x1 - r.x0, dz = r.z1 - r.z0, L = Math.hypot(dx, dz);
+    const ux = dx / L, uz = dz / L, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    const out = (uz * cx - ux * cz) > 0 ? 1 : -1;
+    // The gap nearest the middle of the stretch.
+    const k = Math.round((L / 2 - 3.1) / 3.2);
+    const u = -L / 2 + 3.1 + 3.2 * k;
+    const x = cx + ux * u + uz * out * 0.1, z = cz + uz * u - ux * out * 0.1;
+    g.place(i % 9 === 4 ? 'mg' : 'rifleman', V(x, r.top + 0.05, z), face(uz * out, -ux * out), 3, { cover: 'trench' });
   });
-  // The church's windows: the nave's south side and the choir's, at the sill.
-  const sill = 8.0 * K.scale + 0.3;
-  for (let i = 0; i < 3; i++) {
-    const x = K.nave.x0 + (i + 0.5) * (K.nave.x1 - K.nave.x0) / 3;
-    g.place(i === 1 ? 'mg' : 'rifleman', V(x, sill, K.nave.z1 - K.wall / 2 - 0.6), 0, 6, { cover: 'window' });
-    g.place('rifleman', V(x, sill, K.nave.z0 + K.wall / 2 + 0.6), Math.PI, 6, { cover: 'window' });
+  // The towers' tops, facing off the rock.
+  PLAN.towers.forEach((w, i) => {
+    const r = Math.hypot(w.x, w.z), ox = w.x / r, oz = w.z / r;
+    g.place(i % 2 ? 'sniper' : 'at', V(w.x + ox * 1.0, w.top + 0.05, w.z + oz * 1.0), face(ox, oz), 3, { cover: 'roof' });
+  });
+
+  // The Merveille's deck, along its north edge beside the cloister, over the bay.
+  for (let i = 0; i < 5; i++) {
+    const x = (CLOISTER.x0 + 1.5 + i * (CLOISTER.x1 - CLOISTER.x0 - 3.0) / 4) * S;
+    g.place(i === 2 ? 'mg' : 'rifleman', V(x, POSTS.deck * SV + 0.05, (MERVEILLE.z0 + 1.1) * S), Math.PI, 3, { cover: 'roof' });
   }
-  for (const sz of [-1, 1]) {
-    g.place('mg', V((K.choir.x0 + K.choir.x1) / 2, sill, sz > 0 ? K.choir.z1 - K.wall / 2 - 0.6 : K.choir.z0 + K.wall / 2 + 0.6), sz > 0 ? 0 : Math.PI, 6, { cover: 'window' });
-  }
-  g.place('rifleman', V(K.choir.x1 - K.wall / 2 - 0.6, sill, 0), Math.PI / 2, 6, { cover: 'window' });
-  // Snipers in the belfry, one a face.
-  const T = K.tower;
-  const bel = T.top - 6.0 * K.scale;
+
+  // The church: the choir's gallery at its windows, both sides, where the
+  // choir runs out east past the refectory and the lodgings — the nave's
+  // windows look straight into their roofs.
+  const sill = POSTS.sill * SV + 0.05;
+  POSTS.choir.filter((x) => x > Math.max(LOGIS.x1, MERVEILLE.x1) + 1.5).forEach((x, i) => {
+    g.place(i ? 'rifleman' : 'mg', V(x * S, sill, (CHOIR.z1 - WALL - 0.6) * S), 0, 3, { cover: 'window' });
+    g.place('rifleman', V(x * S, sill, (CHOIR.z0 + WALL + 0.6) * S), Math.PI, 3, { cover: 'window' });
+  });
+
+  // The belfry: a sniper at the opening in each face.
+  const bel = (TOWER.top - 8.0) * SV + 0.05;
   for (const [fx, fz] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-    g.place('sniper', V(T.cx + fx * (T.w / 2 - K.wall / 2 - 0.6), bel, T.cz + fz * (T.w / 2 - K.wall / 2 - 0.6)), Math.atan2(fx, fz), 6, { cover: 'window' });
+    const d = TOWER.w / 2 - WALL - 0.6;
+    g.place('sniper', V((TOWER.cx + fx * d) * S, bel, (TOWER.cz + fz * d) * S), face(fx, fz), 3, { cover: 'window' });
   }
-  // Anti-tank teams: two in the cloister looking north and west, two at the
-  // lodgings on the south.
-  const C = K.cloister;
-  g.place('at', V((C.x0 + C.x1) / 2, C.floor + 0.6, C.z0 + 1.6), Math.PI, 6, { cover: 'arcade' });
-  g.place('at', V(C.x0 + 1.6, C.floor + 0.6, (C.z0 + C.z1) / 2), -Math.PI / 2, 6, { cover: 'arcade' });
-  const L = K.logis;
-  for (const x of [L.x0 + 8.0, L.x1 - 8.0]) {
-    g.place('at', V(x, 3.0 * K.scale + 0.3, L.z1 - K.wall / 2 - 0.6), 0, 6, { cover: 'window' });
-  }
-  // Mortars dug in on the summit's west terrace, clear of the nave: a crew on
-  // the Merveille's deck had the deck in the muzzle's cell and never fired.
-  for (const z of [-8.0 * K.scale, 8.0 * K.scale]) {
-    g.place('mortar', V(K.nave.x0 - 9.0 * K.scale, 0.3, z), -Math.PI / 2, 7, { cover: 'roof', emplaced: true });
+
+  // Mortars dug in on the summit, west of the church.
+  for (const k of ['west1', 'west2', 'west3']) {
+    const p = PLAN.points[k];
+    g.place('mortar', V(p.x, p.y + 0.3, p.z), -Math.PI / 2, 20, { cover: 'ground', emplaced: true, sandbags: true });
   }
 }

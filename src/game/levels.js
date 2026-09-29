@@ -1582,20 +1582,22 @@ export const LEVELS = {
       hinterland: 'harbour',
       haze: { colour: 0xc8d2d8, density: 0.00020 },
     },
-    // The abbey's own outlines lie within forty metres of the summit and are
-    // rebuilt here at 1.3; the village — seventy houses, hotels and towers
-    // the survey has by name — begins seventy metres out on the south-east
-    // benches and is kept, on its own streets, inside its own ramparts.
-    cityExcludeRadius: 70,
-    contextExclude: 65,
+    // The abbey's own outlines lie within forty metres of the summit, and the
+    // village and its ramparts out to a hundred and forty: all of it is laid
+    // by the builder now, the houses as granite and slate on their surveyed
+    // footprints and the walls through their surveyed towers, instead of the
+    // town's generic blocks. The town resumes on the mainland.
+    cityExcludeRadius: 150,
+    contextExclude: 145,
     // A summit. The bake's rock is the floor and nothing is flattened; the
     // church, the crypts and the Merveille carry their footings down to
     // meet it, thirty-six metres under the nave floor on the north face.
     groundLevel: 'bake',
     padRadius: 0,
-    // From the bay to the south-south-west, low, the way it is seen from the
-    // causeway: the village up the rock, the Merveille's flank, the spire.
-    camera: { yaw: -0.35, pitch: 0.09, distance: 520, height: 45 },
+    // From the sands to the south-east: the ramparts and their towers, the
+    // village climbing the rock inside them, the abbey over it and the spire
+    // over that. From the south-west the rock is a bare flank.
+    camera: { yaw: 0.5, pitch: 0.1, distance: 540, height: 55 },
     structures: (quality) => [
       { key: 'montstmichel', blocks: buildMontstmichel(quality), primary: true, required: true, label: 'MONT-SAINT-MICHEL' },
     ],
