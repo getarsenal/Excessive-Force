@@ -175,6 +175,45 @@ const FIRING_ARC = Math.cos(THREE.MathUtils.degToRad(72));
  * quiet. Positions in the open get almost none, so a wall standing in front of
  * a sandbagged pit still stops the shot.
  */
+/**
+ * How far out from a defender the line of sight is tested stone by stone
+ * rather than on the occupancy grid.
+ *
+ * The grid is two metres a cell, and a cell with any masonry in it is solid to
+ * its top. A man behind a breast-high parapet has his eye a hand over the
+ * stone and inside the same cell as it, so the grid called every wall-walk in
+ * the campaign blind — and the placement search then walked him forward off
+ * the wall, or lifted him a storey into the air, until the grid agreed he
+ * could see. Near him — far enough out to be past the cells of a wall turned
+ * across the grid, whose boxes are inflated — the question is asked of the
+ * stones themselves, which know where their tops are; past this the grid is
+ * as good as ever.
+ */
+const NEAR = 7.5;
+
+/** Does the segment p→q pass through stone i of s? Exact, in the stone's own frame. */
+function segHitsStone(s, i, px, py, pz, qx, qy, qz) {
+  const c = Math.cos(s.ry[i]), n = Math.sin(s.ry[i]);
+  const ax = px - s.px[i], az = pz - s.pz[i], bx = qx - s.px[i], bz = qz - s.pz[i];
+  const o = [ax * c - az * n, py - s.py[i], ax * n + az * c];
+  const e = [bx * c - bz * n, qy - s.py[i], bx * n + bz * c];
+  const h = [s.hx[i] - 0.02, s.hy[i] - 0.02, s.hz[i] - 0.02];
+  let t0 = 0, t1 = 1;
+  for (let k = 0; k < 3; k++) {
+    const d = e[k] - o[k];
+    if (Math.abs(d) < 1e-9) {
+      if (o[k] < -h[k] || o[k] > h[k]) return false;
+      continue;
+    }
+    let a = (-h[k] - o[k]) / d, b = (h[k] - o[k]) / d;
+    if (a > b) { const t = a; a = b; b = t; }
+    if (a > t0) t0 = a;
+    if (b < t1) t1 = b;
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
 function skipFor(d) {
   if (d.cover === 'window' || d.cover === 'arcade') return 3.6;
   if (d.cover === 'roof') return 2.6;
@@ -642,6 +681,67 @@ export class Garrison {
    * position that cannot be rescued keeps its original place and is flagged, so
    * the test menu can report it rather than it passing unnoticed.
    */
+  /**
+   * Line of sight from a defender's muzzle to a point: exact against the stones
+   * within NEAR of him, the occupancy grid beyond. `skip` is his own cover — the
+   * sill he leans on — which the exact test does not need, but a stone he is
+   * standing inside of by a few centimetres should not blind him either.
+   */
+  _los(d, to, structures, skipEnd = 0) {
+    const from = d.muzzle;
+    const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
+    const len = Math.hypot(dx, dy, dz);
+    if (len < 1e-3) return true;
+    const near = this._nearStones(d);
+    const t0 = 0.35 / len, t1 = Math.min(1, NEAR / len);
+    const px = from.x + dx * t0, py = from.y + dy * t0, pz = from.z + dz * t0;
+    const qx = from.x + dx * t1, qy = from.y + dy * t1, qz = from.z + dz * t1;
+    for (let k = 0; k < near.length; k += 2) {
+      const s = near[k], i = near[k + 1];
+      if (!(s.flags[i] & 1)) continue;
+      if (segHitsStone(s, i, px, py, pz, qx, qy, qz)) return false;
+    }
+    if (len <= NEAR) return true;
+    return lineOfSight(structures || this.structures, from, to, Math.max(skipFor(d), NEAR), skipEnd);
+  }
+
+  /** The stones within NEAR of a defender's muzzle, cached until he moves. */
+  _nearStones(d) {
+    const m = d.muzzle;
+    if (d._near && d._nearX === m.x && d._nearY === m.y && d._nearZ === m.z) return d._near;
+    const out = [];
+    const r = NEAR + 0.5;
+    for (const s of this.structures) {
+      for (let i = 0; i < s.count; i++) {
+        if (!(s.flags[i] & 1)) continue;
+        const ext = s.hx[i] + s.hz[i];
+        const ddx = s.px[i] - m.x, ddz = s.pz[i] - m.z;
+        if (ddx * ddx + ddz * ddz > (r + ext) ** 2) continue;
+        if (s.py[i] - s.hy[i] > m.y + 5 || s.py[i] + s.hy[i] < m.y - 5) continue;
+        out.push(s, i);
+      }
+    }
+    d._near = out; d._nearX = m.x; d._nearY = m.y; d._nearZ = m.z;
+    return out;
+  }
+
+  /** Is there a standing stone under these feet, its top within a hand of them? */
+  _footingAt(p) {
+    for (const s of this.structures) {
+      for (let i = 0; i < s.count; i++) {
+        if (!(s.flags[i] & 1)) continue;
+        const top = s.py[i] + s.hy[i];
+        if (top < p.y - 0.5 || top > p.y + 0.35) continue;
+        const dx = p.x - s.px[i], dz = p.z - s.pz[i];
+        if (dx * dx + dz * dz > (s.hx[i] + s.hz[i]) ** 2) continue;
+        const c = Math.cos(s.ry[i]), n = Math.sin(s.ry[i]);
+        const lx = dx * c - dz * n, lz = dx * n + dz * c;
+        if (Math.abs(lx) <= s.hx[i] + 0.2 && Math.abs(lz) <= s.hz[i] + 0.2) return true;
+      }
+    }
+    return false;
+  }
+
   _settleIntoPosition(d) {
     if (d.def.indirect) return;
     // An emplaced gun is in a pit that was dug where it is. Nudging it out and
@@ -655,6 +755,12 @@ export class Garrison {
     for (const up of [0, 1.2, 2.4]) {
       for (const out of [1.2, 2.4, 3.6, 5.0]) {
         d.pos.set(home.x + fx * out, home.y + up, home.z + fz * out);
+        // Only onto something. The search used to take the first spot with a
+        // field of fire, and the first spot with a field of fire from behind a
+        // parapet is in front of it — so a man posted on a wall-walk was stood
+        // in the air five metres off the wall, and a garrison that was placed
+        // with care looked as if it had been scattered at random.
+        if (!this._footingAt(d.pos)) continue;
         d.muzzle.copy(d.pos).y += d.def.eye ?? 1.25;
         if (this.hasFieldOfFire(d)) { d.blind = false; return; }
       }
@@ -1767,9 +1873,7 @@ export class Garrison {
       this.losBlocked++;
       return false;
     }
-    const clear = lineOfSight(
-      structures || this.structures, this._from, this._to, skipFor(d), 0.5,
-    );
+    const clear = this._los(d, this._to, structures, 0.5);
     if (!clear) this.losBlocked++;
     return clear;
   }
@@ -1784,7 +1888,6 @@ export class Garrison {
   hasFieldOfFire(d, range = 130, structures) {
     if (d.def.indirect) return true;      // a mortar shoots over everything
     const list = structures || this.structures;
-    const skip = skipFor(d);
     // Sample a fan across the firing arc rather than one ray: a single ray
     // straight ahead can clip a mullion and libel a perfectly good position.
     //
@@ -1802,7 +1905,7 @@ export class Garrison {
           d.muzzle.y - dip,
           d.muzzle.z + Math.cos(a) * range,
         );
-        if (lineOfSight(list, d.muzzle, to, skip, 0.0)) return true;
+        if (this._los(d, to, list, 0.0)) return true;
       }
     }
     return false;
@@ -1931,7 +2034,7 @@ export class Garrison {
       // anything low enough to be masked by it: a canopy, a helicopter.
       if (this.city && this.city.blocks(d.muzzle, t.pos)) continue;
       if ((t.kind === 'chute' || t.heli) && structures
-          && !lineOfSight(structures, d.muzzle, t.pos, 1.2, 0.0)) continue;
+          && !this._los(d, t.pos, structures, 0.0)) continue;
       best = t; bestScore = score;
     }
     return best;

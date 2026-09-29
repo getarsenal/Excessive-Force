@@ -1477,10 +1477,12 @@ export const LEVELS = {
     // southern cliff actually are.
     groundLevel: 'bake',
     padRadius: 0,
-    // From Princes Street Gardens, north-east and eighty-five metres below:
-    // the rock, the batteries along its rim, the Half Moon and the Palace
-    // over it, looked up at. Nearly level, so the crag fills the frame.
-    camera: { yaw: 2.55, pitch: 0.03, distance: 470, height: 18 },
+    // From over the Grassmarket, south-west and below the rock, with the sun
+    // behind the camera: the New Barracks and the Queen Anne Building on
+    // their retaining walls, the gables of Crown Square over them and the
+    // Palace tower with the saltire. The old view was from the gardens to the
+    // north, which is the postcard and is into the sun all day.
+    camera: { yaw: 5.6, pitch: 0.08, distance: 330, height: 22 },
     structures: (quality) => [
       { key: 'edinburgh', blocks: buildEdinburgh(quality), primary: true, required: true, label: 'EDINBURGH CASTLE' },
     ],
@@ -1489,9 +1491,9 @@ export const LEVELS = {
     // castle's own level ground behind the battery wall, the gun facing north
     // over the gardens where the battery deploys.
     turret: { x: EDINBURGH.gun.x, z: EDINBURGH.gun.z, yaw: Math.PI, scale: 1.25, minRange: 60 },
-    // The castle's buildings and the Half Moon; the batteries are the rim of
-    // the rock and stay as ground.
-    scoreTags: ['halfmoon', 'palace', 'greathall', 'chapel', 'gatehouse', 'barracks', 'batteries'],
+    // Everything the castle is above the rock. The footings are inside it and
+    // cannot be shot, so they are not asked for.
+    scoreTags: ['palace', 'greathall', 'memorial', 'barracks', 'hospital', 'governor', 'chapel', 'argyle', 'gatehouse', 'halfmoon', 'curtain'],
     precinct: { boundary: 'none', ground: 'lawn', ornament: 'none' },
     // A fortress on a hill: walls bonded to the rock, nothing that leans.
     // It comes down course by course or it does not come down.

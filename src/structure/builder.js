@@ -37,6 +37,8 @@ export const MATERIALS = {
   MADDER: 21,    // rammed earth washed in the red dye: the Potala's Red Palace
   KYEMA: 22,     // the dark brushwood frieze laid under every Tibetan roofline
   GOLD: 23,      // gilded brick: a stupa's bell, a palace's glazed yellow roof — structural, unlike GILT
+  ASHLAR: 24,    // Craigleith sandstone, grey-brown and sooted: Edinburgh
+  SCOTSLATE: 25, // Ballachulish slate, near black
 };
 
 /**
@@ -249,6 +251,12 @@ export const MATERIAL_PROPS = {
   // bell under its gold and a Chinese hall's roof is fired clay under its glaze,
   // and both have to bear their own weight and the courses over them.
   [MATERIALS.GOLD]:      { density: 1.95, strength: 0.80, toughness: 80,  color: 0xd9a63a, structural: true },
+  // Craigleith sandstone: physically the limestone's equal, and the colour of
+  // Edinburgh — a grey-brown gone darker with two centuries of coal smoke,
+  // where LIMESTONE is the warm cream of Anston and read as a sandcastle.
+  [MATERIALS.ASHLAR]:    { density: 2.35, strength: 1.00, toughness: 100, color: 0x8e8474, structural: true },
+  // Scottish slate is nearly black; SLATE is the blue-grey Welsh kind.
+  [MATERIALS.SCOTSLATE]: { density: 2.70, strength: 0.55, toughness: 55,  color: 0x4a4e55, structural: true },
 };
 
 
