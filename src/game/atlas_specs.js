@@ -480,7 +480,8 @@ export const SPECS = {
     ],
   },
   monas: {
-    S: 1.6, yaw: 0.3, mat: M.MARBLE,
+    // A slender obelisk: finer stone, or the first volley cuts it through (see cntower).
+    S: 1.6, yaw: 0.3, mat: M.MARBLE, budget: 2.4, fine: 0.7,
     parts: [
       { t: 'steps', tag: 'cawan', x: 0, z: 0, w: 45, h: 17, n: 2, wTop: 30, mat: M.MARBLE, posts: true },
       { t: 'tower', tag: 'obelisk', x: 0, z: 0, y0: 17, w: 8, h: 98, taper: 0.7, cap: 'flat', capH: 1, mat: M.MARBLE, ground: false, storey: 10, floors: 2 },

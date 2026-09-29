@@ -742,7 +742,23 @@ export class TestMenu {
    * Bennelong Point all four cardinals are harbour, and a test that took the
    * first of them and stopped reported that there was nowhere to fire from.
    */
+  /**
+   * The range a test asked for, or clear of the building if that is further.
+   * The tests' ranges were set when the widest catalogue site was 200 m
+   * across; at game scale Versailles is 420, and a battery 220 m out on its
+   * axis was standing in the Cour de Marbre.
+   */
+  _clearRange(range) {
+    const st = this.ctx.battle.primary, f = st.footprint;
+    if (!f) return range;
+    const o = st.origin;
+    const reach = Math.hypot(Math.max(Math.abs(f.x0 - o.x), Math.abs(f.x1 - o.x)),
+      Math.max(Math.abs(f.z0 - o.z), Math.abs(f.z1 - o.z)));
+    return Math.max(range, reach + 45);
+  }
+
   spawnSomewhere(id, n, range) {
+    range = this._clearRange(range);
     for (const a of this._clearBearings(range)) {
       const placed = this.spawnAt(id, n, a, range);
       if (placed > 0) return placed;
