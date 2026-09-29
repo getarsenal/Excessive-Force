@@ -699,7 +699,7 @@ export const GAME_SCALE = {
   warsaw: 1.25,
   bran: 1.30,
   bucharest: 2.50,
-  kronborg: 1.89,
+  kronborg: 1.35,        // held to its headland: at 1.89 the bastions stood out over the Sound
   stockholm: 2.60,
   hallgrimskirkja: 1.16,
   trakai: 1.62,
