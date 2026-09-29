@@ -2051,3 +2051,45 @@ body.standoff #comcard, body.ended #comcard { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .tb-value.money, .integrity-wrap.milestone *, #edgeflash, #comcard { animation: none !important; transition: none !important; }
 }
+
+/* ── Feedback: every press is felt and seen (feedback.js) ──────────────── */
+/* A press gives: everything tappable sinks a few per cent while held and
+   springs back. `scale` is its own property, so it composes with whatever
+   transform a control already carries. */
+button, .unit-card, [role="button"], .ef-row, .tt-item, .ef-card, .ef-hero, .dock-btn {
+  transition: scale 0.14s cubic-bezier(0.3, 1.6, 0.5, 1), filter 0.12s ease;
+}
+button:active, .unit-card:active, [role="button"]:active, .ef-row:active, .ef-card:active, .ef-hero:active, .dock-btn:active {
+  scale: 0.94; filter: brightness(1.18);
+  transition: scale 0.05s ease-out, filter 0.05s ease-out;
+}
+.tt-item:active { scale: 0.975; }
+/* The armed weapon breathes, so it is never a question which one is loaded. */
+.unit-card.selected { animation: armedPulse 1.3s ease-in-out infinite; }
+@keyframes armedPulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 10px rgba(88, 166, 255, 0.35); }
+  50% { box-shadow: 0 0 0 2px var(--accent), 0 0 22px rgba(88, 166, 255, 0.75); }
+}
+/* No: the prompt shakes its head. */
+#prompt.deny { animation: denyShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes denyShake {
+  10%, 90% { transform: translateX(calc(-50% - 1px)); }
+  20%, 80% { transform: translateX(calc(-50% + 3px)); }
+  30%, 50%, 70% { transform: translateX(calc(-50% - 6px)); }
+  40%, 60% { transform: translateX(calc(-50% + 6px)); }
+}
+/* And if it was the money, the money says so. */
+.tb-value.money.broke { animation: brokeFlash 0.6s ease-out; }
+@keyframes brokeFlash {
+  0%, 30% { color: #ff5a4a; text-shadow: 0 0 14px rgba(255, 70, 50, 0.9); transform: translateX(-4px); }
+  15%, 45% { transform: translateX(4px); }
+  60% { transform: none; }
+  100% { color: var(--money); text-shadow: none; }
+}
+/* An open drawer's button stays lit. */
+.dock-btn.armed, .dock-btn.open { filter: drop-shadow(0 0 8px rgba(224, 108, 52, 0.55)); }
+.reduce-motion .unit-card.selected, .reduce-motion #prompt.deny, .reduce-motion .tb-value.money.broke { animation: none; }
+
+/* A locked card shakes its head too. */
+.unit-card.nope { animation: cardNope 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes cardNope { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 5px 0; } }

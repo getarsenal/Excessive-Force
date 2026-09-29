@@ -1,3 +1,4 @@
+import { feedback } from './feedback.js';
 import { UNITS, UNITS_BY_ID } from '../game/units.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
@@ -398,6 +399,12 @@ export class HUD {
       if (this.el.sound) this.el.sound.click();
       else { this.soundOn = !this.soundOn; this.syncSound(); this.onToggleSound(this.soundOn); }
     });
+    const hap = menu.querySelector('#menu-haptics');
+    if (hap) {
+      const label = () => { hap.textContent = feedback.haptics ? 'HAPTICS: ON' : 'HAPTICS: OFF'; };
+      label();
+      hap.addEventListener('click', () => { feedback.haptics = !feedback.haptics; label(); });
+    }
     const opening = menu.querySelector('#menu-opening');
     if (opening) {
       const label = () => { opening.textContent = openingEnabled() ? 'OPENING: ON' : 'OPENING: OFF'; };
@@ -461,6 +468,18 @@ export class HUD {
     el.style.left = `${sc.x}px`;
     el.style.top = `${sc.y}px`;
     el.className = `popup go ${kind}`;
+  }
+
+  /**
+   * No. The prompt shakes its head; if it was the money, the funds flash red
+   * and shake too, so the reason is where the eye already is.
+   */
+  deny(kind = '') {
+    // The prompt's own shake comes with the warning it shows (showPrompt).
+    if (kind === 'money' && this.el.money) {
+      const m = this.el.money;
+      m.classList.remove('broke'); void m.offsetWidth; m.classList.add('broke');
+    }
   }
 
   /** The funds readout flares as a bounty lands on it. */
@@ -659,7 +678,17 @@ export class HUD {
         <div class="uc-lock">LOCKED</div>`;
 
       card.addEventListener('click', () => {
-        if (card.classList.contains('locked')) return;
+        if (card.classList.contains('locked')) {
+          // A locked card says no out loud, and says when: the card shakes,
+          // the phone buzzes, and the prompt gives the reason on its face.
+          feedback.emit('deny');
+          card.classList.remove('nope'); void card.offsetWidth; card.classList.add('nope');
+          const why = card.classList.contains('sealed')
+            ? `${u.name} · released by a later contract`
+            : `${u.name} · unlocks ${card.querySelector('.uc-lock')?.textContent?.toLowerCase() || 'as the target falls'} demolished`;
+          this.showPrompt(why, 'warn');
+          return;
+        }
         this.onSelect(u.id);
       });
 
@@ -695,7 +724,11 @@ export class HUD {
 
   showPrompt(text, kind = '') {
     this.el.prompt.textContent = text;
-    this.el.prompt.className = kind;
+    // A warning is a refusal, and a refusal shakes its head: restarted each
+    // time, so a second no is seen as a second no.
+    this.el.prompt.className = '';
+    if (kind === 'warn') void this.el.prompt.offsetWidth;
+    this.el.prompt.className = kind === 'warn' ? 'warn deny' : kind;
     this.el.prompt.hidden = false;
     this._promptTimer = kind === 'warn' ? 2.2 : 0;
   }

@@ -10,6 +10,7 @@ import { QUALITY_IDS, setQuality, detectQuality } from '../core/quality.js';
 import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { menuMusic, eagle } from './music.js';
+import { feedback } from './feedback.js';
 
 /**
  * The par marks: R, $, T and L on the contract list, and the same four
@@ -242,6 +243,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             <button class="ef-set" id="ef-free" type="button"><span>FREE DEPLOY</span><em></em></button>
             <button class="ef-set" id="ef-intros" type="button"><span>STAND-OFF INTROS</span><em></em></button>
             <button class="ef-set" id="ef-opening" type="button"><span>TITLE OPENING</span><em></em></button>
+            <button class="ef-set" id="ef-haptics" type="button"><span>HAPTICS</span><em></em></button>
           </div>
           <div class="ef-set-k sub">QUALITY · RELOADS THE LEVEL</div>
           <div class="ef-qual" id="ef-qual"></div>
@@ -775,6 +777,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     flag('#ef-free', freeDeploy(), 'ON · every contract open', 'OFF · contracts in order');
     flag('#ef-intros', introsEnabled(), 'ON', 'OFF');
     flag('#ef-opening', openingEnabled(), 'ON', 'OFF');
+    flag('#ef-haptics', feedback.haptics, 'ON', 'OFF');
     const now = detectQuality().id;
     root.querySelector('#ef-qual').innerHTML = QUALITY_IDS.map((q) => (
       `<button class="ef-q${q === now ? ' on' : ''}" type="button" data-q="${q}">${q.toUpperCase()}</button>`
@@ -795,6 +798,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     const t = state.list.find((k) => k.id === id);
     if (!t || t === selected) return;
     selected = t;
+    feedback.emit('select');
     for (const p of pins) p.g.classList.toggle('sel', p.t.id === id);
     for (const p of lands.querySelectorAll('.wm-target')) {
       p.classList.toggle('sel', p.getAttribute('data-iso') === t.iso);
@@ -849,6 +853,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       if (id && id !== HOME) {
         // Into a battle: the eagle has its moment before the level loads.
         leaving = true;
+        feedback.emit('strike');
         menuMusic.stop(900);
         root.classList.add('launch');
         eagle().then(() => { cleanup(); root.remove(); resolve(id); });
@@ -1005,6 +1010,9 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     });
     root.querySelector('#ef-intros').addEventListener('click', () => {
       setIntrosEnabled(!introsEnabled()); paintRecords();
+    });
+    root.querySelector('#ef-haptics').addEventListener('click', () => {
+      feedback.haptics = !feedback.haptics; paintRecords();
     });
     root.querySelector('#ef-opening').addEventListener('click', () => {
       setOpeningEnabled(!openingEnabled()); paintRecords();

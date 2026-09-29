@@ -24,6 +24,7 @@ import {
   switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
+import { feedback } from './feedback.js';
 import { showWorldMap, HOME } from './worldmap.js';
 import './title.css';
 
@@ -219,6 +220,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
         if (how === 'resume') sessionStorage.setItem('tt.resume', level);
       } catch { /* private mode */ }
       root.classList.add('launch');
+      feedback.emit('strike');
       menuMusic.stop(900);
       eagle().then(() => done({ level }));
     };
@@ -228,6 +230,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       sheetIn.className = `tt-sheet-in ${cls}`;
       sheetIn.innerHTML = `<header class="tt-sh-top"><b>${title}</b><button class="tt-x" type="button" data-act="close" aria-label="Close">✕</button></header><div class="tt-sh-body">${html}</div>`;
       sheet.hidden = false;
+      feedback.emit('open');
       requestAnimationFrame(() => sheet.classList.add('open'));
     };
     const closeSheet = () => {

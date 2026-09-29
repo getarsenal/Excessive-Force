@@ -37,6 +37,7 @@ import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
 import { ComCard } from './ui/comcard.js';
+import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
@@ -84,6 +85,7 @@ function progress(pct, msg) {
 }
 
 async function boot() {
+  installTapFeedback();
   // A regression run is reproducible, so its randomness is too.
   //
   // Everything else about the suite is now identical from one run to the next
@@ -174,6 +176,8 @@ async function boot() {
   const engine = new Engine(canvas, quality);
   const physics = new PhysicsWorld(quality);
   const audio = new Audio();
+  // Every event's touch, sound and sight: see feedback.js.
+  feedback.attach(audio);
   // Browsers won't start an AudioContext without a gesture, so the first tap
   // on the canvas is what brings sound up.
   // Not `once`: `unlock()` doubles as "start the clock again", and a game that
@@ -694,17 +698,24 @@ async function boot() {
   let winOrbit = false;
   function handleEvent(kind, data) {
     switch (kind) {
+      case 'target':
+        if (data) feedback.emit('target');
+        break;
       case 'bounty':
         hud.popup(`+$${data.amount.toLocaleString()}`, data.point, data.kind);
         hud.flareMoney();
+        if (data.kind === 'kill') feedback.emit('kill');
         break;
       case 'bigimpact':
         hud.edgeFlash('impact', data.point);
+        feedback.emit('impact');
         break;
       case 'unithit':
         hud.edgeFlash('hit', data.from);
+        feedback.emit('hit');
         break;
       case 'rank': {
+        feedback.emit('rank');
         const names = ['', 'SEASONED', 'VETERAN', 'ELITE'];
         hud.feed(`${data.def.name} CREW ${names[data.rank]} ${'★'.repeat(data.rank)}`, 'good');
         break;
@@ -725,12 +736,14 @@ async function boot() {
         hud.feed(`${data.unit.def.name} SOLD  +$${data.refund}`, '');
         break;
       case 'deployed':
+        feedback.emit(battle.airlift ? 'landed' : 'confirm');
         hud.feed(`${data.def.name} ${battle.airlift ? 'ON THE GROUND' : 'DEPLOYED'}`, 'good');
         // With the airlift this arrives twenty seconds after the tap, and
         // whatever the player has selected since is theirs to keep.
         if (!battle.airlift) { battle.selectedUnitId = null; hud.hidePrompt(); }
         break;
       case 'queued':
+        feedback.emit('confirm');
         // The card stays selected while the package is open: the message
         // says place more, so placing more is one tap, not two.
         hud.feed(`${data.def.name} IN THE LIFT`, 'good');
@@ -742,6 +755,7 @@ async function boot() {
         hud.status(`lift · ${data.count} unit${data.count > 1 ? 's' : ''} · wheels up in ${data.left} s`, 1.6);
         break;
       case 'lift':
+        feedback.emit('lift');
         hud.hidePrompt();
         {
           const parts = [];
@@ -752,6 +766,7 @@ async function boot() {
         }
         break;
       case 'strike':
+        feedback.emit('strike');
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
         hud.hidePrompt();
         battle.pulse(data.point, 0xffa040, 22, true);
@@ -797,18 +812,23 @@ async function boot() {
         hud.showPrompt(`${TAP} the building to mark the drop`, 'warn');
         break;
       case 'poor':
+        feedback.emit('deny'); hud.deny('money');
         hud.showPrompt(`need $${data.cost.toLocaleString()}`, 'warn');
         break;
       case 'badplace':
+        feedback.emit('deny'); hud.deny();
         hud.showPrompt(data.reason, 'warn');
         break;
       case 'unitlost':
+        feedback.emit('lost');
         hud.feed(data.fell ? `${data.def.name} DOWN WITH THE BUILDING` : `${data.def.name} LOST`, 'bad');
         break;
       case 'crushed':
+        if (data > 2) feedback.emit('impact', 1.3);
         if (data > 2) hud.feed(`${data} DEFENDERS CRUSHED`, 'big');
         break;
       case 'charge':
+        feedback.emit('collapse');
         hud.feed(`DEMOLITION CHARGE — ${data.destroyed} STONES`, 'big');
         break;
       // The marks, and which of them fell to this run.
@@ -817,6 +837,7 @@ async function boot() {
       // best — ask afterwards and every run is a personal best.
       case 'win':
         battleOver = true;
+        feedback.emit('win');
         clearBattle(level.id);
         winOrbit = true;
         if (comcard) setTimeout(() => { if (!document.body.classList.contains('ended')) comcard.win(); }, 1400);
@@ -867,6 +888,7 @@ async function boot() {
         break;
       case 'lose':
         battleOver = true;
+        feedback.emit('lose');
         clearBattle(level.id);
         if (dailyMod) endDailyRun();
         setTimeout(() => {
@@ -893,6 +915,7 @@ async function boot() {
       const t = island.body.translation();
       const where = new THREE.Vector3(t.x, t.y, t.z);
       audio.rumble(1, where);
+      feedback.emit('collapse');
       engine.addShake(0.8);
       hud.feed('STRUCTURE COLLAPSING', 'big');
       // The rounds it took, counted at the moment the first big section went:
@@ -1507,6 +1530,7 @@ async function boot() {
     }
   };
 
+  let lastArmed = null, lastDrawer = null;
   const hazeBase = engine.scene.fog.density;
   const warmBase = engine.gradePass.uniforms.uWarm.value;
   const MILESTONES = [
@@ -1594,6 +1618,16 @@ async function boot() {
     fx.update(dt);
     hud.update(rawDt);
     if (tutorial) tutorial.update();
+    // A weapon armed, a drawer opened: felt and heard, from whichever of the
+    // dozen places that can do it did it.
+    if (battle.selectedUnitId !== lastArmed) {
+      if (battle.selectedUnitId) feedback.emit('select');
+      lastArmed = battle.selectedUnitId;
+    }
+    if (hud.openDrawer !== lastDrawer) {
+      if (hud.openDrawer) feedback.emit('open');
+      lastDrawer = hud.openDrawer;
+    }
     // The fight leaves its mark on the air. As the building comes down the
     // haze thickens and the grade warms, so a site an hour into a bombardment
     // does not look like the postcard it started as. Two uniforms a frame.
@@ -1610,6 +1644,7 @@ async function boot() {
       while (MILESTONES[nextMs] && integ <= MILESTONES[nextMs].at) {
         const m = MILESTONES[nextMs++];
         hud.milestone();
+        feedback.emit('milestone');
         hud.feed(m.label, 'big');
         engine.addShake(0.22);
         if (comcard && m.taunt) comcard[m.taunt]();
