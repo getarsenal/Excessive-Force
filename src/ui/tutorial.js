@@ -72,7 +72,7 @@ export class Tutorial {
     const h = this.hud, b = this.battle;
     const armedGun = () => !!b.selectedUnitId && !this._isStrike(b.selectedUnitId);
     return [
-      { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar is what still stands — get it under 10%.', ok: true,
+      { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar is what still stands — get it under 10%. Tap its name to fly back to it.', ok: true,
         say: "Welcome to Fort Irwin, maggot. That tower cost the taxpayer eleven million dollars. Let's waste it." },
       { el: null, title: 'LOOK AROUND', text: 'Drag to orbit. Pinch or scroll to zoom.', ok: true,
         done: () => this.yaw0 != null && Math.abs(this.rig.yaw - this.yaw0) > 0.35 },

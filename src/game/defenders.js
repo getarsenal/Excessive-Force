@@ -2079,7 +2079,8 @@ export class Garrison {
       d.facing = Math.atan2(aim.x - d.pos.x, aim.z - d.pos.z);
       d.cooldown = d.def.rof * (observed ? 0.6 : 1.0) * (0.75 + Math.random() * 0.5);
       this.mortarsFired++;
-      if (this.onMortarFire) this.onMortarFire(d);
+      // With the aim and the flight, so a whistle can be timed to the landing.
+      if (this.onMortarFire) this.onMortarFire(d, aim, sol.vel, sh.gravity);
     }
   }
 

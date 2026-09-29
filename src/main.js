@@ -36,6 +36,7 @@ import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
+import { ComCard } from './ui/comcard.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
@@ -43,6 +44,37 @@ import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS } from '
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
+
+/**
+ * A tip on the loading screen, and another every few seconds after it. The
+ * things the game has never said out loud, said while the player is waiting
+ * anyway; a level with a trick of its own leads with that.
+ */
+const TIPS = [
+  'SURVEY paints the stone that is holding the rest up. Shoot the red.',
+  'Undercut the base. Gravity works for free.',
+  'DELAY fuze bursts inside the wall, not on it.',
+  'A gun that has stood still for thirty seconds digs in and takes a third less.',
+  'Smoke blinds the garrison. It does not stop mortars.',
+  'Every defender you drop is money. Kills pay.',
+  'Leverage is what fell that you did not shoot. It is the mark that matters.',
+  'With a gun armed, drag across the ground to lay a whole battery in one stroke.',
+  'Guns on rooftops see over the town. Rooftops burn.',
+  'Everything placed inside eight seconds flies in on one lift.',
+  "Tap the target's name to fly the camera back to it; tap UNITS for your battery.",
+  'Leave mid-fight from MAIN MENU and the battle is kept. CONTINUE picks it up.',
+];
+function startTips(level) {
+  const el = document.getElementById('load-tip');
+  if (!el) return () => {};
+  const pool = [...TIPS].sort(() => Math.random() - 0.5);
+  if (level && level.traits && level.traits.topples === false) pool.unshift('This one will not tip over. Take it apart.');
+  let i = 0;
+  const show = () => { el.classList.remove('swap'); el.textContent = pool[i++ % pool.length]; };
+  show();
+  const t = setInterval(() => { el.classList.add('swap'); setTimeout(show, 320); }, 3400);
+  return () => { clearInterval(t); };
+}
 
 function progress(pct, msg) {
   if (fillEl) fillEl.style.width = `${pct}%`;
@@ -115,6 +147,7 @@ async function boot() {
   }
 
   await progress(6, 'starting physics');
+  const stopTips = startTips(level);
   // The two commanders fetch while the world builds, so the stand-off never
   // opens on an empty stage.
   // RUN ALL on a battle in progress restarts the level to run the suite on a
@@ -596,6 +629,17 @@ async function boot() {
         testMenu.paused = wasPaused;
       }
     },
+    // The readouts fly the camera: the target's name back to the target, UNITS
+    // to the middle of whatever is deployed.
+    onFocusTarget: () => rig.focus(new THREE.Vector3(origin.x, groundY + level.camera.height * 0.6, origin.z), level.camera.distance),
+    onFocusUnits: () => {
+      const live = battle.units.filter((u) => u.alive);
+      if (!live.length) { hud.status('no units on the ground', 1.6); return; }
+      const c = new THREE.Vector3();
+      for (const u of live) c.add(u.pos);
+      c.divideScalar(live.length);
+      rig.focus(c.setY(c.y + 6), Math.max(90, Math.min(220, 60 + live.length * 8)));
+    },
     onToggleSound: (on) => audio.setEnabled(on),
     onFireMode: (m) => battle.setFireMode(m),
     onSmoke: () => battle.placeSmoke(),
@@ -643,10 +687,22 @@ async function boot() {
       ...m, best: had[m.id] == null || m.got < had[m.id],
     }));
   };
+  // The generals' corner card, the win orbit and the milestones: see the
+  // frame loop. Boot Camp has its own General and gets no heckling.
+  const comcard = level.id === 'tutorial' ? null : new ComCard({ level, audio });
+  window.__comcard = comcard;      // for the harness
+  let winOrbit = false;
   function handleEvent(kind, data) {
     switch (kind) {
       case 'bounty':
         hud.popup(`+$${data.amount.toLocaleString()}`, data.point, data.kind);
+        hud.flareMoney();
+        break;
+      case 'bigimpact':
+        hud.edgeFlash('impact', data.point);
+        break;
+      case 'unithit':
+        hud.edgeFlash('hit', data.from);
         break;
       case 'rank': {
         const names = ['', 'SEASONED', 'VETERAN', 'ELITE'];
@@ -762,6 +818,8 @@ async function boot() {
       case 'win':
         battleOver = true;
         clearBattle(level.id);
+        winOrbit = true;
+        if (comcard) setTimeout(() => { if (!document.body.classList.contains('ended')) comcard.win(); }, 1400);
         if (dailyMod) {
           setTimeout(() => {
             if (dailyMet(dailyMod.id, battle.summary())) {
@@ -790,6 +848,7 @@ async function boot() {
       case 'flattened':
         battleOver = true;
         clearBattle(level.id);
+        winOrbit = true;
         hud.feed('NOTHING LEFT STANDING', 'big');
         setTimeout(() => {
           const sum = battle.summary();
@@ -1297,6 +1356,7 @@ async function boot() {
     }
   }
 
+  stopTips();
   document.getElementById('loading').style.display = 'none';
   uiEl.hidden = false;
   if (!standoff) firstPrompt();
@@ -1447,6 +1507,43 @@ async function boot() {
     }
   };
 
+  const hazeBase = engine.scene.fog.density;
+  const warmBase = engine.gradePass.uniforms.uWarm.value;
+  const MILESTONES = [
+    { at: 0.75, label: 'A QUARTER OF IT DOWN' },
+    { at: 0.5, label: 'HALF STANDING', taunt: 'half' },
+    { at: 0.25, label: 'A QUARTER STANDING' },
+    { at: 0.2, label: 'ONE FIFTH STANDING — NEARLY THERE', taunt: 'last' },
+  ];
+  let nextMs = -1;
+
+  // The whistle of an incoming mortar bomb, timed to the landing: a sine
+  // sliding down an octave under a low-pass, cut off dead at the impact,
+  // made in the game's own audio context so the SOUND switch covers it.
+  let lastWhistle = -10;
+  garrison.onMortarFire = (d, aim, vel, g) => {
+    const c = audio.ctx;
+    if (!c || !audio.enabled || c.state !== 'running') return;
+    const now = c.currentTime;
+    if (now - lastWhistle < 1.3) return;
+    lastWhistle = now;
+    const flight = Math.max(0.6, (2 * Math.max(0, vel.y)) / g);
+    const len = Math.min(1.6, flight * 0.55);
+    const t0 = now + flight - len, t1 = now + flight;
+    try {
+      const o = c.createOscillator(), f = c.createBiquadFilter(), gn = c.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(1500, t0);
+      o.frequency.exponentialRampToValueAtTime(620, t1);
+      f.type = 'lowpass'; f.frequency.value = 2400; f.Q.value = 0.7;
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.exponentialRampToValueAtTime(0.11, t1 - 0.08);
+      gn.gain.setValueAtTime(0.0001, t1);
+      o.connect(f).connect(gn).connect(c.destination);
+      o.start(t0); o.stop(t1 + 0.01);
+    } catch { /* no audio */ }
+  };
+
   function frame() {
     requestAnimationFrame(frame);
     const now = performance.now();
@@ -1497,6 +1594,30 @@ async function boot() {
     fx.update(dt);
     hud.update(rawDt);
     if (tutorial) tutorial.update();
+    // The fight leaves its mark on the air. As the building comes down the
+    // haze thickens and the grade warms, so a site an hour into a bombardment
+    // does not look like the postcard it started as. Two uniforms a frame.
+    {
+      const frac = battle.primary ? Math.max(0, Math.min(1, 1 - battle.primary.monumentIntegrity)) : 0;
+      engine.scene.fog.density = hazeBase * (1 + 0.6 * frac);
+      engine.gradePass.uniforms.uWarm.value = warmBase + 0.07 * frac;
+    }
+    // Milestones on the way down: a flash on the bar, a line in the feed, a
+    // nudge to the camera, and the enemy general with something to say.
+    if (battle.state === 'playing') {
+      const integ = 1 - battle.objectiveProgress;
+      if (nextMs < 0) { nextMs = 0; while (MILESTONES[nextMs] && integ <= MILESTONES[nextMs].at) nextMs++; }
+      while (MILESTONES[nextMs] && integ <= MILESTONES[nextMs].at) {
+        const m = MILESTONES[nextMs++];
+        hud.milestone();
+        hud.feed(m.label, 'big');
+        engine.addShake(0.22);
+        if (comcard && m.taunt) comcard[m.taunt]();
+      }
+    }
+    // Once it is down the camera drifts round the ruin until the player
+    // takes it back.
+    if (winOrbit && rig._pointers.size === 0) rig.desiredYaw += rawDt * 0.07;
     // One finger belongs to the weapon while one is armed. Set here rather
     // than in the selection handler because a unit can be deselected from
     // half a dozen places — a keypress, a deploy, a win — and a camera left

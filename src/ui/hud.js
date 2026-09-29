@@ -33,6 +33,10 @@ export class HUD {
     this.onPause = opts.onPause || (() => {});
     this.onQuality = opts.onQuality || (() => {});
     this.onSurvey = opts.onSurvey || (() => {});
+    // The readouts are buttons too: the target's name flies the camera back
+    // to it, UNITS flies it to the battery.
+    this.onFocusTarget = opts.onFocusTarget || (() => {});
+    this.onFocusUnits = opts.onFocusUnits || (() => {});
     this.picker = opts.picker || null;
     this.qualityId = opts.qualityId || null;
     this.nextTargetLabel = null;
@@ -459,6 +463,78 @@ export class HUD {
     el.className = `popup go ${kind}`;
   }
 
+  /** The funds readout flares as a bounty lands on it. */
+  flareMoney() {
+    const el = this.el.money;
+    if (!el) return;
+    this._flare = this._flare === 'flare-a' ? 'flare-b' : 'flare-a';
+    el.classList.remove('flare-a', 'flare-b');
+    el.classList.add(this._flare);
+  }
+
+  /** The integrity bar marks a milestone: a white flash and the figure pops. */
+  milestone() {
+    const wrap = this.el.integrity?.closest('.integrity-wrap');
+    if (!wrap) return;
+    wrap.classList.remove('milestone');
+    void wrap.offsetWidth;
+    wrap.classList.add('milestone');
+  }
+
+  /**
+   * A flash at the edge of the screen from the direction of a world point:
+   * warm for a heavy hit on the masonry, red for fire landing on the battery.
+   * Where the point is behind the camera the flash comes up from the bottom,
+   * which is where "behind you" reads on a phone.
+   */
+  edgeFlash(kind, worldPoint) {
+    const el = this._edge || (this._edge = document.getElementById('edgeflash'));
+    if (!el || !this.picker || !worldPoint) return;
+    const sc = this.picker.toScreen(worldPoint);
+    let x = 50, y = 100;
+    if (!sc.behind) {
+      // Push the point out to the frame edge along the ray from the centre.
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      const dx = sc.x - cx, dy = sc.y - cy;
+      const k = Math.max(Math.abs(dx) / cx, Math.abs(dy) / cy, 0.001);
+      x = 50 + (dx / k) / innerWidth * 100;
+      y = 50 + (dy / k) / innerHeight * 100;
+    }
+    el.style.setProperty('--ex', `${x.toFixed(1)}%`);
+    el.style.setProperty('--ey', `${y.toFixed(1)}%`);
+    el.className = '';
+    void el.offsetWidth;
+    el.className = `${kind} go`;
+  }
+
+  /** The figures on the end card count up to their values. */
+  _countUp(root) {
+    try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t0 = performance.now(), dur = 950;
+    const items = [];
+    for (const b of root.querySelectorAll('b')) {
+      const m = /^(\$?)([\d,]+)(.*)$/s.exec(b.textContent);
+      if (!m) continue;
+      const n = parseInt(m[2].replace(/,/g, ''), 10);
+      if (!(n > 0)) continue;
+      items.push({ b, pre: m[1], n, post: m[3] });
+    }
+    if (!items.length) return;
+    // From nought, now, so the first frame already shows the roll starting.
+    for (const it of items) it.b.textContent = `${it.pre}0${it.post}`;
+    const finish = () => { for (const it of items) it.b.textContent = `${it.pre}${it.n.toLocaleString()}${it.post}`; };
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - u, 3);
+      for (const it of items) it.b.textContent = `${it.pre}${Math.round(it.n * e).toLocaleString()}${it.post}`;
+      if (u < 1) requestAnimationFrame(step); else finish();
+    };
+    requestAnimationFrame(step);
+    // Whatever the frame rate does, the figures are right a second from now.
+    setTimeout(finish, dur + 120);
+  }
+
   _updateBadges() {
     if (!this.picker) return;
     let w = 0;
@@ -683,8 +759,21 @@ export class HUD {
       this.el.smokeBtn.hidden = !b.smokes;
     }
 
-    setText(this.el.money, `$${Math.floor(b.money).toLocaleString()}`);
+    // The funds roll to the figure rather than jumping to it. A jump is a
+    // number changing; a roll is money arriving.
+    const money = Math.floor(b.money);
+    if (this._moneyShown == null || Math.abs(money - this._moneyShown) > 4000) this._moneyShown = money;
+    else if (Math.abs(money - this._moneyShown) < 1) this._moneyShown = money;
+    else this._moneyShown += (money - this._moneyShown) * Math.min(1, dt * 8);
+    setText(this.el.money, `$${Math.round(this._moneyShown).toLocaleString()}`);
     setText(this.el.income, `$${b.income.toFixed(0)}/s`);
+    if (!this._flyBound) {
+      this._flyBound = true;
+      this.el.target?.addEventListener('click', () => this.onFocusTarget());
+      this.el.units?.closest('.tb-block')?.addEventListener('click', () => this.onFocusUnits());
+      this.el.target?.classList.add('tappable');
+      this.el.units?.classList.add('tappable');
+    }
 
     // The bar is the whole job, not just the landmark. A level with a second
     // garrisoned building in it is not four fifths finished because the tower
@@ -990,6 +1079,7 @@ export class HUD {
     this.el.ecStats.innerHTML = rows
       .map(([k, v]) => `<div class="ec-stat"><span>${k}</span><b>${v}</b></div>`)
       .join('');
+    this._countUp(this.el.ecStats);
     // Only offer the next target when this one is actually down. After a
     // stalled assault the thing to do is run it again, not walk away.
     // Carrying on only makes sense when there is something still standing to

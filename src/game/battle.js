@@ -1963,6 +1963,13 @@ export class Battle {
     for (const s of shots) {
       this.tracerFX.fire(s.from, s.to, s.defender.def, s.hit);
     }
+    // Where the fire that is hurting the battery is coming from, for the
+    // screen-edge flash. One report a quarter second is plenty; the flash
+    // itself is what says "still".
+    if (this.elapsed - (this._hitAt || -1) > 0.25) {
+      const s = shots.find((k) => k.hit && k.unit);
+      if (s) { this._hitAt = this.elapsed; this.onEvent('unithit', { from: s.from, unit: s.unit, damage: s.damage }); }
+    }
     if (this.audio && shots.length) {
       const s = shots[Math.floor(Math.random() * shots.length)];
       const kind = s.defender?.type;
