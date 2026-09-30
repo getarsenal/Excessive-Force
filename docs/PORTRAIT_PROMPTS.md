@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The fifty-four drawn officers (`public/assets/characters/*.png`) are painted
+The fifty-nine drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -27,15 +27,15 @@ without a hard edge. File name and slot are in `manifest.json` under
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
 | hassan | `ma-general.png` | Général de Corps d'Armée, Morocco | Dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap. |
-| watarun | `th-phon-ek.png` | Phon Ek, Thailand | White dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile. |
 
 Every campaign officer is drawn, Malaysia last. China, Spain, Indonesia,
 Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium,
 Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland,
 Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon,
 Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru,
-Saudi Arabia, South Korea, Sri Lanka and Sweden are drawn too, one officer to
-each nation's every level. The rest are in `manifest.json` with their looks.
+Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand,
+Uzbekistan and Vietnam are drawn too, one officer to each nation's every
+level. Morocco and Serbia are the last two placeholders. The rest are in `manifest.json` with their looks.
 
 ## Installing one
 

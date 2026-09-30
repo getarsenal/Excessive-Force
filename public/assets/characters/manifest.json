@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifty-four are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru, Saudi Arabia, South Korea, Sri Lanka and Sweden, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifty-nine are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru, Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand, Uzbekistan and Vietnam, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -453,11 +453,12 @@
       "pose": "arms folded — reads as refusal"
     },
     "watarun": {
-      "id": "th-officer",
-      "file": "th-officer.png",
+      "id": "th-phon-ek",
+      "file": "th-phon-ek.png",
       "nation": "Thailand",
       "defends": "the Wat Arun",
-      "look": "Thai Phon Ek in white dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile."
+      "look": "Phon Ek as a Siamese warrior in modern kit: hair in a topknot under a gold headband, sak yant tattoos on the arms, gilded Garuda armlets, bracers and buckle, a chest rig of pouches and a radio, a blue-and-red panelled skirt carrying white elephants, red tassels, gilded greaves with demon masks, rope-bound legs and sandals, the Thai flag streaming from the headband, a rifle across the front, a sword with a red tassel, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "shwedagon": {
       "id": "mm-bogyoke",
@@ -703,7 +704,8 @@
       "file": "ch-korpskommandant.png",
       "nation": "Switzerland",
       "defends": "Château de Chillon, Montreux",
-      "look": "Korpskommandant of Switzerland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Korpskommandant as an alpine trooper: a green felt hat with an edelweiss and a feather, an embroidered white shirt under a plate carrier with the white cross on its pouches, embroidered leather lederhosen worked with edelweiss, red knitted socks with the cross, knee pads with the Swiss shield, a coiled climbing rope and a pack, a rifle across the front, a knife, laced mountain boots, beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "saintsava": {
       "id": "rs-general",
@@ -717,7 +719,8 @@
       "file": "tw-shangjiang.png",
       "nation": "Taiwan",
       "defends": "Taipei 101, Taipei",
-      "look": "Shàngjiàng of Taiwan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Shàngjiàng as a warrior in modern kit: hair in a topknot under a blue headband with the white sun, a red-and-blue robe worked with gold dragons and clouds, the flag on the sleeve, chest and skirt, a plate carrier with pouches and a radio, red knotted tassels, a lion buckle and lion knee guards, a rifle across the front, a sword with a red tassel, combat boots laced in red, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "shanghaitower": {
       "id": "cn-shangjiang",
@@ -740,7 +743,8 @@
       "file": "vn-dai-tuong.png",
       "nation": "Vietnam",
       "defends": "Landmark 81, Ho Chi Minh City",
-      "look": "Đại tướng of Vietnam in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Đại tướng as a warrior in modern kit: a nón lá over a red headband, a red scarf, a green tunic and trousers worked with gold dragons, the flag on the sleeve, a chest rig of pouches and a radio, a red sash, dragon knee guards, red-wrapped legs, laced combat boots, the red flag with its gold star worn torn as a cape, a rifle across the front, a sword with a red tassel, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "boudhanath": {
       "id": "np-pradhan-senapati",
@@ -845,7 +849,8 @@
       "file": "uz-general-polkovnik.png",
       "nation": "Uzbekistan",
       "defends": "Registan, Samarkand",
-      "look": "General-polkovnik of Uzbekistan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General-polkovnik as a Timurid warrior in modern kit: a patterned turban with a jewelled badge, a fur-trimmed blue chapan worked in gold and ikat, the flag and a winged emblem on the sleeve, a chest rig of pouches, a woven sash with a gold buckle, a dagger in a gold scabbard, green trousers, gilded knee guards with turquoise, tooled boots, the crescent-and-stars flag worn as a fringed cape, a rifle across the front, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "flametowers": {
       "id": "az-general-polkovnik",
