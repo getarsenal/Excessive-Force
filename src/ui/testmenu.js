@@ -939,6 +939,34 @@ export class TestMenu {
     }
   }
 
+  /**
+   * Put a battle the suite has ended back into play, and say so.
+   *
+   * The tests take the level apart between them, and on a small objective
+   * (Boot Camp, Karnak) that is enough to fill the bar, or to leave nothing
+   * alive and too little in the bank, part way through. A battle that is won
+   * or lost stops updating its units and its garrison, so every test after
+   * that point read a frozen world: a gun on a burnt roof that never fell,
+   * men with no floor who never did, flak that never fired — failing or
+   * passing on how far the run before them happened to get. No test is about
+   * the end of the battle, so each one starts in play, and the note says
+   * which test the battle ended before.
+   */
+  _inPlay() {
+    const b = this.ctx.battle;
+    if (b.state === 'playing') return '';
+    const was = b.state;
+    b.state = 'playing';
+    // Won stays banked, as when a player plays on past the card; lost gets
+    // the money the loss was declared for, or it is declared again next tick.
+    b._winAcknowledged = true;
+    if (was === 'lost') {
+      const costs = UNITS.filter((u) => !u.strike).map((u) => u.cost);
+      b.money = Math.max(b.money, (costs.length ? Math.min(...costs) : 0) * 4);
+    }
+    return ` [the battle had been ${was}; put back in play]`;
+  }
+
   _calm(fn) {
     const b = this.ctx.battle;
     const fire = b.garrison.fireEnabled;
@@ -3798,9 +3826,10 @@ export class TestMenu {
         // sees a page that is alive rather than one that has hung.
         await new Promise((r) => setTimeout(r, 16));
         let ok = true, detail = '';
+        const note = this._inPlay();
         const t0 = performance.now();
         try {
-          detail = fn() || '';
+          detail = (fn() || '') + note;
         } catch (err) {
           ok = false;
           detail = err.message;
@@ -3832,13 +3861,14 @@ export class TestMenu {
     const out = [];
     let pass = 0, fail = 0;
     for (const [name, fn] of this.tests()) {
+      const note = this._inPlay();
       try {
-        const detail = fn() || '';
+        const detail = (fn() || '') + note;
         pass++;
         out.push({ name, ok: true, detail });
       } catch (err) {
         fail++;
-        out.push({ name, ok: false, detail: err.message });
+        out.push({ name, ok: false, detail: err.message + note });
       }
     }
     this.lastResults = { pass, fail, out };
