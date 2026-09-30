@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-five are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala and Hungary, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-eight are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran and Iraq, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -637,7 +637,8 @@
       "file": "is-skipherra.png",
       "nation": "Iceland",
       "defends": "Hallgrímskirkja, Reykjavík",
-      "look": "Skipherra of Iceland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Skipherra as a Viking chieftain: long braided blond hair and beard, blue paint across the eye, a rune tattoo on the forearm, a mail shirt under a blue tunic banded in red and white, a fur cloak in the red cross of Iceland, a drinking horn at the hip, tooled leather bracers and belts with silver bosses, a knotwork-headed axe, fur-topped strapped boots, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "trakai": {
       "id": "lt-generolas",
@@ -847,7 +848,8 @@
       "file": "ir-sarlashkar.png",
       "nation": "Iran",
       "defends": "Azadi Tower, Tehran",
-      "look": "Sarlashkar of Iran in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Sarlashkar as a Persian immortal: a gilded helmet with green, white and red plumes, scale armour over a green-and-red robe worked in gold with the Faravahar on the bracers, belt and skirt, gold roundels down the chest, a red-and-green cape carrying the Lion and Sun on a gold-fringed hem, red trousers, tall brown boots with lion cuffs, a shamshir with an eagle hilt, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "kingdomcentre": {
       "id": "sa-fariq-awwal",
@@ -868,7 +870,8 @@
       "file": "iq-fariq-awwal.png",
       "nation": "Iraq",
       "defends": "Ziggurat of Ur, Nasiriyah",
-      "look": "Fariq Awwal of Iraq in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Farīq Awwal as a Mesopotamian champion: a red, white and black keffiyeh wound as a turban with a gold medallion, gilded pauldrons and bracers worked with lions, scale armour over a white robe, a red, black and white skirt of woven panels and tassels, a lion buckle, the flag of Iraq with the takbir worn as a fringed cape, tall brown boots tooled with lions and palms, a curved sword in a lion scabbard, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "djoser": {
       "id": "eg-field-marshal",
