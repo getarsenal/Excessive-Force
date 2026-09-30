@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifteen are drawn: the player, the nine of the first campaign and the five of the third. The Malaysian, the Chinese and the thirteen nations of the fourth batch are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Eighteen are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain and Indonesia, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -321,7 +321,7 @@
       "file": "cn-shangjiang.png",
       "nation": "China",
       "defends": "the Potala Palace",
-      "look": "Shangjiang in a dark olive dress tunic with heavy gold shoulder boards and three gold stars, peaked cap with the gold wreath, red collar tabs, rows of ribbons, a fur-collared greatcoat slung over the shoulders against the altitude, snow on the epaulettes, cigar, arms folded",
+      "look": "Shàngjiàng in black lamellar armour laced in red and trimmed in gold, dragon-headed pauldrons and lion-mask tassets and knee guards, gold dragons on the greaves, the flag of China on the shoulder, a red robe and cape worked with gold clouds and dragons, hair in a topknot with a red headband, a long sheathed dao, moustache, cigar, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
@@ -347,11 +347,12 @@
       "look": "Italian Generale in dark blue service dress with gold braid, peaked cap, sunglasses, a hand on the hilt of a ceremonial sword."
     },
     "segovia": {
-      "id": "es-officer",
-      "file": "es-officer.png",
+      "id": "es-capitan-general",
+      "file": "es-capitan-general.png",
       "nation": "Spain",
       "defends": "the Aqueduct of Segovia",
-      "look": "Spanish Capitán General in dark green dress uniform with a red sash, peaked cap with gold oak leaves, arms folded."
+      "look": "Capitán General as a tercio captain: black and gold-chased half armour with a lion on the pauldron, the flag of Spain on the arm, red-and-gold slashed sleeves and pumpkin breeches, white ruff and cuffs, a red sash, a red cape with gold fringe, a broad black hat with red and gold plumes, a swept-hilt rapier, spurred riding boots, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "atomium": {
       "id": "be-officer",
@@ -375,11 +376,12 @@
       "look": "Hungarian Vezérezredes in dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind."
     },
     "sagrada": {
-      "id": "es-officer",
-      "file": "es-officer.png",
+      "id": "es-capitan-general",
+      "file": "es-capitan-general.png",
       "nation": "Spain",
       "defends": "the Sagrada Familia",
-      "look": "Spanish Capitán General in dark green dress uniform with a red sash, peaked cap with gold oak leaves, arms folded."
+      "look": "Capitán General as a tercio captain: black and gold-chased half armour with a lion on the pauldron, the flag of Spain on the arm, red-and-gold slashed sleeves and pumpkin breeches, white ruff and cuffs, a red sash, a red cape with gold fringe, a broad black hat with red and gold plumes, a swept-hilt rapier, spurred riding boots, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "edinburgh": {
       "id": "uk-officer",
@@ -431,11 +433,12 @@
       "look": "Egyptian Field Marshal in khaki dress uniform with crossed batons and eagle, red collar tabs, peaked cap, swagger stick."
     },
     "forbidden": {
-      "id": "cn-officer",
-      "file": "cn-officer.png",
+      "id": "cn-shangjiang",
+      "file": "cn-shangjiang.png",
       "nation": "China",
       "defends": "the Forbidden City",
-      "look": "Chinese Shàngjiàng in olive dress uniform with gold shoulder boards and red collar, peaked cap with a red star."
+      "look": "Shàngjiàng in black lamellar armour laced in red and trimmed in gold, dragon-headed pauldrons and lion-mask tassets and knee guards, gold dragons on the greaves, the flag of China on the shoulder, a red robe and cape worked with gold clouds and dragons, hair in a topknot with a red headband, a long sheathed dao, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "gyeongbok": {
       "id": "kr-officer",
@@ -466,11 +469,12 @@
       "look": "Cambodian Oudom Seney in dark olive dress uniform with red collar tabs and gold stars, peaked cap."
     },
     "borobudur": {
-      "id": "id-officer",
-      "file": "id-officer.png",
+      "id": "id-jenderal",
+      "file": "id-jenderal.png",
       "nation": "Indonesia",
       "defends": "the Borobudur",
-      "look": "Indonesian Jenderal in dark green dress uniform with four gold stars, peaked cap, red-and-white cord."
+      "look": "Jenderal in a black Javanese beskap buttoned to a gold-embroidered stand collar, the Garuda Pancasila on the shoulder and on the belt buckle, a gold-and-black batik blangkon, a red-and-gold songket sash and hip cloth worked with a Garuda, a keris with a gold hilt at his side, black trousers bound with gold ribbon, gold sandals, wristwatch, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "tikal": {
       "id": "gt-officer",
@@ -494,11 +498,12 @@
       "look": "Peruvian General de Ejército in red-and-white sash over dark dress uniform, peaked cap with gold laurels."
     },
     "greatwall": {
-      "id": "cn-officer",
-      "file": "cn-officer.png",
+      "id": "cn-shangjiang",
+      "file": "cn-shangjiang.png",
       "nation": "China",
       "defends": "the Great Wall at Badaling",
-      "look": "Chinese Shàngjiàng in olive dress uniform with gold shoulder boards and red collar, peaked cap with a red star, fur-lined greatcoat."
+      "look": "Shàngjiàng in black lamellar armour laced in red and trimmed in gold, dragon-headed pauldrons and lion-mask tassets and knee guards, gold dragons on the greaves, the flag of China on the shoulder, a red robe and cape worked with gold clouds and dragons, hair in a topknot with a red headband, a long sheathed dao, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "milan": {
       "id": "it-generale",
@@ -561,14 +566,16 @@
       "file": "es-capitan-general.png",
       "nation": "Spain",
       "defends": "Seville Cathedral, Seville",
-      "look": "Capitán General of Spain in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Capitán General as a tercio captain: black and gold-chased half armour with a lion on the pauldron, the flag of Spain on the arm, red-and-gold slashed sleeves and pumpkin breeches, white ruff and cuffs, a red sash, a red cape with gold fringe, a broad black hat with red and gold plumes, a swept-hilt rapier, spurred riding boots, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "alhambra": {
       "id": "es-capitan-general",
       "file": "es-capitan-general.png",
       "nation": "Spain",
       "defends": "Alhambra, Granada",
-      "look": "Capitán General of Spain in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Capitán General as a tercio captain: black and gold-chased half armour with a lion on the pauldron, the flag of Spain on the arm, red-and-gold slashed sleeves and pumpkin breeches, white ruff and cuffs, a red sash, a red cape with gold fringe, a broad black hat with red and gold plumes, a swept-hilt rapier, spurred riding boots, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "malbork": {
       "id": "pl-general-broni",
@@ -694,14 +701,16 @@
       "file": "cn-shangjiang.png",
       "nation": "China",
       "defends": "Shanghai Tower, Shanghai",
-      "look": "Shàngjiàng of China in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Shàngjiàng in black lamellar armour laced in red and trimmed in gold, dragon-headed pauldrons and lion-mask tassets and knee guards, gold dragons on the greaves, the flag of China on the shoulder, a red robe and cape worked with gold clouds and dragons, hair in a topknot with a red headband, a long sheathed dao, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "wildgoose": {
       "id": "cn-shangjiang",
       "file": "cn-shangjiang.png",
       "nation": "China",
       "defends": "Giant Wild Goose Pagoda, Xi'an",
-      "look": "Shàngjiàng of China in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Shàngjiàng in black lamellar armour laced in red and trimmed in gold, dragon-headed pauldrons and lion-mask tassets and knee guards, gold dragons on the greaves, the flag of China on the shoulder, a red robe and cape worked with gold clouds and dragons, hair in a topknot with a red headband, a long sheathed dao, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "landmark81": {
       "id": "vn-dai-tuong",
@@ -771,14 +780,16 @@
       "file": "id-jenderal.png",
       "nation": "Indonesia",
       "defends": "National Monument, Jakarta",
-      "look": "Jenderal of Indonesia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Jenderal in a black Javanese beskap buttoned to a gold-embroidered stand collar, the Garuda Pancasila on the shoulder and on the belt buckle, a gold-and-black batik blangkon, a red-and-gold songket sash and hip cloth worked with a Garuda, a keris with a gold hilt at his side, black trousers bound with gold ribbon, gold sandals, wristwatch, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "prambanan": {
       "id": "id-jenderal",
       "file": "id-jenderal.png",
       "nation": "Indonesia",
       "defends": "Prambanan, Yogyakarta",
-      "look": "Jenderal of Indonesia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Jenderal in a black Javanese beskap buttoned to a gold-embroidered stand collar, the Garuda Pancasila on the shoulder and on the belt buckle, a gold-and-black batik blangkon, a red-and-gold songket sash and hip cloth worked with a Garuda, a keris with a gold hilt at his side, black trousers bound with gold ribbon, gold sandals, wristwatch, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "minarpakistan": {
       "id": "pk-general",

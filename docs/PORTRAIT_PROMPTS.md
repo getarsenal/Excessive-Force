@@ -1,8 +1,8 @@
 # Officer portraits: the prompt template
 
-The fifteen drawn officers (`public/assets/characters/*.png`) are painted
+The eighteen drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
-the brief that produced them, so the thirteen placeholders can be replaced
+the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
 shares these properties; keep them all.
 
@@ -22,11 +22,10 @@ soft dark halo left in the alpha so the figure sits on the stand-off's blue
 without a hard edge. File name and slot are in `manifest.json` under
 `enemies.<level>`; the `look` line there is the `{look}` in the prompt.
 
-## The thirteen
+## Still to draw (from the first batch of placeholders)
 
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
-| segovia, sagrada | `es-capitan-general.png` | Capitán General, Spain | Dark green dress uniform with a red sash, peaked cap with gold oak leaves, arms folded. |
 | atomium | `be-luitenant-generaal.png` | Luitenant-generaal, Belgium | Dark green dress uniform with red collar tabs and gold stars, beret in hand. |
 | budapest | `hu-vezerezredes.png` | Vezérezredes, Hungary | Dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind. |
 | pena | `pt-general.png` | General, Portugal | Dark green dress uniform with a red-and-green sash and gold shoulder boards, peaked cap. |
@@ -36,13 +35,12 @@ without a hard edge. File name and slot are in `manifest.json` under
 | watarun | `th-phon-ek.png` | Phon Ek, Thailand | White dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile. |
 | shwedagon | `mm-bogyoke.png` | Bogyoke, Myanmar | Olive dress uniform with red collar and gold epaulettes, peaked cap, medals. |
 | angkor | `kh-oudom-seney.png` | Oudom Seney, Cambodia | Dark olive dress uniform with red collar tabs and gold stars, peaked cap. |
-| borobudur | `id-jenderal.png` | Jenderal, Indonesia | Dark green dress uniform with four gold stars, peaked cap, red-and-white cord. |
 | tikal | `gt-general-de-division.png` | General de División, Guatemala | Olive dress uniform with gold epaulettes and a blue-white sash, peaked cap. |
 | machupicchu | `pe-general-de-ejercito.png` | General de Ejército, Peru | Red-and-white sash over dark dress uniform, peaked cap with gold laurels. |
 
-The Malaysian (`my-jeneral.png`) and Chinese (`cn-shangjiang.png`) slots
-from the third batch are in `manifest.json` with their looks and take the
-same template.
+The Malaysian slot (`my-jeneral.png`) from the third batch is in
+`manifest.json` with its look and takes the same template. China, Spain
+and Indonesia are drawn, one officer to each nation's every level.
 
 ## Installing one
 
