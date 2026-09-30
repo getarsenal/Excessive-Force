@@ -1011,10 +1011,30 @@ def blur(a, passes=2):
     return a
 
 
+# Named landforms that Overture files under water. Its `physical` subtype is
+# the coast's vocabulary, and some of that vocabulary is land: Ras Ajouza,
+# the cape the Kuwait Towers stand on, is a thirteen-hectare `physical/cape`
+# polygon in the water layer, and burning it as sea cut the towers off from
+# the city on an island of their own pad.
+LANDFORMS = {"cape", "peninsula", "isthmus", "island", "islet", "archipelago",
+             "headland", "point", "promontory", "spit"}
+
+
+# And water that is not the sea's: a swimming pool on a rooftop or a terrace
+# is surveyed water, and the dredge sinks everything wet to the waterline, so
+# the Kuwait Towers' pools became four-metre pits with the Gulf in the bottom.
+NOT_SEA = {"swimming_pool", "fountain"}
+
+
+def is_water(row):
+    c = row.get("class") or ""
+    return c not in LANDFORMS and c not in NOT_SEA
+
+
 def water_polys(sink, lat0, lon0, span):
     to_local, m_lat, m_lon = projector(lat0, lon0)
     return collect_polys(sink, "base", "water", lat0, lon0, span * 1.6,
-                         to_local, m_lat, m_lon)
+                         to_local, m_lat, m_lon, keep=is_water)
 
 
 # How far past the map the world is still drawn. The surround apron and the
@@ -1045,7 +1065,7 @@ def bake_far_water(sink, level_id, lat0, lon0, span):
     to_local, m_lat, m_lon = projector(lat0, lon0)
     reach = span * FAR
     polys = collect_polys(sink, "base", "water", lat0, lon0, reach,
-                          to_local, m_lat, m_lon)
+                          to_local, m_lat, m_lon, keep=is_water)
     w = np.clip(rasterise(polys, FAR_SIZE, reach), 0, 1)
     w = close(w, 1)
     img = Image.fromarray((w * 255).astype(np.uint8), mode="L")
