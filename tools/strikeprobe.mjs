@@ -54,14 +54,23 @@ for (const level of levels.split(',')) {
         } else {
           B.garrison.fireEnabled = false;
           B.setTarget(aim.clone(), 'probe');
-          const range = Math.max((def.minRange || 0) + 60, Math.min(def.range * 0.5, 320));
+          // Placed the way a player places it: open ground the game's own
+          // placement test accepts, at a sensible range, and deployed through
+          // the same call — awaited, because a launcher's model can take ten
+          // seconds to load before the unit exists.
+          const want = Math.max((def.minRange || 0) + 60, Math.min(def.range * 0.5, 320));
+          let at = null;
+          for (let k = 0; k < 96 && !at; k++) {
+            const a = 2.2 + k * 0.4, r = want * (1 + (k % 4) * 0.1);
+            const q = new THREE.Vector3(S.origin.x + Math.sin(a) * r, 0, S.origin.z + Math.cos(a) * r);
+            q.y = window.terrain.heightAt(q.x, q.z);
+            if (B.validPlacement(q, def).ok) at = q;
+          }
+          if (!at) return { err: 'no ground for the gun' };
           const n0 = B.units.length;
-          placed = T.spawnAt(id, 1, 2.2, range);
-          if (!placed) return { err: 'no ground for the gun' };
-          // Deploying loads the model first; a launcher whose model is not
-          // cached yet is not on the ground until it has.
-          for (let k = 0; k < 150 && B.units.length === n0; k++) await new Promise((r) => setTimeout(r, 200));
-          if (B.units.length === n0) return { err: 'the gun never arrived' };
+          await B.deploy(id, at);
+          placed = B.units.length - n0;
+          if (!placed) return { err: 'the gun never arrived' };
           secs = 60;
           ff(secs + 15);
         }
