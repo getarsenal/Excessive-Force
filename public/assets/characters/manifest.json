@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-nine are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia and Côte d'Ivoire, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-two are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia and Denmark, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -520,7 +520,8 @@
       "file": "cz-armadni-general.png",
       "nation": "Czechia",
       "defends": "St. Vitus Cathedral, Prague",
-      "look": "Armádní generál of Czechia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Armádní generál as a Hussite-era knight: a gilded kettle helm with red, white and blue plumes, silvered plate on the arms and legs with gold lions, a mail shirt under a blue-and-red surcoat carrying the crowned double-tailed Bohemian lion, a tricolour cape with a gold hem, a long sword in a lion-worked scabbard, brown boots, moustache and beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "ulm": {
       "id": "de-general",
@@ -619,7 +620,8 @@
       "file": "dk-general.png",
       "nation": "Denmark",
       "defends": "Kronborg Castle, Helsingør",
-      "look": "General of Denmark in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a Viking jarl: long braided blond hair and beard, red war paint across the eye, a mail shirt under a red tunic with the white cross on it, a fur-collared cloak in the Dannebrog with a knotwork hem, tooled leather bracers and belts, a drinking horn at the hip, a knotwork-headed bearded axe, fur-topped strapped boots, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "stockholm": {
       "id": "se-general",
@@ -901,7 +903,8 @@
       "file": "cu-general-de-cuerpo-de-ejercito.png",
       "nation": "Cuba",
       "defends": "El Capitolio, Havana",
-      "look": "General de Cuerpo de Ejército of Cuba in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General de Cuerpo de Ejército as a Sierra Maestra guerrilla: olive fatigues with rolled sleeves, a beret with the red star, a red neckerchief, bandoliers across the chest, webbing pouches and a machete on the belt, a rifle slung over the shoulder, the flag of Cuba worn torn as a cape, laced combat boots, full beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "bellasartes": {
       "id": "mx-general",

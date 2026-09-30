@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The twenty-nine drawn officers (`public/assets/characters/*.png`) are painted
+The thirty-two drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -38,8 +38,8 @@ without a hard edge. File name and slot are in `manifest.json` under
 The Malaysian slot (`my-jeneral.png`) from the third batch is in
 `manifest.json` with its look and takes the same template. China, Spain,
 Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina,
-Azerbaijan, Belgium, Cambodia, Colombia and Côte d'Ivoire are drawn, one
-officer to each nation's every level.
+Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia and
+Denmark are drawn, one officer to each nation's every level.
 
 ## Installing one
 
