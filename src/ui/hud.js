@@ -1,6 +1,7 @@
 import { feedback } from './feedback.js';
 import { power } from '../core/power.js';
 import { UNITS, UNITS_BY_ID } from '../game/units.js';
+import { damageBill, money } from './bill.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
 import { openingEnabled, setOpeningEnabled } from './opening.js';
@@ -70,7 +71,9 @@ export class HUD {
       ecTitle: document.getElementById('ec-title'),
       ecSub: document.getElementById('ec-sub'),
       ecStats: document.getElementById('ec-stats'),
+      ecBill: document.getElementById('ec-bill'),
       ecRelease: document.getElementById('ec-release'),
+      ecMedals: document.getElementById('ec-medals'),
       ecAgain: document.getElementById('ec-again'),
       ecNext: document.getElementById('ec-next'),
       ecKeep: document.getElementById('ec-keep'),
@@ -1112,6 +1115,17 @@ export class HUD {
       .map(([k, v]) => `<div class="ec-stat"><span>${k}</span><b>${v}</b></div>`)
       .join('');
     this._countUp(this.el.ecStats);
+    // The damage bill, and what Buck thinks of it.
+    if (this.el.ecBill) {
+      const bill = won ? damageBill(summary, { burnt: this.battle.cityFire?.burnt || 0 }) : null;
+      this.el.ecBill.hidden = !bill || bill.total <= 0;
+      if (bill && bill.total > 0) {
+        this.el.ecBill.innerHTML = `<span class="eb-tag">INSURANCE CLAIM</span>`
+          + `<b class="eb-total">${money(bill.total)}</b>`
+          + `<span class="eb-items">${bill.items.map(([k, v]) => `${k} ${money(v)}`).join(' · ')}</span>`
+          + `<span class="eb-quip"><i>BUCK</i>“${bill.quip}”</span>`;
+      }
+    }
     // Only offer the next target when this one is actually down. After a
     // stalled assault the thing to do is run it again, not walk away.
     // Carrying on only makes sense when there is something still standing to
@@ -1144,6 +1158,14 @@ export class HUD {
           + `<span class="em-par">par ${m.high ? '\u2265' : ''}${fmt(m.par)}</span>`
           + `${m.best ? '<span class="em-best">BEST</span>' : ''}</div>`;
       }).join('');
+    }
+
+    // Medals this run won for the first time.
+    if (this.el.ecMedals) {
+      const got = won ? (opts.medals || []) : [];
+      this.el.ecMedals.hidden = !got.length;
+      this.el.ecMedals.innerHTML = got.map((m) => `<div class="ec-medal"><span class="emd-tag">MEDAL</span>`
+        + `<b>${m.name}</b><span class="emd-line">${m.line}</span></div>`).join('');
     }
 
     // What closing the contract bought. Said here rather than on the map,

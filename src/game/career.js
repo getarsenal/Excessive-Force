@@ -19,7 +19,7 @@
  * date, with a twist on it — double funds, the whole arsenal, a five-minute
  * clock, half the money — and a streak for coming back tomorrow.
  */
-const SLOT_KEYS = ['tt.progress', 'tt.campaign', 'tt.tutorial', 'tt.battles', 'tt.daily', 'tt.commander'];
+const SLOT_KEYS = ['tt.progress', 'tt.campaign', 'tt.tutorial', 'tt.battles', 'tt.daily', 'tt.commander', 'tt.medals'];
 const SLOTS_KEY = 'tt.slots';
 export const SLOT_IDS = ['A', 'B', 'C'];
 

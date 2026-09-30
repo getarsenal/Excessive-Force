@@ -86,6 +86,7 @@ export class Battle {
     this.smokeCooldown = 0;
     this.smokes = null;        // a SmokeScreens, if the level has one
     this.fires = null;         // Fires, likewise
+    this.stores = null;        // the garrison's dumps, set by main
 
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
@@ -1605,6 +1606,29 @@ export class Battle {
   }
 
   /** A bomb from the air wing has gone off. */
+  /**
+   * A dump going up: the blast on the masonry and the men round it, fire if
+   * it was fuel, a scar in the ground, and the bounty for the position.
+   */
+  _storeBoom(dump, spec) {
+    const p = dump.pos.clone(); p.y += 0.6;
+    for (const st of this.structures) {
+      st.explode(p, spec.lethal, spec.radius, spec.power * this.powerScale, { dir: { x: 0, y: 1, z: 0 }, kinetic: 0.3 });
+    }
+    const killed = this.garrison.splash(p, spec.splash, spec.power);
+    this.defendersKilled += killed;
+    const pay = killed * MONEY_PER_DEFENDER + spec.bounty;
+    this.money += pay;
+    this.onEvent('bounty', { point: p, amount: pay, kind: 'kill' });
+    this.fx.detonate(p, spec.fx, { ground: true, groundY: dump.pos.y });
+    if (dump.kind === 'fuel' && this.fires) this.fires.ignite(p.x, dump.pos.y + 0.4, p.z, 2.2, 45);
+    if (this.craters) this.craters.add(p.x, dump.pos.y, p.z, spec.radius * 0.45);
+    if (this.audio) this.audio.play('explosion', p, { rate: dump.kind === 'fuel' ? 0.8 : 1.05, gain: 0.8, rolloff: 400 });
+    const cd = this.camera.position.distanceTo(p);
+    this.engine.addShake(THREE.MathUtils.clamp(spec.fx * 22 / Math.max(cd, 30), 0.02, 0.5));
+    this.onEvent('secondary', { kind: dump.kind, point: p, killed });
+  }
+
   _strikeImpact(hit) {
     const { point, proj } = hit;
     const w = proj.warhead;
@@ -1635,6 +1659,7 @@ export class Battle {
         // is most of what the player is paying half a million dollars to see.
         { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4, eject: 0.34 });
     }
+    if (this.stores) this.stores.blast(point, rMax * 1.5);
     const killed = this.garrison.splash(point, rMax * 1.5, w.power);
     if (killed) {
       this.defendersKilled += killed;
@@ -1776,6 +1801,7 @@ export class Battle {
       destroyed += s.explode(at, lethal, radius, blastPower, blast);
     }
 
+    if (this.stores) this.stores.blast(at, splashR);
     const killed = this.garrison.splash(at, splashR, power);
     if (killed) {
       this.defendersKilled += killed;
@@ -1864,6 +1890,7 @@ export class Battle {
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
       this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
+      if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
       if (this.smokes) this.smokes.update(dt);
       if (this.fires) this.fires.update(dt);
       if (this.tracerFX) this.tracerFX.update(dt);
@@ -1887,6 +1914,7 @@ export class Battle {
     this._updateUnits(dt);
     this.air.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
+    if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
 
     // Money and unlocks track masonry actually brought down. Using the
     // standing-mass figure means you are paid for collapse, not for cosmetic

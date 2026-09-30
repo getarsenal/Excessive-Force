@@ -16,6 +16,7 @@
  */
 import { LEVELS } from '../game/levels.js';
 import { UNITS } from '../game/units.js';
+import { MEDALS, loadMedals } from '../game/medals.js';
 import { THEATRES, campaignState, isReleased } from '../game/campaign.js';
 import { loadProgress } from './levelselect.js';
 import { listBattles, clearBattle } from '../game/battlesave.js';
@@ -96,6 +97,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     battles.length && { act: 'battles', name: 'BATTLES IN PROGRESS', sub: `${battles.length} SAVED · LAST ${ago(battles[0].at).toUpperCase()}`, count: battles.length },
     { act: 'map', name: 'THEATRE MAP', sub: `${state.done} ${state.done === 1 ? 'COUNTRY' : 'COUNTRIES'} BURNT · ${state.total - state.done} STANDING` },
     { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} WEAPONS RELEASED` },
+    { act: 'medals', name: 'MEDALS', sub: `${Object.keys(loadMedals()).length} OF ${MEDALS.length} WON` },
     { act: 'boot', name: 'BOOT CAMP', sub: 'THE CONTROLS, ONE AT A TIME · FORT IRWIN' },
     { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot} · ${esc(cmd.name)} · THREE SAVES` },
     { act: 'records', name: 'RECORDS & SETTINGS', sub: `${fmtTons(tons)} TONNES DOWN · QUALITY, INTROS, SOUND` },
@@ -270,6 +272,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'armoury':
           openSheet('ARMOURY', armouryHtml(), 'armoury');
           break;
+        case 'medals':
+          openSheet('MEDALS', medalsHtml(), 'medals');
+          break;
         case 'unit': {
           // One open at a time, brought into view whole.
           const was = el.classList.contains('open');
@@ -375,6 +380,16 @@ export function showTitle({ current = null, canResume = false } = {}) {
       </button>
       ${full ? `<button class="tt-bx" type="button" data-act="discard" data-level="${b.level}" aria-label="Abandon">ABANDON</button>` : ''}
     </div>`;
+  }
+
+  function medalsHtml() {
+    const have = loadMedals();
+    return `<p class="tt-arm-intro">Things the marks do not ask for. Each one is won once.</p><div class="tt-medals">${MEDALS.map((m) => {
+      const h = have[m.id];
+      const where = h && LEVELS[h.level] ? ` · ${esc((LEVELS[h.level].target || '').toUpperCase())}` : '';
+      return `<div class="tt-medal${h ? ' won' : ''}"><b>${esc(m.name)}</b><span>${esc(m.line)}</span>`
+        + `<i>${h ? `WON ${esc(h.at)}${where}` : 'NOT YET'}</i></div>`;
+    }).join('')}</div>`;
   }
 
   function armouryHtml() {

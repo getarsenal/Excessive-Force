@@ -114,7 +114,7 @@ export class Tutorial {
         done: () => h.openDrawer === 'strikes' || this._striking() },
       { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',
         text: 'Cheapest first. LOITER stays on station; the rest make one pass. Tap one, then the tower.', done: () => this._striking() },
-      { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts.', ok: true },
+      { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts: the crates and drums by their guns go up.', ok: true },
       { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
       { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls.', done: () => b.state === 'won',
         say: "Stop admiring it and knock the damn thing over. I've got a tee time." },

@@ -28,6 +28,10 @@ import { HUD } from './ui/hud.js';
 import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
+import { Stores } from './game/stores.js';
+import { checkMedals } from './game/medals.js';
+import { BeforeAfter } from './ui/beforeafter.js';
+import { damageBill, money } from './ui/bill.js';
 import { CollapseClip } from './ui/clip.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
@@ -554,6 +558,8 @@ async function boot() {
   battle.fires = new Fires(fx, quality);
   // And the town burns. A shell that stops against a building guts it: the
   // walls go to soot, the windows go dark, and the fire is on the roof.
+  // The dumps beside the heavy weapons, which go up when a round lands close.
+  battle.stores = new Stores({ scene: engine.scene, garrison, terrain, structures });
   battle.cityFire = new CityFire({
     cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene,
     onBurn: (p) => battle.cityCollapse(p),
@@ -683,6 +689,27 @@ async function boot() {
   });
   hud.setClip(clip);
   window.__clip = clip;     // for the harness and the console
+  // The landmark before, the ruin after: taken as the report goes up.
+  const beforeAfter = new BeforeAfter({
+    level, canvas: engine.renderer.domElement, render: () => engine.render(),
+    onModal: (open) => {
+      if (open) { clipWasPaused = testMenu.paused; testMenu.paused = true; }
+      else testMenu.paused = clipWasPaused;
+    },
+  });
+  window.__beforeAfter = beforeAfter;
+  const baBtn = document.getElementById('ec-ba');
+  if (baBtn) {
+    baBtn.hidden = true;
+    baBtn.addEventListener('click', () => beforeAfter.open());
+  }
+  const takeBeforeAfter = (sum) => {
+    if (level.id === 'tutorial') return;
+    const claim = money(damageBill(sum, { burnt: battle.cityFire?.burnt || 0 }).total);
+    beforeAfter.capture({ claim, rounds: battle.collapseRounds ?? battle.shotsFired })
+      .then((b) => { if (b && baBtn) baBtn.hidden = false; })
+      .catch(() => {});
+  };
   const unitCard = new UnitCard(battle, {
     onSell: (u) => battle.sellUnit(u),
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
@@ -709,7 +736,23 @@ async function boot() {
   const comcard = level.id === 'tutorial' ? null : new ComCard({ level, audio });
   window.__comcard = comcard;      // for the harness
   let winOrbit = false;
+  // What went into the fight, for the medals: every weapon deployed or
+  // called, and whether an aircraft was lost doing it.
+  const used = new Set();
+  let lostAircraft = false;
+  let chain = 0, chainAt = 0;
+  const awardMedals = (sum) => {
+    for (const u of battle.units) if (u.def) used.add(u.def.id);
+    const fresh = checkMedals({
+      level, sum, used, defs: UNITS_BY_ID, burnt: battle.cityFire?.burnt || 0,
+      defendersLeft: garrison ? garrison.aliveCount : 1, lostAircraft, dumps: battle.stores?.blown || 0,
+    });
+    for (const m of fresh) hud.feed(`MEDAL · ${m.name}`, 'big');
+    return fresh;
+  };
   function handleEvent(kind, data) {
+    if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
+    if (kind === 'shotdown') lostAircraft = true;
     switch (kind) {
       case 'target':
         if (data) feedback.emit('target');
@@ -840,6 +883,16 @@ async function boot() {
         if (data > 2) feedback.emit('impact', 1.3);
         if (data > 2) hud.feed(`${data} DEFENDERS CRUSHED`, 'big');
         break;
+      case 'secondary': {
+        // One line for a chain, not one per dump: a run of them inside a
+        // couple of seconds is counted up on the same line.
+        feedback.emit('impact', 1.1);
+        const now = performance.now();
+        chain = now - chainAt < 2500 ? chain + 1 : 1;
+        chainAt = now;
+        hud.feed(chain > 1 ? `CHAIN REACTION ×${chain}` : `SECONDARY EXPLOSION · ${data.kind === 'fuel' ? 'FUEL' : 'AMMUNITION'}`, 'big');
+        break;
+      }
       case 'charge':
         feedback.emit('collapse');
         hud.feed(`DEMOLITION CHARGE — ${data.destroyed} STONES`, 'big');
@@ -876,7 +929,8 @@ async function boot() {
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
-          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks });
+          takeBeforeAfter(sum);
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: awardMedals(sum) });
         }, 7000);
         break;
       case 'flattened':
@@ -891,7 +945,9 @@ async function boot() {
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
+          takeBeforeAfter(sum);
           hud.showEnd('win', sum, {
+            medals: awardMedals(sum),
             title: 'Flattened',
             sub: `${level.subtitle} · nothing left standing`,
             release: releaseNoteFor(level.id),
@@ -935,10 +991,47 @@ async function boot() {
       // what a shared clip boasts and what a challenge is scored on.
       if (battle.collapseRounds == null) battle.collapseRounds = battle.shotsFired;
       clip.trigger(island.mass);
-      // Half speed for two seconds, eased back. Long enough to read what is
-      // happening, short enough not to feel like a cutscene.
-      testMenu.dramaticPause(2.0, 0.45);
+      // The first time the landmark goes, it gets the film treatment: a cut
+      // to a low angle a quarter round from where the player was, time down
+      // to a third for three seconds, and back. Every fall after the first
+      // gets the short half-speed beat, which is enough once it has been seen.
+      if (!cine.played && st === primary) collapseCinematic(where);
+      else testMenu.dramaticPause(2.0, 0.45);
     };
+  }
+
+  /**
+   * The collapse, shot like a film. The camera cuts rather than glides — a
+   * glide at a third of the speed is a second of nothing moving — to a low
+   * orbit on the side of the building a quarter turn from the player's view,
+   * far enough out to hold the whole height, looking at the lower third
+   * where the fall is. When the beat ends the view eases back to where it
+   * was, unless the player has taken the camera in the meantime.
+   */
+  const cine = { played: false, keep: null };
+  function collapseCinematic(where) {
+    cine.played = true;
+    if (suiteHold) { testMenu.dramaticPause(2.0, 0.45); return; }
+    const tall = Math.max(24, (battle.startHeight ?? groundY + 60) - groundY);
+    cine.keep = {
+      yaw: rig.desiredYaw, pitch: rig.desiredPitch, distance: rig.desiredDistance,
+      target: rig.desiredTarget.clone(),
+    };
+    const turn = Math.random() < 0.5 ? 0.85 : -0.85;
+    rig.yaw = rig.desiredYaw = rig.yaw + turn;
+    rig.pitch = rig.desiredPitch = 0.1;
+    rig.distance = rig.desiredDistance = Math.min(rig.maxDistance, Math.max(70, tall * 1.5));
+    const aim = new THREE.Vector3(where.x, groundY + tall * 0.32, where.z);
+    rig.target.copy(aim); rig.desiredTarget.copy(aim);
+    testMenu.dramaticPause(3.2, 0.3);
+  }
+  // Called each frame: once the beat is over, hand the camera back.
+  function cinematicTick() {
+    if (!cine.keep || testMenu._drama) return;
+    const k = cine.keep; cine.keep = null;
+    if (rig._pointers.size || battleOver) return;   // the player, or the win orbit, has it
+    rig.desiredYaw = k.yaw; rig.desiredPitch = k.pitch; rig.desiredDistance = k.distance;
+    rig.desiredTarget.copy(k.target);
   }
 
   // Welded sections fragment when they land hard enough.
@@ -1683,6 +1776,7 @@ async function boot() {
     rig.dragLocked = !!battle.selectedUnitId && battle.state === 'playing';
     unitCard.update();
     testMenu.update(rawDt);
+    cinematicTick();
     flags.update(rawDt);
     if (standoff) standoff.update();
     faultRun = 0;

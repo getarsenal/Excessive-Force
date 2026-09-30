@@ -542,12 +542,12 @@ html, body {
 #clip-btn[hidden] { display: none; }
 body.drawer-open #clip-btn { display: none; }
 @keyframes clip-in { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
-#clip-view {
+#clip-view, #ba-view {
   position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
   background: rgba(5, 7, 10, 0.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
 }
-#clip-view[hidden] { display: none; }
+#clip-view[hidden], #ba-view[hidden] { display: none; }
 .cv-inner { width: min(560px, 100%); max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .cv-title { font-size: 12px; letter-spacing: 0.3em; color: var(--dim); }
 .cv-video {
@@ -943,6 +943,19 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 .ec-stat { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
 .ec-stat span { color: var(--dim); }
 .ec-stat b { font-variant-numeric: tabular-nums; }
+/* The damage bill: one big figure, what it is made of, and Buck. */
+.ec-bill {
+  margin: -8px 0 20px; padding: 12px 14px 11px;
+  border: 1px solid rgba(111, 208, 140, 0.28); border-radius: 6px;
+  background: rgba(111, 208, 140, 0.05);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.ec-bill[hidden] { display: none; }
+.eb-tag { font-size: 9px; letter-spacing: 0.26em; color: var(--dim); }
+.eb-total { font-size: clamp(22px, 6vw, 30px); letter-spacing: 0.06em; color: var(--money); font-variant-numeric: tabular-nums; }
+.eb-items { font-size: 10.5px; color: var(--dim); letter-spacing: 0.04em; }
+.eb-quip { font-size: 12.5px; color: var(--text); margin-top: 5px; font-style: italic; }
+.eb-quip i { font-style: normal; font-size: 9px; letter-spacing: 0.2em; color: var(--warn); margin-right: 7px; }
 /* The three marks, in a row that wraps to one per line on a narrow phone. */
 .ec-marks { display: flex; gap: 8px; margin: -10px 0 22px; flex-wrap: wrap; }
 .ec-mark {
@@ -1787,6 +1800,17 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
      is where Rio's and Sydney's labels end up. */
   .wm-zoom { right: auto; left: 8px; }
 }
+
+/* Medals won on this run, under the contract line. */
+.ec-medals { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ec-medals[hidden] { display: none; }
+.ec-medal {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; text-align: left;
+  padding: 8px 12px; border: 1px solid rgba(224, 163, 60, 0.45); border-radius: 6px; background: rgba(224, 163, 60, 0.07);
+}
+.ec-medal b { font-size: 13px; letter-spacing: 0.12em; color: var(--warn); }
+.emd-tag { font-size: 9px; letter-spacing: 0.22em; color: var(--dim); grid-row: span 2; align-self: center; }
+.emd-line { font-size: 11px; color: var(--dim); grid-column: 2; }
 
 /* What closing a contract bought, on the after-action card. */
 .ec-release {
