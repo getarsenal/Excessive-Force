@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Eighteen are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain and Indonesia, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-three are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal and Romania, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -405,11 +405,12 @@
       "look": "French Maréchal in dark blue dress uniform with oak-leaf kepi and seven stars, gloved hand raised in refusal."
     },
     "pena": {
-      "id": "pt-officer",
-      "file": "pt-officer.png",
+      "id": "pt-general",
+      "file": "pt-general.png",
       "nation": "Portugal",
       "defends": "the Pena Palace",
-      "look": "Portuguese General in dark green dress uniform with a red-and-green sash and gold shoulder boards, peaked cap."
+      "look": "General as a navigator's captain: green doublet with gold scrollwork over white sleeves, a red-and-green sash, the Cross of the Order of Christ on the arm, orders at the breast, green breeches worked in gold, tall black boots with gold cuffs, a green hat with red and green plumes and the arms of Portugal, a red cape with the armillary sphere and the shield, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "hassan": {
       "id": "ma-officer",
@@ -538,14 +539,16 @@
       "file": "at-general.png",
       "nation": "Austria",
       "defends": "St. Stephen's Cathedral, Vienna",
-      "look": "General of Austria in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a Tyrolean Kaiserjäger: white tunic with red facings and gold oak-leaf cuffs, red-white-red sash and gold aiguillettes, the Austrian eagle on the arm and the belt buckle, orders at the breast, brown lederhosen worked with edelweiss, white wool stockings with green tassels, red-laced mountain boots, a green Tyrolean hat with an edelweiss and a spray of feathers, a red cape with the eagle on it, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "hohensalzburg": {
       "id": "at-general",
       "file": "at-general.png",
       "nation": "Austria",
       "defends": "Hohensalzburg Fortress, Salzburg",
-      "look": "General of Austria in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a Tyrolean Kaiserjäger: white tunic with red facings and gold oak-leaf cuffs, red-white-red sash and gold aiguillettes, the Austrian eagle on the arm and the belt buckle, orders at the breast, brown lederhosen worked with edelweiss, white wool stockings with green tassels, red-laced mountain boots, a green Tyrolean hat with an edelweiss and a spray of feathers, a red cape with the eagle on it, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "versailles": {
       "id": "fr-marshal",
@@ -582,28 +585,32 @@
       "file": "pl-general-broni.png",
       "nation": "Poland",
       "defends": "Malbork Castle, Malbork",
-      "look": "Generał broni of Poland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Generał broni as a hussar: white żupan under a silvered breastplate with gold medallions, the white eagle on the arm, the belt and a red sash, a fur kołpak with the eagle and red and white plumes, a red cape lined with fur and worked with the crowned eagle, red trousers with a white stripe, tall brown boots with eagle cuffs, a karabela, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "warsaw": {
       "id": "pl-general-broni",
       "file": "pl-general-broni.png",
       "nation": "Poland",
       "defends": "Palace of Culture and Science, Warsaw",
-      "look": "Generał broni of Poland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Generał broni as a hussar: white żupan under a silvered breastplate with gold medallions, the white eagle on the arm, the belt and a red sash, a fur kołpak with the eagle and red and white plumes, a red cape lined with fur and worked with the crowned eagle, red trousers with a white stripe, tall brown boots with eagle cuffs, a karabela, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "bran": {
       "id": "ro-general-de-armata",
       "file": "ro-general-de-armata.png",
       "nation": "Romania",
       "defends": "Bran Castle, Bran",
-      "look": "General de armată of Romania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General de armată in an embroidered ie shirt and white trousers worked in black and red, a navy dolman with gold aiguillettes and medals, a woven brâu and tricolour tassels at the waist, the Romanian eagle on the belt and pouch, a black fur căciulă with blue, yellow and red plumes and the arms, a red-and-navy cape lined with fur and carrying the eagle, tall black boots with eagle cuffs and spurs, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "bucharest": {
       "id": "ro-general-de-armata",
       "file": "ro-general-de-armata.png",
       "nation": "Romania",
       "defends": "Palace of the Parliament, Bucharest",
-      "look": "General de armată of Romania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General de armată in an embroidered ie shirt and white trousers worked in black and red, a navy dolman with gold aiguillettes and medals, a woven brâu and tricolour tassels at the waist, the Romanian eagle on the belt and pouch, a black fur căciulă with blue, yellow and red plumes and the arms, a red-and-navy cape lined with fur and carrying the eagle, tall black boots with eagle cuffs and spurs, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "kronborg": {
       "id": "dk-general",
@@ -645,7 +652,8 @@
       "file": "pt-general.png",
       "nation": "Portugal",
       "defends": "Belém Tower, Lisbon",
-      "look": "General of Portugal in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a navigator's captain: green doublet with gold scrollwork over white sleeves, a red-and-green sash, the Cross of the Order of Christ on the arm, orders at the breast, green breeches worked in gold, tall black boots with gold cuffs, a green hat with red and green plumes and the arms of Portugal, a red cape with the armillary sphere and the shield, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "salisbury": {
       "id": "uk-field-marshal",
@@ -873,14 +881,16 @@
       "file": "ca-general.png",
       "nation": "Canada",
       "defends": "CN Tower, Toronto",
-      "look": "General of Canada in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General in Mountie red serge with a black collar and gold maple leaves, a Stetson with a maple-leaf badge, gold aiguillettes and a Sam Browne belt, the maple leaf on the arm, dark breeches with a gold stripe, tall brown riding boots with spurs, a fur-trimmed cape in the flag, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "frontenac": {
       "id": "ca-general",
       "file": "ca-general.png",
       "nation": "Canada",
       "defends": "Château Frontenac, Quebec City",
-      "look": "General of Canada in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General in Mountie red serge with a black collar and gold maple leaves, a Stetson with a maple-leaf badge, gold aiguillettes and a Sam Browne belt, the maple leaf on the arm, dark breeches with a gold stripe, tall brown riding boots with spurs, a fur-trimmed cape in the flag, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "capitolio": {
       "id": "cu-general-de-cuerpo-de-ejercito",

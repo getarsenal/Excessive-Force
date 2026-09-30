@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The eighteen drawn officers (`public/assets/characters/*.png`) are painted
+The twenty-three drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -28,7 +28,6 @@ without a hard edge. File name and slot are in `manifest.json` under
 |---|---|---|---|
 | atomium | `be-luitenant-generaal.png` | Luitenant-generaal, Belgium | Dark green dress uniform with red collar tabs and gold stars, beret in hand. |
 | budapest | `hu-vezerezredes.png` | Vezérezredes, Hungary | Dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind. |
-| pena | `pt-general.png` | General, Portugal | Dark green dress uniform with a red-and-green sash and gold shoulder boards, peaked cap. |
 | hassan | `ma-general.png` | Général de Corps d'Armée, Morocco | Dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap. |
 | kuwait | `kw-fariq-awwal.png` | Farīq Awwal, Kuwait | Khaki service dress with gold shoulder boards and a red beret, sunglasses. |
 | gyeongbok | `kr-daejang.png` | Daejang, South Korea | Dark green dress uniform with four silver stars, peaked cap, white gloves. |
@@ -39,8 +38,9 @@ without a hard edge. File name and slot are in `manifest.json` under
 | machupicchu | `pe-general-de-ejercito.png` | General de Ejército, Peru | Red-and-white sash over dark dress uniform, peaked cap with gold laurels. |
 
 The Malaysian slot (`my-jeneral.png`) from the third batch is in
-`manifest.json` with its look and takes the same template. China, Spain
-and Indonesia are drawn, one officer to each nation's every level.
+`manifest.json` with its look and takes the same template. China, Spain,
+Indonesia, Austria, Canada, Poland, Portugal and Romania are drawn, one
+officer to each nation's every level.
 
 ## Installing one
 
