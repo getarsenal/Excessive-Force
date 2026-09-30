@@ -34,6 +34,9 @@ export class BeforeAfter {
       after.width = this.canvas.width; after.height = this.canvas.height;
       after.getContext('2d').drawImage(this.canvas, 0, 0);
     } catch { return null; }
+    // The card is lettered in the game's own faces; a canvas uses a web
+    // font only once it has loaded.
+    try { await Promise.all([document.fonts.load("800 44px 'EF Stencil'"), document.fonts.load("600 21px 'EF Sans'")]); } catch { /* fallback faces */ }
     const before = await new Promise((res) => {
       const img = new Image();
       img.onload = () => res(img);
@@ -57,23 +60,23 @@ export class BeforeAfter {
     const L = this.level;
     g.textBaseline = 'alphabetic';
     g.fillStyle = '#eaf1f8';
-    g.font = '700 38px system-ui, -apple-system, Segoe UI, sans-serif';
+    g.font = "800 44px 'EF Stencil', 'Arial Narrow', sans-serif";
     g.fillText(fit(g, (L.target || L.name || '').toUpperCase(), 640), 28, y + 54);
     g.fillStyle = '#7e8b9b';
-    g.font = '500 19px system-ui, -apple-system, Segoe UI, sans-serif';
+    g.font = "600 21px 'EF Sans', 'Arial Narrow', sans-serif";
     const sub = [L.place || L.name, rounds > 0 ? `${rounds} rounds` : ''].filter(Boolean).join(' · ');
     g.fillText(fit(g, sub.toUpperCase(), 640), 28, y + 88);
     g.textAlign = 'right';
     if (claim) {
       g.fillStyle = '#7e8b9b';
-      g.font = '600 13px system-ui, -apple-system, Segoe UI, sans-serif';
+      g.font = "700 14px 'EF Stencil', 'Arial Narrow', sans-serif";
       g.fillText('INSURANCE CLAIM', W - 28, y + 30);
       g.fillStyle = '#6fd08c';
-      g.font = '700 34px system-ui, -apple-system, Segoe UI, sans-serif';
+      g.font = "800 40px 'EF Stencil', 'Arial Narrow', sans-serif";
       g.fillText(claim, W - 28, y + 68);
     }
     g.fillStyle = '#e06c34';
-    g.font = '700 15px system-ui, -apple-system, Segoe UI, sans-serif';
+    g.font = "700 16px 'EF Stencil', 'Arial Narrow', sans-serif";
     g.fillText('EXCESSIVE FORCE · GETARSENAL.APP', W - 28, y + 98);
     g.textAlign = 'left';
     const blob = await new Promise((res) => cv.toBlob(res, 'image/jpeg', 0.9));
@@ -163,7 +166,7 @@ function cover(g, img, x, y, w, h) {
 }
 
 function tag(g, text, x, y, fg, bg) {
-  g.font = '700 15px system-ui, -apple-system, Segoe UI, sans-serif';
+  g.font = "700 16px 'EF Stencil', 'Arial Narrow', sans-serif";
   const w = g.measureText(text).width + 22;
   g.fillStyle = bg;
   g.fillRect(x, y, w, 30);

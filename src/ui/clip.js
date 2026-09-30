@@ -127,7 +127,7 @@ export class CollapseClip {
     const s = Math.max(0.8, Math.min(w, h) / 520);
     const pad = 16 * s;
     const room = w - pad * 2;
-    const FONT = 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    const FONT = "'EF Sans', 'Arial Narrow', sans-serif";
     const line = (text, weight, size, y, colour) => {
       g.font = `${weight} ${Math.round(size)}px ${FONT}`;
       const tw = g.measureText(text).width;
