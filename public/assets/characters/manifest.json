@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-two are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon and Lithuania, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-six are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal and New Zealand, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -312,7 +312,7 @@
       "file": "my-jeneral.png",
       "nation": "Malaysia",
       "defends": "the Petronas Towers",
-      "look": "Jeneral in Malaysian Army olive service dress, songkok, the fourteen-point federal star and crescent on the cap, Jalur Gemilang on the shoulder, gold aiguillette, keris in a carved wooden sheath at the hip, songket sash over the tunic, cigar, arms folded",
+      "look": "Jeneral as a Melaka laksamana: a navy tengkolok wound in songket with a gold badge and trailing ends, gilded armour over a navy baju worked in gold, a songket sampin at the waist, a crescent-and-star buckle, red and gold tassels, the Jalur Gemilang worn as a fringed cape, a keris and a sword, tall boots with crescent-and-star greaves and upturned toes, beard, arms folded",
       "pose": "arms folded — reads as refusal",
       "side": "right"
     },
@@ -459,11 +459,12 @@
       "look": "Thai Phon Ek in white dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile."
     },
     "shwedagon": {
-      "id": "mm-officer",
-      "file": "mm-officer.png",
+      "id": "mm-bogyoke",
+      "file": "mm-bogyoke.png",
       "nation": "Myanmar",
       "defends": "the Shwedagon Pagoda",
-      "look": "Myanmar Bogyoke in olive dress uniform with red collar and gold epaulettes, peaked cap, medals."
+      "look": "Bogyoke as a Konbaung general: hair in a topknot under a gold diadem, gilded armour worked with chinthe and a kala-mask buckle, a green-and-red longyi in woven checks under a panelled skirt, red tassels, the yellow-green-red flag with its white star worn as a fringed cape, a dha in a gold scabbard, gilded greaves and boots with upturned toes, moustache, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "angkor": {
       "id": "kh-oudom-seney",
@@ -742,7 +743,8 @@
       "file": "np-pradhan-senapati.png",
       "nation": "Nepal",
       "defends": "Boudhanath Stupa, Kathmandu",
-      "look": "Pradhan Senapati of Nepal in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Pradhan Senapati in a patterned dhaka topi with a red sash streaming from it, a white daura under gilded lamellar armour chased with lions, the double pennant of Nepal worn as a fringed cape, a blue skirt worked with the Himalaya, red leg wraps and tassels, a lion buckle, a kukri and a sword, tall boots with lion greaves, moustache, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "victoriamemorial": {
       "id": "in-maharaja-general",
@@ -951,7 +953,8 @@
       "file": "nz-lieutenant-general.png",
       "nation": "New Zealand",
       "defends": "Sky Tower, Auckland",
-      "look": "Lieutenant General of New Zealand in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Lieutenant General as a Māori rangatira: tā moko on the face and arms, hair tied up with red, white and black feathers, a korowai cloak of black, red, white and blue feathers with a tāniko border, a woven flax piupiu and belt with pounamu and bone pendants, a hei-tiki and koru carvings, woven leg bindings, barefoot, a carved taiaha at his side, arms folded",
+      "pose": "arms folded — reads as refusal"
     }
   }
 }
