@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-eight are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran and Iraq, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-two are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon and Lithuania, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -422,11 +422,12 @@
       "look": "Moroccan Général de Corps d'Armée in dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap."
     },
     "kuwait": {
-      "id": "kw-officer",
-      "file": "kw-officer.png",
+      "id": "kw-fariq-awwal",
+      "file": "kw-fariq-awwal.png",
       "nation": "Kuwait",
       "defends": "the Kuwait Towers",
-      "look": "Kuwaiti Farīq Awwal in khaki service dress with gold shoulder boards and a red beret, sunglasses."
+      "look": "Farīq Awwal as a desert champion: a red-and-white shemagh under a black agal, a white thobe under gilded leather armour worked with dhows, palms and crossed swords, a dhow buckle, green, white, red and black tassels, a cape in the flag's colours embroidered with dhows and palms, a curved sword and a khanjar, tooled brown boots with upturned toes, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "karnak": {
       "id": "eg-officer",
@@ -645,7 +646,8 @@
       "file": "lt-generolas.png",
       "nation": "Lithuania",
       "defends": "Trakai Island Castle, Trakai",
-      "look": "Generolas of Lithuania in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Generolas as a Grand Duchy knight: a fur cap with yellow, green and red plumes and a gold badge, a fur-collared cloak in the yellow-green-red tricolour worked with a woven sash border and the white Vytis horseman, a mail shirt under a red surcoat carrying the Vytis, gilded pauldrons, bracers and greaves chased with horses, a horse buckle, a long sword, tooled brown boots, long hair and beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "winterpalace": {
       "id": "ru-marshal",
@@ -826,7 +828,8 @@
       "file": "kz-armiya-generaly.png",
       "nation": "Kazakhstan",
       "defends": "Bayterek Tower, Astana",
-      "look": "Armiya generaly of Kazakhstan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Armiya generaly as a steppe khan: a fur-trimmed borik with golden eagle feathers, braided hair and a moustache, a sky-blue chapan lined with fur and worked in gold ornament, lamellar armour, gilded pauldrons, bracers and greaves chased with snow leopards, a quiver of arrows, a leopard buckle, the flag with the sun and steppe eagle worn as a fringed cape, a curved sword, fur-topped tooled boots, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "registan": {
       "id": "uz-general-polkovnik",
@@ -863,7 +866,8 @@
       "file": "lb-imad.png",
       "nation": "Lebanon",
       "defends": "Temple of Bacchus, Baalbek",
-      "look": "Imad of Lebanon in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "ʿImād as a Levantine champion: a red-and-white keffiyeh wound as a turban with a gold medallion, lamellar armour over a white robe embroidered with cedars, gilded pauldrons, bracers and greaves carrying the cedar, a cedar buckle, red-and-green tassels, the flag of Lebanon worn as a fringed cape, a curved sword in a cedar scabbard, tall brown boots, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "ur": {
       "id": "iq-fariq-awwal",
