@@ -690,7 +690,7 @@ export class HUD {
         <div class="uc-key">${bar === 'strikes' ? '⇧' : ''}${n}</div>
         <div class="uc-icon">${unitIcon(u.id) || ''}</div>
         <div class="uc-name${u.name.length > 7 ? ' long' : ''}">${u.name}</div>
-        <div class="uc-cost">$${u.cost.toLocaleString()}</div>
+        <div class="uc-cost">$${this.battle.costOf(u).toLocaleString()}</div>
         <div class="uc-lock">LOCKED</div>`;
 
       card.addEventListener('click', () => {
@@ -897,7 +897,7 @@ export class HUD {
     for (const u of UNITS) {
       const card = this.cards.get(u.id);
       const unlocked = b.isUnlocked(u);
-      const affordable = b.freeBuild || b.money >= u.cost;
+      const affordable = b.canAfford(u);
 
       card.classList.toggle('locked', !unlocked);
       card.classList.toggle('unaffordable', unlocked && !affordable);

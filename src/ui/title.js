@@ -405,7 +405,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     // missile are one section so a strike list runs by price without a break.
     const sec = (u) => (u.strike ? 'STRIKE' : u.tier);
     const tiers = [...new Set(UNITS.map(sec))];
-    return `<p class="tt-arm-intro">Everything the contract pays for. Tap a card for the brief.</p>` + tiers.map((tier) => `
+    return `<p class="tt-arm-intro">Everything the contract pays for, at list price: a strike costs more on a big target and less on a small one. Tap a card for the brief.</p>` + tiers.map((tier) => `
       <div class="tt-sk">${tierName(tier)}</div>
       <div class="tt-arm">${UNITS.filter((u) => sec(u) === tier).map((u) => {
         const ok = isReleased(u.id);

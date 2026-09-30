@@ -31,7 +31,7 @@ export function unitTipHTML(u, battle) {
   const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
   if (u.strike) {
     return `
-    <div class="ut-head"><b>${u.full}</b><span>$${u.cost.toLocaleString()}</span></div>
+    <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>
     <div class="ut-blurb">${u.blurb}</div>
     ${bar('Vs stone', u.strike.frac / 0.35)}
     ${bar('Blast', 1)}
@@ -43,7 +43,7 @@ export function unitTipHTML(u, battle) {
     ${unlocked ? '' : `<div class="ut-lock">Unlocks at ${need}% of the target down</div>`}`;
   }
   return `
-    <div class="ut-head"><b>${u.full}</b><span>$${u.cost.toLocaleString()}</span></div>
+    <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>
     <div class="ut-blurb">${u.blurb}</div>
     ${bar('Range', u.range / MAX_RANGE)}
     ${bar('Vs stone', Math.pow(w.power / MAX_POWER, 0.6))}

@@ -159,7 +159,7 @@ export const UNITS = [
   },
   {
     id: 'm270', name: 'M270 MLRS', full: 'M270A2 MLRS', tier: 'MRL',
-    cost: 3600, unlockFrac: 0.25,
+    cost: 1800, unlockFrac: 0.25,
     tint: ARTILLERY_GREEN, model: 'M270', modelLength: 7.0,
     // The launcher box points down +Z in the file; the game's forward is
     // the other way, and it was shooting out of its own back.
@@ -201,11 +201,11 @@ export const UNITS = [
   // allowed to reach, and `strike.shock` how many blast radii the mortar is
   // shaken out to. Both are how the Eagle is kept to what its blurb promises:
   // a low hit used to sever a tower's whole cross section and shake the
-  // mortar out of two hundred feet of shaft above it, so a single $100k
+  // mortar out of two hundred feet of shaft above it, so a single
   // 500-pounder laid the Elizabeth Tower flat — a tenth of the building on
   // paper, all of it in practice. Held to a bite and a short shock it takes
-  // its tenth and the tower stands. The Lancer has neither, which is what the
-  // extra $150k buys: the MOAB still fells a tower in one pass.
+  // its tenth and the tower stands. The Lancer has neither, which is what its
+  // price buys: the MOAB still fells a tower in one pass.
   {
     id: 'f15', name: 'F-15E', full: 'F-15E Strike Eagle · GBU-12 500 lb', tier: 'AIR',
     cost: 100000, unlockFrac: 0.12,
@@ -219,7 +219,7 @@ export const UNITS = [
   },
   {
     id: 'b1', name: 'B-1 LANCER', full: 'B-1B Lancer · GBU-43/B MOAB', tier: 'AIR',
-    cost: 250000, unlockFrac: 0.25,
+    cost: 400000, unlockFrac: 0.25,
     model: 'aircraft', strike: { frac: 0.35, maxR: 120, minR: 18, fx: 9.5 },
     aircraft: { kind: 'lancer', speed: 210, height: 330, clearance: 150, runIn: 3200, offset: 60 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
@@ -230,7 +230,7 @@ export const UNITS = [
   },
   {
     id: 'ah64', name: 'APACHE', full: 'AH-64E Apache · Hydra 70 rockets and 30 mm', tier: 'AIR',
-    cost: 40000, unlockFrac: 0.05,
+    cost: 8000, unlockFrac: 0.05,
     // Not a bomber. It comes in low, stops at a stand-off off the camera's
     // side of the target, and works it for as long as it has time on
     // station: 70 mm rockets in pairs, small and accurate, and the 30 mm
@@ -253,7 +253,7 @@ export const UNITS = [
   },
   {
     id: 'ac130', name: 'AC-130', full: 'AC-130J Ghostrider · 105 mm', tier: 'AIR',
-    cost: 120000, unlockFrac: 0.14,
+    cost: 70000, unlockFrac: 0.14,
     // A gunship, not a bomber: a banked orbit high over the target for a
     // minute and a quarter, the 105 mm howitzer firing down its port side
     // in direct fire, one round every couple of seconds. It follows the

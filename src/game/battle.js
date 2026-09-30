@@ -25,6 +25,8 @@ const START_MONEY = 900;
 const BASE_INCOME = 14;
 const MONEY_PER_TONNE = 1.15;
 const MONEY_PER_DEFENDER = 22;
+// The objective tonnage at which a strike costs its list price (see costOf).
+const STRIKE_REF_TONNES = 300000;
 
 export class Battle {
   constructor(ctx) {
@@ -660,7 +662,26 @@ export class Battle {
 
   /** Released by the campaign but not yet earned here, for the build bar. */
   isReleased(u) { return this.unlockAll || isReleased(u.id); }
-  canAfford(u) { return this.freeBuild || this.money >= u.cost; }
+  canAfford(u) { return this.freeBuild || this.money >= this.costOf(u); }
+
+  /**
+   * What a weapon costs on this map.
+   *
+   * A gun is a gun anywhere. A strike is priced by the size of the job: a
+   * bomb takes a share of whatever it lands on and the rubble is paid by the
+   * tonne, so on a small target the same strike returned a tenth of its
+   * price and on a cathedral two and a half times it. The list price is for
+   * three hundred thousand tonnes of objective; the level's own tonnage
+   * scales it, within a third and three times, rounded to the thousand.
+   */
+  costOf(def) {
+    if (!def?.strike) return def?.cost ?? 0;
+    if (this._strikeScale == null) {
+      const t = this.objectives.reduce((a, o) => a + o.structure.totalMass, 0) / 1000;
+      this._strikeScale = Math.min(3, Math.max(0.35, t / STRIKE_REF_TONNES));
+    }
+    return Math.max(1000, Math.round((def.cost * this._strikeScale) / 1000) * 1000);
+  }
 
   get income() {
     // Income rises as the assault succeeds, so a good opening snowballs.
@@ -786,10 +807,11 @@ export class Battle {
     if (!def || !def.strike) return null;
     if (!this.isUnlocked(def)) return null;
     if (!point) { this.onEvent('needtarget', def); return null; }
-    if (!this.freeBuild && this.money < def.cost) { this.onEvent('poor', def); return null; }
+    const price = this.costOf(def);
+    if (!this.freeBuild && this.money < price) { this.onEvent('poor', { ...def, cost: price }); return null; }
     if (!this.freeBuild) {
-      this.money -= def.cost;
-      this.spent += def.cost;
+      this.money -= price;
+      this.spent += price;
     }
     const at = point.clone();
     // Aim at the ground under the point if it is in the open, or at the
@@ -1586,8 +1608,8 @@ export class Battle {
    * It is also what separates the two aircraft. The Strike Eagle bites
    * (`bite` below 1) and cannot fell a tower alone; the Lancer's MOAB is
    * written with no bite at all, because eleven tonnes of it genuinely does
-   * take a third of whatever it lands on in one pass. That is what the extra
-   * $300k buys.
+   * take a third of whatever it lands on in one pass. That is what four
+   * times the Eagle's price buys.
    */
   _sectionCap(s, point, bite) {
     const BAND = 6.0;                       // the course the bomb goes off in
@@ -1656,7 +1678,7 @@ export class Battle {
       destroyed += s.explode(point, rMax, rMax * 1.15, w.power * this.powerScale,
         // A third of the core comes out as stone rather than as dust. A bomb
         // this size does not make masonry vanish, it throws it, and the throw
-        // is most of what the player is paying half a million dollars to see.
+        // is most of what the player is paying the B-1's price to see.
         { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4, eject: 0.34 });
     }
     if (this.stores) this.stores.blast(point, rMax * 1.5);

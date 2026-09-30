@@ -676,7 +676,7 @@ export class TestMenu {
       // An aircraft is called, not placed: one call on the designated point
       // or the monument's centre, gates ignored as below.
       const money = b.money, unlock = b.unlockAll;
-      b.unlockAll = true; b.money = Math.max(b.money, def.cost);
+      b.unlockAll = true; b.money = Math.max(b.money, b.costOf(def));
       b.callStrike(id, b.target || origin.clone().setY(origin.y + 20));
       b.money = money; b.unlockAll = unlock;
       return 1;
@@ -704,7 +704,7 @@ export class TestMenu {
       const unlock = b.unlockAll;
       const lift = b.airlift;
       b.unlockAll = true; b.airlift = false;
-      b.money = Math.max(b.money, def.cost);
+      b.money = Math.max(b.money, b.costOf(def));
       b.deploy(id, p);
       b.money = money;
       b.unlockAll = unlock; b.airlift = lift;
@@ -804,7 +804,7 @@ export class TestMenu {
       if (!b.validPlacement(p).ok) continue;
       const money = b.money, unlock = b.unlockAll, lift = b.airlift;
       b.unlockAll = true; b.airlift = false;
-      b.money = Math.max(b.money, UNITS_BY_ID[id].cost);
+      b.money = Math.max(b.money, b.costOf(UNITS_BY_ID[id]));
       b.deploy(id, p);
       b.money = money; b.unlockAll = unlock; b.airlift = lift;
       placed++;
