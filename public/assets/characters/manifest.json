@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifty-nine are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru, Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand, Uzbekistan and Vietnam, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Sixty are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Morocco, Peru, Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand, Uzbekistan and Vietnam, each nation's one officer defending every level of theirs. Serbia is the one placeholder silhouette left, tinted in its colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -415,11 +415,12 @@
       "pose": "arms folded — reads as refusal"
     },
     "hassan": {
-      "id": "ma-officer",
-      "file": "ma-officer.png",
+      "id": "ma-general",
+      "file": "ma-general.png",
       "nation": "Morocco",
       "defends": "the Hassan II Mosque",
-      "look": "Moroccan Général de Corps d'Armée in dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap."
+      "look": "Général de Corps d'Armée as a Riffian warrior in modern kit: a red turban wound with an embroidered band and a jewelled badge, a red scarf, a white djellaba worked in red, the flag and a green zellige knot on the sleeve, a chest rig of pouches and a radio, a red sash with a gold buckle, a curved koummiya in a gold scabbard, red and green tassels, knee guards with the green star, combat boots laced in red, the red flag with its green star worn as a fringed cape, a rifle across the front, moustache and beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "kuwait": {
       "id": "kw-fariq-awwal",

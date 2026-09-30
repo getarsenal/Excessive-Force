@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The fifty-nine drawn officers (`public/assets/characters/*.png`) are painted
+The sixty drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -22,20 +22,20 @@ soft dark halo left in the alpha so the figure sits on the stand-off's blue
 without a hard edge. File name and slot are in `manifest.json` under
 `enemies.<level>`; the `look` line there is the `{look}` in the prompt.
 
-## Still to draw (from the first batch of placeholders)
+## Still to draw
 
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
-| hassan | `ma-general.png` | Général de Corps d'Armée, Morocco | Dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap. |
+| saintsava | `rs-general.png` | Generál, Serbia | See `manifest.json` → `enemies.saintsava`. |
 
 Every campaign officer is drawn, Malaysia last. China, Spain, Indonesia,
 Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium,
 Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland,
 Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon,
-Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru,
+Lithuania, Morocco, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru,
 Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand,
 Uzbekistan and Vietnam are drawn too, one officer to each nation's every
-level. Morocco and Serbia are the last two placeholders. The rest are in `manifest.json` with their looks.
+level. Serbia is the last placeholder.
 
 ## Installing one
 
