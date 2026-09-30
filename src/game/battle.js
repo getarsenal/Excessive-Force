@@ -26,7 +26,7 @@ const BASE_INCOME = 14;
 const MONEY_PER_TONNE = 1.15;
 const MONEY_PER_DEFENDER = 22;
 // The objective tonnage at which a strike costs its list price (see costOf).
-const STRIKE_REF_TONNES = 300000;
+const STRIKE_REF_TONNES = 600000;
 
 export class Battle {
   constructor(ctx) {
@@ -671,8 +671,10 @@ export class Battle {
    * bomb takes a share of whatever it lands on and the rubble is paid by the
    * tonne, so on a small target the same strike returned a tenth of its
    * price and on a cathedral two and a half times it. The list price is for
-   * three hundred thousand tonnes of objective; the level's own tonnage
-   * scales it, within a third and three times, rounded to the thousand.
+   * six hundred thousand tonnes of objective, which is a landmark and its
+   * neighbours on an ordinary map (Westminster 579 kt, Pisa 565 kt, Cologne
+   * 720 kt); the level's own tonnage scales it, within a third and three
+   * times, rounded to the thousand. Giza, at eleven million, pays triple.
    */
   costOf(def) {
     if (!def?.strike) return def?.cost ?? 0;
