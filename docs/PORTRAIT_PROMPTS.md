@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The forty-nine drawn officers (`public/assets/characters/*.png`) are painted
+The fifty-four drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -27,16 +27,15 @@ without a hard edge. File name and slot are in `manifest.json` under
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
 | hassan | `ma-general.png` | Général de Corps d'Armée, Morocco | Dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap. |
-| gyeongbok | `kr-daejang.png` | Daejang, South Korea | Dark green dress uniform with four silver stars, peaked cap, white gloves. |
 | watarun | `th-phon-ek.png` | Phon Ek, Thailand | White dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile. |
-| machupicchu | `pe-general-de-ejercito.png` | General de Ejército, Peru | Red-and-white sash over dark dress uniform, peaked cap with gold laurels. |
 
 Every campaign officer is drawn, Malaysia last. China, Spain, Indonesia,
 Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium,
 Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland,
 Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon,
-Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway and Pakistan are
-drawn too, one officer to each nation's every level. The rest are in `manifest.json` with their looks.
+Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru,
+Saudi Arabia, South Korea, Sri Lanka and Sweden are drawn too, one officer to
+each nation's every level. The rest are in `manifest.json` with their looks.
 
 ## Installing one
 

@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-nine are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway and Pakistan, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Fifty-four are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru, Saudi Arabia, South Korea, Sri Lanka and Sweden, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -445,11 +445,12 @@
       "pose": "arms folded — reads as refusal"
     },
     "gyeongbok": {
-      "id": "kr-officer",
-      "file": "kr-officer.png",
+      "id": "kr-daejang",
+      "file": "kr-daejang.png",
       "nation": "South Korea",
       "defends": "the Gyeongbokgung",
-      "look": "South Korean Daejang in dark green dress uniform with four silver stars, peaked cap, white gloves."
+      "look": "Daejang as a Joseon general in modern kit: hair in a topknot under a navy headband with the taegeuk, a navy robe worked in gold dragons and clouds over a white hanbok collar, the taegukgi on the sleeve, a plate carrier with pouches and a radio over the robe, red knotted tassels and a medallion, a rifle slung across the front, a sword with a red tassel, knee pads, combat boots bound with red cord, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "watarun": {
       "id": "th-officer",
@@ -498,11 +499,12 @@
       "look": "Mexican General de División in dark green dress uniform with gold oak leaves, peaked cap, a hand on his belt."
     },
     "machupicchu": {
-      "id": "pe-officer",
-      "file": "pe-officer.png",
+      "id": "pe-general-de-ejercito",
+      "file": "pe-general-de-ejercito.png",
       "nation": "Peru",
       "defends": "the Machu Picchu",
-      "look": "Peruvian General de Ejército in red-and-white sash over dark dress uniform, peaked cap with gold laurels."
+      "look": "General de Ejército in the field: a red beret with a gold badge, a red Andean woven poncho with white patterns and fringes worn over the shoulders, woodland camouflage, the flag with the arms on the sleeve, a plate carrier with pouches and a radio, a holstered pistol and a knife, knee pads, tan combat boots, big moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "greatwall": {
       "id": "cn-shangjiang",
@@ -632,7 +634,8 @@
       "file": "se-general.png",
       "nation": "Sweden",
       "defends": "Stockholm Palace, Stockholm",
-      "look": "General of Sweden in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a Viking in modern kit: braided blond hair and beard, a fur-collared mail shirt under a blue tunic with a gold knotwork hem, the Swedish flag and the three crowns on the sleeve, knee pads with the crowns, a blue-and-yellow cape carrying the three crowns, a chest rig and radio, a rifle across the front, a bearded axe, fur-topped combat boots, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "hallgrimskirkja": {
       "id": "is-skipherra",
@@ -826,7 +829,8 @@
       "file": "lk-general.png",
       "nation": "Sri Lanka",
       "defends": "Lotus Tower, Colombo",
-      "look": "General of Sri Lanka in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a Sinhalese champion in modern kit: hair tied up under a red headband with a gold ornament, gold earring and necklace, a maroon-and-gold sarong-cut skirt carrying the sword lion, gold lion armlets and buckle, a chest rig of pouches and a radio, a rifle across the front, the lion flag worn as a fringed cape, a curved sword with a lion hilt, gold-worked knee guards, tooled brown boots, beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "bayterek": {
       "id": "kz-armiya-generaly",
@@ -864,7 +868,8 @@
       "file": "sa-fariq-awwal.png",
       "nation": "Saudi Arabia",
       "defends": "Kingdom Centre, Riyadh",
-      "look": "Fariq Awwal of Saudi Arabia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Farīq Awwal in the field: a red-and-white shemagh under a black agal, a desert-pattern scarf, desert digital camouflage, the green flag with the shahada on the sleeve and the palm-and-swords on the patch and buckle, a plate carrier hung with pouches and a radio, a rifle slung across the front, knee pads, tan combat boots, beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "baalbek": {
       "id": "lb-imad",
