@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The twenty-three drawn officers (`public/assets/characters/*.png`) are painted
+The twenty-six drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -26,7 +26,6 @@ without a hard edge. File name and slot are in `manifest.json` under
 
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
-| atomium | `be-luitenant-generaal.png` | Luitenant-generaal, Belgium | Dark green dress uniform with red collar tabs and gold stars, beret in hand. |
 | budapest | `hu-vezerezredes.png` | Vezérezredes, Hungary | Dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind. |
 | hassan | `ma-general.png` | Général de Corps d'Armée, Morocco | Dark green dress uniform with red collar and gold stars, red-and-green sash, peaked cap. |
 | kuwait | `kw-fariq-awwal.png` | Farīq Awwal, Kuwait | Khaki service dress with gold shoulder boards and a red beret, sunglasses. |
@@ -39,8 +38,8 @@ without a hard edge. File name and slot are in `manifest.json` under
 
 The Malaysian slot (`my-jeneral.png`) from the third batch is in
 `manifest.json` with its look and takes the same template. China, Spain,
-Indonesia, Austria, Canada, Poland, Portugal and Romania are drawn, one
-officer to each nation's every level.
+Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina,
+Azerbaijan and Belgium are drawn, one officer to each nation's every level.
 
 ## Installing one
 

@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-three are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal and Romania, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-six are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan and Belgium, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -355,11 +355,12 @@
       "pose": "arms folded — reads as refusal"
     },
     "atomium": {
-      "id": "be-officer",
-      "file": "be-officer.png",
+      "id": "be-luitenant-generaal",
+      "file": "be-luitenant-generaal.png",
       "nation": "Belgium",
       "defends": "the Atomium",
-      "look": "Belgian Luitenant-generaal in dark green dress uniform with red collar tabs and gold stars, beret in hand."
+      "look": "Luitenant-generaal in a black tunic heavy with gold oak leaves and bullion epaulettes, a black-yellow-red sash and orders at the breast, the crowned lion on the arm, the buckle and the boot cuffs, a bicorne with the lion and black, yellow and red plumes, white breeches striped red and gold, a black cape with the crowned lion on a gold-fringed hem, tall black boots with spurs, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "tokyotower": {
       "id": "jp-officer",
@@ -832,7 +833,8 @@
       "file": "az-general-polkovnik.png",
       "nation": "Azerbaijan",
       "defends": "Flame Towers, Baku",
-      "look": "General-polkovnik of Azerbaijan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General-polkovnik in a blue chokha worked in gold with gazyrs across the chest, a papakha with the crescent and star and blue, red and green plumes, a woven carpet-pattern sash with tricolour tassels, the flag worn as a fringed cape, blue sharovary, tall brown boots with crescent cuffs, a shashka, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "azadi": {
       "id": "ir-sarlashkar",
@@ -918,7 +920,8 @@
       "file": "ar-teniente-general.png",
       "nation": "Argentina",
       "defends": "Obelisco, Buenos Aires",
-      "look": "Teniente General of Argentina in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Teniente General in a navy tunic with gold oak leaves and bullion epaulettes, a sky-blue and white sash, the Sun of May on the arm, the buckle and the boot cuffs, a navy wide-brimmed hat with blue and white plumes, the flag worn as a fringed cape with the Sun on it, tall brown boots with sun spurs, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "cartagena": {
       "id": "co-general",
