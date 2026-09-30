@@ -294,7 +294,9 @@ export const UNITS = [
     dispersion: 0,
     blurb: 'Two and a half tonnes that goes in before it goes off. For the things that will not fall over.',
   },
-];
+// Cheapest first, everywhere a list of them is shown: the dock, the number
+// keys, the armoury. Written in the order they were designed; sorted here.
+].sort((a, b) => a.cost - b.cost);
 
 export const UNITS_BY_ID = Object.fromEntries(UNITS.map((u) => [u.id, u]));
 

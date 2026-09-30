@@ -654,22 +654,12 @@ export class HUD {
   _buildBar() {
     this.bars = { units: [], strikes: [] };
     const frags = { units: document.createDocumentFragment(), strikes: document.createDocumentFragment() };
-    // The strikes in two groups: what stays on station, then what makes one
-    // pass, each cheapest first. A label opens each group.
+    // Cheapest first in both drawers, as UNITS already is. What stays on
+    // station says so on its card instead of in a group of its own.
     const loiters = (u) => !!u.aircraft?.station;
-    const strikes = UNITS.filter((u) => u.strike)
-      .sort((a, b) => (loiters(b) - loiters(a)) || (a.cost - b.cost));
-    const order = [...UNITS.filter((u) => !u.strike), ...strikes];
-    let group = null;
+    const order = [...UNITS.filter((u) => !u.strike), ...UNITS.filter((u) => u.strike)];
     for (const u of order) {
       const bar = u.strike && this.el.strikebar ? 'strikes' : 'units';
-      if (bar === 'strikes' && loiters(u) !== group) {
-        group = loiters(u);
-        const tag = document.createElement('div');
-        tag.className = 'cb-group';
-        tag.textContent = group ? 'LOITERING' : 'SINGLE USE';
-        frags.strikes.appendChild(tag);
-      }
       this.bars[bar].push(u.id);
       const card = document.createElement('button');
       card.className = 'unit-card locked';
@@ -679,7 +669,7 @@ export class HUD {
       const n = this.bars[bar].length;
 
       card.innerHTML = `
-        <div class="uc-tier">${u.tier}</div>
+        <div class="uc-tier">${loiters(u) ? 'LOITER' : u.tier}</div>
         <div class="uc-key">${bar === 'strikes' ? '⇧' : ''}${n}</div>
         <div class="uc-icon">${unitIcon(u.id) || ''}</div>
         <div class="uc-name${u.name.length > 7 ? ' long' : ''}">${u.name}</div>

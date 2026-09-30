@@ -335,16 +335,6 @@ html, body {
   align-items: stretch;
 }
 .cardbar::-webkit-scrollbar { display: none; }
-/* A group label in the strikes drawer: a narrow upright tag at the head of
-   each group, so the two read as two without a second row. */
-.cb-group {
-  flex: 0 0 auto; align-self: stretch; display: flex; align-items: center; justify-content: center;
-  writing-mode: vertical-rl; transform: rotate(180deg);
-  font-size: 8.5px; letter-spacing: 0.22em; color: var(--dim);
-  padding: 4px 3px; border-left: 1px solid var(--edge);   /* on the right once turned */
-}
-.cb-group + .unit-card { margin-left: 0; }
-.unit-card + .cb-group { margin-left: 8px; }
 
 .unit-card {
   flex: 0 0 auto; width: clamp(78px, 20vw, 104px);

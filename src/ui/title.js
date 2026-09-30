@@ -386,10 +386,13 @@ export function showTitle({ current = null, canResume = false } = {}) {
     const maxPowG = top(ground, (u) => u.warhead?.power || 0), maxPowA = top(air, (u) => u.warhead?.power || 0);
     const maxRadG = top(ground, (u) => u.warhead?.radius || 0), maxRadA = top(air, (u) => u.warhead?.radius || 0);
     const bar = (k, v) => `<span class="tt-stat"><i>${k}</i><span><span style="width:${Math.max(4, Math.min(100, v * 100)).toFixed(0)}%"></span></span></span>`;
-    const tiers = [...new Set(UNITS.map((u) => u.tier))];
+    // Sections in the order UNITS is, cheapest first; the aircraft and the
+    // missile are one section so a strike list runs by price without a break.
+    const sec = (u) => (u.strike ? 'STRIKE' : u.tier);
+    const tiers = [...new Set(UNITS.map(sec))];
     return `<p class="tt-arm-intro">Everything the contract pays for. Tap a card for the brief.</p>` + tiers.map((tier) => `
       <div class="tt-sk">${tierName(tier)}</div>
-      <div class="tt-arm">${UNITS.filter((u) => u.tier === tier).map((u) => {
+      <div class="tt-arm">${UNITS.filter((u) => sec(u) === tier).map((u) => {
         const ok = isReleased(u.id);
         const by = THEATRES.find((t) => t.unlocks.includes(u.id));
         const pow = (u.warhead?.power || 0) / (u.strike ? maxPowA : maxPowG);
@@ -447,7 +450,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
 }
 
 function tierName(t) {
-  return ({ INF: 'INFANTRY', GUN: 'TOWED GUNS', SPH: 'SELF-PROPELLED', AFV: 'ARMOUR', MRL: 'ROCKET ARTILLERY', AIR: 'AIR STRIKES', SEA: 'NAVAL' })[t] || t;
+  return ({ INF: 'INFANTRY', GUN: 'TOWED GUNS', SPH: 'SELF-PROPELLED', AFV: 'ARMOUR', MRL: 'ROCKET ARTILLERY', AIR: 'AIR STRIKES', SEA: 'NAVAL', STRIKE: 'STRIKES · PAID ONCE' })[t] || t;
 }
 
 function flame() {
