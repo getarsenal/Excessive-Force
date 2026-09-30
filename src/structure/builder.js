@@ -40,6 +40,10 @@ export const MATERIALS = {
   ASHLAR: 24,    // Craigleith sandstone, grey-brown and sooted: Edinburgh
   SCOTSLATE: 25, // Ballachulish slate, near black
   GRANITE: 26,   // the Chausey granite of Mont-Saint-Michel, a pale warm grey
+  GLAZE: 27,     // imperial yellow glazed tile, the row between two GOLD rows
+  RIDGE: 28,     // the darker ridge and hip tile along a Chinese roof's lines
+  BEAM: 29,      // the painted architrave and bracket sets, blue-green
+  LATTICE: 30,   // a hall's lattice doors, dark red, hung between the columns
 };
 
 /**
@@ -261,6 +265,14 @@ export const MATERIAL_PROPS = {
   // Granite from the Chausey islands, weathered by the sea to a pale warm
   // grey: the Mont, which LIMESTONE made into a sandcastle.
   [MATERIALS.GRANITE]:   { density: 2.65, strength: 1.10, toughness: 110, color: 0xa7a293, structural: true },
+  // The Forbidden City's roofs: fired clay under a yellow glaze, a shade
+  // deeper than GOLD so alternate courses read as rows of tile; the ridges
+  // and hips in a darker amber; the painted beams under the eaves in the
+  // blue-green of the dougong; and the lattice doors, which carry nothing.
+  [MATERIALS.GLAZE]:     { density: 1.95, strength: 0.80, toughness: 80,  color: 0xc98f22, structural: true },
+  [MATERIALS.RIDGE]:     { density: 1.95, strength: 0.80, toughness: 80,  color: 0x9c6a1a, structural: true },
+  [MATERIALS.BEAM]:      { density: 1.60, strength: 0.85, toughness: 85,  color: 0x2f6a62, structural: true },
+  [MATERIALS.LATTICE]:   { density: 0.90, strength: 0.40, toughness: 40,  color: 0x5e1a14, structural: false },
 };
 
 

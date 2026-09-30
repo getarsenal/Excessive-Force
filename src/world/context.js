@@ -1126,9 +1126,13 @@ export function buildContext(terrain, quality, opts = {}) {
   // bald plate. Where the precinct says its ground is lawn, garden or sand,
   // the ground is the ground.
   const paved = !['lawn', 'charbagh', 'sand'].includes(opts.precinct?.ground);
+  // A palace court is paved wall to wall, the galleries that close it
+  // included: at the Forbidden City the scenery *is* the edge of the paving.
+  const court = opts.precinct?.ground === 'court';
   if (paved) {
     group.add(buildForecourt(terrain, quality,
-      (opts.landmarks || []).filter((l) => !l.scenery), realNet ? 0 : YAW, EXCLUDE));
+      (opts.landmarks || []).filter((l) => court || !l.scenery), realNet ? 0 : YAW, EXCLUDE,
+      court ? { paving: 0x9e998f, edge: 0x86817a } : null));
   }
   group.add(buildStreetSurface(net, terrain, quality));
   group.add(buildBridge(terrain, quality, bridge));
@@ -1475,7 +1479,7 @@ function buildBlockGround(terrain, net, quality, inPrecinct) {
  * because a flat disc laid on anything but a billiard table buries one side of
  * itself and hangs in the air on the other.
  */
-function buildForecourt(terrain, quality, landmarks, yaw, radius) {
+function buildForecourt(terrain, quality, landmarks, yaw, radius, tone = null) {
   // The paved ground is the precinct's own outline — the landmarks' combined
   // footprint with the same margin the railings stand at, corners cut — laid
   // out on the building's axes. It used to be a disc of radius `EXCLUDE`
@@ -1514,8 +1518,9 @@ function buildForecourt(terrain, quality, landmarks, yaw, radius) {
 
   const pos = [];
   const col = [];
-  const paving = new THREE.Color(0xb6ae9b);
-  const edge = new THREE.Color(0x9a927f);
+  // Portland-grey flags by default; a palace court's grey brick when asked.
+  const paving = new THREE.Color(tone?.paving ?? 0xb6ae9b);
+  const edge = new THREE.Color(tone?.edge ?? 0x9a927f);
   const tmp = new THREE.Color();
   const STEP = 5;
   const put = (u, v) => {

@@ -183,7 +183,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
         counts.walks++;
       }
     }
-  } else if (spec.ground !== 'sand') {
+  } else if (spec.ground !== 'sand' && spec.ground !== 'court') {
     // A square with a plan to it: a gravel walk round the inside of the
     // railings, walks in from the gates to the building, a few planted beds,
     // and a line of plane trees along the fence.
@@ -297,7 +297,7 @@ export function buildPrecinct(props, terrain, rng, opts) {
   // at odd angles as far as a player looking down on them can tell.
   const ornaments = spec.ornament === 'none' ? 0 : spec.ornament === 'pavilions' ? 4 : 8;
   const spots = [];
-  if (spec.ground !== 'charbagh' && spec.ground !== 'sand') {
+  if (spec.ground !== 'charbagh' && spec.ground !== 'sand' && spec.ground !== 'court') {
     const cx2 = (u0 + u1) / 2, cz2 = (v0 + v1) / 2;
     const IN2 = 14;
     for (const [du, dv] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {

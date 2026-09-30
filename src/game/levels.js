@@ -34,7 +34,7 @@ import { buildPena, populatePena } from '../structure/landmarks/pena.js';
 import { buildHassan, populateHassan } from '../structure/landmarks/hassan.js';
 import { buildKuwait, populateKuwait } from '../structure/landmarks/kuwait.js';
 import { buildKarnak, populateKarnak } from '../structure/landmarks/karnak.js';
-import { buildForbidden, populateForbidden } from '../structure/landmarks/forbidden.js';
+import { buildForbidden, buildForbiddenCourt, populateForbidden } from '../structure/landmarks/forbidden.js';
 import { buildGyeongbok, populateGyeongbok } from '../structure/landmarks/gyeongbok.js';
 import { buildWatarun, populateWatarun } from '../structure/landmarks/watarun.js';
 import { buildShwedagon, populateShwedagon } from '../structure/landmarks/shwedagon.js';
@@ -1853,8 +1853,8 @@ export const LEVELS = {
     // builder lays the same halls at twice life on a terrace 460 m long, so
     // every one of them would stand inside the marble; the radius clears the
     // court and the town of grey courtyards begins beyond it.
-    cityExcludeRadius: 380,
-    contextExclude: 360,
+    cityExcludeRadius: 470,
+    contextExclude: 450,
     // From the south, across the Taihemen courtyard: the view up the three
     // flights of stairs to the Hall of Supreme Harmony that every photograph
     // of the place is taken from. Low, so the roofs stand against the sky
@@ -1862,11 +1862,16 @@ export const LEVELS = {
     camera: { yaw: 0.16, pitch: 0.13, distance: 470, height: 38 },
     structures: (quality) => [
       { key: 'forbidden', blocks: buildForbidden(quality), primary: true, required: true, label: 'FORBIDDEN CITY' },
+      // The galleries round the court, and the two pavilions on them: the
+      // frame the halls are seen in, worth nothing.
+      { key: 'court', blocks: buildForbiddenCourt(quality), required: false, scenery: true, label: 'OUTER COURT' },
     ],
     garrison: (g, origin, groundY) => populateForbidden(g, origin, groundY),
     // The terrace is ground; the three halls are the contract.
     scoreTags: ['supreme', 'central', 'preserving'],
-    precinct: { boundary: 'none', ground: 'sand', ornament: 'none' },
+    // Grey brick from gallery to gallery, and nothing planted in it: the
+    // court of the Hall of Supreme Harmony has no trees, on purpose.
+    precinct: { boundary: 'none', ground: 'court', ornament: 'none' },
     traits: { windows: true, river: false, topples: true },
     par: { rounds: 70, spend: 16000, minutes: 5, leverage: 6 },
     brief: 'The marble terrace cannot be shot down. The roofs are the heaviest part of the halls on it, and they go over the way you lean them.',

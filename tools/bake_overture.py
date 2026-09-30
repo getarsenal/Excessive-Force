@@ -1037,6 +1037,34 @@ def water_polys(sink, lat0, lon0, span):
                          to_local, m_lat, m_lon, keep=is_water)
 
 
+def drop_dry(polys, rects):
+    """Cut the level's `dry` rectangles out of the surveyed water.
+
+    For a landmark built larger than life on a life-size survey: the
+    Forbidden City's halls are laid at twice their size, so the court the
+    galleries close is twice the real one and the Inner Golden Water River,
+    which runs in front of the Gate of Supreme Harmony, lands inside it as a
+    ragged channel across the paving. Rectangles are map metres, x0 z0 x1 z1.
+    """
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    cut = unary_union([shapely_box(x0, z0, x1, z1) for x0, z0, x1, z1 in rects])
+    out = []
+    for p in polys:
+        ring, holes = (p if isinstance(p, tuple) else (p, ()))
+        try:
+            g = Polygon(ring, holes).buffer(0).difference(cut)
+        except Exception:
+            continue
+        for piece in (g.geoms if hasattr(g, "geoms") else [g]):
+            if piece.geom_type != "Polygon" or piece.is_empty:
+                continue
+            r = list(piece.exterior.coords)
+            h = [list(i.coords) for i in piece.interiors if len(i.coords) >= 4]
+            out.append((r, h) if h else r)
+    return out
+
+
 # How far past the map the world is still drawn. The surround apron and the
 # skyline ring both run to seven spans, so that is how far the sea has to be
 # known: anything nearer is a coastline that stops in mid-air.
@@ -1435,6 +1463,8 @@ def bake(level_id):
     # The water first, because whether there is a real shoreline decides how
     # the ground under it is cut.
     water = water_polys(sink, lat0, lon0, span)
+    if cfg.get("dry"):
+        water = drop_dry(water, cfg["dry"])
     cover = float(np.clip(rasterise(water, 512, span), 0, 1).mean()) if water else 0.0
     natural = cover > 0.012
     print(f"  water: {len(water)} polygons, {cover * 100:.1f}% of the map"

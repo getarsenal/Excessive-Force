@@ -594,6 +594,9 @@ LEVELS = {
         "ceiling": 52.0,
         "parks": [[0, 620, 230], [-520, 300, 260], [-520, -20, 200]],
         "flatten": [[0, 0, [220, 160], 40]],
+        # The court the galleries close, which at twice life takes in the
+        # Inner Golden Water River: paved, not a channel through the paving.
+        "dry": [[-212, -266, 212, 402]],
     },
     "gyeongbok": {
         "name": "Gyeongbokgung, Seoul",
