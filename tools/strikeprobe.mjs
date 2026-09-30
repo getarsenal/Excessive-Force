@@ -55,8 +55,13 @@ for (const level of levels.split(',')) {
           B.garrison.fireEnabled = false;
           B.setTarget(aim.clone(), 'probe');
           const range = Math.max((def.minRange || 0) + 60, Math.min(def.range * 0.5, 320));
+          const n0 = B.units.length;
           placed = T.spawnAt(id, 1, 2.2, range);
           if (!placed) return { err: 'no ground for the gun' };
+          // Deploying loads the model first; a launcher whose model is not
+          // cached yet is not on the ground until it has.
+          for (let k = 0; k < 150 && B.units.length === n0; k++) await new Promise((r) => setTimeout(r, 200));
+          if (B.units.length === n0) return { err: 'the gun never arrived' };
           secs = 60;
           ff(secs + 15);
         }
