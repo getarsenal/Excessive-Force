@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The forty-six drawn officers (`public/assets/characters/*.png`) are painted
+The forty-nine drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -35,8 +35,8 @@ Every campaign officer is drawn, Malaysia last. China, Spain, Indonesia,
 Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium,
 Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland,
 Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon,
-Lithuania, Myanmar, Nepal and New Zealand are drawn too, one officer to each
-nation's every level. The rest are in `manifest.json` with their looks.
+Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway and Pakistan are
+drawn too, one officer to each nation's every level. The rest are in `manifest.json` with their looks.
 
 ## Installing one
 

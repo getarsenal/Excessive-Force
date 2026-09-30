@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-six are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal and New Zealand, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Forty-nine are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway and Pakistan, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -684,7 +684,8 @@
       "file": "no-general.png",
       "nation": "Norway",
       "defends": "Nidaros Cathedral, Trondheim",
-      "look": "General of Norway in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a ranger in the field: a maroon beret with a gold badge, green paint across the cheek, a fur-hooded woodland smock under a chest rig, the Norwegian flag on the sleeve and the pouches, an elk patch, a heavy pack with an antenna, a holstered pistol, knee and elbow pads, black combat boots, beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "helsinki": {
       "id": "fi-kenraali",
@@ -793,7 +794,8 @@
       "file": "kp-chasu.png",
       "nation": "North Korea",
       "defends": "Juche Tower, Pyongyang",
-      "look": "Chasu of North Korea in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Chasu in olive dress uniform with red collar tabs, a red-banded peaked cap with the star badge, gold bullion shoulder boards with the red star, gold oak leaves on red cuffs, rows of medals and orders, a Sam Browne and map case, a star buckle, olive breeches with a red stripe, a long olive greatcoat lined in red worn as a cape, tall black boots, a sabre with a red tassel, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "monas": {
       "id": "id-jenderal",
@@ -816,7 +818,8 @@
       "file": "pk-general.png",
       "nation": "Pakistan",
       "defends": "Minar-e-Pakistan, Lahore",
-      "look": "General of Pakistan in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General in the field: a green beret with the crescent-and-star badge, a green-and-sand shemagh, digital woodland camouflage, the flag and the army's crossed swords on the sleeve, a plate carrier hung with pouches and a radio, a crescent-and-star buckle, a rifle slung across the front, knee pads, tan combat boots, beard, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "lotustower": {
       "id": "lk-general",
