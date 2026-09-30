@@ -208,6 +208,17 @@ function planFieldWorks(opts = {}) {
   /** A gun pit behind the line, with something heavy in it. */
   const pit = (x, z, nx, nz, type) => {
     if (!siteOk(x, z)) return false;
+    // Room for the pit itself, which is six metres across its bank, and for
+    // flak a sky to shoot at. A pit sited only clear of a building's footprint
+    // could be dug with its bank against the wall, and at Karnak the one flak
+    // gun on the map stood seven metres from an eight-metre house that hid the
+    // whole south-eastern sky: an aircraft came in over it on every run and
+    // the gun never fired a round.
+    const room = type === 'aa' ? 12 : 6;
+    for (const f of footprints) {
+      const dx = f.x - x, dz = f.z - z;
+      if (dx * dx + dz * dz < (f.r + room) ** 2) return false;
+    }
     // A horseshoe of spoil is eight metres across, so the ground under the ring
     // has to be as level as the ground under its centre: the same staircase
     // happens round a gun pit, it is just harder to name.
@@ -287,10 +298,18 @@ function planFieldWorks(opts = {}) {
       if (!run(L.x + nx * stand, L.z + nz * stand, nx, nz, len, 2)) continue;
       pit(L.x + nx * (stand + 13), L.z + nz * (stand + 13), nx, nz, 'fieldgun');
     }
-    for (const [ax, az] of [[1, 1], [-1, -1]]) {
+    // Two flak pits on opposite diagonals, and the other two diagonals if
+    // one of those is built on or faces a friend — further out along the same
+    // bearing, too, since a flak gun is worth walking forty metres for open
+    // sky. A belt with no flak at all hands the sky to the player's strikes.
+    let flak = 0;
+    for (const [ax, az] of [[1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+      if (flak >= 2) break;
       const [nx, nz] = rot(ax * 0.7071, az * 0.7071);
       if (facesFriend(nx, nz)) continue;
-      pit(L.x + nx * (stand + 6), L.z + nz * (stand + 6), nx, nz, 'aa');
+      for (const out of [6, 18, 30, 44, 60]) {
+        if (pit(L.x + nx * (stand + out), L.z + nz * (stand + out), nx, nz, 'aa')) { flak++; break; }
+      }
     }
     // An observer, far enough back to see the whole approach — and on land.
     for (const [ax, az] of [[1, -1], [-1, -1], [1, 1], [-1, 1]]) {
