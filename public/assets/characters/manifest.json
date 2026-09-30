@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-two are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia and Denmark, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Thirty-five are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala and Hungary, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -370,11 +370,12 @@
       "look": "Japanese Taishō in olive dress uniform with a peaked cap and white gloves, standing very straight."
     },
     "budapest": {
-      "id": "hu-officer",
-      "file": "hu-officer.png",
+      "id": "hu-vezerezredes",
+      "file": "hu-vezerezredes.png",
       "nation": "Hungary",
       "defends": "the Hungarian Parliament",
-      "look": "Hungarian Vezérezredes in dark olive dress uniform, red-white-green cord, peaked cap, moustache, hands clasped behind."
+      "look": "Vezérezredes as a winged hussar: a gilded helmet, a tall wing of red, white and green feathers on a red frame, silvered plate and scale over a red kaftan worked in gold, a leopard skin over the shoulder, a quiver of arrows, a lion buckle, the tricolour worn as a torn cape carrying the crowned arms of Hungary, green trousers, tall brown boots, a curved sabre, moustache, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "sagrada": {
       "id": "es-capitan-general",
@@ -480,11 +481,12 @@
       "pose": "arms folded — reads as refusal"
     },
     "tikal": {
-      "id": "gt-officer",
-      "file": "gt-officer.png",
+      "id": "gt-general-de-division",
+      "file": "gt-general-de-division.png",
       "nation": "Guatemala",
       "defends": "the Tikal",
-      "look": "Guatemalan General de División in olive dress uniform with gold epaulettes and a blue-white sash, peaked cap."
+      "look": "General de División as a Maya warrior: a gold diadem and ear discs with a crest of blue, white and black feathers, blue paint across the eye, a white huipil-cut tunic and trousers woven with blue patterns, a red-and-blue woven sash, bandoliers and a gold sun buckle, a machete and a rifle, the flag with the quetzal and the arms worn torn as a cape, tall brown boots, long hair, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "teotihuacan": {
       "id": "mx-officer",
@@ -685,7 +687,8 @@
       "file": "fi-kenraali.png",
       "nation": "Finland",
       "defends": "Helsinki Cathedral, Helsinki",
-      "look": "Kenraali of Finland in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Kenraali as a Viking chieftain: long braided blond hair and beard, blue paint across the eye, a mail shirt under a blue-and-white tunic with a knotwork hem, a fur cloak in the blue cross of Finland, a round shield in blue and white on his back, tooled leather bracers and belts with silver bosses, a long sword in a knotwork scabbard, fur-topped strapped boots, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "chillon": {
       "id": "ch-korpskommandant",
