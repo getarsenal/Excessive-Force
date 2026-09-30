@@ -23,12 +23,13 @@ import { halfWidth } from './streets.js';
  * goes into the same merged prop buckets as the lamp posts, which is a handful
  * of triangles and no draw calls of its own.
  *
- * And a trench here is a parapet rather than a hole. The terrain is a heightmap
- * shared with the physics and the water mask, so cutting into it is a much
- * larger change than it looks; but a trench you can see from a gun position is
- * mostly its own spoil anyway — the bank thrown up in front, the revetment
- * behind it, the men's heads above the parapet. Building the bank and standing
- * the men behind it gives the same picture from every angle the camera has.
+ * And the ground is not cut. The terrain is a heightmap shared with the
+ * physics and the water mask, so digging into it is a much larger change than
+ * it looks. A trench seen from a gun position is a dark slot between two banks
+ * with a wall of sandbags along the near lip and heads over the bags, and all
+ * of that can be built on top of the ground: the slot's floor laid over the
+ * grass, the banks bedded vertex by vertex either side of it, and the men
+ * stood half a metre into the ground so the terrain takes their legs.
  */
 
 /** Dug earth, sandbags, and the revetting boards behind them. */
@@ -36,6 +37,8 @@ const SPOIL = 0x6d6048;
 const BAG = 0x8f8464;
 const BOARD = 0x5d5240;
 const GUNMETAL = 0x4a5238;
+/** The floor of the slot: shaded earth, read from a distance as a hole. */
+const CUT = 0x2b241b;
 
 /**
  * Where the works go.
@@ -112,7 +115,7 @@ function planFieldWorks(opts = {}) {
     // spade would actually choose — and it is also most of the Corcovado's
     // garrison, because a mountain top has no such ground within two hundred
     // metres of itself. So the bank was taught to lie along the slope instead
-    // (see `pitchedBox`) and the limit put back up to a quarter, which is a
+    // (every vertex of it is bedded on its own ground) and the limit put back up to a quarter, which is a
     // fourteen-degree hillside: steep for a trench, but it is a trench that
     // now follows the hill rather than stepping down it.
     if (slope > 0.25) return false;
@@ -183,8 +186,8 @@ function planFieldWorks(opts = {}) {
       // at close range is a bad idea.
       for (let m = 0; m < 2; m++) {
         const g = (m + 0.5) - 1;
-        const px = x + tx * g * bayLen * 0.8 - nx * 1.15;
-        const pz = z + tz * g * bayLen * 0.8 - nz * 1.15;
+        const px = x + tx * g * bayLen * 0.8 - nx * 0.12;
+        const pz = z + tz * g * bayLen * 0.8 - nz * 0.12;
         const roll = rnd();
         const type = (m === 0 && b % 3 === 0) ? 'mg'
           : roll < 0.09 ? 'sniper'
@@ -195,7 +198,7 @@ function planFieldWorks(opts = {}) {
         // him two thirds of a metre and the bank takes his legs, which is the
         // whole picture the words "dug in" are doing.
         posts.push({
-          x: px, z: pz, y: terrain.heightAt(px, pz) - 0.62, yaw: face, type, kind: 'trench',
+          x: px, z: pz, y: terrain.heightAt(px, pz) - 0.46, yaw: face, type, kind: 'trench',
         });
       }
     }
@@ -347,148 +350,199 @@ function planFieldWorks(opts = {}) {
 /**
  * Build what the plan describes into the city's prop buckets.
  *
- * Everything is a box or a short cylinder tinted per vertex, so the whole belt
- * — a hundred bays, a dozen gun pits and the guns in them — merges into the
- * meshes the street furniture already uses.
+ * Sandbags are boxes and the earth is swept profiles tinted per vertex, so the
+ * whole belt — a hundred bays, a dozen gun pits and the guns in them — merges
+ * into a handful of meshes. `courses` is how high the bags go: two on a phone,
+ * three everywhere else.
  */
-function addFieldWorks(props, terrain, plan, rng) {
+function addFieldWorks(props, terrain, plan, rng, courses) {
   let bays = 0, pits = 0;
   for (const L of plan.lines) {
-    if (L.pit) { gunPit(props, terrain, L, rng); pits++; continue; }
-    parapet(props, terrain, L, rng);
+    if (L.pit) { gunPit(props, terrain, L, rng, courses); pits++; continue; }
+    parapet(props, terrain, L, rng, courses);
     bays++;
   }
   return { trenchBays: bays, gunPits: pits };
 }
 
+/** One sandbag: 66 cm long, a quarter of a metre high, filled and slumped. */
+const BAG_L = 0.66, BAG_H = 0.24, BAG_D = 0.42;
+
 /**
- * A box laid along a slope rather than across it.
+ * One bay, dug.
  *
- * `box` can only be turned about the upright, so a run of them down a grade
- * comes out as a flight of steps: every tread level, every nose hanging over
- * the ground in front of it. That is what the Acropolis showed — a black
- * staircase pinned to the side of the rock with daylight under it — and no
- * amount of sinking the boxes fixes it, because the fault is that the tops are
- * level and the hill is not. Pitching each box about its own cross axis by the
- * grade it stands on costs one rotation and makes the bank follow the ground.
+ * It used to be a row of spoil boxes standing on the grass with men sunk
+ * behind it, and from a gun position that read as a line of elevated cubes —
+ * which is what it was. A trench seen from two hundred metres is three things:
+ * a dark slot in the ground, a low bank of thrown earth in front of it with a
+ * wall of sandbags along its lip, and heads and shoulders over the bags. So
+ * that is what is built. The ground itself is not cut (it is a heightmap
+ * shared with the physics and the water mask); the channel is its dark floor
+ * laid a hair over the grass, the banks either side are swept profiles bedded
+ * vertex by vertex on the ground they stand on, and the men stand half a metre
+ * into the ground in the middle of it, so the terrain takes their legs and the
+ * bags come up to their chests.
+ *
+ * In the line's own frame: `d` is metres out toward the enemy from the fire
+ * step, where the men stand; `s` is metres along the bay.
  */
-function pitchedBox(w, h, d, x, y, z, ry, pitch) {
+function parapet(props, terrain, L, rng, courses) {
+  const { x, z, yaw, len } = L;
+  const nx = Math.sin(yaw), nz = Math.cos(yaw);
+  const tx = -nz, tz = nx;
+  const at = (s, d) => ({ x: x + tx * s + nx * d, z: z + tz * s + nz * d });
+  const half = len / 2;
+  // The spoil: low and sloped, the way earth thrown out of a hole lands.
+  const BERM = [[2.9, -0.06], [1.9, 0.16], [1.15, 0.3], [0.62, 0.27], [0.56, -0.06]];
+  const PARADOS = [[-0.7, -0.06], [-0.76, 0.2], [-1.35, 0.27], [-2.2, -0.06]];
+  sweep(props, terrain, 'stone', SPOIL, at, -half, half, BERM, rng);
+  sweep(props, terrain, 'stone', SPOIL, at, -half, half, PARADOS, rng);
+  // The slot: dark floor from lip to lip, and duckboards down the middle of it.
+  sweep(props, terrain, 'cut', CUT, at, -half - 0.3, half + 0.3, [[0.6, 0.02], [-0.74, 0.02]], rng, true);
+  sweep(props, terrain, 'markings', BOARD, at, -half, half, [[0.12, 0.03], [-0.36, 0.03]], rng, true);
+  // The bags along the lip, laid in running bond and each a little off square
+  // the way they go up in a hurry. The crest is chest-high to the man on the
+  // fire step, and that is what he shoots over.
+  const n = Math.max(2, Math.floor(len / BAG_L));
+  const step = len / n;
+  for (let c = 0; c < courses; c++) {
+    const shift = (c % 2) * step / 2;
+    for (let i = 0; i < n - (c % 2); i++) {
+      const p = at(-half + shift + (i + 0.5) * step, 0.84 - c * 0.05);
+      const g = terrain.heightAt(p.x, p.z);
+      props.add('stone', bag(step * 0.96, BAG_H, BAG_D, p.x, g + 0.26 + BAG_H * 0.5 + c * BAG_H * 0.9, p.z,
+        yaw + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.24);
+    }
+  }
+  // A traverse at the end of the bay: a block of bags across the slot, so one
+  // shell takes one bay.
+  if (L.traverse) {
+    for (let c = 0; c < courses + 1; c++) {
+      for (let k = 0; k < 3; k++) {
+        const p = at(half + 0.5, 0.45 - k * 0.55 + (c % 2) * 0.12);
+        const g = terrain.heightAt(p.x, p.z);
+        props.add('stone', bag(BAG_L, BAG_H, BAG_D, p.x, g + BAG_H * 0.5 + c * BAG_H * 0.9, p.z,
+          yaw + Math.PI / 2 + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.22);
+      }
+    }
+  }
+}
+
+/**
+ * Sweep a cross-section along a bay, every vertex bedded on the ground under
+ * it. `profile` is [[offset across the line, height over the ground]], walked
+ * in order; `flat` lays a one-sided ribbon (a floor, a duckboard).
+ */
+function sweep(props, terrain, bucket, colour, at, s0, s1, profile, rng, flat = false) {
+  const segs = Math.max(2, Math.round((s1 - s0) / 1.6));
+  const rows = profile.length;
+  const pos = [];
+  const idx = [];
+  for (let k = 0; k <= segs; k++) {
+    const s = s0 + ((s1 - s0) * k) / segs;
+    for (let r = 0; r < rows; r++) {
+      const [d, h] = profile[r];
+      const p = at(s, d);
+      const wob = (!flat && h > 0.05) ? (rng() - 0.5) * 0.07 : 0;
+      pos.push(p.x, terrain.heightAt(p.x, p.z) + h + wob, p.z);
+    }
+  }
+  for (let k = 0; k < segs; k++) {
+    for (let r = 0; r < rows - 1; r++) {
+      const a = k * rows + r, b = a + 1, c = a + rows, e = c + 1;
+      idx.push(a, b, c, b, e, c);
+    }
+  }
+  props.add(bucket, surface(pos, idx, !flat), colour, 0.94 + rng() * 0.1);
+}
+
+/**
+ * An indexed surface with the attributes a box has, so it merges into the same
+ * bucket as one. `twoSided` adds every triangle again reversed: the banks are
+ * seen from both sides, whichever way their profile happened to be walked.
+ */
+function surface(pos, idx, twoSided) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  if (twoSided) {
+    // Lit from the side that faces the sky, which is the side anyone sees;
+    // the normals are taken before the reversed faces go in, or the two
+    // would cancel and the bank would render black.
+    const nm = g.attributes.normal;
+    for (let i = 0; i < nm.count; i++) if (nm.getY(i) < 0) nm.setXYZ(i, -nm.getX(i), -nm.getY(i), -nm.getZ(i));
+    const all = idx.slice();
+    for (let i = 0; i < idx.length; i += 3) all.push(idx[i], idx[i + 2], idx[i + 1]);
+    g.setIndex(all);
+  }
+  return g;
+}
+
+/** A sandbag: a box with its top edges drawn in, so a row of them reads as bags. */
+function bag(w, h, d, x, y, z, ry) {
   const g = new THREE.BoxGeometry(w, h, d);
-  if (pitch) g.rotateZ(pitch);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    if (p.getY(i) > 0) {
+      p.setX(i, p.getX(i) * 0.9);
+      p.setZ(i, p.getZ(i) * 0.8);
+    }
+  }
+  g.computeVertexNormals();
   if (ry) g.rotateY(ry);
   g.translate(x, y, z);
   return g;
 }
 
-/** One bay: the bank in front, the fire step behind it, and a traverse. */
-function parapet(props, terrain, L, rng) {
-  const { x, z, yaw, len } = L;
-  // Buried to the local ground, not to the bay's.
-  //
-  // Each box takes its own height off the terrain and is sunk far enough that
-  // the lowest corner it could have is still under the surface. Sitting a
-  // fixed-height box on a single sampled height is what left banks floating
-  // over a slope on one side and half-swallowed on the other, and the ground
-  // under a two-hundred-metre belt is never flat for all of it.
-  const tx = -Math.sin(yaw + Math.PI / 2), tz = -Math.cos(yaw + Math.PI / 2);
-  const nx = Math.sin(yaw), nz = Math.cos(yaw);
-  // Where a box's own length points, in the world. `box` puts its width on the
-  // local X axis, and a yaw of `yaw` swings that to the negative of the line's
-  // tangent — so this is the direction the grade below has to be measured in.
-  const ux = -tx, uz = -tz;
-  const n = Math.max(2, Math.round(len / 2.6));
-  /** The grade a box of length `l` centred here stands on, and its mid height. */
-  const lie = (cx, cz, l) => {
-    const a = terrain.heightAt(cx + ux * l / 2, cz + uz * l / 2);
-    const b = terrain.heightAt(cx - ux * l / 2, cz - uz * l / 2);
-    return { pitch: Math.atan2(a - b, l), mid: (a + b) / 2 };
-  };
-  /** How far the cross slope would leave one flank of a box in the air. */
-  const flank = (cx, cz, mid, half) => Math.max(0.35, mid
-    - Math.min(terrain.heightAt(cx + nx * half, cz + nz * half),
-      terrain.heightAt(cx - nx * half, cz - nz * half)) + 0.3);
-  for (let i = 0; i < n; i++) {
-    const f = ((i + 0.5) / n) * 2 - 1;
-    const px = x + tx * f * len / 2, pz = z + tz * f * len / 2;
-    const bankX = px + nx * 0.85, bankZ = pz + nz * 0.85;
-    const { pitch, mid } = lie(bankX, bankZ, 2.7);
-    const h = 1.15 + rng() * 0.3;
-    const sink = flank(bankX, bankZ, mid, 0.95);
-    // The bank, thrown a little unevenly the way spoil lands.
-    props.add('stone', pitchedBox(2.7, h + sink, 1.9,
-      bankX, mid + (h - sink) / 2 - 0.05, bankZ, yaw, pitch), SPOIL, 0.94 + rng() * 0.12);
-    // Sandbags along the crest of every second length, so the line has a
-    // rhythm rather than being one long mound.
-    if (i % 2 === 0) {
-      const bag = lie(px + nx * 1.3, pz + nz * 1.3, 2.5);
-      props.add('stone', pitchedBox(2.5, 0.36, 0.7,
-        px + nx * 1.3, bag.mid + h - 0.2, pz + nz * 1.3, yaw, bag.pitch),
-      BAG, 0.92 + rng() * 0.16);
-    }
-    // The parados behind the trench, which is both what a real one has and
-    // what stops the men reading as sunk into bare grass when the camera comes
-    // round to the objective's side.
-    const backX = px - nx * 1.25, backZ = pz - nz * 1.25;
-    const back = lie(backX, backZ, 2.6);
-    const backSink = flank(backX, backZ, back.mid, 0.4);
-    props.add('stone', pitchedBox(2.6, 0.75 + backSink, 0.75,
-      backX, back.mid + (0.75 - backSink) / 2, backZ, yaw, back.pitch),
-    SPOIL, 0.9 + rng() * 0.1);
-    const stepX = px - nx * 0.78, stepZ = pz - nz * 0.78;
-    const step = lie(stepX, stepZ, 2.6);
-    props.add('dark', pitchedBox(2.6, 0.62, 0.14,
-      stepX, step.mid - 0.12, stepZ, yaw, step.pitch), BOARD, 1);
-  }
-  if (L.traverse) {
-    const ex = x + tx * (len / 2 + 0.9), ez = z + tz * (len / 2 + 0.9);
-    const low = lowestUnder(terrain, ex, ez, 0.7, 1.7, yaw);
-    const rise = terrain.heightAt(ex, ez) - low;
-    props.add('stone', box(1.2, 1.0 + rise, 3.2, ex, low + (1.0 + rise) / 2 - 0.06, ez, yaw),
-      SPOIL, 0.96);
-  }
-}
-
 /**
- * The lowest ground under a box's footprint.
- *
- * Four corners and the middle. A box is axis-aligned about its own yaw and
- * cannot be pitched, so the only way to keep one from hanging over a slope is
- * to start it at the bottom of what it covers and make it tall enough to reach
- * the top. That is also what a real parapet is: the bank is thicker on the
- * downhill side because that is where the spoil went.
+ * A gun pit: a dug floor, a round wall of sandbags open to the front with the
+ * spoil banked against the outside of it, and the piece in the middle.
  */
-function lowestUnder(terrain, cx, cz, hx, hz, yaw) {
-  const c = Math.cos(yaw), s = Math.sin(yaw);
-  let low = terrain.heightAt(cx, cz);
-  for (const [ox, oz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]]) {
-    const x = cx + ox * c + oz * s;
-    const z = cz - ox * s + oz * c;
-    const g = terrain.heightAt(x, z);
-    if (g < low) low = g;
-  }
-  return low;
-}
-
-/**
- * A gun pit: a horseshoe of spoil with the piece in it.
- *
- * Open to the front, which is both how one is built and what lets the gun in
- * the middle read as a gun rather than as a shape inside a ring.
- */
-function gunPit(props, terrain, L, rng) {
+function gunPit(props, terrain, L, rng, courses) {
   const { x, z, yaw } = L;
   const g = terrain.heightAt(x, z);
   const R = L.weapon === 'aa' ? 3.4 : 4.0;
-  const n = 11;
-  for (let i = 0; i < n; i++) {
-    const a = yaw + Math.PI + (-0.76 + (i / (n - 1)) * 1.52) * Math.PI;
-    const px = x + Math.sin(a) * R, pz = z + Math.cos(a) * R;
-    const h = 0.95 + rng() * 0.25;
-    const low = lowestUnder(terrain, px, pz, 0.75, 0.6, a);
-    const rise = terrain.heightAt(px, pz) - low;
-    props.add('stone', box(1.5, h + rise, 1.2, px, low + (h + rise) / 2 - 0.1, pz,
-      a), SPOIL, 0.93 + rng() * 0.13);
+  const seg = 16;
+  const ringAt = (a, r, h) => {
+    const px = x + Math.sin(a) * r, pz = z + Math.cos(a) * r;
+    return [px, terrain.heightAt(px, pz) + h, pz];
+  };
+  // The floor.
+  const floor = [x, g + 0.02, z];
+  const fIdx = [];
+  for (let i = 0; i < seg; i++) {
+    floor.push(...ringAt((i / seg) * Math.PI * 2, R - 0.1, 0.02));
+    fIdx.push(0, 1 + i, 1 + ((i + 1) % seg));
   }
+  props.add('cut', surface(floor, fIdx, false), CUT, 1);
+  // The wall, in running bond, with a gap at the front for the barrel.
+  const around = Math.round((Math.PI * 2 * R) / BAG_L);
+  const facing = (a) => { const o = a - yaw; return Math.abs(Math.atan2(Math.sin(o), Math.cos(o))); };
+  for (let c = 0; c < courses + 1; c++) {
+    for (let i = 0; i < around; i++) {
+      const a = ((i + (c % 2) * 0.5) / around) * Math.PI * 2;
+      if (facing(a) < 0.5) continue;
+      const [px, gy, pz] = ringAt(a, R - c * 0.04, 0);
+      props.add('stone', bag(BAG_L, BAG_H, BAG_D, px, gy + BAG_H * 0.5 + c * BAG_H * 0.9, pz,
+        a + Math.PI / 2 + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.24);
+    }
+  }
+  // The spoil banked against the outside, a ring of quads from the top of the
+  // bags down to the grass.
+  const bank = [];
+  const bIdx = [];
+  const top = BAG_H * (courses + 0.6);
+  for (let i = 0; i < seg; i++) {
+    const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+    if (facing((a0 + a1) / 2) < 0.62) continue;
+    const b = bank.length / 3;
+    bank.push(...ringAt(a0, R + 0.25, top), ...ringAt(a1, R + 0.25, top),
+      ...ringAt(a0, R + 1.7, -0.06), ...ringAt(a1, R + 1.7, -0.06));
+    bIdx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
+  }
+  if (bIdx.length) props.add('stone', surface(bank, bIdx, true), SPOIL, 0.95);
   if (L.weapon === 'fieldgun') {
     // A long barrel over a shield on two wheels, laid along the pit's facing.
     props.add('metal', box(0.22, 0.22, 4.6, x + Math.sin(yaw) * 1.9, g + 1.15,
@@ -548,9 +602,11 @@ export function buildFieldWorks(terrain, quality, opts = {}) {
   });
   const props = new PropSet(quality);
   const rng = mulberry(0x77c41d);
-  const counts = addFieldWorks(props, terrain, plan, rng);
+  const counts = addFieldWorks(props, terrain, plan, rng, quality.name === 'low' ? 2 : 3);
   const group = new THREE.Group();
   group.name = 'fieldworks';
-  props.flush(group, MATERIALS);
+  // The trench floor is laid a hair over the grass: offset so it wins, and a
+  // tier short of the road paint so a duckboard wins over it in turn.
+  props.flush(group, { ...MATERIALS, cut: { roughness: 1, cast: false, offset: true, offsetLevel: 3, renderOrder: 1 } });
   return { group, posts: plan.posts, counts };
 }

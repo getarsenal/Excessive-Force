@@ -231,7 +231,7 @@ async function boot() {
       if (b.z + r > z1) z1 = b.z + r;
     }
     return { x: (x0 + x1) / 2 + off.x, z: (z0 + z1) / 2 + off.z,
-      w: x1 - x0, d: z1 - z0, scenery: !!sp.scenery };
+      w: x1 - x0, d: z1 - z0, scenery: !!sp.scenery, open: !!sp.open };
   });
   // One pad per group of structures founded at the same point, not one per
   // structure. The Taj, its mosque and its jawab are all founded at the level
@@ -371,7 +371,10 @@ async function boot() {
   const fieldWorks = buildFieldWorks(terrain, quality, {
     // Nothing worth defending is dug in round: the belt goes round the
     // objectives, not round the scenery across the river.
-    landmarks: landmarks.filter((l) => !l.scenery),
+    // An open precinct is the exception: the Forbidden City's galleries are
+    // scenery, and a belt laid round the halls alone was dug inside them, with
+    // every man in it looking at the back of a wall forty metres off.
+    landmarks: landmarks.filter((l) => !l.scenery || l.open),
     // And the turret's emplacement is ground already taken.
     plots: (contextGroup?.userData?.plots || []).concat(level.turret
       ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,

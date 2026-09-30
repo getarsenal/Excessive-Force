@@ -1048,7 +1048,9 @@ export class Garrison {
       const p = new THREE.Vector3(w.x, w.y, w.z);
       if (this.place(w.type, p, w.yaw, 4, {
         cover: w.kind === 'pit' ? 'ground' : 'trench',
-        sandbags: w.kind === 'trench',
+        // The trench has its own wall of bags along the lip; a horseshoe
+        // round each man as well stood a second, smaller wall in the slot.
+        sandbags: false,
         emplaced: true,
       })) placed++;
     }
