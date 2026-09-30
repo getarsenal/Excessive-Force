@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MATERIALS, MATERIAL_PROPS } from './builder.js';
 import { Occupancy } from './occupancy.js';
 import { PhysicsWorld } from '../core/physics.js';
+import { surveyRamp } from '../core/access.js';
 
 /**
  * A destructible masonry structure.
@@ -2033,11 +2034,9 @@ export class Structure {
     }
     // Cool to hot, ordered so that the ramp reads even in shadow: indigo,
     // teal, green, amber, red. Five stops rather than two because a two-stop
-    // wash puts four fifths of a building in the same colour.
-    const RAMP = [
-      [0.13, 0.14, 0.32], [0.14, 0.44, 0.55], [0.28, 0.66, 0.44],
-      [0.87, 0.73, 0.26], [0.82, 0.22, 0.16],
-    ];
+    // wash puts four fifths of a building in the same colour. Purple to
+    // yellow instead for a colour-blind player (see core/access.js).
+    const RAMP = surveyRamp();
     for (const entry of this.meshes) {
       const props = MATERIAL_PROPS[entry.matId] || {};
       const gated = props.minPower > 0;

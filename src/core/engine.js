@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { access } from './access.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -366,6 +367,7 @@ export class Engine {
 
   /** Kick the camera. `amount` is roughly "metres of apparent displacement". */
   addShake(amount) {
+    if (access.still) return;
     // Capped low so a salvo landing together does not stack into a quake.
     this.shake.amount = Math.min(0.8, this.shake.amount + amount);
   }

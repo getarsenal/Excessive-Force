@@ -28,6 +28,8 @@ import { HUD } from './ui/hud.js';
 import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
+import { Ambience } from './core/ambient.js';
+import { access } from './core/access.js';
 import { Stores } from './game/stores.js';
 import { checkMedals } from './game/medals.js';
 import { BeforeAfter } from './ui/beforeafter.js';
@@ -57,7 +59,7 @@ const fillEl = document.getElementById('load-fill');
  * anyway; a level with a trick of its own leads with that.
  */
 const TIPS = [
-  'SURVEY paints the stone that is holding the rest up. Shoot the red.',
+  'SURVEY paints the stone that is holding the rest up. Shoot the hottest colour.',
   'Undercut the base. Gravity works for free.',
   'DELAY fuze bursts inside the wall, not on it.',
   'A gun that has stood still for thirty seconds digs in and takes a third less.',
@@ -115,6 +117,7 @@ async function boot() {
 
   // The last level load died on screen: a tier down before anything is
   // built, or the phone runs out the same way again (see power.js).
+  access.apply();
   const recovered = recoverFromCrash();
   if (recovered) console.warn('[tumble] last load died; quality', recovered.from, '->', recovered.to);
   const quality = detectQuality();
@@ -688,6 +691,16 @@ async function boot() {
     },
   });
   hud.setClip(clip);
+  // The sound of the place, under the guns. The bells stop when the belfry
+  // is no longer standing.
+  const ambience = new Ambience(audio, level,
+    () => battle.state === 'playing' && primary.monumentIntegrity > 0.85);
+  window.__ambience = ambience;
+  // The survey repaints in the other ramp the moment the switch is thrown.
+  access.onChange((k) => {
+    if (k !== 'cb') return;
+    for (const st of structures) if (st._survey) { st.setSurvey(false); st.setSurvey(true); }
+  });
   window.__clip = clip;     // for the harness and the console
   // The landmark before, the ruin after: taken as the report goes up.
   const beforeAfter = new BeforeAfter({
@@ -1011,7 +1024,7 @@ async function boot() {
   const cine = { played: false, keep: null };
   function collapseCinematic(where) {
     cine.played = true;
-    if (suiteHold) { testMenu.dramaticPause(2.0, 0.45); return; }
+    if (suiteHold || access.still) { testMenu.dramaticPause(2.0, 0.45); return; }
     const tall = Math.max(24, (battle.startHeight ?? groundY + 60) - groundY);
     cine.keep = {
       yaw: rig.desiredYaw, pitch: rig.desiredPitch, distance: rig.desiredDistance,
@@ -1425,7 +1438,7 @@ async function boot() {
     // a tool nobody uses, and every level was being ground down from the top.
     setTimeout(() => {
       if (battle.state === 'playing' && !hud.survey) {
-        hud.status('SURVEY (V) \u2014 red stone is holding the rest up', 6);
+        hud.status(`SURVEY (V) \u2014 ${access.cb ? 'yellow' : 'red'} stone is holding the rest up`, 6);
       }
     }, 9000);
   };
@@ -1768,7 +1781,7 @@ async function boot() {
     }
     // Once it is down the camera drifts round the ruin until the player
     // takes it back.
-    if (winOrbit && rig._pointers.size === 0) rig.desiredYaw += rawDt * 0.07;
+    if (winOrbit && rig._pointers.size === 0 && !access.still) rig.desiredYaw += rawDt * 0.07;
     // One finger belongs to the weapon while one is armed. Set here rather
     // than in the selection handler because a unit can be deselected from
     // half a dozen places — a keypress, a deploy, a win — and a camera left
@@ -1777,6 +1790,7 @@ async function boot() {
     unitCard.update();
     testMenu.update(rawDt);
     cinematicTick();
+    ambience.tick();
     flags.update(rawDt);
     if (standoff) standoff.update();
     faultRun = 0;
@@ -1846,6 +1860,7 @@ async function boot() {
     try { engine.renderer.dispose(); } catch { /* going anyway */ }
     try { engine.renderer.forceContextLoss(); } catch { /* going anyway */ }
     try { physics.dead = true; physics.world.free(); } catch { /* going anyway */ }
+    try { ambience.stop(); } catch { /* going anyway */ }
     try { if (audio.ctx) audio.ctx.close(); } catch { /* going anyway */ }
   };
   window.__releaseLevel = release;

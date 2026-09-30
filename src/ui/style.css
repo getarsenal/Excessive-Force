@@ -2115,3 +2115,25 @@ button:active, .unit-card:active, [role="button"]:active, .ef-row:active, .ef-ca
 /* A locked card shakes its head too. */
 .unit-card.nope { animation: cardNope 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
 @keyframes cardNope { 20%, 60% { translate: -5px 0; } 40%, 80% { translate: 5px 0; } }
+
+/* ── Accessibility (core/access.js) ─────────────────────────────────────── */
+/* Colour-blind: the survey key follows the survey's own purple-to-yellow
+   ramp, and the HUD's green and red become blue and orange. */
+body.a11y-cb { --money: #5ab0ff; --danger: #ff8c1a; }
+body.a11y-cb #survey-key .sk-ramp i:nth-child(1) { background: #2b0f5c; }
+body.a11y-cb #survey-key .sk-ramp i:nth-child(2) { background: #782175; }
+body.a11y-cb #survey-key .sk-ramp i:nth-child(3) { background: #cc474d; }
+body.a11y-cb #survey-key .sk-ramp i:nth-child(4) { background: #f7941a; }
+body.a11y-cb #survey-key .sk-ramp i:nth-child(5) { background: #fced6b; }
+/* Larger text: the things that are read rather than tapped. */
+body.a11y-text1 #feed, body.a11y-text1 #prompt, body.a11y-text1 #status,
+body.a11y-text1 #comcard, body.a11y-text1 .ec-inner, body.a11y-text1 .menu-inner,
+body.a11y-text1 .tut-card, body.a11y-text1 #unit-card { zoom: 1.15; }
+body.a11y-text2 #feed, body.a11y-text2 #prompt, body.a11y-text2 #status,
+body.a11y-text2 #comcard, body.a11y-text2 .ec-inner, body.a11y-text2 .menu-inner,
+body.a11y-text2 .tut-card, body.a11y-text2 #unit-card { zoom: 1.3; }
+/* Reduced motion: no letterbox bars sliding in over the collapse. */
+body.a11y-still #cine i { transition: none; height: 0 !important; }
+/* Left-handed: the dock to the left edge, the survey button to the right. */
+body.a11y-lefty #dock { justify-content: flex-start; }
+body.a11y-lefty #survey-btn { left: auto; right: var(--ui-pad); }

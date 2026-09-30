@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { access } from '../core/access.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { Typewriter } from './typewriter.js';
 
@@ -102,8 +103,9 @@ export class Tutorial {
       { world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.', done: () => !!b.target,
         enter: () => { b.selectedUnitId = null; h.closeDrawer?.(); h.hidePrompt?.(); } },
       { el: '#targetcard', title: 'TARGET CARD', text: 'What you hit, how high, and how many guns are on it.', ok: true },
-      { el: '#survey-btn', title: 'SURVEY', text: 'Paints the load. Red stone holds the rest up — cut it.', done: () => h.survey,
-        say: 'Red is holding the rest up. Shoot the red. They taught you colours in basic, right?' },
+      { el: '#survey-btn', title: 'SURVEY', text: `Paints the load. ${access.cb ? 'Yellow' : 'Red'} stone holds the rest up — cut it.`, done: () => h.survey,
+        say: access.cb ? 'Yellow is holding the rest up. Shoot the yellow. They taught you colours in basic, right?'
+          : 'Red is holding the rest up. Shoot the red. They taught you colours in basic, right?' },
       { el: '#survey-btn', title: 'SURVEY OFF', text: 'Tap again to see the stone. V on a keyboard.', done: () => !h.survey, ok: true },
       { el: '#dock-orders', title: 'ORDERS', text: 'How the guns shoot. Tap to open.', done: () => h.openDrawer === 'orders' },
       { el: '#orders-modes', fallback: '#dock-orders', title: 'FIRE MODE',
@@ -115,7 +117,7 @@ export class Tutorial {
       { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',
         text: 'Cheapest first. LOITER stays on station; the rest make one pass. Tap one, then the tower.', done: () => this._striking() },
       { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts: the crates and drums by their guns go up.', ok: true },
-      { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
+      { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, accessibility, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
       { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls.', done: () => b.state === 'won',
         say: "Stop admiring it and knock the damn thing over. I've got a tee time." },
     ];

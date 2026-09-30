@@ -1,6 +1,7 @@
 import { feedback } from './feedback.js';
 import { power } from '../core/power.js';
 import { UNITS, UNITS_BY_ID } from '../game/units.js';
+import { access } from '../core/access.js';
 import { damageBill, money } from './bill.js';
 import { unitIcon } from './icons.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
@@ -416,6 +417,19 @@ export class HUD {
       const label = () => { saver.textContent = power.saver ? 'BATTERY SAVER: ON' : 'BATTERY SAVER: OFF'; };
       label();
       saver.addEventListener('click', () => { power.saver = !power.saver; label(); });
+    }
+    // Accessibility (see core/access.js): each button says what it is set to.
+    const a11y = [
+      ['#menu-cb', 'cb', () => (access.cb ? 'COLOUR: COLOUR-BLIND' : 'COLOUR: STANDARD'), () => !access.cb],
+      ['#menu-text', 'text', () => `TEXT: ${['NORMAL', 'LARGE', 'LARGER'][access.text] || 'NORMAL'}`, () => ((access.text || 0) + 1) % 3],
+      ['#menu-still', 'still', () => (access.still ? 'MOTION: REDUCED' : 'MOTION: FULL'), () => !access.still],
+      ['#menu-lefty', 'lefty', () => (access.lefty ? 'DOCK: LEFT' : 'DOCK: CENTRE'), () => !access.lefty],
+    ];
+    for (const [sel, key, label, next] of a11y) {
+      const b = menu.querySelector(sel);
+      if (!b) continue;
+      b.textContent = label();
+      b.addEventListener('click', () => { access.set(key, next()); b.textContent = label(); });
     }
     const opening = menu.querySelector('#menu-opening');
     if (opening) {

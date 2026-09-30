@@ -472,7 +472,7 @@ function levelRecord(P, i) {
   const target = P.landmark.toUpperCase();
   const reach = Math.hypot(Math.max(Math.abs(L.box.x0), Math.abs(L.box.x1)), Math.max(Math.abs(L.box.z0), Math.abs(L.box.z1)));
   const windows = L.posts.some((q) => q.kind === 'window');
-  const setting = { haze: cl.haze };
+  const setting = { haze: cl.haze, clime: P.clime };
   if (cl.roofPitch != null) setting.roofPitch = cl.roofPitch;
   if (WILD[P.id]) setting.hinterland = WILD[P.id];
   else if (P.coast) setting.hinterland = 'harbour';
