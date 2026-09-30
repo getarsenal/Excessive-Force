@@ -1,6 +1,6 @@
 # Officer portraits: the prompt template
 
-The twenty-six drawn officers (`public/assets/characters/*.png`) are painted
+The twenty-nine drawn officers (`public/assets/characters/*.png`) are painted
 illustrations, not something a script can draw. What *can* be templated is
 the brief that produced them, so the placeholders can be replaced
 in the same style by anyone with an image generator. Every drawn portrait
@@ -32,14 +32,14 @@ without a hard edge. File name and slot are in `manifest.json` under
 | gyeongbok | `kr-daejang.png` | Daejang, South Korea | Dark green dress uniform with four silver stars, peaked cap, white gloves. |
 | watarun | `th-phon-ek.png` | Phon Ek, Thailand | White dress uniform with a red sash and gold aiguillettes, peaked cap, unbothered smile. |
 | shwedagon | `mm-bogyoke.png` | Bogyoke, Myanmar | Olive dress uniform with red collar and gold epaulettes, peaked cap, medals. |
-| angkor | `kh-oudom-seney.png` | Oudom Seney, Cambodia | Dark olive dress uniform with red collar tabs and gold stars, peaked cap. |
 | tikal | `gt-general-de-division.png` | General de División, Guatemala | Olive dress uniform with gold epaulettes and a blue-white sash, peaked cap. |
 | machupicchu | `pe-general-de-ejercito.png` | General de Ejército, Peru | Red-and-white sash over dark dress uniform, peaked cap with gold laurels. |
 
 The Malaysian slot (`my-jeneral.png`) from the third batch is in
 `manifest.json` with its look and takes the same template. China, Spain,
 Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina,
-Azerbaijan and Belgium are drawn, one officer to each nation's every level.
+Azerbaijan, Belgium, Cambodia, Colombia and Côte d'Ivoire are drawn, one
+officer to each nation's every level.
 
 ## Installing one
 

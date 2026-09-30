@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-six are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan and Belgium, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Twenty-nine are drawn: the player, the nine of the first campaign, the five of the third, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia and Côte d'Ivoire, each nation's one officer defending every level of theirs. The rest are placeholder silhouettes tinted in their colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -464,11 +464,12 @@
       "look": "Myanmar Bogyoke in olive dress uniform with red collar and gold epaulettes, peaked cap, medals."
     },
     "angkor": {
-      "id": "kh-officer",
-      "file": "kh-officer.png",
+      "id": "kh-oudom-seney",
+      "file": "kh-oudom-seney.png",
       "nation": "Cambodia",
       "defends": "the Angkor Wat",
-      "look": "Cambodian Oudom Seney in dark olive dress uniform with red collar tabs and gold stars, peaked cap."
+      "look": "Oudom Seney as an Angkorian general: a tiered gold mokot crown, gold shoulder pieces with naga finials, a blue-and-red tunic and sampot worked with the towers of Angkor Wat, a red sash with a gold kala-head buckle, gold armlets and greaves with kala masks, a blue cape carrying Angkor Wat on a gold-fringed hem, gold slippers with upturned toes, a gold-hilted sword, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "borobudur": {
       "id": "id-jenderal",
@@ -876,7 +877,8 @@
       "file": "ci-general-de-corps-d-armee.png",
       "nation": "Côte d'Ivoire",
       "defends": "Basilica of Our Lady of Peace, Yamoussoukro",
-      "look": "Général de corps d'armée of Côte d'Ivoire in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "Général de corps d'armée in the ceremonial dress of a chief: an orange-and-green headdress with a gold disc and orange, white and green plumes, white clay markings on the face and arms, strings of orange, white and green beads, a leopard skin over the shoulder, gold armlets and an elephant buckle, a kente-patterned wrap and sash in the flag's colours with gold fringes, white trousers, gold elephant greaves over beaded ankles, sandals, a gold-headed spear, beard, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "cntower": {
       "id": "ca-general",
@@ -928,7 +930,8 @@
       "file": "co-general.png",
       "nation": "Colombia",
       "defends": "Castillo San Felipe de Barajas, Cartagena",
-      "look": "General of Colombia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General in a navy tunic heavy with gold oak leaves and bullion epaulettes, a yellow-blue-red sash and orders at the breast, a black bicorne with the arms and yellow, blue and red plumes, white breeches worked in gold, a tricolour sash and tassels at the waist, the flag worn as a fringed cape, tall black boots with spurs, a sabre, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "skytower": {
       "id": "nz-lieutenant-general",
