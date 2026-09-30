@@ -430,7 +430,19 @@ export class ModelLibrary {
           repainted.set(src, m);
         }
       }
-      m.side = THREE.FrontSide;
+      // A surface authored double-sided is often a single sheet whose normal
+      // faces inward (the M270's hull sides): culled, the far wheels show
+      // through it.
+      m.side = src.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide;
+      // Exporters mark whole hulls BLEND at full opacity, which three draws
+      // without writing depth, so whatever is drawn after shows through.
+      // Only real glass keeps its transparency; the repaint drops the
+      // texture that carried any cut-out alpha anyway.
+      if (m.transparent && m.opacity >= 0.5 && (tint || m.opacity >= 0.99)) {
+        m.transparent = false;
+        m.depthWrite = true;
+        m.opacity = 1;
+      }
       // Source materials are often near-black metal; lift them so they read
       // against the terrain at bird's-eye distance.
       if (m.metalness !== undefined) {
