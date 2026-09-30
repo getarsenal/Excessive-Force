@@ -714,11 +714,17 @@ export function populatePotalaPalace(g, origin, groundY) {
     g.place(i % 14 === 0 ? 'at' : 'rifleman', V(p.x, p.y, p.z), p.yaw, 6, { cover: 'window' });
   });
 
-  // ── The terrace deck: the mortar line, in the open on the widest flat
-  // surface in the game, forty-six metres above the rock.
-  for (let i = 0; i < 8; i++) {
-    const x = (i - 3.5) * (K.terrace.w / 9);
-    g.place('mortar', V(x, K.terrace.h + K.terrace.d * 0 + 3.6, K.terrace.d * 0.32), 0, 10, { cover: 'roof' });
+  // ── The mortar line, on the top tier's walk under the terrace wall: the
+  // highest open ground on the hill. It was on the terrace deck, until the
+  // palace grew out of the rock and its wings came down to the deck's edge,
+  // and then all eight crews were posted inside the White Palace with forty
+  // metres of masonry over their tubes and never fired a round. The walk is
+  // thirty metres deep and clear but for the last flight of the stair, which
+  // climbs it on the west side of the axis, so the line leaves that gap.
+  const top = K.tiers[K.tiers.length - 1];
+  const walkZ = (K.terrace.d / 2 + top.z + top.d / 2) / 2;
+  for (const x of [-150, -118, -86, -54, -22, 110, 138, 164]) {
+    g.place('mortar', V(x, top.h + 1.4, walkZ), 0, 10, { cover: 'roof' });
   }
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2;
