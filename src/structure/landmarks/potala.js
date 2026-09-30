@@ -701,7 +701,7 @@ export function populatePotalaPalace(g, origin, groundY) {
   // that a man can be standing on, and snipers hold it.
   for (const p of K.pavilions) {
     for (const sz of [-1, 1]) {
-      g.place('sniper', V(p.x, K.red.top + 5.0, p.z + sz * 15), sz > 0 ? 0 : Math.PI, 9, { cover: 'roof' });
+      g.place('sniper', V(p.x, K.red.top + 2.75, p.z + sz * 15), sz > 0 ? 0 : Math.PI, 9, { cover: 'roof' });
     }
   }
 
@@ -724,25 +724,26 @@ export function populatePotalaPalace(g, origin, groundY) {
   const top = K.tiers[K.tiers.length - 1];
   const walkZ = (K.terrace.d / 2 + top.z + top.d / 2) / 2;
   for (const x of [-150, -118, -86, -54, -22, 110, 138, 164]) {
-    g.place('mortar', V(x, top.h + 1.4, walkZ), 0, 10, { cover: 'roof' });
+    g.place('mortar', V(x, top.h + 0.03, walkZ), 0, 10, { cover: 'roof' });
   }
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2;
-    g.place(i % 4 === 0 ? 'at' : 'rifleman',
-      V(Math.cos(a) * (K.terrace.w / 2 - 4), K.terrace.h + 3.6, Math.sin(a) * (K.terrace.d / 2 - 4)),
-      Math.atan2(Math.cos(a), Math.sin(a)), 9, { cover: 'roof' });
+  // Their picket, along the front of the same walk. It was a ring round the
+  // terrace deck's edge, and the deck is under the palace now: the men at
+  // its front and back were posted inside the wings.
+  const front = top.z + top.d / 2 - 6.0;
+  for (const [i, x] of [-160, -134, -108, -82, -56, -30, 0, 26, 52, 78, 104, 130, 152, 172].entries()) {
+    g.place(i % 4 === 0 ? 'at' : 'rifleman', V(x, top.h + 0.03, front), 0, 9, { cover: 'roof' });
   }
 
   // ── Shöl, on the terraces: the first line, and the one that tells the
   // player what the next two are going to be like.
   K.shol.forEach((q, i) => {
-    g.place(i % 3 === 0 ? 'mg' : 'rifleman', V(q.x, q.y + 1.4, q.z), 0, 9, { cover: 'roof' });
+    g.place(i % 3 === 0 ? 'mg' : 'rifleman', V(q.x, q.y + 0.03, q.z), 0, 9, { cover: 'roof' });
   });
   for (const t of K.tiers) {
     for (let i = 0; i < 6; i++) {
       const x = (i - 2.5) * (t.w / 7);
       g.place(i % 2 ? 'rifleman' : 'sniper',
-        V(x, t.h + 1.4, t.z + t.d / 2 - 3.0), 0, 9, { cover: 'roof' });
+        V(x, t.h + 0.03, t.z + t.d / 2 - 3.0), 0, 9, { cover: 'roof' });
     }
   }
 }
@@ -815,7 +816,7 @@ export function populateChortenGate(g, origin, groundY) {
   for (const sx of [-1, 1]) {
     g.place('rifleman', new THREE.Vector3(origin.x + sx * 10, groundY + 1.0, origin.z),
       sx > 0 ? Math.PI / 2 : -Math.PI / 2, 7, { cover: 'arcade' });
-    g.place('sniper', new THREE.Vector3(origin.x + sx * 9, groundY + GATE.rise + GATE.span / 2 + 5.0, origin.z),
+    g.place('sniper', new THREE.Vector3(origin.x + sx * 9, groundY + GATE.rise + GATE.span / 2 + 4.4, origin.z),
       sx > 0 ? Math.PI / 2 : -Math.PI / 2, 8, { cover: 'roof' });
   }
 }

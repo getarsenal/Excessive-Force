@@ -1124,12 +1124,22 @@ export class TestMenu {
           const s = d.structure;
           if (!(s.flags[i] & 1) || (s.flags[i] & 10)) continue;   // dead or falling
           checked++;
-          const dist = Math.hypot(s.px[i] - d.pos.x, s.py[i] - d.pos.y, s.pz[i] - d.pos.z);
-          if (dist > 10) bad++;
+          // To the stone, not to its centre. The Potala's tier walks are laid
+          // in slabs twenty-seven metres long, and a man standing on the
+          // middle of one is thirteen metres from its centre and nought from
+          // the stone; measured to the centre, standing properly on the floor
+          // failed this and standing a metre and a half over it passed.
+          const dx = d.pos.x - s.px[i], dz = d.pos.z - s.pz[i];
+          const c = Math.cos(s.ry[i]), n = Math.sin(s.ry[i]);
+          const lx = Math.max(0, Math.abs(dx * c - dz * n) - s.hx[i]);
+          const lz = Math.max(0, Math.abs(dx * n + dz * c) - s.hz[i]);
+          const ly = Math.max(0, Math.abs(d.pos.y - s.py[i]) - s.hy[i]);
+          const dist = Math.hypot(lx, ly, lz);
+          if (dist > 8) bad++;
         }
         assert(checked > 0, 'no living defender is pinned to standing masonry');
         assert(bad === 0,
-          `${bad} of ${checked} defenders are more than 10 m from their stone`);
+          `${bad} of ${checked} defenders are more than 8 m from their stone`);
         const cover = {};
         for (const d of g.defenders) cover[d.cover || 'none'] = (cover[d.cover || 'none'] || 0) + 1;
         assert(!cover.none, `${cover.none} defenders have no stated position type`);
