@@ -645,6 +645,28 @@ export class Battle {
   }
 
   /**
+   * Where on the bar a weapon unlocks, nought to one.
+   *
+   * The cards and the tick marks have always quoted this, on the bar's own
+   * scale, while the gate itself read a different number: the fraction of
+   * all the stone on the map. They agree only where the objectives are most
+   * of the map. At the Forbidden City the marble terrace and the galleries
+   * are four fifths of it and are scored against nobody, so the bar read 6 %
+   * under a card that said "AT 2 %" and stayed locked. The gate reads the
+   * bar now, so whatever a card says is what happens.
+   */
+  unlockAt(u) {
+    if (this._unlockDenom == null) {
+      this._unlockDenom = this.objectives.reduce(
+        (a, o) => a + o.structure.totalMass * (1 - o.win.integrity), 0) / Math.max(1, this.totalMass);
+    }
+    const scale = this.level?.unlockScale ?? 1;
+    const frac = u.unlockFrac ?? 0;
+    if (frac <= 0) return 0;
+    return Math.min(0.999, (frac / scale) / Math.max(0.05, this._unlockDenom));
+  }
+
+  /**
    * Whether a weapon can be bought.
    *
    * Two gates, and they do different jobs. The campaign releases a weapon —
@@ -657,7 +679,7 @@ export class Battle {
   isUnlocked(u) {
     if (this.unlockAll) return true;
     if (!isReleased(u.id)) return false;
-    return this.unlockProgress >= (u.unlockFrac ?? 0);
+    return this.objectiveProgress >= this.unlockAt(u) - 1e-6;
   }
 
   /** Released by the campaign but not yet earned here, for the build bar. */
@@ -707,6 +729,39 @@ export class Battle {
    * launcher's near limit depends on what it is being asked to shoot, so
    * placing one is the moment to say no.
    */
+  /**
+   * Whether any of a structure's stones stands within `pad` of a point, in
+   * plan. A grid of the stones' positions is made the first time it is
+   * asked; a stone shot away since still counts, which errs toward caution.
+   */
+  _nearStones(s, point, pad) {
+    const CELL = 8;
+    if (!s._planGrid) {
+      const g = new Map();
+      for (let i = 0; i < s.count; i++) {
+        const k = `${Math.floor(s.px[i] / CELL)},${Math.floor(s.pz[i] / CELL)}`;
+        let a = g.get(k);
+        if (!a) g.set(k, a = []);
+        a.push(i);
+      }
+      s._planGrid = g;
+    }
+    const r = Math.ceil((pad + 4) / CELL);
+    const cx = Math.floor(point.x / CELL), cz = Math.floor(point.z / CELL);
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        const a = s._planGrid.get(`${cx + dx},${cz + dz}`);
+        if (!a) continue;
+        for (const i of a) {
+          const ex = Math.max(0, Math.abs(s.px[i] - point.x) - s.hx[i]);
+          const ez = Math.max(0, Math.abs(s.pz[i] - point.z) - s.hz[i]);
+          if (ex * ex + ez * ez < pad * pad) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   validPlacement(point, def = null) {
     if (!point) return { ok: false, reason: 'no ground' };
     // A rooftop has already been established as a flat surface by the picker;
@@ -758,6 +813,10 @@ export class Battle {
       const PAD = 9;
       if (point.x > f.x0 - PAD && point.x < f.x1 + PAD
           && point.z > f.z0 - PAD && point.z < f.z1 + PAD) {
+        // A ring of galleries round a court is not a building: its box is
+        // the whole court, and a gun in the middle of the court is nowhere
+        // near it. Asked of the stones instead.
+        if (s.open && !this._nearStones(s, point, PAD)) continue;
         return { ok: false, reason: 'too close' };
       }
     }

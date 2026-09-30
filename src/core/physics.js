@@ -446,7 +446,9 @@ export class PhysicsWorld {
    */
   _sectionStands(body) {
     const n = body.numColliders();
-    const step = Math.max(1, Math.floor(n / 14));
+    // Every collider of an ordinary section, a sample of a huge one: the
+    // footprint needs the bottom course, not fourteen stones from anywhere.
+    const step = Math.max(1, Math.floor(n / 240));
     const feet = [];
     for (let c = 0; c < n; c += step) {
       const col = body.collider(c);
@@ -459,12 +461,64 @@ export class PhysicsWorld {
       return this._probeStands(
         { x: t.x, y: t.y, z: t.z, hy: reach, hr: reach }, body);
     }
-    feet.sort((a, b) => (a.y - a.hy) - (b.y - b.hy));
-    for (let i = 0; i < feet.length && i < 4; i++) {
-      const sup = this._probeStands(feet[i], body);
-      if (sup) return sup;
+    let low = Infinity;
+    for (const f of feet) low = Math.min(low, f.y - f.hy);
+    const bottom = feet.filter((f) => f.y - f.hy < low + 1.2);
+    // Standing means standing under its own weight, not touching something.
+    //
+    // Any one foot resting on anything used to be enough, so a section of
+    // pylon that tipped off its stump and caught one corner on the tower
+    // beside it was frozen there, forty metres of stone held out over clear
+    // air by its elbow, and stayed for the rest of the match. What holds a
+    // body up is support under its centre of mass: the feet that are resting
+    // on something have to bracket it. When they do not, it is not frozen,
+    // and the physics tips it off the corner the way it would go.
+    //
+    // The probes are the bottom course's extremes and its lowest stone, so
+    // an upright chunk standing squarely on its base finds its whole base.
+    const pick = new Set();
+    let a = bottom[0], b = bottom[0], c2 = bottom[0], d = bottom[0], e = bottom[0];
+    for (const f of bottom) {
+      if (f.x < a.x) a = f;
+      if (f.x > b.x) b = f;
+      if (f.z < c2.z) c2 = f;
+      if (f.z > d.z) d = f;
+      if (f.y - f.hy < e.y - e.hy) e = f;
     }
-    return null;
+    for (const f of [e, a, b, c2, d]) pick.add(f);
+    let first = null;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const f of pick) {
+      const sup = this._probeStands(f, body);
+      if (!sup) continue;
+      if (!first) first = sup;
+      x0 = Math.min(x0, f.x - f.hx); x1 = Math.max(x1, f.x + f.hx);
+      z0 = Math.min(z0, f.z - f.hz); z1 = Math.max(z1, f.z + f.hz);
+    }
+    if (!first) return null;
+    // Lying on the terrain is lying on the terrain, whatever its shape.
+    if (first === GROUNDED && this._restsOnGround(bottom)) return first;
+    let mx = 0, mz = 0, mw = 0;
+    for (const f of feet) {
+      const w = f.hx * f.hz * f.hy;
+      mx += f.x * w; mz += f.z * w; mw += w;
+    }
+    if (mw <= 0) return first;
+    mx /= mw; mz /= mw;
+    const M = 0.8;
+    if (mx < x0 - M || mx > x1 + M || mz < z0 - M || mz > z1 + M) return null;
+    return first;
+  }
+
+  /** Whether most of a section's sampled feet are down on the terrain itself. */
+  _restsOnGround(feet) {
+    if (!this.groundAt) return false;
+    let on = 0;
+    for (const f of feet) {
+      const g = this.groundAt(f.x, f.z);
+      if (isFinite(g) && f.y - f.hy <= g + 0.8) on++;
+    }
+    return on * 2 >= feet.length;
   }
 
   /** How far the body reaches below its own origin. Cached: it never changes. */

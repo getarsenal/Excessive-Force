@@ -39,7 +39,7 @@ for (const sp of specs) {
     // the survey test in the browser is the slow way to find that out.
     if (st.structural[i] && !Number.isFinite(st.utilisation(i))) nonsense++;
   }
-  console.log(`${sp.key}: ${st.count} stones, ${loose.length} loose, ${crushed} crushed at load, ${st._calibrated || 0} sized up at rest${nonsense ? `, ${nonsense} NaN loads` : ''}`);
+  console.log(`${sp.key}: ${st.count} stones, ${st.bearingCantilever || 0} held sideways, ${loose.length} loose, ${crushed} crushed at load, ${st._calibrated || 0} sized up at rest${nonsense ? `, ${nonsense} NaN loads` : ''}`);
   bad += crushed + nonsense;
   for (const b of loose.slice(0, 25)) console.log(`   ${b.tag.padEnd(12)} y ${String(b.y).padStart(6)}  r ${String(b.r).padStart(6)}  ${b.h.join(' x ')}`);
   if (loose.length > 25) console.log(`   … and ${loose.length - 25} more`);

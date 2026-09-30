@@ -1864,7 +1864,7 @@ export const LEVELS = {
       { key: 'forbidden', blocks: buildForbidden(quality), primary: true, required: true, label: 'FORBIDDEN CITY' },
       // The galleries round the court, and the two pavilions on them: the
       // frame the halls are seen in, worth nothing.
-      { key: 'court', blocks: buildForbiddenCourt(quality), required: false, scenery: true, label: 'OUTER COURT' },
+      { key: 'court', blocks: buildForbiddenCourt(quality), required: false, scenery: true, open: true, label: 'OUTER COURT' },
     ],
     garrison: (g, origin, groundY) => populateForbidden(g, origin, groundY),
     // The terrace is ground; the three halls are the contract.

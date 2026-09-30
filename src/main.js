@@ -445,6 +445,8 @@ async function boot() {
       { groundY: sGround, origin: sOrigin, onChunkDestroyed });
     st.key = spec.key;
     st.required = !!spec.required;
+    // A ring of buildings round open ground: judged by its stones, not its box.
+    st.open = !!spec.open;
     st.label = spec.label || spec.key.toUpperCase();
     engine.scene.add(st.group);
     structures.push(st);

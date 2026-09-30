@@ -210,13 +210,10 @@ export class HUD {
     win.style.left = `${(b.constructor.WIN_AT * 100).toFixed(0)}%`;
     win.title = 'Level won';
     el.appendChild(win);
-    const denom = b.objectives.reduce(
-      (a, o) => a + o.structure.totalMass * (1 - o.win.integrity), 0) / Math.max(1, b.totalMass);
-    // Kept, because the cards have to quote the same number the bar is showing.
-    this._unlockDenom = denom;
     const seen = new Set();
     for (const u of UNITS) {
-      const frac = Math.min(1, ((u.unlockFrac ?? 0) / scale) / Math.max(0.05, denom));
+      // The battle's own conversion: the gate reads the same number.
+      const frac = b.unlockAt(u);
       if (frac <= 0.001 || frac >= 0.97) continue;
       const key = frac.toFixed(3);
       if (seen.has(key)) continue;
@@ -921,9 +918,7 @@ export class HUD {
           // while a card said "UNLOCK 12 %" and stayed locked, which is the
           // game contradicting itself in two places a thumb's width apart.
           // Same conversion the tick marks on the bar already use.
-          const scale = b.level?.unlockScale ?? 1;
-          const denom = Math.max(0.05, this._unlockDenom ?? 1);
-          const at = Math.min(0.999, ((u.unlockFrac ?? 0) / scale) / denom);
+          const at = b.unlockAt(u);
           setText(card.querySelector('.uc-lock'), `AT ${Math.max(1, Math.round(at * 100))}%`);
         }
       } else if (!this._lastUnlocked.has(u.id)) {
