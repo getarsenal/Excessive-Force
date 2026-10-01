@@ -2325,7 +2325,7 @@ body.clear-view .stamp { display: none; }
 
 /* ── The news: a lower third when the landmark comes down. ── */
 #newsflash {
-  position: fixed; left: 0; right: 0; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); z-index: 8;
+  position: fixed; left: 0; right: 0; top: calc(74px + env(safe-area-inset-top, 0px)); z-index: 30;
   pointer-events: none; display: flex; align-items: stretch; height: 54px;
   font-family: 'Oswald', 'Arial Narrow', system-ui, sans-serif;
   transform: translateX(-104%); transition: transform 0.55s cubic-bezier(.2,.9,.3,1);
@@ -2346,7 +2346,7 @@ body.clear-view .stamp { display: none; }
 #newsflash .nf-tick { height: 19px; background: #14181d; color: #f2d36b; overflow: hidden; white-space: nowrap; font-size: 12px; line-height: 19px; }
 #newsflash .nf-tick span { display: inline-block; padding-left: 100%; animation: nf-scroll 22s linear infinite; }
 @keyframes nf-scroll { to { transform: translateX(-100%); } }
-#newsflash .nf-live { position: absolute; right: 10px; top: -18px; font: 700 10px/1 system-ui, sans-serif; letter-spacing: 0.14em;
+#newsflash .nf-live { position: absolute; right: 10px; bottom: -18px; font: 700 10px/1 system-ui, sans-serif; letter-spacing: 0.14em;
   color: #fff; background: #c8141c; padding: 3px 6px; }
 #newsflash .nf-live::before { content: '● '; animation: tgp-blink 1s steps(2) infinite; }
 body.clear-view #newsflash { display: none; }

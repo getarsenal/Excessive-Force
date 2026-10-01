@@ -1628,6 +1628,7 @@ async function boot() {
       battle.update(step);
       while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
       fx.update(step);
+      whiteFlags.update(step);
     }
     return steps;
   };
