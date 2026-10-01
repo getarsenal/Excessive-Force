@@ -413,12 +413,12 @@ export class Flourish {
       while (r.acc > 0.03) {
         r.acc -= 0.03;
         fx.sparks.spawn({ x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 2, vy: -2, vz: (Math.random() - 0.5) * 2,
-          life: 0.5, size0: 1.2, size1: 0.3, color0: this._c.flare, color1: this._c.tracer, drag: 1, grav: -4, alpha: 0.9 });
+          life: 0.6, size0: 2.4, size1: 0.6, color0: this._c.flare, color1: this._c.tracer, drag: 1, grav: -4, alpha: 0.9 });
       }
       if (r.vy > 4) continue;
       // The break.
       this.rockets.splice(i, 1);
-      const n = this.low ? 40 : 90, sp = 22 + Math.random() * 14;
+      const n = this.low ? 50 : 110, sp = 24 + Math.random() * 14;
       for (let k = 0; k < n; k++) {
         const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, q = Math.sqrt(1 - u * u);
         const v = sp * (0.85 + Math.random() * 0.3);
@@ -426,7 +426,7 @@ export class Flourish {
         fx.sparks.spawn({
           x: r.x, y: r.y, z: r.z,
           vx: Math.cos(a) * q * v, vy: u * v, vz: Math.sin(a) * q * v,
-          life: 1.6 + Math.random() * 1.0, size0: 2.6, size1: 0.8,
+          life: 1.8 + Math.random() * 1.0, size0: 5.5, size1: 1.6,
           color0: c, color1: c, drag: 1.3, grav: -5, alpha: 1,
         });
       }
@@ -466,7 +466,7 @@ export class Flourish {
       const capR = (18 + 14 * m.t) * k;
       const lit = Math.max(0, 1 - m.t / 2.5);
       m.acc += dt;
-      const every = this.low ? 0.06 : 0.03;
+      const every = this.low ? 0.1 : 0.04;
       while (m.acc > every) {
         m.acc -= every;
         // The cap: round its rim, rolling outward and over.
@@ -476,7 +476,7 @@ export class Flourish {
             x: m.x + Math.cos(a) * r, y: m.y + head + (Math.random() - 0.3) * capR * 0.45, z: m.z + Math.sin(a) * r,
             vx: Math.cos(a) * 6 * k, vy: rise * 0.9, vz: Math.sin(a) * 6 * k,
             life: 6 + Math.random() * 5,
-            size0: 16 * k, size1: (38 + Math.random() * 22) * k,
+            size0: 22 * k, size1: (55 + Math.random() * 30) * k,
             color0: lit > 0.3 ? this._c.mushLit : this._c.mushDark, color1: this._c.mushDark,
             color2: this._c.mushGrey, cool: lit > 0.3 ? 0.08 : 0.3,
             drag: 0.6, grav: 0.3, turb: 1.4, alpha: 0.9,
@@ -487,11 +487,12 @@ export class Flourish {
         const h = Math.random() * head * 0.85;
         const r = (6 + 10 * (h / Math.max(1, head))) * k;
         const a = Math.random() * Math.PI * 2;
-        fx.plume.spawn({
+        // On the dust pool, so the cap keeps the plume's to itself.
+        fx.dust.spawn({
           x: m.x + Math.cos(a) * r * 0.4, y: m.y + h, z: m.z + Math.sin(a) * r * 0.4,
           vx: 0, vy: rise * 0.7, vz: 0,
           life: 5 + Math.random() * 3,
-          size0: r * 1.4, size1: r * 2.6,
+          size0: r * 1.6, size1: r * 3,
           color0: this._c.mushDark, color1: this._c.mushGrey,
           drag: 0.8, grav: 0.2, turb: 0.8, alpha: 0.85,
         });

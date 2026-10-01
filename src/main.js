@@ -433,12 +433,18 @@ async function boot() {
     lensAt = performance.now();
     let el = document.getElementById('lensdirt');
     if (!el) { el = document.createElement('div'); el.id = 'lensdirt'; document.body.appendChild(el); }
-    const n = 5 + Math.floor(Math.random() * 7);
+    // Big clots and a spray of small ones round each, nearer the side the
+    // blast was on.
+    const n = 4 + Math.floor(Math.random() * 4);
     const g = [];
     for (let i = 0; i < n; i++) {
-      const x = Math.random() * 100, y = Math.random() * 100, r = 2 + Math.random() * 7;
-      const a = (0.35 + Math.random() * 0.45).toFixed(2);
-      g.push(`radial-gradient(circle at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(52,40,28,${a}) 0, rgba(52,40,28,${(a * 0.6).toFixed(2)}) ${(r * 0.55).toFixed(1)}vmin, transparent ${r.toFixed(1)}vmin)`);
+      const x = 8 + Math.random() * 84, y = 8 + Math.random() * 84, r = 4 + Math.random() * 9;
+      const a = 0.6 + Math.random() * 0.3;
+      g.push(`radial-gradient(circle at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(46,34,22,${a.toFixed(2)}) 0, rgba(58,44,30,${(a * 0.75).toFixed(2)}) ${(r * 0.45).toFixed(1)}vmin, rgba(70,55,40,${(a * 0.25).toFixed(2)}) ${(r * 0.8).toFixed(1)}vmin, transparent ${r.toFixed(1)}vmin)`);
+      for (let k = 0; k < 4; k++) {
+        const sx = x + (Math.random() - 0.5) * r * 2.2, sy = y + (Math.random() - 0.5) * r * 2.2, sr = 0.6 + Math.random() * 1.6;
+        g.push(`radial-gradient(circle at ${sx.toFixed(1)}% ${sy.toFixed(1)}%, rgba(46,34,22,${(a * 0.9).toFixed(2)}) 0, transparent ${sr.toFixed(1)}vmin)`);
+      }
     }
     el.style.background = g.join(',');
     el.className = ''; void el.offsetWidth; el.className = 'go';

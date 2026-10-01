@@ -2355,7 +2355,7 @@ body.clear-view #newsflash { display: none; }
 /* ── Optics: the canvas through a sensor. A filter on the canvas and a layer
    of chrome over it; nothing in the frame. ── */
 body.optics-thermal #game-canvas { filter: grayscale(1) contrast(1.75) brightness(1.12); }
-body.optics-nv #game-canvas { filter: grayscale(1) sepia(1) hue-rotate(62deg) saturate(3.4) contrast(1.3) brightness(1.05); }
+body.optics-nv #game-canvas { filter: grayscale(1) sepia(1) hue-rotate(68deg) saturate(1.9) contrast(1.18) brightness(0.9); }
 body.clear-view #game-canvas { filter: none; }
 #optics { position: fixed; inset: 0; z-index: 2; pointer-events: none; display: none;
   font: 600 10px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace; letter-spacing: 0.1em; color: rgba(235, 245, 235, 0.85); }
