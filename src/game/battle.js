@@ -1932,10 +1932,28 @@ export class Battle {
   }
 
   _strikeImpact(hit) {
-    const { point, proj } = hit;
+    const { proj } = hit;
+    let point = hit.point;
     const w = proj.warhead;
     const st = proj.strikeDef.strike;
     const down = { x: 0, y: -1, z: 0 };
+    // A penetrator goes in before it goes off. It carried no such thing: the
+    // GBU-28 burst on the face it touched, and on the stupa at the summit of
+    // Borobudur that face is a few metres across, so the bite rule sized a
+    // two-and-a-half-tonne bomb to it and it took seventy stones. It now
+    // carries on along its line for `penetrate` metres — never below the
+    // ground — and bursts in there, where the masonry is wide.
+    if (st.penetrate && proj.vel.lengthSq() > 1) {
+      const dir = proj.vel.clone().normalize();
+      const p2 = point.clone().addScaledVector(dir, st.penetrate);
+      const g = this.terrain.heightAt(p2.x, p2.z) + 1;
+      if (p2.y < g) {
+        // Stop at the ground along the same line.
+        const k = dir.y < -0.05 ? Math.max(0, (point.y - g) / -dir.y) : 0;
+        p2.copy(point).addScaledVector(dir, Math.min(st.penetrate, k));
+      }
+      point = p2;
+    }
     // Sized on the building it lands on — the one with masonry nearest the
     // impact — and everything else in the sphere is collateral. Sizing each
     // structure separately had one bomb take its tenth of the tower and its
@@ -1973,7 +1991,9 @@ export class Battle {
     this._lastImpact = point.clone();
     // Everything under the bomb burns.
     if (this.cityFire) this.cityFire.blast(point, rMax * 0.8);
-    this.fx.strikeBlast(point, w.fx, { groundY });
+    // The blast is seen where the bomb went in, not fourteen metres inside
+    // the stone where a penetrator actually goes off.
+    this.fx.strikeBlast(hit.point, w.fx, { groundY });
     // The column stands over the site for the rest of the level, and it is
     // the thing you see from across the map. A bomb earns a bigger one than a
     // shell does, so this is not clamped to the shell's ceiling.

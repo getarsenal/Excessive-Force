@@ -333,7 +333,8 @@ export const UNITS = [
     cost: 160000, unlockFrac: 0.2,
     // Penetrating: a small radius and a very large charge, so it goes deep
     // into a solid monument instead of scorching its face.
-    model: 'aircraft', strike: { frac: 0.14, maxR: 30, minR: 6, fx: 5.0, bite: 1.0, shock: 0.4 },
+    // `penetrate`: metres along its line it goes in before it goes off.
+    model: 'aircraft', strike: { frac: 0.14, maxR: 30, minR: 6, fx: 5.0, bite: 1.0, shock: 0.4, penetrate: 14 },
     aircraft: { kind: 'eagle', store: 'gbu28', speed: 230, height: 160, clearance: 60, runIn: 2400, offset: 40 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     // Laser-guided: it glides to the spot and comes down on it steeply.
