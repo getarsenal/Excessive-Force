@@ -51,12 +51,12 @@ const LOOK = {
   // they are held to a wider streak on screen (`minPx`) than the garrison's,
   // because nine rounds from one team have to read against three hundred
   // from the other side.
-  chaingun: { color: 0xffb21a, core: 0xfff4d8, speed: 820, len: 26.0, width: 0.45, flash: 1.8, player: true, minPx: 3.0 },
+  chaingun: { color: 0xffb21a, core: 0xfff4d8, speed: 820, len: 14.0, width: 0.16, flash: 1.6, player: true, minPx: 1.4, every: 2 },
   // American 7.62 burns red, which is also what tells the player's bursts
   // apart from the garrison's orange.
-  m240: { color: 0xff2414, core: 0xffd2b8, speed: 760, len: 45.0, width: 0.5, flash: 2.0, player: true, minPx: 5.0 },
+  m240: { color: 0xff4a24, core: 0xffd8c0, speed: 760, len: 12.0, width: 0.14, flash: 1.4, player: true, minPx: 1.3, every: 3 },
   // The A-10's 30 mm: long, fat and fast, and a flash at the nose like a torch.
-  gau8: { color: 0xffa020, core: 0xfff0c0, speed: 1050, len: 34.0, width: 0.6, flash: 2.6, player: true, minPx: 3.6 },
+  gau8: { color: 0xffa020, core: 0xfff0c0, speed: 1050, len: 22.0, width: 0.3, flash: 2.6, player: true, minPx: 1.8 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 /**
@@ -68,7 +68,7 @@ const DEFAULT_LOOK = LOOK.rifleman;
  * keeps a tracer a line on the screen at any zoom; up close the real width
  * is larger and wins.
  */
-const MIN_PX = 1.3;
+const MIN_PX = 0.9;
 
 export class TracerFX {
   constructor(scene, quality) {
@@ -167,31 +167,48 @@ export class TracerFX {
     const look = LOOK[def?.look] || LOOK[def?.key] || DEFAULT_LOOK;
     this.fired++;
 
-    const dir = new THREE.Vector3().subVectors(to, from);
-    const dist = dir.length();
+    const dist = from.distanceTo(to);
     if (dist < 0.01) return;
-    dir.multiplyScalar(1 / dist);
 
-    // A miss goes past the target rather than stopping at it — that is what
-    // makes suppression legible: rounds cracking around the gun, not into it.
-    const end = hit ? dist : dist * (1.02 + Math.random() * 0.06);
-    const scatter = hit ? 0 : 1.4;
-
+    // Where the round actually goes. A hit lands on the man, near enough; a
+    // miss goes past him by a margin that grows with the range — a rifle's
+    // cone at three hundred metres is metres across, not centimetres — and
+    // carries on beyond, which is what makes fire that is missing look like
+    // fire that is missing rather than a beam that stops at its target.
     const aim = to.clone();
-    if (!hit) {
-      aim.x += (Math.random() - 0.5) * scatter * 2;
-      aim.y += (Math.random() - 0.5) * scatter * 2;
-      aim.z += (Math.random() - 0.5) * scatter * 2;
+    const scatter = hit ? 0.25 : Math.max(1.2, dist * 0.014);
+    aim.x += (Math.random() - 0.5) * scatter * 2;
+    aim.y += (Math.random() - 0.5) * scatter * (hit ? 1 : 0.9);
+    aim.z += (Math.random() - 0.5) * scatter * 2;
+    const dir = new THREE.Vector3().subVectors(aim, from);
+    const reach = dir.length();
+    dir.multiplyScalar(1 / reach);
+    // A round fired downward that misses meets the ground at its scatter
+    // point, kicks up dirt and may skip off it; one fired level or upward
+    // (at a man in a window, at an aircraft) goes on past.
+    const intoGround = !hit && dir.y < -0.04;
+    const end = hit || intoGround ? reach : reach * (1.08 + Math.random() * 0.25);
+
+    // Not every round is a tracer. A belt is loaded one in four or five; the
+    // player's guns show one in `every`, which is enough to see the stream
+    // walk and few enough that it does not read as a solid bar.
+    if (look.every) {
+      this._belt = (this._belt || 0) + 1;
+      if (this._belt % look.every) {
+        this._flash(from, dir, look);
+        return;
+      }
     }
 
     const rec = {
       player: !!look.player, minPx: look.minPx ?? MIN_PX,
       from: from.clone(), dir: dir.clone(), end, t: 0,
       speed: look.speed, len: look.len, width: look.width,
-      color: look.color, core: look.core, hit, aim,
-      // Not every round is a tracer; every fourth or so glows, which is both
-      // correct and stops a burst reading as a solid bar of light. The
-      // player's are all drawn: the team is one gun, not three hundred.
+      color: look.color, core: look.core, hit, ground: intoGround,
+      aim: from.clone().addScaledVector(dir, end),
+      // Most of the garrison's tracers burn full; some are dim, which keeps
+      // three hundred rifles from reading as one sheet of light. The
+      // player's are thinned by `every` instead.
       bright: look.player || Math.random() < 0.82 ? 1 : 0.34,
     };
     if (look.player) {
@@ -201,6 +218,26 @@ export class TracerFX {
       this.tracers.push(rec);
     }
 
+    this._flash(from, dir, look);
+  }
+
+  /** A tracer off the ground at a new angle, dimmer, slower and short-lived. */
+  _ricochet(t, live) {
+    const d = t.dir.clone();
+    d.y = Math.abs(d.y) * (1.5 + Math.random() * 4) + 0.1;
+    d.x += (Math.random() - 0.5) * 0.9;
+    d.z += (Math.random() - 0.5) * 0.9;
+    d.normalize();
+    live.push({
+      player: t.player, minPx: t.minPx, rico: true,
+      from: t.aim.clone(), dir: d, end: 12 + Math.random() * 40, t: 0,
+      speed: t.speed * 0.45, len: t.len * 0.6, width: t.width * 0.8,
+      color: t.color, core: t.core, hit: true, aim: t.aim, bright: 0.55,
+    });
+  }
+
+  /** The muzzle flash: every round has one, tracer or not. */
+  _flash(from, dir, look) {
     if (this.flashes.length >= MAX_FLASHES && look.player) {
       const k = this.flashes.findIndex((f) => !f.player);
       if (k >= 0) this.flashes.splice(k, 1);
@@ -210,7 +247,7 @@ export class TracerFX {
         pos: from.clone(), dir: dir.clone(), t: 0,
         life: 0.055 + look.flash * 0.012,
         size: 0.9 * look.flash, color: look.core, player: !!look.player,
-        minPx: look.player ? 11 : 0,
+        minPx: look.player ? 3 : 0,
         roll: Math.random() * Math.PI,
       });
     }
@@ -253,11 +290,19 @@ export class TracerFX {
       t.t += dt;
       const travelled = t.t * t.speed;
       if (travelled - t.len > t.end) {
+        if (t.rico) continue;
         // Where the player's burst lands, said loudly enough to see from the
         // camera: a spurt of sparks and grit, bigger when it connected.
-        if (t.player) this.impact(t.aim, t.hit ? 0xffb070 : 0xc8b89a, t.hit ? 7 : 5, t.hit ? 1.3 : 1.0, true);
-        else if (t.hit) this.impact(t.aim, 0xffd0a0, 4, 0.7);
-        else this.impact(t.aim, 0x9fb6c8, 3, 0.5);
+        // A round that flew on past its target and burnt out in the air
+        // leaves nothing to see where it ended.
+        if (t.hit || t.ground) {
+          if (t.player) this.impact(t.aim, t.hit ? 0xffb070 : 0xc8b89a, t.hit ? 6 : 4, t.hit ? 1.2 : 0.9, true);
+          else if (t.hit) this.impact(t.aim, 0xffd0a0, 4, 0.7);
+          else this.impact(t.aim, 0x9fb6c8, 3, 0.5);
+        }
+        // A miss that meets the ground at a shallow angle skips off it: the
+        // tracer kicks up and away at a fraction of its speed and burns out.
+        if (t.ground && Math.random() < 0.3) this._ricochet(t, live);
         continue;
       }
       live.push(t);

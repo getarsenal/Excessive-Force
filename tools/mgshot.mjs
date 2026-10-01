@@ -3,18 +3,24 @@
 // the level's own camera.
 //
 //   node tools/mgshot.mjs <level>      -> /tmp/out/mg-<level>.png
+//   PHONE=1 node tools/mgshot.mjs <level>   a phone in portrait
 import { chromium } from 'playwright';
 const level = process.argv[2] || 'westminster';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
-const page = await b.newPage({ viewport: { width: 1280, height: 720 } });
+// PHONE=1 shoots a phone in portrait at its own pixel density, which is
+// where a width held in screen pixels is easiest to get wrong.
+const phone = !!process.env.PHONE;
+const page = await b.newPage(phone
+  ? { viewport: { width: 430, height: 932 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+  : { viewport: { width: 1280, height: 720 } });
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message.slice(0, 200)));
 page.on('console', (m) => { if (m.text().startsWith('cam ')) console.log(m.text()); });
 await page.addInitScript(() => { try {
   localStorage.setItem('tt.quality', 'medium'); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
   localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.suite', '1'); } catch {} });
-await page.addInitScript((d) => { window.__mgDist = d; }, process.env.DIST || 220);
+await page.addInitScript(([d, n, p]) => { window.__mgDist = d; window.__mgN = n; window.__mgPitch = p; }, [process.env.DIST || 220, process.env.N || 3, process.env.PITCH || 0.75]);
 await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 const info = await page.evaluate(async () => {
@@ -29,8 +35,11 @@ const info = await page.evaluate(async () => {
   let dx = cam.x - o.x, dz = cam.z - o.z;
   const l = Math.hypot(dx, dz); dx /= l; dz /= l;
   let n = 0;
-  for (const [f, side] of [[0.38, 0], [0.42, 25], [0.42, -25], [0.5, 50], [0.5, -50]]) {
-    if (n >= 3) break;
+  const want = +(window.__mgN || 3);
+  const spots = [];
+  for (const f of [0.38, 0.45, 0.52, 0.6]) for (const side of [0, 30, -30, 60, -60, 90, -90]) spots.push([f, side]);
+  for (const [f, side] of spots) {
+    if (n >= want) break;
     const q = new THREE.Vector3(o.x + dx * l * f - dz * side, 0, o.z + dz * l * f + dx * side);
     q.y = window.terrain.heightAt(q.x, q.z);
     if (!B.validPlacement(q).ok) continue;
@@ -62,7 +71,7 @@ const info = await page.evaluate(async () => {
 console.log(JSON.stringify(info));
 await page.evaluate(() => document.body.classList.add('clear-view'));
 await page.waitForTimeout(400);
-await page.screenshot({ path: `/tmp/out/mg-${level}.png` });
+await page.screenshot({ path: `/tmp/out/mg-${level}.png`, timeout: 180000 });
 // Then looking at the first team at the level's own zoom, as a player
 // watching his gun would, and a few bursts later.
 await page.evaluate(() => {
@@ -71,6 +80,7 @@ await page.evaluate(() => {
   if (!u) return;
   r.target.set(u.pos.x, u.pos.y, u.pos.z); r.desiredTarget.copy(r.target);
   r.distance = r.desiredDistance = +(window.__mgDist || 220);
+  r.pitch = r.desiredPitch = +(window.__mgPitch || 0.75);
   const c0 = window.__cam0;
   r.yaw = r.desiredYaw = Math.atan2(c0.x - u.pos.x, c0.z - u.pos.z);
   for (let k = 0; k < 40; k++) r.update(0.1);
@@ -91,8 +101,9 @@ const seen = await page.evaluate(() => {
 console.log('player rounds in the air, on screen at:', JSON.stringify(seen));
 await page.waitForTimeout(200);
 if (seen.length) {
-  const x = Math.max(0, Math.min(1280 - 480, seen[0].x - 240)), y = Math.max(0, Math.min(720 - 270, seen[0].y - 135));
-  await page.screenshot({ path: `/tmp/out/mg-${level}-crop.png`, clip: { x, y, width: 480, height: 270 } });
+  const W = phone ? 430 : 1280, H = phone ? 932 : 720;
+  const x = Math.max(0, Math.min(W - 400, seen[0].x * W / 1280 - 200)), y = Math.max(0, Math.min(H - 270, seen[0].y * H / 720 - 135));
+  await page.screenshot({ path: `/tmp/out/mg-${level}-crop.png`, clip: { x, y, width: Math.min(400, W), height: 270 }, timeout: 180000 });
 }
-await page.screenshot({ path: `/tmp/out/mg-${level}-team.png` });
+await page.screenshot({ path: `/tmp/out/mg-${level}-team.png`, timeout: 180000 });
 await b.close();

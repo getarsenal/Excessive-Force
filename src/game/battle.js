@@ -1773,18 +1773,31 @@ export class Battle {
       if (!t.air.alive) { u.burstLeft = 0; return; }
       const dist = t.air.pos.distanceTo(from);
       const hit = Math.random() < 0.5 * (1 - 0.6 * dist / mg.air);
-      this.tracerFX.fire(from, t.air.pos, { look: 'm240' }, hit);
+      // Leading a moving aircraft by eye: the stream hoses round it.
+      const aim = t.air.pos.clone();
+      const sp = dist * (hit ? 0.006 : 0.03);
+      aim.x += gauss() * sp; aim.y += gauss() * sp; aim.z += gauss() * sp;
+      this.tracerFX.fire(from, aim, { look: 'm240' }, hit);
       if (hit) t.air.hit(mg.airDamage, u);
     } else {
       const d = t.d;
       if (!d.alive) { u.burstLeft = 0; return; }
       const to = d.muzzle.clone();
       const dist = to.distanceTo(from);
-      // The sheaf: tight near, wider far, and the burst walks.
+      // The sheaf: tight near, wider far — and the burst walks. A machine
+      // gun on a bipod does not put nine rounds through one hole: the point
+      // of aim wanders round the man as the gunner holds it down, and climbs
+      // a little with every round. `u.walk` is that wander, started fresh
+      // with each burst and carried from round to round within it.
       const spread = u.def.dispersion * (0.4 + dist / u.def.range);
-      to.x += gauss() * spread * 0.6;
-      to.z += gauss() * spread * 0.6;
-      to.y += gauss() * spread * 0.25;
+      const w = u.walk || (u.walk = { x: 0, y: 0, z: 0, n: 0 });
+      if (u.burstLeft === mg.burst - 1) { w.x = gauss() * spread * 0.5; w.z = gauss() * spread * 0.5; w.y = 0; w.n = 0; }
+      w.x += gauss() * spread * 0.22;
+      w.z += gauss() * spread * 0.22;
+      w.y += spread * 0.06;
+      to.x += w.x + gauss() * spread * 0.3;
+      to.z += w.z + gauss() * spread * 0.3;
+      to.y += w.y + gauss() * spread * 0.15;
       // Cover is most of what a burst is up against: a man below a parapet
       // shows a head and shoulders, a man at a window a little more.
       const cover = d.cover === 'trench' ? 0.4
