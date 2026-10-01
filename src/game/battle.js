@@ -2120,6 +2120,13 @@ export class Battle {
     // The blast is seen where the bomb went in, not fourteen metres inside
     // the stone where a penetrator actually goes off.
     this.fx.strikeBlast(hit.point, w.fx, { groundY });
+    // The one bomb big enough for it gets the mushroom cloud and the white
+    // shell of condensation racing out round it, and the screen whites out.
+    if (w.fx >= 9 && this.fx.flourish) {
+      this.fx.flourish.mushroom(point.x, groundY, point.z, w.fx / 9.5);
+      this.fx.flourish.wilson(point.x, groundY, point.z, 60 + w.radius * 1.3);
+      this.onEvent('megablast', { point: hit.point, fx: w.fx });
+    }
     // The column stands over the site for the rest of the level, and it is
     // the thing you see from across the map. A bomb earns a bigger one than a
     // shell does, so this is not clamped to the shell's ceiling.

@@ -1,4 +1,5 @@
 import { feedback } from './feedback.js';
+import { initOptics, cycleOptics, opticsLabel } from './optics.js';
 import { power } from '../core/power.js';
 import { UNITS, UNITS_BY_ID, STRIKES, isLoiter } from '../game/units.js';
 import { access } from '../core/access.js';
@@ -22,6 +23,7 @@ export { TAP } from './pointer.js';
 export class HUD {
   constructor(battle, opts = {}) {
     this.battle = battle;
+    initOptics();
     this.onSelect = opts.onSelect || (() => {});
     this.onClearTarget = opts.onClearTarget || (() => {});
     this.onRestart = opts.onRestart || (() => {});
@@ -407,6 +409,19 @@ export class HUD {
       const label = () => { hap.textContent = feedback.haptics ? 'HAPTICS: ON' : 'HAPTICS: OFF'; };
       label();
       hap.addEventListener('click', () => { feedback.haptics = !feedback.haptics; label(); });
+    }
+    // Optics: day, thermal, night vision (see optics.js), and T for the same.
+    const opt = menu.querySelector('#menu-optics');
+    if (opt) {
+      opt.textContent = opticsLabel();
+      opt.addEventListener('click', () => { cycleOptics(); opt.textContent = opticsLabel(); });
+      window.addEventListener('keydown', (e) => {
+        if (e.code !== 'KeyT' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+        this.status(cycleOptics(), 1.6);
+        opt.textContent = opticsLabel();
+      });
     }
     // Thirty frames in battle and a few behind a menu (see power.js).
     const saver = menu.querySelector('#menu-saver');

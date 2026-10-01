@@ -42,6 +42,7 @@ import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
 import { newsflash, hideNewsflash } from './ui/newsflash.js';
 import { WhiteFlags } from './fx/whiteflags.js';
+import * as synth from './core/synth.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
@@ -421,6 +422,27 @@ async function boot() {
   const fx = new ExplosionFX(engine.scene, quality);
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
+  // Dirt on the lens: a blast close enough to the camera throws it at the
+  // glass. Spots of mud in a soft-edged splatter, sliding down as they fade.
+  const lensSuite = (() => { try { return localStorage.getItem('tt.suite') === '1'; } catch { return false; } })();
+  let lensAt = -1e9;
+  fx.onBlast = (pos, power) => {
+    if (lensSuite || access.still) return;
+    const d = engine.camera.position.distanceTo(pos);
+    if (d > 26 + power * 20 || performance.now() - lensAt < 1500) return;
+    lensAt = performance.now();
+    let el = document.getElementById('lensdirt');
+    if (!el) { el = document.createElement('div'); el.id = 'lensdirt'; document.body.appendChild(el); }
+    const n = 5 + Math.floor(Math.random() * 7);
+    const g = [];
+    for (let i = 0; i < n; i++) {
+      const x = Math.random() * 100, y = Math.random() * 100, r = 2 + Math.random() * 7;
+      const a = (0.35 + Math.random() * 0.45).toFixed(2);
+      g.push(`radial-gradient(circle at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(52,40,28,${a}) 0, rgba(52,40,28,${(a * 0.6).toFixed(2)}) ${(r * 0.55).toFixed(1)}vmin, transparent ${r.toFixed(1)}vmin)`);
+    }
+    el.style.background = g.join(',');
+    el.className = ''; void el.offsetWidth; el.className = 'go';
+  };
   const dustColour = new THREE.Color();
   // Charges that have been uncovered and are about to go off. Queued rather
   // than fired here: this runs from inside the explosion that destroyed the
@@ -767,6 +789,24 @@ async function boot() {
     for (const m of fresh) hud.feed(`MEDAL · ${m.name}`, 'big');
     return fresh;
   };
+  // The battery celebrates: fireworks from wherever the guns are, a dozen
+  // over five seconds, over the ruin.
+  function celebrate() {
+    if (lensSuite || !fx.flourish) return;
+    const from = battle.units.filter((u) => u.alive && u.pos).map((u) => u.pos);
+    for (let i = 0; i < 12; i++) {
+      setTimeout(() => {
+        let p = from.length ? from[i % from.length] : null;
+        if (!p) {
+          const a = Math.random() * Math.PI * 2, r = 110 + Math.random() * 80;
+          const x = origin.x + Math.sin(a) * r, z = origin.z + Math.cos(a) * r;
+          p = { x, y: terrain.heightAt(x, z), z };
+        }
+        fx.flourish.firework(p.x + (Math.random() - 0.5) * 6, p.y + 1, p.z + (Math.random() - 0.5) * 6,
+          90 + Math.random() * 70, audio, synth);
+      }, 300 + i * 420 + Math.random() * 250);
+    }
+  }
   let sirenSounded = false;
   function handleEvent(kind, data) {
     if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
@@ -905,6 +945,17 @@ async function boot() {
       case 'strikehit':
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');
         break;
+      case 'megablast': {
+        // Eleven tonnes of it: the screen goes white, time stumbles, and the
+        // ground shakes the camera whatever it was looking at.
+        let el = document.getElementById('whiteout');
+        if (!el) { el = document.createElement('div'); el.id = 'whiteout'; document.body.appendChild(el); }
+        el.className = ''; void el.offsetWidth; el.className = 'go';
+        engine.addShake(1.2);
+        if (!suiteHold && !access.still) testMenu.dramaticPause(1.8, 0.3);
+        hud.feed('GBU-43/B DETONATION', 'big');
+        break;
+      }
       case 'stamp':
         hud.stamp(data.text, data.point, data.kind);
         break;
@@ -972,6 +1023,7 @@ async function boot() {
         setTimeout(() => {
           if (battle.state !== 'won') return;
           whiteFlags.raise(garrison.defenders, engine.camera);
+          celebrate();
           const sum = battle.summary();
           newsflash(level, sum, { burnt: battle.cityFire?.burnt || 0,
             claim: damageBill(sum, { burnt: battle.cityFire?.burnt || 0 }).total });

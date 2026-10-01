@@ -363,6 +363,7 @@ export class ExplosionFX {
    * @param {object} opts { ground: boolean, normal: THREE.Vector3 }
    */
   detonate(pos, power, opts = {}) {
+    if (this.onBlast) this.onBlast(pos, power);
     const q = this.quality;
     const scale = Math.pow(power, 0.72);
     const radius = 5.2 * scale;
@@ -504,6 +505,7 @@ export class ExplosionFX {
    * The flash and the light are kept; the dome and the ripple are not.
    */
   strikeBlast(pos, power, opts = {}) {
+    if (this.onBlast) this.onBlast(pos, power * 1.6);
     const q = this.quality;
     const low = q.name === 'low';
     const scale = Math.pow(power, 0.72);

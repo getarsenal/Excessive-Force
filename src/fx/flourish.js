@@ -23,6 +23,9 @@ export class Flourish {
     this.low = fx.quality.name === 'low';
     this.markers = [];
     this.cookoffs = [];
+    this.rockets = [];
+    this.mushrooms = [];
+    this.wilsons = [];
     /** Things to do in a moment, on the effects' own clock. */
     this._later = [];
     this.flareList = [];
@@ -49,6 +52,11 @@ export class Flourish {
     this._c.surge = new THREE.Color(0.52, 0.48, 0.42);
     this._c.surgeFade = new THREE.Color(0.47, 0.44, 0.4);
     this._c.tracer = new THREE.Color(1.6, 0.9, 0.35);
+    this._c.works = [new THREE.Color(1.7, 0.3, 0.25), new THREE.Color(1.6, 1.6, 1.6), new THREE.Color(0.35, 0.6, 1.8),
+      new THREE.Color(1.7, 1.25, 0.3), new THREE.Color(0.4, 1.6, 0.55), new THREE.Color(1.5, 0.45, 1.6)];
+    this._c.mushDark = new THREE.Color(0.24, 0.2, 0.17);
+    this._c.mushLit = new THREE.Color(1.15, 0.5, 0.14);
+    this._c.mushGrey = new THREE.Color(0.46, 0.42, 0.38);
     this._c.paperSoot = new THREE.Color(0.55, 0.52, 0.48);
     // Paper is its own pool: a sheet is a small hard-edged rectangle, not a
     // puff, and there can be a few hundred of them in the air at once.
@@ -379,6 +387,159 @@ export class Flourish {
     }
   }
 
+  /**
+   * A firework: a rocket on a hissing spark trail up to `h` metres, and a
+   * break of coloured stars falling and fading under gravity. For when the
+   * landmark is down and the battery wants to say so.
+   */
+  firework(x, y, z, h = 110, audio = null, sound = null) {
+    if (this.rockets.length > 20) return;
+    const colour = this._c.works[Math.floor(Math.random() * this._c.works.length)];
+    const colour2 = Math.random() < 0.4 ? this._c.works[Math.floor(Math.random() * this._c.works.length)] : colour;
+    const vy = Math.sqrt(2 * 9.81 * h) * 1.05;
+    this.rockets.push({ x, y, z, vx: (Math.random() - 0.5) * 8, vy, vz: (Math.random() - 0.5) * 8,
+      t: 0, colour, colour2, audio, sound, acc: 0 });
+    if (audio && sound) { sound.thump(audio, { x, y, z }, 0, 0.3); sound.hiss(audio, { x, y, z }, 0.05, vy / 9.81 * 0.8, 0.1); }
+  }
+
+  _stepRockets(dt) {
+    const fx = this.fx;
+    for (let i = this.rockets.length - 1; i >= 0; i--) {
+      const r = this.rockets[i];
+      r.t += dt;
+      r.vy -= 9.81 * dt;
+      r.x += r.vx * dt; r.y += r.vy * dt; r.z += r.vz * dt;
+      r.acc += dt;
+      while (r.acc > 0.03) {
+        r.acc -= 0.03;
+        fx.sparks.spawn({ x: r.x, y: r.y, z: r.z, vx: (Math.random() - 0.5) * 2, vy: -2, vz: (Math.random() - 0.5) * 2,
+          life: 0.5, size0: 1.2, size1: 0.3, color0: this._c.flare, color1: this._c.tracer, drag: 1, grav: -4, alpha: 0.9 });
+      }
+      if (r.vy > 4) continue;
+      // The break.
+      this.rockets.splice(i, 1);
+      const n = this.low ? 40 : 90, sp = 22 + Math.random() * 14;
+      for (let k = 0; k < n; k++) {
+        const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, q = Math.sqrt(1 - u * u);
+        const v = sp * (0.85 + Math.random() * 0.3);
+        const c = k % 2 ? r.colour : r.colour2;
+        fx.sparks.spawn({
+          x: r.x, y: r.y, z: r.z,
+          vx: Math.cos(a) * q * v, vy: u * v, vz: Math.sin(a) * q * v,
+          life: 1.6 + Math.random() * 1.0, size0: 2.6, size1: 0.8,
+          color0: c, color1: c, drag: 1.3, grav: -5, alpha: 1,
+        });
+      }
+      const lg = fx._freeLight();
+      lg.light.position.set(r.x, r.y, r.z);
+      lg.light.color.copy(r.colour).multiplyScalar(0.6);
+      lg.light.distance = 260; lg.peak = 900; lg.life = 0.6; lg.age = 0;
+      // The light's colour is put back to the blast's warm white when it
+      // next goes for a blast.
+      fx.flourish.later(0.7, () => lg.light.color.set(0xffb060));
+      if (r.audio && r.sound) {
+        r.sound.crack(r.audio, { x: r.x, y: r.y, z: r.z }, 0, 0.6, 900, 0.25);
+        for (let k = 0; k < 6; k++) r.sound.crack(r.audio, { x: r.x, y: r.y, z: r.z }, 0.5 + Math.random() * 1.2, 0.12, 3000, 0.04);
+      }
+    }
+  }
+
+  /**
+   * A mushroom cloud, for the one bomb in the game that has earned one: the
+   * column standing up out of the blast and the cap rolling over at its
+   * head, rising and spreading for eight seconds, lit from inside at first
+   * and then going grey and drifting.
+   */
+  mushroom(x, groundY, z, scale = 1) {
+    this.mushrooms.push({ x, y: groundY, z, t: 0, k: scale, acc: 0 });
+  }
+
+  _stepMushrooms(dt) {
+    const fx = this.fx;
+    for (let i = this.mushrooms.length - 1; i >= 0; i--) {
+      const m = this.mushrooms[i];
+      m.t += dt;
+      if (m.t > 8) { this.mushrooms.splice(i, 1); continue; }
+      const k = m.k, H = 230 * k;
+      const head = H * (1 - Math.exp(-m.t / 2.2));          // the head's height
+      const rise = (H / 2.2) * Math.exp(-m.t / 2.2);        // and its speed
+      const capR = (18 + 14 * m.t) * k;
+      const lit = Math.max(0, 1 - m.t / 2.5);
+      m.acc += dt;
+      const every = this.low ? 0.06 : 0.03;
+      while (m.acc > every) {
+        m.acc -= every;
+        // The cap: round its rim, rolling outward and over.
+        for (let j = 0; j < 2; j++) {
+          const a = Math.random() * Math.PI * 2, r = capR * (0.55 + Math.random() * 0.5);
+          fx.plume.spawn({
+            x: m.x + Math.cos(a) * r, y: m.y + head + (Math.random() - 0.3) * capR * 0.45, z: m.z + Math.sin(a) * r,
+            vx: Math.cos(a) * 6 * k, vy: rise * 0.9, vz: Math.sin(a) * 6 * k,
+            life: 6 + Math.random() * 5,
+            size0: 16 * k, size1: (38 + Math.random() * 22) * k,
+            color0: lit > 0.3 ? this._c.mushLit : this._c.mushDark, color1: this._c.mushDark,
+            color2: this._c.mushGrey, cool: lit > 0.3 ? 0.08 : 0.3,
+            drag: 0.6, grav: 0.3, turb: 1.4, alpha: 0.9,
+            spin: (Math.random() - 0.5) * 0.4,
+          });
+        }
+        // The stem: a narrower column up to under the cap.
+        const h = Math.random() * head * 0.85;
+        const r = (6 + 10 * (h / Math.max(1, head))) * k;
+        const a = Math.random() * Math.PI * 2;
+        fx.plume.spawn({
+          x: m.x + Math.cos(a) * r * 0.4, y: m.y + h, z: m.z + Math.sin(a) * r * 0.4,
+          vx: 0, vy: rise * 0.7, vz: 0,
+          life: 5 + Math.random() * 3,
+          size0: r * 1.4, size1: r * 2.6,
+          color0: this._c.mushDark, color1: this._c.mushGrey,
+          drag: 0.8, grav: 0.2, turb: 0.8, alpha: 0.85,
+        });
+      }
+    }
+  }
+
+  /**
+   * The condensation shell: the pressure wave of a very large blast chills
+   * the damp air it passes through and for half a second there is a white
+   * dome standing round the fireball, racing outward and gone.
+   */
+  wilson(x, y, z, radius = 140) {
+    let w = this.wilsons.find((q) => !q.mesh.visible);
+    if (!w) {
+      if (this.wilsons.length >= 2) return;
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { uA: { value: 0 } },
+        vertexShader: `varying vec3 vN; varying vec3 vV;
+          void main() { vec4 w = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-w.xyz); gl_Position = projectionMatrix * w; }`,
+        fragmentShader: `uniform float uA; varying vec3 vN; varying vec3 vV;
+          void main() { float rim = 1.0 - abs(dot(vN, vV)); float a = uA * (0.18 + 0.82 * pow(rim, 2.2)); gl_FragColor = vec4(vec3(0.97, 0.98, 1.0), a); }`,
+        transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), mat);
+      mesh.renderOrder = 12;
+      mesh.frustumCulled = false;
+      this.fx.scene.add(mesh);
+      w = { mesh, t: 0, r: radius };
+      this.wilsons.push(w);
+    }
+    w.t = 0; w.r = radius;
+    w.mesh.position.set(x, y, z);
+    w.mesh.visible = true;
+  }
+
+  _stepWilsons(dt) {
+    for (const w of this.wilsons) {
+      if (!w.mesh.visible) continue;
+      w.t += dt;
+      const T = 0.75;
+      if (w.t > T) { w.mesh.visible = false; continue; }
+      const u = w.t / T;
+      w.mesh.scale.setScalar(Math.max(1, w.r * (1 - Math.pow(1 - u, 2.4))));
+      w.mesh.material.uniforms.uA.value = (u < 0.12 ? u / 0.12 : 1) * Math.pow(1 - u, 1.6) * 0.9;
+    }
+  }
+
   /** Run `fn` after `t` seconds of effects time. */
   later(t, fn) { if (this._later.length < 64) this._later.push({ t, fn }); }
 
@@ -390,6 +551,9 @@ export class Flourish {
     }
     this.paper.update(dt, this.fx.time);
     if (this.cookoffs.length) this._stepCookoffs(dt);
+    if (this.rockets.length) this._stepRockets(dt);
+    if (this.mushrooms.length) this._stepMushrooms(dt);
+    if (this.wilsons.length) this._stepWilsons(dt);
     if (this.markers.length) this._stepMarkers(dt);
     if (this.flareList.length) this._stepFlares(dt);
   }
