@@ -99,7 +99,7 @@ export class Tutorial {
         done: () => this._count() >= 3,
         say: 'One gun is a hobby. A row of them is a foreign policy.' },
       { el: '#buildbar .unit-card[data-id="m240"]', fallback: '#dock-units', title: 'M240 MG',
-        text: 'Two men and a machine gun, $40. Light damage, but whatever it fires at is pinned and fires a third as often. Shoots at aircraft too.',
+        text: 'Two men and a machine gun, $40. Light damage, but whatever it fires at is pinned and fires a third as often. Shoots at aircraft too. Its fire is the red tracer: put it within 340 m of the enemy with a clear line to them.',
         ok: true, enter: () => { if (h.openDrawer !== 'units') h.setDrawer?.('units'); },
         say: 'Two boys and a belt of ammo. They won\'t knock anything down, but nobody shoots straight with their face in the dirt.' },
       // A gun stays armed after it is placed, and a tap with one armed is a

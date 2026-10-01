@@ -1740,7 +1740,17 @@ export class Battle {
       if (dd < r2) near.push([dd, d]);
     }
     near.sort((a, b) => a[0] - b[0]);
-    for (let i = 0; i < Math.min(6, near.length); i++) {
+    // Nearest first, but not only the nearest: in a town the six closest men
+    // are as often as not behind the same block, and a gun that gave up after
+    // them sat silent with thirty-five others in plain view. Twenty-four
+    // sight lines once a burst is nothing.
+    for (let i = 0; i < Math.min(24, near.length); i++) {
+      const d = near[i][1];
+      if (this._mgSees(from, d)) return { d, pos: d.muzzle };
+    }
+    // Then a sample of the rest, so the far edge of the range is not out of
+    // reach just because the near edge is crowded.
+    for (let i = 24; i < near.length; i += Math.max(1, Math.floor((near.length - 24) / 16))) {
       const d = near[i][1];
       if (this._mgSees(from, d)) return { d, pos: d.muzzle };
     }

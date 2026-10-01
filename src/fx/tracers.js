@@ -26,8 +26,10 @@ import * as THREE from 'three';
  * rocket does not look like a rifle round.
  */
 
-const MAX_TRACERS = 320;
-const MAX_FLASHES = 96;
+const MAX_TRACERS = 480;
+/** The player's own rounds, in a pool of their own so they are never crowded out. */
+const MAX_PLAYER = 200;
+const MAX_FLASHES = 128;
 const MAX_SPARKS = 220;
 
 /**
@@ -45,14 +47,28 @@ const LOOK = {
   sniper: { color: 0x62d8ff, core: 0xffffff, speed: 780, len: 16.0, width: 0.30, flash: 1.5 },
   at: { color: 0xff3a12, core: 0xffc078, speed: 210, len: 5.0, width: 0.62, flash: 2.6 },
   mortar: { color: 0xff3a12, core: 0xffc078, speed: 220, len: 4.5, width: 0.56, flash: 2.4 },
-  chaingun: { color: 0xffc23a, core: 0xfff4d8, speed: 820, len: 15.0, width: 0.42, flash: 1.8 },
+  // The player's guns carry `player`: their rounds always get a slot, and
+  // they are held to a wider streak on screen (`minPx`) than the garrison's,
+  // because nine rounds from one team have to read against three hundred
+  // from the other side.
+  chaingun: { color: 0xffb21a, core: 0xfff4d8, speed: 820, len: 26.0, width: 0.45, flash: 1.8, player: true, minPx: 3.0 },
   // American 7.62 burns red, which is also what tells the player's bursts
   // apart from the garrison's orange.
-  m240: { color: 0xff3424, core: 0xffd8c8, speed: 760, len: 13.0, width: 0.34, flash: 1.2 },
+  m240: { color: 0xff2414, core: 0xffd2b8, speed: 760, len: 45.0, width: 0.5, flash: 2.0, player: true, minPx: 5.0 },
   // The A-10's 30 mm: long, fat and fast, and a flash at the nose like a torch.
-  gau8: { color: 0xffb030, core: 0xfff0c0, speed: 1050, len: 26.0, width: 0.6, flash: 2.6 },
+  gau8: { color: 0xffa020, core: 0xfff0c0, speed: 1050, len: 34.0, width: 0.6, flash: 2.6, player: true, minPx: 3.6 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
+/**
+ * The narrowest a streak is drawn, in screen pixels, whatever its calibre.
+ *
+ * A 0.34 m streak at four hundred metres is three quarters of a pixel: the
+ * garrison's fire still reads because there is so much of it, and a single
+ * machine-gun team's burst simply was not there. Widening with distance
+ * keeps a tracer a line on the screen at any zoom; up close the real width
+ * is larger and wins.
+ */
+const MIN_PX = 1.3;
 
 export class TracerFX {
   constructor(scene, quality) {
@@ -75,6 +91,18 @@ export class TracerFX {
       MAX_TRACERS,
     );
     this._prepare(this.tracerMesh, MAX_TRACERS);
+
+    // ── The player's tracers: the same streak, but drawn solid rather than
+    // added. Added light is how a tracer glows at dusk, and over a sunlit
+    // city it is nearly nothing: red added to a pale roof is a pale roof.
+    // Solid, it is a red line on any ground at any distance, and it tells
+    // the player's fire from the garrison's at a glance.
+    this.playerMesh = new THREE.InstancedMesh(
+      tGeo,
+      new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false, fog: false }),
+      MAX_PLAYER,
+    );
+    this._prepare(this.playerMesh, MAX_PLAYER);
 
     // ── Muzzle flashes: a camera-facing star.
     this.flashMesh = new THREE.InstancedMesh(
@@ -101,9 +129,10 @@ export class TracerFX {
     );
     this._prepare(this.sparkMesh, MAX_SPARKS);
 
-    scene.add(this.tracerMesh, this.flashMesh, this.sparkMesh);
+    scene.add(this.tracerMesh, this.playerMesh, this.flashMesh, this.sparkMesh);
 
     this.tracers = [];
+    this.ptracers = [];
     this.flashes = [];
     this.sparks = [];
     this.fired = 0;
@@ -155,29 +184,42 @@ export class TracerFX {
       aim.z += (Math.random() - 0.5) * scatter * 2;
     }
 
-    if (this.tracers.length < MAX_TRACERS) {
-      this.tracers.push({
-        from: from.clone(), dir: dir.clone(), end, t: 0,
-        speed: look.speed, len: look.len, width: look.width,
-        color: look.color, core: look.core, hit, aim,
-        // Not every round is a tracer; every fourth or so glows, which is both
-        // correct and stops a burst reading as a solid bar of light.
-        bright: Math.random() < 0.82 ? 1 : 0.34,
-      });
+    const rec = {
+      player: !!look.player, minPx: look.minPx ?? MIN_PX,
+      from: from.clone(), dir: dir.clone(), end, t: 0,
+      speed: look.speed, len: look.len, width: look.width,
+      color: look.color, core: look.core, hit, aim,
+      // Not every round is a tracer; every fourth or so glows, which is both
+      // correct and stops a burst reading as a solid bar of light. The
+      // player's are all drawn: the team is one gun, not three hundred.
+      bright: look.player || Math.random() < 0.82 ? 1 : 0.34,
+    };
+    if (look.player) {
+      if (this.ptracers.length >= MAX_PLAYER) this.ptracers.shift();
+      this.ptracers.push(rec);
+    } else if (this.tracers.length < MAX_TRACERS) {
+      this.tracers.push(rec);
     }
 
+    if (this.flashes.length >= MAX_FLASHES && look.player) {
+      const k = this.flashes.findIndex((f) => !f.player);
+      if (k >= 0) this.flashes.splice(k, 1);
+    }
     if (this.flashes.length < MAX_FLASHES) {
       this.flashes.push({
         pos: from.clone(), dir: dir.clone(), t: 0,
         life: 0.055 + look.flash * 0.012,
-        size: 0.9 * look.flash, color: look.core,
+        size: 0.9 * look.flash, color: look.core, player: !!look.player,
+        minPx: look.player ? 11 : 0,
         roll: Math.random() * Math.PI,
       });
     }
   }
 
   /** Sparks where something lands. Also used by mortar rounds. */
-  impact(point, colour = 0xffb870, n = 6, energy = 1) {
+  impact(point, colour = 0xffb870, n = 6, energy = 1, big = false) {
+    // The player's own hits are never the ones dropped for want of a slot.
+    if (big) while (this.sparks.length > MAX_SPARKS - n) this.sparks.shift();
     for (let i = 0; i < n && this.sparks.length < MAX_SPARKS; i++) {
       this.sparks.push({
         pos: point.clone(),
@@ -188,7 +230,7 @@ export class TracerFX {
         ),
         t: 0, life: 0.22 + Math.random() * 0.3,
         size: 0.16 + Math.random() * 0.22 * energy,
-        color: colour,
+        color: colour, minPx: big ? 4 : 0,
       });
     }
   }
@@ -200,18 +242,26 @@ export class TracerFX {
   }
 
   _updateTracers(dt) {
+    this.tracers = this._updateList(this.tracers, this.tracerMesh, MAX_TRACERS, dt, true);
+    this.ptracers = this._updateList(this.ptracers, this.playerMesh, MAX_PLAYER, dt, false);
+  }
+
+  _updateList(list, mesh, cap, dt, additive) {
     let w = 0;
     const live = [];
-    for (const t of this.tracers) {
+    for (const t of list) {
       t.t += dt;
       const travelled = t.t * t.speed;
       if (travelled - t.len > t.end) {
-        if (t.hit) this.impact(t.aim, 0xffd0a0, 4, 0.7);
+        // Where the player's burst lands, said loudly enough to see from the
+        // camera: a spurt of sparks and grit, bigger when it connected.
+        if (t.player) this.impact(t.aim, t.hit ? 0xffb070 : 0xc8b89a, t.hit ? 7 : 5, t.hit ? 1.3 : 1.0, true);
+        else if (t.hit) this.impact(t.aim, 0xffd0a0, 4, 0.7);
         else this.impact(t.aim, 0x9fb6c8, 3, 0.5);
         continue;
       }
       live.push(t);
-      if (w >= MAX_TRACERS) continue;
+      if (w >= cap) continue;
 
       const tip = Math.min(travelled, t.end);
       const tail = Math.max(0, tip - t.len);
@@ -220,24 +270,33 @@ export class TracerFX {
 
       this._v.copy(t.from).addScaledVector(t.dir, tip);
       this._q.setFromUnitVectors(this._up, t.dir);
-      this._s.set(t.width, t.width, len);
+      let wid = t.width;
+      if (this._cam) wid = Math.max(wid, this._v.distanceTo(this._cam.position) * this._mPerPx * t.minPx);
+      this._s.set(wid, wid, len);
       this._m4.compose(this._v, this._q, this._s);
-      this.tracerMesh.setMatrixAt(w, this._m4);
+      mesh.setMatrixAt(w, this._m4);
 
-      // Bright at the tip, cooling along the streak: approximated by fading the
-      // whole instance as it ages, which at this size reads the same. The
-      // overall gain is well above 1 because this is additive over a daylit
-      // scene — at unit brightness a warm tracer washes out to a grey smear.
-      const fade = t.bright * (1 - Math.min(1, (t.t * t.speed) / (t.end + t.len)) * 0.35);
-      this._c2.setHex(t.color);
-      this._c.setHex(t.core).lerp(this._c2, 0.62).multiplyScalar(fade * 2.1);
-      this.tracerMesh.instanceColor.setXYZ(w, this._c.r, this._c.g, this._c.b);
+      if (additive) {
+        // Bright at the tip, cooling along the streak: approximated by fading
+        // the whole instance as it ages, which at this size reads the same.
+        // The overall gain is well above 1 because this is additive over a
+        // daylit scene — at unit brightness a warm tracer washes out to a
+        // grey smear.
+        const fade = t.bright * (1 - Math.min(1, (t.t * t.speed) / (t.end + t.len)) * 0.35);
+        this._c2.setHex(t.color);
+        this._c.setHex(t.core).lerp(this._c2, 0.62).multiplyScalar(fade * 2.1);
+      } else {
+        // Solid: the hot colour itself, a little lighter toward the core.
+        this._c2.setHex(t.core);
+        this._c.setHex(t.color).lerp(this._c2, 0.18);
+      }
+      mesh.instanceColor.setXYZ(w, this._c.r, this._c.g, this._c.b);
       w++;
     }
-    this.tracers = live;
-    this.tracerMesh.count = w;
-    this.tracerMesh.instanceMatrix.needsUpdate = true;
-    this.tracerMesh.instanceColor.needsUpdate = true;
+    mesh.count = w;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true;
+    return live;
   }
 
   _updateFlashes(dt) {
@@ -250,8 +309,9 @@ export class TracerFX {
       if (w >= MAX_FLASHES) continue;
       const k = 1 - f.t / f.life;
       // Flashes out fast and wide, then collapses.
-      const s = f.size * (0.5 + k * 1.5);
+      let s = f.size * (0.5 + k * 1.5);
       this._v.copy(f.pos).addScaledVector(f.dir, 0.35);
+      if (this._cam && f.minPx) s = Math.max(s, this._v.distanceTo(this._cam.position) * this._mPerPx * f.minPx * (0.5 + k * 0.5));
       this._q.setFromUnitVectors(this._up, f.dir);
       this._q.multiply(this._qRoll.setFromAxisAngle(this._up, f.roll));
       this._s.set(s, s, s);
@@ -278,7 +338,9 @@ export class TracerFX {
       live.push(s);
       if (w >= MAX_SPARKS) continue;
       const k = 1 - s.t / s.life;
-      this._s.set(s.size, s.size, s.size);
+      let sz = s.size;
+      if (s.minPx && this._cam) sz = Math.max(sz, s.pos.distanceTo(this._cam.position) * this._mPerPx * s.minPx);
+      this._s.set(sz, sz, sz);
       this._m4.compose(s.pos, this._camQuat || this._q.identity(), this._s);
       this.sparkMesh.setMatrixAt(w, this._m4);
       this._c.setHex(s.color).multiplyScalar(k * 1.8);
@@ -294,13 +356,18 @@ export class TracerFX {
   /** Billboarding for the sparks; called once a frame with the live camera. */
   setCamera(camera) {
     this._camQuat = camera.quaternion;
+    this._cam = camera;
+    // Metres a screen pixel covers at one metre's distance.
+    const h = (typeof window !== 'undefined' && window.innerHeight) || 720;
+    this._mPerPx = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov || 50) / 2)) / h;
   }
 
   clear() {
     this.tracers.length = 0;
+    this.ptracers.length = 0;
     this.flashes.length = 0;
     this.sparks.length = 0;
-    for (const m of [this.tracerMesh, this.flashMesh, this.sparkMesh]) m.count = 0;
+    for (const m of [this.tracerMesh, this.playerMesh, this.flashMesh, this.sparkMesh]) m.count = 0;
   }
 }
 
