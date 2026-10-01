@@ -25,7 +25,7 @@ import * as THREE from 'three';
  */
 
 /** The pitch of the roar for each airframe: the rocket clip slowed down. */
-const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62 };
+const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62, warthog: 0.48 };
 
 /** Dark grey, the way both of them are actually painted. */
 const EAGLE_GREY = 0x565b61;
@@ -298,6 +298,70 @@ export function makeEagle({ store } = {}) {
 }
 
 /**
+ * A-10C Thunderbolt II. 16.3 m long, 17.5 m span, nose along +Z.
+ *
+ * Nothing else in the sky looks like it, which is the point of drawing it at
+ * all: a straight, thick wing set low, the two engines in pods high on the
+ * back of the fuselage, twin square fins on the ends of the tailplane, and the
+ * seven barrels of the gun sticking out of the nose just off the centreline.
+ */
+export function makeWarthog() {
+  const g = new THREE.Group();
+  const grey = new THREE.MeshStandardMaterial({ color: 0x6b7177, roughness: 0.7, metalness: 0.25 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.5, metalness: 0.5 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x1f2a36, roughness: 0.18, metalness: 0.8 });
+  const glow = new THREE.MeshBasicMaterial({ color: 0xffb060, toneMapped: false });
+  g.add(part(loft([
+    { z: 8.2, w: 0.5, h: 0.6, n: 2.2 },
+    { z: 7.4, w: 1.1, h: 1.2, n: 2.4 },
+    { z: 5.4, w: 1.5, h: 1.7, y: 0.05, n: 2.8 },
+    { z: 2.0, w: 1.6, h: 1.8, y: 0.05, n: 3.0 },
+    { z: -2.4, w: 1.3, h: 1.5, y: 0.1, n: 3.0 },
+    { z: -6.0, w: 0.8, h: 1.0, y: 0.25, n: 2.8 },
+    { z: -7.6, w: 0.4, h: 0.6, y: 0.3, n: 2.4 },
+  ]), grey, 0, 0, 0));
+  // The bubble canopy, high and well forward.
+  g.add(part(loft([
+    { z: 6.3, w: 0.2, h: 0.12, y: 0.8, n: 2.2 },
+    { z: 5.5, w: 0.86, h: 0.62, y: 1.0, n: 2.4 },
+    { z: 4.4, w: 0.9, h: 0.66, y: 1.02, n: 2.6 },
+    { z: 3.6, w: 0.5, h: 0.3, y: 0.92, n: 2.6 },
+  ], 10), glass, 0, 0, 0));
+  // The gun: seven barrels in a cluster under the nose, a touch to port.
+  const gun = new THREE.CylinderGeometry(0.18, 0.2, 1.4, 8).rotateX(Math.PI / 2);
+  g.add(part(gun, dark, -0.18, -0.38, 8.6));
+  // Straight wing, low on the body, the tips drooped a little.
+  const wing = surface({ span: 7.8, root: 3.2, tip: 1.9, sweep: 0.4, thick: 0.42, dihedral: 0.06 });
+  pair(g, wing, grey, 0.6, -0.42, 1.6);
+  // Hardpoints and a load of stores under it.
+  for (const x of [2.2, 3.6, 5.0]) {
+    for (const sx of [-1, 1]) g.add(part(new THREE.CylinderGeometry(0.16, 0.16, 2.0, 8).rotateX(Math.PI / 2), dark, sx * x, -0.85, 0.6));
+  }
+  // The engines: two fat pods high on the back, on short pylons.
+  for (const sx of [-1, 1]) {
+    g.add(part(loft([
+      { z: 0.0, w: 0.9, h: 0.9, n: 2.2 }, { z: -0.6, w: 1.24, h: 1.24, n: 2.2 },
+      { z: -2.6, w: 1.2, h: 1.2, n: 2.2 }, { z: -3.6, w: 0.9, h: 0.9, n: 2.2 },
+    ], 12), grey, sx * 1.25, 1.05, -2.2));
+    g.add(part(new THREE.BoxGeometry(0.2, 0.6, 1.4), grey, sx * 0.85, 0.75, -3.2));
+    const f = new THREE.ConeGeometry(0.34, 1.0, 8); f.rotateX(-Math.PI / 2);
+    g.add(part(f, glow, sx * 1.25, 1.05, -6.0));
+  }
+  // Tailplane and the two square fins on its ends.
+  const stab = surface({ span: 2.7, root: 1.8, tip: 1.5, sweep: 0.2, thick: 0.22 });
+  pair(g, stab, grey, 0.3, 0.4, -5.8);
+  const fin = surface({ span: 2.4, root: 1.8, tip: 1.3, sweep: 0.5, thick: 0.18 });
+  for (const sx of [-1, 1]) {
+    const m = new THREE.Mesh(sx > 0 ? fin : mirrorX(fin), grey);
+    m.position.set(sx * 3.0, 0.2, -5.7);
+    m.rotation.z = sx * (Math.PI / 2);
+    m.castShadow = true;
+    g.add(m);
+  }
+  return g;
+}
+
+/**
  * The airframe a strike flies, by its record: `aircraft.kind` picks the
  * builder and `aircraft.store` what the Eagle carries. Exported so the card
  * icons are rendered from exactly what the sortie draws.
@@ -309,6 +373,7 @@ export function makeAirframe(def) {
     case 'apache': return makeApache();
     case 'ghostrider': return makeGhostrider();
     case 'tomahawk': return makeTomahawk();
+    case 'warthog': return makeWarthog();
     default: return makeEagle({ store: a.store });
   }
 }
@@ -425,6 +490,7 @@ export class AirWing {
    */
   call(def, target, ceiling, opts = {}) {
     if (def.aircraft?.station) return this._callLoiter(def, target, ceiling, opts);
+    if (def.strike?.strafe) return this._callStrafe(def, target, ceiling, opts);
     const a = def.aircraft;
     const p = def.projectile;
     // Run in from behind the camera, across the target, and out the far side.
@@ -487,6 +553,105 @@ export class AirWing {
     };
     this.sorties.push(s);
     return s;
+  }
+
+  /**
+   * A gun run down a line: the A-10.
+   *
+   * The player draws the line, from where the stream should start to where
+   * it should end; a tap with no drag is a line through the point, running
+   * away from the camera. The aircraft comes in low along that line from well
+   * behind its start, opens fire at a slant range of about seven hundred
+   * metres, and walks a stream of 30 mm from the start of the line to its end
+   * over a second and a half or so: a hundred-odd real rounds, each one a
+   * projectile that stops against whatever it meets first. Then it pulls up
+   * and away. Each round is a small high-explosive burst: lethal to a man
+   * within a couple of metres of it, trench or not, and nothing that troubles
+   * masonry beyond the face it chips.
+   */
+  _callStrafe(def, target, ceiling, opts = {}) {
+    const a = def.aircraft, st = def.strike;
+    let from = target.clone();
+    let to = opts.to ? opts.to.clone() : null;
+    if (!to || Math.hypot(to.x - from.x, to.z - from.z) < 12) {
+      // A tap: a line through the point, along the camera's look.
+      const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+      const l = Math.hypot(dx, dz) || 1;
+      const half = st.defaultLen / 2;
+      from = target.clone().set(target.x - dx / l * half, 0, target.z - dz / l * half);
+      to = target.clone().set(target.x + dx / l * half, 0, target.z + dz / l * half);
+    }
+    // Not shorter than the stream needs, not longer than one burst covers.
+    const len0 = Math.hypot(to.x - from.x, to.z - from.z);
+    const len = THREE.MathUtils.clamp(len0, st.minLen, st.maxLen);
+    const dir = new THREE.Vector3((to.x - from.x) / len0, 0, (to.z - from.z) / len0);
+    to.set(from.x + dir.x * len, 0, from.z + dir.z * len);
+    from.y = this.terrain.heightAt(from.x, from.z);
+    to.y = this.terrain.heightAt(to.x, to.z);
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    const alt = Math.max(Math.max(from.y, to.y) + a.height, ceiling + a.clearance);
+    const model = makeAirframe(def);
+    model.rotation.order = 'YXZ';
+    // Opens fire `lead` metres short of the start of the line. Steep: forty
+    // degrees or so down the gun line, the way a gun run is flown, because
+    // the trenches that matter are dug in streets, and a shallow stream is
+    // stopped by the first block in front of them.
+    const lead = Math.max(st.lead, (alt - from.y) * 1.15);
+    model.position.copy(from).addScaledVector(dir, -(a.runIn + lead));
+    model.position.y = alt;
+    model.rotation.y = Math.atan2(dir.x, dir.z);
+    model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
+    this.scene.add(model);
+    const openAt = a.runIn / a.speed;
+    const s = {
+      def, model, dir, side, alt, target: from.clone(),
+      speed: a.speed, t: 0, released: false,
+      releaseAt: openAt, fall: st.burst,
+      pullUpAt: openAt + st.burst + 0.8,
+      climb: 0, roar: 0, life: 0,
+      flak: opts.flak || 0,
+      hp: AIRFRAME.jet * 2.2, hits: 0, jink: 0, jinkAt: Math.random() * Math.PI * 2,
+      strafe: { from, to, fired: 0, rounds: st.rounds, burst: st.burst, brrt: false },
+    };
+    this.sorties.push(s);
+    return s;
+  }
+
+  /** The rounds due by now, each from the gun to its point on the line. */
+  _strafeFire(s) {
+    const S = s.strafe, m = s.model;
+    const since = s.t - s.releaseAt;
+    const due = Math.min(S.rounds, Math.floor((since / S.burst) * S.rounds) + 1);
+    const nose = this._v.set(0, -0.4, 8.6).applyQuaternion(m.quaternion).add(m.position);
+    for (; S.fired < due; S.fired++) {
+      const f = S.fired / Math.max(1, S.rounds - 1);
+      // The stream walks the line, with the scatter of a gun firing from a
+      // moving aircraft: a few metres either side and a little long or short.
+      // Flak on the way in shakes the run off the line, but a pilot holding a
+      // gun on a point corrects as he goes: a fraction of what the same hits
+      // do to a bomb released blind, and never more than half a bay's width.
+      const off = Math.min(3, s.jink * 0.05);
+      const p = S.from.clone().lerp(S.to, f);
+      p.addScaledVector(s.side, (Math.random() - 0.5) * 5.0 + Math.cos(s.jinkAt) * off);
+      p.addScaledVector(s.dir, (Math.random() - 0.5) * 4.0 + Math.sin(s.jinkAt) * off);
+      p.y = this.terrain.heightAt(p.x, p.z);
+      const v = p.clone().sub(nose).normalize().multiplyScalar(1050);
+      this.projectiles.fire({
+        pos: nose.clone(), vel: v, gravity: 0, kind: 'direct', speed: 1050,
+        warhead: s.def.warhead, owner: null, target: p, trail: 0,
+      });
+      if (this.tracers && S.fired % 2 === 0) this.tracers.fire(nose, p, { look: 'gau8' }, true);
+    }
+    if (this.fx) this.fx.trail(nose, 2.8);
+    if (!S.brrt && this.audio) {
+      S.brrt = true;
+      // The gun is one sound, not a rattle of separate shots: at sixty-five
+      // rounds a second the reports run together into the tearing note the
+      // aircraft is named for.
+      for (let k = 0; k < 5; k++) {
+        setTimeout(() => this.audio.play('mg', m.position, { rate: 0.38, gain: 0.9, rolloff: 1600, cooldown: 0 }), k * 260);
+      }
+    }
   }
 
   /**
@@ -609,11 +774,16 @@ export class AirWing {
         m.rotation.z = s.climb * 0.5;
       }
 
+      // A gun run fires for the length of its burst, unless it was driven off.
+      if (s.strafe && !s.aborted && s.t >= s.releaseAt && s.strafe.fired < s.strafe.rounds) {
+        s.released = true;
+        this._strafeFire(s);
+      }
       // Driven off: the bomb stays on the rail and the aircraft goes home.
       if (s.aborted && !s.released) s.released = true;
 
       // Let go.
-      if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli) {
+      if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli && !s.strafe) {
         s.released = true;
         // Where it actually goes. The aim point walks off by what the pilot
         // has been hit with on the way in, and a pilot under fire lets go

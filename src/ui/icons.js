@@ -295,7 +295,7 @@ const BODY = {
 export const IMAGE_ICONS = new Set([
   'm240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm120',
   'm119', 'm777', 'm109', 'stryker', 'm270', 'm142',
-  'f15', 'b1', 'ah64', 'ac130', 'tomahawk', 'gbu28',
+  'a10', 'f15', 'b1', 'ah64', 'ac130', 'tomahawk', 'gbu28',
 ]);
 
 /** Inline markup for a unit id, or null if it has no icon. */

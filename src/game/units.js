@@ -229,6 +229,24 @@ export const UNITS = [
   // its tenth and the tower stands. The Lancer has neither, which is what its
   // price buys: the MOAB still fells a tower in one pass.
   {
+    id: 'a10', name: 'A-10C', full: 'A-10C Thunderbolt II · GAU-8/A 30 mm', tier: 'AIR',
+    cost: 2500, unlockFrac: 0.02,
+    // The cheap strike, and the only one that is drawn rather than tapped:
+    // press where the stream should start and drag along the line it should
+    // walk. A hundred and ten 30 mm high-explosive rounds in a second and
+    // three quarters, each one a small burst: it empties a trench bay it is
+    // laid along and does little more than chip a wall it crosses. It flies
+    // low and slow through the flak to do it, and it is built to.
+    model: 'aircraft',
+    strike: { strafe: true, rounds: 110, burst: 1.75, lead: 220, minLen: 60, maxLen: 220, defaultLen: 150 },
+    aircraft: { kind: 'warthog', speed: 170, height: 90, clearance: 40, runIn: 1500 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'direct', speed: 1050, gravity: 0, trail: 0 },
+    warhead: { lethal: 0.45, radius: 1.8, power: 900, fx: 0.3, kinetic: 0.12 },
+    dispersion: 0,
+    blurb: 'A gun run down the line you draw. Shreds a trench; barely chips a wall.',
+  },
+  {
     id: 'f15', name: 'F-15E', full: 'F-15E Strike Eagle · GBU-12 500 lb', tier: 'AIR',
     cost: 100000, unlockFrac: 0.12,
     model: 'aircraft', strike: { frac: 0.10, maxR: 64, minR: 9, fx: 4.6, bite: 0.62, shock: 1.2 },

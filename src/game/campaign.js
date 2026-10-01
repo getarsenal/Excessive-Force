@@ -694,7 +694,7 @@ function closedCount() {
  * Great Pyramid with rockets still means working up to them.
  */
 export function releasedUnits() {
-  const out = new Set(['m240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm119', 'm777']);
+  const out = new Set(['m240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm119', 'm777', 'a10']);
   const prog = loadProgress();
   const upTo = challengeUpTo();
   for (const t of THEATRES) {

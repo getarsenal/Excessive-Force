@@ -49,6 +49,8 @@ const LOOK = {
   // American 7.62 burns red, which is also what tells the player's bursts
   // apart from the garrison's orange.
   m240: { color: 0xff3424, core: 0xffd8c8, speed: 760, len: 13.0, width: 0.34, flash: 1.2 },
+  // The A-10's 30 mm: long, fat and fast, and a flash at the nose like a torch.
+  gau8: { color: 0xffb030, core: 0xfff0c0, speed: 1050, len: 26.0, width: 0.6, flash: 2.6 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 

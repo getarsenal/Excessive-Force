@@ -585,6 +585,7 @@ async function boot() {
       // what the player wants next is the map it was standing over.
       if (battle.selectedUnitId) hud.closeDrawer();
       if (!battle.selectedUnitId) hud.hidePrompt();
+      else if (UNITS_BY_ID[id].strike?.strafe) hud.status('press and drag along the line to strafe', 4);
       else if (UNITS_BY_ID[id].strike) hud.status('drag to aim the strike', 4);
       else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
@@ -1194,7 +1195,12 @@ async function boot() {
     if (!def || livePointers.size > 1) return;
     const hit = pick(e.clientX, e.clientY, !!def.strike);
     if (!hit) return;
-    if (def.strike) {
+    if (def.strike?.strafe) {
+      // A gun run is a line: down where the stream starts, drag along it.
+      const at = hit.point.clone();
+      aiming = { kind: 'strafe', def, at, to: at.clone() };
+      battle.showStrafe(at, at, def);
+    } else if (def.strike) {
       const at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
       aiming = { kind: 'strike', def, at };
       battle.showStrikeAim(at, def);
@@ -1215,6 +1221,11 @@ async function boot() {
       if (a.kind === 'strike') {
         battle.hideStrikeAim();
         if (battle.state === 'playing') battle.callStrike(battle.selectedUnitId, a.at);
+        return;
+      }
+      if (a.kind === 'strafe') {
+        battle.hideStrikeAim();
+        if (battle.state === 'playing') battle.callStrike(battle.selectedUnitId, a.at, { to: a.to });
         return;
       }
       if (a.kind === 'line') {
@@ -1296,6 +1307,13 @@ async function boot() {
       if (livePointers.size > 1) { endAiming(); return; }
       const hit = pickMoving(e.clientX, e.clientY, aiming.kind === 'strike');
       if (!hit) return;
+      if (aiming.kind === 'strafe') {
+        aiming.to = hit.point.clone();
+        battle.showStrafe(aiming.at, aiming.to, aiming.def);
+        const len = Math.hypot(aiming.to.x - aiming.at.x, aiming.to.z - aiming.at.z);
+        hud.status(len < 12 ? 'drag along the line to strafe' : `GUN RUN · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
+        return;
+      }
       if (aiming.kind === 'strike') {
         aiming.at = hit.kind === 'defender' ? hit.defender.pos.clone() : hit.point.clone();
         battle.showStrikeAim(aiming.at, aiming.def);
@@ -1335,6 +1353,8 @@ async function boot() {
       battle.ghost.visible = false;
       battle.rangeRing.visible = false;
       if (!hit) { battle.hideStrikeAim(); return; }
+      // A gun run previews the default line through the point.
+      if (def.strike.strafe) { battle.showStrafe(hit.point, hit.point, def); return; }
       battle.showStrikeAim(hit.kind === 'defender' ? hit.defender.pos : hit.point, def);
       return;
     }
@@ -1408,8 +1428,8 @@ async function boot() {
       const row = (e.shiftKey || hud.openDrawer === 'strikes') ? hud.bars.strikes : hud.bars.units;
       const id = row[n - 1];
       if (id && battle.selectUnit(id)) {
-        hud.status(UNITS_BY_ID[id].strike
-          ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
+        hud.status(UNITS_BY_ID[id].strike?.strafe ? 'press and drag along the line to strafe'
+          : UNITS_BY_ID[id].strike ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
       }
     }
   });

@@ -136,6 +136,8 @@ export class Battle {
     // The Apache's chain gun: the air wing knows where the helicopter is
     // and when it fires; the garrison is here. `pick` is the live defender
     // nearest the aim point, `fire` is one burst on it.
+    // The A-10's stream is drawn as tracer the same way the garrison's is.
+    this.air.tracers = this.tracerFX;
     this.air.gunner = {
       pick: (c, reach) => {
         let best = null, bd = reach * reach;
@@ -447,6 +449,50 @@ export class Battle {
   hideStrikeAim() {
     if (this.strikeReticle) this.strikeReticle.visible = false;
     this._strikeAt = null;
+    if (this._strafeLine) this._strafeLine.visible = false;
+  }
+
+  /**
+   * The line a gun run will walk, while it is being drawn: a strip on the
+   * ground from the finger down to the finger now, with an arrowhead at the
+   * far end for the way the aircraft will fly. Clamped to what one burst
+   * covers, so the strip is the run the player will actually get.
+   */
+  showStrafe(from, to, def) {
+    if (!this._strafeLine) {
+      const g = new THREE.Group();
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff8a3a, transparent: true, opacity: 0.55, depthWrite: false });
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(1, 0.3, 1), mat);
+      strip.name = 'strip';
+      const head = new THREE.Mesh(new THREE.ConeGeometry(4.5, 9, 3).rotateX(Math.PI / 2), mat);
+      head.name = 'head';
+      g.add(strip, head);
+      g.renderOrder = 18;
+      this._strafeLine = g;
+      this.scene.add(g);
+    }
+    const st = def.strike;
+    let dx = to.x - from.x, dz = to.z - from.z;
+    let len = Math.hypot(dx, dz);
+    if (len < 12) {
+      // Not drawn yet: the default run through the point, away from the camera.
+      dx = from.x - this.camera.position.x; dz = from.z - this.camera.position.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l; dz /= l; len = st.defaultLen;
+      from = new THREE.Vector3(from.x - dx * len / 2, from.y, from.z - dz * len / 2);
+    } else {
+      dx /= len; dz /= len;
+      len = THREE.MathUtils.clamp(len, st.minLen, st.maxLen);
+    }
+    const g = this._strafeLine;
+    const strip = g.getObjectByName('strip'), head = g.getObjectByName('head');
+    const y = this.terrain.heightAt(from.x + dx * len / 2, from.z + dz * len / 2) + 0.6;
+    g.position.set(from.x, y, from.z);
+    g.rotation.set(0, Math.atan2(dx, dz), 0);
+    strip.scale.set(5, 1, len);
+    strip.position.set(0, 0, len / 2);
+    head.position.set(0, 0, len + 3);
+    g.visible = true;
   }
 
   _setupGhost() {
@@ -866,7 +912,7 @@ export class Battle {
    * Call an air strike on a point. Paid for on the call; the aircraft comes
    * in from behind the camera and the bomb lands a few seconds later.
    */
-  callStrike(id, point) {
+  callStrike(id, point, opts = {}) {
     const def = UNITS_BY_ID[id];
     if (!def || !def.strike) return null;
     if (!this.isUnlocked(def)) return null;
@@ -887,7 +933,7 @@ export class Battle {
     // aircraft arrives gives the player the few seconds he needs to put
     // something on those pits first, which is the whole point of them.
     const flak = this.garrison ? this.garrison.flakOver(at, 120) : 0;
-    const sortie = this.air.call(def, at, ceiling, { flak });
+    const sortie = this.air.call(def, at, ceiling, { flak, to: opts.to || null });
     this.shotsFired++;
     this.selectedUnitId = null;
     if (flak > 0) this.onEvent('flak', { def, guns: flak });
