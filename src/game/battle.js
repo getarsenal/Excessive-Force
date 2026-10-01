@@ -2086,8 +2086,18 @@ export class Battle {
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 6.0;
     this._lastImpact = point.clone();
-    // Everything under the bomb burns.
-    if (this.cityFire) this.cityFire.blast(point, rMax * 0.8);
+    // Everything under the bomb burns, and the town round it. The masonry
+    // radius above is sized on the monument and falls to `minR` in the
+    // street, which in town was a circle smaller than one house: a 2,000 lb
+    // bomb into a terrace took the one building it went through. In the town
+    // the circle is the warhead's own — forty metres for the F-15's bomb, a
+    // hundred and ten for the MOAB — with a ring past it that is scorched
+    // and loosened rather than gutted. A loitering gunship's rounds are
+    // shells, and keep to the building they hit.
+    if (this.cityFire) {
+      const cityR = st.loiter ? rMax * 0.8 : Math.max(rMax * 0.8, w.radius || 0);
+      this.cityFire.blast(point, cityR, st.loiter ? cityR : cityR * 1.6);
+    }
     // The blast is seen where the bomb went in, not fourteen metres inside
     // the stone where a penetrator actually goes off.
     this.fx.strikeBlast(hit.point, w.fx, { groundY });
@@ -2313,6 +2323,7 @@ export class Battle {
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
       if (this.smokes) this.smokes.update(dt);
       if (this.fires) this.fires.update(dt);
+      if (this.cityFire) this.cityFire.update(dt);
       if (this.tracerFX) this.tracerFX.update(dt);
       return;
     }
@@ -2359,6 +2370,7 @@ export class Battle {
     if (this.smokeCooldown > 0) this.smokeCooldown -= dt;
     if (this.smokes) this.smokes.update(dt);
     if (this.fires) this.fires.update(dt);
+    if (this.cityFire) this.cityFire.update(dt);
 
     // Defenders.
     if (this.targetDefender && !this.targetDefender.alive) this.clearTarget();

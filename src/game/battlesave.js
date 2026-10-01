@@ -98,7 +98,9 @@ export function snapshotBattle({ level, battle, structures }) {
   if (g && nBase < 0) nBase = g.defenders.length;
   const cf = battle.cityFire;
   const burnt = [];
-  if (cf) for (const p of cf.plots) if (p.burnt) burnt.push(p.index);
+  // A bomb's circle goes over a few tenths of a second; what it has
+  // claimed and not yet reached is as good as burnt.
+  if (cf) for (const p of cf.plots) if (p.burnt || p.doomed) burnt.push(p.index);
   return {
     v: 1,
     level: level.id,

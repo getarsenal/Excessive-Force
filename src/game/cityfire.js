@@ -45,6 +45,8 @@ export class CityFire {
     this.onBurn = onBurn || null;
     this.burnt = 0;
     this._v = new THREE.Vector3();
+    this._queue = [];
+    this._clock = 0;
 
     // A grid over the plots: an impact asks "which building is this" once,
     // but a bomb asks for everything within sixty metres.
@@ -118,12 +120,25 @@ export class CityFire {
     return { plot: p, burnt: true };
   }
 
-  /** A bomb: everything under it goes. */
-  blast(point, radius) {
+  /**
+   * A bomb: everything under it goes, and the street round it.
+   *
+   * `radius` is the circle that is gutted; out to `ring` the blast still
+   * reaches, scorching the facades and loosening the buildings so a shell
+   * finishes them. The circle does not go up in one frame: the shock runs
+   * out from the burst, so each building goes when the front reaches its
+   * near wall, the nearest first and the edge of the circle a beat later.
+   *
+   * Only the nearest few get a fireball, a column and a sound of their own;
+   * a heavy bomb in a dense town guts fifty buildings, and fifty fireballs
+   * on top of the bomb's own is a slideshow on a phone and noise on any
+   * screen. The rest go to shells, soot and fire on the heap.
+   */
+  blast(point, radius, ring = radius) {
     const cx = Math.floor(point.x / this.CELL), cz = Math.floor(point.z / this.CELL);
-    const reach = Math.ceil(radius / this.CELL);
+    const reach = Math.ceil(ring / this.CELL);
     const seen = new Set();
-    let n = 0;
+    const doomed = [];
     for (let ox = -reach; ox <= reach; ox++) {
       for (let oz = -reach; oz <= reach; oz++) {
         const b = this.grid.get((cx + ox) * 8192 + (cz + oz));
@@ -132,20 +147,51 @@ export class CityFire {
           if (seen.has(i)) continue;
           seen.add(i);
           const p = this.plots[i];
-          if (p.burnt) continue;
+          if (p.burnt || p.doomed) continue;
           // Within the blast by the near edge of the building, not its centre:
           // a long terrace with one end in the fire is in the fire.
           const dx = point.x - p.x, dz = point.z - p.z;
           const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
           const lx = Math.max(0, Math.abs(dx * ca - dz * sa) - p.w / 2);
           const lz = Math.max(0, Math.abs(dx * sa + dz * ca) - p.d / 2);
-          if (Math.hypot(lx, lz) > radius) continue;
-          this.burn(p, 0.15 + Math.hypot(lx, lz) / radius * 0.8);
-          n++;
+          const d = Math.hypot(lx, lz);
+          if (d > ring) continue;
+          if (d <= radius) { doomed.push([d, p]); continue; }
+          // The ring: soot by how near, and most of the way to coming down.
+          const f = 1 - (d - radius) / Math.max(1, ring - radius);
+          this.scorch(p, 0.25 + 0.5 * f);
+          const need = 5 + Math.min(p.w, p.d) * 0.3 + Math.min(p.h, 40) * 0.12;
+          p.dmg = Math.max(p.dmg || 0, need * (0.4 + 0.5 * f));
         }
       }
     }
-    return n;
+    doomed.sort((a, b) => a[0] - b[0]);
+    const t = this._clock || 0;
+    doomed.forEach(([d, p], k) => {
+      p.doomed = true;
+      this._queue.push({ p, at: t + 0.04 + d / 260 + Math.random() * 0.12,
+        quiet: k < 6 ? 0.15 + d / Math.max(1, radius) * 0.8 : 0, rank: k });
+    });
+    return doomed.length;
+  }
+
+  /** Burn what the blasts have queued, each when its shock front arrives. */
+  update(dt) {
+    this._clock = (this._clock || 0) + dt;
+    if (!this._queue.length) return;
+    const now = this._clock;
+    for (let i = this._queue.length - 1; i >= 0; i--) {
+      const q = this._queue[i];
+      if (q.at > now) continue;
+      this._queue.splice(i, 1);
+      if (!q.p.burnt) this.burn(q.p, q.quiet, q.rank);
+    }
+  }
+
+  /** Everything queued, burnt now: a save, or a level being torn down. */
+  flush() {
+    for (const q of this._queue) if (!q.p.burnt) this.burn(q.p, 0, q.rank);
+    this._queue.length = 0;
   }
 
   /**
@@ -177,7 +223,7 @@ export class CityFire {
    * Gut the building. The walls go to char, the windows go dark, the roof
    * catches, and the smoke stands over it.
    */
-  burn(p, quiet = 1) {
+  burn(p, quiet = 1, rank = 0) {
     p.burnt = true;
     this.burnt++;
     // The building as it was goes: every piece of it — walls, roof, cornice,
@@ -200,7 +246,7 @@ export class CityFire {
     this.ruins.add(buildRuin(p, Math.random));
     const top = p.top ?? (p.base + p.h);
     const size = Math.hypot(p.w, p.d);
-    if (this.fx) {
+    if (this.fx && quiet > 0) {
       // The charge goes off inside; the fireball comes out of the windows.
       this._v.set(p.x, p.base + Math.min(p.h, 40) * 0.55, p.z);
       this.fx.detonate(this._v, (1.8 + size * 0.03) * quiet, { ground: false });
@@ -209,7 +255,8 @@ export class CityFire {
     if (this.fires) {
       // Fire in the shell: on the heap inside, one for a house, several for
       // a block, and the smoke comes up through where the roof was.
-      const n = Math.max(1, Math.min(4, Math.round(size / 20)));
+      // Past the first dozen of a bomb's circle, one fire a building.
+      const n = rank >= 12 ? 1 : Math.max(1, Math.min(4, Math.round(size / 20)));
       const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
       const heap = p.base + Math.min(3.2, 0.9 + p.h * 0.12) * 0.7;
       for (let i = 0; i < n; i++) {
@@ -219,7 +266,7 @@ export class CityFire {
         this.fires.ignite(fx, heap, fz, 1.4 + size * 0.02, 45 + size * 1.5);
       }
     }
-    if (this.audio) {
+    if (this.audio && quiet > 0) {
       this._v.set(p.x, top, p.z);
       this.audio.play('explosion', this._v, { rate: 0.72, gain: 0.55 + Math.min(0.4, size * 0.006), rolloff: 420 });
     }
