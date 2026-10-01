@@ -1772,13 +1772,13 @@ export class Battle {
     if (t.air) {
       if (!t.air.alive) { u.burstLeft = 0; return; }
       const dist = t.air.pos.distanceTo(from);
-      const hit = Math.random() < 0.5 * (1 - 0.6 * dist / mg.air);
+      const hit = Math.random() < 0.5 * (1 - 0.6 * dist / mg.air) * (t.air.exposure ?? 1);
       // Leading a moving aircraft by eye: the stream hoses round it.
       const aim = t.air.pos.clone();
       const sp = dist * (hit ? 0.006 : 0.03);
       aim.x += gauss() * sp; aim.y += gauss() * sp; aim.z += gauss() * sp;
       this.tracerFX.fire(from, aim, { look: 'm240' }, hit);
-      if (hit) t.air.hit(mg.airDamage, u);
+      if (hit) t.air.hit(mg.airDamage * (t.air.armour ?? 1), u);
     } else {
       const d = t.d;
       if (!d.alive) { u.burstLeft = 0; return; }

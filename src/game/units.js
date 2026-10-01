@@ -46,7 +46,7 @@ export const UNITS = [
     crew: 2, health: 150,
     mg: {
       burst: 9, interval: 0.085, damage: 6,
-      pin: 6.0, pinRadius: 10, air: 520, airDamage: 5,
+      pin: 6.0, pinRadius: 10, air: 420, airDamage: 5,
     },
     projectile: { kind: 'direct', speed: 850, gravity: 0, trail: 0.2 },
     warhead: { lethal: 0.1, radius: 0.5, power: 30, fx: 0.1, kinetic: 0 },

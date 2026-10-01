@@ -1080,7 +1080,7 @@ export class AirWing {
         pos: nose.clone(), vel: v, gravity: 0, kind: 'direct', speed: 1050,
         warhead: s.def.warhead, owner: null, target: p, trail: 0,
       });
-      if (this.tracers && S.fired % 2 === 0) this.tracers.fire(nose, p, { look: 'gau8' }, true);
+      if (this.tracers) this.tracers.fire(nose, p, { look: 'gau8' }, true);
     }
     if (this.fx) this.fx.trail(nose, 2.8);
     if (!S.brrt && this.audio) {

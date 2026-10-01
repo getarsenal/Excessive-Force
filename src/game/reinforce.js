@@ -45,6 +45,21 @@ const SHARE = 0.5;
  * teams dug in before it comes should bring down about one aircraft in
  * three, and every man still aboard goes with it.
  */
+/**
+ * What small arms do to an aeroplane.
+ *
+ * A 7.62 round through a transport's skin makes a hole and very little else:
+ * what brings one down is a hit on an engine, a fuel line or the crew, and
+ * that takes time under fire, not a lot of guns at once. `armour` is the
+ * share of a hit that counts, and `soak` the rate the airframe can lose it
+ * at, in its own hit points a second — a battery of thirty machine guns on
+ * one Il-76 brought it down in a second and a half, and every transport in
+ * the drop with it, before anyone had jumped. Held to a ninth of its
+ * strength a second, the most fire there is takes nine seconds: it can
+ * catch a transport late in its pass, after most of its stick is out.
+ */
+const SMALL_ARMS = { armour: 0.35, soak: 1 / 9 };
+
 const FRAMES = {
   il76: { name: 'IL-76 CANDID', cap: 40, hp: 230, speed: 84, alt: 190 },
   an12: { name: 'AN-12 CUB', cap: 30, hp: 190, speed: 74, alt: 175 },
@@ -568,6 +583,7 @@ export class EnemyAirborne {
       this.scene.add(model);
       const p = {
         model, dir, side, lat, along: -behind, speed: F.speed, hp: F.hp, alive: true, down: false,
+        armour: SMALL_ARMS.armour, soakRate: F.hp * SMALL_ARMS.soak, soak: F.hp * SMALL_ARMS.soak,
         load, next: 0, nextAt: 0, t: 0, roar: 0, bank: 0,
         pos: model.position,
         hit: (dmg) => this._hitPlane(p, dmg),
@@ -705,6 +721,7 @@ export class EnemyAirborne {
     for (let i = this.planes.length - 1; i >= 0; i--) {
       const p = this.planes[i];
       p.t += dt;
+      p.soak = Math.min(p.soakRate, p.soak + p.soakRate * dt);
       const m = p.model;
       if (p.down) {
         // Going in: nose down, a wing dropping, and a lot of smoke.
@@ -828,6 +845,9 @@ export class EnemyAirborne {
 
   _hitPlane(p, dmg) {
     if (!p.alive || p.down) return;
+    // No faster than the airframe can actually be shot down.
+    dmg = Math.min(dmg, p.soak);
+    p.soak -= dmg;
     p.hp -= dmg;
     this.planeDamage = (this.planeDamage || 0) + dmg;
     if (p.hp > 0) return;
@@ -857,7 +877,9 @@ export class EnemyAirborne {
     list.length = 0;
     for (const p of this.planes) if (p.alive) list.push(p);
     for (const man of this.men) {
-      if (man.alive && man.open > 0.6) list.push({ pos: man.hitPos, alive: true, hit: man.hit });
+      // A man under a canopy is a small thing falling past at two hundred
+      // metres: most of a burst goes through the silk or past him.
+      if (man.alive && man.open > 0.6) list.push({ pos: man.hitPos, alive: true, hit: man.hit, exposure: 0.15 });
     }
   }
 

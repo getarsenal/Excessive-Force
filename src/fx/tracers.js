@@ -56,7 +56,9 @@ const LOOK = {
   // apart from the garrison's orange.
   m240: { color: 0xff4a24, core: 0xffd8c0, speed: 760, len: 12.0, width: 0.14, flash: 1.4, player: true, minPx: 1.3, every: 3 },
   // The A-10's 30 mm: long, fat and fast, and a flash at the nose like a torch.
-  gau8: { color: 0xffa020, core: 0xfff0c0, speed: 1050, len: 22.0, width: 0.3, flash: 2.6, player: true, minPx: 1.8 },
+  // One in five, as the combat mix is loaded; 30 mm is fatter than rifle
+  // tracer but not by much at this range.
+  gau8: { color: 0xffa020, core: 0xfff0c0, speed: 1050, len: 14.0, width: 0.16, flash: 2.2, player: true, minPx: 1.1, every: 5 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 /**
