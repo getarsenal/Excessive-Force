@@ -2,12 +2,13 @@
 // where it went, where it landed, what the game said about it, and what came
 // down.
 //
-//   node tools/bombtrace.mjs <level> [id=gbu28] [pre=0]
+//   node tools/bombtrace.mjs <level> [id=gbu28] [pre=0] [core|top]
 //
-// `pre` knocks that share of the primary down first (by deleting stones from
-// the middle out), to try the strike on a ruin rather than a fresh building.
+// `pre` knocks that share of the primary down first — from the middle out
+// (`core`) or from the top down (`top`) — to try the strike on a ruin rather
+// than a fresh building.
 import { chromium } from 'playwright';
-const [level = 'borobudur', id = 'gbu28', pre = '0'] = process.argv.slice(2);
+const [level = 'borobudur', id = 'gbu28', pre = '0', mode = 'core'] = process.argv.slice(2);
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 900, height: 600 } });
@@ -19,7 +20,7 @@ await page.addInitScript(() => { try {
   localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.suite', '1'); } catch {} });
 await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
-const r = await page.evaluate(async ([id, pre]) => {
+const r = await page.evaluate(async ([id, pre, mode]) => {
   const B = window.battle, THREE = window.THREE, ff = window.__fastForward;
   B.unlockAll = true; B.freeBuild = true; B.airlift = false; B.airborne.auto = false;
   ff(2);
@@ -27,7 +28,7 @@ const r = await page.evaluate(async ([id, pre]) => {
   if (pre > 0) {
     // Hollow the middle out: the stones nearest the centre line go first.
     const idx = [];
-    for (let i = 0; i < S.count; i++) if (S.isAlive(i)) idx.push([Math.hypot(S.px[i] - o.x, S.pz[i] - o.z), i]);
+    for (let i = 0; i < S.count; i++) if (S.isAlive(i)) idx.push([mode === 'top' ? -S.py[i] : Math.hypot(S.px[i] - o.x, S.pz[i] - o.z), i]);
     idx.sort((a, b2) => a[0] - b2[0]);
     const n = Math.floor(idx.length * pre);
     for (let k = 0; k < n; k++) S.destroyChunk(idx[k][1]);
@@ -71,6 +72,6 @@ const r = await page.evaluate(async ([id, pre]) => {
     track: track.slice(0, 40), impacts, events, stones: S.destroyedCount - before,
     projKeys: Object.keys(B.projectiles).slice(0, 20),
   };
-}, [id, +pre]);
+}, [id, +pre, mode]);
 console.log(JSON.stringify(r, null, 0));
 await b.close();

@@ -787,6 +787,27 @@ export class Battle {
    * plan. A grid of the stones' positions is made the first time it is
    * asked; a stone shot away since still counts, which errs toward caution.
    */
+  /** Is a point inside a standing stone of any structure? */
+  _inMasonry(p) {
+    const CELL = 8;
+    for (const s of this.structures) {
+      if (!s._planGrid) this._nearStones(s, p, 0);
+      const cx = Math.floor(p.x / CELL), cz = Math.floor(p.z / CELL);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const a = s._planGrid.get(`${cx + dx},${cz + dz}`);
+          if (!a) continue;
+          for (const i of a) {
+            if (!(s.flags[i] & 1)) continue;
+            if (Math.abs(s.px[i] - p.x) <= s.hx[i] && Math.abs(s.py[i] - p.y) <= s.hy[i]
+              && Math.abs(s.pz[i] - p.z) <= s.hz[i]) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   _nearStones(s, point, pad) {
     const CELL = 8;
     if (!s._planGrid) {
@@ -1943,14 +1964,22 @@ export class Battle {
     // two-and-a-half-tonne bomb to it and it took seventy stones. It now
     // carries on along its line for `penetrate` metres — never below the
     // ground — and bursts in there, where the masonry is wide.
+    //
+    // Through stone, not air. Borobudur's crown is a hollow bell, and
+    // fourteen metres straight down from its pinnacle is its empty chamber:
+    // a burst there was capped to the bell's thin wall and took fourteen
+    // stones. The depth is counted only while the line is inside masonry,
+    // so the bomb crosses a chamber, a gallery or a void and goes on into
+    // the fill beyond.
     if (st.penetrate && proj.vel.lengthSq() > 1) {
       const dir = proj.vel.clone().normalize();
-      const p2 = point.clone().addScaledVector(dir, st.penetrate);
-      const g = this.terrain.heightAt(p2.x, p2.z) + 1;
-      if (p2.y < g) {
-        // Stop at the ground along the same line.
-        const k = dir.y < -0.05 ? Math.max(0, (point.y - g) / -dir.y) : 0;
-        p2.copy(point).addScaledVector(dir, Math.min(st.penetrate, k));
+      const p2 = point.clone();
+      let solid = 0;
+      for (let k = 0; k < st.penetrate * 4; k++) {
+        p2.addScaledVector(dir, 1);
+        if (p2.y < this.terrain.heightAt(p2.x, p2.z) + 1) { p2.addScaledVector(dir, -1); break; }
+        if (this._inMasonry(p2)) solid += 1;
+        if (solid >= st.penetrate) break;
       }
       point = p2;
     }
