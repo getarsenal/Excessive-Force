@@ -389,18 +389,28 @@ export class Projectile {
    * degrees below, then straight at it with a quick turn. Pointed at a
    * fixed spot, a bomb comes down a straight line at the angle it pitched
    * over at; from releases sixty to three hundred metres above the spot it
-   * lands within two metres of it at fifty-two to sixty-eight degrees. Past
-   * the spot, or if the spot has gone (a summit shot away under it), it is
-   * a falling bomb like any other and goes off against whatever is below.
+   * lands within two metres of it at fifty-two to sixty-eight degrees. If it
+   * reaches the spot and nothing is there (a summit shot away under it), it
+   * goes straight down onto whatever the laser is on now.
    */
   _stepGuided(dt) {
     const t = this.target;
     const dx = t.x - this.pos.x, dy = t.y - this.pos.y, dz = t.z - this.pos.z;
     const flat = Math.hypot(dx, dz);
     const range = Math.hypot(flat, dy);
-    if (range < 3 || range > this._lastRange + 0.5) {
-      this.phase = 'free';
-      this.vel.y -= this.gravity * dt;
+    // At the spot, or past it, with nothing struck: what was there has been
+    // shot away. The laser is on whatever is under it now, so the bomb goes
+    // straight down onto that, rather than carrying on along its dive and
+    // landing sixty metres beyond.
+    if (this.phase === 'sink' || range < 3 || range > this._lastRange + 0.5) {
+      this.phase = 'sink';
+      const speed = Math.max(140, this.vel.length() + this.gravity * dt);
+      const cur = this._cur || (this._cur = new THREE.Vector3());
+      cur.copy(this.vel).normalize();
+      const down = this._want || (this._want = new THREE.Vector3());
+      down.set(t.x - this.pos.x, -Math.max(20, Math.hypot(t.x - this.pos.x, t.z - this.pos.z) * 3), t.z - this.pos.z).normalize();
+      cur.lerp(down, Math.min(1, dt * GUIDED.diveTurn)).normalize();
+      this.vel.copy(cur).multiplyScalar(speed);
       this.pos.addScaledVector(this.vel, dt);
       return;
     }

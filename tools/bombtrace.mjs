@@ -34,11 +34,15 @@ const r = await page.evaluate(async ([id, pre]) => {
     ff(8);
   }
   B.garrison.fireEnabled = false;
-  // Aim the way a tap does: the picker's point on what is there.
-  const top = new THREE.Vector3(o.x, S.standingHeight() + 80, o.z);
-  const ray = new THREE.Raycaster(top, new THREE.Vector3(0, -1, 0));
-  const hits = ray.intersectObjects(window.engine.scene.children, true).filter((h) => h.object.visible);
-  const aim = hits.length ? hits[0].point.clone() : new THREE.Vector3(o.x, S.groundY, o.z);
+  // Aim the way a tap on the middle of the building does: the top of the
+  // highest standing stone within fifteen metres of its centre.
+  let best = -1, bestY = -Infinity;
+  for (let i = 0; i < S.count; i++) {
+    if (!S.isAlive(i) || Math.hypot(S.px[i] - o.x, S.pz[i] - o.z) > 15) continue;
+    const top = S.py[i] + S.hy[i];
+    if (top > bestY) { bestY = top; best = i; }
+  }
+  const aim = best >= 0 ? new THREE.Vector3(S.px[best], bestY, S.pz[best]) : new THREE.Vector3(o.x, S.groundY, o.z);
   const events = [];
   const say = B.onEvent;
   B.onEvent = (k, d) => { if (/strike|bomb|abort|underfire|shotdown|bigimpact|flak/.test(k)) events.push([k, d?.destroyed ?? d?.point?.y?.toFixed?.(1) ?? '']); return say(k, d); };
