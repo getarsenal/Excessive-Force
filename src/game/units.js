@@ -238,8 +238,11 @@ export const UNITS = [
     // laid along and does little more than chip a wall it crosses. It flies
     // low and slow through the flak to do it, and it is built to.
     model: 'aircraft',
-    strike: { strafe: true, rounds: 110, burst: 1.75, lead: 220, minLen: 60, maxLen: 220, defaultLen: 150 },
-    aircraft: { kind: 'warthog', speed: 170, height: 90, clearance: 40, runIn: 1500 },
+    // A twenty-degree dive, the gun opening at 650 m slant with the rounds
+    // a dozen degrees below the nose.
+    strike: { strafe: true, rounds: 110, burst: 1.75, slant: 650, dive: 20, depression: 12, preDive: 2.6,
+      minLen: 60, maxLen: 220, defaultLen: 150 },
+    aircraft: { kind: 'warthog', speed: 170, clearance: 40, runIn: 1500 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'direct', speed: 1050, gravity: 0, trail: 0 },
     warhead: { lethal: 0.45, radius: 1.8, power: 900, fx: 0.3, kinetic: 0.12 },

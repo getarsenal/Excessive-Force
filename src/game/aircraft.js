@@ -50,10 +50,16 @@ export function part(geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
  * A station with no width closes the body to a point, which is how both
  * noses and the Lancer's tailcone are made.
  */
-export function loft(stations, seg = 12) {
-  const pos = [], idx = [];
+export function loft(stations, seg = 12, { uv = false } = {}) {
+  const pos = [], idx = [], uvs = [];
+  // A textured body needs the seam vertex twice — once at u = 0 and once at
+  // u = 1 — or the last quad of each ring carries the whole picture back
+  // across itself. An untextured one shares it.
+  const per = uv ? seg + 1 : seg;
+  const zs = stations.map((st) => st.z);
+  const z0 = Math.min(...zs), z1 = Math.max(...zs);
   const ring = (st) => {
-    for (let k = 0; k < seg; k++) {
+    for (let k = 0; k < per; k++) {
       const a = (k / seg) * Math.PI * 2;
       const c = Math.cos(a), s = Math.sin(a);
       const p = 2 / (st.n ?? 2.6);
@@ -62,13 +68,14 @@ export function loft(stations, seg = 12) {
         Math.sign(s) * Math.abs(s) ** p * st.h * 0.5 + (st.y ?? 0),
         st.z,
       );
+      if (uv) uvs.push(k / seg, (st.z - z0) / Math.max(1e-6, z1 - z0));
     }
   };
   for (const st of stations) ring(st);
   for (let i = 0; i < stations.length - 1; i++) {
     for (let k = 0; k < seg; k++) {
-      const a = i * seg + k, b = i * seg + (k + 1) % seg;
-      idx.push(a, b, a + seg, b, b + seg, a + seg);
+      const a = i * per + k, b = i * per + (uv ? k + 1 : (k + 1) % seg);
+      idx.push(a, b, a + per, b, b + per, a + per);
     }
   }
   // Cap both ends so the body is closed from any angle, including the one
@@ -77,16 +84,51 @@ export function loft(stations, seg = 12) {
     const base = pos.length / 3;
     const st = stations[end];
     pos.push(0, st.y ?? 0, st.z);
+    if (uv) uvs.push(0.5, (st.z - z0) / Math.max(1e-6, z1 - z0));
     for (let k = 0; k < seg; k++) {
-      const a = end * seg + k, b = end * seg + (k + 1) % seg;
+      const a = end * per + k, b = end * per + (uv ? k + 1 : (k + 1) % seg);
       if (end === 0) idx.push(base, b, a); else idx.push(base, a, b);
     }
   }
+  // Outward, whichever way the stations run. Every body here was written
+  // nose first, down -Z, and that order wound every triangle inward: the
+  // near wall of each fuselage was culled, the inside of the far wall drawn
+  // in its place and lit from the wrong side — which is why an aircraft in
+  // full sun read as a black cut-out and a pylon inside an engine pod showed
+  // through it. The signed volume of a closed body says which way it is
+  // wound; a negative one is turned round.
+  let vol = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    vol += pos[a] * (pos[b + 1] * pos[c + 2] - pos[b + 2] * pos[c + 1])
+      - pos[a + 1] * (pos[b] * pos[c + 2] - pos[b + 2] * pos[c])
+      + pos[a + 2] * (pos[b] * pos[c + 1] - pos[b + 1] * pos[c]);
+  }
+  if (vol < 0) for (let t = 0; t < idx.length; t += 3) { const k = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = k; }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
+}
+
+/**
+ * Two colours on one flying surface: the upper skin one grey, the lower
+ * another, for a material with `vertexColors` on. `surface` lays its twelve
+ * points out as six upper then six lower, which is what makes this a
+ * one-liner rather than a normal test.
+ */
+export function twoTone(geo, upper, lower) {
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  const u = new THREE.Color(upper), l = new THREE.Color(lower);
+  for (let i = 0; i < n; i++) {
+    const c = i < 6 ? u : l;
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
 }
 
 /**
@@ -298,66 +340,392 @@ export function makeEagle({ store } = {}) {
 }
 
 /**
- * A-10C Thunderbolt II. 16.3 m long, 17.5 m span, nose along +Z.
+ * The Warthog's paint, drawn once onto a canvas and wrapped round the body.
  *
- * Nothing else in the sky looks like it, which is the point of drawing it at
- * all: a straight, thick wing set low, the two engines in pods high on the
- * back of the fuselage, twin square fins on the ends of the tailplane, and the
- * seven barrels of the gun sticking out of the nose just off the centreline.
+ * `loft` with `uv` unwraps the fuselage so that u runs round the section
+ * from the port side (0) over the top (0.25) to starboard (0.5) and under
+ * the belly (0.75), and v runs from the tail (0) to the nose (1). On the
+ * canvas the nose is the top edge. What is painted on: the two greys of the
+ * Compass Ghost scheme, dark above and light below; the false canopy on the
+ * belly under the real one, which is there to confuse a gunner about which
+ * way the aircraft is about to turn; the anti-glare panel ahead of the
+ * windscreen; low-visibility stars on the shoulders; and, because it is the
+ * most recognisable nose art of the last fifty years, the shark mouth and
+ * eyes that the 23rd Wing has worn since the Flying Tigers.
+ */
+export function warthogSkin(z0, z1) {
+  if (typeof document === 'undefined') return null;
+  const W = 1024, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  // Length to canvas row: the nose at the top.
+  const row = (z) => (1 - (z - z0) / (z1 - z0)) * H;
+  const col = (u) => u * W;
+
+  ctx.fillStyle = '#878e93';                 // the lighter grey, FS 36375
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#5a6166';                 // the darker, FS 36118
+  ctx.fillRect(0, 0, col(0.52), H);          // the upper half, port round to starboard
+  ctx.fillRect(col(0.98), 0, W, H);          // and the sliver past the seam
+  // A soft edge where the two meet, as the real demarcation is sprayed.
+  for (let k = 0; k < 6; k++) {
+    ctx.fillStyle = `rgba(90,97,102,${0.5 - k * 0.08})`;
+    ctx.fillRect(col(0.52) + k * 3, 0, 3, H);
+    ctx.fillRect(col(0.98) - (k + 1) * 3, 0, 3, H);
+  }
+
+  // The anti-glare panel on the nose ahead of the windscreen.
+  ctx.fillStyle = '#34383c';
+  ctx.beginPath();
+  ctx.ellipse(col(0.25), (row(6.5) + row(7.5)) / 2, col(0.07), (row(6.5) - row(7.5)) / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The false canopy on the belly: the same dark glass shape as the real one
+  // on top, under the nose where a gunner looking up sees it.
+  ctx.fillStyle = '#3d4247';
+  ctx.beginPath();
+  ctx.ellipse(col(0.75), (row(4.2) + row(5.6)) / 2, col(0.06), (row(4.2) - row(5.6)) / 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The mouth. In side view it is a wedge: the upper lip runs straight back
+  // along the side at about the height of the gun, the lower jaw sweeps from
+  // under the chin down and back, and the two meet at the corner of the jaw
+  // under the windscreen. Unwrapped, that is a region bounded by the angle
+  // round the body below the side — nought at the upper lip, ninety at the
+  // keel — which opens from nothing at the corner to the whole chin at the
+  // nose, where the two halves join. `side` is +1 for starboard (u from 0.5
+  // down to 0.75) and -1 for port (u from 1.0 down to 0.75).
+  const zt = 7.95, zc = 5.75;
+  const uAt = (side, deg) => (side > 0 ? 0.5 + deg / 360 : 1.0 - deg / 360);
+  const jaw = (z) => 8 + 82 * Math.pow(THREE.MathUtils.clamp((z - zc) / (zt - zc), 0, 1), 0.55);
+  const lip = -4;                                    // the upper lip, a touch above the side
+  const face = (side) => {
+    ctx.beginPath();
+    ctx.moveTo(col(uAt(side, lip)), row(zt));
+    for (let i = 0; i <= 30; i++) ctx.lineTo(col(uAt(side, lip)), row(zt - (zt - zc) * (i / 30)));
+    for (let i = 30; i >= 0; i--) {
+      const z = zt - (zt - zc) * (i / 30);
+      ctx.lineTo(col(uAt(side, jaw(z))), row(z));
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#a3121c';
+    ctx.fill();
+    ctx.strokeStyle = '#141414';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    // Teeth. Down from the upper lip, a row of white triangles pointing
+    // into the mouth; up from the lower jaw, another, smaller toward the
+    // corner where the jaw closes.
+    ctx.fillStyle = '#f2f0ea';
+    ctx.lineWidth = 2;
+    const n = 9;
+    for (let i = 0; i < n; i++) {
+      const za = zt - (zt - zc) * (i / n) * 0.92, zb = zt - (zt - zc) * ((i + 1) / n) * 0.92;
+      const zm = (za + zb) / 2;
+      const open = jaw(zm) - lip;
+      ctx.beginPath();
+      ctx.moveTo(col(uAt(side, lip)), row(za));
+      ctx.lineTo(col(uAt(side, lip)), row(zb));
+      ctx.lineTo(col(uAt(side, lip + open * 0.42)), row(zm));
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(col(uAt(side, jaw(za))), row(za));
+      ctx.lineTo(col(uAt(side, jaw(zb))), row(zb));
+      ctx.lineTo(col(uAt(side, jaw(zm) - open * 0.38)), row(zm));
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    // The eye, above and ahead of the corner of the jaw, glaring forward.
+    {
+    const x = col(uAt(side, -26)), y = row(6.55);
+    const rx = col(0.034), ry = (row(6.25) - row(6.85)) / 2;
+    ctx.fillStyle = '#f2f0ea';
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#141414'; ctx.lineWidth = 4; ctx.stroke();
+    // The pupil toward the nose, which on the canvas is up.
+    ctx.fillStyle = '#141414';
+    ctx.beginPath(); ctx.ellipse(x, y - ry * 0.35, rx * 0.5, ry * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    // The brow, cutting across the top of the eye toward the nose: an angry
+    // eye rather than a surprised one.
+    ctx.fillStyle = '#5a6166';
+    ctx.beginPath();
+    const top = side > 0 ? -1 : 1;                    // which way is up the side
+    ctx.moveTo(x + top * rx * 1.3, y - ry * 1.3);
+    ctx.lineTo(x + top * rx * 1.3, y + ry * 0.2);
+    ctx.lineTo(x + top * rx * 0.1, y - ry * 1.3);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#141414'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x + top * rx * 1.25, y + ry * 0.15); ctx.lineTo(x + top * rx * 0.05, y - ry * 1.25); ctx.stroke();
+  }
+  };
+  // Port runs across the seam at u = 1, so it is drawn a turn to the left as
+  // well and whatever falls off one edge comes back on the other.
+  face(1);
+  face(-1);
+  ctx.save(); ctx.translate(-W, 0); face(-1); ctx.restore();
+
+  // Low-visibility national insignia on the shoulders, above the wing root:
+  // the star in its disc with a bar either side, the bars running fore and
+  // aft. Drawn in metres — the canvas has about six times as many pixels a
+  // metre round the body as along it, so a star drawn in pixels comes out
+  // as a tall thin letter.
+  const around = W / 5.4, along = H / (z1 - z0);
+  const star = (side, zc, deg, r) => {
+    ctx.save();
+    // p metres along the body toward the nose, q metres up the side.
+    const sgn = side > 0 ? -1 : 1;
+    ctx.transform(0, -along, sgn * around, 0, col(uAt(side, -deg)), row(zc));
+    ctx.fillStyle = '#7d858a';
+    ctx.fillRect(-r * 2.4, -r * 0.42, r * 4.8, r * 0.84);               // the bars
+    ctx.fillStyle = '#5a6166';
+    ctx.fillRect(-r * 2.4, -r * 0.12, r * 4.8, r * 0.24);               // the stripe through them
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.02, 0, Math.PI * 2); ctx.fill(); // the disc
+    ctx.fillStyle = '#7d858a';
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = Math.PI / 2 + (i * Math.PI) / 5;                       // point up the side
+      const rr = i % 2 ? r * 0.38 : r * 0.92;
+      ctx.lineTo(rr * Math.cos(a), rr * Math.sin(a));
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+  star(1, 2.6, -14, 0.36);
+  star(-1, 2.6, -14, 0.36);
+  ctx.save(); ctx.translate(-W, 0); star(-1, 2.6, -14, 0.36); ctx.restore();
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+/** The two letters on the fin: the 23rd Wing's tail code. */
+function tailCode(text) {
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#5a6166'; ctx.fillRect(0, 0, 128, 96);
+  ctx.fillStyle = '#2b2f33';
+  ctx.font = 'bold 72px sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 64, 52);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/**
+ * A-10C Thunderbolt II. 16.3 m long, 17.5 m span, nose along +Z; port is +X.
+ *
+ * Nothing else in the sky looks like it, which is why it is worth getting
+ * right rather than roughly right. What makes it: a slab-sided tub of a
+ * fuselage with a great bubble canopy up front and the seven barrels of the
+ * gun out of the nose, off-centre so the one that fires is on the
+ * centreline; a straight, thick, low wing with the main-gear pods hanging
+ * off its leading edge and the tips turned down; two high-bypass fans in
+ * pods up on the back, set between the wing and the tail so the tailplane
+ * hides the hot end; and square twin fins on the ends of the stabiliser,
+ * hanging below it as well as standing above. The TF34 does not glow — it
+ * is an airliner engine — so there is no flame here, only a dark fan face
+ * at the front and a tail cone at the back. Everything about it is
+ * subsonic and deliberate, and it is drawn that way.
  */
 export function makeWarthog() {
   const g = new THREE.Group();
-  const grey = new THREE.MeshStandardMaterial({ color: 0x6b7177, roughness: 0.7, metalness: 0.25 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2d30, roughness: 0.5, metalness: 0.5 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x1f2a36, roughness: 0.18, metalness: 0.8 });
-  const glow = new THREE.MeshBasicMaterial({ color: 0xffb060, toneMapped: false });
+  const UPPER = 0x5a6166, LOWER = 0x878e93;
+  const skinTex = warthogSkin(-8.1, 8.13);
+  const skin = skinTex
+    ? new THREE.MeshStandardMaterial({ map: skinTex, roughness: 0.72, metalness: 0.2 })
+    : new THREE.MeshStandardMaterial({ color: LOWER, roughness: 0.72, metalness: 0.2 });
+  // Flying surfaces: dark on top, light underneath, by vertex colour.
+  const surf = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.2 });
+  const upper = new THREE.MeshStandardMaterial({ color: UPPER, roughness: 0.72, metalness: 0.2 });
+  const lower = new THREE.MeshStandardMaterial({ color: LOWER, roughness: 0.72, metalness: 0.2 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.5, metalness: 0.5 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x3c4044, roughness: 0.45, metalness: 0.7 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x27394c, roughness: 0.15, metalness: 0.75 });
+  const olive = new THREE.MeshStandardMaterial({ color: 0x5e6b3a, roughness: 0.6 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xd9dad4, roughness: 0.55, metalness: 0.2 });
+
+  // The fuselage: a blunt nose, flat sides where the titanium tub is, and a
+  // long gentle taper to a tail that keeps its depth until the last metre.
   g.add(part(loft([
-    { z: 8.2, w: 0.5, h: 0.6, n: 2.2 },
-    { z: 7.4, w: 1.1, h: 1.2, n: 2.4 },
-    { z: 5.4, w: 1.5, h: 1.7, y: 0.05, n: 2.8 },
-    { z: 2.0, w: 1.6, h: 1.8, y: 0.05, n: 3.0 },
-    { z: -2.4, w: 1.3, h: 1.5, y: 0.1, n: 3.0 },
-    { z: -6.0, w: 0.8, h: 1.0, y: 0.25, n: 2.8 },
-    { z: -7.6, w: 0.4, h: 0.6, y: 0.3, n: 2.4 },
-  ]), grey, 0, 0, 0));
-  // The bubble canopy, high and well forward.
-  g.add(part(loft([
-    { z: 6.3, w: 0.2, h: 0.12, y: 0.8, n: 2.2 },
-    { z: 5.5, w: 0.86, h: 0.62, y: 1.0, n: 2.4 },
-    { z: 4.4, w: 0.9, h: 0.66, y: 1.02, n: 2.6 },
-    { z: 3.6, w: 0.5, h: 0.3, y: 0.92, n: 2.6 },
-  ], 10), glass, 0, 0, 0));
-  // The gun: seven barrels in a cluster under the nose, a touch to port.
-  const gun = new THREE.CylinderGeometry(0.18, 0.2, 1.4, 8).rotateX(Math.PI / 2);
-  g.add(part(gun, dark, -0.18, -0.38, 8.6));
-  // Straight wing, low on the body, the tips drooped a little.
-  const wing = surface({ span: 7.8, root: 3.2, tip: 1.9, sweep: 0.4, thick: 0.42, dihedral: 0.06 });
-  pair(g, wing, grey, 0.6, -0.42, 1.6);
-  // Hardpoints and a load of stores under it.
-  for (const x of [2.2, 3.6, 5.0]) {
-    for (const sx of [-1, 1]) g.add(part(new THREE.CylinderGeometry(0.16, 0.16, 2.0, 8).rotateX(Math.PI / 2), dark, sx * x, -0.85, 0.6));
+    { z: 8.13, w: 0.34, h: 0.34, y: -0.04, n: 2.0 },
+    { z: 7.85, w: 0.78, h: 0.80, y: -0.04, n: 2.2 },
+    { z: 7.20, w: 1.18, h: 1.24, y: 0.00, n: 2.6 },
+    { z: 6.40, w: 1.46, h: 1.58, y: 0.08, n: 3.0 },
+    { z: 4.80, w: 1.56, h: 1.72, y: 0.12, n: 3.2 },
+    { z: 2.60, w: 1.56, h: 1.68, y: 0.10, n: 3.2 },
+    { z: 0.00, w: 1.50, h: 1.56, y: 0.08, n: 3.2 },
+    { z: -2.60, w: 1.34, h: 1.40, y: 0.12, n: 3.1 },
+    { z: -5.00, w: 1.14, h: 1.20, y: 0.20, n: 3.0 },
+    { z: -7.00, w: 0.86, h: 0.92, y: 0.30, n: 2.8 },
+    { z: -8.10, w: 0.42, h: 0.50, y: 0.36, n: 2.4 },
+  ], 16, { uv: true }), skin, 0, 0, 0));
+
+  // The gun. Seven barrels in a ring with the muzzle clamp round them,
+  // offset to port so the barrel in the firing position sits on the
+  // centreline — which is why the nose gear is on the other side.
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const r = k < 6 ? 0.1 : 0;
+    g.add(part(new THREE.CylinderGeometry(0.042, 0.042, 1.1, 6).rotateX(Math.PI / 2), steel,
+      0.2 + Math.cos(a) * r, -0.36 + Math.sin(a) * r, 8.2));
   }
-  // The engines: two fat pods high on the back, on short pylons.
+  g.add(part(new THREE.CylinderGeometry(0.17, 0.17, 0.09, 12).rotateX(Math.PI / 2), dark, 0.2, -0.36, 8.52));
+
+  // The canopy: a bubble, high and well forward, with the windscreen bow
+  // ahead of it and the frame it closes against behind.
+  g.add(part(loft([
+    { z: 6.55, w: 0.36, h: 0.14, y: 0.98, n: 2.4 },
+    { z: 6.00, w: 0.98, h: 0.80, y: 1.22, n: 2.4 },
+    { z: 5.20, w: 1.10, h: 1.00, y: 1.32, n: 2.6 },
+    { z: 4.50, w: 1.04, h: 0.92, y: 1.30, n: 2.6 },
+    { z: 3.90, w: 0.64, h: 0.36, y: 1.10, n: 2.6 },
+  ], 12), glass, 0, 0, 0));
+  g.add(part(loft([
+    { z: 6.10, w: 1.02, h: 0.84, y: 1.22, n: 2.4 },
+    { z: 5.96, w: 1.06, h: 0.88, y: 1.24, n: 2.4 },
+  ], 12), dark, 0, 0, 0));
+  g.add(part(loft([
+    { z: 4.02, w: 0.74, h: 0.46, y: 1.13, n: 2.6 },
+    { z: 3.88, w: 0.62, h: 0.30, y: 1.08, n: 2.6 },
+  ], 12), dark, 0, 0, 0));
+
+  // The wing: a flat centre section the gear pods hang from, outer panels
+  // with a little dihedral and a taper mostly on the trailing edge, and the
+  // Hoerner tips turned down at the end.
+  const wy = -0.46, wz = 1.55;
+  // 47 m² on a 17.5 m span: a 3.1 m chord at the root, 1.75 m at the tip.
+  pair(g, twoTone(surface({ span: 3.4, root: 3.1, tip: 3.1, sweep: 0, thick: 0.5 }), UPPER, LOWER), surf, 0, wy, wz);
+  pair(g, twoTone(surface({ span: 4.6, root: 3.1, tip: 1.75, sweep: 0.25, thick: 0.4, dihedral: 0.06 }), UPPER, LOWER), surf, 3.4, wy, wz);
+  pair(g, twoTone(surface({ span: 0.78, root: 1.75, tip: 1.5, sweep: 0.08, thick: 0.2, dihedral: -0.62 }), UPPER, LOWER), surf,
+    8.0, wy + Math.sin(0.06) * 4.6, wz - 0.25);
+  // The main-gear pods, out ahead of the leading edge, with the wheels half
+  // out of them: the A-10 lands on its tyres with the gear up.
   for (const sx of [-1, 1]) {
     g.add(part(loft([
-      { z: 0.0, w: 0.9, h: 0.9, n: 2.2 }, { z: -0.6, w: 1.24, h: 1.24, n: 2.2 },
-      { z: -2.6, w: 1.2, h: 1.2, n: 2.2 }, { z: -3.6, w: 0.9, h: 0.9, n: 2.2 },
-    ], 12), grey, sx * 1.25, 1.05, -2.2));
-    g.add(part(new THREE.BoxGeometry(0.2, 0.6, 1.4), grey, sx * 0.85, 0.75, -3.2));
-    const f = new THREE.ConeGeometry(0.34, 1.0, 8); f.rotateX(-Math.PI / 2);
-    g.add(part(f, glow, sx * 1.25, 1.05, -6.0));
+      { z: 3.00, w: 0.30, h: 0.30, n: 2.2 },
+      { z: 2.40, w: 0.80, h: 0.78, n: 2.6 },
+      { z: 1.20, w: 0.90, h: 0.86, n: 2.8 },
+      { z: -0.80, w: 0.86, h: 0.80, y: 0.05, n: 2.8 },
+      { z: -1.80, w: 0.50, h: 0.50, y: 0.10, n: 2.4 },
+    ], 10), lower, sx * 2.6, -0.75, 0));
+    g.add(part(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14).rotateZ(Math.PI / 2), dark, sx * 2.6, -0.98, 1.9));
+    g.add(part(new THREE.CylinderGeometry(0.18, 0.18, 0.32, 10).rotateZ(Math.PI / 2), lower, sx * 2.6, -0.98, 1.9));
   }
-  // Tailplane and the two square fins on its ends.
-  const stab = surface({ span: 2.7, root: 1.8, tip: 1.5, sweep: 0.2, thick: 0.22 });
-  pair(g, stab, grey, 0.3, 0.4, -5.8);
-  const fin = surface({ span: 2.4, root: 1.8, tip: 1.3, sweep: 0.5, thick: 0.18 });
+
+  // The engines: two TF34 fans in fat short pods up on the back, each on a
+  // pylon off the fuselage shoulder, pitched up a few degrees. A dark fan
+  // face behind the lip with the spinner in it; a nozzle and a tail cone
+  // behind, and nothing burning.
   for (const sx of [-1, 1]) {
-    const m = new THREE.Mesh(sx > 0 ? fin : mirrorX(fin), grey);
-    m.position.set(sx * 3.0, 0.2, -5.7);
+    const n = new THREE.Group();
+    n.add(part(loft([
+      { z: 2.00, w: 1.24, h: 1.24, n: 2.0 },
+      { z: 1.60, w: 1.34, h: 1.34, n: 2.0 },
+      { z: 0.00, w: 1.36, h: 1.36, n: 2.0 },
+      { z: -1.30, w: 1.26, h: 1.26, n: 2.0 },
+      { z: -1.95, w: 0.98, h: 0.98, n: 2.0 },
+    ], 16), lower, 0, 0, 0));
+    n.add(part(new THREE.CylinderGeometry(0.56, 0.56, 0.06, 20).rotateX(Math.PI / 2), dark, 0, 0, 1.88));
+    n.add(part(new THREE.ConeGeometry(0.15, 0.4, 10).rotateX(Math.PI / 2), lower, 0, 0, 2.02));
+    n.add(part(new THREE.CylinderGeometry(0.44, 0.49, 0.26, 16).rotateX(Math.PI / 2), dark, 0, 0, -1.98));
+    n.add(part(new THREE.ConeGeometry(0.2, 0.7, 10).rotateX(-Math.PI / 2), steel, 0, 0, -2.2));
+    n.position.set(sx * 1.24, 1.56, -2.9);
+    n.rotation.x = -0.08;
+    g.add(n);
+    // The pylon: a thin fairing from the fuselage's shoulder up and out to
+    // the inboard underside of the pod, so there is sky between the two.
+    const py = part(new THREE.BoxGeometry(0.14, 0.8, 2.4), upper, sx * 0.62, 0.93, -3.2);
+    py.rotation.z = -sx * 0.785;
+    g.add(py);
+  }
+
+  // The tail: an unswept stabiliser low on the aft body, and a square fin on
+  // each end of it that goes below as well as above.
+  const ty = 0.42, tz = -6.05;
+  pair(g, twoTone(surface({ span: 2.87, root: 1.95, tip: 1.55, sweep: 0.25, thick: 0.24 }), UPPER, LOWER), surf, 0, ty, tz);
+  const fin = surface({ span: 2.6, root: 1.95, tip: 1.35, sweep: 0.55, thick: 0.2 });
+  const code = tailCode('FT');
+  const codeMat = code ? new THREE.MeshStandardMaterial({ map: code, roughness: 0.75 }) : null;
+  for (const sx of [-1, 1]) {
+    const m = new THREE.Mesh(sx > 0 ? fin : mirrorX(fin), upper);
+    m.position.set(sx * 2.87, ty - 0.5, tz + 0.1);
     m.rotation.z = sx * (Math.PI / 2);
     m.castShadow = true;
     g.add(m);
+    if (codeMat) {
+      for (const side of [-1, 1]) {
+        const c = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), codeMat);
+        c.position.set(sx * 2.87 + side * 0.11, ty + 1.15, tz - 0.95);
+        c.rotation.y = side * Math.PI / 2;
+        g.add(c);
+      }
+    }
   }
+
+  // The load, which is what the aircraft is for. Pylons under the wing with
+  // a typical A-10C fit: a rack of three Mk 82s inboard, a Maverick on its
+  // rail, a rocket pod, and on the outer stations the jamming pod to port
+  // and a pair of Sidewinders to starboard; a targeting pod under the
+  // belly on the starboard side.
+  const pylon = (x, z, len = 1.3) => g.add(part(new THREE.BoxGeometry(0.14, 0.42, len), lower, x, -0.9, z));
+  const bomb = (x, y, z) => {
+    g.add(part(new THREE.CylinderGeometry(0.135, 0.135, 1.5, 10).rotateX(Math.PI / 2), olive, x, y, z));
+    g.add(part(new THREE.ConeGeometry(0.135, 0.5, 10).rotateX(Math.PI / 2), olive, x, y, z + 1.0));
+    g.add(part(new THREE.CylinderGeometry(0.1, 0.135, 0.5, 10).rotateX(Math.PI / 2), olive, x, y, z - 1.0));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      g.add(part(new THREE.BoxGeometry(0.02, 0.2, 0.36), olive, x + Math.cos(a) * 0.17, y + Math.sin(a) * 0.17, z - 1.05, 0, 0, a - Math.PI / 2));
+    }
+  };
+  for (const sx of [-1, 1]) {
+    // Triple ejector rack with three Mk 82s.
+    pylon(sx * 3.35, 0.35, 1.5);
+    g.add(part(new THREE.BoxGeometry(0.46, 0.22, 1.9), dark, sx * 3.35, -1.2, 0.35));
+    bomb(sx * 3.35, -1.52, 0.3);
+    bomb(sx * 3.35 - 0.3, -1.3, 0.3);
+    bomb(sx * 3.35 + 0.3, -1.3, 0.3);
+    // The Maverick: a grey tube with a glass nose and the big delta fins.
+    pylon(sx * 4.5, 0.25);
+    g.add(part(new THREE.BoxGeometry(0.16, 0.18, 1.7), dark, sx * 4.5, -1.18, 0.1));
+    g.add(part(new THREE.CylinderGeometry(0.15, 0.15, 2.3, 12).rotateX(Math.PI / 2), white, sx * 4.5, -1.42, 0.1));
+    g.add(part(new THREE.SphereGeometry(0.15, 12, 8), glass, sx * 4.5, -1.42, 1.25));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      g.add(part(new THREE.BoxGeometry(0.02, 0.34, 0.7), white, sx * 4.5 + Math.cos(a) * 0.3, -1.42 + Math.sin(a) * 0.3, 0.2, 0, 0, a - Math.PI / 2));
+      g.add(part(new THREE.BoxGeometry(0.02, 0.22, 0.3), white, sx * 4.5 + Math.cos(a) * 0.24, -1.42 + Math.sin(a) * 0.24, -0.9, 0, 0, a - Math.PI / 2));
+    }
+    // A seven-tube rocket pod.
+    pylon(sx * 5.6, 0.15, 1.1);
+    g.add(part(new THREE.CylinderGeometry(0.21, 0.21, 1.7, 12).rotateX(Math.PI / 2), lower, sx * 5.6, -1.33, 0.1));
+    g.add(part(new THREE.CylinderGeometry(0.2, 0.2, 0.05, 12).rotateX(Math.PI / 2), dark, sx * 5.6, -1.33, 0.96));
+  }
+  // Outer stations: the jamming pod and the Sidewinders.
+  pylon(6.7, 0.0, 1.1);
+  g.add(part(loft([
+    { z: 1.4, w: 0.2, h: 0.24, n: 2.4 }, { z: 1.0, w: 0.42, h: 0.5, n: 3.4 },
+    { z: -1.0, w: 0.42, h: 0.5, n: 3.4 }, { z: -1.4, w: 0.2, h: 0.3, n: 2.4 },
+  ], 10), lower, 6.7, -1.36, 0.0));
+  pylon(-6.7, 0.0, 1.1);
+  g.add(part(new THREE.BoxGeometry(0.5, 0.12, 1.4), dark, -6.7, -1.16, 0.0));
+  for (const dx of [-0.18, 0.18]) {
+    g.add(part(new THREE.CylinderGeometry(0.065, 0.065, 2.6, 8).rotateX(Math.PI / 2), white, -6.7 + dx, -1.3, 0.0));
+    g.add(part(new THREE.ConeGeometry(0.065, 0.4, 8).rotateX(Math.PI / 2), glass, -6.7 + dx, -1.3, 1.5));
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      g.add(part(new THREE.BoxGeometry(0.015, 0.2, 0.3), white, -6.7 + dx + Math.cos(a) * 0.14, -1.3 + Math.sin(a) * 0.14, -1.1, 0, 0, a - Math.PI / 2));
+    }
+  }
+  // The targeting pod under the belly.
+  g.add(part(new THREE.BoxGeometry(0.14, 0.3, 1.0), lower, -0.95, -0.82, 0.6));
+  g.add(part(new THREE.CylinderGeometry(0.2, 0.2, 1.9, 12).rotateX(Math.PI / 2), lower, -0.95, -1.1, 0.5));
+  g.add(part(new THREE.SphereGeometry(0.2, 12, 8), glass, -0.95, -1.1, 1.45));
+
+  g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
   return g;
 }
 
@@ -589,32 +957,104 @@ export class AirWing {
     from.y = this.terrain.heightAt(from.x, from.z);
     to.y = this.terrain.heightAt(to.x, to.z);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const alt = Math.max(Math.max(from.y, to.y) + a.height, ceiling + a.clearance);
+
+    // The run is a dive, and the gun fires along the aircraft, not out of
+    // its belly.
+    //
+    // It used to come in level at whatever height cleared the tallest thing
+    // on the map and fire down at the line from there; at Westminster that
+    // was two hundred and thirty metres over the tower's shoulder, and by the
+    // end of the burst the aircraft was nearly over the line and the stream
+    // went straight down out of it. A gun run is flown the other way: roll in
+    // from height, settle into a twenty-degree dive with the pipper on the
+    // start of the line, open at six or seven hundred metres slant, walk the
+    // stream down the line with the nose, and pull off before the ground
+    // gets interesting. The rounds leave a dozen degrees below the
+    // fuselage's axis and meet the ground at a little over thirty — steep
+    // enough to reach a trench dug in a street, which a shallower stream is
+    // not, because the first block in front of it takes the burst.
+    const D = THREE.MathUtils.degToRad(st.dive ?? 20);
+    const G = THREE.MathUtils.degToRad(st.depression ?? 12);
+    const theta = D + G;
+    const v = a.speed, T = st.burst;
+    const preDive = st.preDive ?? 2.6;
+    const drop = v * Math.sin(D) * T;          // height given up while firing
+    const sink = 25;                           // and in the pull-out
+    const backFor = (R) => R * Math.cos(theta) + v * Math.cos(D) * preDive;
+    const ceilOn = (R) => this.ceilingAlong(
+      from.x - dir.x * (backFor(R) + a.runIn), from.z - dir.z * (backFor(R) + a.runIn),
+      to.x + dir.x * 500, to.z + dir.z * 500);
+    let R = st.slant ?? 650;
+    // Opened further out, on the same angles, when something tall stands
+    // under the run: the bottom of the pull-out clears it.
+    for (let k = 0; k < 3; k++) {
+      const top = Math.max(from.y, to.y, ceilOn(R));
+      const need = (top + a.clearance + drop + sink - from.y) / Math.sin(theta);
+      if (need <= R) break;
+      R = need;
+    }
+    const open = from.clone().addScaledVector(dir, -R * Math.cos(theta));
+    open.y = from.y + R * Math.sin(theta);
+    const rollY = open.y + v * Math.sin(D) * preDive;
     const model = makeAirframe(def);
     model.rotation.order = 'YXZ';
-    // Opens fire `lead` metres short of the start of the line. Steep: forty
-    // degrees or so down the gun line, the way a gun run is flown, because
-    // the trenches that matter are dug in streets, and a shallow stream is
-    // stopped by the first block in front of them.
-    const lead = Math.max(st.lead, (alt - from.y) * 1.15);
-    model.position.copy(from).addScaledVector(dir, -(a.runIn + lead));
-    model.position.y = alt;
+    model.position.copy(from).addScaledVector(dir, -(backFor(R) + a.runIn));
+    model.position.y = rollY;
     model.rotation.y = Math.atan2(dir.x, dir.z);
     model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
-    const openAt = a.runIn / a.speed;
+    const corner = a.runIn / v;
+    const openAt = corner + preDive;
     const s = {
-      def, model, dir, side, alt, target: from.clone(),
-      speed: a.speed, t: 0, released: false,
-      releaseAt: openAt, fall: st.burst,
-      pullUpAt: openAt + st.burst + 0.8,
+      def, model, dir, side, alt: rollY, target: from.clone(),
+      speed: v, t: 0, released: false,
+      releaseAt: openAt, fall: T,
+      pullUpAt: openAt + T + 0.25,
       climb: 0, roar: 0, life: 0,
       flak: opts.flak || 0,
       hp: AIRFRAME.jet * 2.2, hits: 0, jink: 0, jinkAt: Math.random() * Math.PI * 2,
-      strafe: { from, to, fired: 0, rounds: st.rounds, burst: st.burst, brrt: false },
+      strafe: { from, to, fired: 0, rounds: st.rounds, burst: T, brrt: false,
+        corner, dive: D, depression: G, nose: 0, slant: R },
     };
     this.sorties.push(s);
     return s;
+  }
+
+  /**
+   * Fly the gun run: level to the roll-in, a push over into the dive, the
+   * dive, and the pull-off once the burst is out. The path is one thing and
+   * the nose another: through the dive the pilot holds the pipper on the
+   * point the stream is walking, so the nose sits a dozen degrees above the
+   * line to it and comes up as the stream walks away.
+   */
+  _flyStrafe(s, dt) {
+    const S = s.strafe, m = s.model, D = S.dive;
+    let path;
+    if (s.t < S.corner - 0.45) path = 0;
+    else if (s.t < S.corner + 0.45) path = -D * (s.t - (S.corner - 0.45)) / 0.9;
+    else path = -D;
+    if (s.t > s.pullUpAt) s.climb = Math.min(1, s.climb + dt * 0.75);
+    path += (0.42 - path) * s.climb;
+    m.position.x += s.dir.x * Math.cos(path) * s.speed * dt;
+    m.position.z += s.dir.z * Math.cos(path) * s.speed * dt;
+    m.position.y += Math.sin(path) * s.speed * dt;
+    const g = this.terrain.heightAt(m.position.x, m.position.z);
+    if (m.position.y < g + 20) m.position.y = g + 20;
+
+    // Where the nose wants to be.
+    let want = path;
+    if (s.t > S.corner && s.t < s.pullUpAt) {
+      const f = S.fired / Math.max(1, S.rounds - 1);
+      const aim = this._v2 || (this._v2 = new THREE.Vector3());
+      aim.copy(S.from).lerp(S.to, f);
+      const h = Math.hypot(aim.x - m.position.x, aim.z - m.position.z);
+      const down = Math.atan2(m.position.y - aim.y, Math.max(1, h));
+      want = -(down - S.depression);
+    }
+    S.nose += (want - S.nose) * Math.min(1, dt * 3.5);
+    m.rotation.x = -S.nose;
+    // Rolled a little into the pull-off so it reads as a turn away.
+    m.rotation.z = s.climb * 0.55;
   }
 
   /** The rounds due by now, each from the gun to its point on the line. */
@@ -622,7 +1062,7 @@ export class AirWing {
     const S = s.strafe, m = s.model;
     const since = s.t - s.releaseAt;
     const due = Math.min(S.rounds, Math.floor((since / S.burst) * S.rounds) + 1);
-    const nose = this._v.set(0, -0.4, 8.6).applyQuaternion(m.quaternion).add(m.position);
+    const nose = this._v.set(0.2, -0.36, 8.6).applyQuaternion(m.quaternion).add(m.position);
     for (; S.fired < due; S.fired++) {
       const f = S.fired / Math.max(1, S.rounds - 1);
       // The stream walks the line, with the scatter of a gun firing from a
@@ -645,12 +1085,16 @@ export class AirWing {
     if (this.fx) this.fx.trail(nose, 2.8);
     if (!S.brrt && this.audio) {
       S.brrt = true;
-      // The gun is one sound, not a rattle of separate shots: at sixty-five
-      // rounds a second the reports run together into the tearing note the
-      // aircraft is named for.
-      for (let k = 0; k < 5; k++) {
-        setTimeout(() => this.audio.play('mg', m.position, { rate: 0.38, gain: 0.9, rolloff: 1600, cooldown: 0 }), k * 260);
-      }
+      // One recording, heard from where the rounds land: the impacts first,
+      // then — the gun being a long way off and the rounds being faster than
+      // sound — the tearing note of the gun itself arriving after them. It
+      // starts when the first rounds do, and the engine adds the time the
+      // sound takes to reach the camera from the line.
+      // The clip has three tenths of a second of lead-in before the first
+      // impact, so it starts that much before the first round lands.
+      const flight = nose.distanceTo(S.from) / 1050;
+      this.audio.play('brrt', S.from.clone().lerp(S.to, 0.35),
+        { gain: 1.0, rolloff: 2600, delay: Math.max(0, flight - 0.3), exact: true });
     }
   }
 
@@ -759,6 +1203,8 @@ export class AirWing {
         this._updateHeli(s, dt);
       } else if (s.loiter) {
         this._updateLoiter(s, dt);
+      } else if (s.strafe) {
+        this._flyStrafe(s, dt);
       } else {
         // Straight and level, then a climbing turn away once past the target.
         if (s.t > s.pullUpAt) {

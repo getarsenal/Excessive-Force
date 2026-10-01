@@ -35,6 +35,8 @@ const CLIPS = {
   explosion: 'assets/explosion.mp3',
   mg: 'assets/machine_gun.mp3',
   enemy: 'assets/enemy_shot.mp3',
+  // The A-10's gun, as heard near its target: impacts, then the gun.
+  brrt: 'assets/a10_gun.mp3',
 };
 
 export class Audio {
@@ -193,10 +195,12 @@ export class Audio {
     const src = this.ctx.createBufferSource();
     src.buffer = buf;
     // Pitch jitter, plus whatever the caller wants for weapon size.
-    src.playbackRate.value = (opts.rate ?? 1) * (0.94 + Math.random() * 0.12);
+    // A recording that is a performance rather than a sample — the A-10's —
+    // plays as it is.
+    src.playbackRate.value = (opts.rate ?? 1) * (opts.exact ? 1 : 0.94 + Math.random() * 0.12);
 
     const g = this.ctx.createGain();
-    g.gain.value = gain * (0.88 + Math.random() * 0.24);
+    g.gain.value = gain * (opts.exact ? 1 : 0.88 + Math.random() * 0.24);
 
     const panner = this.ctx.createStereoPanner?.();
     if (panner) {
