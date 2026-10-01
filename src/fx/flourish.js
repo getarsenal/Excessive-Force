@@ -46,8 +46,8 @@ export class Flourish {
     this._c.ring = new THREE.Color(0.82, 0.8, 0.76);
     this._c.ground = new THREE.Color(0.66, 0.6, 0.5);
     this._c.groundFade = new THREE.Color(0.55, 0.5, 0.43);
-    this._c.surge = new THREE.Color(0.7, 0.66, 0.6);
-    this._c.surgeFade = new THREE.Color(0.6, 0.57, 0.53);
+    this._c.surge = new THREE.Color(0.52, 0.48, 0.42);
+    this._c.surgeFade = new THREE.Color(0.47, 0.44, 0.4);
     this._c.tracer = new THREE.Color(1.6, 0.9, 0.35);
     this._c.paperSoot = new THREE.Color(0.55, 0.52, 0.48);
     // Paper is its own pool: a sheet is a small hard-edged rectangle, not a
@@ -332,7 +332,7 @@ export class Flourish {
       const late = c.t / c.secs;
       c.next = 0.08 + Math.random() * (0.25 + late * 0.9);
       // The pop.
-      fx.sparks.spawn({ x: c.x, y: c.y + 0.5, z: c.z, life: 0.12, size0: 2.4, size1: 0.6,
+      fx.sparks.spawn({ x: c.x, y: c.y + 0.5, z: c.z, life: 0.16, size0: 4.2, size1: 1.0,
         color0: this._c.flare, color1: this._c.tracer, drag: 0, grav: 0, alpha: 1 });
       // And what it throws: a streak or two off in any direction.
       const m = 1 + Math.floor(Math.random() * 3);
@@ -341,7 +341,7 @@ export class Flourish {
         fx.sparks.spawn({
           x: c.x, y: c.y + 0.5, z: c.z,
           vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp, vz: Math.sin(a) * Math.cos(e) * sp,
-          life: 0.5 + Math.random() * 0.7, size0: 0.9, size1: 0.4,
+          life: 0.6 + Math.random() * 0.8, size0: 1.5, size1: 0.6,
           color0: this._c.tracer, color1: this._c.tracer, drag: 0.5, grav: -9.8, alpha: 1,
         });
       }
@@ -360,18 +360,21 @@ export class Flourish {
    */
   surge(x, groundY, z, strength = 1) {
     const fx = this.fx, k = Math.max(0.6, Math.min(3, strength));
-    const n = Math.min(Math.round((this.low ? 26 : 60) * k), Math.round(fx.dust.max * 0.3));
+    const n = Math.min(Math.round((this.low ? 30 : 80) * k), Math.round(fx.dust.max * 0.32));
+    // Three rings at three speeds, so it is a wall with depth rather than
+    // one thin hoop of puffs: the front, the body and the slow heart.
     for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + Math.random() * 0.2;
-      const sp = (16 + Math.random() * 22) * k;
+      const a = Math.random() * Math.PI * 2;
+      const band = i % 3;
+      const sp = (band === 0 ? 30 : band === 1 ? 19 : 9) * (0.85 + Math.random() * 0.3) * k;
       fx.dust.spawn({
-        x: x + Math.cos(a) * 6 * k, y: groundY + 1 + Math.random() * 4, z: z + Math.sin(a) * 6 * k,
-        vx: Math.cos(a) * sp, vy: 0.8 + Math.random() * 2.4, vz: Math.sin(a) * sp,
-        life: 9 + Math.random() * 7,
-        size0: 6 * k, size1: (22 + Math.random() * 18) * k,
+        x: x + Math.cos(a) * 5 * k, y: groundY + 2 + Math.random() * 3 * k, z: z + Math.sin(a) * 5 * k,
+        vx: Math.cos(a) * sp, vy: 0.6 + Math.random() * 1.8 + band * 0.6, vz: Math.sin(a) * sp,
+        life: 10 + Math.random() * 8,
+        size0: 9 * k, size1: (30 + Math.random() * 20) * k,
         color0: this._c.surge, color1: this._c.surgeFade,
-        drag: 0.42, grav: 0.18, turb: 1.2, alpha: 0.5,
-        spin: (Math.random() - 0.5) * 0.3,
+        drag: 0.5, grav: 0.12, turb: 1.0, alpha: 0.62,
+        spin: (Math.random() - 0.5) * 0.25,
       });
     }
   }
