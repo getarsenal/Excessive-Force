@@ -245,7 +245,22 @@ export class ExplosionFX {
       { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 8 },
     );
 
-    for (const s of [this.smoke, this.dust, this.fire, this.sparks]) scene.add(s.mesh);
+    // The plume of a big blast: opaque puffs that are born as fire and go
+    // out to black smoke, each at its own pace, so pockets of flame burn on
+    // inside a cloud already gone dark. Normal blending, not added light:
+    // flame added to a sunlit scene is a pale smear, and smoke has to hide
+    // what is behind it.
+    this.plume = new BillboardParticles(
+      Math.round(quality.maxSmokePuffs * 0.6), smokeTex,
+      { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 11 },
+    );
+    // Clods of earth and stone thrown out of the crater, dark and heavy.
+    this.clods = new BillboardParticles(
+      Math.round(quality.maxSmokePuffs * 0.35), smokeTex,
+      { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 10 },
+    );
+
+    for (const s of [this.smoke, this.dust, this.fire, this.sparks, this.plume, this.clods]) scene.add(s.mesh);
 
     // How many particles one blast may take.
     //
@@ -269,6 +284,8 @@ export class ExplosionFX {
       smoke: cap(this.smoke, 0.30, 70),
       sparks: cap(this.sparks, 0.30, 90),
       dust: cap(this.dust, 0.26, 46),
+      plume: cap(this.plume, 0.4, 60),
+      clods: cap(this.clods, 0.4, 40),
     };
 
     const ballCount = quality.name === 'low' ? 5 : quality.name === 'medium' ? 8 : 14;
@@ -318,6 +335,17 @@ export class ExplosionFX {
       spark: new THREE.Color(0xffd08a),
       sparkCold: new THREE.Color(0x803000),
       stone: new THREE.Color(0xbcae92),
+      // The plume's three stops: white-hot at the core, burning orange, and
+      // the oily black a high-explosive fireball leaves.
+      // Kept below the clip in the warm channels, so the fire stays orange
+      // on screen instead of saturating to cream.
+      plumeHot: new THREE.Color(1.35, 0.82, 0.22),
+      plumeBurn: new THREE.Color(1.05, 0.36, 0.05),
+      plumeBlack: new THREE.Color(0.075, 0.068, 0.062),
+      plumeGrey: new THREE.Color(0.2, 0.19, 0.18),
+      surge: new THREE.Color(0.64, 0.58, 0.49),
+      surgeFade: new THREE.Color(0.5, 0.46, 0.4),
+      clod: new THREE.Color(0.2, 0.16, 0.12),
     };
     this._v = new THREE.Vector3();
   }
@@ -449,6 +477,30 @@ export class ExplosionFX {
    * real bodies, so they land and stay landed. This is the part that has to
    * arrive on the same frame as the flash, before any of them have moved.
    */
+  /**
+   * A bomb going off.
+   *
+   * What a bomb looks like from a few hundred metres is not a ball of fire.
+   * It is a dark, lumpy mass of smoke as wide as it is tall, thrown up in a
+   * second, with fire showing in pockets inside it for a moment longer; a
+   * white skirt of dust racing out along the ground under it; and clods of
+   * earth and stone flung out of it in arcs that trail dirt behind them.
+   * Then the column, which stands for the rest of the level.
+   *
+   * It used to be a smooth orange sphere — a lit dome that read as a
+   * computer graphic — a flat ring on the ground like a ripple on a pond,
+   * and a modest grey puff. Each part of that is replaced:
+   *
+   * - The plume is fifty-odd opaque puffs thrown out of the burst on a hard
+   *   drag, each born white-hot, burning orange for a fraction of its life
+   *   and then going out to black, at its own pace. Opaque, so the black
+   *   hides the burning ones behind it and the fire shows in pockets.
+   * - The surge is fast, low and pale, the way the shock lifts dust.
+   * - The clods are chains of dark puffs launched together at slightly
+   *   different speeds, so each spreads along its own arc into a streak.
+   *
+   * The flash and the light are kept; the dome and the ripple are not.
+   */
   strikeBlast(pos, power, opts = {}) {
     const q = this.quality;
     const low = q.name === 'low';
@@ -456,151 +508,166 @@ export class ExplosionFX {
     const radius = 5.2 * scale;
     const groundY = opts.groundY ?? pos.y;
     const high = pos.y - groundY;
+    const ground = high < radius * 2.2;
+    const C = this._c;
 
-    // ── The flash. Short, colourless, and far brighter than anything else in
-    // the scene: the frame a bomb goes off in should be hard to look at.
+    // ── The flash: one frame you cannot look at, and the light on the stone.
     const flash = this._freeLight();
     flash.light.position.copy(pos);
     flash.light.distance = radius * 26;
-    // Bright, but not so bright that the blast becomes a white disc with
-    // nothing in it: what wants to be visible is the *fire*, and a flash that
-    // blows the exposure for two seconds hides the thing it is announcing.
     flash.peak = 1450 * scale * scale;
     flash.life = 0.13;
     flash.age = 0;
-
     const core = this._freeFireball();
-    if (core) core.fire(pos, radius * 0.55, 0.15, 1.6);
+    if (core) core.fire(pos, radius * 0.45, 0.1, 1.6);
 
-    const ball = this._freeFireball();
-    if (ball) ball.fire(pos, radius * 1.35, 0.62 + 0.22 * scale, 1.05 + scale * 0.14);
+    // ── The plume.
+    const plumeN = Math.round(THREE.MathUtils.clamp(16 * scale, 40, this._caps.plume) * (low ? 0.6 : 1));
+    // Two kinds of puff, drawn in this order. The core burns: smaller and
+    // slower, kept inside, holding its fire for two or three seconds. The
+    // shell goes black almost at once and is drawn over the core, so the
+    // fire shows only where the shell is ragged — pockets of flame in a dark
+    // mass, which is what the photographs show, and not the reverse (a black
+    // heart in an orange halo), which is what random order drew.
+    const coreN = Math.round(plumeN * 0.3);
+    for (let i = 0; i < plumeN; i++) {
+      const inner = i < coreN;
+      const dir = randomDir();
+      // A ground burst throws up and out, not down into the earth, and more
+      // up than out: the mass stands taller than it is wide.
+      if (ground) { dir.y = Math.abs(dir.y) * 1.3 + 0.25; dir.x *= 0.8; dir.z *= 0.8; }
+      const sp = (inner ? 6 + Math.random() * 12 : 14 + Math.random() * 30) * Math.sqrt(scale);
+      this.plume.spawn({
+        x: pos.x + dir.x * radius * (inner ? 0.4 : 0.9) * Math.random(),
+        y: pos.y + Math.abs(dir.y) * radius * (inner ? 0.4 : 0.9) * Math.random(),
+        z: pos.z + dir.z * radius * (inner ? 0.4 : 0.9) * Math.random(),
+        vx: dir.x * sp, vy: dir.y * sp + (inner ? 18 : 22) * Math.sqrt(scale), vz: dir.z * sp,
+        life: 9 + Math.random() * 6,
+        size0: radius * (inner ? 1.2 + Math.random() * 0.5 : 1.8 + Math.random() * 0.8),
+        size1: radius * (inner ? 2.6 + Math.random() * 1.0 : 4.2 + Math.random() * 1.8),
+        color0: C.plumeHot, color1: C.plumeBurn, color2: Math.random() < 0.75 ? C.plumeBlack : C.plumeGrey,
+        cool: inner ? 0.2 + Math.random() * 0.14 : 0.03 + Math.random() * 0.05,
+        drag: 2.0 + Math.random() * 0.6, grav: 5.0 + Math.random() * 4.0, turb: 2.0 * scale,
+        spin: (Math.random() - 0.5) * 0.4, alpha: 0.97,
+      });
+    }
 
-    // ── The shock, at the burst and again on the ground under it.
-    const air = this._freeShock();
-    if (air) air.fire(pos, radius * 5.0, 0.5 + 0.1 * scale);
-    if (high < radius * 2.2) {
-      const sw = this._freeShock();
-      if (sw) {
-        const p = this._v.copy(pos);
-        p.y = groundY + 0.8;
-        sw.fire(p, radius * 7.5, 0.7 + 0.14 * scale);
+    // ── A little added light in the first instant, for the heat.
+    const fireN = Math.round(THREE.MathUtils.clamp(10 * scale, 10, this._caps.fire * 0.5) * (low ? 0.5 : 1));
+    for (let i = 0; i < fireN; i++) {
+      const dir = randomDir();
+      const sp = (10 + Math.random() * 20) * Math.sqrt(scale);
+      this.fire.spawn({
+        x: pos.x, y: pos.y + radius * 0.2, z: pos.z,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp + 3 * scale, vz: dir.z * sp,
+        life: 0.25 + Math.random() * 0.35,
+        size0: radius * 0.5, size1: radius * (1.1 + Math.random() * 0.6),
+        color0: C.fireHot, color1: C.fireMid,
+        drag: 3.0, grav: 1.0, alpha: 0.85,
+      });
+    }
+
+    // ── Hot fragments: a few, fast, in a flat disc.
+    const fragN = Math.round(THREE.MathUtils.clamp(30 * scale, 24, this._caps.sparks * 0.6) * (low ? 0.45 : 1));
+    for (let i = 0; i < fragN; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const rise = Math.pow(Math.random(), 1.8) * 0.9 + 0.08;
+      const sp = (40 + Math.random() * 80) * Math.sqrt(scale);
+      this.sparks.spawn({
+        x: pos.x, y: pos.y, z: pos.z,
+        vx: Math.cos(a) * sp, vy: rise * sp * 0.8, vz: Math.sin(a) * sp,
+        life: 0.8 + Math.random() * 1.6,
+        size0: 0.45 * scale, size1: 0.08 * scale,
+        color0: C.spark, color1: C.sparkCold,
+        drag: 0.35, grav: -19.0, alpha: 1.0,
+      });
+    }
+
+    // ── Clods: chains of dark puffs on the same heading at slightly
+    // different speeds, so each spreads along its arc into a streak of dirt.
+    const jets = Math.round(THREE.MathUtils.clamp(5 + scale * 2.5, 6, 18) * (low ? 0.6 : 1));
+    const chain = low ? 5 : 9;
+    for (let j = 0; j < jets; j++) {
+      const a = Math.random() * Math.PI * 2;
+      const up = 0.45 + Math.random() * 0.75;
+      const sp = (32 + Math.random() * 36) * Math.sqrt(scale);
+      const hx = Math.cos(a), hz = Math.sin(a);
+      for (let k = 0; k < chain && this.clods.count < this.clods.max; k++) {
+        const f = 1 - k * 0.075;
+        this.clods.spawn({
+          x: pos.x + hx * radius * 0.2, y: pos.y + radius * 0.1, z: pos.z + hz * radius * 0.2,
+          vx: hx * sp * f, vy: up * sp * f, vz: hz * sp * f,
+          life: 2.6 + Math.random() * 1.2,
+          size0: radius * (0.22 - k * 0.014), size1: radius * (0.7 + k * 0.06),
+          color0: C.clod, color1: C.dustFade,
+          drag: 0.25 + k * 0.05, grav: -15, alpha: 0.9 - k * 0.07,
+        });
       }
     }
 
-    // ── Fire, thrown out of the core rather than puffed round it.
-    const fireN = Math.round(THREE.MathUtils.clamp(34 * scale, 20, this._caps.fire) * (low ? 0.5 : 1));
-    for (let i = 0; i < fireN; i++) {
-      const dir = randomDir();
-      const sp = (14 + Math.random() * 30) * scale;
-      this.fire.spawn({
-        x: pos.x + dir.x * radius * 0.3,
-        y: pos.y + dir.y * radius * 0.3,
-        z: pos.z + dir.z * radius * 0.3,
-        vx: dir.x * sp, vy: dir.y * sp + 4.5 * scale, vz: dir.z * sp,
-        life: 0.4 + Math.random() * 0.6,
-        size0: radius * 0.4, size1: radius * (1.2 + Math.random() * 0.9),
-        color0: this._c.fireHot, color1: this._c.fireMid,
-        drag: 2.8, grav: 2.4, spin: (Math.random() - 0.5) * 3.4, alpha: 0.97,
-      });
+    // ── The surge: pale, low and fast.
+    if (ground) {
+      const surgeN = Math.round(THREE.MathUtils.clamp(26 * scale, 36, this._caps.dust) * (low ? 0.5 : 1));
+      for (let i = 0; i < surgeN; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = (30 + Math.random() * 50) * Math.sqrt(scale);
+        this.dust.spawn({
+          x: pos.x + Math.cos(a) * radius * 0.5,
+          y: groundY + 0.5 + Math.random() * 1.0,
+          z: pos.z + Math.sin(a) * radius * 0.5,
+          vx: Math.cos(a) * sp, vy: 0.5 + Math.random() * 2.0, vz: Math.sin(a) * sp,
+          life: 3.0 + Math.random() * 3.0,
+          size0: radius * 1.3, size1: radius * (2.8 + Math.random() * 1.0),
+          color0: C.surge, color1: C.surgeFade,
+          drag: 2.3, grav: 0.3, turb: 1.4,
+          spin: (Math.random() - 0.5) * 0.5, alpha: 0.3,
+        });
+      }
     }
 
-    // ── Ejecta. Flat and far: the fragments outrun the fireball by a long way,
-    // and they come off the burst in a disc rather than a ball.
-    const fragN = Math.round(THREE.MathUtils.clamp(70 * scale, 40, this._caps.sparks) * (low ? 0.45 : 1));
-    for (let i = 0; i < fragN; i++) {
-      const a = Math.random() * Math.PI * 2;
-      // Biased low — a ground burst throws its skirt outward, not upward.
-      const rise = Math.pow(Math.random(), 1.8) * 0.85 + 0.06;
-      const sp = (34 + Math.random() * 90) * scale;
-      this.sparks.spawn({
-        x: pos.x, y: pos.y, z: pos.z,
-        vx: Math.cos(a) * sp, vy: rise * sp * 0.75, vz: Math.sin(a) * sp,
-        life: 1.1 + Math.random() * 2.4,
-        size0: 0.5 * scale, size1: 0.08 * scale,
-        color0: this._c.spark, color1: this._c.sparkCold,
-        drag: 0.32, grav: -19.0, alpha: 1.0,
-      });
-    }
-
-    // ── The base surge: the ring that tells you how big it was.
-    const surgeN = Math.round(THREE.MathUtils.clamp(40 * scale, 22, this._caps.dust) * (low ? 0.5 : 1));
-    for (let i = 0; i < surgeN; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = (26 + Math.random() * 44) * scale;
-      this.dust.spawn({
-        x: pos.x + Math.cos(a) * radius * 0.4,
-        y: groundY + 0.6 + Math.random() * 2.0,
-        z: pos.z + Math.sin(a) * radius * 0.4,
-        vx: Math.cos(a) * sp, vy: 1.0 + Math.random() * 2.6, vz: Math.sin(a) * sp,
-        life: 3.4 + Math.random() * 3.6,
-        size0: 2.6 * scale, size1: (16 + Math.random() * 16) * scale,
-        color0: this._c.dust, color1: this._c.dustFade,
-        drag: 0.85, grav: 0.3, turb: 1.6,
-        spin: (Math.random() - 0.5) * 0.5, alpha: 0.6,
-      });
-    }
-
-    // ── Smoke, which is what is left thirty seconds later.
-    const smokeN = Math.round(THREE.MathUtils.clamp(34 * scale, 16, this._caps.smoke) * (low ? 0.45 : 1));
-    for (let i = 0; i < smokeN; i++) {
-      const dir = randomDir();
-      const sp = (5 + Math.random() * 13) * scale;
-      this.smoke.spawn({
-        x: pos.x + dir.x * radius * 0.4,
-        y: pos.y + dir.y * radius * 0.4,
-        z: pos.z + dir.z * radius * 0.4,
-        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.7 + 7.0 * scale, vz: dir.z * sp,
-        life: 4.0 + Math.random() * 5.0 * scale,
-        size0: radius * 0.6, size1: radius * (2.6 + Math.random() * 2.2),
-        color0: this._c.smokeDark, color1: this._c.smokeLight,
-        drag: 1.0, grav: 1.2, turb: 3.0 * scale,
-        spin: (Math.random() - 0.5) * 0.8, alpha: 0.78,
-      });
-    }
-
-    // The second beat, always — a bomb has one whatever its size.
-    this._rolls.push({
-      t: 0.22, x: pos.x, y: pos.y, z: pos.z, scale: scale * 1.15,
-      ground: high < radius * 2.2, groundY,
-    });
+    // ── The column, rising out of the plume: the second beat.
+    this._rolls.push({ t: 0.5, x: pos.x, y: pos.y, z: pos.z, scale: scale * 1.1, ground, groundY });
   }
 
-  /** The second beat of a large blast: the fireball rolling out and up. */
+  /** The second beat of a large blast: the column rising out of the plume. */
   _roll(r) {
     const q = this.quality;
     const scale = r.scale;
     const radius = 5.2 * scale;
-    const pos = this._v.set(r.x, r.y + radius * 0.22, r.z);
-
-    const ball = this._freeFireball();
-    if (ball) ball.fire(pos, radius * 1.55, 0.9 + 0.22 * scale, 0.78 + scale * 0.12);
+    const pos = this._v.set(r.x, r.y + radius * 0.6, r.z);
+    const C = this._c;
 
     const lg = this._freeLight();
     lg.light.position.copy(pos);
-    lg.light.distance = radius * 18;
-    lg.peak = 620 * scale * scale;
-    lg.life = 0.7 + 0.12 * scale;
+    lg.light.distance = radius * 14;
+    lg.peak = 380 * scale * scale;
+    lg.life = 0.9;
     lg.age = 0;
 
-    // Dark, slow and buoyant: the head of the column that stands afterwards.
-    const n = Math.round(THREE.MathUtils.clamp(18 * scale, 10, this._caps.smoke * 0.8)
-      * (q.name === 'low' ? 0.4 : 1));
+    // Dark, slow and buoyant: the head of the column, still burning low
+    // down for a moment. In the smoke layer, which is drawn before the
+    // plume: spawned half a second after it and drawn on top, it put a black
+    // heart in the middle of the fireball.
+    const n = Math.round(THREE.MathUtils.clamp(10 * scale, 12, this._caps.smoke * 0.5)
+      * (q.name === 'low' ? 0.5 : 1));
     for (let i = 0; i < n; i++) {
       const dir = randomDir();
-      const sp = (2.5 + Math.random() * 6) * scale;
+      const sp = (3 + Math.random() * 6) * Math.sqrt(scale);
+      const burning = Math.random() < 0.35;
       this.smoke.spawn({
-        x: pos.x + dir.x * radius * 0.5,
-        y: pos.y + Math.abs(dir.y) * radius * 0.5,
-        z: pos.z + dir.z * radius * 0.5,
-        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.5 + 7.5 * scale, vz: dir.z * sp,
-        life: 4.5 + Math.random() * 5.0 * scale,
-        size0: radius * 0.8, size1: radius * (2.8 + Math.random() * 2.4),
-        color0: this._c.smokeDark, color1: this._c.smokeLight,
-        drag: 0.85, grav: 1.1, turb: 3.0 * scale,
-        spin: (Math.random() - 0.5) * 0.7, alpha: 0.8,
+        x: pos.x + dir.x * radius * 0.6,
+        y: pos.y + Math.abs(dir.y) * radius * 0.6,
+        z: pos.z + dir.z * radius * 0.6,
+        vx: dir.x * sp, vy: Math.abs(dir.y) * sp * 0.5 + 6.5 * Math.sqrt(scale) * 1.6, vz: dir.z * sp,
+        life: 7 + Math.random() * 6,
+        size0: radius * 0.9, size1: radius * (2.4 + Math.random() * 1.6),
+        color0: burning ? C.plumeBurn : C.plumeBlack, color1: C.plumeBlack,
+        color2: Math.random() < 0.5 ? C.plumeGrey : C.smokeLight,
+        cool: burning ? 0.06 : 0.3,
+        drag: 0.9, grav: 1.4, turb: 3.0 * scale,
+        spin: (Math.random() - 0.5) * 0.5, alpha: 0.9,
       });
     }
-    if (r.ground) this.groundBurst(this._v.set(r.x, r.y, r.z), scale * 0.8, r.groundY);
   }
 
   /** Dust running outward along the ground at the base of a blast. */
@@ -778,6 +845,8 @@ export class ExplosionFX {
     this.smoke.update(dt, this.time);
     this.sparks.update(dt, this.time);
     this.dust.update(dt, this.time);
+    this.plume.update(dt, this.time);
+    this.clods.update(dt, this.time);
   }
 }
 

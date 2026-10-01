@@ -161,6 +161,10 @@ export class BillboardParticles {
     this.seed = new Float32Array(max);
     this.c0 = new Float32Array(max * 3);
     this.c1 = new Float32Array(max * 3);
+    // An optional third colour, reached after `cool` of the life: fire that
+    // turns to smoke goes hot -> burning (c1) by `cool`, then burning -> c2.
+    this.c2 = new Float32Array(max * 3);
+    this.cool = new Float32Array(max);
     this.alpha0 = new Float32Array(max);
 
     const geo = new THREE.InstancedBufferGeometry();
@@ -232,9 +236,11 @@ export class BillboardParticles {
     this.seed[i] = Math.random();
     this.alpha0[i] = o.alpha ?? 1;
 
-    const a = o.color0, b = o.color1 ?? o.color0;
+    const a = o.color0, b = o.color1 ?? o.color0, c = o.color2 ?? b;
     this.c0[i * 3] = a.r; this.c0[i * 3 + 1] = a.g; this.c0[i * 3 + 2] = a.b;
     this.c1[i * 3] = b.r; this.c1[i * 3 + 1] = b.g; this.c1[i * 3 + 2] = b.b;
+    this.c2[i * 3] = c.r; this.c2[i * 3 + 1] = c.g; this.c2[i * 3 + 2] = c.b;
+    this.cool[i] = o.color2 ? (o.cool ?? 0.15) : 0;
     return i;
   }
 
@@ -285,7 +291,9 @@ export class BillboardParticles {
       this.vel[to * 3 + k] = this.vel[from * 3 + k];
       this.c0[to * 3 + k] = this.c0[from * 3 + k];
       this.c1[to * 3 + k] = this.c1[from * 3 + k];
+      this.c2[to * 3 + k] = this.c2[from * 3 + k];
     }
+    this.cool[to] = this.cool[from];
     this.age[to] = this.age[from];
     this.life[to] = this.life[from];
     this.size0[to] = this.size0[from];
@@ -312,10 +320,21 @@ export class BillboardParticles {
 
     // Colour ramps over life; alpha rises fast then falls away slowly, which
     // is what makes smoke read as dissipating rather than blinking out.
-    const k = Math.pow(t, 0.7);
-    this.aColor.array[i * 3] = this.c0[i * 3] + (this.c1[i * 3] - this.c0[i * 3]) * k;
-    this.aColor.array[i * 3 + 1] = this.c0[i * 3 + 1] + (this.c1[i * 3 + 1] - this.c0[i * 3 + 1]) * k;
-    this.aColor.array[i * 3 + 2] = this.c0[i * 3 + 2] + (this.c1[i * 3 + 2] - this.c0[i * 3 + 2]) * k;
+    const cool = this.cool[i];
+    if (cool > 0) {
+      // Hot to burning by `cool`, burning to the third colour after it — and
+      // quickly, as a pocket of flame goes out.
+      const A = t < cool ? this.c0 : this.c1, B = t < cool ? this.c1 : this.c2;
+      // Out as fast as it burned: a puff that was alight for a twentieth of
+      // its life goes black over about as long again, not over a third of it.
+      const k = t < cool ? t / cool : Math.min(1, Math.pow((t - cool) / Math.max(0.03, cool * 0.9), 0.8));
+      for (let c = 0; c < 3; c++) this.aColor.array[i * 3 + c] = A[i * 3 + c] + (B[i * 3 + c] - A[i * 3 + c]) * k;
+    } else {
+      const k = Math.pow(t, 0.7);
+      this.aColor.array[i * 3] = this.c0[i * 3] + (this.c1[i * 3] - this.c0[i * 3]) * k;
+      this.aColor.array[i * 3 + 1] = this.c0[i * 3 + 1] + (this.c1[i * 3 + 1] - this.c0[i * 3 + 1]) * k;
+      this.aColor.array[i * 3 + 2] = this.c0[i * 3 + 2] + (this.c1[i * 3 + 2] - this.c0[i * 3 + 2]) * k;
+    }
 
     const fadeIn = Math.min(1, t / 0.08);
     const fadeOut = 1.0 - THREE.MathUtils.smoothstep(t, 0.35, 1.0);
