@@ -268,6 +268,10 @@ export class Projectile {
     // Bombs slow in the air: a light drag on a slick 500-pounder, a heavy one
     // on the MOAB under its parachute.
     this.drag = opts.drag ?? 0;
+    // A laser-guided bomb: it glides at the height it was let go at, then
+    // pitches over and dives onto the spot. See `_stepGuided`.
+    this.guided = !!opts.guided && !!this.target;
+    if (this.guided) { this.phase = 'glide'; this._lastRange = Infinity; }
     // The unit definition behind an air-dropped bomb, for the strike logic.
     this.strikeDef = opts.strikeDef ?? null;
     // The sortie that fired it, for a weapon that fires many rounds and
@@ -301,6 +305,8 @@ export class Projectile {
 
     if (this.kind === 'topattack') {
       this._stepTopAttack(dt);
+    } else if (this.guided && this.phase !== 'free') {
+      this._stepGuided(dt);
     } else {
       if (this.kind === 'rocket' && this.age < this.boostTime) {
         this.vel.addScaledVector(this.boostDir, this.boostAccel * dt);
@@ -357,6 +363,56 @@ export class Projectile {
     this._lastRange = range;
     const desired = toTarget.normalize().multiplyScalar(this.speed * 1.35);
     this.vel.lerp(desired, Math.min(1, dt * 7));
+    this.pos.addScaledVector(this.vel, dt);
+  }
+
+  /**
+   * The laser-guided bomb's flight: glide, then dive.
+   *
+   * Dropped ballistically from a jet at two hundred and thirty metres a
+   * second, a bomb comes down at ten or twelve degrees. Aimed at the summit
+   * of a stepped pyramid that is a shot past the top: at Borobudur the
+   * GBU-28 went through its aim point a dozen metres to one side, missed the
+   * stupa, sailed on over the far side of the monument as it fell away
+   * beneath it, and landed in the town three hundred metres beyond — and a
+   * player who had paid four hundred and eighty thousand for it saw nothing
+   * at all. A guided bomb does not fly like that. It holds its height on its
+   * fins toward the spot, and when the spot is steeply enough below it, it
+   * pitches over and comes down on it at about sixty degrees, which is what
+   * puts a penetrator into the top of a thing rather than its side.
+   *
+   * The steering point is the target raised by twice the remaining
+   * horizontal distance, never above the bomb itself: far out that is level
+   * flight, and as the distance closes it slides down onto the target along
+   * a line sixty-three degrees steep. Past the spot, or if the spot has gone
+   * (a summit shot away under it), it is a falling bomb like any other and
+   * goes off against whatever is below.
+   */
+  _stepGuided(dt) {
+    const t = this.target;
+    const dx = t.x - this.pos.x, dz = t.z - this.pos.z;
+    const flat = Math.hypot(dx, dz);
+    const range = Math.hypot(dx, t.y - this.pos.y, dz);
+    if (range < 3 || range > this._lastRange + 0.5) {
+      this.phase = 'free';
+      this.vel.y -= this.gravity * dt;
+      this.pos.addScaledVector(this.vel, dt);
+      return;
+    }
+    this._lastRange = range;
+    const aimY = Math.min(this.pos.y, t.y + flat * 2);
+    const want = this._want || (this._want = new THREE.Vector3());
+    want.set(dx, aimY - this.pos.y, dz).normalize();
+    if (aimY < this.pos.y - 0.5) this.phase = 'dive';
+    // Speed: what it was let go at, bled a little in the glide and gained
+    // back in the dive.
+    let speed = this.vel.length();
+    const down = Math.max(0, -want.y);
+    speed = Math.max(140, speed + (this.gravity * down - (this.phase === 'glide' ? 4 : 0)) * dt);
+    // The fins turn it, not instantly.
+    const cur = this.vel.clone().normalize();
+    cur.lerp(want, Math.min(1, dt * (this.phase === 'dive' ? 3.0 : 1.5))).normalize();
+    this.vel.copy(cur).multiplyScalar(speed);
     this.pos.addScaledVector(this.vel, dt);
   }
 

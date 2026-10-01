@@ -1257,7 +1257,7 @@ export class AirWing {
           this.projectiles.fire({
             pos: m.position.clone().addScaledVector(s.dir, -back).setY(m.position.y - 1.6),
             vel: new THREE.Vector3(s.dir.x * s.speed, 0, s.dir.z * s.speed),
-            gravity: p.gravity, kind: 'bomb', drag: p.drag || 0, speed: s.speed,
+            gravity: p.gravity, kind: 'bomb', drag: p.drag || 0, speed: s.speed, guided: !!p.guided,
             warhead: s.def.warhead, owner: null,
             target: n > 1 ? s.target.clone().addScaledVector(s.dir, along) : s.target, trail: p.trail,
             strikeDef: s.def,

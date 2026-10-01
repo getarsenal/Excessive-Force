@@ -258,7 +258,8 @@ export const UNITS = [
     model: 'aircraft', strike: { frac: 0.10, maxR: 64, minR: 9, fx: 4.6, bite: 0.62, shock: 1.2 },
     aircraft: { kind: 'eagle', speed: 230, height: 110, clearance: 45, runIn: 2400, offset: 40 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.04, trail: 0.8 },
+    // A GBU-12: laser-guided, so it glides to the spot and dives onto it.
+    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.04, trail: 0.8, guided: true },
     warhead: { lethal: 30, radius: 40, power: 90000, fx: 4.6, kinetic: 0.35 },
     dispersion: 0,
     blurb: 'One pass, one 500-pounder, a tenth of the building. It will not fell a tower on its own.',
@@ -335,7 +336,8 @@ export const UNITS = [
     model: 'aircraft', strike: { frac: 0.14, maxR: 30, minR: 6, fx: 5.0, bite: 1.0, shock: 0.4 },
     aircraft: { kind: 'eagle', store: 'gbu28', speed: 230, height: 160, clearance: 60, runIn: 2400, offset: 40 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
-    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.03, trail: 0.9 },
+    // Laser-guided: it glides to the spot and comes down on it steeply.
+    projectile: { kind: 'bomb', speed: 230, gravity: 9.81, drag: 0.03, trail: 0.9, guided: true },
     warhead: { lethal: 45, radius: 24, power: 220000, fx: 5.0, kinetic: 0.9 },
     dispersion: 0,
     blurb: 'Two and a half tonnes that goes in before it goes off. For the things that will not fall over.',
