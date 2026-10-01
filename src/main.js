@@ -22,7 +22,7 @@ import { recordTheatre, releaseNoteFor } from './game/campaign.js';
 import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
-import { Garrison, loadSoldierGeometry } from './game/defenders.js';
+import { Garrison } from './game/defenders.js';
 import { Battle } from './game/battle.js';
 import { HUD } from './ui/hud.js';
 import { TAP } from './ui/pointer.js';
@@ -525,17 +525,9 @@ async function boot() {
     if (dailyMod.id === 'arsenal') battle.unlockAll = true;
   }
 
-  // The real soldier from FIREBASE, flattened into one instanceable geometry.
-  // Loaded after the garrison is posted rather than before it, so a slow or
-  // missing asset costs the box stand-in instead of the whole level.
-  loadSoldierGeometry(battle.models.loader, 'Enemy_Soldier', 1.85)
-    .then((m) => {
-      if (m && garrison.useSoldierModel(m.geometry, m.material)) {
-        console.log('[tumble] garrison: Enemy_Soldier.glb,',
-          m.geometry.attributes.position.count, 'verts per figure');
-      }
-    })
-    .catch((e) => console.warn('[tumble] soldier model unavailable', e.message));
+  // The downloaded soldier is not loaded any more: flattened, it stood in its
+  // rest pose, a T, and the whole garrison held its arms straight out. The
+  // figure is built in `game/soldier.js` in a firing pose instead.
 
   battle.craters = new CraterFX(engine.scene, terrain, quality);
 

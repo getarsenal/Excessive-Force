@@ -177,17 +177,19 @@ function planFieldWorks(opts = {}) {
       if (Math.abs(hA - hB) > 3.4) continue;
       lines.push({ x, z, yaw: face, len: bayLen, traverse: b < bays - 1 });
       laid++;
-      // Two men to a bay, and not two of the same thing.
+      // Men to a bay, and not all of the same thing.
       //
       // Mostly rifles, a gun group in about one bay in three, and the odd
       // sniper or AT team — roughly the mix a rifle section carries and, more
       // to the point, it means the line does not answer every attack the same
       // way. An AT team in a trench is the reason walking a gun up to the line
       // at close range is a bad idea.
-      for (let m = 0; m < 2; m++) {
-        const g = (m + 0.5) - 1;
-        const px = x + tx * g * bayLen * 0.8 - nx * 0.12;
-        const pz = z + tz * g * bayLen * 0.8 - nz * 0.12;
+      // Four men to a bay. Two was a picket, not a trench line: from a gun
+      // position the belt read as empty ditches with the odd head in them.
+      for (let m = 0; m < 4; m++) {
+        const g = (m + 0.5) / 4 - 0.5;
+        const px = x + tx * g * bayLen * 0.9 - nx * 0.12;
+        const pz = z + tz * g * bayLen * 0.9 - nz * 0.12;
         const roll = rnd();
         const type = (m === 0 && b % 3 === 0) ? 'mg'
           : roll < 0.09 ? 'sniper'

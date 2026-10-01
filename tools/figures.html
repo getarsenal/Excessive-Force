@@ -1,0 +1,42 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Figures</title>
+<style>html,body{margin:0;background:#9fb3c8}canvas{display:block}</style>
+<script type="module">
+// Every soldier pose in a row, lit like the game: `node tools/figures.mjs`.
+import * as THREE from 'three';
+import { soldierGeometry, soldierFigure } from '/src/game/soldier.js';
+import { makeInfantryMesh, makeMortarTeam } from '/src/game/units.js';
+const W = innerWidth, H = innerHeight;
+const r = new THREE.WebGLRenderer({ antialias: true });
+r.setSize(W, H); document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xdfe8f0, 0x5a5040, 1.4));
+const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(4, 8, 6); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshStandardMaterial({ color: 0x7a7a5c }));
+ground.rotation.x = -Math.PI / 2; scene.add(ground);
+const Q = new URLSearchParams(location.search);
+const view = Q.get('view') || 'side';
+const cx = +(Q.get('x') || 0), dist = +(Q.get('d') || 30);
+scene.background = new THREE.Color(0x9fb3c8);
+const items = [];
+// The garrison's figure, instanced, in three uniform colours.
+for (const [i, c] of [0x6b5a3e, 0x515a3c, 0x7a6b4e].entries()) {
+  const m = new THREE.Mesh(soldierGeometry('aim'), new THREE.MeshStandardMaterial({ vertexColors: true, color: c, roughness: 0.9 }));
+  items.push(m);
+}
+for (const w of ['at4', 'gustaf', 'rpg32', 'javelin']) {
+  items.push(makeInfantryMesh(0x4a5340, { weapon: w, role: 'gunner' }));
+  items.push(makeInfantryMesh(0x3f4738, { weapon: w, role: 'second' }));
+}
+items.push(makeInfantryMesh(0x4a5340, { weapon: 'm240', role: 'gunner' }));
+items.push(makeInfantryMesh(0x3f4738, { weapon: 'm240', role: 'second' }));
+items.push(makeMortarTeam());
+items.forEach((m, i) => { m.position.set((i - (items.length - 1) / 2) * 1.5, 0, 0); scene.add(m); });
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
+if (view === 'side') { cam.position.set(cx, 1.4, dist); cam.lookAt(cx, 0.8, 0); for (const m of items) m.rotation.y = Math.PI / 2; }
+else if (view === 'front') { cam.position.set(cx, 1.4, dist); cam.lookAt(cx, 0.8, 0); }
+else { cam.position.set(cx + 4, 5, dist * 0.7); cam.lookAt(cx, 0.5, 0); for (const m of items) m.rotation.y = 0.7; }
+r.render(scene, cam);
+window.done = true;
+</script>

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { soldierGeometry } from './soldier.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveBallistic } from './projectiles.js';
@@ -229,17 +230,6 @@ function skipFor(d) {
  * the garrison is posted during the loading screen, so this is what stands in
  * the windows for the second or two before the real thing lands.
  */
-function soldierGeometry() {
-  const parts = [];
-  const push = (geo, x, y, z) => { geo.translate(x, y, z); parts.push(geo); };
-  push(new THREE.BoxGeometry(0.46, 0.68, 0.28), 0, 1.08, 0);
-  push(new THREE.BoxGeometry(0.16, 0.72, 0.18), -0.12, 0.36, 0);
-  push(new THREE.BoxGeometry(0.16, 0.72, 0.18), 0.12, 0.36, 0);
-  push(new THREE.BoxGeometry(0.26, 0.26, 0.26), 0, 1.55, 0);
-  push(new THREE.BoxGeometry(0.1, 0.1, 0.86), 0.16, 1.22, 0.3);
-  return BufferGeometryUtils.mergeGeometries(parts, false);
-}
-
 /**
  * Flatten a GLB into one instanceable geometry.
  *
@@ -505,8 +495,23 @@ export class Garrison {
     // gun pits and the observers are posted after it and simply never appeared.
     // The figures are instanced and the cost is the line-of-sight pass, which
     // is what the tiers are for.
-    this.cap = { low: 200, medium: 288, high: 360, ultra: 420 }[quality.name] ?? 288;
-    this.mesh = mk(soldierGeometry(), 0xffffff, this.cap);
+    //
+    // In pools now, because one pool let the building garrison spend it all:
+    // at Westminster the Palace took the cap and eight of a hundred and
+    // forty-two trench positions were manned. The buildings, the belt and the
+    // airborne reinforcement each have their own allowance, and the instanced
+    // mesh is sized for all three.
+    this.pools = {
+      base: { low: 200, medium: 288, high: 360, ultra: 420 }[quality.name] ?? 288,
+      works: { low: 110, medium: 170, high: 220, ultra: 280 }[quality.name] ?? 170,
+      air: { low: 120, medium: 170, high: 210, ultra: 250 }[quality.name] ?? 170,
+    };
+    this.used = { base: 0, works: 0, air: 0 };
+    this.cap = this.pools.base + this.pools.works + this.pools.air;
+    // The rifleman in the shoulder, from `soldier.js`: the tones are baked into
+    // the vertices and the instance colour is the uniform.
+    this.mesh = mk(soldierGeometry('aim'), 0xffffff, this.cap);
+    this.mesh.material.vertexColors = true;
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 48);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 96);
     this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
@@ -563,7 +568,8 @@ export class Garrison {
    * position that would have floated in mid-air quietly declines to exist.
    */
   place(type, pos, facing = 0, maxDist = 6, opts = {}) {
-    if (this.defenders.length >= this.cap) return false;
+    const pool = opts.pool || 'base';
+    if (this.defenders.length >= this.cap || this.used[pool] >= this.pools[pool]) return false;
     const def = DEFENDER_TYPES[type];
     if (!def) return false;
 
@@ -644,6 +650,8 @@ export class Garrison {
       if (re) { d.structure = re.structure; d.chunk = re.chunk; }
     }
     this.defenders.push(d);
+    d.pool = pool;
+    this.used[pool]++;
     return true;
   }
 
@@ -1048,6 +1056,7 @@ export class Garrison {
       const p = new THREE.Vector3(w.x, w.y, w.z);
       if (this.place(w.type, p, w.yaw, 4, {
         cover: w.kind === 'pit' ? 'ground' : 'trench',
+        pool: 'works',
         // The trench has its own wall of bags along the lip; a horseshoe
         // round each man as well stood a second, smaller wall in the slot.
         sandbags: false,
