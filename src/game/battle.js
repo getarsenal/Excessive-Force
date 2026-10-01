@@ -454,24 +454,42 @@ export class Battle {
     if (this.strikeReticle) this.strikeReticle.visible = false;
     this._strikeAt = null;
     if (this._strafeLine) this._strafeLine.visible = false;
+    this._strafeArgs = null;
   }
 
   /**
-   * The line a gun run will walk, while it is being drawn: a strip on the
-   * ground from the finger down to the finger now, with an arrowhead at the
-   * far end for the way the aircraft will fly. Clamped to what one burst
-   * covers, so the strip is the run the player will actually get.
+   * The line a gun run will walk, while it is being drawn.
+   *
+   * Drawn as the overlay a forward air controller would draw it, not as a
+   * strip of paint: a dashed gun-target line down the middle, solid rails
+   * either side as wide as the beaten zone the stream will scatter over,
+   * a cross-bar where the stream starts and one where it stops, chevrons
+   * along the run that flow the way the aircraft will fly it, and the
+   * run-in axis dashed back the way it will come. Amber on a dark outline,
+   * so it reads on sand, stone, grass or sky, and drawn over everything —
+   * the line goes through a town, and a line hidden by the town is no use
+   * to the player laying it. Each piece sits on the ground under it.
+   *
+   * Clamped to what one burst covers, so what is drawn is the run the
+   * player will actually get.
    */
   showStrafe(from, to, def) {
     if (!this._strafeLine) {
       const g = new THREE.Group();
-      const mat = new THREE.MeshBasicMaterial({ color: 0xff8a3a, transparent: true, opacity: 0.55, depthWrite: false });
-      const strip = new THREE.Mesh(new THREE.BoxGeometry(1, 0.3, 1), mat);
-      strip.name = 'strip';
-      const head = new THREE.Mesh(new THREE.ConeGeometry(4.5, 9, 3).rotateX(Math.PI / 2), mat);
-      head.name = 'head';
-      g.add(strip, head);
-      g.renderOrder = 18;
+      const mk = (colour, opacity, order) => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6 * 3 * 600), 3));
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+          color: colour, transparent: true, opacity, depthTest: false, depthWrite: false,
+          side: THREE.DoubleSide, toneMapped: false, fog: false,
+        }));
+        m.renderOrder = order;
+        m.frustumCulled = false;
+        g.add(m);
+        return m;
+      };
+      this._strafeOutline = mk(0x0b0d0e, 0.55, 30);
+      this._strafeInk = mk(0xffb020, 0.95, 31);
       this._strafeLine = g;
       this.scene.add(g);
     }
@@ -488,15 +506,57 @@ export class Battle {
       dx /= len; dz /= len;
       len = THREE.MathUtils.clamp(len, st.minLen, st.maxLen);
     }
-    const g = this._strafeLine;
-    const strip = g.getObjectByName('strip'), head = g.getObjectByName('head');
-    const y = this.terrain.heightAt(from.x + dx * len / 2, from.z + dz * len / 2) + 0.6;
-    g.position.set(from.x, y, from.z);
-    g.rotation.set(0, Math.atan2(dx, dz), 0);
-    strip.scale.set(5, 1, len);
-    strip.position.set(0, 0, len / 2);
-    head.position.set(0, 0, len + 3);
-    g.visible = true;
+    this._strafeArgs = { x: from.x, z: from.z, dx, dz, len };
+    this._drawStrafe();
+    this._strafeLine.visible = true;
+  }
+
+  /** Lay the gun-run overlay's ribbons down for the current line and moment. */
+  _drawStrafe() {
+    const A = this._strafeArgs;
+    if (!A) return;
+    const { x: x0, z: z0, dx, dz, len } = A;
+    const nx = -dz, nz = dx;                         // across the run
+    const ink = [], line = [];
+    // One flat quad from (u0, v0) to (u1, v1) in run coordinates, `w` wide.
+    const seg = (out, u0, v0, u1, v1, w) => {
+      const ax = x0 + dx * u0 + nx * v0, az = z0 + dz * u0 + nz * v0;
+      const bx = x0 + dx * u1 + nx * v1, bz = z0 + dz * u1 + nz * v1;
+      let px = -(bz - az), pz = bx - ax;
+      const pl = Math.hypot(px, pz) || 1;
+      px = px / pl * w / 2; pz = pz / pl * w / 2;
+      const ay = this.terrain.heightAt(ax, az) + 0.8, by = this.terrain.heightAt(bx, bz) + 0.8;
+      out.push(ax + px, ay, az + pz, ax - px, ay, az - pz, bx + px, by, bz + pz,
+        bx + px, by, bz + pz, ax - px, ay, az - pz, bx - px, by, bz - pz);
+    };
+    const both = (u0, v0, u1, v1, w) => { seg(ink, u0, v0, u1, v1, w); seg(line, u0, v0, u1, v1, w + 1.6); };
+    const half = 5;                                   // the beaten zone, either side
+    // Rails, the gun-target line in dashes down the middle, and the bars.
+    both(0, -half, len, -half, 0.9);
+    both(0, half, len, half, 0.9);
+    for (let u = 0; u < len; u += 14) both(u, 0, Math.min(len, u + 8), 0, 1.1);
+    both(0, -half - 4, 0, half + 4, 1.6);
+    both(len, -half - 4, len, half + 4, 1.6);
+    // Chevrons along the run, flowing the way it will be flown.
+    const phase = ((this.elapsed || 0) * 22) % 30;
+    for (let u = 6 + phase; u < len - 4; u += 30) {
+      both(u - 5, -3.2, u, 0, 1.0);
+      both(u - 5, 3.2, u, 0, 1.0);
+    }
+    // The arrowhead off the end: the way the aircraft leaves.
+    both(len + 4, -6, len + 14, 0, 1.4);
+    both(len + 4, 6, len + 14, 0, 1.4);
+    // The run-in axis, dashed back the way it comes in.
+    for (let u = -16; u > -90; u -= 12) both(u, 0, u + 6, 0, 0.9);
+    const put = (mesh, arr) => {
+      const at = mesh.geometry.attributes.position;
+      const n = Math.min(arr.length, at.array.length);
+      at.array.set(arr.length > at.array.length ? arr.slice(0, n) : arr);
+      at.needsUpdate = true;
+      mesh.geometry.setDrawRange(0, n / 3);
+    };
+    put(this._strafeInk, ink);
+    put(this._strafeOutline, line);
   }
 
   _setupGhost() {
@@ -2325,6 +2385,7 @@ export class Battle {
     this._updateHealthBars();
     this._updateEmplacements();
 
+    if (this._strafeLine && this._strafeLine.visible) this._drawStrafe();
     if (this.targetMarker.visible) {
       this.targetMarker.rotation.y += dt * 0.7;
       this.targetMarker.children[0].rotation.x = Math.PI / 2;
