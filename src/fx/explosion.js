@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Flourish } from './flourish.js';
 import { BillboardParticles, makeSmokeTexture, makeSparkTexture } from './particles.js';
 
 /**
@@ -348,6 +349,7 @@ export class ExplosionFX {
       clod: new THREE.Color(0.2, 0.16, 0.12),
     };
     this._v = new THREE.Vector3();
+    this.flourish = new Flourish(this);
   }
 
   _freeFireball() { return this.fireballs.find((f) => !f.active) || null; }
@@ -841,6 +843,7 @@ export class ExplosionFX {
       l.light.intensity = l.peak * Math.pow(1 - t, 3.0) * (t < 0.06 ? t / 0.06 : 1);
     }
 
+    this.flourish.update(dt);
     this.fire.update(dt, this.time);
     this.smoke.update(dt, this.time);
     this.sparks.update(dt, this.time);

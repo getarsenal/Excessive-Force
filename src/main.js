@@ -39,6 +39,7 @@ import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
+import { TargetingPod } from './ui/tgp.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
@@ -415,6 +416,7 @@ async function boot() {
   await progress(56, `setting ${totalBlocks.toLocaleString()} stones`);
 
   const fx = new ExplosionFX(engine.scene, quality);
+  const pod = new TargetingPod(engine, quality);
   const dustColour = new THREE.Color();
   // Charges that have been uncovered and are about to go off. Queued rather
   // than fired here: this runs from inside the explosion that destroyed the
@@ -837,6 +839,11 @@ async function boot() {
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
         hud.hidePrompt();
         battle.pulse(data.point, 0xffa040, 22, true);
+        // The spot marked for the pilot with a smoke canister, burning until
+        // the strike is in and a while after.
+        if (data.point && fx.flourish) fx.flourish.markerSmoke(data.point, (data.eta || 10) + 10);
+        // And the pilot's picture of it in the corner, for a single pass.
+        if (data.point && !data.def?.aircraft?.station) pod.show(data.point, data.eta || 10, data.def.name);
         break;
       case 'airborne':
         // The enemy sends for help. Said big, with the count, so the player
@@ -1843,6 +1850,7 @@ async function boot() {
     engine.sun.position.set(
       rig.target.x + SUN_OFFSET.x, rig.target.y + SUN_OFFSET.y, rig.target.z + SUN_OFFSET.z);
     engine.render();
+    pod.render(dt);
     clip.frame();
 
     frames++; fpsAcc += dtMs;

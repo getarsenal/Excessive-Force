@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bombWhistle } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
 
@@ -2314,6 +2315,33 @@ export class Battle {
 
   // ────────────────────────────────────────────────────────────────── loop ──
 
+  /**
+   * A bomb whistles on its way down. Not the real sound of a modern bomb —
+   * which is nothing, until it is everything — but the one every film has
+   * taught the ear to listen for, and the last three seconds of warning
+   * that something is coming are what make the arrival land. Timed from the
+   * bomb's own height and speed to end on the impact.
+   */
+  _whistles() {
+    if (!this.audio || !this.projectiles) return;
+    const now = this.elapsed;
+    for (const p of this.projectiles.list) {
+      if (p._whistle || !p.strikeDef || p.kind !== 'bomb' || p.vel.y > -12) continue;
+      const floor = p.target ? p.target.y : this.terrain.heightAt(p.pos.x, p.pos.z);
+      const h = p.pos.y - floor;
+      const v = -p.vel.y, g = p.drag > 0.08 ? 0 : (p.gravity ?? 9.81);
+      const t = g > 0 ? (-v + Math.sqrt(v * v + 2 * g * Math.max(0, h))) / g : h / v;
+      if (!(t < 3.2)) continue;
+      p._whistle = true;
+      // A stick of them is one whistle.
+      if (now - (this._whistleAt ?? -9) < 0.9) continue;
+      this._whistleAt = now;
+      const d = this.camera.position.distanceTo(p.pos);
+      const big = p.drag > 0.08;
+      bombWhistle(this.audio, t, t, 0.13 * Math.min(1, 700 / (d + 250)), big ? 1100 : 1900, big ? 240 : 380);
+    }
+  }
+
   update(dt) {
     if (this.state !== 'playing') {
       // The fight is over; the sky is not. Transports still in the air fly
@@ -2346,6 +2374,7 @@ export class Battle {
     if (this._aimAge > 0.6) this._refreshAimCandidates();
 
     this._updateUnits(dt);
+    this._whistles();
     this.air.update(dt);
     this.airborne.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));

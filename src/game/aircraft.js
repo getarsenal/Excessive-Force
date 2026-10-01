@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { flyby, crack } from '../core/synth.js';
 
 /**
  * The air wing.
@@ -25,6 +26,8 @@ import * as THREE from 'three';
  */
 
 /** The pitch of the roar for each airframe: the rocket clip slowed down. */
+/** Half-spans, for the vapour off the wings. */
+const WINGSPAN = { eagle: 6.5, lancer: 12, warthog: 8.5 };
 const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62, warthog: 0.48 };
 
 /** Dark grey, the way both of them are actually painted. */
@@ -1104,6 +1107,40 @@ export class AirWing {
    * Filled into a caller-owned array rather than allocating one a frame: the
    * garrison asks for this every tick of every battle.
    */
+  /**
+   * Flares. Every airframe here carries a dispenser, and any of them taking
+   * fire empties some of it: no more than a burst every two and a half
+   * seconds, so a long engagement is a run of pops rather than a fountain.
+   */
+  _popFlares(s) {
+    if (!this.fx?.flourish || !s.model) return;
+    if (s.def?.aircraft?.consumed) return;
+    if (s.t - (s._flareT ?? -9) < 2.5) return;
+    s._flareT = s.t;
+    const dir = s.dir || this._v.set(Math.sin(s.model.rotation.y), 0, Math.cos(s.model.rotation.y));
+    const big = !!(s.lift || s.def?.aircraft?.kind === 'lancer');
+    this.fx.flourish.flares(s.model.position, dir, s.speed || 80, big ? 10 : 6);
+    if (this.audio) for (let k = 0; k < 4; k++) crack(this.audio, s.model.position, k * 0.09, 0.22, 2600, 0.05);
+  }
+
+  /**
+   * A jet going over the camera: the tear of it, swelling and falling away
+   * and crossing from one ear to the other. Once a run, when it first comes
+   * within a few hundred metres.
+   */
+  _passBy(s) {
+    if (s._passed || !this.audio) return;
+    const p = s.model.position, c = this.camera.position;
+    const d = p.distanceTo(c);
+    if (d > 420) return;
+    s._passed = true;
+    const right = this._v.setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const now = (p.x - c.x) * right.x + (p.z - c.z) * right.z;
+    const next = now + ((s.dir?.x ?? 0) * right.x + (s.dir?.z ?? 0) * right.z) * 300;
+    const pan = (v) => Math.max(-0.9, Math.min(0.9, v / 200));
+    flyby(this.audio, 0.22 + 0.4 * (1 - d / 420), pan(now), pan(next), s.def?.aircraft?.kind === 'lancer' ? 3.4 : 2.4);
+  }
+
   airTargets(out = []) {
     out.length = 0;
     for (const s of this.sorties) {
@@ -1142,6 +1179,7 @@ export class AirWing {
     const s = t.sortie;
     if (s.hp === undefined) return;
     s.hits++;
+    this._popFlares(s);
     s.hp -= damage;
     if (s.lift || s.heli) {
       // A transport does not abort — it is already over the drop zone and the
@@ -1218,6 +1256,17 @@ export class AirWing {
         m.rotation.x = -pitch;
         // A little bank into the pull-up so it reads as a turn, not a lift.
         m.rotation.z = s.climb * 0.5;
+        // The pull-up is hard enough to pull vapour off the wings.
+        if (s.climb > 0 && s.climb < 0.75 && !s.def.aircraft.consumed && this.fx?.flourish) {
+          this.fx.flourish.vapour(m.position, s.dir, WINGSPAN[s.def.aircraft.kind] ?? 6.5, 1 - s.climb / 0.75);
+        }
+      }
+      if (!s.lift && !s.heli && !s.loiter) this._passBy(s);
+      // A jet running in over guns that are already firing lets its flares
+      // go before the first round reaches it; one that is hit lets more go.
+      if (s.flak && !s._flared && !s.lift && !s.heli && s.t > s.releaseAt - 3.5) {
+        s._flared = true;
+        this._popFlares(s);
       }
 
       // A gun run fires for the length of its burst, unless it was driven off.

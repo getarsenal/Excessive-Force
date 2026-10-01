@@ -2254,3 +2254,42 @@ body.a11y-lefty #survey-btn { left: auto; right: var(--ui-pad); }
   background: rgba(236, 123, 63, 0.14); border-color: #ec7b3f;
 }
 .ec-btn.primary:hover { background: #f58c52; }
+
+/* ── The targeting pod's picture: a corner of the canvas drawn from a second
+   camera, greyed, contrasted and grained by the page. ── */
+#tgp {
+  position: fixed; right: 12px; top: 92px; z-index: 6;
+  width: min(30vw, 232px); aspect-ratio: 4 / 3;
+  pointer-events: none; display: none;
+  border: 1px solid rgba(220, 230, 220, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.45);
+  font: 600 9px/1 ui-monospace, 'SFMono-Regular', Menlo, monospace; letter-spacing: 0.08em;
+  color: #e9efe9; text-shadow: 0 0 2px #000;
+}
+#tgp.on { display: block; animation: tgp-in 0.35s steps(4) both; }
+@keyframes tgp-in { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0 0 0 0); } }
+#tgp .tgp-glass {
+  position: absolute; inset: 0;
+  -webkit-backdrop-filter: grayscale(1) contrast(1.55) brightness(1.08);
+  backdrop-filter: grayscale(1) contrast(1.55) brightness(1.08);
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);
+}
+#tgp .tgp-x, #tgp .tgp-y { position: absolute; background: rgba(240, 245, 240, 0.85); }
+#tgp .tgp-x { left: 8%; right: 8%; top: 50%; height: 1px;
+  -webkit-mask: linear-gradient(90deg, #000 0 42%, transparent 42% 58%, #000 58%);
+          mask: linear-gradient(90deg, #000 0 42%, transparent 42% 58%, #000 58%); }
+#tgp .tgp-y { top: 10%; bottom: 10%; left: 50%; width: 1px;
+  -webkit-mask: linear-gradient(180deg, #000 0 40%, transparent 40% 60%, #000 60%);
+          mask: linear-gradient(180deg, #000 0 40%, transparent 40% 60%, #000 60%); }
+#tgp .tgp-box { position: absolute; left: 50%; top: 50%; width: 14%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); border: 1px solid rgba(240, 245, 240, 0.9);
+  animation: tgp-track 1.6s ease-in-out infinite; }
+@keyframes tgp-track { 50% { transform: translate(-50%, -50%) scale(0.86); } }
+#tgp span { position: absolute; padding: 4px 5px; }
+#tgp .tgp-tl { left: 0; top: 0; } #tgp .tgp-tr { right: 0; top: 0; }
+#tgp .tgp-bl { left: 0; bottom: 0; } #tgp .tgp-br { right: 0; bottom: 0; animation: tgp-blink 0.8s steps(2) infinite; }
+@keyframes tgp-blink { 50% { opacity: 0.25; } }
+body.clear-view #tgp, body.ended #tgp { display: none !important; }
+@media (prefers-reduced-motion: reduce) { #tgp.on, #tgp .tgp-box, #tgp .tgp-br { animation: none; } }

@@ -119,7 +119,7 @@ export class Tutorial {
         say: 'Air power. For when you can\'t be bothered to aim.',
         done: () => h.openDrawer === 'strikes' || this._striking() },
       { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',
-        text: 'LOITER cards first: they stay on station. Then the single passes, cheapest first. The A-10 strafes: press and drag along the line for its gun run; the rest make one pass at what you tap.', done: () => this._striking(),
+        text: 'LOITER cards first: they stay on station. Then the single passes, cheapest first. The A-10 strafes: press and drag along the line for its gun run; the rest make one pass at what you tap. Coloured smoke marks the spot, and the pilot\'s pod picture counts down in the corner.', done: () => this._striking(),
         say: 'The Warthog. Draw it a line and it eats everything on it. Trenches, mostly. Not the tower.' },
       { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts: the crates and drums by their guns go up. Halfway down, they fly in half their army again round the building: have M240s out to shoot the transports and the chutes.', ok: true },
       { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, accessibility, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
