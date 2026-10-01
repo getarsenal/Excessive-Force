@@ -183,9 +183,12 @@ export const UNITS = [
     id: 'm270', name: 'M270 MLRS', full: 'M270A2 MLRS', tier: 'MRL',
     cost: 1800, unlockFrac: 0.25,
     tint: ARTILLERY_GREEN, model: 'M270', modelLength: 7.0,
-    // The launcher box points down +Z in the file; the game's forward is
-    // the other way, and it was shooting out of its own back.
-    modelYaw: Math.PI,
+    // Fires over its cab, as the real one does, so the cab faces the
+    // target. Measured in play (tools/mlrsshot.mjs: the target to the right
+    // of a side view): at a half turn the cab and the open end of the
+    // launcher pointed away from what it was shooting at.
+    modelYaw: 0,
+    noBarrel: true,
     minRange: 200, range: 2000, reload: 15.0, setup: 4.0,
     crew: 0, health: 480,
     projectile: { kind: 'rocket', speed: 300, gravity: 9.81, trail: 1.4 },
@@ -198,12 +201,12 @@ export const UNITS = [
     id: 'm142', name: 'HIMARS', full: 'M142 HIMARS', tier: 'MRL',
     cost: 5200, unlockFrac: 0.37,
     tint: ARTILLERY_GREEN, model: 'M142', modelLength: 7.0,
-    // The model is posed with its pod elevated over the rear, so laid nose
-    // forward it reads from the bird's-eye camera as a truck driving away
-    // from the target. Turned to put the cab toward the target, which is what
-    // the player asked for; and it has no barrel for the facing test to find,
-    // so that test is told not to look.
-    modelYaw: 0,
+    // The pod rises at its cab end and fires over the cab, so the cab faces
+    // the target. Measured in play (tools/mlrsshot.mjs): at no turn the pod
+    // was raised toward the side away from the target, firing backwards.
+    // No barrel for the facing test to find, so that test is told not to
+    // look; the probe is the check.
+    modelYaw: Math.PI,
     noBarrel: true,
     minRange: 200, range: 2600, reload: 18.0, setup: 3.5,
     crew: 0, health: 420,
