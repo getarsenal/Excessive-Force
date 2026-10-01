@@ -2088,14 +2088,17 @@ export class Battle {
     this._lastImpact = point.clone();
     // Everything under the bomb burns, and the town round it. The masonry
     // radius above is sized on the monument and falls to `minR` in the
-    // street, which in town was a circle smaller than one house: a 2,000 lb
-    // bomb into a terrace took the one building it went through. In the town
-    // the circle is the warhead's own — forty metres for the F-15's bomb, a
-    // hundred and ten for the MOAB — with a ring past it that is scorched
-    // and loosened rather than gutted. A loitering gunship's rounds are
-    // shells, and keep to the building they hit.
+    // street, which in town was a circle smaller than one house: a bomb into
+    // a terrace took the one building it went through. In the town the
+    // circle goes as the cube root of the charge, as blast does, and never
+    // under the warhead's own radius: forty metres for the F-15's 500 lb,
+    // forty-eight for the Tomahawk, fifty-four for the GBU-28's 5,000 lb, a
+    // hundred and ten for the MOAB. Past it a ring is scorched and loosened
+    // rather than gutted. A loitering gunship's rounds are shells, and keep
+    // to the building they hit.
     if (this.cityFire) {
-      const cityR = st.loiter ? rMax * 0.8 : Math.max(rMax * 0.8, w.radius || 0);
+      const cityR = st.loiter ? rMax * 0.8
+        : Math.max(rMax * 0.8, w.radius || 0, 0.9 * Math.cbrt(w.power || 0));
       this.cityFire.blast(point, cityR, st.loiter ? cityR : cityR * 1.6);
     }
     // The blast is seen where the bomb went in, not fourteen metres inside
