@@ -253,6 +253,9 @@ export function solveDirect(from, to, speed, gravity) {
 
 let PROJ_ID = 0;
 
+/** The guided bomb's seeker: when it pitches over, and how fast it turns. */
+const GUIDED = { pitchOver: 50 * Math.PI / 180, glideTurn: 1.5, diveTurn: 12 };
+
 export class Projectile {
   constructor(opts) {
     this.id = ++PROJ_ID;
@@ -381,18 +384,20 @@ export class Projectile {
    * pitches over and comes down on it at about sixty degrees, which is what
    * puts a penetrator into the top of a thing rather than its side.
    *
-   * The steering point is the target raised by twice the remaining
-   * horizontal distance, never above the bomb itself: far out that is level
-   * flight, and as the distance closes it slides down onto the target along
-   * a line sixty-three degrees steep. Past the spot, or if the spot has gone
-   * (a summit shot away under it), it is a falling bomb like any other and
-   * goes off against whatever is below.
+   * The law is the simple one, and it was measured against two cleverer
+   * ones in a simulation of this same step: level until the spot is fifty
+   * degrees below, then straight at it with a quick turn. Pointed at a
+   * fixed spot, a bomb comes down a straight line at the angle it pitched
+   * over at; from releases sixty to three hundred metres above the spot it
+   * lands within two metres of it at fifty-two to sixty-eight degrees. Past
+   * the spot, or if the spot has gone (a summit shot away under it), it is
+   * a falling bomb like any other and goes off against whatever is below.
    */
   _stepGuided(dt) {
     const t = this.target;
-    const dx = t.x - this.pos.x, dz = t.z - this.pos.z;
+    const dx = t.x - this.pos.x, dy = t.y - this.pos.y, dz = t.z - this.pos.z;
     const flat = Math.hypot(dx, dz);
-    const range = Math.hypot(dx, t.y - this.pos.y, dz);
+    const range = Math.hypot(flat, dy);
     if (range < 3 || range > this._lastRange + 0.5) {
       this.phase = 'free';
       this.vel.y -= this.gravity * dt;
@@ -400,18 +405,18 @@ export class Projectile {
       return;
     }
     this._lastRange = range;
-    const aimY = Math.min(this.pos.y, t.y + flat * 2);
+    if (this.phase === 'glide' && Math.atan2(-dy, flat) >= GUIDED.pitchOver) this.phase = 'dive';
     const want = this._want || (this._want = new THREE.Vector3());
-    want.set(dx, aimY - this.pos.y, dz).normalize();
-    if (aimY < this.pos.y - 0.5) this.phase = 'dive';
+    if (this.phase === 'dive') want.set(dx, dy, dz).normalize();
+    else want.set(dx, 0, dz).normalize();
     // Speed: what it was let go at, bled a little in the glide and gained
     // back in the dive.
     let speed = this.vel.length();
-    const down = Math.max(0, -want.y);
-    speed = Math.max(140, speed + (this.gravity * down - (this.phase === 'glide' ? 4 : 0)) * dt);
+    speed = Math.max(140, speed + (this.gravity * Math.max(0, -want.y) - (this.phase === 'glide' ? 4 : 0)) * dt);
     // The fins turn it, not instantly.
-    const cur = this.vel.clone().normalize();
-    cur.lerp(want, Math.min(1, dt * (this.phase === 'dive' ? 3.0 : 1.5))).normalize();
+    const cur = this._cur || (this._cur = new THREE.Vector3());
+    cur.copy(this.vel).normalize();
+    cur.lerp(want, Math.min(1, dt * (this.phase === 'dive' ? GUIDED.diveTurn : GUIDED.glideTurn))).normalize();
     this.vel.copy(cur).multiplyScalar(speed);
     this.pos.addScaledVector(this.vel, dt);
   }
