@@ -46,6 +46,9 @@ const LOOK = {
   at: { color: 0xff3a12, core: 0xffc078, speed: 210, len: 5.0, width: 0.62, flash: 2.6 },
   mortar: { color: 0xff3a12, core: 0xffc078, speed: 220, len: 4.5, width: 0.56, flash: 2.4 },
   chaingun: { color: 0xffc23a, core: 0xfff4d8, speed: 820, len: 15.0, width: 0.42, flash: 1.8 },
+  // American 7.62 burns red, which is also what tells the player's bursts
+  // apart from the garrison's orange.
+  m240: { color: 0xff3424, core: 0xffd8c8, speed: 760, len: 13.0, width: 0.34, flash: 1.2 },
 };
 const DEFAULT_LOOK = LOOK.rifleman;
 

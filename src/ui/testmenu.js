@@ -1425,10 +1425,12 @@ export class TestMenu {
           const m = makeInfantryMesh(0x4a5340, { weapon: def.id, role: 'gunner' });
           box.setFromObject(m);
           box.getSize(size);
-          // Silhouette and colour, which is what the player has to go on.
+          // Silhouette and colour, which is what the player has to go on: the
+          // figure's size in all three axes (the launchers point forward now,
+          // so length is where they differ) and the colour of the weapon.
           let tube = 0;
-          m.traverse((o) => { if (o.material && o.material.color) tube = Math.max(tube, o.material.color.getHex()); });
-          const sig = `${m.children.length}|${size.x.toFixed(2)}x${size.y.toFixed(2)}|${tube}`;
+          m.traverse((o) => { if (o.userData?.tone === 'steel' && o.material?.color) tube = o.material.color.getHex(); });
+          const sig = `${size.x.toFixed(2)}x${size.y.toFixed(2)}x${size.z.toFixed(2)}|${tube}`;
           assert(!seen.has(sig),
             `${def.id} and ${seen.get(sig)} are the same figure — ${sig}`);
           seen.set(sig, def.id);

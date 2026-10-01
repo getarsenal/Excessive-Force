@@ -631,6 +631,7 @@ export class Garrison {
       blocked: false,
       muzzle: snapped.clone().add(new THREE.Vector3(0, def.eye ?? 1.25, 0)),
       suppressed: 0,
+      pinned: 0,
     };
 
     this._settleIntoPosition(d);
@@ -1969,7 +1970,7 @@ export class Garrison {
       // air target and lets the ground wait — which is also the only reason
       // the player's own guns get a quiet moment during a drop.
       const sky = this._acquireAir(d, air, structures);
-      if (sky) { this._shootAir(d, sky, shots); continue; }
+      if (sky) { this._shootAir(d, sky, shots); if (d.pinned > this.time) d.cooldown *= 3; continue; }
 
       const best = this._acquire(d, playerUnits, structures);
       if (!best) { d.cooldown = 0.4; continue; }
@@ -1999,6 +2000,10 @@ export class Garrison {
       } else {
         d.cooldown = d.def.rof * (0.8 + Math.random() * 0.4);
       }
+      // Pinned by machine-gun fire: still in the fight, head down, firing a
+      // third as often. Shelling stops a position outright for a few seconds;
+      // a gun team keeps it from ever getting back to full rate.
+      if (d.pinned > this.time) d.cooldown *= 3;
     }
   }
 
@@ -2200,6 +2205,7 @@ export class Garrison {
       });
       d.facing = Math.atan2(aim.x - d.pos.x, aim.z - d.pos.z);
       d.cooldown = d.def.rof * (observed ? 0.6 : 1.0) * (0.75 + Math.random() * 0.5);
+      if (d.pinned > this.time) d.cooldown *= 3;
       this.mortarsFired++;
       // With the aim and the flight, so a whistle can be timed to the landing.
       if (this.onMortarFire) this.onMortarFire(d, aim, sol.vel, sh.gravity);
@@ -2322,7 +2328,7 @@ export class Garrison {
       }
 
       // A suppressed man is drawn crouched: the squat is the tell.
-      const ducking = d.suppressed > this.time;
+      const ducking = d.suppressed > this.time || d.pinned > this.time;
       if (ducking && !this._sDuck) this._sDuck = new THREE.Vector3(1, 0.55, 1);
       this._m4.compose(this._v, this._q, ducking ? this._sDuck : this._s);
       this.mesh.setMatrixAt(w, this._m4);

@@ -354,6 +354,7 @@ export function soldierFigure(colour, pose = 'aim', weapon = null, opts = {}) {
     });
     const m = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(geos, false), mat);
     m.castShadow = true;
+    m.userData.tone = tone;
     g.add(m);
   }
   return g;

@@ -33,6 +33,27 @@ export const ARTILLERY_GREEN = 0x3c4a2a;
 
 export const UNITS = [
   {
+    id: 'm240', name: 'M240 MG', full: 'M240B Machine Gun Team', tier: 'INF',
+    cost: 40, unlockFrac: 0.0,
+    // Two men flat on the ground behind a 7.62 mm gun on its bipod. Not a
+    // building-killer and not meant to be: a burst hurts a man in the open and
+    // barely scratches one in a trench, but every burst puts the men round
+    // where it lands on the floor, and a pinned position fires at a third of
+    // its rate. It shoots what the enemy's infantry shoots, the nearest man it
+    // can see, and when something of theirs is in the air it shoots that.
+    model: 'infantry',
+    range: 340, reload: 1.5, setup: 1.4,
+    crew: 2, health: 150,
+    mg: {
+      burst: 9, interval: 0.085, damage: 6,
+      pin: 6.0, pinRadius: 10, air: 520, airDamage: 5,
+    },
+    projectile: { kind: 'direct', speed: 850, gravity: 0, trail: 0.2 },
+    warhead: { lethal: 0.1, radius: 0.5, power: 30, fx: 0.1, kinetic: 0 },
+    dispersion: 1.6,
+    blurb: '7.62 mm in long bursts. Light damage, heavy suppression: whatever it fires at keeps its head down.',
+  },
+  {
     id: 'at4', name: 'AT4', full: 'M136 AT4 Team', tier: 'INF',
     cost: 60, unlockFrac: 0.0,
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',

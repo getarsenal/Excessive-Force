@@ -293,7 +293,7 @@ const BODY = {
  * the fallback for anything without a file.
  */
 export const IMAGE_ICONS = new Set([
-  'at4', 'gustaf', 'rpg32', 'javelin', 'm120',
+  'm240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm120',
   'm119', 'm777', 'm109', 'stryker', 'm270', 'm142',
   'f15', 'b1', 'ah64', 'ac130', 'tomahawk', 'gbu28',
 ]);

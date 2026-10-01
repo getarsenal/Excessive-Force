@@ -7,7 +7,8 @@
 // model with a margin, lit and framed the same for every unit.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
-// The Tomahawk and the infantry teams are drawn art, not renders: leave them out.
+// The Tomahawk and the first infantry teams are drawn art, not renders: leave
+// them out. Later teams (the M240) are rendered from the in-game figures.
 const ids = (process.argv[2] || 'm119,m777,m109,stryker,m270,m142,f15,b1,ah64,ac130,gbu28').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
@@ -35,6 +36,16 @@ const out = await page.evaluate(async (ids) => {
     const def = UNITS_BY_ID[id];
     let obj;
     if (def.model === 'aircraft') obj = air.makeAirframe(def);
+    else if (def.model === 'infantry') {
+      // A team, posed as it fights: the same two figures the game builds.
+      const { makeInfantryMesh } = await import('/src/game/units.js');
+      obj = new THREE.Group();
+      for (let i = 0; i < 2; i++) {
+        const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738, { weapon: id, role: i === 0 ? 'gunner' : 'second' });
+        m.position.set((i - 0.5) * 1.3, 0, i * 0.5);
+        obj.add(m);
+      }
+    }
     else obj = B.models.instance(await B.models.load(def.model, def.modelLength, { tint: def.tint }));
     obj.rotation.y = def.modelYaw ?? 0;
     // The blur discs a spinning rotor or prop is drawn as are for motion; on

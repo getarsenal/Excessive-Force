@@ -118,6 +118,9 @@ export class Battle {
     this.powerScale = 1;
 
     this.tracerFX = new TracerFX(this.scene, this.quality);
+    // What the enemy has in the air — transports on their run, men under
+    // canopies — for the player's machine guns. Each is { pos, alive, hit(dmg) }.
+    this.enemyAir = [];
     this.air = new AirWing({
       scene: this.scene, quality: this.quality, terrain: this.terrain,
       projectiles: this.projectiles, fx: this.fx, audio: this.audio, camera: this.camera,
@@ -923,8 +926,10 @@ export class Battle {
       group: new THREE.Group(), model: null, marker: null,
       // Under the canopy a mortarman is just a man: the kneel and the raised
       // round belong to the emplacement, which forms up when he lands.
+      // A machine gunner is not prone under a canopy either.
       figure: (k) => makeInfantryMesh(k === 0 ? 0x4a5340 : 0x3f4738,
-        { weapon: def.id === 'm120' ? null : def.id, role: def.id === 'm120' ? 'second' : k === 0 ? 'gunner' : 'second' }),
+        (def.id === 'm120' || def.id === 'm240') ? { weapon: null, role: 'second' }
+          : { weapon: def.id, role: k === 0 ? 'gunner' : 'second' }),
     };
     if (def.model !== 'infantry') {
       // The vehicle or gun is loaded now, so it is on the platform when the
@@ -1579,6 +1584,9 @@ export class Battle {
         continue;
       }
 
+      // A machine-gun team fires bursts of its own, not shells.
+      if (u.def.mg) { this._updateMG(u, dt); continue; }
+
       // Mid-salvo: keep loosing rockets on the interval.
       if (u.salvoLeft > 0) {
         u.salvoTimer -= dt;
@@ -1614,6 +1622,141 @@ export class Battle {
       }
     }
     this.units = this.units.filter((u) => u.alive || u.group.parent);
+  }
+
+  // ──────────────────────────────────────────────────────── machine guns ──
+
+  /**
+   * A machine-gun team: a burst, a pause, a burst.
+   *
+   * Hitscan, because a 7.62 round crosses three hundred metres in a third of a
+   * second and a projectile that slow would read as a slow round; what the
+   * player sees is the tracer, which flies. The air comes first, the way it
+   * does for the garrison's own gunners: anything of the enemy's that is in
+   * the sky — a transport on its run, men under canopies — will not be there
+   * in ten seconds, and the trench will.
+   */
+  _updateMG(u, dt) {
+    const mg = u.def.mg;
+    if (u.burstLeft > 0) {
+      u.burstTimer -= dt;
+      if (u.burstTimer > 0) return;
+      u.burstTimer = mg.interval;
+      u.burstLeft--;
+      this._mgRound(u);
+      if (u.burstLeft === 0) u.cooldown = u.def.reload * this.reloadScale * (0.85 + Math.random() * 0.3);
+      return;
+    }
+    u.cooldown -= dt;
+    if (u.cooldown > 0) return;
+    const t = this._mgTarget(u);
+    if (!t) { u.idle = true; u.cooldown = 0.5; u.mgTarget = null; return; }
+    u.idle = false;
+    u.mgTarget = t;
+    u.burstLeft = mg.burst;
+    u.burstTimer = 0;
+    // The team turns to its target; the gun is laid along the group's +Z.
+    const p = t.pos;
+    u.yaw = Math.atan2(p.x - u.pos.x, p.z - u.pos.z);
+    u.group.rotation.y = u.yaw;
+  }
+
+  /** What a machine-gun team fires at: the enemy in the air, else the nearest man it can see. */
+  _mgTarget(u) {
+    const mg = u.def.mg;
+    const from = this._mgFrom || (this._mgFrom = new THREE.Vector3());
+    from.copy(u.pos).y += 0.6;
+    for (const a of this.enemyAir) {
+      if (!a.alive) continue;
+      if (a.pos.y < from.y + 8) continue;
+      if (a.pos.distanceToSquared(from) > mg.air * mg.air) continue;
+      return { air: a, pos: a.pos };
+    }
+    const g = this.garrison;
+    if (!g) return null;
+    const r2 = u.def.range * u.def.range;
+    // The designated man first, if this gun can see him.
+    const td = this.targetDefender;
+    if (td && td.alive && td.pos.distanceToSquared(u.pos) < r2
+      && this._mgSees(from, td)) return { d: td, pos: td.muzzle };
+    // Otherwise the nearest few, nearest first, until one is in sight.
+    const near = [];
+    for (const d of g.defenders) {
+      if (!d.alive) continue;
+      const dd = d.pos.distanceToSquared(u.pos);
+      if (dd < r2) near.push([dd, d]);
+    }
+    near.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(6, near.length); i++) {
+      const d = near[i][1];
+      if (this._mgSees(from, d)) return { d, pos: d.muzzle };
+    }
+    return null;
+  }
+
+  _mgSees(from, d) {
+    const to = d.muzzle;
+    if (this.cityBlocker && this.cityBlocker.blocks(from, to)) return false;
+    return lineOfSight(this.structures, from, to, 1.0, 1.2);
+  }
+
+  /** One round of a burst: the tracer, the hit, and the pinning. */
+  _mgRound(u) {
+    const mg = u.def.mg;
+    const t = u.mgTarget;
+    if (!t) return;
+    const from = new THREE.Vector3(u.pos.x, u.pos.y + 0.55, u.pos.z);
+    if (t.air) {
+      if (!t.air.alive) { u.burstLeft = 0; return; }
+      const dist = t.air.pos.distanceTo(from);
+      const hit = Math.random() < 0.5 * (1 - 0.6 * dist / mg.air);
+      this.tracerFX.fire(from, t.air.pos, { look: 'm240' }, hit);
+      if (hit) t.air.hit(mg.airDamage, u);
+    } else {
+      const d = t.d;
+      if (!d.alive) { u.burstLeft = 0; return; }
+      const to = d.muzzle.clone();
+      const dist = to.distanceTo(from);
+      // The sheaf: tight near, wider far, and the burst walks.
+      const spread = u.def.dispersion * (0.4 + dist / u.def.range);
+      to.x += gauss() * spread * 0.6;
+      to.z += gauss() * spread * 0.6;
+      to.y += gauss() * spread * 0.25;
+      // Cover is most of what a burst is up against: a man below a parapet
+      // shows a head and shoulders, a man at a window a little more.
+      const cover = d.cover === 'trench' ? 0.4
+        : d.cover === 'window' || d.cover === 'arcade' ? 0.5
+          : d.sandbags ? 0.65 : d.cover === 'roof' ? 0.75 : 1;
+      const hit = Math.random() < 0.45 * (1 - 0.5 * dist / u.def.range) * cover;
+      this.tracerFX.fire(from, to, { look: 'm240' }, hit);
+      if (hit) {
+        d.health -= mg.damage;
+        if (d.health <= 0) {
+          d.alive = false;
+          u.kills = (u.kills || 0) + 1;
+          this._creditKills(1, d.pos);
+        }
+      }
+      // Pinned: every man near where the burst is landing, hit or not.
+      const g = this.garrison;
+      const until = g.time + mg.pin;
+      const pr2 = mg.pinRadius * mg.pinRadius;
+      for (const o of g.defenders) {
+        if (!o.alive) continue;
+        if (o.pos.distanceToSquared(to) < pr2 && (o.pinned || 0) < until) o.pinned = until;
+      }
+    }
+    if (this.audio && u.burstLeft % 3 === 0) {
+      this.audio.play('mg', from, { gain: 0.3, rolloff: 380, rate: 1.05, cooldown: 0.05 });
+    }
+  }
+
+  /** The garrison men killed: the tally, the pay and the bounty text. */
+  _creditKills(n, at) {
+    if (!n) return;
+    this.defendersKilled += n;
+    this.money += n * MONEY_PER_DEFENDER;
+    this.onEvent('bounty', { point: at, amount: n * MONEY_PER_DEFENDER, kind: 'kill' });
   }
 
   // ─────────────────────────────────────────────────────────────── impacts ──
