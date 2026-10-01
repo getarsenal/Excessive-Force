@@ -2293,3 +2293,61 @@ body.a11y-lefty #survey-btn { left: auto; right: var(--ui-pad); }
 @keyframes tgp-blink { 50% { opacity: 0.25; } }
 body.clear-view #tgp, body.ended #tgp { display: none !important; }
 @media (prefers-reduced-motion: reduce) { #tgp.on, #tgp .tgp-box, #tgp .tgp-br { animation: none; } }
+
+/* ── Stamps: a word slammed onto the screen where it happened. ── */
+.stamp {
+  position: fixed; z-index: 7; pointer-events: none; opacity: 0;
+  transform: translate(-50%, -50%) rotate(var(--tilt, -4deg)) scale(2.4);
+  font: 800 clamp(18px, 4.2vw, 34px)/1 'Black Ops One', 'Impact', system-ui, sans-serif;
+  letter-spacing: 0.06em; white-space: nowrap;
+  color: #ffd25a; padding: 4px 10px 5px;
+  border: 3px solid currentColor; border-radius: 3px;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.6), 0 0 14px rgba(0,0,0,0.5);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.35);
+  background: rgba(20, 14, 6, 0.32);
+}
+.stamp.kill { color: #ff6a4a; }
+.stamp.city { color: #ffb050; }
+.stamp.go { animation: stamp-slam 1.6s cubic-bezier(.2,.9,.3,1) forwards; }
+@keyframes stamp-slam {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--tilt)) scale(2.4); }
+  9% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--tilt)) scale(0.94); }
+  14% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1.04); }
+  20% { transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -54%) rotate(var(--tilt)) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -66%) rotate(var(--tilt)) scale(1); }
+}
+body.clear-view .stamp { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .stamp.go { animation: stamp-still 1.6s linear forwards; }
+  @keyframes stamp-still { 0%, 80% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--tilt)); } 100% { opacity: 0; } }
+}
+
+/* ── The news: a lower third when the landmark comes down. ── */
+#newsflash {
+  position: fixed; left: 0; right: 0; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); z-index: 8;
+  pointer-events: none; display: flex; align-items: stretch; height: 54px;
+  font-family: 'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  transform: translateX(-104%); transition: transform 0.55s cubic-bezier(.2,.9,.3,1);
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.45));
+}
+#newsflash.on { transform: translateX(0); }
+#newsflash .nf-tag {
+  flex: none; display: flex; flex-direction: column; justify-content: center;
+  background: #c8141c; color: #fff; padding: 0 14px; font-weight: 700; letter-spacing: 0.08em;
+}
+#newsflash .nf-tag b { font-size: 19px; line-height: 1; }
+#newsflash .nf-tag i { font-style: normal; font-size: 10px; opacity: 0.85; letter-spacing: 0.16em; margin-top: 3px; }
+#newsflash .nf-body { flex: 1; display: flex; flex-direction: column; min-width: 0; background: rgba(246, 244, 238, 0.97); }
+#newsflash .nf-head {
+  flex: 1; display: flex; align-items: center; padding: 0 12px; color: #111; font-weight: 700;
+  font-size: clamp(13px, 3.4vw, 19px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase;
+}
+#newsflash .nf-tick { height: 19px; background: #14181d; color: #f2d36b; overflow: hidden; white-space: nowrap; font-size: 12px; line-height: 19px; }
+#newsflash .nf-tick span { display: inline-block; padding-left: 100%; animation: nf-scroll 22s linear infinite; }
+@keyframes nf-scroll { to { transform: translateX(-100%); } }
+#newsflash .nf-live { position: absolute; right: 10px; top: -18px; font: 700 10px/1 system-ui, sans-serif; letter-spacing: 0.14em;
+  color: #fff; background: #c8141c; padding: 3px 6px; }
+#newsflash .nf-live::before { content: '● '; animation: tgp-blink 1s steps(2) infinite; }
+body.clear-view #newsflash { display: none; }
+@media (prefers-reduced-motion: reduce) { #newsflash { transition: none; } #newsflash .nf-tick span { animation: none; padding-left: 12px; } }

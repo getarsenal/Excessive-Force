@@ -494,6 +494,39 @@ export class HUD {
   }
 
   /**
+   * A stamp: one word or two, big, slammed onto the screen where it
+   * happened at a tilt, and gone in a second and a half. For the things
+   * worth shouting about — a bomb on the spot, a block of the town at once,
+   * a post emptied by one round. Three at most on screen.
+   */
+  stamp(text, worldPoint, kind = '', dy = 0) {
+    if (!this.picker || !worldPoint) return;
+    const sc = this.picker.toScreen(worldPoint);
+    if (sc.behind) return;
+    if (!this._stamps) {
+      this._stamps = [];
+      for (let i = 0; i < 3; i++) {
+        const el = document.createElement('div');
+        el.className = 'stamp';
+        document.body.appendChild(el);
+        this._stamps.push({ el, at: 0 });
+      }
+    }
+    let slot = this._stamps[0];
+    for (const p of this._stamps) if (p.at < slot.at) slot = p;
+    slot.at = performance.now();
+    const el = slot.el;
+    el.className = 'stamp';
+    void el.offsetWidth;
+    el.textContent = text;
+    const x = Math.max(90, Math.min(innerWidth - 90, sc.x)), y = Math.max(110, Math.min(innerHeight - 150, sc.y - 40 + dy));
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.setProperty('--tilt', `${(Math.random() * 10 - 7).toFixed(1)}deg`);
+    el.className = `stamp go ${kind}`;
+  }
+
+  /**
    * No. The prompt shakes its head; if it was the money, the funds flash red
    * and shake too, so the reason is where the eye already is.
    */

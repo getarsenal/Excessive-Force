@@ -2091,6 +2091,12 @@ export class Battle {
       this.money += killed * MONEY_PER_DEFENDER;
       this.onEvent('bounty', { point, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
     }
+    // The bomb on the spot it was sent to, said as a stamp.
+    if (!st.loiter && proj.target && Math.hypot(hit.point.x - proj.target.x, hit.point.z - proj.target.z) < 4) {
+      this.onEvent('stamp', { text: 'DIRECT HIT', point: hit.point, kind: 'hit' });
+    } else if (killed >= 3) {
+      this.onEvent('stamp', { text: `MULTI-KILL ×${killed}`, point, kind: 'kill' });
+    }
     const groundY = this.terrain.heightAt(point.x, point.z);
     const nearGround = point.y - groundY < 6.0;
     this._lastImpact = point.clone();
@@ -2107,7 +2113,8 @@ export class Battle {
     if (this.cityFire) {
       const cityR = st.loiter ? rMax * 0.8
         : Math.max(rMax * 0.8, w.radius || 0, 0.9 * Math.cbrt(w.power || 0));
-      this.cityFire.blast(point, cityR, st.loiter ? cityR : cityR * 1.6);
+      const gutted = this.cityFire.blast(point, cityR, st.loiter ? cityR : cityR * 1.6);
+      if (gutted >= 4) this.onEvent('collateral', { n: gutted, point: hit.point });
       this._streetBlast(point, st.loiter ? Math.max(8, cityR * 1.5) : cityR, !st.loiter);
     }
     // The blast is seen where the bomb went in, not fourteen metres inside
@@ -2253,6 +2260,7 @@ export class Battle {
       if (proj.owner) proj.owner.kills += killed;
       this.onEvent('bounty', { point: at, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
     }
+    if (killed >= 3) this.onEvent('stamp', { text: killed >= 6 ? `MASSACRE ×${killed}` : `MULTI-KILL ×${killed}`, point: at, kind: 'kill' });
     // The crew's record. Rounds that actually took stone out count toward
     // the next chevron; the sheaf tightens as they earn them.
     if (proj.owner && (destroyed > 0 || killed > 0)) {

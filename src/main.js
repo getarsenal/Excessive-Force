@@ -40,6 +40,8 @@ import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
+import { newsflash, hideNewsflash } from './ui/newsflash.js';
+import { WhiteFlags } from './fx/whiteflags.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
@@ -418,6 +420,7 @@ async function boot() {
 
   const fx = new ExplosionFX(engine.scene, quality);
   const pod = new TargetingPod(engine, quality);
+  const whiteFlags = new WhiteFlags(engine.scene);
   const dustColour = new THREE.Color();
   // Charges that have been uncovered and are about to go off. Queued rather
   // than fired here: this runs from inside the explosion that destroyed the
@@ -902,6 +905,13 @@ async function boot() {
       case 'strikehit':
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');
         break;
+      case 'stamp':
+        hud.stamp(data.text, data.point, data.kind);
+        break;
+      case 'collateral':
+        hud.feed(`${data.n} CITY BLOCKS LEVELLED`, 'big');
+        setTimeout(() => hud.stamp(`COLLATERAL ×${data.n}`, data.point, 'city', 58), 380);
+        break;
       case 'needtarget':
         hud.showPrompt(`${TAP} the building to mark the drop`, 'warn');
         break;
@@ -959,6 +969,13 @@ async function boot() {
         // Let the collapse actually finish before covering it with a panel —
         // the tower coming down is the thing the player came for.
         hud.feed('STRUCTURE FAILING', 'big');
+        setTimeout(() => {
+          if (battle.state !== 'won') return;
+          whiteFlags.raise(garrison.defenders, engine.camera);
+          const sum = battle.summary();
+          newsflash(level, sum, { burnt: battle.cityFire?.burnt || 0,
+            claim: damageBill(sum, { burnt: battle.cityFire?.burnt || 0 }).total });
+        }, 1800);
         rig.focus(new THREE.Vector3(0, groundY + level.camera.height * 0.7, 0),
           level.camera.distance * 1.3);
         setTimeout(() => {
@@ -968,6 +985,7 @@ async function boot() {
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
           takeBeforeAfter(sum);
+          hideNewsflash();
           hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: awardMedals(sum) });
         }, 7000);
         break;
@@ -976,6 +994,12 @@ async function boot() {
         clearBattle(level.id);
         winOrbit = true;
         hud.feed('NOTHING LEFT STANDING', 'big');
+        whiteFlags.raise(garrison.defenders, engine.camera);
+        {
+          const sum0 = battle.summary();
+          newsflash(level, sum0, { burnt: battle.cityFire?.burnt || 0,
+            claim: damageBill(sum0, { burnt: battle.cityFire?.burnt || 0 }).total });
+        }
         setTimeout(() => {
           const sum = battle.summary();
           const marks = markRun(sum);
@@ -984,6 +1008,7 @@ async function boot() {
           recordTheatre(level.id, true, sum);
           hud.nextTargetLabel = nextTarget(level.id).target;
           takeBeforeAfter(sum);
+          hideNewsflash();
           hud.showEnd('win', sum, {
             medals: awardMedals(sum),
             title: 'Flattened',
@@ -1797,6 +1822,7 @@ async function boot() {
     // safely outside the pass that exposed it.
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
+    whiteFlags.update(dt);
     hud.update(rawDt);
     if (tutorial) tutorial.update();
     // A weapon armed, a drawer opened: felt and heard, from whichever of the
