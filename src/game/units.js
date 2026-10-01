@@ -341,6 +341,19 @@ export const UNITS = [
 // keys, the armoury. Written in the order they were designed; sorted here.
 ].sort((a, b) => a.cost - b.cost);
 
+/**
+ * The strikes in the order the STRIKES drawer, the number keys and the
+ * armoury list them: what stays on station first, then what makes one pass,
+ * each group cheapest first. Price order alone kept the two apart only while
+ * every loiterer happened to be cheaper than every single pass; the A-10 is
+ * the cheapest strike of all, and it was filed at the head of the loiterers.
+ */
+export const isLoiter = (u) => !!u.aircraft?.station;
+export const STRIKES = [
+  ...UNITS.filter((u) => u.strike && isLoiter(u)),
+  ...UNITS.filter((u) => u.strike && !isLoiter(u)),
+];
+
 export const UNITS_BY_ID = Object.fromEntries(UNITS.map((u) => [u.id, u]));
 
 /**

@@ -3170,6 +3170,18 @@ export class TestMenu {
           `the strikes drawer holds ${strikes.join(', ') || 'nothing'}`);
         assert(ground.every((k) => !UNITS_BY_ID[k].strike),
           `a strike is still in the units drawer: ${ground.filter((k) => UNITS_BY_ID[k].strike).join(', ')}`);
+        // In their two groups: everything that loiters, then everything that
+        // makes one pass, each cheapest first.
+        const loit = (k) => !!UNITS_BY_ID[k].aircraft?.station;
+        const firstPass = strikes.findIndex((k) => !loit(k));
+        assert(firstPass < 0 || strikes.slice(firstPass).every((k) => !loit(k)),
+          `a single-pass strike is among the loiterers: ${strikes.join(', ')}`);
+        for (const grp of [strikes.filter(loit), strikes.filter((k) => !loit(k))]) {
+          for (let i = 1; i < grp.length; i++) {
+            assert(UNITS_BY_ID[grp[i]].cost >= UNITS_BY_ID[grp[i - 1]].cost,
+              `${grp[i]} is listed after the dearer ${grp[i - 1]}`);
+          }
+        }
         hud.setDrawer(null);
         b2.selectedUnitId = was;
         return `armed, put away in one tap, drawer on the next; ${ground.length} units, ${strikes.length} strikes`;

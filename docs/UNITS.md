@@ -97,8 +97,10 @@ pitch of each one's roar.
 
 The dock has two weapon drawers. UNITS holds everything that is placed on
 the ground; STRIKES holds every record with a `strike`, the aircraft and
-the Tomahawk, in two labelled groups, LOITERING (anything with
-`aircraft.station`) then SINGLE USE, each cheapest first. The split is by that field, not by tier, so a new strike
+the Tomahawk, in two groups, loitering (anything with
+`aircraft.station`, whose card says LOITER where the tier goes) then single
+pass, each cheapest first: `STRIKES` in `units.js` is that order, and the
+armoury reads it too. The split is by that field, not by tier, so a new strike
 lands in the right drawer without a list to update. The armed weapon is
 worn by the button it came from, and tapping that button puts it away.
 Number keys pick from UNITS; Shift with a number, or a number while the

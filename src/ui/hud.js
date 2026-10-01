@@ -1,6 +1,6 @@
 import { feedback } from './feedback.js';
 import { power } from '../core/power.js';
-import { UNITS, UNITS_BY_ID } from '../game/units.js';
+import { UNITS, UNITS_BY_ID, STRIKES, isLoiter } from '../game/units.js';
 import { access } from '../core/access.js';
 import { damageBill, money } from './bill.js';
 import { unitIcon } from './icons.js';
@@ -668,10 +668,11 @@ export class HUD {
   _buildBar() {
     this.bars = { units: [], strikes: [] };
     const frags = { units: document.createDocumentFragment(), strikes: document.createDocumentFragment() };
-    // Cheapest first in both drawers, as UNITS already is. What stays on
-    // station says so on its card instead of in a group of its own.
-    const loiters = (u) => !!u.aircraft?.station;
-    const order = [...UNITS.filter((u) => !u.strike), ...UNITS.filter((u) => u.strike)];
+    // The guns cheapest first, as UNITS is. The strikes in their two groups,
+    // loitering then single pass, each cheapest first (`STRIKES`); a card
+    // that stays on station says LOITER where the tier goes.
+    const loiters = isLoiter;
+    const order = [...UNITS.filter((u) => !u.strike), ...STRIKES];
     for (const u of order) {
       const bar = u.strike && this.el.strikebar ? 'strikes' : 'units';
       this.bars[bar].push(u.id);

@@ -15,7 +15,7 @@
  * for everything it has.
  */
 import { LEVELS } from '../game/levels.js';
-import { UNITS } from '../game/units.js';
+import { UNITS, STRIKES } from '../game/units.js';
 import { MEDALS, loadMedals } from '../game/medals.js';
 import { THEATRES, campaignState, isReleased } from '../game/campaign.js';
 import { loadProgress } from './levelselect.js';
@@ -402,12 +402,13 @@ export function showTitle({ current = null, canResume = false } = {}) {
     const maxRadG = top(ground, (u) => u.warhead?.radius || 0), maxRadA = top(air, (u) => u.warhead?.radius || 0);
     const bar = (k, v) => `<span class="tt-stat"><i>${k}</i><span><span style="width:${Math.max(4, Math.min(100, v * 100)).toFixed(0)}%"></span></span></span>`;
     // Sections in the order UNITS is, cheapest first; the aircraft and the
-    // missile are one section so a strike list runs by price without a break.
+    // missile are one section, in the drawer's order: what loiters, then
+    // what makes one pass, each cheapest first.
     const sec = (u) => (u.strike ? 'STRIKE' : u.tier);
     const tiers = [...new Set(UNITS.map(sec))];
     return `<p class="tt-arm-intro">Everything the contract pays for, at list price: a strike costs more on a big target and less on a small one. Tap a card for the brief.</p>` + tiers.map((tier) => `
       <div class="tt-sk">${tierName(tier)}</div>
-      <div class="tt-arm">${UNITS.filter((u) => sec(u) === tier).map((u) => {
+      <div class="tt-arm">${(tier === 'STRIKE' ? STRIKES : UNITS.filter((u) => sec(u) === tier)).map((u) => {
         const ok = isReleased(u.id);
         const by = THEATRES.find((t) => t.unlocks.includes(u.id));
         const pow = (u.warhead?.power || 0) / (u.strike ? maxPowA : maxPowG);
