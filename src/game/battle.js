@@ -529,7 +529,15 @@ export class Battle {
       out.push(ax + px, ay, az + pz, ax - px, ay, az - pz, bx + px, by, bz + pz,
         bx + px, by, bz + pz, ax - px, ay, az - pz, bx - px, by, bz - pz);
     };
-    const both = (u0, v0, u1, v1, w) => { seg(ink, u0, v0, u1, v1, w); seg(line, u0, v0, u1, v1, w + 1.6); };
+    // Widths are metres on the ground, but from the opening camera a metre
+    // is under a pixel: a floor of two pixels for the thinnest stroke at the
+    // middle of the run keeps it legible zoomed out.
+    const cam = this.camera;
+    const mx = x0 + dx * len / 2, mz = z0 + dz * len / 2;
+    const d = Math.hypot(cam.position.x - mx, cam.position.y - this.terrain.heightAt(mx, mz), cam.position.z - mz);
+    const perPx = 2 * d * Math.tan((cam.fov || 50) * Math.PI / 360) / Math.max(1, window.innerHeight || 720);
+    const k = Math.max(1, 2 * perPx / 0.9);
+    const both = (u0, v0, u1, v1, w) => { seg(ink, u0, v0, u1, v1, w * k); seg(line, u0, v0, u1, v1, (w + 1.6) * k); };
     const half = 5;                                   // the beaten zone, either side
     // Rails, the gun-target line in dashes down the middle, and the bars.
     both(0, -half, len, -half, 0.9);
