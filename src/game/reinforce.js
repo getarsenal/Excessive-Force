@@ -36,7 +36,14 @@ import { FLAG_SITES, patternTexture } from '../world/flags.js';
 /** When it comes: this far along the bar that wins the level. */
 export const AIRBORNE_AT = 0.45;
 /** How big it is, as a share of the garrison the level started with. */
-const SHARE = 0.5;
+const SHARE = 0.75;
+/**
+ * How many aircraft carry it. A drop is a fleet, not a flight: ten to
+ * fifteen transports in a loose stream, so the guns that reach up cannot
+ * put all their fire on two or three of them and have the job done. The
+ * load is shared between them, never fewer than four men to an aircraft.
+ */
+const FLEET = { min: 10, max: 15, minLoad: 4 };
 
 /**
  * The airframes. `cap` is men a load, `hp` what it takes to bring one down
@@ -559,7 +566,8 @@ export class EnemyAirborne {
 
     // Into aircraft by where they are going across the run, so each load is
     // the men for one strip of the ground.
-    const nPlanes = Math.max(1, Math.min(8, Math.ceil(slots.length / F.cap)));
+    const nPlanes = Math.max(1, Math.min(FLEET.max, Math.floor(slots.length / FLEET.minLoad),
+      Math.max(FLEET.min, Math.ceil(slots.length / F.cap))));
     for (const s of slots) {
       s.across = (s.pos.x - c.x) * side.x + (s.pos.z - c.z) * side.z;
       s.along = (s.pos.x - c.x) * dir.x + (s.pos.z - c.z) * dir.z;
@@ -575,9 +583,14 @@ export class EnemyAirborne {
       const lat = load.reduce((a, s) => a + s.across, 0) / load.length;
       const model = makeEnemyTransport(this.code, pattern);
       // A loose vic: the middle aircraft leads and the others hang back.
-      const behind = runIn + Math.abs(i - (nPlanes - 1) / 2) * F.speed * 1.4;
+      // Fifteen of them in one vic is a line a kilometre deep; past the
+      // first few the spacing closes up, so the stream is over the drop
+      // zone inside half a minute.
+      const back = Math.abs(i - (nPlanes - 1) / 2);
+      const behind = runIn + F.speed * (Math.min(back, 3) * 1.4 + Math.max(0, back - 3) * 0.7);
       const start = c.clone().addScaledVector(dir, -behind).addScaledVector(side, lat);
-      start.y = alt + (i % 2) * 14;
+      // Three heights, so wingtips in neighbouring strips never meet.
+      start.y = alt + (i % 3) * 20;
       model.position.copy(start);
       model.rotation.y = Math.atan2(dir.x, dir.z);
       this.scene.add(model);

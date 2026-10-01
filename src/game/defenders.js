@@ -504,7 +504,7 @@ export class Garrison {
     this.pools = {
       base: { low: 200, medium: 288, high: 360, ultra: 420 }[quality.name] ?? 288,
       works: { low: 110, medium: 170, high: 220, ultra: 280 }[quality.name] ?? 170,
-      air: { low: 120, medium: 170, high: 210, ultra: 250 }[quality.name] ?? 170,
+      air: { low: 170, medium: 250, high: 310, ultra: 370 }[quality.name] ?? 250,
     };
     this.used = { base: 0, works: 0, air: 0 };
     this.cap = this.pools.base + this.pools.works + this.pools.air;
