@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { bombWhistle, carAlarm } from '../core/synth.js';
+import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
 
@@ -1616,6 +1616,12 @@ export class Battle {
 
     const dir = vel.clone().normalize();
     this.fx.muzzleFlash(from, dir, def.warhead.fx);
+    if (p.kind !== 'rocket' && this.fx.flourish) {
+      // The blast flattens the ground in front of a heavy gun, and now and
+      // then a big one blows a smoke ring.
+      if (def.warhead.fx >= 0.7) this.fx.flourish.muzzleDust(from, dir, this.terrain.heightAt(from.x, from.z), def.warhead.fx);
+      if (def.warhead.fx >= 0.9 && Math.random() < 0.14) this.fx.flourish.smokeRing(from, dir, def.warhead.fx);
+    }
     if (p.kind === 'rocket') {
       // A rocket leaves a launcher, not a barrel: the blast goes out of the
       // back, and the round itself only starts to move.
@@ -2004,6 +2010,7 @@ export class Battle {
    */
   _storeBoom(dump, spec) {
     const p = dump.pos.clone(); p.y += 0.6;
+    if (dump.kind !== 'fuel' && this.fx.flourish) this.fx.flourish.cookOff(p.x, dump.pos.y, p.z, 7 + Math.random() * 4, this.audio, crack);
     for (const st of this.structures) {
       st.explode(p, spec.lethal, spec.radius, spec.power * this.powerScale, { dir: { x: 0, y: 1, z: 0 }, kinetic: 0.3 });
     }
@@ -2156,6 +2163,7 @@ export class Battle {
   _onImpact(hit) {
     const { point, proj } = hit;
     const w = proj.warhead;
+    if (this._splash(hit, w) && !(proj.kind === 'bomb' && proj.strikeDef)) return;
     if (proj.kind === 'bomb' && proj.strikeDef) { this._strikeImpact(hit); return; }
 
     // Defensive mortar fire lands on the player's guns. It chips whatever it
@@ -2317,6 +2325,21 @@ export class Battle {
   }
 
   // ────────────────────────────────────────────────────────────────── loop ──
+
+  /**
+   * A round into the river is a round into the river: a column of white
+   * water and a ring of spray, not a fireball on the riverbed with a crater
+   * under three metres of the Thames. True if it was.
+   */
+  _splash(hit, w) {
+    const t = this.terrain, p = hit.point;
+    if (!hit.groundHit || t.hasWater === false || !Number.isFinite(t.waterLevel)) return false;
+    if (p.y > t.waterLevel + 0.3 || !t.isWater(p.x, p.z)) return false;
+    if (this.fx.flourish) this.fx.flourish.waterPlume(p.x, t.waterLevel, p.z, w.fx || 1);
+    if (this.audio) this.audio.play('explosion', p, { rate: 0.62, gain: 0.45, rolloff: 300 });
+    if (this.life) this.life.startle(p.x, p.z, 80);
+    return true;
+  }
 
   /**
    * A blast in the street: the cars near it are thrown and burn, and the

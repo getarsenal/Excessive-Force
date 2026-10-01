@@ -22,6 +22,7 @@ export class Flourish {
     this.fx = fx;
     this.low = fx.quality.name === 'low';
     this.markers = [];
+    this.cookoffs = [];
     /** Things to do in a moment, on the effects' own clock. */
     this._later = [];
     this.flareList = [];
@@ -40,6 +41,14 @@ export class Flourish {
     this._c.glass = new THREE.Color(1.4, 1.55, 1.7);
     this._c.glassFade = new THREE.Color(0.5, 0.6, 0.7);
     this._c.paper = new THREE.Color(0.95, 0.94, 0.9);
+    this._c.water = new THREE.Color(0.96, 0.98, 1.0);
+    this._c.waterFade = new THREE.Color(0.78, 0.83, 0.86);
+    this._c.ring = new THREE.Color(0.82, 0.8, 0.76);
+    this._c.ground = new THREE.Color(0.66, 0.6, 0.5);
+    this._c.groundFade = new THREE.Color(0.55, 0.5, 0.43);
+    this._c.surge = new THREE.Color(0.7, 0.66, 0.6);
+    this._c.surgeFade = new THREE.Color(0.6, 0.57, 0.53);
+    this._c.tracer = new THREE.Color(1.6, 0.9, 0.35);
     this._c.paperSoot = new THREE.Color(0.55, 0.52, 0.48);
     // Paper is its own pool: a sheet is a small hard-edged rectangle, not a
     // puff, and there can be a few hundred of them in the air at once.
@@ -218,6 +227,155 @@ export class Flourish {
     }
   }
 
+  /**
+   * A round into the river: no fireball, a column of white water standing
+   * up out of it as tall as the charge can throw it, collapsing back into a
+   * ring of spray running out across the surface.
+   */
+  waterPlume(x, y, z, power = 1) {
+    const fx = this.fx, k = Math.pow(Math.max(0.2, power), 0.6);
+    const n = Math.round((this.low ? 18 : 40) * Math.min(2.2, k));
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 1.6 * k;
+      const up = (14 + Math.random() * 26) * k;
+      fx.dust.spawn({
+        x: x + Math.cos(a) * r, y: y + 0.3, z: z + Math.sin(a) * r,
+        vx: Math.cos(a) * (1 + Math.random() * 3) * k, vy: up, vz: Math.sin(a) * (1 + Math.random() * 3) * k,
+        life: 1.8 + Math.random() * 1.6,
+        size0: 1.2 * k, size1: (5 + Math.random() * 5) * k,
+        color0: this._c.water, color1: this._c.waterFade,
+        drag: 0.6, grav: -16, turb: 0.4, alpha: 0.85,
+      });
+    }
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const sp = (8 + Math.random() * 10) * k;
+      fx.dust.spawn({
+        x, y: y + 0.4, z,
+        vx: Math.cos(a) * sp, vy: 1 + Math.random() * 2, vz: Math.sin(a) * sp,
+        life: 2.4 + Math.random() * 1.6,
+        size0: 1.5 * k, size1: (6 + Math.random() * 6) * k,
+        color0: this._c.water, color1: this._c.waterFade,
+        drag: 1.4, grav: 0.2, turb: 0.6, alpha: 0.45,
+      });
+    }
+  }
+
+  /**
+   * The ground in front of a heavy gun when it fires: the blast flattens the
+   * grass and throws the dust off it in a fan, forward of the muzzle.
+   */
+  muzzleDust(pos, dir, groundY, power = 1) {
+    if (this.low || pos.y - groundY > 6) return;
+    const fx = this.fx, k = Math.min(2.4, Math.pow(power, 0.7));
+    const n = Math.round(10 * k);
+    for (let i = 0; i < n; i++) {
+      const a = Math.atan2(dir.x, dir.z) + (Math.random() - 0.5) * 2.4;
+      const sp = (6 + Math.random() * 12) * k;
+      fx.dust.spawn({
+        x: pos.x + dir.x * 2, y: groundY + 0.4, z: pos.z + dir.z * 2,
+        vx: Math.sin(a) * sp, vy: 0.6 + Math.random() * 1.6, vz: Math.cos(a) * sp,
+        life: 1.6 + Math.random() * 1.4,
+        size0: 1.2 * k, size1: (4 + Math.random() * 4) * k,
+        color0: this._c.ground, color1: this._c.groundFade,
+        drag: 1.8, grav: 0.3, turb: 0.8, alpha: 0.42,
+      });
+    }
+  }
+
+  /**
+   * A smoke ring. Big guns blow one now and then — the propellant gas
+   * leaving the muzzle as a vortex — and it drifts off along the line of
+   * fire, widening and thinning.
+   */
+  smokeRing(pos, dir, power = 1) {
+    const fx = this.fx, k = Math.min(2, Math.pow(power, 0.5));
+    // Two axes across the line of fire.
+    const ax = new THREE.Vector3(dir.x, dir.y, dir.z).normalize();
+    const u = new THREE.Vector3(0, 1, 0).cross(ax);
+    if (u.lengthSq() < 1e-4) u.set(1, 0, 0);
+    u.normalize();
+    const v = new THREE.Vector3().crossVectors(ax, u).normalize();
+    const n = this.low ? 14 : 24, R = 1.1 * k;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
+      const ox = (u.x * c + v.x * s), oy = (u.y * c + v.y * s), oz = (u.z * c + v.z * s);
+      fx.smoke.spawn({
+        x: pos.x + ax.x * 3 + ox * R, y: pos.y + ax.y * 3 + oy * R, z: pos.z + ax.z * 3 + oz * R,
+        vx: ax.x * 9 + ox * 2.2, vy: ax.y * 9 + oy * 2.2 + 0.4, vz: ax.z * 9 + oz * 2.2,
+        life: 3.2 + Math.random() * 0.6,
+        size0: 0.9 * k, size1: 2.6 * k,
+        color0: this._c.ring, color1: this._c.ring,
+        drag: 0.75, grav: 0.05, turb: 0.1, alpha: 0.6, spin: 0,
+      });
+    }
+  }
+
+  /**
+   * An ammunition dump that has gone up keeps going: rounds cooking off in
+   * the fire for several seconds, each a pop and a streak thrown off in a
+   * random direction, the gaps between them getting longer.
+   */
+  cookOff(x, y, z, secs = 8, audio = null, crack = null) {
+    if (this.cookoffs.length > 6) return;
+    this.cookoffs.push({ x, y, z, t: 0, secs, next: 0.4, audio, crack });
+  }
+
+  _stepCookoffs(dt) {
+    const fx = this.fx;
+    for (let i = this.cookoffs.length - 1; i >= 0; i--) {
+      const c = this.cookoffs[i];
+      c.t += dt;
+      if (c.t > c.secs) { this.cookoffs.splice(i, 1); continue; }
+      c.next -= dt;
+      if (c.next > 0) continue;
+      const late = c.t / c.secs;
+      c.next = 0.08 + Math.random() * (0.25 + late * 0.9);
+      // The pop.
+      fx.sparks.spawn({ x: c.x, y: c.y + 0.5, z: c.z, life: 0.12, size0: 2.4, size1: 0.6,
+        color0: this._c.flare, color1: this._c.tracer, drag: 0, grav: 0, alpha: 1 });
+      // And what it throws: a streak or two off in any direction.
+      const m = 1 + Math.floor(Math.random() * 3);
+      for (let j = 0; j < m; j++) {
+        const a = Math.random() * Math.PI * 2, e = 0.15 + Math.random() * 1.1, sp = 25 + Math.random() * 45;
+        fx.sparks.spawn({
+          x: c.x, y: c.y + 0.5, z: c.z,
+          vx: Math.cos(a) * Math.cos(e) * sp, vy: Math.sin(e) * sp, vz: Math.sin(a) * Math.cos(e) * sp,
+          life: 0.5 + Math.random() * 0.7, size0: 0.9, size1: 0.4,
+          color0: this._c.tracer, color1: this._c.tracer, drag: 0.5, grav: -9.8, alpha: 1,
+        });
+      }
+      if (Math.random() < 0.5) {
+        fx.smoke.spawn({ x: c.x, y: c.y + 1, z: c.z, vx: 0, vy: 2, vz: 0, life: 2.5, size0: 1.5, size1: 6,
+          color0: this.fx._c.smokeDark, color1: this.fx._c.smokeLight, drag: 0.8, grav: 0.4, turb: 0.8, alpha: 0.5 });
+      }
+      if (c.audio && c.crack) c.crack(c.audio, { x: c.x, y: c.y, z: c.z }, 0, 0.35, 1400 + Math.random() * 1600, 0.07);
+    }
+  }
+
+  /**
+   * When a big section lands: the dust it drives out along the ground, a
+   * wall of it rolling out down the streets for a hundred metres and more,
+   * slowing and rising as it goes, and hanging over everything after.
+   */
+  surge(x, groundY, z, strength = 1) {
+    const fx = this.fx, k = Math.max(0.6, Math.min(3, strength));
+    const n = Math.min(Math.round((this.low ? 26 : 60) * k), Math.round(fx.dust.max * 0.3));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.2;
+      const sp = (16 + Math.random() * 22) * k;
+      fx.dust.spawn({
+        x: x + Math.cos(a) * 6 * k, y: groundY + 1 + Math.random() * 4, z: z + Math.sin(a) * 6 * k,
+        vx: Math.cos(a) * sp, vy: 0.8 + Math.random() * 2.4, vz: Math.sin(a) * sp,
+        life: 9 + Math.random() * 7,
+        size0: 6 * k, size1: (22 + Math.random() * 18) * k,
+        color0: this._c.surge, color1: this._c.surgeFade,
+        drag: 0.42, grav: 0.18, turb: 1.2, alpha: 0.5,
+        spin: (Math.random() - 0.5) * 0.3,
+      });
+    }
+  }
+
   /** Run `fn` after `t` seconds of effects time. */
   later(t, fn) { if (this._later.length < 64) this._later.push({ t, fn }); }
 
@@ -228,6 +386,7 @@ export class Flourish {
       if (l.t <= 0) { this._later.splice(i, 1); try { l.fn(); } catch { /* a callback is not worth a frame */ } }
     }
     this.paper.update(dt, this.fx.time);
+    if (this.cookoffs.length) this._stepCookoffs(dt);
     if (this.markers.length) this._stepMarkers(dt);
     if (this.flareList.length) this._stepFlares(dt);
   }

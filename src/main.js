@@ -1033,6 +1033,13 @@ async function boot() {
       // to a low angle a quarter round from where the player was, time down
       // to a third for three seconds, and back. Every fall after the first
       // gets the short half-speed beat, which is enough once it has been seen.
+      // And where it lands, the dust it drives out along the ground.
+      if (fx.flourish && performance.now() - surgeAt > 3000) {
+        surgeAt = performance.now();
+        const fall = Math.min(4, Math.sqrt(2 * Math.max(1, t.y - groundY) / 9.81));
+        const k = Math.min(3, 0.8 + island.mass / 2.5e6);
+        fx.flourish.later(fall, () => fx.flourish.surge(t.x, terrain.heightAt(t.x, t.z), t.z, k));
+      }
       if (!cine.played && st === primary) collapseCinematic(where);
       else testMenu.dramaticPause(2.0, 0.45);
     };
@@ -1047,6 +1054,7 @@ async function boot() {
    * was, unless the player has taken the camera in the meantime.
    */
   const cine = { played: false, keep: null };
+  let surgeAt = -1e9;
   function collapseCinematic(where) {
     cine.played = true;
     if (suiteHold || access.still) { testMenu.dramaticPause(2.0, 0.45); return; }
