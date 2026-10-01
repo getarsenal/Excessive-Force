@@ -2362,7 +2362,7 @@ body.clear-view #game-canvas { filter: none; }
 body.optics-thermal #optics, body.optics-nv #optics { display: block; }
 body.clear-view #optics { display: none !important; }
 #optics span { position: absolute; }
-#optics .op-tl { left: 16px; top: 112px; } #optics .op-tr { right: 16px; top: 112px; }
+#optics .op-tl { left: 16px; top: 156px; } #optics .op-tr { right: 16px; top: 156px; }
 #optics .op-bl { left: 16px; bottom: 120px; } #optics .op-br { right: 16px; bottom: 120px; }
 #optics .op-ret { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; transform: translate(-50%, -50%); }
 #optics .op-ret i { position: absolute; background: rgba(235, 245, 235, 0.7); }
