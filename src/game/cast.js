@@ -274,7 +274,7 @@ export const STANDOFF = {
   istanbul: [
     { who: 'us', line: "Four pointy towers round a big dome and not one of 'em gets cell signal. What kinda outfit is this?" },
     { who: 'tr', line: 'Bin beş yüz yıl depremlere dayandı, Amerikalı. Sen bir hafta sonu dayanamazsın.' },
-    { who: 'us', line: "Gobble gobble, pal. Thanksgiving came early this year." },
+    { who: 'us', line: "Translator says that was about earthquakes. Translator also just ran into the mosque. Spy. Fired." },
   ],
   cologne: [
     { who: 'us', line: "Six hundred years to build one church? That's not devotion, that's a union job." },
@@ -289,7 +289,7 @@ export const STANDOFF = {
   dubai: [
     { who: 'us', line: "Eight hundred metres of glass in the middle of a sandbox. Somebody was compensating." },
     { who: 'ae', line: 'ثمانمئة متر يا أمريكي. مدافعك ما توصل نصّها.' },
-    { who: 'us', line: "Loved the passion, understood none of it. Somebody ask him where the pool is, it's a hundred and twenty." },
+    { who: 'us', line: "My phone says he said 'the camel is in the refrigerator'. Sounds like a threat to me." },
   ],
   petronas: [
     { who: 'us', line: "Two of 'em. Somebody built it twice and still couldn't get it right." },
@@ -329,7 +329,7 @@ export const STANDOFF = {
   tokyotower: [
     { who: 'us', line: "Somebody knocked off the Eiffel Tower and painted it like a traffic cone." },
     { who: 'jp', line: "この塔はお前の国の中古戦車を溶かして造ったんだ。返してほしいか？" },
-    { who: 'us', line: "Whatever that was, you're welcome. Boys, give him the full American experience." },
+    { who: 'us', line: "Translator says he wants his tanks back. I fired the translator. Nobody's getting any tanks." },
   ],
   budapest: [
     { who: 'us', line: "That's not a parliament, that's a wedding cake somebody dropped in the river." },
@@ -364,7 +364,7 @@ export const STANDOFF = {
   hassan: [
     { who: 'us', line: "Two hundred metres of tower and nobody thought to put in an elevator? My knees can't do this." },
     { who: 'ma', line: "المئذنة قائمة على البحر يا أمريكي، والبحر لا يركع لأحد." },
-    { who: 'us', line: "He's pointing at the ocean. You want me to swim? I'm not swimming. I'm shooting." },
+    { who: 'us', line: "Where's my translator? ...He's on their side now? Since when? Fine. Shell him too." },
   ],
   kuwait: [
     { who: 'us', line: "Three giant golf tees stuck in the sand. Somebody get me the world's biggest driver." },
@@ -379,7 +379,7 @@ export const STANDOFF = {
   forbidden: [
     { who: 'us', line: "Forbidden City. Forbidden. That's a dare, and Buck Hollister never backs down from a dare." },
     { who: 'cn', line: "你连筷子都不会用，还想打紫禁城？" },
-    { who: 'us', line: "Didn't catch it, but he looked at my hands when he said it. Nobody looks at my hands." },
+    { who: 'us', line: "Translator says he insulted my chopsticks. Translator's wearing their uniform now. Fired." },
   ],
   gyeongbok: [
     { who: 'us', line: "Nice palace. Where's the K-pop? I was promised K-pop." },
@@ -394,7 +394,7 @@ export const STANDOFF = {
   shwedagon: [
     { who: 'us', line: "Is that real gold? Nobody shoot it till I get a picture with it." },
     { who: 'mm', line: "ရွှေတိဂုံသည် ငလျင်နှင့် ဧကရာဇ်များကို ကျော်လွှားခဲ့သည်။ သင်သည် ဘာမှမဟုတ်။" },
-    { who: 'us', line: "Sounded like a bunch of bubbles. Real cute. Bubble THIS." },
+    { who: 'us', line: "Phrasebook says this is Thai. Phrasebook's wrong. Phrasebook's fired. Fire!" },
   ],
   angkor: [
     { who: 'us', line: "Jungle, moat, giant stone heads everywhere. It's Indiana Jones, and I'm the boulder." },
@@ -424,7 +424,7 @@ export const STANDOFF = {
   greatwall: [
     { who: 'us', line: "They say you can see it from space. You can't. I checked. Liar wall." },
     { who: 'cn', line: "你站的地方，孟姜女哭倒过一段长城。你哭也没用。" },
-    { who: 'us', line: "Why's he making a sad face at me? Don't pity me, pal. Pity the wall." },
+    { who: 'us', line: "My translator started crying too. Now they're crying together. That's two spies. Fire!" },
   ],
   ...ATLAS_STANDOFF,
 };
