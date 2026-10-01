@@ -1704,6 +1704,9 @@ export class Battle {
     u.idle = false;
     u.mgTarget = t;
     u.burstLeft = mg.burst;
+    // A burst is a shot, for the tally and for the save's "has this battle
+    // started": a battle fought with machine guns alone fired nothing.
+    this.shotsFired++;
     u.burstTimer = 0;
     // The team turns to its target; the gun is laid along the group's +Z.
     const p = t.pos;

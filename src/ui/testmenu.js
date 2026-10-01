@@ -277,7 +277,7 @@ export class TestMenu {
     this._stat(units, 'Guns engaging', () => b.gunsOnTarget);
     this.spawnSel = this._select(units, 'Spawn', {
       options: UNITS.map((u) => [u.id, `${u.name} ($${u.cost})`]),
-      get: () => this._spawnId || UNITS[0].id,
+      get: () => this._spawnId || (UNITS.find((u) => !u.mg) || UNITS[0]).id,
       set: (v) => { this._spawnId = v; },
     });
     this._buttons(units, null, [
@@ -669,7 +669,9 @@ export class TestMenu {
 
   spawnRing(n) {
     const b = this.ctx.battle;
-    const id = this._spawnId || UNITS[0].id;
+    // The cheapest gun, not the cheapest unit: the M240 is cheaper than
+    // anything with a shell, and it shoots men, not buildings.
+    const id = this._spawnId || (UNITS.find((u) => !u.mg) || UNITS[0]).id;
     const def = UNITS_BY_ID[id];
     const origin = b.primary.origin;
     if (def.strike) {
