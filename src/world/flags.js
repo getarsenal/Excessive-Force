@@ -395,7 +395,7 @@ PATTERNS.uae = (ctx, w, h) => {
 
 Object.assign(PATTERNS, ATLAS_PATTERNS);
 
-function patternTexture(name, w, h) {
+export function patternTexture(name, w, h) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = Math.round(128 * (h / w));
   const ctx = c.getContext('2d');

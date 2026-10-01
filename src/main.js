@@ -838,6 +838,22 @@ async function boot() {
         hud.hidePrompt();
         battle.pulse(data.point, 0xffa040, 22, true);
         break;
+      case 'airborne':
+        // The enemy sends for help. Said big, with the count, so the player
+        // knows it is worth turning the machine guns up for.
+        feedback.emit('lost');
+        hud.feed(`ENEMY AIRBORNE · ${data.planes}× ${data.name} · ${data.men} MEN · ${Math.round(data.eta)} s`, 'bad');
+        hud.status(`enemy airborne inbound · ${data.men} men · M240 teams engage aircraft`, 6);
+        if (data.point) battle.pulse(data.point, 0xd04030, 40, true);
+        if (comcard) comcard.airborne();
+        break;
+      case 'airbornedown':
+        feedback.emit('impact', 1.2);
+        hud.feed(`${data.name} SHOT DOWN${data.aboard ? ` — ${data.aboard} ABOARD` : ''}`, 'big');
+        break;
+      case 'airbornelanded':
+        hud.feed(`ENEMY AIRBORNE DOWN · ${data.landed} DUG IN · ${data.lost} LOST`, data.landed > data.lost ? 'bad' : 'big');
+        break;
       case 'flak':
         // Said before the INBOUND line, so the player reads "under fire" and
         // then watches what the guns do about it, rather than wondering

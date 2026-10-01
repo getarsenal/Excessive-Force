@@ -39,6 +39,25 @@ const BUCK_WIN = [
   'Send the bill to whoever built it. They clearly skimped.',
 ];
 
+// When the airborne is called in. The enemy says it in his own language, or
+// would if Buck had a translator who had not been fired.
+const ENEMY_AIRBORNE = [
+  'Look up, cowboy. My paratroopers are very keen to meet you.',
+  'Reinforcements! Half my army again, and every one of them angry.',
+  'You brought artillery. I brought the sky. Fair is fair.',
+  'Gentlemen, the drop zone is the American. Go.',
+  'I have called my cousins. My cousins own aeroplanes.',
+  'Every man I have left is in the air. Duck, or do not. I prefer not.',
+];
+const BUCK_AIRBORNE = [
+  "Translator says that means \"the bus is late.\" Shoot the bus.",
+  "No idea what he said. Fired the last translator for spying. Shoot the planes.",
+  "He either called in paratroopers or ordered a pizza. Either way, MGs up.",
+  "My app says \"the goat has wings.\" Close enough. Light 'em up.",
+  "Interpreter quit mid-sentence. I'm guessing that's not a peace offer.",
+  "I don't speak whatever that is, but I speak parachute. Kill the parachutes.",
+];
+
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 
 export class ComCard {
@@ -103,7 +122,16 @@ export class ComCard {
     setTimeout(() => { if (!this.el.classList.contains('in')) this.el.hidden = true; }, 260);
   }
 
-  half() { this.say('enemy', pick(ENEMY_HALF)); }
+  half() { if (performance.now() < (this._quietUntil || 0)) return; this.say('enemy', pick(ENEMY_HALF)); }
+  /** The airborne: his boast, then Buck's best guess at what it meant. */
+  airborne() {
+    this.say('enemy', pick(ENEMY_AIRBORNE));
+    this._quietUntil = performance.now() + 20000;
+    clearTimeout(this._reply);
+    this._reply = setTimeout(() => {
+      if (!document.body.classList.contains('ended')) this.say('us', pick(BUCK_AIRBORNE));
+    }, 6500);
+  }
   last() { this.say('enemy', pick(ENEMY_LAST)); }
   win() { this.say('us', pick(BUCK_WIN)); }
 }

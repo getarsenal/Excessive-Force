@@ -209,6 +209,23 @@ function carryingRound(k, hipY) {
 }
 
 /**
+ * Under a canopy: both hands up on the risers, legs together and a little
+ * bent for the landing, the rifle slung across the chest. The enemy's
+ * airborne, coming down.
+ */
+function hanging(k) {
+  for (const x of [-0.09, 0.09]) {
+    k.rod(v(x, 0.92, 0), v(x, 0.5, 0.12), 0.085, 'uniform');
+    k.rod(v(x, 0.5, 0.12), v(x, 0.14, 0.02), 0.08, 'uniform');
+    k.box(0.13, 0.12, 0.28, x, 0.08, 0.07, 'boots');
+  }
+  const sh = upperBody(k, 0.92, 0);
+  k.arm(sh.right, v(0.3, sh.right.y + 0.24, 0.02), v(0.2, sh.right.y + 0.56, 0));
+  k.arm(sh.left, v(-0.3, sh.left.y + 0.24, 0.02), v(-0.2, sh.left.y + 0.56, 0));
+  k.rod(v(-0.2, sh.right.y - 0.42, 0.16), v(0.22, sh.right.y - 0.02, 0.16), 0.022, 'steel', 5);
+}
+
+/**
  * Flat on the ground behind a machine gun on its bipod, propped on the
  * elbows: the gunner. Head toward +Z, feet back along -Z.
  */
@@ -301,6 +318,7 @@ function build(pose, weapon, opts) {
   else if (pose === 'prone-ag') proneAssistant(k);
   else if (pose === 'mortar-gunner') mortarGunner(k);
   else if (pose === 'mortar-loader') mortarLoader(k);
+  else if (pose === 'hang') hanging(k);
   else {
     if (kneel) kneelingLegs(k); else standingLegs(k);
     const hip = kneel ? 0.52 : 0.92;

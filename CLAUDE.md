@@ -146,7 +146,8 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift
   package · `src/game/aircraft.js` air strikes and the airlift (the C-130,
-  the parachutes, what the flak does to both) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
+  the parachutes, what the flak does to both) · `src/game/reinforce.js` the enemy's airborne at the halfway mark (each nation's
+  transport, the drop, the men digging in round the building) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
   `src/ui/` HUD, level select, stand-off, test panel · `src/ui/title.js`
   the title screen in front of the contract card (continue, daily strike,

@@ -32,7 +32,7 @@ const EAGLE_GREY = 0x565b61;
 const LANCER_GREY = 0x3a3e43;
 const HERCULES_GREY = 0x6d7378;
 
-function part(geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
+export function part(geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.rotation.set(rx, ry, rz);
@@ -50,7 +50,7 @@ function part(geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
  * A station with no width closes the body to a point, which is how both
  * noses and the Lancer's tailcone are made.
  */
-function loft(stations, seg = 12) {
+export function loft(stations, seg = 12) {
   const pos = [], idx = [];
   const ring = (st) => {
     for (let k = 0; k < seg; k++) {
@@ -99,7 +99,7 @@ function loft(stations, seg = 12) {
  * `sweep` is how far back the leading edge has gone by the tip, in metres,
  * which is easier to eyeball against a photograph than an angle.
  */
-function surface(o) {
+export function surface(o) {
   const { span, root, tip, sweep, thick, dihedral = 0, ridge = 0.38 } = o;
   const y1 = Math.sin(dihedral) * span;
   const half = thick * 0.5;
@@ -155,7 +155,7 @@ function solid(pos, idx) {
 }
 
 /** The same geometry reflected in x, wound so it still faces outwards. */
-function mirrorX(geo) {
+export function mirrorX(geo) {
   const g = geo.clone();
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) p.setX(i, -p.getX(i));
@@ -170,7 +170,7 @@ function mirrorX(geo) {
  * a negative scale turns every triangle inside out and the renderer culls
  * the wrong faces, which shows up as a wing with a hole in it.
  */
-function pair(group, geo, mat, x, y, z) {
+export function pair(group, geo, mat, x, y, z) {
   const right = new THREE.Mesh(geo, mat);
   right.position.set(x, y, z);
   right.castShadow = true;

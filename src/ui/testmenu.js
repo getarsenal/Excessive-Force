@@ -3825,6 +3825,9 @@ export class TestMenu {
     const b = this.ctx.battle;
     const lift = b.airlift;
     b.airlift = false;               // the tests place batteries and expect them there
+    // Nor the enemy's airborne: a test that brings the building down past
+    // halfway would land half a garrison on the next one.
+    if (b.airborne) b.airborne.auto = false;
     if (this.holdClock) this.holdClock(true);
     const rows = [];
     let pass = 0, fail = 0;
@@ -3870,6 +3873,7 @@ export class TestMenu {
   runTestsSync() {
     // The harness places a battery and expects it there: no airlift.
     this.ctx.battle.airlift = false;
+    if (this.ctx.battle.airborne) this.ctx.battle.airborne.auto = false;
     const out = [];
     let pass = 0, fail = 0;
     for (const [name, fn] of this.tests()) {

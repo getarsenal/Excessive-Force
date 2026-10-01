@@ -20,6 +20,8 @@
  * handful at most. A win or a loss clears it; so does starting that contract
  * over.
  */
+import * as THREE from 'three';
+
 const KEY = 'tt.battles';
 const MAX = 6;
 
@@ -92,6 +94,8 @@ export function snapshotBattle({ level, battle, structures }) {
   const touched = structures.some((s) => s.destroyedCount > 0);
   if (!units.length && !touched && !battle.shotsFired) return null;
   const g = battle.garrison;
+  let nBase = g ? g.defenders.findIndex((d) => d.pool === 'air') : 0;
+  if (g && nBase < 0) nBase = g.defenders.length;
   const cf = battle.cityFire;
   const burnt = [];
   if (cf) for (const p of cf.plots) if (p.burnt) burnt.push(p.index);
@@ -110,9 +114,15 @@ export function snapshotBattle({ level, battle, structures }) {
     lost: battle.unitsLost || 0,
     integrity: +(battle.primary.monumentIntegrity ?? 1).toFixed(3),
     stones: structures.map((s) => ({ n: s.count, dead: packBits(s.count, (i) => !s.isAlive(i)) })),
-    defenders: g ? packBits(g.defenders.length, (i) => !g.defenders[i].alive) : '',
-    nDefenders: g ? g.defenders.length : 0,
+    // The garrison the level was built with, by index. The airborne come
+    // after it in the list and are saved by where they dug in instead,
+    // because a fresh level does not have them.
+    defenders: g ? packBits(nBase, (i) => !g.defenders[i].alive) : '',
+    nDefenders: nBase,
     alive: g ? g.defenders.filter((d) => d.alive).length : 0,
+    airborne: battle.airborne && battle.airborne.spent ? 1 : 0,
+    air: g ? g.defenders.slice(nBase).filter((d) => d.alive).map((d) => [
+      d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2)]) : [],
     burnt,
     units,
   };
@@ -168,6 +178,14 @@ export function restoreBattle(snap, { battle, structures }) {
   const g = battle.garrison;
   if (g && snap.nDefenders === g.defenders.length) {
     unpackBits(snap.defenders, g.defenders.length, (i) => { g.defenders[i].alive = false; });
+  }
+  // The airborne, if they have been: dug in where they were, and not coming
+  // a second time.
+  if (snap.airborne && battle.airborne) battle.airborne.state = 'done';
+  if (g) {
+    for (const [type, x, y, z, f] of snap.air || []) {
+      g.place(type, new THREE.Vector3(x, y, z), f, 4, { cover: 'ground', emplaced: true, pool: 'air' });
+    }
   }
   // The guns, where they were standing, as they were — without the feed
   // announcing each one as if it had just been deployed.

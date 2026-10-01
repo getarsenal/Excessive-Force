@@ -9,6 +9,7 @@ import {
 } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
+import { EnemyAirborne } from './reinforce.js';
 import { lineOfSight } from '../structure/occupancy.js';
 
 /**
@@ -138,6 +139,9 @@ export class Battle {
     // nearest the aim point, `fire` is one burst on it.
     // The A-10's stream is drawn as tracer the same way the garrison's is.
     this.air.tracers = this.tracerFX;
+    // The enemy's airborne: half the garrison again, flown in over the
+    // building when the bar is about halfway to the win.
+    this.airborne = new EnemyAirborne(this);
     this.air.gunner = {
       pick: (c, reach) => {
         let best = null, bd = reach * reach;
@@ -2161,6 +2165,7 @@ export class Battle {
       // and the smoke drifts — under the collapse and behind the report,
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
+      this.airborne.update(dt);
       this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
       if (this.smokes) this.smokes.update(dt);
@@ -2185,6 +2190,7 @@ export class Battle {
 
     this._updateUnits(dt);
     this.air.update(dt);
+    this.airborne.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
     if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
 
