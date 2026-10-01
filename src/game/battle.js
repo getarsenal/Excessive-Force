@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { bombWhistle } from '../core/synth.js';
+import { bombWhistle, carAlarm } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
 
@@ -2101,6 +2101,7 @@ export class Battle {
       const cityR = st.loiter ? rMax * 0.8
         : Math.max(rMax * 0.8, w.radius || 0, 0.9 * Math.cbrt(w.power || 0));
       this.cityFire.blast(point, cityR, st.loiter ? cityR : cityR * 1.6);
+      this._streetBlast(point, st.loiter ? Math.max(8, cityR * 1.5) : cityR, !st.loiter);
     }
     // The blast is seen where the bomb went in, not fourteen metres inside
     // the stone where a penetrator actually goes off.
@@ -2208,6 +2209,8 @@ export class Battle {
     if (this.cityFire && hit.owner == null) {
       this.cityFire.hit(point, w);
     }
+    // Cars in the street, whoever's round it was.
+    if (w.radius >= 2) this._streetBlast(point, Math.max(6, w.radius * 1.4), false);
 
     const power = w.power * this.powerScale;
     // The direction the round was travelling when it arrived, so the masonry
@@ -2314,6 +2317,35 @@ export class Battle {
   }
 
   // ────────────────────────────────────────────────────────────────── loop ──
+
+  /**
+   * A blast in the street: the cars near it are thrown and burn, and the
+   * alarms on the ones further off go. A few alarms at once and no more —
+   * twelve whooping at the same time is not a street, it is a fault.
+   */
+  _streetBlast(point, radius, big) {
+    if (!this.life || !this.life.cars) return;
+    const wrecks = this.life.wreck(point.x, point.z, radius);
+    for (let i = 0; i < wrecks.length && i < 6; i++) {
+      const q = wrecks[i];
+      if (this.fires) this.fires.ignite(q.x, q.y + 0.6, q.z, 0.8, 30 + Math.random() * 30);
+      // The fuel tank, a second after it lands.
+      if (i < 3) this.fx.flourish?.later?.(0.6 + Math.random() * 1.4, () => {
+        this._v3 = this._v3 || new THREE.Vector3();
+        this.fx.detonate(this._v3.set(q.x, q.y + 0.8, q.z), 0.55, { ground: true, groundY: q.y });
+      });
+    }
+    if (!this.audio) return;
+    this._alarms = (this._alarms || []).filter((t) => t > this.elapsed);
+    const want = Math.min(4 - this._alarms.length, big ? 3 : (wrecks.length ? 2 : (Math.random() < 0.35 ? 1 : 0)));
+    for (let k = 0; k < want; k++) {
+      const a = Math.random() * Math.PI * 2, r = radius * (1.2 + Math.random() * 1.6);
+      const at = { x: point.x + Math.cos(a) * r, y: point.y, z: point.z + Math.sin(a) * r };
+      const dur = 7 + Math.random() * 9, delay = 0.3 + Math.random() * 1.8;
+      carAlarm(this.audio, at, delay, dur, Math.floor(Math.random() * 3));
+      this._alarms.push(this.elapsed + delay + dur);
+    }
+  }
 
   /**
    * A bomb whistles on its way down. Not the real sound of a modern bomb —

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BillboardParticles } from './particles.js';
 
 /**
  * The small things the fight does that are not the fight.
@@ -21,6 +22,8 @@ export class Flourish {
     this.fx = fx;
     this.low = fx.quality.name === 'low';
     this.markers = [];
+    /** Things to do in a moment, on the effects' own clock. */
+    this._later = [];
     this.flareList = [];
     this._c = {
       // Coloured marking smoke: the canisters are red, violet and yellow,
@@ -34,6 +37,66 @@ export class Flourish {
       vapour: new THREE.Color(0xf4f6f8),
     };
     this._mark = 0;
+    this._c.glass = new THREE.Color(1.4, 1.55, 1.7);
+    this._c.glassFade = new THREE.Color(0.5, 0.6, 0.7);
+    this._c.paper = new THREE.Color(0.95, 0.94, 0.9);
+    this._c.paperSoot = new THREE.Color(0.55, 0.52, 0.48);
+    // Paper is its own pool: a sheet is a small hard-edged rectangle, not a
+    // puff, and there can be a few hundred of them in the air at once.
+    this.paper = new BillboardParticles(this.low ? 220 : 640, paperTexture(),
+      { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 12 });
+    fx.scene.add(this.paper.mesh);
+  }
+
+  /**
+   * The windows go. A gutted building throws its glass out of every face:
+   * a glittering shower off each wall, falling fast and catching the sun.
+   */
+  glass(p, k = 1) {
+    const fx = this.fx;
+    const n = Math.round((this.low ? 12 : 30) * k);
+    const ca = Math.cos(p.yaw || 0), sa = Math.sin(p.yaw || 0);
+    const H = Math.min(p.h, 60);
+    for (let i = 0; i < n; i++) {
+      // A point on one of the four faces, and out from it.
+      const side = i % 4;
+      const u = (Math.random() - 0.5);
+      let lx, lz, nx, nz;
+      if (side < 2) { lx = u * p.w; lz = (side ? 1 : -1) * p.d / 2; nx = 0; nz = side ? 1 : -1; }
+      else { lz = u * p.d; lx = (side === 3 ? 1 : -1) * p.w / 2; nz = 0; nx = side === 3 ? 1 : -1; }
+      const x = p.x + lx * ca + lz * sa, z = p.z - lx * sa + lz * ca;
+      const wx = nx * ca + nz * sa, wz = -nx * sa + nz * ca;
+      const sp = 4 + Math.random() * 9;
+      fx.sparks.spawn({
+        x, y: p.base + 2 + Math.random() * H * 0.9, z,
+        vx: wx * sp + (Math.random() - 0.5) * 3, vy: 1 + Math.random() * 4, vz: wz * sp + (Math.random() - 0.5) * 3,
+        life: 1.2 + Math.random() * 1.3, size0: 0.55, size1: 0.25,
+        color0: this._c.glass, color1: this._c.glassFade,
+        drag: 0.4, grav: -14, alpha: 0.95, spin: (Math.random() - 0.5) * 20,
+      });
+    }
+  }
+
+  /**
+   * And the paper. Every office in the town goes up the same way: the heat
+   * lifts its paper out through the windows and it comes down for a minute
+   * afterwards over the street, tumbling, half of it charred.
+   */
+  paperSnow(x, y, z, spread = 20, n = 30) {
+    if (this.low) n = Math.round(n * 0.4);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * spread;
+      const sooty = Math.random() < 0.45;
+      this.paper.spawn({
+        x: x + Math.cos(a) * r, y: y + Math.random() * spread * 0.4, z: z + Math.sin(a) * r,
+        vx: Math.cos(a) * (1 + Math.random() * 3) + 1.5, vy: 5 + Math.random() * 9, vz: Math.sin(a) * (1 + Math.random() * 3) + 0.5,
+        life: 14 + Math.random() * 12,
+        size0: 0.55 + Math.random() * 0.35, size1: 0.5,
+        color0: sooty ? this._c.paperSoot : this._c.paper, color1: sooty ? this._c.paperSoot : this._c.paper,
+        drag: 1.1, grav: -1.1, turb: 2.4, alpha: 1,
+        spin: (Math.random() - 0.5) * 7,
+      });
+    }
   }
 
   /**
@@ -155,8 +218,32 @@ export class Flourish {
     }
   }
 
+  /** Run `fn` after `t` seconds of effects time. */
+  later(t, fn) { if (this._later.length < 64) this._later.push({ t, fn }); }
+
   update(dt) {
+    for (let i = this._later.length - 1; i >= 0; i--) {
+      const l = this._later[i];
+      l.t -= dt;
+      if (l.t <= 0) { this._later.splice(i, 1); try { l.fn(); } catch { /* a callback is not worth a frame */ } }
+    }
+    this.paper.update(dt, this.fx.time);
     if (this.markers.length) this._stepMarkers(dt);
     if (this.flareList.length) this._stepFlares(dt);
   }
+}
+
+/** A sheet of paper, seen at forty metres: a pale rectangle with lines on it. */
+function paperTexture() {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 32, 32);
+  g.fillStyle = '#f4f2ea';
+  g.fillRect(7, 3, 18, 26);
+  g.fillStyle = 'rgba(80,80,90,0.35)';
+  for (let y = 8; y < 27; y += 3) g.fillRect(10, y, 12, 1);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }

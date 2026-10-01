@@ -246,6 +246,13 @@ export class CityFire {
     this.ruins.add(buildRuin(p, Math.random));
     const top = p.top ?? (p.base + p.h);
     const size = Math.hypot(p.w, p.d);
+    // The windows go out of every face, and a little after, the paper
+    // comes down over the street.
+    if (this.fx?.flourish && rank < 18) {
+      this.fx.flourish.glass(p, rank < 6 ? 1 : 0.5);
+      this.fx.flourish.paperSnow(p.x, p.base + Math.min(p.h, 40) * 0.8, p.z,
+        Math.max(8, Math.min(30, Math.hypot(p.w, p.d) * 0.4)), rank < 6 ? 34 : 14);
+    }
     if (this.fx && quiet > 0) {
       // The charge goes off inside; the fireball comes out of the windows.
       this._v.set(p.x, p.base + Math.min(p.h, 40) * 0.55, p.z);

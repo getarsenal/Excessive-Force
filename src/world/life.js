@@ -45,6 +45,7 @@ export class Life {
     this._q = new THREE.Quaternion();
     this._p = new THREE.Vector3();
     this._s = new THREE.Vector3(1, 1, 1);
+    this._e = new THREE.Euler();
 
     const dense = quality.groundClutter ? 1 : 0.45;
     this.cars = this._buildTraffic(scene, Math.round(150 * dense));
@@ -95,6 +96,7 @@ export class Life {
       c.setHex(PALETTE[Math.floor(this.rng() * PALETTE.length)])
         .multiplyScalar(0.8 + this.rng() * 0.4);
       mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
+      cars[i].rgb = [c.r, c.g, c.b];
     }
     mesh.instanceColor.needsUpdate = true;
     return { mesh, cars, edges };
@@ -341,7 +343,65 @@ export class Life {
     return { mesh, birds };
   }
 
-  /** Something loud happened here: birds within earshot climb and scatter. */
+  /**
+   * A blast in the street. Every car within `radius` is thrown — up, over
+   * and round, harder the nearer it was — and lands where it lands as a
+   * burnt-out shell, and stays there. Cars further out, to twice the radius,
+   * stop where they are: nobody drives on through that.
+   *
+   * @returns {{x:number,y:number,z:number}[]} where the wrecks will land, so
+   *   the caller can set them burning
+   */
+  wreck(x, z, radius) {
+    const out = [];
+    if (!this.cars || !(radius > 0)) return out;
+    for (const car of this.cars.cars) {
+      if (car.wreck) continue;
+      const p = car.at;
+      if (!p) continue;
+      const d = Math.hypot(p.x - x, p.z - z);
+      if (d > radius * 2) continue;
+      if (d > radius) { car.speed = 0; car.stopped = true; continue; }
+      const k = 1 - d / radius;
+      const away = Math.atan2(p.x - x, p.z - z);
+      const push = 6 + 18 * k;
+      car.wreck = {
+        x: p.x, y: p.y, z: p.z, yaw: p.yaw,
+        vx: Math.sin(away) * push, vz: Math.cos(away) * push,
+        vy: 5 + 16 * k * (0.6 + this.rng() * 0.6),
+        roll: 0, pitch: 0,
+        vroll: (this.rng() - 0.5) * 9 * (0.4 + k), vpitch: (this.rng() - 0.5) * 6 * (0.4 + k),
+        landed: false,
+        // Where it ends: on its roof now and then, otherwise on its wheels
+        // with a lean.
+        rest: this.rng() < 0.3 * k ? Math.PI : (this.rng() - 0.5) * 0.3,
+      };
+      car.speed = 0;
+      out.push({ x: p.x + Math.sin(away) * push * 0.9, y: p.y, z: p.z + Math.cos(away) * push * 0.9 });
+    }
+    return out;
+  }
+
+  /** A thrown car in the air, and then on the ground where it came down. */
+  _wreckStep(car, dt) {
+    const W = car.wreck;
+    if (W.landed) return;
+    W.vy -= 9.81 * dt;
+    W.x += W.vx * dt; W.y += W.vy * dt; W.z += W.vz * dt;
+    W.roll += W.vroll * dt; W.pitch += W.vpitch * dt;
+    const g = this.terrain.heightAt(W.x, W.z) + 0.1;
+    if (W.y <= g && W.vy < 0) {
+      W.y = g;
+      // Settle to whichever way up it was nearest.
+      const upside = Math.abs(Math.cos(W.roll)) < 0.5 || W.rest > 1;
+      W.roll = upside ? Math.PI : W.rest;
+      if (upside) W.y += 1.4;
+      W.pitch = (this.rng() - 0.5) * 0.12;
+      W.landed = true;
+    }
+  }
+
+    /** Something loud happened here: birds within earshot climb and scatter. */
   startle(x, z, radius = 130) {
     const b = this.birds;
     if (!b) return;
@@ -363,8 +423,20 @@ export class Life {
 
     if (this.cars) {
       const { mesh, cars } = this.cars;
+      const col = mesh.instanceColor;
       let w = 0;
       for (const car of cars) {
+        if (car.wreck) {
+          this._wreckStep(car, dt);
+          const W = car.wreck;
+          this._p.set(W.x, W.y, W.z);
+          this._e.set(W.pitch, W.yaw, W.roll, 'YXZ');
+          this._q.setFromEuler(this._e);
+          this._m.compose(this._p, this._q, this._s);
+          col.setXYZ(w, 0.07, 0.062, 0.055);
+          mesh.setMatrixAt(w++, this._m);
+          continue;
+        }
         car.s += car.speed * dt;
         if (car.s > car.edge.len) {
           // Arrived at a junction: turn onto another street.
@@ -388,10 +460,14 @@ export class Life {
         this._p.set(p.x + nx * car.lane, p.y + 0.06, p.z + nz * car.lane);
         this._q.setFromAxisAngle(UP, Math.atan2(p.dx, p.dz));
         this._m.compose(this._p, this._q, this._s);
+        car.at = car.at || {};
+        car.at.x = this._p.x; car.at.y = this._p.y; car.at.z = this._p.z; car.at.yaw = Math.atan2(p.dx, p.dz);
+        if (car.rgb) col.setXYZ(w, car.rgb[0], car.rgb[1], car.rgb[2]);
         mesh.setMatrixAt(w++, this._m);
       }
       mesh.count = w;
       mesh.instanceMatrix.needsUpdate = true;
+      col.needsUpdate = true;
     }
 
     if (this.boats) {

@@ -40,6 +40,7 @@ import { cloudShadows, cloudUniforms } from './world/clouds.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
+import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
@@ -763,6 +764,7 @@ async function boot() {
     for (const m of fresh) hud.feed(`MEDAL · ${m.name}`, 'big');
     return fresh;
   };
+  let sirenSounded = false;
   function handleEvent(kind, data) {
     if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
     if (kind === 'shotdown') lostAircraft = true;
@@ -842,6 +844,8 @@ async function boot() {
         // The spot marked for the pilot with a smoke canister, burning until
         // the strike is in and a while after.
         if (data.point && fx.flourish) fx.flourish.markerSmoke(data.point, (data.eta || 10) + 10);
+        // The first aircraft over a town sets its sirens going.
+        if (!sirenSounded && life?.cars) { sirenSounded = true; airRaidSiren(audio, 15); }
         // And the pilot's picture of it in the corner, for a single pass.
         if (data.point && !data.def?.aircraft?.station) pod.show(data.point, data.eta || 10, data.def.name);
         break;
