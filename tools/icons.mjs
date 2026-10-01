@@ -8,7 +8,7 @@
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 // The Tomahawk and the first infantry teams are drawn art, not renders: leave
-// them out. Later teams (the M240) are rendered from the in-game figures.
+// them out, and the M240 team, which is the artist's too.
 const ids = (process.argv[2] || 'm119,m777,m109,stryker,m270,m142,f15,b1,ah64,ac130,gbu28').split(',');
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });

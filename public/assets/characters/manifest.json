@@ -1,5 +1,5 @@
 {
-  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Sixty are drawn: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Morocco, Peru, Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand, Uzbekistan and Vietnam, each nation's one officer defending every level of theirs. Serbia is the one placeholder silhouette left, tinted in its colours until drawn — the look is specified here and the stand-off tolerates the picture being missing.",
+  "note": "Cast for the pre-level stand-off. All PNGs are RGBA with the figure cut out and a soft dark halo in the alpha, 1024x1536 except the American at 1145x1374. Sixty-one are drawn, every one of them: the player, the nine of the first campaign, the five of the third and Malaysia, which completes the campaign, and China, Spain, Indonesia, Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium, Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland, Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon, Lithuania, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Morocco, Peru, Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand, Uzbekistan, Vietnam and Serbia, each nation's one officer defending every level of theirs.",
   "player": {
     "id": "us-general",
     "file": "us-general.png",
@@ -713,7 +713,8 @@
       "file": "rs-general.png",
       "nation": "Serbia",
       "defends": "Church of Saint Sava, Belgrade",
-      "look": "Generál of Serbia in dress uniform; placeholder silhouette in the flag's colours until drawn."
+      "look": "General as a hajduk in modern kit: a green šajkača with the eagle badge, a fur-collared blue tunic embroidered in red and white with the cross and four firesteels, a plate carrier with pouches, a red and blue sash with tassels, a broad belt with the eagle buckle, the eagle on round knee guards, a rifle slung across him and a sabre with a red-and-blue tassel at his hip, the tricolour with the crowned arms behind him, laced boots with the arms on the cuff, beard, moustache, cigar, arms folded",
+      "pose": "arms folded — reads as refusal"
     },
     "taipei101": {
       "id": "tw-shangjiang",

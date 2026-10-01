@@ -26,7 +26,7 @@ without a hard edge. File name and slot are in `manifest.json` under
 
 | Level | File | Rank, nation | Look |
 |---|---|---|---|
-| saintsava | `rs-general.png` | Generál, Serbia | See `manifest.json` → `enemies.saintsava`. |
+| saintsava | `rs-general.png` | General, Serbia (a hajduk in modern kit) | See `manifest.json` → `enemies.saintsava`. |
 
 Every campaign officer is drawn, Malaysia last. China, Spain, Indonesia,
 Austria, Canada, Poland, Portugal, Romania, Argentina, Azerbaijan, Belgium,
@@ -34,8 +34,8 @@ Cambodia, Colombia, Côte d'Ivoire, Cuba, Czechia, Denmark, Finland,
 Guatemala, Hungary, Iceland, Iran, Iraq, Kazakhstan, Kuwait, Lebanon,
 Lithuania, Morocco, Myanmar, Nepal, New Zealand, North Korea, Norway, Pakistan, Peru,
 Saudi Arabia, South Korea, Sri Lanka, Sweden, Switzerland, Taiwan, Thailand,
-Uzbekistan and Vietnam are drawn too, one officer to each nation's every
-level. Serbia is the last placeholder.
+Uzbekistan, Vietnam and Serbia are drawn too, one officer to each nation's
+every level. There are no placeholders left.
 
 ## Installing one
 
