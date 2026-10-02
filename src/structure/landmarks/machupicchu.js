@@ -69,12 +69,14 @@ const WINDOWS = { cx: -29.0, cz: -46.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill
 const KANCHAS = [
   // The upper town, west of the plaza, in two columns, leaving the Torreón
   // its ground at the middle of the west side.
-  ...[-24, -7, 10, 60, 77].map((cz) => ({ cx: -46.0, cz, w: 17.0, d: 14.0, door: 'e' })),
+  // The outer columns open outward, over the terraces and the drop: their
+  // backs are to the inner yards, which is how the town turns to the view.
+  ...[-24, -7, 10, 60, 77].map((cz) => ({ cx: -46.0, cz, w: 17.0, d: 14.0, door: 'w' })),
   ...[-24, -8, 8, 61, 77].map((cz) => ({ cx: -27.0, cz, w: 13.0, d: 13.0, door: 'e' })),
   // The lower town, east of it: the Three Doorways at the north, then the
   // Mortars and the Condor, two columns deep down the whole east side.
   ...[-77, -61, -45, -29, -13, 3, 19, 35, 51].map((cz) => ({ cx: 22.0, cz, w: 13.0, d: 13.5, door: 'w' })),
-  ...[-77, -61, -45, -29, -13, 3, 19, 35].map((cz) => ({ cx: 40.0, cz, w: 15.0, d: 14.0, door: 'w' })),
+  ...[-77, -61, -45, -29, -13, 3, 19, 35].map((cz) => ({ cx: 40.0, cz, w: 15.0, d: 14.0, door: 'e' })),
 ];
 const KANCHA = { wall: 0.9, h: 2.4, gap: 0.5 };
 const HOUSE = { wall: 0.75, h: 3.0, pitch: 1.15, door: { b: 1.1, t: 0.8, h: 2.0 } };
