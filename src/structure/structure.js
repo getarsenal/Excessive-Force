@@ -242,6 +242,7 @@ export class Structure {
     this._stack = new Int32Array(n);
     this._comp = new Int32Array(n);
     this._spanBudget = new Float32Array(n);
+    this._spanFrom = new Int32Array(n);  // the stone a spanned stone hangs from
     this._bearing = new Uint8Array(n);   // supported from directly below
     this._stress = new Float32Array(n);  // last computed bearing stress, Pa
     // Arches (see `BlockList.hold`): stones that stand only while both their
@@ -600,6 +601,104 @@ export class Structure {
     this._bArea = new Float64Array(this.bandCount);
     this._bSupX = new Float64Array(this.bandCount);
     this._bSupZ = new Float64Array(this.bandCount);
+  }
+
+  /**
+   * Whether each named piece of the building is still standing over its own
+   * footing.
+   *
+   * `_bearingAnalysis` asks that question one horizontal slice at a time
+   * across the whole building, which is right for a tower going over and
+   * blind to a part of one: cut the shaft of one of St. Vitus's west towers
+   * down to a single corner column and the slice through the cut still holds
+   * the nave walls, the other tower and the great tower, the building as a
+   * whole is in balance, and the belfry and its spire stand on the column for
+   * the rest of the battle — the column is strong enough in compression,
+   * which real stone would be too. What it would not be is balanced.
+   *
+   * So the masonry of each section (by its tag) is swept from the top down,
+   * joined into connected pieces as it goes, and at the foot of every slice
+   * each piece is asked whether its centre of mass is over the stones it
+   * bears on in that slice. A piece that has walked off its footing is let go
+   * — the solver's ordinary detached-masonry path then drops it or leans it —
+   * one piece a solve, so a cascade is seen over several ticks.
+   *
+   * Some things stand out of balance as built (a leaning tower, an arm held
+   * out): the first solve measures every slice and allows it what it has.
+   */
+  _localBalance(reach, bearing, first) {
+    const n = this.count;
+    const order = this.heightOrder;
+    const parent = this._lbParent || (this._lbParent = new Int32Array(n));
+    const mass = this._lbMass || (this._lbMass = new Float64Array(n));
+    const mx = this._lbMx || (this._lbMx = new Float64Array(n));
+    const mz = this._lbMz || (this._lbMz = new Float64Array(n));
+    const cnt = this._lbCnt || (this._lbCnt = new Int32Array(n));
+    parent.fill(-1);
+    const allow = this._lbAllow || (this._lbAllow = new Map());
+    const tagOf = this.tagOf;
+    const find = (x) => {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    };
+    const ok = (i) => (this.flags[i] & ALIVE) && !(this.flags[i] & (FREE | ISLAND)) && reach[i];
+    const minMass = Math.max(20000, this._significantLoad * 0.15);
+    const foot = new Map();
+    let k = 0;
+    while (k < n) {
+      const band = this.bandOf[order[k]];
+      const start = k;
+      // Add this slice's stones and join each to its neighbours of the same
+      // section already added (above it, or beside it in this slice).
+      for (; k < n && this.bandOf[order[k]] === band; k++) {
+        const i = order[k];
+        if (!ok(i)) continue;
+        parent[i] = i; mass[i] = this.mass[i];
+        mx[i] = this.px[i] * this.mass[i]; mz[i] = this.pz[i] * this.mass[i]; cnt[i] = 1;
+        const t = tagOf[i];
+        for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+          const j = this.adjList[a];
+          if (parent[j] < 0 || tagOf[j] !== t) continue;
+          const ri = find(i), rj = find(j);
+          if (ri === rj) continue;
+          const [big, small] = cnt[ri] >= cnt[rj] ? [ri, rj] : [rj, ri];
+          parent[small] = big;
+          mass[big] += mass[small]; mx[big] += mx[small]; mz[big] += mz[small]; cnt[big] += cnt[small];
+        }
+      }
+      // The footing of each piece in this slice: its stones that bear on
+      // something below.
+      foot.clear();
+      for (let q = start; q < k; q++) {
+        const i = order[q];
+        if (parent[i] < 0 || !bearing[i]) continue;
+        const r = find(i);
+        let f = foot.get(r);
+        if (!f) foot.set(r, (f = { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity }));
+        const hx = Math.max(this.hx[i], this.hz[i]);
+        f.x0 = Math.min(f.x0, this.px[i] - hx); f.x1 = Math.max(f.x1, this.px[i] + hx);
+        f.z0 = Math.min(f.z0, this.pz[i] - hx); f.z1 = Math.max(f.z1, this.pz[i] + hx);
+      }
+      for (const [r, f] of foot) {
+        if (mass[r] < minMass || cnt[r] < 12) continue;
+        const cx = mx[r] / mass[r], cz = mz[r] / mass[r];
+        const out = Math.max(f.x0 - cx, cx - f.x1, f.z0 - cz, cz - f.z1, 0);
+        const key = `${tagOf[r]}|${band}`;
+        if (first) {
+          if (out > 0) allow.set(key, Math.max(allow.get(key) || 0, out));
+          continue;
+        }
+        if (out <= 1.0 + (allow.get(key) || 0)) continue;
+        // Over: everything in this piece is let go.
+        for (let q = 0; q < k; q++) {
+          const i = order[q];
+          if (parent[i] >= 0 && find(i) === r) reach[i] = 0;
+        }
+        this.stabilityDirty = true;
+        this._toppled = (this._toppled || 0) + 1;
+        return;
+      }
+    }
   }
 
   /**
@@ -2347,6 +2446,8 @@ export class Structure {
     // pathological joint graph.
     const span = this._spanBudget;
     span.fill(0);
+    const from = this._spanFrom;
+    from.fill(-1);
     for (let i = 0; i < n; i++) if (bearing[i]) span[i] = this.spanReach[i];
     for (let pass = 0; pass < 6; pass++) {
       let changed = false;
@@ -2365,6 +2466,7 @@ export class Structure {
           const left = Math.min(budget - step, this.spanReach[j]);
           if (left <= span[j] + 0.01) continue;
           span[j] = left;
+          if (!bearing[j]) from[j] = i;
           reach[j] = 1;
           changed = true;
         }
@@ -2377,8 +2479,35 @@ export class Structure {
     load.fill(0);
     const order = this.heightOrder;
     const crushed = [];
+    // A stone held up sideways — a lintel, a slab, the ring of a belfry whose
+    // shaft has been shot away and which now hangs off the roof beside it —
+    // has nothing under it to put its weight on, and it used to put it
+    // nowhere: the weight vanished. So a belfry and the whole spire on it,
+    // held by a roof edge, weighed nothing, crushed nothing and hung in the
+    // air for the rest of the battle. It is handed to the stone it hangs
+    // from. That stone may be at its own height and already passed on, so
+    // the weight follows the same path down from it.
+    const done = this._loadDone || (this._loadDone = new Uint8Array(n));
+    done.fill(0);
+    const pass = (j, w, depth) => {
+      if (!done[j]) { load[j] += w; return; }
+      if (depth > 24) return;
+      const b0 = this.belowStart[j], b1 = this.belowStart[j + 1];
+      let area = 0, cnt = 0;
+      for (let a = b0; a < b1; a++) {
+        const q = this.belowList[a];
+        if (reach[q] && this.structural[q]) { area += this.belowArea[a]; cnt++; }
+      }
+      if (cnt && area > 0) {
+        for (let a = b0; a < b1; a++) {
+          const q = this.belowList[a];
+          if (reach[q] && this.structural[q]) pass(q, w * (0.5 / cnt + 0.5 * (this.belowArea[a] / area)), depth + 1);
+        }
+      } else if (from[j] >= 0 && from[j] !== j) pass(from[j], w, depth + 1);
+    };
     for (let k = 0; k < n; k++) {
       const i = order[k];
+      done[i] = 1;
       if (!reach[i]) continue;
       const own = this.mass[i] * 9.81;
       const total = own + load[i];
@@ -2419,7 +2548,10 @@ export class Structure {
         const j = this.belowList[a];
         if (reach[j] && this.structural[j]) { carried += this.belowArea[a]; supporters++; }
       }
-      if (supporters === 0 || carried <= 0) continue;
+      if (supporters === 0 || carried <= 0) {
+        if (from[i] >= 0) pass(from[i], total, 0);
+        continue;
+      }
       for (let a = s0; a < s1; a++) {
         const j = this.belowList[a];
         if (reach[j] && this.structural[j]) {
@@ -2435,6 +2567,8 @@ export class Structure {
       reach[i] = 0;
       this.stabilityDirty = true;
     }
+    // (c) Balance, piece by piece.
+    this._localBalance(reach, bearing, !this._settledOnce);
     this._settledOnce = true;
 
     // Everything alive, attached, and unreachable is now falling.
