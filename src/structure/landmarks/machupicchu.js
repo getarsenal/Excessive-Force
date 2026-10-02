@@ -67,24 +67,21 @@ const WINDOWS = { cx: -29.0, cz: -46.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill
  * walls, a door in the wall that faces the plaza. `door` is the side.
  */
 const KANCHAS = [
-  // The upper town, west of the plaza.
-  { cx: -38.0, cz: -17.0, w: 20.0, d: 15.0, door: 'e' },
-  { cx: -38.0, cz: 10.0, w: 20.0, d: 15.0, door: 'e' },
-  { cx: -24.0, cz: 64.0, w: 16.0, d: 14.0, door: 'e' },
-  // The lower town: the Three Doorways at the north, then the Mortars and the Condor.
-  { cx: 34.0, cz: -74.0, w: 15.0, d: 14.0, door: 'w' },
-  { cx: 34.0, cz: -57.0, w: 15.0, d: 14.0, door: 'w' },
-  { cx: 34.0, cz: -40.0, w: 15.0, d: 14.0, door: 'w' },
-  { cx: 35.0, cz: -12.0, w: 18.0, d: 16.0, door: 'w' },
-  { cx: 34.0, cz: 16.0, w: 16.0, d: 14.0, door: 'w' },
-  { cx: 33.0, cz: 46.0, w: 16.0, d: 14.0, door: 'w' },
+  // The upper town, west of the plaza, in two columns, leaving the Torreón
+  // its ground at the middle of the west side.
+  ...[-24, -7, 10, 60, 77].map((cz) => ({ cx: -46.0, cz, w: 17.0, d: 14.0, door: 'e' })),
+  ...[-24, -8, 8, 61, 77].map((cz) => ({ cx: -27.0, cz, w: 13.0, d: 13.0, door: 'e' })),
+  // The lower town, east of it: the Three Doorways at the north, then the
+  // Mortars and the Condor, two columns deep down the whole east side.
+  ...[-77, -61, -45, -29, -13, 3, 19, 35, 51].map((cz) => ({ cx: 22.0, cz, w: 13.0, d: 13.5, door: 'w' })),
+  ...[-77, -61, -45, -29, -13, 3, 19, 35].map((cz) => ({ cx: 40.0, cz, w: 15.0, d: 14.0, door: 'w' })),
 ];
 const KANCHA = { wall: 0.9, h: 2.4, gap: 0.5 };
 const HOUSE = { wall: 0.75, h: 3.0, pitch: 1.15, door: { b: 1.1, t: 0.8, h: 2.0 } };
 
 /** Houses standing on their own: the priests' house, the guardhouse, the storehouses. */
 const LONE = [
-  { cx: -36.0, cz: -32.0, w: 8.0, d: 4.6, door: 'n', thatch: true },
+  { cx: -36.0, cz: -35.0, w: 8.0, d: 4.6, door: 'n', thatch: true },
   { cx: -38.0, cz: 92.0, w: 7.0, d: 4.6, door: 'e', thatch: true },     // the guardhouse
   { cx: 10.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
   { cx: 19.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
@@ -372,7 +369,7 @@ export function buildTerraces(quality, terrain) {
   const g0 = terrain.heightAt(0, 0);
   const H = (x, z) => (terrain.heightAt(x * S, z * S) - g0) / S;
   const C = { x: 0, z: 8 };
-  const RISE = 1.9, LEVELS = 7, FIELD = 2.6, THICK = 1.1;
+  const RISE = 1.9, LEVELS = 7, FIELD = 3.4, THICK = 1.0;
   const sectors = [[-40, 118], [148, 202]];
   const STEP = 3;
 
@@ -422,7 +419,7 @@ export function buildTerraces(quality, terrain) {
               const t = (i + 0.5 + stag) / n;
               if (t >= 1) continue;
               B.add(A.x + dx * t, y + h / 2, A.z + dz * t,
-                B.shrink(THICK / 2), B.shrink(h / 2), B.shrink(seg / 2), M.GRANITE, ry);
+                B.shrink(THICK / 2), B.shrink(h / 2), B.shrink(seg / 2), M.ASHLAR, ry);
             }
           });
           // The field behind it, packed up level with the wall's top.

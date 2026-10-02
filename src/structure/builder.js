@@ -277,7 +277,7 @@ export const MATERIAL_PROPS = {
   [MATERIALS.LATTICE]:   { density: 0.90, strength: 0.40, toughness: 40,  color: 0x5e1a14, structural: false },
   // Ichu grass, sun-bleached to straw over a darker underside: light and
   // weak, and it rests on the gables and the wall heads like the roofs it is.
-  [MATERIALS.THATCH]:    { density: 0.45, strength: 0.30, toughness: 30,  color: 0x9a7f4a, structural: true },
+  [MATERIALS.THATCH]:    { density: 0.45, strength: 0.30, toughness: 30,  color: 0x7b6844, structural: true },
   // A terrace's field: earth packed behind the wall, grassed over. Soft as
   // the rubble in a pyramid and the green of the slope round it.
   [MATERIALS.TURF]:      { density: 1.70, strength: 0.55, toughness: 24,  color: 0x5f7a3a, structural: true },
