@@ -141,6 +141,46 @@ export function realNetwork(data, terrain, opts = {}) {
     if (!Array.isArray(e.pts) || e.pts.length < 2) continue;
     const pts = e.pts.map((p) => ({ x: p[0], z: p[1], y: terrain.heightAt(p[0], p[1]) }));
     const ok = pts.map((p) => clear(p.x, p.z) && (e.bridge || dry(p.x, p.z)));
+    // A quay road that grazes the water is moved onto the quay, not cut.
+    //
+    // The survey traces the kerb and the mask traces the water, three and a
+    // half metres to the pixel, and where a road runs along a bank the two
+    // touch: a few points of the Rheinufer fall on a wet pixel, and the
+    // longest dry stretch was kept and the rest thrown away. Cologne lost its
+    // riverside road in thirty-four places that way, Sky Tower's waterfront
+    // in twenty-five — streets ending at the water for no reason and starting
+    // again beyond it. A wet run of thirty metres or less with dry road on
+    // both sides is the road on its bank: each wet point steps sideways to
+    // the nearest dry ground, up to fifteen metres, and the road goes on.
+    if (!e.bridge) {
+      let i = 1;
+      while (i < pts.length - 1) {
+        if (ok[i] || !clear(pts[i].x, pts[i].z)) { i++; continue; }
+        let j = i;
+        while (j + 1 < pts.length - 1 && !ok[j + 1] && clear(pts[j + 1].x, pts[j + 1].z)) j++;
+        const a = pts[i - 1], b = pts[j + 1];
+        if (ok[i - 1] && ok[j + 1] && Math.hypot(b.x - a.x, b.z - a.z) <= 30) {
+          const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1;
+          const nx = -dz / L, nz = dx / L;
+          let moved = true;
+          for (let k = i; k <= j && moved; k++) {
+            moved = false;
+            for (let off = 3; off <= 15 && !moved; off += 3) {
+              for (const sgn of [1, -1]) {
+                const x = pts[k].x + nx * off * sgn, z = pts[k].z + nz * off * sgn;
+                if (dry(x, z) && clear(x, z)) {
+                  pts[k] = { x, z, y: terrain.heightAt(x, z) };
+                  moved = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (moved) for (let k = i; k <= j; k++) ok[k] = true;
+        }
+        i = j + 1;
+      }
+    }
     const run = keepRun(pts, ok);
     if (!run) continue;
     let [i0, i1] = run;

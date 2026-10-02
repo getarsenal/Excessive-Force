@@ -1069,7 +1069,12 @@ def drop_dry(polys, rects):
 # skyline ring both run to seven spans, so that is how far the sea has to be
 # known: anything nearer is a coastline that stops in mid-air.
 FAR = 7.0
-FAR_SIZE = 320
+# Twenty metres to the pixel, supersampled four ways and kept soft. It was 320
+# pixels of hard 0 or 255, forty metres each, and every distant river and
+# shore was drawn as forty-metre steps: the Thames leaving Windsor as a
+# staircase across the fields. The loader reads the grey and interpolates.
+FAR_SIZE = 640
+FAR_SUPER = 4
 
 
 def bake_far_water(sink, level_id, lat0, lon0, span):
@@ -1094,9 +1099,13 @@ def bake_far_water(sink, level_id, lat0, lon0, span):
     reach = span * FAR
     polys = collect_polys(sink, "base", "water", lat0, lon0, reach,
                           to_local, m_lat, m_lon, keep=is_water)
-    w = np.clip(rasterise(polys, FAR_SIZE, reach), 0, 1)
-    w = close(w, 1)
-    img = Image.fromarray((w * 255).astype(np.uint8), mode="L")
+    big = FAR_SIZE * FAR_SUPER
+    w = np.clip(rasterise(polys, big, reach), 0, 1)
+    w = close(w, 6)
+    # Box-filter down: each pixel is the share of it that is water.
+    w = w[: FAR_SIZE * FAR_SUPER, : FAR_SIZE * FAR_SUPER].reshape(
+        FAR_SIZE, FAR_SUPER, FAR_SIZE, FAR_SUPER).mean(axis=(1, 3))
+    img = Image.fromarray(np.round(w * 255).astype(np.uint8), mode="L")
     img.save(TERRAIN_DIR / f"{level_id}_far.png")
     frac = float((w > 0.5).mean())
     print(f"  far water: {len(polys)} polygons, {frac * 100:.1f}% of "
@@ -1455,6 +1464,20 @@ def verify(level_id, span, meta):
     return not bad
 
 
+def bake_far_only(level_id):
+    """Re-burn the far water and nothing else (`--far`): the playfield, the
+    town and the ground stay exactly as they are."""
+    cfg = LEVELS[level_id]
+    lat0, lon0, span = cfg["lat"], cfg["lon"], cfg["span"]
+    far = bake_far_water(s3fs(), level_id, lat0, lon0, span)
+    mpath = TERRAIN_DIR / f"{level_id}.json"
+    if mpath.exists():
+        meta = json.loads(mpath.read_text())
+        meta["farSpan"] = span * FAR
+        meta["farWater"] = round(far, 4)
+        mpath.write_text(json.dumps(meta, indent=2))
+
+
 def bake(level_id):
     cfg = LEVELS[level_id]
     lat0, lon0, span = cfg["lat"], cfg["lon"], cfg["span"]
@@ -1498,7 +1521,8 @@ if __name__ == "__main__":
         USE_CACHE = False
     targets = list(LEVELS) if "--all" in args else [a for a in args if a in LEVELS]
     if not targets:
-        print("usage: bake_overture.py <level>... | --all  [--fresh]")
+        print("usage: bake_overture.py <level>... | --all  [--fresh] [--far]")
         raise SystemExit(2)
     for t in targets:
-        bake(t)
+        print(t)
+        (bake_far_only if "--far" in args else bake)(t)

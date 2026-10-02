@@ -52,8 +52,10 @@ export class Terrain {
     if (farData && this.farSpan) {
       const fn = Math.round(Math.sqrt(farData.length / 4));
       this.farSize = fn;
-      this.farMask = new Uint8Array(fn * fn);
-      for (let i = 0; i < fn * fn; i++) this.farMask[i] = farData[i * 4] > 127 ? 1 : 0;
+      // The share of each sample that is water, kept soft so the edge can be
+      // interpolated between samples (see `_farWet`).
+      this.farMask = new Float32Array(fn * fn);
+      for (let i = 0; i < fn * fn; i++) this.farMask[i] = farData[i * 4] / 255;
     }
 
     this.cellSize = (this.span * 2) / (n - 1);
@@ -713,13 +715,24 @@ export class Terrain {
           if (this._farWet(x + a * 60, z + b * 60)) wetn++;
         }
       }
-      if (wetn) {
-        const k = wetn / 9;
+      // Mostly-wet neighbourhoods only. Any wet sample at all used to start
+      // sinking the ground, which put every distant shore sixty metres
+      // inland of where the survey has it, under the surround's own houses.
+      if (wetn > 2) {
+        const k = Math.min(1, (wetn - 2) / 5);
         const bed = this.waterLevel - 11;
         // Only ever downward. Inland of the shore the country keeps its own
         // relief; over the water it is a bed.
         return Math.min(land, land + (bed - land) * k);
       }
+      // And where the survey says land, it is land. The open-sea guess below
+      // is for a map that knows nothing past its edge; on one that does it
+      // sank the far country round Landmark 81 into a sea the survey does not
+      // have, and the surveyed town out there stood in it — and so did the
+      // hills' noise, which on a delta a metre over the river dipped the
+      // country under it in long fingers. Above the waterline, then.
+      return this.hasWater !== false && Number.isFinite(this.waterLevel)
+        ? Math.max(land, this.waterLevel + 2.5) : land;
     }
     if (!this.openSea) return land;
 
@@ -777,11 +790,20 @@ export class Terrain {
    */
   _farWet(x, z) {
     if (!this.farMask) return false;
+    // Bilinear on the forty-metre samples and cut at a half, not the nearest
+    // sample: nearest drew every distant river and shore as a staircase of
+    // forty-metre steps. Interpolated, the edge runs between the samples on
+    // the diagonal, which is what a bank does.
     const n = this.farSize, s = this.farSpan;
-    const u = Math.round((x + s) / (s * 2) * (n - 1));
-    const v = Math.round((s - z) / (s * 2) * (n - 1));
+    const u = (x + s) / (s * 2) * (n - 1);
+    const v = (s - z) / (s * 2) * (n - 1);
     if (u < 0 || v < 0 || u > n - 1 || v > n - 1) return false;
-    return this.farMask[v * n + u] === 1;
+    const x0 = Math.floor(u), z0 = Math.floor(v);
+    const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
+    const fx = u - x0, fz = v - z0, m = this.farMask;
+    const w = (m[z0 * n + x0] * (1 - fx) + m[z0 * n + x1] * fx) * (1 - fz)
+      + (m[z1 * n + x0] * (1 - fx) + m[z1 * n + x1] * fx) * fz;
+    return w > 0.5;
   }
 
   /** The wet mask, and nothing else: false everywhere off the DEM. */
@@ -1109,7 +1131,7 @@ export class Terrain {
     // Subdivided far more finely than it needs to be as a flat sheet, because
     // it is no longer flat: the river's channel is cut through it, and a cut
     // with ten divisions across seven kilometres is a staircase.
-    const apronGeo = frameGeometry(this.span, this.span * 7, 150);
+    const apronGeo = gradedFrame(this.span, this.span * 7);
     const ap = apronGeo.attributes.position;
     // Carve the channel. The apron sits at the DEM's edge height, which is
     // above the waterline — so without this the river simply ran into a wall of
@@ -1470,6 +1492,29 @@ export class Terrain {
     const OUT = 70;
     const tails = [];
     for (const e of this.riverExits()) {
+      // Not where the survey already has the river.
+      //
+      // The tail is an invention: a channel marched out from the mouth on a
+      // damped random heading, because the map used to know nothing past its
+      // own edge. A level baked with a far mask knows exactly where the river
+      // goes, and drawing both put two rivers in the picture — the real one
+      // in the far survey, and a straight canal striking off across the
+      // country beside it, raised on a bank where the survey's water sank the
+      // ground round it. At Malbork it ran a kilometre through the outskirts
+      // to nowhere. Where the survey shows water within a few hundred metres
+      // of the mouth, the river is the survey's; only a river too narrow for
+      // the far mask's forty-metre samples still gets a tail.
+      if (this.farMask) {
+        let seen = false;
+        for (let t = 40; t <= 700 && !seen; t += 40) {
+          for (const off of [-1, 0, 1]) {
+            const x = e.mid.x + e.dir.x * t - e.dir.z * off * e.half;
+            const z = e.mid.z + e.dir.z * t + e.dir.x * off * e.half;
+            if (this._farWet(x, z)) { seen = true; break; }
+          }
+        }
+        if (seen) continue;
+      }
       // The first drawn control point has to be the river mouth exactly.
       //
       // Marching from a point behind the mouth does not achieve that: the
@@ -1615,36 +1660,55 @@ export async function loadTerrain(levelId, quality) {
  * with the middle left open. Built from eight subdivided rectangles so the
  * vertex colouring has something to interpolate across.
  */
-function frameGeometry(inner, outer, div) {
-  const pos = [];
+/**
+ * The coordinates a surround grid is laid on, one axis: fine near the map,
+ * where the surveyed town stands and a shore is seen from a few hundred
+ * metres, and coarse toward the horizon, where it is fog. ±inner is always
+ * in the list, so the grid meets the playfield's edge exactly.
+ */
+export function gradedCoords(inner, outer) {
+  const near = Math.min(outer, inner * 2.6);
+  const out = new Set();
+  const FINE = 24, COARSE = 160;
+  for (let c = 0; c <= near; c += FINE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
+  for (let c = near; c < outer; c += COARSE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
+  for (const c of [inner, -inner, near, -near, outer, -outer]) out.add(+c.toFixed(2));
+  return [...out].filter((c) => Math.abs(c) <= outer + 0.01).sort((a, b) => a - b);
+}
+
+/**
+ * The surround as one graded grid with the playfield cut out of it.
+ *
+ * It was four uniform strips of 150 by 150 cells over seven spans, which is a
+ * vertex every eighty-four metres along the long side — and every shore past
+ * the map edge was drawn by those vertices sinking under the far water: an
+ * eighty-four-metre staircase of bank, with the surround's buildings, placed
+ * on the smooth ground function, standing in the water wherever the coarse
+ * mesh dipped under it. Twenty-four metres to the cell out to two and a half
+ * spans now, a hundred and sixty beyond, and fewer vertices than before.
+ */
+function gradedFrame(inner, outer) {
+  const cs = gradedCoords(inner, outer);
+  const n = cs.length;
+  const pos = new Float32Array(n * n * 3);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const k = (j * n + i) * 3;
+      pos[k] = cs[i]; pos[k + 1] = 0; pos[k + 2] = cs[j];
+    }
+  }
   const index = [];
-
-  const rect = (x0, z0, x1, z1) => {
-    const base = pos.length / 3;
-    const nx = div, nz = div;
-    for (let j = 0; j <= nz; j++) {
-      for (let i = 0; i <= nx; i++) {
-        pos.push(x0 + (x1 - x0) * (i / nx), 0, z0 + (z1 - z0) * (j / nz));
-      }
+  for (let j = 0; j < n - 1; j++) {
+    for (let i = 0; i < n - 1; i++) {
+      const cx = (cs[i] + cs[i + 1]) / 2, cz = (cs[j] + cs[j + 1]) / 2;
+      if (Math.abs(cx) < inner && Math.abs(cz) < inner) continue;
+      const a = j * n + i, b = a + 1, c = a + n, d = c + 1;
+      index.push(a, c, b, b, c, d);
     }
-    for (let j = 0; j < nz; j++) {
-      for (let i = 0; i < nx; i++) {
-        const a = base + j * (nx + 1) + i;
-        const b = a + 1, c = a + nx + 1, d = c + 1;
-        index.push(a, c, b, b, c, d);
-      }
-    }
-  };
-
-  // Four sides plus four corners.
-  rect(-outer, -outer, outer, -inner);        // north strip
-  rect(-outer, inner, outer, outer);          // south strip
-  rect(-outer, -inner, -inner, inner);        // west strip
-  rect(inner, -inner, outer, inner);          // east strip
-
+  }
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-  geo.setIndex(pos.length / 3 > 65535
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(n * n > 65535
     ? new THREE.BufferAttribute(new Uint32Array(index), 1)
     : new THREE.BufferAttribute(new Uint16Array(index), 1));
   geo.computeVertexNormals();

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { gradedCoords } from './terrain.js';
 
 /**
  * Sky dome and water.
@@ -417,10 +418,14 @@ export function createWater(terrain, sunDirection, quality) {
   // picture, which is not.
   if (terrain.farMask) {
     const S = terrain.span, F = terrain.farSpan;
-    const DIV = 150;
-    const cellF = (F * 2) / DIV;
-    const fx = (i) => -F + i * cellF;
-    const fz = (j) => F - j * cellF;
+    // On the same graded grid as the ground under it (see `gradedFrame`), and
+    // only where the cell is mostly water: a quad laid wherever any corner
+    // was wet spread every distant shore eighty-four metres over the land in
+    // a staircase.
+    const cs = gradedCoords(S, F);
+    const DIV = cs.length - 1;
+    const fx = (i) => cs[i];
+    const fz = (j) => -cs[j];
     const fIndex = new Int32Array((DIV + 1) * (DIV + 1)).fill(-1);
     const fVert = (i, j) => {
       const k = j * (DIV + 1) + i;
@@ -443,7 +448,8 @@ export function createWater(terrain, sunDirection, quality) {
         if (terrain._farWet(x1, z0)) wetc++;
         if (terrain._farWet(x1, z1)) wetc++;
         if (terrain._farWet(x0, z1)) wetc++;
-        if (!wetc) continue;
+        if (terrain._farWet((x0 + x1) / 2, (z0 + z1) / 2)) wetc += 2;
+        if (wetc < 3) continue;
         const a = fVert(i, j), b = fVert(i + 1, j);
         const c = fVert(i + 1, j + 1), d = fVert(i, j + 1);
         index.push(a, c, d, a, b, c);
