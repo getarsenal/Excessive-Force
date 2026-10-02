@@ -1478,6 +1478,19 @@ export class Terrain {
    * centreline with a half-width at every point. Shared by the water sheet and
    * by the ground it has to be sunk into.
    */
+  /** Does the far survey carry this river mouth on past the map? */
+  surveyedBeyond(e) {
+    if (!this.farMask) return false;
+    for (let t = 40; t <= 700; t += 40) {
+      for (const off of [-1, 0, 1]) {
+        const x = e.mid.x + e.dir.x * t - e.dir.z * off * e.half;
+        const z = e.mid.z + e.dir.z * t + e.dir.x * off * e.half;
+        if (this._farWet(x, z)) return true;
+      }
+    }
+    return false;
+  }
+
   riverTails() {
     if (this._tails) return this._tails;
     // Far enough to put the end of the channel at the outer edge of the apron,
@@ -1504,17 +1517,7 @@ export class Terrain {
       // to nowhere. Where the survey shows water within a few hundred metres
       // of the mouth, the river is the survey's; only a river too narrow for
       // the far mask's forty-metre samples still gets a tail.
-      if (this.farMask) {
-        let seen = false;
-        for (let t = 40; t <= 700 && !seen; t += 40) {
-          for (const off of [-1, 0, 1]) {
-            const x = e.mid.x + e.dir.x * t - e.dir.z * off * e.half;
-            const z = e.mid.z + e.dir.z * t + e.dir.x * off * e.half;
-            if (this._farWet(x, z)) { seen = true; break; }
-          }
-        }
-        if (seen) continue;
-      }
+      if (this.surveyedBeyond(e)) continue;
       // The first drawn control point has to be the river mouth exactly.
       //
       // Marching from a point behind the mouth does not achieve that: the

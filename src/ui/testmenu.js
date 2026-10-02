@@ -2189,10 +2189,13 @@ export class TestMenu {
         const exits = t.riverExits();
         if (!exits.length) return 'landlocked: no river leaves this map';
         const tails = t.riverTails();
-        assert(tails.length === exits.length,
-          `${exits.length} river mouths but ${tails.length} channels`);
+        // A mouth the far survey carries on is the survey's river past the
+        // edge, drawn as surveyed water; only the others get a channel.
+        const surveyed = exits.filter((e) => t.surveyedBeyond(e)).length;
+        assert(tails.length === exits.length - surveyed,
+          `${exits.length} river mouths, ${surveyed} carried on by the survey, but ${tails.length} channels`);
 
-        let reach = 0, worst = 0;
+        let reach = tails.length ? 0 : Infinity, worst = 0;
         for (const pts of tails) {
           const end = pts[pts.length - 1];
           reach = Math.max(reach, Math.hypot(end.x, end.z));
