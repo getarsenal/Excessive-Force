@@ -153,6 +153,7 @@ export function siteSams(terrain, o = {}) {
   const landmarks = o.landmarks || [];
   let seed = 0x5a3 + Math.round(span);
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  let tol = 1.6;
   const clear = (x, z, r) => {
     if (Math.abs(x) > span - 70 || Math.abs(z) > span - 70) return false;
     const g = terrain.heightAt(x, z);
@@ -160,7 +161,7 @@ export function siteSams(terrain, o = {}) {
       const a = (k / 10) * Math.PI * 2;
       const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
       if (terrain.isWater(px, pz)) return false;
-      if (Math.abs(terrain.heightAt(px, pz) - g) > 1.6) return false;
+      if (Math.abs(terrain.heightAt(px, pz) - g) > tol) return false;
       if (net && net.roadClearance && net.roadClearance(px, pz) < 2) return false;
     }
     if (terrain.isWater(x, z)) return false;
@@ -174,21 +175,38 @@ export function siteSams(terrain, o = {}) {
     return true;
   };
   const r0 = Math.max(150, Math.min(span * 0.6, exclude * 1.35));
-  const rings = [r0, r0 * 1.3, r0 * 1.65, r0 * 2.0].filter((r) => r < span - 90);
+  const rings = [r0, r0 * 1.3, r0 * 1.65, r0 * 2.0, r0 * 2.5, r0 * 3.1].filter((r) => r < span - 90);
+  if (!rings.length || rings[rings.length - 1] < span - 160) rings.push(span - 120);
   const turn = rnd() * Math.PI * 2;
   const found = [];
-  for (const r of rings) {
-    for (let k = 0; k < 36; k++) {
-      const a = turn + (k / 36) * Math.PI * 2;
-      const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(260, r * 0.9))) continue;
-      if (!clear(x, z, 14)) continue;
-      found.push({ x, z, a });
+  // Level ground first; on a mountain, whatever a crew could dig a launcher
+  // into. The Corcovado has nothing within two metres of flat for a quarter
+  // of a kilometre in any direction, and a battery is still there.
+  for (const t of [1.6, 2.6, 4.2]) {
+    tol = t;
+    for (const r of rings) {
+      for (let k = 0; k < 48; k++) {
+        const a = turn + (k / 48) * Math.PI * 2;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(220, r * 0.8))) continue;
+        if (!clear(x, z, 12)) continue;
+        found.push({ x, z, a });
+        if (found.length >= 2) break;
+      }
       if (found.length >= 2) break;
     }
     if (found.length >= 2) break;
   }
-  return found.map((f) => ({ x: f.x, z: f.z, y: terrain.heightAt(f.x, f.z), yaw: Math.atan2(f.x, f.z) }));
+  // Bedded on the low side, so nothing hangs off a slope.
+  const low = (x, z) => {
+    let g = terrain.heightAt(x, z);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      g = Math.min(g, terrain.heightAt(x + Math.cos(a) * 6, z + Math.sin(a) * 6));
+    }
+    return g;
+  };
+  return found.map((f) => ({ x: f.x, z: f.z, y: low(f.x, f.z), yaw: Math.atan2(f.x, f.z) }));
 }
 
 export class SamSites {
