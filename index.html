@@ -276,26 +276,58 @@
 
     <!-- End-of-level -->
     <div id="endcard" hidden>
-      <div class="ec-inner">
-        <div class="ec-title" id="ec-title">TOWER DOWN</div>
-        <div class="ec-sub" id="ec-sub"></div>
-        <!-- The pay: what the run earned, a line at a time, into the rank bar. -->
-        <div class="ec-xp" id="ec-xp" hidden></div>
-        <div class="ec-stats" id="ec-stats"></div>
-        <div class="ec-bill" id="ec-bill" hidden></div>
-        <!-- The three marks. A contract is closed or it is not; these are how
-             well, and they are the reason to run one twice. -->
-        <div class="ec-marks" id="ec-marks" hidden></div>
-        <div class="ec-release" id="ec-release" hidden></div>
-        <div class="ec-medals" id="ec-medals" hidden></div>
-        <div class="ec-buttons">
-          <button id="ec-clip" class="ec-btn clip" hidden>&#9654;&nbsp; SHARE THE COLLAPSE</button>
-          <button id="ec-ba" class="ec-btn clip" hidden>BEFORE / AFTER</button>
+      <!-- The report scrolls; the buttons do not. What happened is at the top,
+           the detail folds away under it, and what to do next is always in
+           reach at the bottom of the screen. -->
+      <div class="ec-scroll">
+        <div class="ec-inner">
+          <div class="ec-title" id="ec-title">TOWER DOWN</div>
+          <div class="ec-sub" id="ec-sub"></div>
+          <!-- The pay: the rank bar and the total. The lines it is made of
+               fold away below. -->
+          <div class="ec-xp" id="ec-xp" hidden></div>
+          <div class="ec-hero" id="ec-hero"></div>
+          <!-- The three marks. A contract is closed or it is not; these are how
+               well, and they are the reason to run one twice. -->
+          <div class="ec-marks" id="ec-marks" hidden></div>
+          <div class="ec-badges">
+            <div class="ec-release" id="ec-release" hidden></div>
+            <div class="ec-medals" id="ec-medals" hidden></div>
+            <div class="ec-crates" id="ec-crates" hidden></div>
+          </div>
+          <div class="ec-folds">
+            <details class="ec-fold" id="ec-fold-xp" hidden>
+              <summary><span>XP EARNED</span><b id="ec-fold-xp-sum"></b></summary>
+              <div class="ec-fold-body" id="ec-xp-lines"></div>
+            </details>
+            <details class="ec-fold" id="ec-fold-orders" hidden>
+              <summary><span>DAILY ORDERS</span><b id="ec-fold-orders-sum"></b></summary>
+              <div class="ec-fold-body" id="ec-xp-orders"></div>
+            </details>
+            <details class="ec-fold" id="ec-fold-report">
+              <summary><span>BATTLE REPORT</span><b id="ec-fold-report-sum"></b></summary>
+              <div class="ec-fold-body"><div class="ec-stats" id="ec-stats"></div></div>
+            </details>
+            <details class="ec-fold" id="ec-fold-bill" hidden>
+              <summary><span>INSURANCE CLAIM</span><b id="ec-fold-bill-sum"></b></summary>
+              <div class="ec-fold-body"><div class="ec-bill" id="ec-bill" hidden></div></div>
+            </details>
+          </div>
+        </div>
+      </div>
+      <div class="ec-dock">
+        <div class="ec-dock-inner">
           <button id="ec-next" class="ec-btn primary">NEXT TARGET</button>
-          <button id="ec-keep" class="ec-btn">KEEP GOING</button>
-          <button id="ec-again" class="ec-btn">RUN IT AGAIN</button>
-          <button id="ec-home" class="ec-btn">MAIN MENU</button>
-          <button id="ec-targets" class="ec-btn quiet">CAMPAIGN MAP</button>
+          <div class="ec-row">
+            <button id="ec-again" class="ec-btn">RUN IT AGAIN</button>
+            <button id="ec-keep" class="ec-btn">KEEP GOING</button>
+          </div>
+          <div class="ec-row ec-small">
+            <button id="ec-clip" class="ec-btn sm clip" hidden>&#9654;&nbsp;SHARE</button>
+            <button id="ec-ba" class="ec-btn sm" hidden>BEFORE / AFTER</button>
+            <button id="ec-targets" class="ec-btn sm">MAP</button>
+            <button id="ec-home" class="ec-btn sm">MENU</button>
+          </div>
         </div>
       </div>
     </div>

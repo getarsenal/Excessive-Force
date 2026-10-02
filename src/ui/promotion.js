@@ -22,10 +22,19 @@ const fmt = (n) => Math.round(n).toLocaleString();
  * Fill `el` with the report's pay and run it.
  * @param {HTMLElement} el
  * @param {object} rep     progress.award()'s report
- * @param {object} o       { audio, still } — still: no animation (the harness, reduced motion)
+ * @param {object} o       { audio, still, parts } — still: no animation (the harness,
+ *                         reduced motion). parts: { lines, orders, crates }, elements
+ *                         that take the itemised pay, the daily orders and the crate
+ *                         notice instead of `el`, so the report can show the rank bar
+ *                         and fold the detail away.
  */
 export function renderXp(el, rep, o = {}) {
-  if (!el || !rep) { if (el) el.hidden = true; return; }
+  const P = o.parts || null;
+  if (!el || !rep) {
+    if (el) el.hidden = true;
+    if (P) for (const k of ['lines', 'orders', 'crates']) if (P[k]) P[k].innerHTML = '';
+    return;
+  }
   el.hidden = false;
   const g0 = rep.gradeBefore, g1 = rep.grade;
   const lines = rep.lines.map((l, i) => `<div class="ecx-line ${l.kind || ''}" style="--i:${i}">`
@@ -36,7 +45,8 @@ export function renderXp(el, rep, o = {}) {
   const nr = rep.nearest;
   const near = nr ? `<div class="ecx-near"><span>NEXT MEDAL · ${TIERS[nr.tier - 1]} ${esc(nr.name)}</span>`
     + `<i><u style="width:${(nr.frac * 100).toFixed(1)}%"></u></i><b>${fmt(nr.have)} / ${fmt(nr.need)}${nr.unit === 't' ? ' t' : ''}</b></div>` : '';
-  el.innerHTML = `
+  const crates = rep.crates ? `<div class="ecx-crates">${rep.crates} SUPPLY CRATE${rep.crates > 1 ? 'S' : ''} WAITING · OPEN THEM AT THE FRONT DOOR</div>` : '';
+  const head = `
     <div class="ecx-head">
       <span class="ecx-ins">${insignia(g0, 'ecx-insig')}</span>
       <div class="ecx-who">
@@ -45,12 +55,22 @@ export function renderXp(el, rep, o = {}) {
         <span class="ecx-to"></span>
       </div>
       <b class="ecx-total">+0 XP</b>
-    </div>
-    <div class="ecx-lines">${lines}</div>
+    </div>`;
+  const linesHtml = `<div class="ecx-lines">${lines}</div>`;
+  const ordersHtml = `
     <div class="ecx-sec"><span>DAILY ORDERS</span><i>NEW ORDERS IN ${ordersResetIn().toUpperCase()}</i></div>
     <div class="ecx-orders">${orders}</div>
-    ${near}
-    ${rep.crates ? `<div class="ecx-crates">${rep.crates} SUPPLY CRATE${rep.crates > 1 ? 'S' : ''} WAITING · OPEN THEM AT THE FRONT DOOR</div>` : ''}`;
+    ${near}`;
+  if (P) {
+    el.innerHTML = head;
+    if (P.lines) P.lines.innerHTML = linesHtml;
+    if (P.orders) P.orders.innerHTML = ordersHtml;
+    if (P.crates) { P.crates.innerHTML = crates; P.crates.hidden = !crates; }
+  } else {
+    el.innerHTML = head + linesHtml + ordersHtml + crates;
+  }
+  const lineEls = () => (P?.lines || el).querySelectorAll('.ecx-line');
+  if (P?.lines) P.lines.classList.toggle('still', !!o.still);
 
   const bar = el.querySelector('.ecx-bar u'), to = el.querySelector('.ecx-to');
   const rank = el.querySelector('.ecx-rank'), total = el.querySelector('.ecx-total');
@@ -79,7 +99,7 @@ export function renderXp(el, rep, o = {}) {
   // Each line lands, then the bar runs up to the total.
   const step = 260;
   rep.lines.forEach((l, i) => setTimeout(() => {
-    el.querySelectorAll('.ecx-line')[i]?.classList.add('in');
+    lineEls()[i]?.classList.add('in');
     if (o.audio) tick(o.audio, 0.6 + i * 0.03);
   }, 500 + i * step));
   const t0 = 500 + rep.lines.length * step;

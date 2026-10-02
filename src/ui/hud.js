@@ -1171,13 +1171,41 @@ export class HUD {
       ['Spent', `$${summary.spent.toLocaleString()}`],
       ['Time', `${mins}:${String(secs).padStart(2, '0')}`],
     ];
-    // The pay, at the top of the report, where it is read first.
+    const $ = (id) => document.getElementById(id);
+    const fold = (id, show, sum) => {
+      const f = $(id);
+      if (!f) return;
+      f.hidden = !show;
+      f.open = false;
+      const b = $(`${id}-sum`);
+      if (b) b.textContent = sum || '';
+    };
+    // The pay, at the top of the report, where it is read first: the rank bar
+    // and the total. What it is made of, and the daily orders, fold away.
     if (this.el.ecXp) {
       let still = false;
       try { still = localStorage.getItem('tt.suite') === '1'; } catch { /* private mode */ }
       if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) still = true;
-      renderXp(this.el.ecXp, opts.xp || null, { audio: this.audio, still });
+      const xp = opts.xp || null;
+      renderXp(this.el.ecXp, xp, { audio: this.audio, still,
+        parts: { lines: $('ec-xp-lines'), orders: $('ec-xp-orders'), crates: $('ec-crates') } });
+      fold('ec-fold-xp', !!xp, xp ? `+${Math.round(xp.total).toLocaleString()} XP` : '');
+      const orders = xp?.orders || [];
+      fold('ec-fold-orders', orders.length > 0,
+        `${orders.filter((o) => o.done).length} OF ${orders.length} DONE`);
     }
+    // Three numbers, big: what came down, how long it took, what it cost.
+    const hero = $('ec-hero');
+    if (hero) {
+      const tiles = [
+        won ? ['DOWN', `${summary.score.toLocaleString()} t`]
+          : ['STANDING', `${summary.heightStanding.toFixed(0)} m`],
+        ['TIME', `${mins}:${String(secs).padStart(2, '0')}`],
+        ['SPENT', `$${summary.spent.toLocaleString()}`],
+      ];
+      hero.innerHTML = tiles.map(([k, v]) => `<div class="ec-tile"><b>${v}</b><span>${k}</span></div>`).join('');
+    }
+    fold('ec-fold-report', true, `${summary.defendersKilled} KILLED · ${summary.shotsFired} ROUNDS`);
     this.el.ecStats.innerHTML = rows
       .map(([k, v]) => `<div class="ec-stat"><span>${k}</span><b>${v}</b></div>`)
       .join('');
@@ -1186,6 +1214,7 @@ export class HUD {
     if (this.el.ecBill) {
       const bill = won ? damageBill(summary, { burnt: this.battle.cityFire?.burnt || 0 }) : null;
       this.el.ecBill.hidden = !bill || bill.total <= 0;
+      fold('ec-fold-bill', !this.el.ecBill.hidden, bill ? money(bill.total) : '');
       if (bill && bill.total > 0) {
         this.el.ecBill.innerHTML = `<span class="eb-tag">INSURANCE CLAIM</span>`
           + `<b class="eb-total">${money(bill.total)}</b>`
@@ -1198,6 +1227,9 @@ export class HUD {
     // Carrying on only makes sense when there is something still standing to
     // carry on against.
     if (this.el.ecKeep) this.el.ecKeep.hidden = !won || summary.heightStanding <= 0.5;
+    // After a stalled assault the one thing to do is go again, so that is the
+    // big button.
+    this.el.ecAgain.classList.toggle('primary', !won);
     if (this.el.ecNext) {
       this.el.ecNext.hidden = !won;
       this.el.ecNext.textContent = this.nextTargetLabel
