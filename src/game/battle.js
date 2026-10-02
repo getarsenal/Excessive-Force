@@ -27,8 +27,8 @@ const START_MONEY = 900;
 const BASE_INCOME = 14;
 const MONEY_PER_TONNE = 1.15;
 const MONEY_PER_DEFENDER = 22;
-// The objective tonnage at which a strike costs its list price (see costOf).
-const STRIKE_REF_TONNES = 600000;
+// The job, in tonnes, that the rubble rate is quoted for (see payScale).
+const JOB_REF_TONNES = 600000;
 
 export class Battle {
   constructor(ctx) {
@@ -809,24 +809,48 @@ export class Battle {
   canAfford(u) { return this.freeBuild || this.money >= this.costOf(u); }
 
   /**
-   * What a weapon costs on this map.
+   * What a weapon costs: its list price, on every map.
    *
-   * A gun is a gun anywhere. A strike is priced by the size of the job: a
-   * bomb takes a share of whatever it lands on and the rubble is paid by the
-   * tonne, so on a small target the same strike returned a tenth of its
-   * price and on a cathedral two and a half times it. The list price is for
-   * six hundred thousand tonnes of objective, which is a landmark and its
-   * neighbours on an ordinary map (Westminster 579 kt, Pisa 565 kt, Cologne
-   * 720 kt); the level's own tonnage scales it, within a third and three
-   * times, rounded to the thousand. Giza, at eleven million, pays triple.
+   * Strikes used to be priced by the size of the target — a third of list on
+   * a small monument, three times it at Giza — because the rubble was paid
+   * by the tonne and a bomb takes a share of whatever it lands on, so the
+   * same strike paid back a tenth of its price on one map and twice it on the
+   * next. Pricing the strike to the map fixed the return and moved the price
+   * instead, which is worse: a player cannot learn what an F-15 is worth if
+   * it costs $35,000 here and $300,000 there. The price is now the price,
+   * and it is the pay that is evened out (`payScale`).
    */
   costOf(def) {
-    if (!def?.strike) return def?.cost ?? 0;
-    if (this._strikeScale == null) {
-      const t = this.objectives.reduce((a, o) => a + o.structure.totalMass, 0) / 1000;
-      this._strikeScale = Math.min(3, Math.max(0.35, t / STRIKE_REF_TONNES));
+    return def?.cost ?? 0;
+  }
+
+  /**
+   * What a tonne of rubble pays, against the list rate.
+   *
+   * Paid by the share of the job rather than by the tonne. The job is the
+   * objectives' mass, divided by the level's `unlockScale` — the same "how
+   * much of this counts as getting going" the unlock bar reads — and it is
+   * quoted at six hundred thousand tonnes, an ordinary landmark. Machu
+   * Picchu's temples are twenty-one thousand tonnes and the Potala twenty-six
+   * million; per tonne one pays far more than the other, and per share of
+   * the bar they pay the same. So whatever a strike unlocks at, the player
+   * arriving there has earned the same money on every map — about
+   * $6,900 for each point of the unlock bar — and one list price for each
+   * strike holds everywhere: the A-10 and the Apache are affordable as soon
+   * as they unlock, the F-15 and the AC-130 shortly after, the GBU-28, the
+   * Tomahawk and the B-1 have to be saved for.
+   *
+   * The scenery and the town are paid at no more than half again the list
+   * rate, however small the job: Machu Picchu's town is two and a half times
+   * the weight of its temples, and at the temples' rate it would be a mint.
+   */
+  get payScale() {
+    if (this._payScale == null) {
+      const objT = this.objectives.reduce((a, o) => a + o.structure.totalMass, 0) / 1000;
+      const job = objT / Math.max(1, this.level?.unlockScale ?? 1);
+      this._payScale = job > 0 ? Math.min(100, Math.max(0.02, JOB_REF_TONNES / job)) : 1;
     }
-    return Math.max(1000, Math.round((def.cost * this._strikeScale) / 1000) * 1000);
+    return this._payScale;
   }
 
   get income() {
@@ -2456,7 +2480,18 @@ export class Battle {
     const destroyedMass = this.structures.reduce((a, s) => a + s.demolishedMass, 0);
     const delta = destroyedMass - this._lastDestroyedMass;
     if (delta > 0) {
-      const earned = (delta / 1000) * MONEY_PER_TONNE;
+      // Each structure's new rubble at its own rate: the job's, or the
+      // scenery's (see payScale).
+      let earned = 0;
+      const job = this.payScale, other = Math.min(job, 1.5);
+      if (!this._paidMass) this._paidMass = new Map();
+      for (const s of this.structures) {
+        const m = s.demolishedMass, was = this._paidMass.get(s) ?? 0;
+        if (m <= was) continue;
+        this._paidMass.set(s, m);
+        const rate = (s.required || s === this.primary) ? job : other;
+        earned += ((m - was) / 1000) * MONEY_PER_TONNE * rate;
+      }
       this.money += earned;
       this.score += delta / 1000;
       this._lastDestroyedMass = destroyedMass;
