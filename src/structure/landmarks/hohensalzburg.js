@@ -456,6 +456,29 @@ export function populateHohensalzburg(g, origin, groundY) {
     g.place('sniper', V(w.cx + dx * r, (w.base ?? 0) + top + 0.05, w.cz + dz * r), face(dx, dz), 3, { cover: 'window' });
   }
 
+  // The Inner Bastion's gun deck: men in the gaps between the merlons that
+  // the guns do not have, behind the breastwork; and the walk on the old
+  // armoury wall. Both are roofs a man stands on.
+  for (const w of K.plan.wings) {
+    if (w.kind !== 'bastion' && w.kind !== 'wall') continue;
+    const F = K.frame(w);
+    const out = outwardSide(w);
+    const deck = (w.base ?? 0) + w.eaves;
+    const dx = F.vx * out, dz = F.vz * out;
+    if (w.kind === 'bastion') {
+      crenels(w.len).forEach((u, i) => {
+        if (i % 4 === 1 || i % 2 === 1) return;
+        const [x, z] = F.at(u, out * (w.wid / 2 - 1.4));
+        g.place(i % 6 === 2 ? 'mg' : 'rifleman', V(x, deck + 0.05, z), face(dx, dz), 3, { cover: 'roof' });
+      });
+    } else {
+      for (const u of [-w.len / 4, w.len / 4]) {
+        const [x, z] = F.at(u, -out * 0.4);
+        g.place('rifleman', V(x, deck + 0.05, z), face(dx, dz), 3, { cover: 'roof' });
+      }
+    }
+  }
+
   // Mortars in the courtyards, dug in.
   for (const p of Object.values(K.plan.points)) {
     g.place('mortar', V(p.x, p.y + 0.3, p.z), 0, 20, { cover: 'ground', emplaced: true, sandbags: true });
