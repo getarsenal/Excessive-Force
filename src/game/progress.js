@@ -58,7 +58,7 @@ export const GRADES = (() => {
   for (const [name, n, kind, k] of LADDER) {
     for (let s = 1; s <= n; s++) out.push({ name: n > 1 ? `${name} ${ROMAN[s]}` : name, base: name, kind, n: k });
   }
-  out.forEach((g, i) => { g.cost = i === 0 ? 0 : Math.round(400 + 140 * i + 9 * i * i); });
+  out.forEach((g, i) => { g.cost = i === 0 ? 0 : Math.round(900 + 260 * i + 12 * i * i); });
   let acc = 0;
   for (const g of out) { acc += g.cost; g.at = acc; }
   return out;
@@ -315,7 +315,7 @@ export function award(r) {
     const day = today();
     if (r.won && c.firstWin !== day) {
       c.firstWin = day;
-      add('FIRST WIN OF THE DAY · ×2', base + tonXp, 'gold');
+      add('FIRST WIN OF THE DAY', 1000, 'gold');
     }
     if (r.daily) add(`DAILY STRIKE · ${r.streak || 1}-DAY STREAK`, 1000 * (1 + 0.1 * Math.min(10, (r.streak || 1) - 1)), 'gold');
   }
@@ -325,7 +325,7 @@ export function award(r) {
     const rb = RIBBONS[id];
     if (rb && n > 0) add(`${rb.name}${n > 1 ? ` ×${n}` : ''}`, rb.xp * n, 'ribbon');
   }
-  for (const f of r.feats || []) add(`MEDAL · ${f.name}`, 1000, 'medal');
+  for (const f of r.feats || []) add(`MEDAL · ${f.name}`, 750, 'medal');
 
   // The career's counters, and the medals and orders they reach.
   const st = r.stats || {};
