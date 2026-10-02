@@ -16,15 +16,15 @@
  */
 import { LEVELS } from '../game/levels.js';
 import { UNITS, STRIKES } from '../game/units.js';
-import { MEDALS, loadMedals } from '../game/medals.js';
 import { THEATRES, campaignState, isReleased } from '../game/campaign.js';
 import { loadProgress } from './levelselect.js';
 import { listBattles, clearBattle } from '../game/battlesave.js';
 import {
-  commander, setCommanderName, rankFor, insignia, SLOT_IDS, slotInfo, activeSlot,
+  commander, setCommanderName, insignia, SLOT_IDS, slotInfo, activeSlot,
   switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
+import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
 import { feedback } from './feedback.js';
 import { showWorldMap, HOME } from './worldmap.js';
 import './title.css';
@@ -64,7 +64,14 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const prog = loadProgress();
   const cmd = commander();
   const tons = Object.values(prog).reduce((a, r) => a + (r.bestScore || 0), 0);
-  const rank = rankFor(tons);
+  // Rank is experience now, not the sum of best tonnages: every run pays.
+  const car = career();
+  const rank = gradeFor(car.xp);
+  const orders = dailyOrders(car);
+  const ordersDone = orders.filter((o) => o.done).length;
+  const mc = medalCase();
+  const careerTiers = mc.career.reduce((a, m) => a + m.tier, 0);
+  const featsWon = mc.feats.filter((f) => f.won).length;
   const battles = listBattles().filter((b) => LEVELS[b.level]);
   const openIds = state.list.filter((t) => t.open && LEVELS[t.id]).map((t) => t.id);
   const daily = dailyFor(openIds);
@@ -97,7 +104,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
     battles.length && { act: 'battles', name: 'BATTLES IN PROGRESS', sub: `${battles.length} SAVED · LAST ${ago(battles[0].at).toUpperCase()}`, count: battles.length },
     { act: 'map', name: 'THEATRE MAP', sub: `${state.done} ${state.done === 1 ? 'COUNTRY' : 'COUNTRIES'} BURNT · ${state.total - state.done} STANDING` },
     { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} WEAPONS RELEASED` },
-    { act: 'medals', name: 'MEDALS', sub: `${Object.keys(loadMedals()).length} OF ${MEDALS.length} WON` },
+    { act: 'orders', name: 'DAILY ORDERS', sub: ordersDone >= 3 ? `ALL THREE DONE · NEW ORDERS IN ${ordersResetIn().toUpperCase()}` : `${ordersDone} OF 3 DONE · ${orders.find((o) => !o.done)?.line.toUpperCase() || ''}`, hot: ordersDone < 3, count: 3 - ordersDone },
+    car.crates > 0 && { act: 'crates', name: 'SUPPLY CRATES', sub: `${car.crates} TO OPEN · WHAT'S INSIDE IS FOR YOUR NEXT BATTLE`, hot: true, count: car.crates },
+    { act: 'medals', name: 'MEDALS', sub: `${careerTiers} OF ${mc.career.length * 4} CAREER GRADES · ${featsWon} OF ${mc.feats.length} FEATS` },
     { act: 'boot', name: 'BOOT CAMP', sub: 'THE CONTROLS, ONE AT A TIME · FORT IRWIN' },
     { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot} · ${esc(cmd.name)} · THREE SAVES` },
     { act: 'records', name: 'RECORDS & SETTINGS', sub: `${fmtTons(tons)} TONNES DOWN · QUALITY, INTROS, SOUND` },
@@ -128,8 +137,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
           ${insignia(rank, 'tt-ins')}
           <span class="tt-cmdr-t">
             <b>${esc(cmd.name)}</b>
-            <i>${rank.name} · SLOT ${slot}</i>
+            <i>${rank.name}${car.prestige ? ` · ${'★'.repeat(Math.min(5, car.prestige))}` : ''} · SLOT ${slot}</i>
             <span class="tt-xp"><span style="width:${(rank.frac * 100).toFixed(1)}%"></span></span>
+            <small class="tt-xpto">${rank.next ? `${rank.need.toLocaleString()} XP TO ${rank.next}` : 'THE TOP OF THE LADDER'}</small>
           </span>
         </button>
         <div class="tt-tools">
@@ -275,6 +285,23 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'medals':
           openSheet('MEDALS', medalsHtml(), 'medals');
           break;
+        case 'orders':
+          openSheet('DAILY ORDERS', ordersHtml(), 'orders');
+          break;
+        case 'crates':
+          openSheet('SUPPLY CRATES', cratesHtml(null), 'crates');
+          break;
+        case 'opencrate': {
+          const got = openCrate();
+          if (!got) break;
+          feedback.emit(got.rarity === 'LEGENDARY' || got.rarity === 'RARE' ? 'rank' : 'confirm');
+          const body = sheetIn.querySelector('.tt-sh-body');
+          body.innerHTML = cratesHtml(got);
+          // The count on the front door's menu line goes with it.
+          const line = root.querySelector('[data-act="crates"] em');
+          if (line) line.textContent = got.crates ? `${got.crates} TO OPEN · WHAT'S INSIDE IS FOR YOUR NEXT BATTLE` : 'ALL OPENED';
+          break;
+        }
         case 'unit': {
           // One open at a time, brought into view whole.
           const was = el.classList.contains('open');
@@ -383,13 +410,55 @@ export function showTitle({ current = null, canResume = false } = {}) {
   }
 
   function medalsHtml() {
-    const have = loadMedals();
-    return `<p class="tt-arm-intro">Things the marks do not ask for. Each one is won once.</p><div class="tt-medals">${MEDALS.map((m) => {
-      const h = have[m.id];
-      const where = h && LEVELS[h.level] ? ` · ${esc((LEVELS[h.level].target || '').toUpperCase())}` : '';
-      return `<div class="tt-medal${h ? ' won' : ''}"><b>${esc(m.name)}</b><span>${esc(m.line)}</span>`
-        + `<i>${h ? `WON ${esc(h.at)}${where}` : 'NOT YET'}</i></div>`;
-    }).join('')}</div>`;
+    const m = medalCase();
+    const fmtN = (v, u) => u === '$' ? `$${Math.round(v).toLocaleString()}` : `${Math.round(v).toLocaleString()}${u === 't' ? ' t' : ''}`;
+    const careerHtml = m.career.map((c) => {
+      const pips = TIERS.map((t, i) => `<i class="tt-pip t${i + 1}${c.tier > i ? ' on' : ''}" title="${t}"></i>`).join('');
+      return `<div class="tt-cmedal${c.tier ? ` t${c.tier}` : ''}">
+        <b>${esc(c.name)}</b><span class="tt-pips">${pips}</span>
+        <span class="tt-cm-line">${esc(c.line)}</span>
+        <span class="tt-cm-bar"><u style="width:${(c.frac * 100).toFixed(1)}%"></u></span>
+        <i>${c.next ? `${fmtN(c.have, c.unit)} / ${fmtN(c.next, c.unit)} · NEXT: ${TIERS[c.tier]}` : `${fmtN(c.have, c.unit)} · PLATINUM`}</i>
+      </div>`;
+    }).join('');
+    const featsHtml = m.feats.map((f) => {
+      const where = f.won && LEVELS[f.won.level] ? ` · ${esc((LEVELS[f.won.level].target || '').toUpperCase())}` : '';
+      return `<div class="tt-medal${f.won ? ' won' : ''}"><b>${f.won ? esc(f.name) : '?'.repeat(Math.min(12, f.name.length))}</b><span>${esc(f.line)}</span>`
+        + `<i>${f.won ? `WON ${esc(f.won.at)}${where}` : 'NOT YET · 1,000 XP'}</i></div>`;
+    }).join('');
+    return `<p class="tt-arm-intro">Career medals come in four grades, each worth more XP than the last; the bar says how far to the next. Feats are won once.</p>
+      <div class="tt-sk">CAREER</div><div class="tt-cmedals">${careerHtml}</div>
+      <div class="tt-sk">FEATS</div><div class="tt-medals">${featsHtml}</div>`;
+  }
+
+  function ordersHtml() {
+    const os = dailyOrders(career());
+    const done = os.filter((o) => o.done).length;
+    return `<p class="tt-arm-intro">Three jobs a day, the same for every commander on the date. 750 XP each, and a supply crate and 1,000 XP more for all three. Progress counts from any battle.</p>
+      <div class="tt-orders">${os.map((o) => `<div class="tt-order${o.done ? ' done' : ''}">
+        <b>${esc(o.line.toUpperCase())}</b>
+        <span class="tt-cm-bar"><u style="width:${(Math.min(1, o.have / o.n) * 100).toFixed(1)}%"></u></span>
+        <i>${o.done ? 'DONE · +750 XP' : `${Math.round(o.have).toLocaleString()} / ${Math.round(o.n).toLocaleString()} · 750 XP`}</i>
+      </div>`).join('')}</div>
+      <p class="tt-note">${done >= 3 ? 'All three done.' : `${3 - done} to go.`} New orders in ${ordersResetIn()}.</p>`;
+  }
+
+  function cratesHtml(got) {
+    const c = career();
+    const pend = [];
+    if (c.perks.funds) pend.push(`+$${c.perks.funds.toLocaleString()} FIELD FUNDS`);
+    if (c.perks.income) pend.push(`+${Math.round(c.perks.income * 100)}% INCOME`);
+    if (c.perks.double) pend.push(`DOUBLE XP × ${c.perks.double} WIN${c.perks.double > 1 ? 'S' : ''}`);
+    const reveal = got ? `<div class="tt-loot r-${got.rarity.toLowerCase()}"><span>${got.rarity}</span><b>${esc(got.line.toUpperCase())}</b></div>` : '';
+    return `${reveal}
+      <div class="tt-crate-row">
+        <button class="tt-crate${c.crates ? '' : ' empty'}" type="button" data-act="opencrate" ${c.crates ? '' : 'disabled'}>
+          <span class="tt-crate-box"></span>
+          <b>${c.crates ? `OPEN · ${c.crates} LEFT` : 'NONE LEFT'}</b>
+        </button>
+      </div>
+      <p class="tt-note">A crate for every grade you rise, two at every fifth, and one for finishing all three daily orders. What comes out is spent in your next battle.</p>
+      ${pend.length ? `<div class="tt-sk">READY FOR YOUR NEXT BATTLE</div><div class="tt-perks">${pend.map((p) => `<span>${p}</span>`).join('')}</div>` : ''}`;
   }
 
   function armouryHtml() {
@@ -452,13 +521,16 @@ export function showTitle({ current = null, canResume = false } = {}) {
   }
 
   function commandersHtml() {
-    const r = rankFor(tons);
+    const r = gradeFor(career().xp);
+    const ahead = Object.entries(COMMISSIONS).filter(([lv]) => +lv > r.i).slice(0, 3)
+      .map(([lv, k]) => `<span>${esc(GRADES[+lv].name)} · ${esc(k.line.toUpperCase())}</span>`).join('');
     return `<div class="tt-career">
         ${insignia(r, 'tt-ins big')}
         <div><b>${esc(cmd.name)}</b><i>${r.name}</i>
         <span class="tt-xp wide"><span style="width:${(r.frac * 100).toFixed(1)}%"></span></span>
-        <small>${r.next ? `${fmtTons(r.need)} TONNES TO ${r.next}` : 'THE TOP OF THE LADDER'}</small></div>
+        <small>${r.next ? `${r.need.toLocaleString()} XP TO ${r.next} · GRADE ${r.i + 1} OF ${GRADES.length}` : 'THE TOP OF THE LADDER'}</small></div>
       </div>
+      ${ahead ? `<div class="tt-sk">COMMISSIONS AHEAD</div><div class="tt-perks">${ahead}</div>` : ''}
       <div class="tt-sk">SAVE SLOTS</div>
       ${commandersInner()}
       <p class="tt-note">Each commander keeps their own record, campaign, battles in progress and streak. Settings are shared.</p>`;

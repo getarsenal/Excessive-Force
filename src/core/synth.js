@@ -226,3 +226,60 @@ export function hiss(audio, pos, delay = 0, dur = 1.2, gain = 0.12) {
     src.start(t0, Math.random()); src.stop(t0 + dur + 0.02);
   } catch { /* no audio */ }
 }
+
+/** A short bright tick: one line of pay landing on the report. */
+export function tick(audio, pitch = 1) {
+  if (!ok(audio)) return;
+  const c = audio.ctx, t0 = c.currentTime;
+  try {
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(1250 * pitch, t0);
+    o.frequency.exponentialRampToValueAtTime(900 * pitch, t0 + 0.06);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+    o.connect(g).connect(audio.master);
+    o.start(t0); o.stop(t0 + 0.1);
+  } catch { /* no audio */ }
+}
+
+/**
+ * A promotion: a brass-ish call up a major triad to the octave and held,
+ * three detuned saws through a swelling low-pass, with a snare roll under
+ * the first notes.
+ */
+export function fanfare(audio) {
+  if (!ok(audio)) return;
+  const c = audio.ctx, t0 = c.currentTime + 0.02;
+  const notes = [[392, 0, 0.16], [523.3, 0.16, 0.16], [659.3, 0.32, 0.16], [784, 0.48, 1.1]];
+  try {
+    for (const [f, at, len] of notes) {
+      const lp = c.createBiquadFilter(), g = c.createGain();
+      lp.type = 'lowpass'; lp.Q.value = 1.2;
+      lp.frequency.setValueAtTime(700, t0 + at);
+      lp.frequency.exponentialRampToValueAtTime(3200, t0 + at + Math.min(0.12, len));
+      g.gain.setValueAtTime(0.0001, t0 + at);
+      g.gain.exponentialRampToValueAtTime(0.09, t0 + at + 0.03);
+      g.gain.setValueAtTime(0.09, t0 + at + len * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + at + len + 0.25);
+      lp.connect(g).connect(audio.master);
+      for (const d of [-6, 0, 7]) {
+        const o = c.createOscillator();
+        o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = d;
+        o.connect(lp); o.start(t0 + at); o.stop(t0 + at + len + 0.3);
+      }
+    }
+    // The snare roll.
+    for (let k = 0; k < 10; k++) {
+      const src = c.createBufferSource(); src.buffer = noise(c);
+      const bp = c.createBiquadFilter(), g = c.createGain();
+      bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.6;
+      const t = t0 + k * 0.048;
+      g.gain.setValueAtTime(0.05 * (0.6 + k / 14), t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      src.connect(bp).connect(g).connect(audio.master);
+      src.start(t, Math.random()); src.stop(t + 0.06);
+    }
+  } catch { /* no audio */ }
+}

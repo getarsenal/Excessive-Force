@@ -5,6 +5,7 @@ import { UNITS, UNITS_BY_ID, STRIKES, isLoiter } from '../game/units.js';
 import { access } from '../core/access.js';
 import { damageBill, money } from './bill.js';
 import { unitIcon } from './icons.js';
+import { renderXp } from './promotion.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
 import { openingEnabled, setOpeningEnabled } from './opening.js';
 export { TAP } from './pointer.js';
@@ -77,6 +78,7 @@ export class HUD {
       ecBill: document.getElementById('ec-bill'),
       ecRelease: document.getElementById('ec-release'),
       ecMedals: document.getElementById('ec-medals'),
+      ecXp: document.getElementById('ec-xp'),
       ecAgain: document.getElementById('ec-again'),
       ecNext: document.getElementById('ec-next'),
       ecKeep: document.getElementById('ec-keep'),
@@ -1169,6 +1171,13 @@ export class HUD {
       ['Spent', `$${summary.spent.toLocaleString()}`],
       ['Time', `${mins}:${String(secs).padStart(2, '0')}`],
     ];
+    // The pay, at the top of the report, where it is read first.
+    if (this.el.ecXp) {
+      let still = false;
+      try { still = localStorage.getItem('tt.suite') === '1'; } catch { /* private mode */ }
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) still = true;
+      renderXp(this.el.ecXp, opts.xp || null, { audio: this.audio, still });
+    }
     this.el.ecStats.innerHTML = rows
       .map(([k, v]) => `<div class="ec-stat"><span>${k}</span><b>${v}</b></div>`)
       .join('');

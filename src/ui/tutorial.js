@@ -123,7 +123,7 @@ export class Tutorial {
         say: 'The Warthog. Draw it a line and it eats everything on it. Trenches, mostly. Not the tower.' },
       { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts: the crates and drums by their guns go up. Halfway down, a dozen transports fly in three quarters of their army again round the building: have M240s out to shoot the transports and the chutes.', ok: true },
       { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, OPTICS (thermal and night vision, or T), accessibility, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
-      { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls.', done: () => b.state === 'won',
+      { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls. Every battle pays XP toward your next rank, won or not; Boot Camp pays your first.', done: () => b.state === 'won',
         say: "Stop admiring it and knock the damn thing over. I've got a tee time." },
     ];
   }

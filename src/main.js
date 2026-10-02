@@ -32,6 +32,7 @@ import { Ambience } from './core/ambient.js';
 import { access } from './core/access.js';
 import { Stores } from './game/stores.js';
 import { checkMedals } from './game/medals.js';
+import { award, bootCampXp, battlePerks, spendBattlePerks, underHarness, RIBBONS } from './game/progress.js';
 import { BeforeAfter } from './ui/beforeafter.js';
 import { damageBill, money } from './ui/bill.js';
 import { CollapseClip } from './ui/clip.js';
@@ -555,6 +556,14 @@ async function boot() {
   if (level.startMoney) battle.money = level.startMoney;
   if (level.unlockAll) battle.unlockAll = true;
   if (level.freeBuild) battle.freeBuild = true;
+  // The commander's commissions, and whatever the last crate left for this
+  // battle. Not in Boot Camp, and never under the harness.
+  const perks = (!underHarness() && level.id !== 'tutorial') ? battlePerks() : null;
+  if (perks) {
+    battle.money = Math.round(battle.money * (1 + perks.fundsPct)) + perks.funds;
+    battle.income *= 1 + perks.incomePct + perks.income;
+    if (perks.funds || perks.income) spendBattlePerks();
+  }
   if (dailyMod) {
     if (dailyMod.id === 'chest') battle.money *= 2;
     if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
@@ -711,6 +720,7 @@ async function boot() {
     picker,
     qualityId: quality.id,
   });
+  hud.audio = audio;
   attachUnitTips(hud, battle);
   // The collapse, filmed for the player to share. The game holds still while
   // the clip is being watched, and picks up where it was when it is closed.
@@ -788,6 +798,27 @@ async function boot() {
   const used = new Set();
   let lostAircraft = false;
   let chain = 0, chainAt = 0;
+  // What the fight earned besides the result: ribbons, as often as they
+  // happen, and the counts the career and the daily orders are made of.
+  const ribbons = {};
+  const runStats = { hits: 0, downed: 0, strikes: 0, collapses: 0 };
+  const ribbon = (id, n = 1) => {
+    ribbons[id] = (ribbons[id] || 0) + n;
+    const rb = RIBBONS[id];
+    if (rb && !suiteHold) hud.feed(`+${(rb.xp * n).toLocaleString()} XP · ${rb.name}`, 'xp');
+  };
+  let paid = false;
+  const payOut = (won, sum, extra = {}) => {
+    if (paid) return null;
+    paid = true;
+    if (level.id === 'tutorial') return won ? bootCampXp() : null;
+    return award({
+      won, sum, level: level.id, ribbons, marks: extra.marks || [], feats: extra.feats || [],
+      daily: !!dailyBanked, streak: dailyBanked || 0,
+      stats: { ...runStats, burnt: battle.cityFire?.burnt || 0, dumps: battle.stores?.blown || 0 },
+    });
+  };
+  let dailyBanked = 0;
   const awardMedals = (sum) => {
     for (const u of battle.units) if (u.def) used.add(u.def.id);
     const fresh = checkMedals({
@@ -827,6 +858,7 @@ async function boot() {
         hud.popup(`+$${data.amount.toLocaleString()}`, data.point, data.kind);
         hud.flareMoney();
         if (data.kind === 'kill') feedback.emit('kill');
+        if (data.kind === 'kill' && !ribbons.firstblood) ribbon('firstblood');
         break;
       case 'bigimpact':
         hud.edgeFlash('impact', data.point);
@@ -889,6 +921,7 @@ async function boot() {
         break;
       case 'strike':
         feedback.emit('strike');
+        runStats.strikes++;
         hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
         hud.hidePrompt();
         battle.pulse(data.point, 0xffa040, 22, true);
@@ -911,6 +944,7 @@ async function boot() {
         break;
       case 'airbornedown':
         feedback.emit('impact', 1.2);
+        ribbon('downed'); runStats.downed++;
         hud.feed(`${data.name} SHOT DOWN${data.aboard ? ` — ${data.aboard} ABOARD` : ''}`, 'big');
         break;
       case 'airbornelanded':
@@ -966,9 +1000,13 @@ async function boot() {
       }
       case 'stamp':
         hud.stamp(data.text, data.point, data.kind);
+        if (data.text === 'DIRECT HIT') { ribbon('hit'); runStats.hits++; }
+        else if (/^MASSACRE/.test(data.text)) ribbon('massacre');
+        else if (/^MULTI-KILL/.test(data.text)) ribbon('multikill');
         break;
       case 'collateral':
         hud.feed(`${data.n} CITY BLOCKS LEVELLED`, 'big');
+        ribbon('collateral');
         setTimeout(() => hud.stamp(`COLLATERAL ×${data.n}`, data.point, 'city', 58), 380);
         break;
       case 'needtarget':
@@ -988,7 +1026,7 @@ async function boot() {
         break;
       case 'crushed':
         if (data > 2) feedback.emit('impact', 1.3);
-        if (data > 2) hud.feed(`${data} DEFENDERS CRUSHED`, 'big');
+        if (data > 2) { hud.feed(`${data} DEFENDERS CRUSHED`, 'big'); ribbon('crushed'); }
         break;
       case 'secondary': {
         // One line for a chain, not one per dump: a run of them inside a
@@ -998,11 +1036,13 @@ async function boot() {
         chain = now - chainAt < 2500 ? chain + 1 : 1;
         chainAt = now;
         hud.feed(chain > 1 ? `CHAIN REACTION ×${chain}` : `SECONDARY EXPLOSION · ${data.kind === 'fuel' ? 'FUEL' : 'AMMUNITION'}`, 'big');
+        ribbon('secondary');
         break;
       }
       case 'charge':
         feedback.emit('collapse');
         hud.feed(`DEMOLITION CHARGE — ${data.destroyed} STONES`, 'big');
+        ribbon('charge');
         break;
       // The marks, and which of them fell to this run.
       //
@@ -1018,6 +1058,7 @@ async function boot() {
           setTimeout(() => {
             if (dailyMet(dailyMod.id, battle.summary())) {
               const streak = markDailyDone(daily.date);
+              dailyBanked = streak;
               hud.feed(`DAILY STRIKE COMPLETE · ${streak}-DAY STREAK`, 'big');
             } else {
               hud.feed('DAILY STRIKE MISSED · TOO SLOW FOR BLITZ', 'bad');
@@ -1046,7 +1087,9 @@ async function boot() {
           hud.nextTargetLabel = nextTarget(level.id).target;
           takeBeforeAfter(sum);
           hideNewsflash();
-          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: awardMedals(sum) });
+          const feats = awardMedals(sum);
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: feats,
+            xp: payOut(true, sum, { marks, feats }) });
         }, 7000);
         break;
       case 'flattened':
@@ -1069,8 +1112,10 @@ async function boot() {
           hud.nextTargetLabel = nextTarget(level.id).target;
           takeBeforeAfter(sum);
           hideNewsflash();
+          const feats = awardMedals(sum);
           hud.showEnd('win', sum, {
-            medals: awardMedals(sum),
+            xp: payOut(true, sum, { marks, feats }),
+            medals: feats,
             title: 'Flattened',
             sub: `${level.subtitle} · nothing left standing`,
             release: releaseNoteFor(level.id),
@@ -1086,7 +1131,7 @@ async function boot() {
         setTimeout(() => {
           recordResult(level.id, false, data);
           recordTheatre(level.id, false, data);
-          hud.showEnd('lose', data);
+          hud.showEnd('lose', data, { xp: payOut(false, data) });
         }, 1500);
         break;
       default: break;
@@ -1110,6 +1155,7 @@ async function boot() {
       feedback.emit('collapse');
       engine.addShake(0.8);
       hud.feed('STRUCTURE COLLAPSING', 'big');
+      ribbon('collapse'); runStats.collapses++;
       // The rounds it took, counted at the moment the first big section went:
       // what a shared clip boasts and what a challenge is scored on.
       if (battle.collapseRounds == null) battle.collapseRounds = battle.shotsFired;

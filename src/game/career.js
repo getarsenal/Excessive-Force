@@ -19,7 +19,9 @@
  * date, with a twist on it — double funds, the whole arsenal, a five-minute
  * clock, half the money — and a streak for coming back tomorrow.
  */
-const SLOT_KEYS = ['tt.progress', 'tt.campaign', 'tt.tutorial', 'tt.battles', 'tt.daily', 'tt.commander', 'tt.medals'];
+const SLOT_KEYS = ['tt.progress', 'tt.campaign', 'tt.tutorial', 'tt.battles', 'tt.daily', 'tt.commander', 'tt.medals', 'tt.career'];
+import { gradeFor } from './progress.js';
+
 const SLOTS_KEY = 'tt.slots';
 export const SLOT_IDS = ['A', 'B', 'C'];
 
@@ -79,7 +81,9 @@ export function slotInfo(id) {
     closed: recs.filter((r) => r.won).length,
     sorties: recs.reduce((a, r) => a + (r.runs || 0), 0),
     battles,
-    rank: rankFor(tons),
+    // Rank from the experience the slot has banked; a slot from before
+    // there was experience shows the old tonnage rank until it is next played.
+    rank: (() => { const c = parse(src['tt.career'], null); return c && typeof c.xp === 'number' ? gradeFor(c.xp) : rankFor(tons); })(),
     streak: (parse(src['tt.daily'], {}) || {}).streak || 0,
   };
 }

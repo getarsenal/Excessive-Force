@@ -2396,3 +2396,72 @@ body.clear-view #lensdirt { display: none; }
 #whiteout.go { animation: white-out 1.6s cubic-bezier(.1,.7,.3,1) forwards; }
 @keyframes white-out { 0% { opacity: 0; } 5% { opacity: 0.94; } 18% { opacity: 0.8; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { #whiteout.go { animation-duration: 0.6s; } #lensdirt.go { animation: none; } }
+
+/* ── The pay on the report: the rank bar, the lines, the orders. ── */
+.ec-xp { margin: 18px 0 4px; text-align: left; }
+.ec-xp[hidden] { display: none; }
+.ecx-head { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 12px; border: 1px solid rgba(224, 181, 74, 0.38);
+  background: linear-gradient(180deg, rgba(224, 181, 74, 0.10), rgba(224, 181, 74, 0.03)); }
+.ecx-ins { width: 46px; height: 46px; display: grid; place-items: center; }
+.ecx-insig { width: 46px; height: 46px; filter: drop-shadow(0 0 6px rgba(228, 181, 74, 0.45)); }
+.ecx-ins.up { animation: ecx-up 0.6s cubic-bezier(.2,1.6,.4,1); }
+@keyframes ecx-up { from { transform: scale(1.9) rotate(-8deg); } to { transform: none; } }
+.ecx-who { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ecx-rank { font: 700 14px/1 var(--f-display); letter-spacing: 0.1em; color: #f0d27a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ecx-bar { height: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); overflow: hidden; }
+.ecx-bar u { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #b07a1e, #f3cf6a); box-shadow: 0 0 10px rgba(243, 207, 106, 0.55); }
+.ecx-to { font: 600 10px/1 var(--f-data); letter-spacing: 0.06em; color: var(--dim); }
+.ecx-total { font: 700 18px/1 var(--f-data); color: #f3cf6a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ecx-lines { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 4px; }
+.ecx-line { display: flex; justify-content: space-between; gap: 10px; font: 600 11.5px/1.5 var(--f-data); color: var(--text);
+  padding: 2px 8px; opacity: 0; transform: translateX(-10px); transition: opacity 0.2s, transform 0.25s cubic-bezier(.2,1.4,.4,1); }
+.ecx-line.in, .ec-xp.still .ecx-line { opacity: 1; transform: none; }
+.ecx-line b { color: #f3cf6a; font-variant-numeric: tabular-nums; }
+.ecx-line.gold { background: rgba(243, 207, 106, 0.10); }
+.ecx-line.gold span, .ecx-line.big span { color: #f3cf6a; }
+.ecx-line.ribbon span { color: #9fd0ff; }
+.ecx-line.medal span { color: #e6a3ff; }
+.ecx-line.order span { color: var(--money); }
+.ecx-sec { display: flex; justify-content: space-between; margin: 12px 0 5px; font: 600 9.5px/1 var(--f-data); letter-spacing: 0.18em; color: var(--dim); }
+.ecx-sec i { font-style: normal; letter-spacing: 0.06em; }
+.ecx-orders { display: flex; flex-direction: column; gap: 5px; }
+.ecx-order, .ecx-near { display: grid; grid-template-columns: 1fr 70px auto; gap: 8px; align-items: center; font: 600 11px/1.2 var(--f-data); color: var(--text); }
+.ecx-order i, .ecx-near i { height: 5px; background: rgba(255, 255, 255, 0.08); }
+.ecx-order u, .ecx-near u { display: block; height: 100%; background: var(--money); }
+.ecx-order b, .ecx-near b { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 10px; }
+.ecx-order.done span { color: var(--money); text-decoration: line-through; text-decoration-color: rgba(111, 208, 140, 0.6); }
+.ecx-order.done b { color: var(--money); }
+.ecx-near { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--edge); }
+.ecx-near span { color: #e6a3ff; }
+.ecx-near u { background: #c77dff; }
+.ecx-crates { margin-top: 10px; padding: 7px 10px; text-align: center; font: 700 11px/1.2 var(--f-data); letter-spacing: 0.1em;
+  color: #1a1206; background: linear-gradient(90deg, #d79a2b, #f3cf6a); animation: ecx-glow 1.6s ease-in-out infinite; }
+@keyframes ecx-glow { 50% { filter: brightness(1.18); } }
+
+/* ── The promotion: the whole screen, until it is tapped. ── */
+#promotion { position: fixed; inset: 0; z-index: 60; display: none; place-items: center; cursor: pointer;
+  background: radial-gradient(circle at 50% 45%, rgba(40, 28, 6, 0.92), rgba(4, 5, 7, 0.96) 70%); }
+#promotion.on { display: grid; animation: pr-in 0.35s ease both; }
+@keyframes pr-in { from { opacity: 0; } }
+.pr-burst { position: absolute; left: 50%; top: 42%; width: 140vmax; height: 140vmax; transform: translate(-50%, -50%);
+  background: repeating-conic-gradient(rgba(243, 207, 106, 0.10) 0 8deg, transparent 8deg 18deg);
+  animation: pr-spin 18s linear infinite; -webkit-mask: radial-gradient(circle, #000 0, transparent 55%); mask: radial-gradient(circle, #000 0, transparent 55%); }
+@keyframes pr-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.pr-inner { position: relative; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 0 20px; }
+.pr-insig { width: min(34vw, 150px); height: min(34vw, 150px); filter: drop-shadow(0 0 22px rgba(243, 207, 106, 0.7));
+  animation: pr-slam 0.7s cubic-bezier(.2,1.5,.35,1) both; }
+@keyframes pr-slam { from { transform: scale(3.2) rotate(-14deg); opacity: 0; } 60% { opacity: 1; } }
+.pr-tag { font: 700 13px/1 var(--f-data); letter-spacing: 0.5em; color: #f3cf6a; animation: pr-rise 0.5s 0.35s both; }
+.pr-name { font: 700 clamp(28px, 8vw, 52px)/1.05 var(--f-display); letter-spacing: 0.08em; color: #fff4d6;
+  text-shadow: 0 0 24px rgba(243, 207, 106, 0.45); animation: pr-rise 0.5s 0.5s both; }
+.pr-pay { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; animation: pr-rise 0.5s 0.75s both; }
+.pr-pay span { font: 700 12px/1 var(--f-data); letter-spacing: 0.14em; padding: 8px 14px; color: #1a1206; background: #f3cf6a; }
+.pr-pay span.comm { background: transparent; color: var(--money); border: 1px solid rgba(111, 208, 140, 0.5); }
+.pr-tap { margin-top: 18px; font: 600 10px/1 var(--f-data); letter-spacing: 0.3em; color: var(--dim); font-style: normal;
+  animation: pr-rise 0.5s 1.2s both, tgp-blink 1.4s 1.8s steps(2) infinite; }
+@keyframes pr-rise { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { #promotion *, #promotion.on { animation: none !important; } }
+
+/* An XP line in the feed: a ribbon earned. */
+.feed-line.xp { --plate-mark: #9fd0ff; border-left-color: #9fd0ff; color: #cfe7ff; }

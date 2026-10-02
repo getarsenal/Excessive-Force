@@ -539,3 +539,50 @@
 .tt-medal.won, .tt-unit:not(.locked) { --plate-mark: #ec7b3f; }
 .tt-medal:not(.won), .tt-unit.locked { --plate-mark: #4a5b6e; }
 .tt-item, .tt-sbtn, .tt-tool, .tt-x { border-radius: 0; }
+
+/* ── Progression on the front door. ── */
+.tt-xpto { display: block; margin-top: 3px; font: 600 9.5px/1 var(--f-data, ui-monospace, monospace); letter-spacing: 0.06em; color: #9aa7b6; }
+.tt-cmedals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.tt-cmedal { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 10px 12px;
+  border: 1px solid rgba(206, 216, 190, 0.17); background: rgba(11, 14, 11, 0.6); }
+.tt-cmedal b { font-size: 12.5px; letter-spacing: 0.14em; color: #c9d1db; }
+.tt-cmedal.t1 b { color: #d39a6a; } .tt-cmedal.t2 b { color: #cfd6de; } .tt-cmedal.t3 b { color: #f3cf6a; } .tt-cmedal.t4 b { color: #a7f3ff; }
+.tt-cm-line { grid-column: 1 / -1; font-size: 11.5px; color: #9aa7b6; }
+.tt-cm-bar { grid-column: 1 / -1; display: block; height: 6px; background: rgba(255, 255, 255, 0.07); }
+.tt-cm-bar u { display: block; height: 100%; background: linear-gradient(90deg, #7d4fd0, #c77dff); }
+.tt-cmedal i, .tt-order i { grid-column: 1 / -1; font-style: normal; font-size: 9.5px; letter-spacing: 0.14em; color: #7e8b9b; }
+.tt-pips { display: flex; gap: 3px; align-items: center; }
+.tt-pip { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.25); }
+.tt-pip.on.t1 { background: #b87333; border-color: #e0a070; } .tt-pip.on.t2 { background: #c0c8d0; border-color: #fff; }
+.tt-pip.on.t3 { background: #e4b54a; border-color: #fff1b0; } .tt-pip.on.t4 { background: #8fe3f0; border-color: #e8fdff; box-shadow: 0 0 6px #8fe3f0; }
+.tt-orders { display: flex; flex-direction: column; gap: 8px; }
+.tt-order { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid rgba(206, 216, 190, 0.17); background: rgba(11, 14, 11, 0.6); }
+.tt-order b { font-size: 12.5px; letter-spacing: 0.12em; color: #dbe3ec; }
+.tt-order .tt-cm-bar u { background: #6fd08c; }
+.tt-order.done { border-color: rgba(111, 208, 140, 0.5); }
+.tt-order.done b { color: #6fd08c; }
+.tt-crate-row { display: flex; justify-content: center; margin: 8px 0 4px; }
+.tt-crate { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 26px; cursor: pointer;
+  background: rgba(224, 163, 60, 0.08); border: 1px solid rgba(224, 163, 60, 0.55); color: #f3cf6a; font: inherit; }
+.tt-crate b { font-size: 12px; letter-spacing: 0.2em; }
+.tt-crate.empty { opacity: 0.45; cursor: default; }
+.tt-crate-box { width: 96px; height: 70px; position: relative;
+  background: repeating-linear-gradient(90deg, #4d5a2c 0 22px, #3f4a24 22px 24px), #4d5a2c;
+  border: 3px solid #2c3418; box-shadow: inset 0 0 0 4px rgba(0,0,0,0.18), 0 6px 14px rgba(0,0,0,0.5); }
+.tt-crate-box::before { content: ''; position: absolute; left: -3px; right: -3px; top: 16px; height: 6px; background: #2c3418; }
+.tt-crate-box::after { content: 'SUPPLY'; position: absolute; left: 0; right: 0; top: 34px; text-align: center;
+  font: 700 11px/1 var(--f-data, monospace); letter-spacing: 0.24em; color: rgba(230, 220, 170, 0.75); }
+.tt-crate:not(.empty) .tt-crate-box { animation: tt-crate-wobble 2.4s ease-in-out infinite; }
+@keyframes tt-crate-wobble { 0%, 80%, 100% { transform: none; } 84% { transform: rotate(-4deg); } 88% { transform: rotate(4deg); } 92% { transform: rotate(-2deg); } }
+.tt-loot { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 12px; margin-bottom: 12px; text-align: center;
+  border: 1px solid; animation: tt-loot-in 0.6s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes tt-loot-in { from { transform: scale(0.5); opacity: 0; } }
+.tt-loot span { font-size: 10px; letter-spacing: 0.4em; }
+.tt-loot b { font-size: clamp(15px, 4vw, 19px); letter-spacing: 0.08em; color: #fff; }
+.tt-loot.r-common { border-color: #8a96a3; background: rgba(138, 150, 163, 0.1); } .tt-loot.r-common span { color: #b9c3cf; }
+.tt-loot.r-uncommon { border-color: #6fd08c; background: rgba(111, 208, 140, 0.1); } .tt-loot.r-uncommon span { color: #6fd08c; }
+.tt-loot.r-rare { border-color: #58a6ff; background: rgba(88, 166, 255, 0.12); box-shadow: 0 0 22px rgba(88, 166, 255, 0.3); } .tt-loot.r-rare span { color: #58a6ff; }
+.tt-loot.r-legendary { border-color: #f3cf6a; background: rgba(243, 207, 106, 0.14); box-shadow: 0 0 34px rgba(243, 207, 106, 0.5); } .tt-loot.r-legendary span { color: #f3cf6a; }
+.tt-perks { display: flex; flex-wrap: wrap; gap: 6px; }
+.tt-perks span { padding: 6px 10px; font-size: 11px; letter-spacing: 0.12em; color: #6fd08c; border: 1px solid rgba(111, 208, 140, 0.4); }
+@media (prefers-reduced-motion: reduce) { .tt-crate-box, .tt-loot { animation: none !important; } }
