@@ -47,9 +47,12 @@ const WALL = 1.0;
 
 /** The Intihuatana knoll, north-west of the plaza: four terraces wrapped round a rock. */
 const KNOLL = {
-  cx: -36.0, cz: -70.0,
-  rx: 17.0, rz: 13.0,           // the foot of the lowest terrace
-  shrink: 3.0,                  // each terrace steps in this much on rx (rz in proportion)
+  // At the head of the plaza, where the summit is still level under the
+  // whole of its foot: further west the ground falls away, and a knoll
+  // built there stood out over the slope on nothing.
+  cx: -12.0, cz: -63.0,
+  rx: 14.0, rz: 10.5,           // the foot of the lowest terrace
+  shrink: 2.5,                  // each terrace steps in this much on rx (rz in proportion)
   tiers: 4, rise: 2.2,
   sides: 20,
   gnomon: { base: { w: 3.2, d: 2.4, h: 1.0 }, post: { w: 0.7, d: 0.9, h: 1.8 } },
@@ -59,8 +62,8 @@ const wobble = (a) => 1 + 0.09 * Math.sin(3 * a + 0.7) + 0.05 * Math.cos(5 * a -
 const knollR = (i) => ({ rx: KNOLL.rx - KNOLL.shrink * i, rz: KNOLL.rz - KNOLL.shrink * (KNOLL.rz / KNOLL.rx) * i });
 
 /** The Sacred Plaza, under the knoll. */
-const PRINCIPAL = { cx: -43.0, cz: -45.0, w: 11.0, d: 8.0, wall: 1.2, h: 4.0 };     // open to the south
-const WINDOWS = { cx: -29.0, cz: -46.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill: 1.1, head: 2.4, at: [-2.6, 0, 2.6] };
+const PRINCIPAL = { cx: -30.0, cz: -44.0, w: 11.0, d: 8.0, wall: 1.2, h: 4.0 };     // open to the south
+const WINDOWS = { cx: -17.0, cz: -44.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill: 1.1, head: 2.4, at: [-2.6, 0, 2.6] };
 
 /**
  * The kanchas: walled yards, the houses inside along two or three of their
@@ -68,15 +71,14 @@ const WINDOWS = { cx: -29.0, cz: -46.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill
  */
 const KANCHAS = [
   // The upper town, west of the plaza, in two columns, leaving the Torreón
-  // its ground at the middle of the west side.
-  // The outer columns open outward, over the terraces and the drop: their
-  // backs are to the inner yards, which is how the town turns to the view.
-  ...[-24, -7, 10, 60, 77].map((cz) => ({ cx: -46.0, cz, w: 17.0, d: 14.0, door: 'w' })),
-  ...[-24, -8, 8, 61, 77].map((cz) => ({ cx: -27.0, cz, w: 13.0, d: 13.0, door: 'e' })),
+  // its ground at the middle of the west side. Only where the summit is
+  // level under the whole yard: footcheck.mjs measures it.
+  ...[-24, -7, 10].map((cz) => ({ cx: -38.0, cz, w: 15.0, d: 14.0, door: 'w' })),
+  ...[-24, -8, 8, 60].map((cz) => ({ cx: -22.0, cz, w: 13.0, d: 13.0, door: 'e' })),
   // The lower town, east of it: the Three Doorways at the north, then the
-  // Mortars and the Condor, two columns deep down the whole east side.
+  // Mortars and the Condor, two columns deep down the east side.
   ...[-77, -61, -45, -29, -13, 3, 19, 35, 51].map((cz) => ({ cx: 22.0, cz, w: 13.0, d: 13.5, door: 'w' })),
-  ...[-77, -61, -45, -29, -13, 3, 19, 35].map((cz) => ({ cx: 40.0, cz, w: 15.0, d: 14.0, door: 'e' })),
+  ...[-45, -29, -13, 3, 19, 35].map((cz) => ({ cx: 38.5, cz, w: 15.0, d: 14.0, door: 'e' })),
 ];
 const KANCHA = { wall: 0.9, h: 2.4, gap: 0.5 };
 const HOUSE = { wall: 0.75, h: 3.0, pitch: 1.15, door: { b: 1.1, t: 0.8, h: 2.0 } };
@@ -84,10 +86,10 @@ const HOUSE = { wall: 0.75, h: 3.0, pitch: 1.15, door: { b: 1.1, t: 0.8, h: 2.0 
 /** Houses standing on their own: the priests' house, the guardhouse, the storehouses. */
 const LONE = [
   { cx: -36.0, cz: -35.0, w: 8.0, d: 4.6, door: 'n', thatch: true },
-  { cx: -38.0, cz: 92.0, w: 7.0, d: 4.6, door: 'e', thatch: true },     // the guardhouse
-  { cx: 10.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
-  { cx: 19.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
-  { cx: 28.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+  { cx: -8.0, cz: 92.0, w: 7.0, d: 4.6, door: 'e', thatch: true },      // the guardhouse
+  { cx: 6.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+  { cx: 14.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+  { cx: 22.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
 ];
 
 /** The Torreón, on its own ground in the upper town south of the royal compounds. */
