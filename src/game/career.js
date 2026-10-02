@@ -138,38 +138,81 @@ export function rankFor(tons) {
 }
 
 /** The rank as a badge: chevrons, bars, a leaf, an eagle or stars. */
+/**
+ * The rank icons that have been supplied, by grade id, in
+ * `public/assets/ranks/<id>.png`. A rank listed here is shown as its picture;
+ * one that is not is drawn below. Add the id when its file goes in.
+ */
+export const RANK_ICONS = new Set([]);
+
+/**
+ * A rank's insignia: its supplied picture, or — until there is one — the
+ * United States Army's own, drawn. Chevrons with rockers under them and the
+ * device in the middle for the senior NCOs; the specialist's shield; bars,
+ * leaves and the eagle in gold or silver; silver stars for the generals; and
+ * five in a ring for the Field Marshal.
+ */
 export function insignia(rank, cls = 'ins') {
-  const g = '#e4b54a';
-  let body = '';
-  if (rank.kind === 'chev') {
-    for (let k = 0; k < rank.n; k++) {
-      const y = 10 + k * 8;
-      body += `<path d="M6 ${y + 8} L24 ${y} L42 ${y + 8}" fill="none" stroke="${g}" stroke-width="4.2" stroke-linejoin="miter"/>`;
+  if (rank && rank.id && RANK_ICONS.has(rank.id)) {
+    return `<img class="${cls}" src="assets/ranks/${rank.id}.png" alt="" aria-hidden="true">`;
+  }
+  const gold = '#e4b54a', silver = '#d3d8de';
+  const g = rank.metal === 'silver' ? silver : gold;
+  const kind = rank.kind;
+  const star = (cx, cy, r, fill = g) => {
+    let d = '';
+    for (let k = 0; k < 10; k++) {
+      const a = -Math.PI / 2 + (k * Math.PI) / 5, rr = k % 2 ? r * 0.42 : r;
+      d += `${k ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)} `;
     }
-  } else if (rank.kind === 'bar') {
+    return `<path d="${d}Z" fill="${fill}"/>`;
+  };
+  let body = '';
+  if (kind === 'chev') {
+    // Chevrons point up; rockers curve under them; the device sits between.
+    const n = rank.n || 0, r = rank.r || 0;
+    const top = r ? 4 : 10;
+    for (let k = 0; k < n; k++) {
+      const y = top + k * 6;
+      body += `<path d="M7 ${y + 9} L24 ${y} L41 ${y + 9}" fill="none" stroke="${gold}" stroke-width="3.6" stroke-linejoin="miter"/>`;
+    }
+    for (let k = 0; k < r; k++) {
+      const y = 31 + k * 5;
+      body += `<path d="M7 ${y} Q24 ${y + 8} 41 ${y}" fill="none" stroke="${gold}" stroke-width="3.2"/>`;
+    }
+    const cy = top + n * 6 + 6;
+    if (rank.dev === 'diamond') body += `<path d="M24 ${cy - 6} L29 ${cy} L24 ${cy + 6} L19 ${cy} Z" fill="${gold}"/>`;
+    else if (rank.dev === 'star') body += star(24, cy, 6);
+    else if (rank.dev === 'wreath') body += `<circle cx="24" cy="${cy}" r="7" fill="none" stroke="${gold}" stroke-width="1.8"/>${star(24, cy, 4.6)}`;
+    else if (rank.dev === 'eagle') body += `${star(17, cy, 3.6)}${star(31, cy, 3.6)}<path d="M20 ${cy - 2} L24 ${cy - 6} L28 ${cy - 2} L26 ${cy + 4} L22 ${cy + 4} Z" fill="${gold}"/>`;
+  } else if (kind === 'spc') {
+    // The specialist: an eagle on a shield under a curved top.
+    body = `<path d="M8 12 Q24 4 40 12 L40 26 Q40 38 24 44 Q8 38 8 26 Z" fill="${gold}"/>`
+      + `<path d="M15 22 L21 25 L24 18 L27 25 L33 22 L29 30 L24 36 L19 30 Z" fill="#3a3220"/>`;
+  } else if (kind === 'bar') {
     const w = rank.n === 1 ? 10 : 8;
     for (let k = 0; k < rank.n; k++) {
       const x = rank.n === 1 ? 19 : 12 + k * 14;
       body += `<rect x="${x}" y="8" width="${w}" height="32" rx="1.5" fill="${g}"/>`;
     }
-  } else if (rank.kind === 'leaf') {
-    body = `<path d="M24 6 C34 14 38 22 32 32 C29 36 26 38 24 42 C22 38 19 36 16 32 C10 22 14 14 24 6 Z" fill="${g}"/><path d="M24 12 V40" stroke="#6b4b10" stroke-width="1.6"/>`;
-  } else if (rank.kind === 'eagle') {
+  } else if (kind === 'leaf') {
+    const vein = rank.metal === 'silver' ? '#6f757c' : '#6b4b10';
+    body = `<path d="M24 6 C34 14 38 22 32 32 C29 36 26 38 24 42 C22 38 19 36 16 32 C10 22 14 14 24 6 Z" fill="${g}"/><path d="M24 12 V40" stroke="${vein}" stroke-width="1.6"/>`;
+  } else if (kind === 'eagle') {
     body = `<path d="M4 18 L18 22 L24 12 L30 22 L44 18 L34 28 L28 28 L24 40 L20 28 L14 28 Z" fill="${g}"/>`;
-  } else if (rank.kind === 'star') {
+  } else if (kind === 'star') {
     const n = rank.n, gap = 44 / n;
-    const star = (cx, cy, r) => {
-      let d = '';
-      for (let k = 0; k < 10; k++) {
-        const a = -Math.PI / 2 + (k * Math.PI) / 5, rr = k % 2 ? r * 0.42 : r;
-        d += `${k ? 'L' : 'M'}${(cx + Math.cos(a) * rr).toFixed(1)} ${(cy + Math.sin(a) * rr).toFixed(1)} `;
-      }
-      return `<path d="${d}Z" fill="${g}"/>`;
-    };
     const r = Math.min(9, gap * 0.48);
     for (let k = 0; k < n; k++) body += star(2 + gap * (k + 0.5), 24, r);
+  } else if (kind === 'fm' || kind === 'prestige') {
+    // Five stars in a ring; prestige sets them in a laurel.
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + (k * 2 * Math.PI) / 5;
+      body += star(24 + Math.cos(a) * 12, 24 + Math.sin(a) * 12, 5.4, gold);
+    }
+    if (kind === 'prestige') body += `<circle cx="24" cy="24" r="21" fill="none" stroke="${gold}" stroke-width="2"/>`;
   } else {
-    body = `<circle cx="24" cy="24" r="7" fill="none" stroke="${g}" stroke-width="2.4"/>`;
+    body = `<circle cx="24" cy="24" r="7" fill="none" stroke="${gold}" stroke-width="2.4"/>`;
   }
   return `<svg class="${cls}" viewBox="0 0 48 48" aria-hidden="true">${body}</svg>`;
 }

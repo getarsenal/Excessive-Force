@@ -44,19 +44,57 @@ export const underHarness = () => get('tt.suite') === '1';
 
 // ── The ladder.
 
+/**
+ * The United States Army's own ladder, as it stands: the thirteen enlisted
+ * ranks from Private to Sergeant Major of the Army, then the ten commissioned
+ * ones from Second Lieutenant to General, and Field Marshal over the top —
+ * the five-star rank the Army has only ever held in wartime, here earned.
+ * Warrant officers are a track of their own, not a step on this one.
+ *
+ * Fifty grades, as before, on the same XP curve, so a save keeps its place:
+ * the longer ranks are split into steps (I, II, III). `id` names the icon in
+ * `public/assets/ranks/`; until one is there the insignia is drawn.
+ *
+ *   [name, steps, id, kind, n, rockers, device, metal]
+ */
 const LADDER = [
-  ['RECRUIT', 1, 'none', 0], ['PRIVATE', 4, 'chev', 1], ['CORPORAL', 4, 'chev', 2],
-  ['SERGEANT', 4, 'chev', 3], ['STAFF SERGEANT', 4, 'chev', 4],
-  ['LIEUTENANT', 4, 'bar', 1], ['CAPTAIN', 4, 'bar', 2], ['MAJOR', 4, 'leaf', 1],
-  ['COLONEL', 4, 'eagle', 1], ['BRIGADIER GENERAL', 4, 'star', 1], ['MAJOR GENERAL', 4, 'star', 2],
-  ['LIEUTENANT GENERAL', 4, 'star', 3], ['GENERAL', 4, 'star', 4], ['FIELD MARSHAL', 1, 'star', 5],
+  ['PRIVATE', 1, 'pv1', 'none', 0],
+  ['PRIVATE SECOND CLASS', 1, 'pv2', 'chev', 1],
+  ['PRIVATE FIRST CLASS', 2, 'pfc', 'chev', 1, 1],
+  ['SPECIALIST', 2, 'spc', 'spc', 0],
+  ['CORPORAL', 3, 'cpl', 'chev', 2],
+  ['SERGEANT', 3, 'sgt', 'chev', 3],
+  ['STAFF SERGEANT', 2, 'ssg', 'chev', 3, 1],
+  ['SERGEANT FIRST CLASS', 2, 'sfc', 'chev', 3, 2],
+  ['MASTER SERGEANT', 2, 'msg', 'chev', 3, 3],
+  ['FIRST SERGEANT', 2, '1sg', 'chev', 3, 3, 'diamond'],
+  ['SERGEANT MAJOR', 2, 'sgm', 'chev', 3, 3, 'star'],
+  ['COMMAND SERGEANT MAJOR', 2, 'csm', 'chev', 3, 3, 'wreath'],
+  ['SERGEANT MAJOR OF THE ARMY', 1, 'sma', 'chev', 3, 3, 'eagle'],
+  ['SECOND LIEUTENANT', 2, '2lt', 'bar', 1, 0, null, 'gold'],
+  ['FIRST LIEUTENANT', 2, '1lt', 'bar', 1, 0, null, 'silver'],
+  ['CAPTAIN', 3, 'cpt', 'bar', 2, 0, null, 'silver'],
+  ['MAJOR', 3, 'maj', 'leaf', 1, 0, null, 'gold'],
+  ['LIEUTENANT COLONEL', 3, 'ltc', 'leaf', 1, 0, null, 'silver'],
+  ['COLONEL', 3, 'col', 'eagle', 1, 0, null, 'silver'],
+  ['BRIGADIER GENERAL', 2, 'bg', 'star', 1, 0, null, 'silver'],
+  ['MAJOR GENERAL', 2, 'mg', 'star', 2, 0, null, 'silver'],
+  ['LIEUTENANT GENERAL', 2, 'ltg', 'star', 3, 0, null, 'silver'],
+  ['GENERAL', 2, 'gen', 'star', 4, 0, null, 'silver'],
+  ['FIELD MARSHAL', 1, 'fm', 'fm', 5, 0, null, 'gold'],
 ];
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+/** What draws a grade's insignia, carried with it wherever it is shown. */
+export const insigniaOf = (g) => ({ id: g.id, kind: g.kind, n: g.n, r: g.r, dev: g.dev, metal: g.metal });
+/** Prestige, past the top of the ladder. */
+export const PRESTIGE_INSIGNIA = { id: 'prestige', kind: 'prestige', n: 5, metal: 'gold' };
 /** Every grade: its name, its insignia, and the XP it takes to reach it from the one below. */
 export const GRADES = (() => {
   const out = [];
-  for (const [name, n, kind, k] of LADDER) {
-    for (let s = 1; s <= n; s++) out.push({ name: n > 1 ? `${name} ${ROMAN[s]}` : name, base: name, kind, n: k });
+  for (const [name, steps, id, kind, n, r = 0, dev = null, metal = 'gold'] of LADDER) {
+    for (let s = 1; s <= steps; s++) {
+      out.push({ name: steps > 1 ? `${name} ${ROMAN[s]}` : name, base: name, id, kind, n, r, dev, metal });
+    }
   }
   out.forEach((g, i) => { g.cost = i === 0 ? 0 : Math.round(900 + 260 * i + 12 * i * i); });
   let acc = 0;
@@ -88,7 +126,7 @@ export function gradeFor(xp) {
   const g = GRADES[i], nx = GRADES[i + 1] || null;
   const into = xp - g.at, span = nx ? nx.cost : 1;
   return {
-    i, name: g.name, base: g.base, kind: g.kind, n: g.n,
+    i, name: g.name, base: g.base, ...insigniaOf(g),
     next: nx ? nx.name : null, need: nx ? nx.at - xp : 0,
     into, span, frac: nx ? Math.max(0, Math.min(1, into / span)) : 1,
     reward: nx ? rewardFor(i + 1) : null,
@@ -392,7 +430,7 @@ export function award(r) {
     for (let i = gBefore + 1; i <= gAfter; i++) {
       const rw = rewardFor(i);
       c.crates += rw.crates;
-      crossed.push({ i, name: GRADES[i].name, kind: GRADES[i].kind, n: GRADES[i].n, ...rw });
+      crossed.push({ i, name: GRADES[i].name, ...insigniaOf(GRADES[i]), ...rw });
     }
   } else c.crates += 3;
   c.crates += bonusCrate;

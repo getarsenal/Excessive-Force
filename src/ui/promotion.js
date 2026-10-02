@@ -12,7 +12,7 @@
  * always printed beside it, and when it is close the report says so.
  */
 import { insignia } from '../game/career.js';
-import { TIERS, GRADES, ordersResetIn } from '../game/progress.js';
+import { TIERS, GRADES, ordersResetIn, PRESTIGE_INSIGNIA } from '../game/progress.js';
 import { fanfare, tick } from '../core/synth.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -114,7 +114,7 @@ export function promote(rep, o = {}) {
   if (!el) { el = document.createElement('div'); el.id = 'promotion'; document.body.appendChild(el); }
   const crates = rep.crossed.reduce((a, c) => a + c.crates, 0);
   const comms = rep.crossed.filter((c) => c.commission).map((c) => c.commission.line);
-  const g = top ? { kind: top.kind, n: top.n } : { kind: 'star', n: 5 };
+  const g = rep.prestiged || !top ? PRESTIGE_INSIGNIA : top;
   el.innerHTML = `<div class="pr-burst"></div>
     <div class="pr-inner">
       <span class="pr-ins">${insignia(g, 'pr-insig')}</span>
