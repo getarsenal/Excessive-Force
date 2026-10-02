@@ -424,7 +424,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     const featsHtml = m.feats.map((f) => {
       const where = f.won && LEVELS[f.won.level] ? ` · ${esc((LEVELS[f.won.level].target || '').toUpperCase())}` : '';
       return `<div class="tt-medal${f.won ? ' won' : ''}"><b>${f.won ? esc(f.name) : '?'.repeat(Math.min(12, f.name.length))}</b><span>${esc(f.line)}</span>`
-        + `<i>${f.won ? `WON ${esc(f.won.at)}${where}` : 'NOT YET · 1,000 XP'}</i></div>`;
+        + `<i>${f.won ? `WON ${esc(f.won.at)}${where}` : 'NOT YET · 750 XP'}</i></div>`;
     }).join('');
     return `<p class="tt-arm-intro">Career medals come in four grades, each worth more XP than the last; the bar says how far to the next. Feats are won once.</p>
       <div class="tt-sk">CAREER</div><div class="tt-cmedals">${careerHtml}</div>
