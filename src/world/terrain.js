@@ -624,7 +624,16 @@ export class Terrain {
     const ridge = valueNoise(x * 0.00062 + 11.3, z * 0.00062 - 4.7) * 2 - 1;
     const grain = valueNoise(x * 0.0021 - 3.1, z * 0.0021 + 8.9) * 2 - 1;
     const hill = (ridge * 0.72 + grain * 0.28) * this._farAmp;
-    const land = fall + hill * Math.min(1, out / (s * 0.45));
+    let land = fall + hill * Math.min(1, out / (s * 0.45));
+    // Never below the river's own surface unless it is the river. The hills
+    // out here are noise round a falling base, and on a mountain map they
+    // reach a hundred metres down: at Machu Picchu the valley past the map
+    // dropped a hundred metres under the Urubamba, and its water was drawn as
+    // a slab floating over the fields. A harbour's surround is the sea's
+    // business, below.
+    if (!this.openSea && this.hasWater !== false && Number.isFinite(this.waterLevel)) {
+      land = Math.max(land, this.waterLevel + 2.5);
+    }
 
     // The surveyed coastline out here, where there is one.
     //
@@ -1315,7 +1324,13 @@ export class Terrain {
         const corners = [];
         if (r.i0 === 0) corners.push(side.at(0));
         if (r.i1 === N) corners.push(side.at(1));
-        raw.push({ mid, half: w / 2, dir, n: { x: side.n.x, z: side.n.z }, corners });
+        // The run along the edge is the river's width only when it leaves
+        // square. Leaving at a slant, the edge cuts it obliquely and the run
+        // is the width over the cosine of the angle: the Urubamba crosses
+        // Machu Picchu's south-west corner at a shallow angle, and its tail
+        // went off across the valley five hundred and fifty metres wide.
+        const square = Math.max(0.3, Math.abs(dir.x * side.n.x + dir.z * side.n.z));
+        raw.push({ mid, half: (w / 2) * square, dir, n: { x: side.n.x, z: side.n.z }, corners });
       };
       const runs = [];
       let run = null;
