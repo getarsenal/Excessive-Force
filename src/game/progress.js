@@ -45,11 +45,12 @@ export const underHarness = () => get('tt.suite') === '1';
 // ── The ladder.
 
 /**
- * The United States Army's own ladder, as it stands: the thirteen enlisted
- * ranks from Private to Sergeant Major of the Army, then the ten commissioned
- * ones from Second Lieutenant to General, and Field Marshal over the top —
- * the five-star rank the Army has only ever held in wartime, here earned.
- * Warrant officers are a track of their own, not a step on this one.
+ * The United States Army's own ladder, as it stands, from the first stripe:
+ * the twelve enlisted ranks from Private Second Class to Sergeant Major of
+ * the Army, the five warrant officer grades from Warrant Officer 1 to Chief
+ * Warrant Officer 5, then the ten commissioned ranks from Second Lieutenant
+ * to General, and Field Marshal over the top — the five-star rank the Army
+ * has only ever held in wartime, here earned.
  *
  * Fifty grades, as before, on the same XP curve, so a save keeps its place:
  * the longer ranks are split into steps (I, II, III). `id` names the icon in
@@ -58,12 +59,11 @@ export const underHarness = () => get('tt.suite') === '1';
  *   [name, steps, id, kind, n, rockers, device, metal]
  */
 const LADDER = [
-  ['PRIVATE', 1, 'pv1', 'none', 0],
   ['PRIVATE SECOND CLASS', 1, 'pv2', 'chev', 1],
   ['PRIVATE FIRST CLASS', 2, 'pfc', 'chev', 1, 1],
   ['SPECIALIST', 2, 'spc', 'spc', 0],
-  ['CORPORAL', 3, 'cpl', 'chev', 2],
-  ['SERGEANT', 3, 'sgt', 'chev', 3],
+  ['CORPORAL', 2, 'cpl', 'chev', 2],
+  ['SERGEANT', 2, 'sgt', 'chev', 3],
   ['STAFF SERGEANT', 2, 'ssg', 'chev', 3, 1],
   ['SERGEANT FIRST CLASS', 2, 'sfc', 'chev', 3, 2],
   ['MASTER SERGEANT', 2, 'msg', 'chev', 3, 3],
@@ -71,12 +71,17 @@ const LADDER = [
   ['SERGEANT MAJOR', 2, 'sgm', 'chev', 3, 3, 'star'],
   ['COMMAND SERGEANT MAJOR', 2, 'csm', 'chev', 3, 3, 'wreath'],
   ['SERGEANT MAJOR OF THE ARMY', 1, 'sma', 'chev', 3, 3, 'eagle'],
+  ['WARRANT OFFICER 1', 1, 'wo1', 'wo', 1, 0, null, 'silver'],
+  ['CHIEF WARRANT OFFICER 2', 1, 'cw2', 'wo', 2, 0, null, 'silver'],
+  ['CHIEF WARRANT OFFICER 3', 2, 'cw3', 'wo', 3, 0, null, 'silver'],
+  ['CHIEF WARRANT OFFICER 4', 2, 'cw4', 'wo', 4, 0, null, 'silver'],
+  ['CHIEF WARRANT OFFICER 5', 1, 'cw5', 'wo', 5, 0, null, 'silver'],
   ['SECOND LIEUTENANT', 2, '2lt', 'bar', 1, 0, null, 'gold'],
   ['FIRST LIEUTENANT', 2, '1lt', 'bar', 1, 0, null, 'silver'],
-  ['CAPTAIN', 3, 'cpt', 'bar', 2, 0, null, 'silver'],
-  ['MAJOR', 3, 'maj', 'leaf', 1, 0, null, 'gold'],
-  ['LIEUTENANT COLONEL', 3, 'ltc', 'leaf', 1, 0, null, 'silver'],
-  ['COLONEL', 3, 'col', 'eagle', 1, 0, null, 'silver'],
+  ['CAPTAIN', 2, 'cpt', 'bar', 2, 0, null, 'silver'],
+  ['MAJOR', 2, 'maj', 'leaf', 1, 0, null, 'gold'],
+  ['LIEUTENANT COLONEL', 2, 'ltc', 'leaf', 1, 0, null, 'silver'],
+  ['COLONEL', 2, 'col', 'eagle', 1, 0, null, 'silver'],
   ['BRIGADIER GENERAL', 2, 'bg', 'star', 1, 0, null, 'silver'],
   ['MAJOR GENERAL', 2, 'mg', 'star', 2, 0, null, 'silver'],
   ['LIEUTENANT GENERAL', 2, 'ltg', 'star', 3, 0, null, 'silver'],

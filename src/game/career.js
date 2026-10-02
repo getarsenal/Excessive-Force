@@ -148,7 +148,8 @@ export const RANK_ICONS = new Set([]);
 /**
  * A rank's insignia: its supplied picture, or — until there is one — the
  * United States Army's own, drawn. Chevrons with rockers under them and the
- * device in the middle for the senior NCOs; the specialist's shield; bars,
+ * device in the middle for the senior NCOs; the specialist's shield; the
+ * warrant officers' silver bar with its black squares; bars,
  * leaves and the eagle in gold or silver; silver stars for the generals; and
  * five in a ring for the Field Marshal.
  */
@@ -189,6 +190,15 @@ export function insignia(rank, cls = 'ins') {
     // The specialist: an eagle on a shield under a curved top.
     body = `<path d="M8 12 Q24 4 40 12 L40 26 Q40 38 24 44 Q8 38 8 26 Z" fill="${gold}"/>`
       + `<path d="M15 22 L21 25 L24 18 L27 25 L33 22 L29 30 L24 36 L19 30 Z" fill="#3a3220"/>`;
+  } else if (kind === 'wo') {
+    // Warrant officers: a silver bar with black squares across it, one to
+    // four; the Chief Warrant Officer 5 has a black stripe down its length.
+    body = `<rect x="16" y="6" width="16" height="36" rx="1.5" fill="${silver}"/>`;
+    if (rank.n >= 5) body += `<rect x="22.6" y="9" width="2.8" height="30" fill="#14171b"/>`;
+    else {
+      const gap = 30 / rank.n;
+      for (let k = 0; k < rank.n; k++) body += `<rect x="20" y="${(9 + gap * (k + 0.5) - 3.2).toFixed(1)}" width="8" height="6.4" fill="#14171b"/>`;
+    }
   } else if (kind === 'bar') {
     const w = rank.n === 1 ? 10 : 8;
     for (let k = 0; k < rank.n; k++) {
