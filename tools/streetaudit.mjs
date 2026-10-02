@@ -140,7 +140,8 @@ for (const level of levels) {
   }
   if (shots) {
     mkdirSync(shots, { recursive: true });
-    const pick = [...r.crossings.slice(0, 2), ...r.along.slice(0, 2), ...r.through.slice(0, 2)];
+    const pick = [...r.crossings.slice(0, 2), ...r.along.slice(0, 2), ...r.through.slice(0, 2),
+      ...(args.includes('--dead') ? r.deadAt.slice(0, 4) : [])];
     let k = 0;
     for (const q of pick) {
       await page.evaluate((q) => {

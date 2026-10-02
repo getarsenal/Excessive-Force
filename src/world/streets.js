@@ -1308,6 +1308,31 @@ export function buildStreetSurface(net, terrain, quality) {
     fan(junctionRing(n, (a) => a.road), n, y + 0.03, ASPHALT, vert, dry);
   }
 
+  // ── Turning heads.
+  //
+  // A street that ends inside the map — at a quay, at the precinct, at a
+  // survey's own dead end — used to stop square with its kerbs open, which
+  // from above is a road cut off with scissors: the "broken" streets. A road
+  // that really ends has somewhere to turn, so each one ends in a paved
+  // circle a little wider than the carriageway. Not at the map's edge, where
+  // the road carries on into the surround, and not on a bridge.
+  const RING = 18;
+  for (const n of net.nodes) {
+    if (n.links.length !== 1) continue;
+    const e = n.links[0].edge;
+    if (e.bridge || e.approach || e.bank) continue;
+    if (Math.abs(n.x) > terrain.span - 40 || Math.abs(n.z) > terrain.span - 40) continue;
+    const c = ROAD_CLASS[e.cls] || ROAD_CLASS.street;
+    const tar = c.road / 2 + 1.6, paved = tar + c.pave;
+    const ring = (r) => Array.from({ length: RING }, (_, k) => {
+      const a = (k / RING) * Math.PI * 2;
+      return { x: n.x + Math.cos(a) * r, z: n.z + Math.sin(a) * r };
+    });
+    const y = n.y + LIFT;
+    fan(ring(paved), n, y, PAVE, vert, dry);
+    fan(ring(tar), n, y + 0.03, ASPHALT, vert, dry);
+  }
+
   // Face every triangle upward.
   //
   // The ribbons are wound from the direction the street happens to run and the
