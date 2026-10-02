@@ -47,6 +47,7 @@ import { WhiteFlags } from './fx/whiteflags.js';
 import * as synth from './core/synth.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
+import { SamSites, siteSams } from './game/sam.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -617,6 +618,25 @@ async function boot() {
   // walls go to soot, the windows go dark, and the fire is on the roof.
   // The dumps beside the heavy weapons, which go up when a round lands close.
   battle.stores = new Stores({ scene: engine.scene, garrison, terrain, structures });
+  // The S-300 battery. Not in Boot Camp, and never under the harness: the
+  // strike tests fly aeroplanes in and measure what they do, and a battery
+  // that brought one down at random would make every one of them a coin.
+  if (!lensSuite && level.id !== 'tutorial' && level.sams !== false) {
+    const sites = siteSams(terrain, {
+      exclude: level.contextExclude || level.cityExcludeRadius || 120,
+      plots: contextGroup?.userData?.plots || [],
+      net: contextGroup?.userData?.network || null,
+      landmarks,
+    });
+    if (sites.length) {
+      // Sand where the ground is sand, olive drab everywhere else.
+      const u = level.palette?.urban;
+      const desert = !!(u && u.r > 0.5 && u.r > u.b * 1.25);
+      battle.sams = new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air,
+        camera: engine.camera, quality, sites, desert,
+        onEvent: (kind, data) => handleEvent(kind, data) });
+    }
+  }
   battle.cityFire = new CityFire({
     cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene,
     onBurn: (p) => battle.cityCollapse(p),
@@ -941,7 +961,7 @@ async function boot() {
         // the strike is in and a while after.
         if (data.point && fx.flourish) fx.flourish.markerSmoke(data.point, (data.eta || 10) + 10);
         // The first aircraft over a town sets its sirens going.
-        if (!sirenSounded && life?.cars) { sirenSounded = true; airRaidSiren(audio, 15); }
+        if (!sirenSounded && life?.cars) { sirenSounded = true; airRaidSiren(audio); }
         // And the pilot's picture of it in the corner, for a single pass.
         if (data.point && !data.def?.aircraft?.station) pod.show(data.point, data.eta || 10, data.def.name);
         break;
@@ -980,6 +1000,32 @@ async function boot() {
         break;
       case 'offstation':
         hud.feed(`${data.def.name} OFF STATION — ${data.stones} STONES · ${data.kills} KILLED`, 'big');
+        break;
+      case 'samactive':
+        hud.feed('SAM SITES ACTIVE — S-300 OVER THE TARGET · STRIKES AT RISK', 'warn');
+        break;
+      case 'samlaunch':
+        feedback.emit('impact', 0.4);
+        hud.feed(`SAM LAUNCH — ${data.def.name} ENGAGED`, 'bad');
+        break;
+      case 'samkill':
+        feedback.emit('impact', 1.4);
+        hud.feed(`${data.def.name} SHOT DOWN BY SAM`, 'big');
+        battle.onEvent('stamp', { text: 'AIRCRAFT LOST', point: data.point, kind: 'loss' });
+        break;
+      case 'sammiss':
+        hud.feed(`SAM MISSED — ${data.def.name} STILL FLYING`, 'warn');
+        break;
+      case 'samdown':
+        feedback.emit('impact', 1.0);
+        hud.feed(data.left ? `SAM LAUNCHER DESTROYED · ${data.left} LEFT` : 'LAST SAM LAUNCHER DESTROYED — THE SKY IS YOURS', 'big');
+        battle.onEvent('stamp', { text: 'SAM DESTROYED', point: data.point, kind: 'hit' });
+        break;
+      case 'samradar':
+        hud.feed('SAM RADAR DESTROYED — THE BATTERY IS FIRING BLIND', 'big');
+        break;
+      case 'samquiet':
+        hud.feed('SAM SITES HAVE GONE QUIET', 'big');
         break;
       case 'shotdown':
         hud.feed(`${data.def.name} SHOT DOWN`, 'bad');

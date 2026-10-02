@@ -1144,7 +1144,7 @@ export class AirWing {
   airTargets(out = []) {
     out.length = 0;
     for (const s of this.sorties) {
-      if (s.done || s.gone) continue;
+      if (s.done || s.gone || s.downed) continue;
       // The airframe itself. A jet that has already pulled up and is climbing
       // out is left alone — the shooting is about the run, and tracer chasing
       // a dot at three thousand metres is noise.
@@ -1216,6 +1216,76 @@ export class AirWing {
     }
   }
 
+  /**
+   * A missile has found it.
+   *
+   * Not damage: a surface-to-air warhead is fifty kilos of fragmentation a
+   * few metres off the airframe, and what is left is a fireball and the
+   * pieces. A strike jet that has not let go never does — its bomb goes down
+   * with it — and the wreck falls burning and goes in where it lands. The
+   * gunship goes down the way it already does when the flak gets it; a
+   * transport loses an engine, dumps what it is carrying where it is and
+   * turns for home on fire. Returns whether anything happened.
+   */
+  destroy(s) {
+    if (!s || s.done || s.downed) return false;
+    const m = s.model;
+    if (this.fx) this.fx.detonate(m.position, 2.6, { ground: false });
+    if (s.lift || s.loiter) {
+      this.hitAir({ kind: 'aircraft', sortie: s }, 1e6);
+      return true;
+    }
+    if (s.heli) return false;
+    if (!s.released) {
+      s.released = true;
+      s.aborted = true;
+      const bomb = m.getObjectByName('bomb');
+      if (bomb) bomb.visible = false;
+    }
+    if (s.strafe) s.strafe.fired = s.strafe.rounds;
+    const fwd = s.dir ? s.dir.clone() : new THREE.Vector3(Math.sin(m.rotation.y), 0, Math.cos(m.rotation.y));
+    s.downed = {
+      vel: fwd.multiplyScalar((s.speed || 150) * 0.65).setY(-6),
+      spin: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 2.2),
+      dive: 0.35 + Math.random() * 0.5, t: 0, fire: 0,
+    };
+    s.smoking = true;
+    if (this.onAirEvent) this.onAirEvent('missiled', { def: s.def, point: m.position.clone() });
+    return true;
+  }
+
+  /** The wreck: ballistic, rolling, nose dropping, on fire, until the ground. */
+  _fall(s, dt) {
+    const m = s.model, d = s.downed;
+    d.t += dt;
+    d.vel.y -= 9.8 * dt;
+    d.vel.multiplyScalar(1 - 0.06 * dt);
+    m.position.addScaledVector(d.vel, dt);
+    m.rotation.z += d.spin * dt;
+    m.rotation.x = Math.min(1.2, m.rotation.x + d.dive * dt);
+    if (this.fx) {
+      this.fx.trail(m.position, 7);
+      d.fire -= dt;
+      if (d.fire <= 0 && this.fx.fire) {
+        d.fire = 0.05;
+        this.fx.fire.spawn({
+          x: m.position.x, y: m.position.y, z: m.position.z,
+          vx: -d.vel.x * 0.05, vy: 1.5, vz: -d.vel.z * 0.05,
+          life: 0.5 + Math.random() * 0.4, size0: 3, size1: 7,
+          color0: this.fx._c.fireHot, color1: this.fx._c.fireMid,
+          drag: 2, grav: -1, spin: (Math.random() - 0.5) * 3, alpha: 0.95,
+        });
+      }
+    }
+    const g = this.terrain.surfaceAt ? this.terrain.surfaceAt(m.position.x, m.position.z)
+      : this.terrain.heightAt(m.position.x, m.position.z);
+    if (m.position.y <= g + 1 || d.t > 40) {
+      m.position.y = g;
+      if (this.onAirEvent) this.onAirEvent('wreck', { def: s.def, point: m.position.clone() });
+      s.done = true;
+    }
+  }
+
   /** A canopy takes a burst. Enough of them and it stops being a canopy. */
   _hitChute(t, damage) {
     const c = t.chute;
@@ -1235,6 +1305,7 @@ export class AirWing {
     for (const s of this.sorties) {
       s.t += dt;
       const m = s.model;
+      if (s.downed) { this._fall(s, dt); continue; }
       if (s.lift) {
         this._updateLift(s, dt);
       } else if (s.heli) {

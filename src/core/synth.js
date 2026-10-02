@@ -104,7 +104,7 @@ export function flyby(audio, gain = 0.5, panFrom = -0.8, panTo = 0.8, dur = 2.6)
  * from nothing, holding a rising and falling wail, and winding down. Far
  * off, as a town's siren is heard from the guns.
  */
-export function airRaidSiren(audio, dur = 14, gain = 0.07) {
+export function airRaidSiren(audio, dur = 11, gain = 0.03) {
   if (!ok(audio)) return;
   const c = audio.ctx, now = c.currentTime;
   try {
@@ -122,7 +122,7 @@ export function airRaidSiren(audio, dur = 14, gain = 0.07) {
       t += 3.4;
     }
     f.exponentialRampToValueAtTime(70, now + dur); f2.exponentialRampToValueAtTime(71, now + dur);
-    bp.type = 'bandpass'; bp.frequency.value = 700; bp.Q.value = 1.1;
+    bp.type = 'bandpass'; bp.frequency.value = 520; bp.Q.value = 1.6;
     g.gain.setValueAtTime(0.0001, now);
     g.gain.exponentialRampToValueAtTime(gain, now + 2.5);
     g.gain.setValueAtTime(gain, now + dur - 2.5);
@@ -157,8 +157,11 @@ export function carAlarm(audio, pos, delay = 0, dur = 9, pattern = 0) {
       // The chirp.
       for (let t = t0; t < t1; t += 0.12) { f.setValueAtTime(2200, t); f.exponentialRampToValueAtTime(900, t + 0.1); }
     }
-    hp.type = 'highpass'; hp.frequency.value = 500;
-    const v = 0.05 * gain;
+    // Through a band, not just off the bottom: a bare square wave is every
+    // harmonic up to the top of hearing, and it was the harshest thing in the
+    // mix. Distant, small and muffled, which is how one is heard from a gun.
+    hp.type = 'bandpass'; hp.frequency.value = 1100; hp.Q.value = 0.9;
+    const v = 0.022 * gain;
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.linearRampToValueAtTime(v, t0 + 0.05);
     g.gain.setValueAtTime(v, t1 - 0.3);

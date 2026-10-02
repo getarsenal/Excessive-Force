@@ -91,6 +91,7 @@ export class Battle {
     this.smokes = null;        // a SmokeScreens, if the level has one
     this.fires = null;         // Fires, likewise
     this.stores = null;        // the garrison's dumps, set by main
+    this.sams = null;          // the S-300 battery, set by main (see sam.js)
 
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
@@ -130,7 +131,10 @@ export class Battle {
     // What the flak did, said out loud. The air wing raises these where the
     // flying consequence happens, because that is the only place that knows
     // a pilot has turned for home or a canopy has come apart.
-    this.air.onAirEvent = (kind, data) => this.onEvent(kind, data);
+    this.air.onAirEvent = (kind, data) => {
+      if (kind === 'wreck') this._wreckDown(data.point);
+      this.onEvent(kind, data);
+    };
     // What the town stands to along a line, for a helicopter picking a
     // height: the airlift is handed it per delivery, the Apache needs it on
     // any call.
@@ -807,6 +811,40 @@ export class Battle {
   /** Released by the campaign but not yet earned here, for the build bar. */
   isReleased(u) { return this.unlockAll || isReleased(u.id); }
   canAfford(u) { return this.freeBuild || this.money >= this.costOf(u); }
+
+  /** A round landing near the SAM battery: a wrecked launcher pays. */
+  _samBlast(point, radius) {
+    if (!this.sams) return;
+    const pay = this.sams.blast(point, radius);
+    if (pay > 0) {
+      this.money += pay;
+      this.onEvent('bounty', { point, amount: Math.round(pay), kind: 'kill' });
+    }
+  }
+
+  /**
+   * An aeroplane brought down goes in where it lands: a fireball, a crater,
+   * the fire, and the street round it if it lands in the town.
+   */
+  _wreckDown(point) {
+    if (!point) return;
+    const g = this.terrain.heightAt(point.x, point.z);
+    if (Math.abs(point.x) > this.terrain.span || Math.abs(point.z) > this.terrain.span) {
+      if (this.fx) this.fx.strikeBlast(point, 3.2, { groundY: point.y });
+      return;
+    }
+    if (this.fx) {
+      this.fx.strikeBlast(point, 4.2, { groundY: g });
+      this.fx.dustColumn(point.x, g, point.z, 2.0);
+    }
+    if (this.craters) this.craters.add(point.x, g, point.z, 9);
+    if (this.fires) this.fires.ignite(point.x, g, point.z, 4.5, 90);
+    if (this.cityFire) this.cityFire.blast(point, 18, 30);
+    const killed = this.garrison.splash(point, 22, 400);
+    if (killed) this.defendersKilled += killed;
+    const d = this.camera.position.distanceTo(point);
+    this.engine?.addShake?.(THREE.MathUtils.clamp(140 / Math.max(d, 60), 0.1, 0.9));
+  }
 
   /**
    * What a weapon costs: its list price, on every map.
@@ -2109,6 +2147,7 @@ export class Battle {
         { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4, eject: 0.34 });
     }
     if (this.stores) this.stores.blast(point, rMax * 1.5);
+    this._samBlast(point, rMax * 1.5);
     const killed = this.garrison.splash(point, rMax * 1.5, w.power);
     if (killed) {
       this.defendersKilled += killed;
@@ -2284,6 +2323,7 @@ export class Battle {
     }
 
     if (this.stores) this.stores.blast(at, splashR);
+    this._samBlast(at, splashR);
     const killed = this.garrison.splash(at, splashR, power);
     if (killed) {
       this.defendersKilled += killed;
@@ -2398,12 +2438,16 @@ export class Battle {
       });
     }
     if (!this.audio) return;
+    // Car alarms: only where a car was actually thrown, one at a time
+    // across the whole town, and not for long. Every round into a street
+    // used to set off up to three, four at once for up to sixteen seconds,
+    // and a bombardment of a city was a wall of square-wave whooping.
     this._alarms = (this._alarms || []).filter((t) => t > this.elapsed);
-    const want = Math.min(4 - this._alarms.length, big ? 3 : (wrecks.length ? 2 : (Math.random() < 0.35 ? 1 : 0)));
+    const want = wrecks.length && this._alarms.length < 1 && Math.random() < 0.5 ? 1 : 0;
     for (let k = 0; k < want; k++) {
       const a = Math.random() * Math.PI * 2, r = radius * (1.2 + Math.random() * 1.6);
       const at = { x: point.x + Math.cos(a) * r, y: point.y, z: point.z + Math.sin(a) * r };
-      const dur = 7 + Math.random() * 9, delay = 0.3 + Math.random() * 1.8;
+      const dur = 3.5 + Math.random() * 3, delay = 0.3 + Math.random() * 1.8;
       carAlarm(this.audio, at, delay, dur, Math.floor(Math.random() * 3));
       this._alarms.push(this.elapsed + delay + dur);
     }
@@ -2443,6 +2487,7 @@ export class Battle {
       // and the smoke drifts — under the collapse and behind the report,
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
+      if (this.sams) this.sams.update(dt, this.elapsed);
       this.airborne.update(dt);
       this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
@@ -2470,6 +2515,7 @@ export class Battle {
     this._updateUnits(dt);
     this._whistles();
     this.air.update(dt);
+    if (this.sams) this.sams.update(dt, this.elapsed);
     this.airborne.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
     if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));

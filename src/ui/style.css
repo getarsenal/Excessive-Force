@@ -2308,6 +2308,7 @@ body.clear-view #tgp, body.ended #tgp { display: none !important; }
 }
 .stamp.kill { color: #ff6a4a; }
 .stamp.city { color: #ffb050; }
+.stamp.loss { color: #c8ccd2; text-shadow: 0 0 18px rgba(255, 60, 40, 0.75); }
 .stamp.go { animation: stamp-slam 1.6s cubic-bezier(.2,.9,.3,1) forwards; }
 @keyframes stamp-slam {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--tilt)) scale(2.4); }
