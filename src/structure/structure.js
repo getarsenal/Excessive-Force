@@ -2489,9 +2489,15 @@ export class Structure {
     // the weight follows the same path down from it.
     const done = this._loadDone || (this._loadDone = new Uint8Array(n));
     done.fill(0);
+    // Bounded twice over: a stone counted below another at its own height
+    // can send the walk back up and out again, and on a terrace of level
+    // slabs that fanned out exponentially and froze the page. A few hops find
+    // the stone that carries it; a weight that cannot be placed in those is
+    // dropped, as before.
+    let hops = 0;
     const pass = (j, w, depth) => {
       if (!done[j]) { load[j] += w; return; }
-      if (depth > 24) return;
+      if (depth > 6 || ++hops > 4 * n) return;
       const b0 = this.belowStart[j], b1 = this.belowStart[j + 1];
       let area = 0, cnt = 0;
       for (let a = b0; a < b1; a++) {
