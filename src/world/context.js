@@ -1394,7 +1394,12 @@ export function buildContext(terrain, quality, opts = {}) {
   }));
   // Both passes count trees under the same name and the outskirts run second.
   counts.canopy = (counts.canopy || 0) + nearCanopy;
-  Object.assign(counts, buildHorizon(props, terrain, rng,
+  // Its own dice. The skyline is drawn from the same stream as the town, so
+  // every change to how many buildings the town places reshuffled where the
+  // horizon looked for ground — and on a strait like the Bosphorus, where
+  // most of the ring is water, that was the difference between a skyline and
+  // thirty-five towers.
+  Object.assign(counts, buildHorizon(props, terrain, mulberry32(0x5c711e),
     surround ? { beyond: 2.4 } : null));
   // An invented railway for an invented town. A surveyed city has the
   // railways it has, and this one drew a viaduct across Parliament Square and

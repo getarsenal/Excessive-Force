@@ -836,7 +836,7 @@ export function buildHorizon(props, terrain, rng, opts = null) {
   // two and a quarter spans now, and abstract blocks standing in among it are
   // the one thing on the map that has no business being a guess.
   const from = opts && opts.beyond ? Math.max(2.4, opts.beyond) : 1.9;
-  for (let k = 0; k < 1200 && towers < 150; k++) {
+  for (let k = 0; k < 4000 && towers < 150; k++) {
     const a = rng() * Math.PI * 2;
     const r = span * (from + rng() * 1.5);
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
