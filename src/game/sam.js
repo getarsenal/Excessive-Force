@@ -391,8 +391,12 @@ export class SamSites {
     const dir = wild
       ? new THREE.Vector3(Math.random() - 0.5, 0.8, Math.random() - 0.5).normalize()
       : new THREE.Vector3(0, 1, 0);
-    this.missiles.push({ mesh: m, pos, dir, speed: wild ? 120 : 34, t: 0, sortie, kill, off,
-      lost: !sortie, wild, prev: null, gap: 0, done: false, burn: wild ? 3 : 9 });
+    // Blown twenty to thirty metres clear of the canister (sixty-five to a
+    // hundred feet) before the motor lights.
+    const lit = pos.y + 20 + Math.random() * 10;
+    this.missiles.push({ mesh: m, pos, dir, speed: wild ? 120 : 30, t: 0, sortie, kill, off,
+      lost: !sortie, wild, prev: null, gap: 0, done: false, burn: wild ? 3 : 9,
+      lit, ign: wild ? 0 : -1, aim: sortie?.model ? sortie.model.position.clone() : null, gone: false });
     // The gas puff at the canister and the bang of the ejection charge.
     for (let k = 0; k < (this.low ? 10 : 22); k++) {
       const a = Math.random() * Math.PI * 2, r = Math.random() * 2;
@@ -409,16 +413,29 @@ export class SamSites {
       if (M.done) continue;
       M.t += dt;
       const s = M.sortie;
-      if (s && !M.lost && (s.done || s.downed)) M.lost = true;
-      if (M.t < 0.55 && !M.wild) {
-        // Out of the tube on gas: straight up, slowing.
-        M.speed = Math.max(18, M.speed - 30 * dt);
+      // The aeroplane gone before the missile got there — shot down by the
+      // other round of the pair, or out of reach — is not a miss: the
+      // missile flies on to where it was aiming and blows itself up there,
+      // rather than climbing away into an empty sky.
+      if (s && !M.lost && !M.gone && (s.done || s.downed || !s.model)) M.gone = true;
+      if (M.ign < 0 && !M.wild) {
+        // Out of the tube on gas: straight up, slowing, until it is clear.
+        M.speed = Math.max(16, M.speed - 12 * dt);
+        if (M.pos.y >= M.lit || M.t > 1.6) M.ign = M.t;
       } else {
-        // The motor: a few seconds to the best part of a kilometre a second.
-        if (M.t < M.burn) M.speed = Math.min(1050, M.speed + (M.t < 2 ? 520 : 260) * dt);
+        // The motor. Slow for the first second, so the pitch-over is a tight
+        // arc low over the launcher that can be seen as one; then the best
+        // part of a kilometre a second.
+        const since = M.t - M.ign;
+        if (M.t < M.burn) M.speed = Math.min(1050, M.speed + (since < 0.9 ? 140 : since < 2.5 ? 520 : 260) * dt);
         else M.speed = Math.max(200, M.speed - 40 * dt);
         let want;
-        if (!M.lost) {
+        if (M.gone) {
+          want = M.aim ? this._v.copy(M.aim).sub(M.pos) : this._v.copy(M.dir);
+          const d = want.length();
+          if (d < 60 || since > 9 || (M.aim && want.dot(M.dir) < 0)) { this._burst(M); continue; }
+          want.normalize();
+        } else if (!M.lost) {
           const tp = s.model.position;
           const tv = M.prev ? this._v.copy(tp).sub(M.prev).divideScalar(Math.max(1e-3, dt)) : this._v.set(0, 0, 0);
           M.prev = (M.prev || new THREE.Vector3()).copy(tp);
@@ -427,6 +444,7 @@ export class SamSites {
           const tgo = dist / Math.max(200, M.speed);
           const aim = new THREE.Vector3().copy(tp).addScaledVector(tv, Math.min(4, tgo));
           if (!M.kill) aim.add(M.off);
+          M.aim = (M.aim || new THREE.Vector3()).copy(aim);
           want = aim.sub(M.pos).normalize();
           if (M.kill && dist < 16) {
             this._burst(M);
@@ -441,8 +459,9 @@ export class SamSites {
         }
         if (M.lost) want = this._v.copy(M.dir).add(new THREE.Vector3(0, 0.35, 0)).normalize();
         // Turn toward it at a rate a missile can pull: a hard curve, not a
-        // snap.
-        const rate = (M.lost ? 0.5 : 2.4) * dt;
+        // snap. Hardest just after the motor lights, while it is slow and
+        // still pointing at the sky: that is the pitch-over.
+        const rate = (M.lost ? 0.5 : since < 1.2 ? 3.4 : 2.4) * dt;
         const ang = M.dir.angleTo(want);
         if (ang > 1e-4) M.dir.lerp(want, Math.min(1, rate / ang)).normalize();
       }
