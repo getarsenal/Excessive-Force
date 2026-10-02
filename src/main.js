@@ -561,7 +561,8 @@ async function boot() {
   const perks = (!underHarness() && level.id !== 'tutorial') ? battlePerks() : null;
   if (perks) {
     battle.money = Math.round(battle.money * (1 + perks.fundsPct)) + perks.funds;
-    battle.income *= 1 + perks.incomePct + perks.income;
+    // Income is computed from the battle's progress; the perk scales it.
+    battle.incomeScale *= 1 + perks.incomePct + perks.income;
     if (perks.funds || perks.income) spendBattlePerks();
   }
   if (dailyMod) {
