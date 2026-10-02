@@ -219,15 +219,17 @@ export function buildContext(terrain, quality, opts = {}) {
    * metres apart: the outline given as its points in order (a rectangle's
    * first four from `footprintPoints` are its corners in order).
    */
-  const fillFootprint = (pts) => {
+  const fillFootprint = (pts, skip = 0) => {
     const ring = pts.length === 9 ? pts.slice(0, 4) : pts;
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const q of ring) {
       if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x;
       if (q.z < z0) z0 = q.z; if (q.z > z1) z1 = q.z;
     }
-    const out = pts.slice();
-    const step = Math.max(2.8, Math.sqrt((x1 - x0) * (z1 - z0)) / 14);
+    const out = skip ? [] : pts.slice();
+    // Four and a half metres: under the width of the narrowest carriageway
+    // and its pavements, so no street fits between two samples.
+    const step = 4.5;
     // Along every side.
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length];
@@ -307,10 +309,12 @@ export function buildContext(terrain, quality, opts = {}) {
     // block, and a ten-metre street passes between them: Westminster had
     // twenty-five carriageways running through the middle of a building,
     // Paris thirty-six. The outline is filled at three metres or so.
-    for (const p of (fill ? fillFootprint(pts) : pts)) {
-      if (net.roadClearance(p.x, p.z, ground) + allow < 1.0) return false;
-      if (net.nodeClearance(p.x, p.z) + allow < 1.0) return false;
-    }
+    const test = (q) => net.roadClearance(q.x, q.z, ground) + allow >= 1.0
+      && net.nodeClearance(q.x, q.z) + allow >= 1.0;
+    // The given points first: most candidates fail at a corner, and only one
+    // that passes there is worth the fill.
+    for (const p of pts) if (!test(p)) return false;
+    if (fill) for (const p of fillFootprint(pts, pts.length)) if (!test(p)) return false;
     return true;
   };
 

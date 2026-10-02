@@ -349,6 +349,7 @@ async function boot() {
   // level gets the real buildings on the real streets with everything else
   // still built around them.
   const city = await cityLoad;
+  const tCity = performance.now();
   const contextGroup = buildContext(terrain, quality, {
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
@@ -367,6 +368,7 @@ async function boot() {
     // A pitched roof is a climate, not a building size. See `buildContext`.
     roofPitch: level.setting?.roofPitch,
   });
+  console.log(`[tumble] town built in ${(performance.now() - tCity).toFixed(0)} ms`);
   engine.scene.add(contextGroup);
   // And the city is solid. Until this it was scenery: a round fired at a gun
   // behind a terrace went through the terrace, through the office block behind
