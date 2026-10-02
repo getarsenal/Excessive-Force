@@ -42,7 +42,7 @@ import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
 import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
 import { buildTikal, populateTikal, buildTempleII, populateTempleII } from '../structure/landmarks/tikal.js';
 import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/landmarks/teotihuacan.js';
-import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces }
+import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces, MACHUPICCHU }
   from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB, TUTORIAL_LEVEL } from './atlas.js';
@@ -2265,11 +2265,13 @@ export const LEVELS = {
     // From the guardhouse, south-west and above, looking north-east over the
     // citadel with Huayna Picchu behind it: the photograph.
     camera: { yaw: -0.45, pitch: 0.22, distance: 300, height: 18 },
-    structures: (quality) => [
+    structures: (quality, ctx = {}) => [
       { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'INTIHUATANA' },
-      { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: { x: 40, z: 70 } },
-      // The andenes down the south end: what the place looks like, worth nothing.
-      { key: 'terraces', blocks: buildTerraces(quality), required: false, scenery: true, label: 'TERRACES', offset: { x: 0, z: 185 } },
+      { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: MACHUPICCHU.torreon.offset },
+      // The andenes wrapped round the slopes under the town, laid on the
+      // bake's own hillside stone by stone: what the place looks like, worth
+      // nothing. Only when the ground is there to lay them on.
+      ...(ctx.terrain ? [{ key: 'terraces', blocks: buildTerraces(quality, ctx.terrain), required: false, scenery: true, onSlope: true, label: 'TERRACES' }] : []),
     ],
     garrison: (g, origin, groundY, sites) => {
       populateMachupicchu(g, origin, groundY);
@@ -2289,7 +2291,7 @@ export const LEVELS = {
     traits: { windows: false, river: false, remote: true, sheds: false, topples: false },
     unlockScale: 3,
     par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
-    brief: 'Nothing here is tall. The temples stand on the ground the terrace walls hold up: cut a wall and the fill goes, and the stone on top with it.',
+    brief: 'A town, not a tower. The Intihuatana stands on a knoll of terrace walls holding fill: cut a wall and the fill goes, and the terrace above it with it. The Torreón stands on its rock in the upper town.',
   },
   greatwall: {
     id: 'greatwall',

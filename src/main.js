@@ -219,7 +219,8 @@ async function boot() {
   // ninety-five metre terrace — the Taj's plinth was founded on the height at
   // its centre with the ground rising across it, and a third of the terrace
   // ended up underground.
-  const specs = level.structures(quality);
+  // The ground is passed in for the builders that lay masonry over a slope.
+  const specs = level.structures(quality, { terrain });
   const landmarks = specs.map((sp) => {
     const off = sp.offset || { x: 0, z: 0 };
     let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -479,7 +480,8 @@ async function boot() {
     const sGround = off ? terrain.heightAt(sOrigin.x, sOrigin.z) : groundY;
     if (off) sOrigin.y = sGround;
     const st = new Structure(physics, spec.blocks,
-      { groundY: sGround, origin: sOrigin, onChunkDestroyed });
+      { groundY: sGround, origin: sOrigin, onChunkDestroyed,
+        groundAt: spec.onSlope ? (x, z) => terrain.heightAt(x, z) : null });
     st.key = spec.key;
     st.required = !!spec.required;
     // A ring of buildings round open ground: judged by its stones, not its box.

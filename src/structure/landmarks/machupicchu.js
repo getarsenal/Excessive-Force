@@ -2,130 +2,148 @@ import * as THREE from 'three';
 import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
 
 /**
- * Machu Picchu: the Intihuatana and the Sacred Plaza, the Torreón, and the
- * agricultural terraces down the south end of the ridge.
+ * Machu Picchu: the citadel on its saddle, laid out as it is.
  *
- * Reference figures (Instituto Nacional de Cultura; the Wright Paleohydrology
+ * Reference (Instituto Nacional de Cultura; Wright and Valencia Zegarra's
  * survey; Overture has seventy-one house outlines on the summit, 12 x 14 m
- * and smaller, with heights read off the canopy):
+ * and smaller):
  *   the ridge        a saddle running north-south at 2,430 m, the level top
- *                    180 x 342 m in the bake, the Urubamba 400 m below on
- *                    both sides; Huayna Picchu 180 m higher, 600 m north
- *   the Intihuatana  a terraced outcrop about 60 x 45 m at its foot and 20 m
- *                    high, its retaining walls stepping up to a platform with
- *                    the carved gnomon on it; the stair up its east side from
- *                    the Sacred Plaza
- *   the plaza        the Principal Temple, three walls of great ashlar 11 x 8
- *                    and 4 m tall, open to the south; the Temple of the Three
- *                    Windows, its east wall pierced by three trapezoids over
- *                    the plaza below; the priest's houses
- *   the Torreón      the Temple of the Sun: a D-shaped tower of the finest
- *                    ashlar, about 10 m across and 5 m tall, on a granite
- *                    boulder with the Royal Tomb hollowed under it, and the
- *                    enclosure beside it
- *   the terraces     the andenes: retaining walls 2 to 4 m tall stepping down
- *                    the south end of the ridge, dry-laid, holding the fields
+ *                    180 x 342 m in the bake, the Urubamba 560 m below;
+ *                    Huayna Picchu 180 m higher, 600 m north
+ *   the plaza        the long open lawn down the middle of the saddle,
+ *                    separating the upper town on the west from the lower
+ *                    town on the east
+ *   the upper town   at its north end the Intihuatana, a rock knoll wrapped
+ *                    in terraces stepping up to the carved stone on top; under
+ *                    it the Sacred Plaza, with the Principal Temple (three
+ *                    walls of great ashlar open to the plaza) and the Temple
+ *                    of the Three Windows; south of that the royal compounds
+ *                    and the Torreón, the curved tower on its boulder
+ *   the lower town   the kanchas: walled compounds of two to four houses round
+ *                    a yard, the Three Doorways at the north, the Mortars, the
+ *                    Condor at the south
+ *   the houses       a single room, 7 x 4.5 m, granite walls 3 m tall leaning
+ *                    a little inward, a trapezoid door, a gable at each end as
+ *                    steep as fifty degrees; a few carry the thatch of ichu
+ *                    grass they all once had
+ *   the terraces     the andenes, wrapping the slopes under the town: walls
+ *                    two metres tall holding strips of field, following the
+ *                    hill's contours round it
  *
- * A mountain, but a low one: nothing at Machu Picchu is tall enough to fall
- * over, and the whole site is retaining walls with buildings standing on the
- * ground they hold. That is the twist. The temples on the plaza are a few
- * courses of ashlar laid without mortar — there is nothing to bring down but
- * the courses themselves — while the Intihuatana's terraces are the walls
- * that hold the hill up under the stone on top, and cutting one drops the
- * fill and the platform above it. The terraces at the south end are the same
- * construction, exposed on a slope, and are scenery: they are what the place
- * looks like, and they count for nothing.
+ * Granite, the pale grey of the mountain it was quarried from, laid without
+ * mortar. Nearly two thirds life: nothing here is taller than a house, and
+ * at 1:1 the camera that frames the saddle sees a scatter of pebbles.
+ *
+ * Nothing at Machu Picchu is tall enough to fall over, and that is the
+ * twist: it is a town, not a tower. The Intihuatana is the objective, a
+ * knoll of terrace walls holding fill under the stone on top — cut a wall
+ * and the fill goes, and the terrace above it with it — and the Torreón on
+ * its rock is the second. The houses are a few courses each and come down
+ * a house at a time.
  */
 
-// Nearly twice life. Nothing here is taller than twenty metres, and at 1:1
-// the ashlar the place is famous for is a kerb from the camera.
-const S = 1.8;
+const S = 1.6;
+const WALL = 1.0;
 
-// Real metres, scaled once at the end. `FOUND` is where the walls start,
-// under the summit, so that wherever the ridge falls away the masonry meets
-// it; `ROUGH` is below every exposed face and the blocks under it are coarse.
-const FOUND = -46.0;
-const WALL = 1.2;
-
-/** The Intihuatana: five terraces of retaining wall round a fill, stepping up to the gnomon. */
-const MOUND = {
-  cx: -6.0, cz: -12.0,
-  base: { hx: 30.0, hz: 22.0 },
-  top: { hx: 7.5, hz: 5.5 },
-  terraces: 5,
-  rise: 4.0,
-  stair: { w: 2.6, nose: 1.2 },       // up the east face, from the plaza
-  gnomon: { plinth: 5.0, plinthH: 0.5, w: 2.0, d: 1.8, h: 1.6 },
+/** The Intihuatana knoll, north-west of the plaza: four terraces wrapped round a rock. */
+const KNOLL = {
+  cx: -36.0, cz: -70.0,
+  rx: 17.0, rz: 13.0,           // the foot of the lowest terrace
+  shrink: 3.0,                  // each terrace steps in this much on rx (rz in proportion)
+  tiers: 4, rise: 2.2,
+  sides: 20,
+  gnomon: { base: { w: 3.2, d: 2.4, h: 1.0 }, post: { w: 0.7, d: 0.9, h: 1.8 } },
 };
-/** The Sacred Plaza, east of the mound. */
-const PRINCIPAL = { cx: 30.0, cz: -4.0, w: 11.0, d: 8.0, wall: 1.0, h: 4.0, open: 'south' };
-const WINDOWS = { cx: 38.0, cz: 8.0, w: 5.0, d: 10.0, wall: 1.0, h: 3.5, sill: 1.0, head: 2.4, at: [-2.4, 0, 2.4], half: 0.7 };
-const HOUSES = [
-  { cx: 30.0, cz: 16.0, w: 8.0, d: 5.0 },
-  { cx: 30.0, cz: 24.0, w: 8.0, d: 5.0 },
-  { cx: 30.0, cz: 32.0, w: 8.0, d: 5.0 },
-  { cx: 41.0, cz: 20.0, w: 8.0, d: 5.0 },
-  { cx: 41.0, cz: 29.0, w: 8.0, d: 5.0 },
-  { cx: 8.0, cz: 30.0, w: 9.0, d: 5.5 },
-  { cx: -4.0, cz: 30.0, w: 9.0, d: 5.5 },
-];
-const HOUSE = { wall: 0.8, h: 3.0, gable: 2.0 };
+/** The outline's wobble: a knoll is not an ellipse. */
+const wobble = (a) => 1 + 0.09 * Math.sin(3 * a + 0.7) + 0.05 * Math.cos(5 * a - 0.3);
+const knollR = (i) => ({ rx: KNOLL.rx - KNOLL.shrink * i, rz: KNOLL.rz - KNOLL.shrink * (KNOLL.rz / KNOLL.rx) * i });
 
-/** The Torreón, on its own ground 40 m east and 70 m south of the mound. */
+/** The Sacred Plaza, under the knoll. */
+const PRINCIPAL = { cx: -43.0, cz: -45.0, w: 11.0, d: 8.0, wall: 1.2, h: 4.0 };     // open to the south
+const WINDOWS = { cx: -29.0, cz: -46.0, w: 5.5, d: 10.0, wall: 1.1, h: 3.6, sill: 1.1, head: 2.4, at: [-2.6, 0, 2.6] };
+
+/**
+ * The kanchas: walled yards, the houses inside along two or three of their
+ * walls, a door in the wall that faces the plaza. `door` is the side.
+ */
+const KANCHAS = [
+  // The upper town, west of the plaza.
+  { cx: -38.0, cz: -17.0, w: 20.0, d: 15.0, door: 'e' },
+  { cx: -38.0, cz: 10.0, w: 20.0, d: 15.0, door: 'e' },
+  { cx: -24.0, cz: 64.0, w: 16.0, d: 14.0, door: 'e' },
+  // The lower town: the Three Doorways at the north, then the Mortars and the Condor.
+  { cx: 34.0, cz: -74.0, w: 15.0, d: 14.0, door: 'w' },
+  { cx: 34.0, cz: -57.0, w: 15.0, d: 14.0, door: 'w' },
+  { cx: 34.0, cz: -40.0, w: 15.0, d: 14.0, door: 'w' },
+  { cx: 35.0, cz: -12.0, w: 18.0, d: 16.0, door: 'w' },
+  { cx: 34.0, cz: 16.0, w: 16.0, d: 14.0, door: 'w' },
+  { cx: 33.0, cz: 46.0, w: 16.0, d: 14.0, door: 'w' },
+];
+const KANCHA = { wall: 0.9, h: 2.4, gap: 0.5 };
+const HOUSE = { wall: 0.75, h: 3.0, pitch: 1.15, door: { b: 1.1, t: 0.8, h: 2.0 } };
+
+/** Houses standing on their own: the priests' house, the guardhouse, the storehouses. */
+const LONE = [
+  { cx: -36.0, cz: -32.0, w: 8.0, d: 4.6, door: 'n', thatch: true },
+  { cx: -38.0, cz: 92.0, w: 7.0, d: 4.6, door: 'e', thatch: true },     // the guardhouse
+  { cx: 10.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+  { cx: 19.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+  { cx: 28.0, cz: 88.0, w: 6.0, d: 4.2, door: 'n', thatch: true },
+];
+
+/** The Torreón, on its own ground in the upper town south of the royal compounds. */
+const TORREON_AT = { x: -55, z: 62 };            // world metres from the origin
 const TORREON = {
-  offset: { x: 40, z: 70 },
   rock: { w: 12.0, d: 12.0, h: 3.0 },
   r: 4.5, wall: 1.0, h: 5.0,
   windows: [0.5, -0.35],               // bearings on the curved wall, radians from east
   sill: 0.6, head: 2.0,                // over the rock
-  enclosure: { cx: -10.0, cz: 0.0, w: 8.0, d: 6.0, wall: 0.9, h: 3.5 },
+  enclosure: { cx: 2.0, cz: 10.5, w: 9.0, d: 6.0, wall: 0.9, h: 3.0 },
 };
 
-/**
- * The andenes at the south end, on their own ground where the plateau ends.
- *
- * Each row is a retaining wall across the ridge from `FOUND` to its own top,
- * holding a strip of field behind it, and the tops follow the ground the bake
- * cut: `ground` is the crest under each wall in world metres below the
- * structure's own origin, sampled from the bake at ten-metre spacing. The
- * ridge is narrow here — thirty-six metres of level ground at the top row,
- * falling away sixty metres on either hand — so the rows narrow as they go
- * down and their end walls are exposed too.
- */
-const TERRACE_OFFSET = { x: 0, z: 185 };
-const TERRACES = [
-  { z: 0.0, ground: -2, w: 22.0 },
-  { z: 5.0, ground: -9, w: 21.5 },
-  { z: 10.0, ground: -18, w: 21.0 },
-  { z: 15.0, ground: -27, w: 20.5 },
-  { z: 20.0, ground: -36, w: 20.0 },
-  { z: 25.0, ground: -45, w: 19.5 },
-  { z: 30.0, ground: -55, w: 19.0 },
-  { z: 35.0, ground: -61, w: 18.5 },
-  { z: 40.0, ground: -64, w: 18.0 },
-].map((t) => ({ ...t, top: (t.ground + 6.0) / S, rough: (t.ground - 4.0) / S, d: 5.0 }));
+/** Every house in the citadel, in the yards and alone, with its world-metre door. */
+function allHouses() {
+  const out = [];
+  KANCHAS.forEach((k, ki) => {
+    const inner = { w: k.w - 2 * KANCHA.wall, d: k.d - 2 * KANCHA.wall };
+    const g = KANCHA.gap;
+    // Along the north and south walls, facing the yard; a third along the
+    // back wall where the yard is wide enough for it.
+    const hd = 4.4, hw = Math.min(8.5, inner.w - 2 * g - 1.0);
+    const back = k.door === 'e' ? -1 : 1;
+    const shiftX = back * 0.6;
+    out.push({ cx: k.cx + shiftX, cz: k.cz - inner.d / 2 + g + hd / 2, w: hw, d: hd, door: 's', thatch: ki % 3 === 0 });
+    out.push({ cx: k.cx + shiftX, cz: k.cz + inner.d / 2 - g - hd / 2, w: hw, d: hd, door: 'n', thatch: ki % 3 === 1 });
+    const room = inner.d - 2 * (hd + g) - 2 * g;
+    if (room >= 4.0 && inner.w >= 15) {
+      const bw = 4.2, bd = Math.min(7.0, room);
+      out.push({ cx: k.cx + back * (inner.w / 2 - g - bw / 2), cz: k.cz, w: bw, d: bd, door: back > 0 ? 'w' : 'e', thatch: ki % 3 === 2 });
+    }
+  });
+  for (const h of LONE) out.push(h);
+  return out;
+}
+const HOUSES = allHouses();
 
-/** Half-width of the mound's terrace `i` along an axis. */
-const moundHalf = (axis, i) => MOUND.base[axis] - (MOUND.base[axis] - MOUND.top[axis]) * (i / MOUND.terraces);
-
-/** What the garrison, the flag and the level record read. */
+/** What the garrison, the flag and the level record read, in world metres. */
 export const MACHUPICCHU = {
   scale: S,
-  mound: {
-    cx: MOUND.cx * S, cz: MOUND.cz * S,
-    top: MOUND.rise * MOUND.terraces * S,
-    /** The terrace walks, low to high: the face of the wall above each, and its height. */
-    ledges: Array.from({ length: MOUND.terraces - 1 }, (_, i) => ({
-      hx: moundHalf('hx', i + 1) * S, hz: moundHalf('hz', i + 1) * S, y: MOUND.rise * (i + 1) * S,
-    })),
-    platform: { hx: moundHalf('hx', MOUND.terraces - 1) * S, hz: moundHalf('hz', MOUND.terraces - 1) * S },
+  knoll: {
+    cx: KNOLL.cx * S, cz: KNOLL.cz * S, top: KNOLL.tiers * KNOLL.rise * S,
+    /** The walk on each terrace, low to high: its height and the half-extents of the wall above it. */
+    walks: Array.from({ length: KNOLL.tiers - 1 }, (_, i) => {
+      const r = knollR(i + 1);
+      return { y: (i + 1) * KNOLL.rise * S, rx: r.rx * S, rz: r.rz * S };
+    }),
+    platform: { rx: knollR(KNOLL.tiers - 1).rx * S, rz: knollR(KNOLL.tiers - 1).rz * S },
   },
-  principal: { cx: PRINCIPAL.cx * S, cz: PRINCIPAL.cz * S, w: PRINCIPAL.w * S, d: PRINCIPAL.d * S, h: PRINCIPAL.h * S },
+  principal: { cx: PRINCIPAL.cx * S, cz: PRINCIPAL.cz * S, w: PRINCIPAL.w * S, d: PRINCIPAL.d * S },
   windows: WINDOWS.at.map((z) => ({ x: (WINDOWS.cx + WINDOWS.w / 2 - 1.2) * S, y: (WINDOWS.sill + 0.2) * S, z: (WINDOWS.cz + z) * S })),
-  houses: HOUSES.map((h) => ({ cx: h.cx * S, cz: h.cz * S, w: h.w * S, d: h.d * S, h: HOUSE.h * S })),
-  torreon: { offset: TORREON.offset, rockTop: TORREON.rock.h * S, r: TORREON.r * S, windows: TORREON.windows, enclosure: { cx: TORREON.enclosure.cx * S, h: TORREON.enclosure.h * S, w: TORREON.enclosure.w * S } },
-  terraces: TERRACE_OFFSET,
-  flag: { x: MOUND.cx * S, y: (MOUND.rise * MOUND.terraces + MOUND.gnomon.plinthH + MOUND.gnomon.h + 1.0) * S, z: MOUND.cz * S },
+  kanchas: KANCHAS.map((k) => ({ cx: k.cx * S, cz: k.cz * S, w: k.w * S, d: k.d * S, door: k.door })),
+  houses: HOUSES.map((h) => ({ cx: h.cx * S, cz: h.cz * S, w: h.w * S, d: h.d * S, door: h.door })),
+  torreon: { offset: TORREON_AT, rockTop: TORREON.rock.h * S, r: TORREON.r * S, windows: TORREON.windows,
+    enclosure: { cx: TORREON.enclosure.cx * S, cz: TORREON.enclosure.cz * S, w: TORREON.enclosure.w * S, d: TORREON.enclosure.d * S } },
+  flag: { x: KNOLL.cx * S, y: (KNOLL.tiers * KNOLL.rise + KNOLL.gnomon.base.h + KNOLL.gnomon.post.h + 1.2) * S, z: KNOLL.cz * S },
 };
 
 const courses = (y0, y1, nominal, fn) => {
@@ -134,100 +152,154 @@ const courses = (y0, y1, nominal, fn) => {
   for (let c = 0; c < n; c++) fn(y0 + c * ch, ch, c, n);
 };
 
-/** A solid course of fill on a fixed lattice, so every stone stands squarely on the one below. */
-function latticeSlab(B, cx, cz, hx, hz, y, h, pitch, mat) {
-  const cuts = (H) => {
-    const m = Math.floor(H / pitch);
-    const edges = [];
-    for (let k = -m; k <= m; k++) edges.push(k * pitch);
-    if (H - m * pitch > pitch * 0.34) { edges.unshift(-H); edges.push(H); } else { edges[0] = -H; edges[edges.length - 1] = H; }
-    return edges;
-  };
-  const ex = cuts(hx), ez = cuts(hz);
-  for (let i = 0; i + 1 < ex.length; i++) {
-    for (let k = 0; k + 1 < ez.length; k++) {
-      const w = ex[i + 1] - ex[i], d = ez[k + 1] - ez[k];
-      B.add(cx + (ex[i] + ex[i + 1]) / 2, y + h / 2, cz + (ez[k] + ez[k + 1]) / 2,
-        B.shrink(w / 2), B.shrink(h / 2), B.shrink(d / 2), mat);
-    }
-  }
-}
-
-/** The stone for a tier, real metres: Inca ashlar is big, a metre and a half at the coarsest tier. */
+/** Inca masonry, real metres: big stones, coarser on the coarser tiers. */
 function grain(quality) {
   const s = Math.min(quality.blockScale, 1.3);
-  return { stone: 1.1 * s, course: 0.9 * s };
+  return { stone: 1.05 * s, course: 0.75 * s };
 }
 
-/** A roofless Inca house: four walls, a door, and the two gable ends stepping up. */
+/** A trapezoid opening in a wall, `b` wide at the sill and `t` at the head. */
+const trapezoid = (u, y, y0, h, b, t) => y > y0 && y < y0 + h && Math.abs(u) < (b + (t - b) * ((y - y0) / h)) / 2;
+
+/**
+ * An Inca house: four granite walls with a trapezoid door, a window opposite,
+ * a steep gable at each end, and — on some — the thatch.
+ */
 function house(B, hs, stone, course) {
-  const { cx, cz, w, d } = hs;
-  const t = HOUSE.wall;
-  const door = (x, y, z) => y < 2.0 && Math.abs(x - cx) < 0.7 && z > cz + d / 2 - t - 0.1;
-  B.openings(door, () => {
-    courses(0, HOUSE.h, course, (y, h, c) => B.ring(cx, cz, w, d, t, y, h, stone, M.MARBLE, c % 2));
+  const { cx, cz, w, d, door } = hs;
+  const t = HOUSE.wall, H = HOUSE.h;
+  const alongX = w >= d;                   // the long axis; the gables close the short ends
+  const long = alongX ? w : d, short = alongX ? d : w;
+  // The door, and a window high in the wall opposite.
+  const D = HOUSE.door;
+  const onSide = (x, z, side) => side === 'n' ? z < cz - d / 2 + t + 0.1
+    : side === 's' ? z > cz + d / 2 - t - 0.1
+      : side === 'w' ? x < cx - w / 2 + t + 0.1 : x > cx + w / 2 - t - 0.1;
+  const opposite = { n: 's', s: 'n', e: 'w', w: 'e' }[door];
+  const along = (x, z, side) => (side === 'n' || side === 's') ? x - cx : z - cz;
+  const cut = (x, y, z) => (onSide(x, z, door) && trapezoid(along(x, z, door), y, 0, D.h, D.b, D.t))
+    || (onSide(x, z, opposite) && trapezoid(along(x, z, opposite), y, 1.3, 1.0, 0.7, 0.5));
+  B.openings(cut, () => {
+    courses(0, H, course, (y, h, c) => B.ring(cx, cz, w, d, t, y, h, stone, M.GRANITE, c % 2));
   });
-  // The gables, on the two end walls, three courses stepping in.
-  courses(HOUSE.h, HOUSE.h + HOUSE.gable, course, (y, h, c, n) => {
+  // The gables: the end walls carried up in courses, each narrower.
+  const G = short * 0.5 * HOUSE.pitch;
+  courses(H, H + G, course, (y, h, c, n) => {
     const k = 1 - (c + 0.5) / n;
-    for (const sx of [-1, 1]) {
-      B.slab(cx + sx * (w / 2 - t / 2), y + h / 2, cz, t, h, Math.max(0.8, d * k), stone, M.MARBLE);
+    const span = Math.max(0.7, (short - 0.2) * k);
+    for (const sgn of [-1, 1]) {
+      if (alongX) B.slab(cx + sgn * (w / 2 - t / 2), y + h / 2, cz, t, h, span, stone, M.GRANITE);
+      else B.slab(cx, y + h / 2, cz + sgn * (d / 2 - t / 2), span, h, t, stone, M.GRANITE);
     }
   });
+  if (!hs.thatch) return;
+  // The thatch: a course at a time up each slope from the wall heads to the
+  // ridge, each course half over the one below it, overhanging the walls.
+  const over = 0.35;
+  const n = Math.max(2, Math.round(G / course));
+  const ch = G / n;
+  const step = (short / 2 + over) / (n + 0.5);
+  const len = long + over * 2;
+  for (let c = 0; c < n; c++) {
+    const off = short / 2 + over - (c + 0.5) * step;
+    for (const sgn of [-1, 1]) {
+      const o = sgn * off;
+      if (alongX) B.slab(cx, H + c * ch + ch / 2, cz + o, len, ch, step * 1.5, stone * 1.6, M.THATCH);
+      else B.slab(cx + o, H + c * ch + ch / 2, cz, step * 1.5, ch, len, stone * 1.6, M.THATCH);
+    }
+  }
+  if (alongX) B.slab(cx, H + G + ch * 0.4, cz, len, ch * 0.8, step * 1.8, stone * 1.6, M.THATCH);
+  else B.slab(cx, H + G + ch * 0.4, cz, step * 1.8, ch * 0.8, len, stone * 1.6, M.THATCH);
+}
+
+/** A kancha's enclosing wall, with its door on the side facing the plaza. */
+function kancha(B, k, stone, course) {
+  const t = KANCHA.wall;
+  const door = (x, y, z) => {
+    if (y > 2.3) return false;
+    if (k.door === 'e') return x > k.cx + k.w / 2 - t - 0.1 && Math.abs(z - k.cz) < 0.75;
+    if (k.door === 'w') return x < k.cx - k.w / 2 + t + 0.1 && Math.abs(z - k.cz) < 0.75;
+    if (k.door === 'n') return z < k.cz - k.d / 2 + t + 0.1 && Math.abs(x - k.cx) < 0.75;
+    return z > k.cz + k.d / 2 - t - 0.1 && Math.abs(x - k.cx) < 0.75;
+  };
+  B.openings(door, () => {
+    courses(0, KANCHA.h, course, (y, h, c) => B.ring(k.cx, k.cz, k.w, k.d, t, y, h, stone, M.GRANITE, c % 2));
+  });
+}
+
+/** The knoll's outline at terrace `i`, as points round its centre. */
+function knollPts(i, inset = 0) {
+  const { rx, rz } = knollR(i);
+  const pts = [];
+  for (let k = 0; k < KNOLL.sides; k++) {
+    const a = (k / KNOLL.sides) * Math.PI * 2;
+    const f = wobble(a);
+    pts.push([Math.cos(a) * (rx * f - inset), Math.sin(a) * (rz * f - inset)]);
+  }
+  return pts;
+}
+
+/** Fill a terrace's outline with a lattice of rubble, inside its wall. */
+function knollFill(B, i, y, h, pitch) {
+  const { rx, rz } = knollR(i);
+  const { cx, cz } = KNOLL;
+  for (let x = -rx; x <= rx; x += pitch) {
+    for (let z = -rz; z <= rz; z += pitch) {
+      const a = Math.atan2(z / rz, x / rx);
+      const f = wobble(a);
+      const e = Math.hypot(x / (rx * f), z / (rz * f));
+      // Inside the wall by a stone, so the fill never runs into it.
+      const margin = (WALL + pitch * 0.6) / Math.min(rx, rz);
+      if (e > 1 - margin) continue;
+      B.add(cx + x, y + h / 2, cz + z, B.shrink(pitch / 2), B.shrink(h / 2), B.shrink(pitch / 2), M.RUBBLE);
+    }
+  }
 }
 
 export function buildMachupicchu(quality) {
   const B = new BlockList();
   B.joint = JOINT / S;
   const { stone, course } = grain(quality);
-  const core = stone * 2.0;
 
-  // ── The Intihuatana: five terraces of retaining wall on a rubble fill, in
-  // solid courses, the walls stepping in and the stair up the east side.
+  // ── The Intihuatana: four terraces of granite wall round a rubble fill,
+  // each stepping in, and the carved stone on the platform at the top.
   B.section('intihuatana', () => {
-    const { cx, cz, rise, terraces } = MOUND;
-    for (let i = 0; i < terraces; i++) {
+    const { cx, cz, rise, tiers } = KNOLL;
+    for (let i = 0; i < tiers; i++) {
+      const pts = knollPts(i);
       courses(i * rise, (i + 1) * rise, course, (y, h, c) => {
-        // The outcrop is steeper on the west, so each terrace sits a little
-        // east of the one below: the real thing is not a pyramid.
-        const shift = 0.6 * i;
-        const hx = moundHalf('hx', i) - 0.08 * c, hz = moundHalf('hz', i) - 0.08 * c;
-        B.ring(cx + shift, cz, hx * 2, hz * 2, WALL, y, h, stone, M.LIMESTONE, c % 2);
-        latticeSlab(B, cx + shift, cz, hx - WALL, hz - WALL, y, h, core, M.RUBBLE);
+        B.polyRing(cx, cz, pts, WALL, y, h, stone, M.GRANITE, c % 2);
+        knollFill(B, i, y, h, stone * 1.9);
       });
     }
-    // The stair, up the east face.
-    for (let i = 0; i < terraces; i++) {
-      courses(i * rise, (i + 1) * rise, course, (y, h, c) => {
-        const face = cx + 0.6 * i + moundHalf('hx', i) - 0.08 * c + 0.03;
-        B.slab(face + MOUND.stair.nose / 2, y + h / 2, cz + 2.0, MOUND.stair.nose, h, MOUND.stair.w, stone, M.LIMESTONE);
-      });
-    }
-    // The gnomon on its plinth, on the summit.
-    const G = MOUND.gnomon, top = rise * terraces, gx = cx + 0.6 * (terraces - 1);
-    B.slab(gx, top + G.plinthH / 2, cz, G.plinth, G.plinthH, G.plinth, stone, M.MARBLE);
-    B.add(gx, top + G.plinthH + G.h / 2, cz, G.w / 2, G.h / 2, G.d / 2, M.MARBLE);
+    // The Intihuatana stone: a carved block with the post standing out of it.
+    const G = KNOLL.gnomon, top = rise * tiers;
+    B.slab(cx, top + G.base.h / 2, cz, G.base.w, G.base.h, G.base.d, stone, M.GRANITE);
+    B.add(cx + 0.4, top + G.base.h + G.post.h / 2, cz, G.post.w / 2, G.post.h / 2, G.post.d / 2, M.GRANITE);
   });
 
-  // ── The Sacred Plaza: the Principal Temple, three walls open to the
-  // south; the Temple of the Three Windows, its east wall pierced.
+  // ── The Sacred Plaza: the Principal Temple, three walls of great ashlar
+  // open to the south; the Temple of the Three Windows, open to the west and
+  // its east wall pierced by three trapezoids over the main plaza.
   B.section('temples', () => {
+    const big = stone * 1.5;
     const P = PRINCIPAL;
-    const openSouth = (x, _y, z) => z > P.cz + P.d / 2 - P.wall - 0.1 && Math.abs(x - P.cx) < P.w / 2 - P.wall * 1.6;
+    const openSouth = (x, _y, z) => z > P.cz + P.d / 2 - P.wall - 0.1 && Math.abs(x - P.cx) < P.w / 2 - P.wall * 1.4;
     B.openings(openSouth, () => {
-      courses(0, P.h, course, (y, h, c) => B.ring(P.cx, P.cz, P.w, P.d, P.wall, y, h, stone, M.MARBLE, c % 2));
+      courses(0, P.h, course * 1.25, (y, h, c) => B.ring(P.cx, P.cz, P.w, P.d, P.wall, y, h, big, M.GRANITE, c % 2));
     });
     const W = WINDOWS;
-    const openWest = (x, _y, z) => x < W.cx - W.w / 2 + W.wall + 0.1 && Math.abs(z - W.cz) < W.d / 2 - W.wall * 1.6;
-    const window = (x, y, z) => x > W.cx + W.w / 2 - W.wall - 0.1 && y > W.sill && y < W.head
-      && W.at.some((a) => Math.abs(z - (W.cz + a)) < W.half);
-    B.openings((x, y, z) => openWest(x, y, z) || window(x, y, z), () => {
-      courses(0, W.h, course, (y, h, c) => B.ring(W.cx, W.cz, W.w, W.d, W.wall, y, h, stone, M.MARBLE, c % 2));
+    const openWest = (x, _y, z) => x < W.cx - W.w / 2 + W.wall + 0.1 && Math.abs(z - W.cz) < W.d / 2 - W.wall * 1.4;
+    const win = (x, y, z) => x > W.cx + W.w / 2 - W.wall - 0.1
+      && W.at.some((a) => trapezoid(z - (W.cz + a), y, W.sill, W.head - W.sill, 1.2, 0.85));
+    B.openings((x, y, z) => openWest(x, y, z) || win(x, y, z), () => {
+      courses(0, W.h, course * 1.2, (y, h, c) => B.ring(W.cx, W.cz, W.w, W.d, W.wall, y, h, big, M.GRANITE, c % 2));
     });
   });
 
-  // ── The houses, roofless, along the plaza's edge and below the mound.
+  // ── The town: the kanchas' walls and every house, in the yards and alone.
   B.section('houses', () => {
+    for (const k of KANCHAS) kancha(B, k, stone, course);
     for (const hs of HOUSES) house(B, hs, stone, course);
   });
 
@@ -247,10 +319,11 @@ export function buildTorreon(quality) {
     const tomb = (x, y, z) => y < 2.4 && x < -T.rock.w / 2 + 5.0 && Math.abs(z) < 2.6;
     B.openings(tomb, () => {
       courses(0, T.rock.h, course, (y, h) => {
-        B.slab(0, y + h / 2, 0, T.rock.w, h, T.rock.d, stone * 1.6, M.LIMESTONE);
+        B.slab(0, y + h / 2, 0, T.rock.w, h, T.rock.d, stone * 1.6, M.GRANITE);
       });
     });
-    // The D: a half circle on the east, a straight wall on the west.
+    // The D: a half circle on the east, a straight wall on the west, in the
+    // finest ashlar in the town.
     const pts = [];
     const n = 14;
     for (let i = 0; i <= n; i++) {
@@ -261,14 +334,14 @@ export function buildTorreon(quality) {
       && T.windows.some((b) => Math.abs(Math.atan2(z, x) - b) < 0.14);
     B.openings(win, () => {
       courses(T.rock.h, T.rock.h + T.h, course, (y, h, c) => {
-        B.polyRing(0, 0, pts, T.wall, y, h, stone, M.MARBLE, c % 2);
+        B.polyRing(0, 0, pts, T.wall, y, h, stone, M.GRANITE, c % 2);
       });
     });
-    // The enclosure beside it, on the ground.
+    // The enclosure beside it, on the ground, with a thatched house in it.
     const E = T.enclosure;
-    const door = (x, y, z) => y < 2.0 && Math.abs(z) < 0.7 && x > E.cx + E.w / 2 - E.wall - 0.1;
+    const door = (x, y, z) => y < 2.0 && Math.abs(x - E.cx) < 0.7 && z > E.cz + E.d / 2 - E.wall - 0.1;
     B.openings(door, () => {
-      courses(0, E.h, course, (y, h, c) => B.ring(E.cx, E.cz, E.w, E.d, E.wall, y, h, stone, M.MARBLE, c % 2));
+      courses(0, E.h, course, (y, h, c) => B.ring(E.cx, E.cz, E.w, E.d, E.wall, y, h, stone, M.GRANITE, c % 2));
     });
   });
 
@@ -277,25 +350,93 @@ export function buildTorreon(quality) {
 }
 
 /**
- * The andenes, down the south end of the ridge: retaining walls from the
- * rock to their own tops, coarse and bare where they are buried and dressed
- * where the slope has left them standing, with a strip of field behind each.
+ * The andenes: terraces wrapped round the slopes under the town, on the
+ * ground the bake cut.
+ *
+ * Each terrace is a wall laid along a contour of the real hillside — found
+ * by walking out from the saddle along rays until the ground drops to the
+ * terrace's line — with a strip of field packed behind it, its top level
+ * with the wall's. Founded on the slope, stone by stone (the structure is
+ * laid `onSlope`), so the wall's foot is wherever the hill is. Scenery: what
+ * the place looks like, and worth nothing.
+ *
+ * Needs the terrain; a builder run without it (the tools in Node) gets no
+ * terraces at all.
  */
-export function buildTerraces(quality) {
+export function buildTerraces(quality, terrain) {
   const B = new BlockList();
   B.joint = JOINT / S;
-  const { stone, course } = grain(quality);
-  const rough = stone * 3.2, roughCourse = course * 3.0;
+  if (!terrain) return B;
+  const { stone } = grain(quality);
+  const st = stone * 1.7, ch = 1.0 * Math.min(quality.blockScale, 1.3);
+  const g0 = terrain.heightAt(0, 0);
+  const H = (x, z) => (terrain.heightAt(x * S, z * S) - g0) / S;
+  const C = { x: 0, z: 8 };
+  const RISE = 1.9, LEVELS = 7, FIELD = 2.6, THICK = 1.1;
+  const sectors = [[-40, 118], [148, 202]];
+  const STEP = 3;
 
   B.section('terraces', () => {
-    for (const t of TERRACES) {
-      const cz = t.z + t.d / 2;
-      const band = (y0, y1, st, ch, mat) => courses(y0, y1, ch, (y, h, c) => {
-        B.ring(0, cz, t.w, t.d, WALL, y, h, st, mat, c % 2);
-        B.slab(0, y + h / 2, cz, t.w - WALL * 2, h, t.d - WALL * 2, st, M.RUBBLE);
-      });
-      if (t.rough > FOUND) band(FOUND, t.rough, rough, roughCourse, M.LIMESTONE);
-      band(Math.max(FOUND, t.rough), t.top, stone, course, M.LIMESTONE);
+    for (const [a0, a1] of sectors) {
+      // Each ray's crossing of each terrace line.
+      const rays = [];
+      for (let a = a0; a <= a1; a += STEP) {
+        const th = a * Math.PI / 180, dx = Math.cos(th), dz = Math.sin(th);
+        const hits = [];
+        let r = 20, k = 0, lastR = -9;
+        while (r < 190 && k < LEVELS) {
+          const top = -(1.2 + k * RISE);
+          const line = top - RISE * 0.55;
+          const x = C.x + dx * r, z = C.z + dz * r;
+          if (H(x, z) <= line) {
+            // Two terraces closer than a stride is a cliff, not a terrace:
+            // that one is not built on this ray.
+            hits[k] = r - lastR > 1.4 ? { x, z, top, g: H(x, z) } : null;
+            if (hits[k]) lastR = r;
+            k++;
+            continue;
+          }
+          r += 0.5;
+        }
+        rays.push({ dx, dz, hits });
+      }
+      for (let k = 0; k < LEVELS; k++) {
+        for (let j = 0; j + 1 < rays.length; j++) {
+          const A = rays[j].hits[k], Bp = rays[j + 1].hits[k];
+          if (!A || !Bp) continue;
+          const dx = Bp.x - A.x, dz = Bp.z - A.z, L = Math.hypot(dx, dz);
+          // A contour that jumps between rays has gone round a spur: not a wall.
+          const expect = Math.hypot(A.x - C.x, A.z - C.z) * STEP * Math.PI / 180;
+          if (L < 0.3 || L > expect * 2.6 + 1.5) continue;
+          const ry = Math.atan2(dx, dz);
+          // Inward: toward the saddle.
+          let nx = -dz / L, nz = dx / L;
+          const mx = (A.x + Bp.x) / 2 - C.x, mz = (A.z + Bp.z) / 2 - C.z;
+          if (nx * mx + nz * mz > 0) { nx = -nx; nz = -nz; }
+          const n = Math.max(1, Math.round(L / st)), seg = L / n;
+          // The wall: from under the ground to a lip over the field.
+          const base = Math.min(A.g, Bp.g) - 0.7, top = A.top + 0.25;
+          courses(base, top, ch, (y, h, c) => {
+            const stag = n > 1 && c % 2 ? 0.5 : 0;
+            for (let i = 0; i < n; i++) {
+              const t = (i + 0.5 + stag) / n;
+              if (t >= 1) continue;
+              B.add(A.x + dx * t, y + h / 2, A.z + dz * t,
+                B.shrink(THICK / 2), B.shrink(h / 2), B.shrink(seg / 2), M.GRANITE, ry);
+            }
+          });
+          // The field behind it, packed up level with the wall's top.
+          const off = THICK / 2 + FIELD / 2 + 0.02;
+          for (let i = 0; i < n; i++) {
+            const t = (i + 0.5) / n;
+            const fx = A.x + dx * t + nx * off, fz = A.z + dz * t + nz * off;
+            const lo = Math.min(H(fx, fz), H(fx - nx * FIELD / 2, fz - nz * FIELD / 2)) - 0.3;
+            const hi = A.top;
+            if (hi - lo < 0.35) continue;
+            B.add(fx, (lo + hi) / 2, fz, B.shrink(FIELD / 2), B.shrink((hi - lo) / 2), B.shrink(seg / 2), M.TURF, ry);
+          }
+        }
+      }
     }
   });
 
@@ -304,36 +445,46 @@ export function buildTerraces(quality) {
 }
 
 /**
- * The garrison: on the Intihuatana's terrace walks, in the temples and the
- * houses on the plaza, and in the Torreón's windows. Read from the constants.
+ * The garrison: on the knoll's terrace walks and its platform, in the
+ * temples, in the kancha doors and the house doors, and in the Torreón's
+ * windows. Read from the constants.
  */
 export function populateMachupicchu(g, origin, groundY) {
   const K = MACHUPICCHU;
   const V = (x, y, z) => new THREE.Vector3(origin.x + x, groundY + y, origin.z + z);
-  const m = K.mound;
-  // The mound's walks: a man at each corner, riflemen low, the long guns high.
-  m.ledges.forEach((L, i) => {
-    const type = i === 0 ? 'rifleman' : i === 1 ? 'mg' : i === 2 ? 'at' : 'sniper';
-    const shift = 0.6 * S * (i + 1);
-    for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-      const x = m.cx + shift + sx * (L.hx + 1.3), z = m.cz + sz * (L.hz * 0.6);
-      g.place(type, V(x, L.y + 1.0, z), Math.atan2(sx, sz), 6, { cover: 'roof' });
+  const kn = K.knoll;
+  // The walks: four men round each, riflemen low, the long guns high.
+  kn.walks.forEach((L, i) => {
+    const type = i === 0 ? 'rifleman' : i === 1 ? 'mg' : 'sniper';
+    for (let q = 0; q < 4; q++) {
+      const a = q * Math.PI / 2 + 0.6;
+      const f = wobble(a);
+      const x = kn.cx + Math.cos(a) * (L.rx * f + 1.2), z = kn.cz + Math.sin(a) * (L.rz * f + 1.2);
+      g.place(type, V(x, L.y + 1.0, z), Math.atan2(Math.cos(a), Math.sin(a)), 6, { cover: 'roof' });
     }
   });
-  // The summit, round the gnomon.
+  // The platform, round the stone.
   for (const sx of [-1, 1]) {
-    g.place('sniper', V(m.cx + 0.6 * S * 4 + sx * (m.platform.hx - 2.0), m.top + 1.0, m.cz), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 6, { cover: 'roof' });
+    g.place('sniper', V(kn.cx + sx * (kn.platform.rx - 2.0), kn.top + 1.0, kn.cz), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 6, { cover: 'roof' });
   }
-  g.place('mortar', V(m.cx + 0.6 * S * 4, m.top + 1.0, m.cz + m.platform.hz - 2.0), 0, 6, { cover: 'roof' });
-  // The Principal Temple: two men in the open south side.
+  g.place('mortar', V(kn.cx, kn.top + 1.0, kn.cz + kn.platform.rz - 2.0), 0, 6, { cover: 'roof' });
+  // The Principal Temple: two men in its open side.
   for (const sx of [-1, 1]) {
-    g.place('mg', V(K.principal.cx + sx * (K.principal.w / 2 - 2.0), 1.0, K.principal.cz + K.principal.d / 2 - 1.0), 0, 6, { cover: 'arcade' });
+    g.place('mg', V(K.principal.cx + sx * (K.principal.w / 2 - 2.4), 1.0, K.principal.cz + K.principal.d / 2 - 1.2), 0, 6, { cover: 'arcade' });
   }
   // The Three Windows.
   for (const w of K.windows) g.place('rifleman', V(w.x, w.y, w.z), Math.PI / 2, 5, { cover: 'window' });
-  // The houses: a man in each door.
+  // A man in each kancha's door, facing the plaza.
+  K.kanchas.forEach((k, i) => {
+    const sx = k.door === 'e' ? 1 : -1;
+    g.place(i % 3 === 0 ? 'mg' : 'rifleman', V(k.cx + sx * (k.w / 2 - 0.8), 1.0, k.cz + 1.6), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 6, { cover: 'arcade' });
+  });
+  // And in every other house door.
   K.houses.forEach((h, i) => {
-    g.place(i % 3 === 0 ? 'at' : 'rifleman', V(h.cx, 1.0, h.cz + h.d / 2 - 1.0), 0, 6, { cover: 'arcade' });
+    if (i % 2) return;
+    const d = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[h.door];
+    const x = h.cx + d[0] * (h.w / 2 - 1.0), z = h.cz + d[1] * (h.d / 2 - 1.0);
+    g.place(i % 6 === 0 ? 'at' : 'rifleman', V(x, 1.0, z), Math.atan2(d[0], d[1]), 6, { cover: 'arcade' });
   });
 }
 
@@ -345,6 +496,7 @@ export function populateTorreon(g, origin, groundY) {
     g.place('sniper', V(Math.cos(b) * (T.r - 1.8), T.rockTop + 1.0, Math.sin(b) * (T.r - 1.8)), Math.atan2(Math.cos(b), Math.sin(b)), 6, { cover: 'window' });
   }
   // The enclosure door, and a rifleman on the rock's west lip over the tomb.
-  g.place('rifleman', V(T.enclosure.cx + T.enclosure.w / 2 - 1.0, 1.0, 0), Math.PI / 2, 6, { cover: 'arcade' });
+  const E = T.enclosure;
+  g.place('rifleman', V(E.cx, 1.0, E.cz + E.d / 2 - 1.0), 0, 6, { cover: 'arcade' });
   g.place('rifleman', V(-T.r - 0.8, T.rockTop + 1.0, 0), -Math.PI / 2, 6, { cover: 'roof' });
 }

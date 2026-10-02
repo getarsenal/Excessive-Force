@@ -44,6 +44,8 @@ export const MATERIALS = {
   RIDGE: 28,     // the darker ridge and hip tile along a Chinese roof's lines
   BEAM: 29,      // the painted architrave and bracket sets, blue-green
   LATTICE: 30,   // a hall's lattice doors, dark red, hung between the columns
+  THATCH: 31,    // ichu grass thatch on an Andean roof, bundled over a pole frame
+  TURF: 32,      // the earth and grass of a terrace's field, packed behind its wall
 };
 
 /**
@@ -273,6 +275,12 @@ export const MATERIAL_PROPS = {
   [MATERIALS.RIDGE]:     { density: 1.95, strength: 0.80, toughness: 80,  color: 0x9c6a1a, structural: true },
   [MATERIALS.BEAM]:      { density: 1.60, strength: 0.85, toughness: 85,  color: 0x2f6a62, structural: true },
   [MATERIALS.LATTICE]:   { density: 0.90, strength: 0.40, toughness: 40,  color: 0x5e1a14, structural: false },
+  // Ichu grass, sun-bleached to straw over a darker underside: light and
+  // weak, and it rests on the gables and the wall heads like the roofs it is.
+  [MATERIALS.THATCH]:    { density: 0.45, strength: 0.30, toughness: 30,  color: 0x9a7f4a, structural: true },
+  // A terrace's field: earth packed behind the wall, grassed over. Soft as
+  // the rubble in a pyramid and the green of the slope round it.
+  [MATERIALS.TURF]:      { density: 1.70, strength: 0.55, toughness: 24,  color: 0x5f7a3a, structural: true },
 };
 
 

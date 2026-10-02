@@ -133,6 +133,8 @@ export class Structure {
     this.rapier = physics.rapier;
     this.quality = physics.quality;
     this.groundY = opts.groundY ?? 0;
+    /** The terrain under a point, for a structure founded on a slope; null for flat ground. */
+    this.groundAt = opts.groundAt || null;
     this.origin = opts.origin ?? new THREE.Vector3();
     this.tagRanges = blockList.tagRanges;
     this.onChunkDestroyed = opts.onChunkDestroyed || null;
@@ -227,7 +229,11 @@ export class Structure {
       this.maxHealth[i] = props.toughness * Math.pow(vol / grid, 0.62) * 21.0;
       this.health[i] = this.maxHealth[i];
       this.flags[i] = ALIVE;
-      if (this.py[i] - this.hy[i] <= this.groundY + 0.45) this.flags[i] |= GROUNDED;
+      // Founded on the one ground height the structure stands at — or, for a
+      // structure laid over a slope, on the terrain under each stone: the
+      // terraces of a hillside are walls whose feet are wherever the hill is.
+      const floor = this.groundAt ? this.groundAt(this.px[i], this.pz[i]) : this.groundY;
+      if (this.py[i] - this.hy[i] <= floor + 0.45) this.flags[i] |= GROUNDED;
     }
 
     // Scratch buffers reused by the solver and the transform sync — allocated
