@@ -777,7 +777,24 @@ LEVELS = {
         "span": 900.0,
         "zoom": 15,
         "parks": [],
-        "flatten": [[0, 0, [70, 70], 30]],
+        # The Festungsberg: a dolomite crag eighty metres over the Old Town,
+        # long along its ridge (about fifteen degrees south of east, toward
+        # the Nonnberg) and narrow across it, sheer on the town and river
+        # sides and falling more gently west to the Scharte, the saddle to the
+        # Moenchsberg. The surface model has the fortress's own roofs in it,
+        # thirty metres over the courtyards; a flat pad levelled to the ring
+        # round it sat the castle in a pit dug into its own hill. The top is
+        # cut to the courtyards' height instead, the shape of the fortress,
+        # and the builder carries every wall down to whatever is under it.
+        "peak": {
+            "at": [6.0, -1.5],
+            "height": 508.0,
+            "top": 74.0,
+            "slope": 1.9,
+            "floor": 432.0,
+            "wobble": [[0.353, 2, -1.0472], [0.05, 3, 0.7], [0.03, 7, 1.9]],
+            "fade": 70.0,
+        },
     },
     "versailles": {
         "name": "Palace of Versailles, Versailles",
@@ -1503,6 +1520,15 @@ def cut_peak(height: np.ndarray, peak: dict, span: float) -> np.ndarray:
         last = r_out
 
     peaked = summit - slope * np.maximum(g, 0.0)
+
+    # A crag stands on a floor: its faces drop as cliffs to the ground round
+    # it and stop there, and the blend back to the real ground starts at the
+    # foot of the cliff rather than at the rim, which rounded the faces off
+    # into a grassy hill.
+    if "floor" in peak:
+        floor = float(peak["floor"])
+        peaked = np.maximum(peaked, floor)
+        last = max(last, top + (summit - floor) / slope)
 
     # Back to the real ground beyond the last bench.
     fade = float(peak.get("fade", 60.0))

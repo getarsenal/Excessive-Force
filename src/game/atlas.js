@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PLACES, TUTORIAL_PLACE } from './atlas_places.js';
 import { SPECS } from './atlas_specs.js';
 import { buildKit, layoutKit, populateKit } from '../structure/landmarks/kit.js';
+import { buildHohensalzburg, populateHohensalzburg, HOHENSALZBURG } from '../structure/landmarks/hohensalzburg.js';
 
 /**
  * The catalogue: fifty-nine levels made from data.
@@ -457,6 +458,41 @@ const WORDS = {
     "People jump off this thing on a rubber band for fun. You people are nuts.", "Mate, the whole country's shaky. She'll be right.", "Wait. You're not Australian? Then who've I been yelling at this whole time?"],
 };
 
+// ── Places built by hand ─────────────────────────────────────────────────
+//
+// A catalogue place whose landmark the kit cannot do justice to brings its own
+// builder: the stones, the garrison, the sections the score counts, where the
+// flag flies, the camera and the ground rules. Everything else (the words, the
+// officer, the flag, the campaign, the palette) is still the catalogue's.
+const BESPOKE = {
+  // Hohensalzburg is a fortress along a crag: thirty-odd buildings on the
+  // summit at their surveyed places and bearings, walls carried down the
+  // cliff. The kit laid it as a ring of towers round three blocks on a lawn.
+  hohensalzburg: {
+    build: buildHohensalzburg,
+    garrison: populateHohensalzburg,
+    tags: HOHENSALZBURG.tags,
+    top: HOHENSALZBURG.top,
+    record: {
+      // Every surveyed building inside 150 m is the fortress, which the
+      // builder lays itself; the villas on the slope and the Nonnberg below
+      // stay.
+      cityExcludeRadius: 150,
+      contextExclude: 140,
+      // The rock is the level: the bake cuts the Festungsberg and nothing may
+      // flatten it.
+      groundLevel: 'bake',
+      padRadius: 0,
+      // From over the Salzach with the sun behind the camera: the long white
+      // flank along the top of the crag, the Hoher Stock and the Reckturm
+      // over it, the Old Town at its foot.
+      camera: { yaw: 0.35, pitch: 0.1, distance: 380, height: 34 },
+      traits: { windows: true, river: false, topples: false, remote: true, opaque: false },
+      par: { rounds: 130, spend: 18000, minutes: 6, leverage: 2 },
+    },
+  },
+};
+
 // ── The generated tables ─────────────────────────────────────────────────
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -465,6 +501,7 @@ const layoutOf = (id) => (LAYOUT[id] ||= layoutKit(SPECS[id]));
 
 function levelRecord(P, i) {
   const spec = SPECS[P.id];
+  const X = BESPOKE[P.id];
   const W = WORDS[P.id];
   const cl = CLIMES[P.clime];
   const L = layoutOf(P.id);
@@ -505,10 +542,11 @@ function levelRecord(P, i) {
       height: Math.round(clamp(Math.max(H * (H > 150 ? 0.6 : 0.35), clamp(Math.max(w, d) * 1.5 + H * 0.9, 260, 820) * 0.2), 30, Math.max(240, H * 0.52))),
     },
     structures: (quality) => [
-      { key: P.id, blocks: buildKit(spec, quality), primary: true, required: true, label: target },
+      { key: P.id, blocks: X ? X.build(quality) : buildKit(spec, quality), primary: true, required: true, label: target },
     ],
-    garrison: (g, origin, groundY) => populateKit(L, g, origin, groundY, P.garrison || {}),
-    scoreTags: L.tags,
+    garrison: X ? (g, origin, groundY) => X.garrison(g, origin, groundY)
+      : (g, origin, groundY) => populateKit(L, g, origin, groundY, P.garrison || {}),
+    scoreTags: X ? X.tags : L.tags,
     precinct: { boundary: 'none', ground: cl.ground, ornament: 'none' },
     // Every catalogued building is won by breaking it, not by leaning it:
     // the kit lays hollow walls on wide footings, and what goes over goes
@@ -530,6 +568,7 @@ function levelRecord(P, i) {
     // water round it.
     ...(P.padH != null ? { groundLevel: 'bake' } : {}),
     atlas: i,
+    ...(X ? X.record : {}),
   };
 }
 
@@ -564,7 +603,7 @@ export const ATLAS_STANDOFF = Object.fromEntries(PLACES.map((P) => {
 }));
 
 export const ATLAS_FLAG_SITES = Object.fromEntries([...PLACES, TUTORIAL_PLACE].map((P) => {
-  const L = layoutOf(P.id);
+  const top = BESPOKE[P.id]?.top || layoutOf(P.id).top;
   const pattern = OLD_PATTERN[P.code] || (P.code === 'us' ? 'usa' : `atlas-${P.code}`);
-  return [P.id, [{ key: P.id, x: L.top.x, y: L.top.y, z: L.top.z, pattern, w: 9, h: 6, pole: 10 }]];
+  return [P.id, [{ key: P.id, x: top.x, y: top.y, z: top.z, pattern, w: 9, h: 6, pole: 10 }]];
 }));
