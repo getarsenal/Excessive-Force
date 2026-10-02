@@ -27,7 +27,9 @@ import * as THREE from 'three';
 
 const SPEED_OF_SOUND = 343; // m/s
 const MAX_DELAY = 3.0;      // beyond this, late audio reads as broken, not distant
-const MAX_VOICES = 24;
+// Delayed voices count from when they are scheduled, and the explosion's
+// slowed-down tails run for ten seconds and more, so a busy fight fills this.
+const MAX_VOICES = 32;
 
 const CLIPS = {
   gun: 'assets/cannon.mp3',
@@ -156,13 +158,17 @@ export class Audio {
   /**
    * @param {string} name   clip id
    * @param {THREE.Vector3|null} pos  world position, or null for a 2D cue
-   * @param {object} opts   { gain, rate, rolloff, cooldown, delay }
+   * @param {object} opts   { gain, rate, rolloff, cooldown, delay, priority }
+   *   `priority` plays past the voice cap: a sound that happens once and is
+   *   the whole point of what the player paid for (the A-10's gun run) must
+   *   not be the one dropped because the battle around it is loud.
+   * @returns {boolean} whether it was scheduled
    */
   play(name, pos, opts = {}) {
-    if (!this.ready || !this.enabled || this._failed) return;
+    if (!this.ready || !this.enabled || this._failed) return false;
     const buf = this.buffers.get(name);
-    if (!buf) return;
-    if (this.voices >= MAX_VOICES) return;
+    if (!buf) return false;
+    if (this.voices >= MAX_VOICES && !opts.priority) return false;
 
     const now = this.ctx.currentTime;
 
@@ -170,7 +176,7 @@ export class Audio {
     const cooldown = opts.cooldown ?? 0;
     if (cooldown > 0) {
       const last = this._lastPlayed.get(name) ?? -1e9;
-      if (now - last < cooldown) return;
+      if (now - last < cooldown) return false;
       this._lastPlayed.set(name, now);
     }
 
@@ -184,7 +190,7 @@ export class Audio {
       // on top of a gun doesn't blow the limiter.
       const rolloff = opts.rolloff ?? 220;
       gain *= rolloff / (rolloff + dist * dist / rolloff);
-      if (gain < 0.006) return;  // inaudible; don't spend a voice on it
+      if (gain < 0.006) return false;  // inaudible; don't spend a voice on it
 
       this._tmp.subVectors(pos, this._listenerPos).normalize();
       pan = THREE.MathUtils.clamp(this._tmp.dot(this._listenerRight), -1, 1) * 0.85;
@@ -213,6 +219,7 @@ export class Audio {
     this.voices++;
     src.onended = () => { this.voices--; };
     src.start(now + delay);
+    return true;
   }
 
   /**

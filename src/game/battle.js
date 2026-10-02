@@ -2360,7 +2360,9 @@ export class Battle {
     this.engine.addShake(THREE.MathUtils.clamp(w.fx * 26 / Math.max(camDist, 30), 0.02, 0.75));
 
     if (this.audio) {
-      this.audio.play('explosion', point, {
+      // A quiet round (the A-10's) is heard in its own recording; a hundred
+      // and ten bangs of its own would only take every voice the mixer has.
+      if (!proj.quiet) this.audio.play('explosion', point, {
         rate: THREE.MathUtils.clamp(1.3 - w.fx * 0.2, 0.55, 1.35),
         gain: 0.5 + w.fx * 0.2,
         rolloff: 300 + w.fx * 180,
@@ -2415,7 +2417,7 @@ export class Battle {
     if (!hit.groundHit || t.hasWater === false || !Number.isFinite(t.waterLevel)) return false;
     if (p.y > t.waterLevel + 0.3 || !t.isWater(p.x, p.z)) return false;
     if (this.fx.flourish) this.fx.flourish.waterPlume(p.x, t.waterLevel, p.z, w.fx || 1);
-    if (this.audio) this.audio.play('explosion', p, { rate: 0.62, gain: 0.45, rolloff: 300 });
+    if (this.audio && !hit.proj?.quiet) this.audio.play('explosion', p, { rate: 0.62, gain: 0.45, rolloff: 300 });
     if (this.life) this.life.startle(p.x, p.z, 80);
     return true;
   }

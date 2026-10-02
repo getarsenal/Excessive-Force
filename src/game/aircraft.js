@@ -1081,13 +1081,14 @@ export class AirWing {
       const v = p.clone().sub(nose).normalize().multiplyScalar(1050);
       this.projectiles.fire({
         pos: nose.clone(), vel: v, gravity: 0, kind: 'direct', speed: 1050,
-        warhead: s.def.warhead, owner: null, target: p, trail: 0,
+        warhead: s.def.warhead, owner: null, target: p, trail: 0, quiet: true, priority: true,
       });
       if (this.tracers) this.tracers.fire(nose, p, { look: 'gau8' }, true);
     }
     if (this.fx) this.fx.trail(nose, 2.8);
-    if (!S.brrt && this.audio) {
-      S.brrt = true;
+    // Tried again on the next frames if it could not be scheduled, until the
+    // first third of the burst is gone and the recording would be out of step.
+    if (!S.brrt && this.audio && S.fired < S.rounds * 0.33) {
       // One recording, heard from where the rounds land: the impacts first,
       // then — the gun being a long way off and the rounds being faster than
       // sound — the tearing note of the gun itself arriving after them. It
@@ -1096,8 +1097,10 @@ export class AirWing {
       // The clip has three tenths of a second of lead-in before the first
       // impact, so it starts that much before the first round lands.
       const flight = nose.distanceTo(S.from) / 1050;
-      this.audio.play('brrt', S.from.clone().lerp(S.to, 0.35),
-        { gain: 1.0, rolloff: 2600, delay: Math.max(0, flight - 0.3), exact: true });
+      // A retry starts that much later into the burst, so it takes off the
+      // time already gone.
+      S.brrt = this.audio.play('brrt', S.from.clone().lerp(S.to, 0.35),
+        { gain: 1.0, rolloff: 2600, delay: Math.max(0, flight - 0.3 - since), exact: true, priority: true });
     }
   }
 

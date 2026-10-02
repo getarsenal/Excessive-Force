@@ -280,6 +280,9 @@ export class Projectile {
     // The sortie that fired it, for a weapon that fires many rounds and
     // reports once: the Apache's rockets add their stones to the sortie.
     this.sortie = opts.sortie ?? null;
+    // A round whose sound is carried by something else (the A-10's rounds:
+    // the gun recording has the impacts in it) makes no noise of its own.
+    this.quiet = !!opts.quiet;
     this.age = 0;
     this.alive = true;
     this._trailAcc = 0;
@@ -462,7 +465,9 @@ export class ProjectileManager {
   }
 
   fire(opts) {
-    if (this.list.length > 220) return null;
+    // A cap on the shells in the air, for the frame rate; a strike's rounds
+    // are paid for and go up whatever else is flying.
+    if (this.list.length > (opts.priority ? 640 : 220)) return null;
     const p = new Projectile(opts);
     this.list.push(p);
     return p;
