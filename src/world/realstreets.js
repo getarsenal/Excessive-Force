@@ -38,6 +38,41 @@ import { buildEdgeIndex, dissolveThroughNodes, halfWidth, GRID_YAW, SURFACE_LIFT
  * @param {object} opts  { exclude } radius round the origin kept clear
  * @returns {object|null} a network, or null if the file carries no usable one
  */
+/**
+ * The roads a mountain level cuts into its hillside, as `terrain.benchRoads`
+ * takes them: the level's own road up (its running surface given against the
+ * ground at the origin) and every surveyed road, whose surface is the ground
+ * under its centre line smoothed along its length — the bench levels the
+ * road across its width, and the smoothing takes the bumps out of its run.
+ * Call before anything reads the ground.
+ */
+export function benchLines(road, city, terrain) {
+  const lines = [];
+  const g0 = terrain.heightAt(0, 0);
+  if (road && road.pts && road.pts.length >= 6) {
+    const pts = [];
+    for (let i = 0; i + 2 < road.pts.length; i += 3) {
+      pts.push({ x: road.pts[i], z: road.pts[i + 1], y: g0 + road.pts[i + 2] });
+    }
+    lines.push({ half: halfWidth(road.cls || 'mews'), pts });
+  }
+  const edges = city && city.roads && Array.isArray(city.roads.edges) ? city.roads.edges : [];
+  for (const e of edges) {
+    if (e.bridge || !Array.isArray(e.pts) || e.pts.length < 2) continue;
+    const raw = e.pts.map((p) => ({ x: p[0], z: p[1], y: terrain.heightAt(p[0], p[1]) }));
+    const pts = raw.map((p, i) => {
+      let sum = 0, n = 0;
+      for (let k = -3; k <= 3; k++) {
+        const q = raw[i + k];
+        if (q) { sum += q.y; n++; }
+      }
+      return { x: p.x, z: p.z, y: sum / n };
+    });
+    lines.push({ half: halfWidth(e.cls || 'street'), pts });
+  }
+  return lines;
+}
+
 export function realNetwork(data, terrain, opts = {}) {
   if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) return null;
   if (data.edges.length < 8) return null;
@@ -155,6 +190,32 @@ export function realNetwork(data, terrain, opts = {}) {
   }
 
   if (edges.length < 8) return null;
+
+  // A level's own road, carried on from where the survey's stops: joined to
+  // the junction it starts at and laid wherever it goes, exclusion or not —
+  // it is the way in.
+  const road = opts.road;
+  if (road && road.pts && road.pts.length >= 6) {
+    const line = [];
+    for (let i = 0; i + 2 < road.pts.length; i += 3) {
+      const x = road.pts[i], z = road.pts[i + 1];
+      line.push({ x, z, y: terrain.heightAt(x, z) });
+    }
+    let ai = -1, best = 20 * 20;
+    for (let i = 0; i < nodes.length; i++) {
+      const q = (nodes[i].x - line[0].x) ** 2 + (nodes[i].z - line[0].z) ** 2;
+      if (q < best && nodes[i].links.length) { best = q; ai = i; }
+    }
+    if (ai < 0) { nodes.push({ ...line[0], links: [] }); ai = nodes.length - 1; }
+    line[0] = { x: nodes[ai].x, z: nodes[ai].z, y: nodes[ai].y };
+    const end = line[line.length - 1];
+    nodes.push({ x: end.x, z: end.z, y: end.y, links: [] });
+    const bi = nodes.length - 1;
+    const edge = { a: ai, b: bi, cls: road.cls || 'mews', pts: line };
+    edges.push(edge);
+    nodes[ai].links.push({ other: bi, edge, at: 0 });
+    nodes[bi].links.push({ other: ai, edge, at: 1 });
+  }
 
   // Blocks first: a block is found by asking whether its corners are linked,
   // and dissolving replaces two of those links with one the corners cannot see.

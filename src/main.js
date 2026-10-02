@@ -7,6 +7,7 @@ import { Audio } from './core/audio.js';
 import { loadTerrain } from './world/terrain.js';
 import { createSky, createWater } from './world/sky.js';
 import { buildContext } from './world/context.js';
+import { benchLines } from './world/realstreets.js';
 import { Life } from './world/life.js';
 import { FLEETS } from './world/craft.js';
 import { loadCity } from './world/city.js';
@@ -221,6 +222,14 @@ async function boot() {
   // its centre with the ground rising across it, and a third of the terrace
   // ended up underground.
   // The ground is passed in for the builders that lay masonry over a slope.
+  // A mountain road is cut into the mountain, before anything stands on it:
+  // the masonry, the mesh, the collider and the streets all read the ground
+  // with the bench in it. Only where a level lays a road up its own slope.
+  const cityLoad = loadCity(level.terrain);
+  if (level.road) {
+    const moved = terrain.benchRoads(benchLines(level.road, await cityLoad, terrain));
+    console.log(`[tumble] road benched into the hillside, up to ${moved.toFixed(1)} m of cut and fill`);
+  }
   const specs = level.structures(quality, { terrain });
   const landmarks = specs.map((sp) => {
     const off = sp.offset || { x: 0, z: 0 };
@@ -339,7 +348,7 @@ async function boot() {
   // Now the footprints and the street plan go *into* the generator, so a baked
   // level gets the real buildings on the real streets with everything else
   // still built around them.
-  const city = await loadCity(level.terrain);
+  const city = await cityLoad;
   const contextGroup = buildContext(terrain, quality, {
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
@@ -347,7 +356,7 @@ async function boot() {
       ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
         r: 5.2 * (level.turret.scale ?? 1.4) * 4.2 }]
       : [],
-    city, cityExclude: level.cityExcludeRadius,
+    city, cityExclude: level.cityExcludeRadius, road: level.road,
     // What is beyond the town. A level says where it is; the generator does
     // not guess it from the terrain, because fields and forest look much the
     // same to a heightmap and nothing like each other from the air.

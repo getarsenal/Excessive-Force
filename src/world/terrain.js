@@ -201,6 +201,70 @@ export class Terrain {
   }
 
   /**
+   * Cut a road into the hillside.
+   *
+   * A road laid on a slope is a plank on a roof: flat across its width, so
+   * on a mountainside its downhill kerb stands in the air and its uphill kerb
+   * is buried, and from below it is a ribbon floating off the face. A real
+   * mountain road sits on a bench — cut into the hill on one side, built up
+   * on the other — and this makes the ground do the same: every vertex within
+   * a metre of the kerb is set to the road's running surface, and the ground
+   * beyond eases back to the hillside over the shoulder. Run on the full grid
+   * before anything is built on it, so the mesh, the collider, the masonry
+   * and the streets all read the ground with the bench in it.
+   *
+   * `lines`: [{ half, pts: [{ x, z, y }] }], y the running surface.
+   * Returns the most any vertex moved.
+   */
+  benchRoads(lines, shoulder = 9) {
+    const n = this.size, h = this.heights, span = this.span;
+    const uOf = (x) => (x + span) / (span * 2) * (n - 1);
+    const vOf = (z) => (span - z) / (span * 2) * (n - 1);
+    const xOf = (i) => -span + (i / (n - 1)) * span * 2;
+    const zOf = (j) => span - (j / (n - 1)) * span * 2;
+    // Per vertex, the nearest road's running surface and how far outside its
+    // kerb the vertex is; the nearest road wins where two legs share a bank.
+    const over = new Float32Array(n * n).fill(Infinity);
+    const top = new Float32Array(n * n);
+    for (const L of lines) {
+      const reach = L.half + shoulder;
+      for (let s = 0; s + 1 < L.pts.length; s++) {
+        const a = L.pts[s], b = L.pts[s + 1];
+        const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1;
+        const i0 = Math.max(0, Math.floor(uOf(Math.min(a.x, b.x) - reach)));
+        const i1 = Math.min(n - 1, Math.ceil(uOf(Math.max(a.x, b.x) + reach)));
+        const j0 = Math.max(0, Math.floor(vOf(Math.max(a.z, b.z) + reach)));
+        const j1 = Math.min(n - 1, Math.ceil(vOf(Math.min(a.z, b.z) - reach)));
+        for (let j = j0; j <= j1; j++) {
+          const z = zOf(j);
+          for (let i = i0; i <= i1; i++) {
+            const x = xOf(i);
+            const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / L2));
+            const d = Math.hypot(x - a.x - dx * t, z - a.z - dz * t) - L.half;
+            const k = j * n + i;
+            if (d >= over[k] || d > shoulder) continue;
+            over[k] = d;
+            top[k] = a.y + (b.y - a.y) * t;
+          }
+        }
+      }
+    }
+    let moved = 0;
+    for (let k = 0; k < n * n; k++) {
+      const d = over[k];
+      if (d === Infinity) continue;
+      // Flat to a metre past the kerb, then eased back into the hillside.
+      const u = Math.max(0, Math.min(1, (d - 1) / (shoulder - 1)));
+      const w = 1 - u * u * (3 - 2 * u);
+      if (w <= 0) continue;
+      const was = h[k];
+      h[k] = was + (top[k] - was) * w;
+      moved = Math.max(moved, Math.abs(h[k] - was));
+    }
+    return moved;
+  }
+
+  /**
    * Level the ground a landmark stands on, to the height of the ring just
    * outside its footprint.
    *

@@ -1186,6 +1186,15 @@ export function buildStreetSurface(net, terrain, quality) {
     // polyline is the running surface itself, worked out once and shared with
     // the structure built under it.
     overWater = !!e.bridge;
+    // A bridge carries its own height, and so does the ramp up to it: both
+    // were worked out once, together, and the structure is built under
+    // exactly this line. Everything else lies on the ground — every vertex
+    // across the width, not just the centre line. A ribbon flat across its
+    // width is a plank on a roof: on a hillside its downhill kerb stands in
+    // the air and the uphill one is buried, which is what the switchbacks up
+    // Machu Picchu were.
+    const own = !!(e.bridge || e.approach);
+    const edge = c.road / 2 + c.pave + c.kerb;
     for (let i = 0; i < line.length - 1; i++) {
       const p = line[i], q = line[i + 1];
       const dx = q.x - p.x, dz = q.z - p.z;
@@ -1196,26 +1205,41 @@ export function buildStreetSurface(net, terrain, quality) {
       // two share ground it sits three centimetres lower: the pad covers the
       // seam, and two surfaces on exactly the same plane are two surfaces
       // that flicker against each other.
-      const yAt = (pt, w) => {
-        // A bridge carries its own height, and so does the ramp up to it:
-        // both were worked out once, together, and the structure is built
-        // under exactly this line.
-        if ((e.bridge || e.approach) && pt.y !== undefined) return pt.y;
-        const g = terrain.heightAt(pt.x, pt.z) + LIFT;
-        if (w <= 0) return g;
-        return g * (1 - w) + w * ((pt.nearA ? a.y : b.y) + LIFT - 0.03);
-      };
       const wp = endWeight(i, line.length - 1), wq = endWeight(i + 1, line.length - 1);
-      p.nearA = i < line.length / 2; q.nearA = (i + 1) < line.length / 2;
-      const py = yAt(p, wp), qy = yAt(q, wq);
-      for (const [f0, f1, colour] of lanes) {
-        quad(
-          { x: p.x + nx * f0, z: p.z + nz * f0, y: py },
-          { x: q.x + nx * f0, z: q.z + nz * f0, y: qy },
-          { x: q.x + nx * f1, z: q.z + nz * f1, y: qy },
-          { x: p.x + nx * f1, z: p.z + nz * f1, y: py },
-          colour,
-        );
+      const nearA = i < line.length / 2;
+      const node = (nearA ? a.y : b.y) + LIFT - 0.03;
+      const yAt = (x, z, w, pt) => {
+        if (own && pt && pt.y !== undefined) return pt.y;
+        const g = terrain.heightAt(x, z) + LIFT;
+        return w <= 0 ? g : g * (1 - w) + w * node;
+      };
+      // Split where the ground bends under the segment, so the surface
+      // follows it between the surveyed points as well as at them.
+      let pieces = 1;
+      if (!own && d > terrain.cellSize) {
+        let dev = 0;
+        for (const f of [-edge, 0, edge]) {
+          const h0 = terrain.heightAt(p.x + nx * f, p.z + nz * f);
+          const h1 = terrain.heightAt(q.x + nx * f, q.z + nz * f);
+          for (const t of [0.25, 0.5, 0.75]) {
+            const h = terrain.heightAt(p.x + dx * t + nx * f, p.z + dz * t + nz * f);
+            dev = Math.max(dev, Math.abs(h - (h0 + (h1 - h0) * t)));
+          }
+        }
+        if (dev > 0.08) pieces = Math.min(32, Math.ceil(d / terrain.cellSize));
+      }
+      for (let k = 0; k < pieces; k++) {
+        const t0 = k / pieces, t1 = (k + 1) / pieces;
+        const P = { x: p.x + dx * t0, z: p.z + dz * t0 }, Q = { x: p.x + dx * t1, z: p.z + dz * t1 };
+        const w0 = wp + (wq - wp) * t0, w1 = wp + (wq - wp) * t1;
+        const pp = k === 0 ? p : null, qq = k === pieces - 1 ? q : null;
+        for (const [f0, f1, colour] of lanes) {
+          const v = (S, f, w, pt) => {
+            const x = S.x + nx * f, z = S.z + nz * f;
+            return { x, z, y: yAt(x, z, w, pt) };
+          };
+          quad(v(P, f0, w0, pp), v(Q, f0, w1, qq), v(Q, f1, w1, qq), v(P, f1, w0, pp), colour);
+        }
       }
     }
   }

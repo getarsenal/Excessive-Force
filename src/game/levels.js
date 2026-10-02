@@ -2262,6 +2262,9 @@ export const LEVELS = {
     // falls away, which at the south end is sixty metres.
     groundLevel: 'bake',
     padRadius: 0,
+    // The Hiram Bingham road, carried on up the east face from where the
+    // survey's stops to the gate at the south-east corner, cut into the hill.
+    road: MACHUPICCHU.road,
     // From the guardhouse, south-west and above, looking north-east over the
     // citadel with Huayna Picchu behind it: the photograph.
     camera: { yaw: -0.45, pitch: 0.22, distance: 300, height: 18 },
