@@ -1669,7 +1669,7 @@ export async function loadTerrain(levelId, quality) {
 export function gradedCoords(inner, outer) {
   const near = Math.min(outer, inner * 2.6);
   const out = new Set();
-  const FINE = 24, COARSE = 160;
+  const FINE = 24, COARSE = 80;
   for (let c = 0; c <= near; c += FINE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
   for (let c = near; c < outer; c += COARSE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
   for (const c of [inner, -inner, near, -near, outer, -outer]) out.add(+c.toFixed(2));
@@ -1685,7 +1685,7 @@ export function gradedCoords(inner, outer) {
  * eighty-four-metre staircase of bank, with the surround's buildings, placed
  * on the smooth ground function, standing in the water wherever the coarse
  * mesh dipped under it. Twenty-four metres to the cell out to two and a half
- * spans now, a hundred and sixty beyond, and fewer vertices than before.
+ * spans now, eighty beyond, and fewer vertices than before.
  */
 function gradedFrame(inner, outer) {
   const cs = gradedCoords(inner, outer);
