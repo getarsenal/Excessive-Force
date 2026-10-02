@@ -233,7 +233,7 @@ export class SamSites {
     // The trails are their own pool: a white column hanging in the sky for
     // ten seconds is a thousand puffs, and taking those from the explosions'
     // pool would starve every shell that lands while a missile is up.
-    this.smoke = new BillboardParticles(this.low ? 700 : 1800, makeSmokeTexture(this.low ? 64 : 128),
+    this.smoke = new BillboardParticles(this.low ? 900 : 2600, makeSmokeTexture(this.low ? 64 : 128),
       { blending: THREE.NormalBlending, emissive: 1.0, renderOrder: 11 });
     this.scene.add(this.smoke.mesh);
     this._white = new THREE.Color(0.93, 0.93, 0.92);
@@ -435,18 +435,18 @@ export class SamSites {
       // out as it climbs away.
       if (M.t < M.burn + 0.5) {
         M.gap -= M.speed * dt;
-        const step = this.low ? 9 : 5;
+        const step = this.low ? 7 : 4;
         while (M.gap <= 0) {
           M.gap += step;
           const back = -M.gap;
           this.smoke.spawn({ x: M.pos.x - M.dir.x * back, y: M.pos.y - M.dir.y * back, z: M.pos.z - M.dir.z * back,
             vx: (Math.random() - 0.5) * 0.6, vy: 0.4, vz: (Math.random() - 0.5) * 0.6,
-            life: 7 + Math.random() * 3, size0: 1.6, size1: 9 + Math.random() * 4,
-            color0: this._white, color1: this._grey, drag: 0.4, grav: -0.05, turb: 0.35, alpha: 0.55 });
+            life: 8 + Math.random() * 4, size0: 8, size1: 22 + Math.random() * 8,
+            color0: this._white, color1: this._grey, drag: 0.4, grav: -0.05, turb: 0.35, alpha: 0.78 });
         }
         // The flame at the nozzle.
-        this.smoke.spawn({ x: M.pos.x - M.dir.x * 4, y: M.pos.y - M.dir.y * 4, z: M.pos.z - M.dir.z * 4,
-          life: 0.08, size0: 3.2, size1: 1.2, color0: this._flame, color1: this._flame, alpha: 1 });
+        this.smoke.spawn({ x: M.pos.x - M.dir.x * 6, y: M.pos.y - M.dir.y * 6, z: M.pos.z - M.dir.z * 6,
+          life: 0.1, size0: 7, size1: 2.5, color0: this._flame, color1: this._flame, alpha: 1 });
       }
       const g = this.terrain.heightAt(M.pos.x, M.pos.z);
       if (M.pos.y > g + 9000 || M.t > 22 || (M.t > 1 && M.pos.y < g)) {
@@ -478,7 +478,7 @@ export class SamSites {
 
 /**
  * The round: seven and a half metres of white body with a dark nose and four
- * fins at the tail, drawn half again its real size so it reads at the range
+ * fins at the tail, drawn at twice its real size so it reads at the range
  * it is watched from. Up its own +y.
  */
 function makeMissile() {
@@ -497,6 +497,6 @@ function makeMissile() {
     fin.rotation.y = -a;
     g.add(fin);
   }
-  g.scale.setScalar(1.6);
+  g.scale.setScalar(2.2);
   return g;
 }
