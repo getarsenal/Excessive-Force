@@ -294,12 +294,23 @@ export function buildMachupicchu(quality) {
     });
   });
 
-  // ── The town: the kanchas' walls and every house, in the yards and alone.
+  B.scaleAll(S);
+  return B;
+}
+
+/**
+ * The town: the kanchas' walls and every house, in the yards and alone. Its
+ * own structure, and not the objective — what the bill counts, and what
+ * the garrison holds the plaza from.
+ */
+export function buildTown(quality) {
+  const B = new BlockList();
+  B.joint = JOINT / S;
+  const { stone, course } = grain(quality);
   B.section('houses', () => {
     for (const k of KANCHAS) kancha(B, k, stone, course);
     for (const hs of HOUSES) house(B, hs, stone, course);
   });
-
   B.scaleAll(S);
   return B;
 }
@@ -450,7 +461,15 @@ export function populateMachupicchu(g, origin, groundY) {
   const K = MACHUPICCHU;
   const V = (x, y, z) => new THREE.Vector3(origin.x + x, groundY + y, origin.z + z);
   const kn = K.knoll;
-  // The walks: four men round each, riflemen low, the long guns high.
+  const wallTop = KANCHA.h * S;
+  // On the kanchas' walls first, over the plaza: a man on a wall one stone
+  // thick, who comes down with it.
+  K.kanchas.forEach((k, i) => {
+    const sx = k.door === 'e' ? 1 : -1;
+    const x = k.cx + sx * (k.w / 2 - KANCHA.wall * S / 2), z = k.cz + (i % 2 ? 1 : -1) * k.d / 4;
+    g.place(i % 4 === 0 ? 'mg' : 'rifleman', V(x, wallTop + 1.0, z), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 4, { cover: 'roof' });
+  });
+  // The knoll's walks: four men round each, riflemen low, the long guns high.
   kn.walks.forEach((L, i) => {
     const type = i === 0 ? 'rifleman' : i === 1 ? 'mg' : 'sniper';
     for (let q = 0; q < 4; q++) {
@@ -471,17 +490,16 @@ export function populateMachupicchu(g, origin, groundY) {
   }
   // The Three Windows.
   for (const w of K.windows) g.place('rifleman', V(w.x, w.y, w.z), Math.PI / 2, 5, { cover: 'window' });
-  // A man in each kancha's door, facing the plaza.
+  // A man in each kancha's doorway, looking out over the plaza.
   K.kanchas.forEach((k, i) => {
     const sx = k.door === 'e' ? 1 : -1;
-    g.place(i % 3 === 0 ? 'mg' : 'rifleman', V(k.cx + sx * (k.w / 2 - 0.8), 1.0, k.cz + 1.6), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 6, { cover: 'arcade' });
+    g.place(i % 3 === 0 ? 'at' : 'rifleman', V(k.cx + sx * (k.w / 2 + 0.6), 1.0, k.cz), sx > 0 ? Math.PI / 2 : -Math.PI / 2, 3, { cover: 'arcade' });
   });
-  // And in every other house door.
-  K.houses.forEach((h, i) => {
-    if (i % 2) return;
+  // And at the doors of the houses that stand on their own, in the open.
+  K.houses.slice(-LONE.length).forEach((h) => {
     const d = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[h.door];
-    const x = h.cx + d[0] * (h.w / 2 - 1.0), z = h.cz + d[1] * (h.d / 2 - 1.0);
-    g.place(i % 6 === 0 ? 'at' : 'rifleman', V(x, 1.0, z), Math.atan2(d[0], d[1]), 6, { cover: 'arcade' });
+    const x = h.cx + d[0] * (h.w / 2 + 0.8), z = h.cz + d[1] * (h.d / 2 + 0.8);
+    g.place('rifleman', V(x, 1.0, z), Math.atan2(d[0], d[1]), 4, { cover: 'arcade' });
   });
 }
 

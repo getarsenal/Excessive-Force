@@ -42,7 +42,7 @@ import { buildAngkor, populateAngkor } from '../structure/landmarks/angkor.js';
 import { buildBorobudur, populateBorobudur } from '../structure/landmarks/borobudur.js';
 import { buildTikal, populateTikal, buildTempleII, populateTempleII } from '../structure/landmarks/tikal.js';
 import { buildTeotihuacan, populateTeotihuacan, buildMoon } from '../structure/landmarks/teotihuacan.js';
-import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces, MACHUPICCHU }
+import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, buildTerraces, buildTown, MACHUPICCHU }
   from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB, TUTORIAL_LEVEL } from './atlas.js';
@@ -2267,6 +2267,9 @@ export const LEVELS = {
     camera: { yaw: -0.45, pitch: 0.22, distance: 300, height: 18 },
     structures: (quality, ctx = {}) => [
       { key: 'machupicchu', blocks: buildMachupicchu(quality), primary: true, required: true, label: 'INTIHUATANA' },
+      // The town round the plaza: houses and yards, held and shot over, and
+      // not what wins the level.
+      { key: 'town', blocks: buildTown(quality), required: false, label: 'TOWN' },
       { key: 'torreon', blocks: buildTorreon(quality), required: true, label: 'TORREÓN', offset: MACHUPICCHU.torreon.offset },
       // The andenes wrapped round the slopes under the town, laid on the
       // bake's own hillside stone by stone: what the place looks like, worth
@@ -2288,7 +2291,9 @@ export const LEVELS = {
     // Dry ashlar a few courses tall on retaining walls: no windows the suite
     // would post men in, no river within reach, and nothing tall enough to
     // go over.
-    traits: { windows: false, river: false, remote: true, sheds: false, topples: false },
+    // A town round an open plaza: a line through the origin crosses the
+    // plaza and a few yards, not a wall.
+    traits: { windows: false, river: false, remote: true, sheds: false, topples: false, opaque: false },
     unlockScale: 3,
     par: { rounds: 60, spend: 9000, minutes: 4, leverage: 2 },
     brief: 'A town, not a tower. The Intihuatana stands on a knoll of terrace walls holding fill: cut a wall and the fill goes, and the terrace above it with it. The Torreón stands on its rock in the upper town.',
