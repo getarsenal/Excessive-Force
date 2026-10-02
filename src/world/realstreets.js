@@ -264,6 +264,7 @@ export function realNetwork(data, terrain, opts = {}) {
   // with two arms.
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
+  const shadowed = dropShadowed(nodes, edges);
   const more = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
   ends.joined += more.joined; ends.pruned += more.pruned;
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
@@ -275,13 +276,81 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, bridges: bridges.length },
+      welded, snapped, ...ends, shadowed, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
 }
 
 const RANK = { avenue: 3, street: 2, mews: 1 };
+
+/**
+ * A road lying along a bigger one.
+ *
+ * The survey draws a service road, a slip or a cycle street a few metres off
+ * the carriageway it serves, and at our widths the two ribbons overlap: two
+ * sets of kerbs down the middle of one road, which from above is a road
+ * drawn twice and out of register. The dedupe only finds twins that share
+ * both junctions. This finds the rest: a road that for most of its length
+ * runs inside the paving of one at least its own class is not built.
+ */
+function dropShadowed(nodes, edges) {
+  const C = 24, grid = new Map();
+  const segs = [];
+  for (const e of edges) {
+    if (e.bridge || e.bank || e.approach) continue;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const s = { e, p, q };
+      segs.push(s);
+      for (let cx = Math.floor(Math.min(p.x, q.x) / C) - 1; cx <= Math.floor(Math.max(p.x, q.x) / C) + 1; cx++) {
+        for (let cz = Math.floor(Math.min(p.z, q.z) / C) - 1; cz <= Math.floor(Math.max(p.z, q.z) / C) + 1; cz++) {
+          const k = cx * 8192 + cz;
+          let a = grid.get(k);
+          if (!a) grid.set(k, a = []);
+          a.push(s);
+        }
+      }
+    }
+  }
+  const dist = (x, z, s) => {
+    const dx = s.q.x - s.p.x, dz = s.q.z - s.p.z, L2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - s.p.x) * dx + (z - s.p.z) * dz) / L2));
+    return Math.hypot(x - s.p.x - dx * t, z - s.p.z - dz * t);
+  };
+  const drop = new Set();
+  // Smallest first, so of two equal roads one survives.
+  const order = edges.filter((e) => !(e.bridge || e.bank || e.approach))
+    .sort((a, b) => (RANK[a.cls] || 0) - (RANK[b.cls] || 0));
+  for (const e of order) {
+    let len = 0, under = 0;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const L = Math.hypot(q.x - p.x, q.z - p.z);
+      const n = Math.max(1, Math.round(L / 4));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, x = p.x + (q.x - p.x) * t, z = p.z + (q.z - p.z) * t;
+        len += L / n;
+        const near = grid.get(Math.floor(x / C) * 8192 + Math.floor(z / C)) || [];
+        for (const s of near) {
+          const o = s.e;
+          if (o === e || drop.has(o) || (RANK[o.cls] || 0) < (RANK[e.cls] || 0)) continue;
+          // Not where the two meet: the last fifteen metres at a shared node.
+          const shared = [e.a, e.b].find((j) => j === o.a || j === o.b);
+          if (shared !== undefined && Math.hypot(x - nodes[shared].x, z - nodes[shared].z) < 15) continue;
+          if (dist(x, z, s) < (halfWidth(e.cls) + halfWidth(o.cls)) * 0.55) { under += L / n; break; }
+        }
+      }
+    }
+    if (len > 12 && under > len * 0.6) drop.add(e);
+  }
+  if (!drop.size) return 0;
+  const kept = edges.filter((e) => !drop.has(e));
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return drop.size;
+}
 
 /**
  * One junction where the survey has several.

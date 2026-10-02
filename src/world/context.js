@@ -214,6 +214,40 @@ export function buildContext(terrain, quality, opts = {}) {
   // way, by testing the whole footprint.
 
   /** The four corners and four edge midpoints of a rotated footprint. */
+  /**
+   * A footprint's outline and inside, as points no more than about three
+   * metres apart: the outline given as its points in order (a rectangle's
+   * first four from `footprintPoints` are its corners in order).
+   */
+  const fillFootprint = (pts) => {
+    const ring = pts.length === 9 ? pts.slice(0, 4) : pts;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const q of ring) {
+      if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x;
+      if (q.z < z0) z0 = q.z; if (q.z > z1) z1 = q.z;
+    }
+    const out = pts.slice();
+    const step = Math.max(2.8, Math.sqrt((x1 - x0) * (z1 - z0)) / 14);
+    // Along every side.
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      const L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.floor(L / step);
+      for (let k = 1; k < n; k++) out.push({ x: a.x + (b.x - a.x) * k / n, z: a.z + (b.z - a.z) * k / n });
+    }
+    // And across it.
+    for (let x = x0 + step / 2; x < x1; x += step) {
+      for (let z = z0 + step / 2; z < z1; z += step) {
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const a = ring[i], c = ring[j];
+          if ((a.z > z) !== (c.z > z) && x < (c.x - a.x) * (z - a.z) / (c.z - a.z) + a.x) inside = !inside;
+        }
+        if (inside) out.push({ x, z });
+      }
+    }
+    return out;
+  };
+
   const footprintPoints = (x, z, w, d, ry) => {
     const ca = Math.cos(ry), sa = Math.sin(ry);
     const pts = [];
@@ -267,8 +301,13 @@ export function buildContext(terrain, quality, opts = {}) {
    * and the pavement it overlaps is pavement it is standing on.
    */
   const PAVEMENT = 4.6;
-  const offStreet = (pts, allow = 0, ground = false) => {
-    for (const p of pts) {
+  const offStreet = (pts, allow = 0, ground = false, fill = true) => {
+    // Every point of the footprint, not its corners. The corners, the
+    // mid-sides and the centre are twenty metres apart on a forty-metre
+    // block, and a ten-metre street passes between them: Westminster had
+    // twenty-five carriageways running through the middle of a building,
+    // Paris thirty-six. The outline is filled at three metres or so.
+    for (const p of (fill ? fillFootprint(pts) : pts)) {
       if (net.roadClearance(p.x, p.z, ground) + allow < 1.0) return false;
       if (net.nodeClearance(p.x, p.z) + allow < 1.0) return false;
     }
@@ -631,7 +670,7 @@ export function buildContext(terrain, quality, opts = {}) {
     // And the roads on the ground only: the Cahill Expressway runs over the
     // top of Circular Quay station and the shops along the quay, on a deck,
     // and a surveyed building under a surveyed deck is where it is.
-    if (!offStreet(ring, PAVEMENT, true) || !offStreet(box, PAVEMENT + 5, true)) {
+    if (!offStreet(ring, PAVEMENT, true) || !offStreet(box, PAVEMENT + 5, true, false)) {
       sv.street++; rejects.street++; return false;
     }
     if (!offBridge(ring)) { sv.bridge++; rejects.bridge++; return false; }

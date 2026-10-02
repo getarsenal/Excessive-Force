@@ -1195,11 +1195,34 @@ export function buildStreetSurface(net, terrain, quality) {
     // Machu Picchu were.
     const own = !!(e.bridge || e.approach);
     const edge = c.road / 2 + c.pave + c.kerb;
+    // Mitred at every bend. Each piece used to be squared off on its own
+    // perpendicular, so at every vertex of a curving street the kerb and the
+    // pavement opened a wedge on the outside of the bend and folded over
+    // themselves on the inside — a sawtooth down both sides of every curve,
+    // which from above is a road that looks broken. Each vertex now takes the
+    // bisector of the pieces either side of it, stretched so the lanes keep
+    // their width round the bend, and both pieces meet on it.
+    const seg = [];
+    for (let i = 0; i < line.length - 1; i++) {
+      const dx = line[i + 1].x - line[i].x, dz = line[i + 1].z - line[i].z;
+      const d = Math.hypot(dx, dz) || 1;
+      seg.push({ x: -dz / d, z: dx / d });
+    }
+    const miter = line.map((_, i) => {
+      const a = seg[Math.max(0, i - 1)], b = seg[Math.min(seg.length - 1, i)];
+      let mx = a.x + b.x, mz = a.z + b.z;
+      const L = Math.hypot(mx, mz);
+      if (L < 1e-3) return { x: b.x, z: b.z };
+      mx /= L; mz /= L;
+      const k = 1 / Math.max(0.55, mx * b.x + mz * b.z);
+      return { x: mx * k, z: mz * k };
+    });
     for (let i = 0; i < line.length - 1; i++) {
       const p = line[i], q = line[i + 1];
       const dx = q.x - p.x, dz = q.z - p.z;
       const d = Math.hypot(dx, dz) || 1;
       const nx = -dz / d, nz = dx / d;
+      const mp = miter[i], mq = miter[i + 1];
       // Ease the ends up to the junction's own level so pad and ribbon meet.
       // The ribbon runs a little way under the junction pad, and where the
       // two share ground it sits three centimetres lower: the pad covers the
@@ -1233,12 +1256,15 @@ export function buildStreetSurface(net, terrain, quality) {
         const P = { x: p.x + dx * t0, z: p.z + dz * t0 }, Q = { x: p.x + dx * t1, z: p.z + dz * t1 };
         const w0 = wp + (wq - wp) * t0, w1 = wp + (wq - wp) * t1;
         const pp = k === 0 ? p : null, qq = k === pieces - 1 ? q : null;
+        // The offset direction: the mitre at the segment's own ends, the
+        // plain perpendicular inside it.
+        const n0 = k === 0 ? mp : { x: nx, z: nz }, n1 = k === pieces - 1 ? mq : { x: nx, z: nz };
         for (const [f0, f1, colour] of lanes) {
-          const v = (S, f, w, pt) => {
-            const x = S.x + nx * f, z = S.z + nz * f;
+          const v = (S, f, w, pt, n) => {
+            const x = S.x + n.x * f, z = S.z + n.z * f;
             return { x, z, y: yAt(x, z, w, pt) };
           };
-          quad(v(P, f0, w0, pp), v(Q, f0, w1, qq), v(Q, f1, w1, qq), v(P, f1, w0, pp), colour);
+          quad(v(P, f0, w0, pp, n0), v(Q, f0, w1, qq, n1), v(Q, f1, w1, qq, n1), v(P, f1, w0, pp, n0), colour);
         }
       }
     }
