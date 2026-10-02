@@ -1214,7 +1214,15 @@ export class Terrain {
             : 1 - THREE.MathUtils.smoothstep((d - p.half) / 32, 0, 1);
           const x = p.x + nx * (p.half + MARGIN) * u, z = p.z + nz * (p.half + MARGIN) * u;
           row.push(pos.length / 3);
-          pos.push(x, sunk * k2, z);
+          // On the ground it crosses, sunk toward the bed by how far into the
+          // channel it is. The banks were laid at the height of the map's
+          // edge, which in a river city is the height of the country round
+          // it and nowhere else is: at Machu Picchu the Urubamba leaves the
+          // map two hundred metres below the edge, and the ribbon's banks
+          // stood up out of the gorge as two curved walls with the river
+          // between them.
+          const land = this.surfaceAt(x, z) - edge;
+          pos.push(x, Math.min(land, land + (sunk - land) * k2), z);
           const c = apronColour(x, z, k2);
           col.push(c.r, c.g, c.b);
         }
