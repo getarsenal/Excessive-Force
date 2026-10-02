@@ -24,6 +24,46 @@ import { valueNoise } from './terrain.js';
  */
 
 /** Collects geometry per material and merges once at the end. */
+/**
+ * A point on a plot's plan, `u` along its width and `v` along its depth, in
+ * the frame its yaw turns: the same turn `BoxGeometry` plus `rotateY` gives,
+ * so the width axis runs to (cos yaw, -sin yaw).
+ *
+ * Everything laid on a roof goes through here. Offsets added straight to x
+ * and z put a water tank or a chimney in the right place on a building
+ * square to north and off the edge of every other one: on a block turned
+ * forty degrees a tank two-thirds of the way along the roof stood in the
+ * air beside it.
+ */
+export function plotPoint(p, u, v) {
+  const cs = Math.cos(p.yaw || 0), sn = Math.sin(p.yaw || 0);
+  return { x: p.x + u * cs + v * sn, z: p.z - u * sn + v * cs };
+}
+
+function inOutline(x, z, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], c = ring[j];
+    if ((a.z > z) !== (c.z > z) && x < (c.x - a.x) * (z - a.z) / (c.z - a.z) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Whether a thing `2hw` by `2hd` at (u, v) on a plot stands wholly on its
+ * roof. A rectangle is all roof; a surveyed outline is registered as the
+ * rectangle round it, and the rectangle round an L-shaped building is half
+ * yard — so its corners are tested against the outline itself.
+ */
+export function onRoof(p, u, v, hw = 0, hd = 0) {
+  if (!p.outline) return true;
+  for (const [a, b] of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd], [0, 0]]) {
+    const q = plotPoint(p, u + a, v + b);
+    if (!inOutline(q.x, q.z, p.outline)) return false;
+  }
+  return true;
+}
+
 export class PropSet {
   constructor(quality) {
     this.quality = quality;
@@ -280,18 +320,38 @@ export function addBuildingDetail(props, terrain, plots, rng, dense) {
     const yaw = p.yaw || 0;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
 
+    // A surveyed outline that is not a rectangle has its own cornice, cut to
+    // its own shape (the cap in `shapeBuilding`), and none of the boxes below
+    // fits it: each was a rectangle round the whole plan, which round an
+    // L-shaped building is a cornice, a plinth and a string course floating
+    // in the air over the yard.
+    if (p.outline) continue;
+    // The plan of the top storey: a setback's roof is two thirds of the
+    // building's. A cornice the size of the whole block laid round it stood
+    // out from the upper walls by a sixth of the building on every side.
+    const tw = p.topW ?? p.w, td = p.topD ?? p.d;
+
     // Cornice: a band proud of the wall at the roofline, and a parapet above
     // it. This is the single most valuable piece of building detail from above
     // — it puts a hard bright edge on every roof.
-    props.add('stone', box(p.w + 1.1, 0.55, p.d + 1.1, p.x, p.top - 0.45, p.z, yaw),
-      0xcfc6b2, 0.88 + rng() * 0.2);
+    //
+    // At the eaves of a pitched roof, not its ridge. `top` is the ridge, and
+    // the cornice laid there was a flat slab the size of the house hanging
+    // level with the ridge — the roof that did not match its building.
+    if (p.pitched) {
+      props.add('stone', box(p.w + 0.9, 0.45, p.d + 0.9, p.x, (p.eave ?? p.top) - 0.25, p.z, yaw),
+        0xcfc6b2, 0.88 + rng() * 0.2);
+    } else {
+      props.add('stone', box(tw + 1.1, 0.55, td + 1.1, p.x, p.top - 0.45, p.z, yaw),
+        0xcfc6b2, 0.88 + rng() * 0.2);
+    }
     cornices++;
-    if (rng() < 0.55) {
+    if (!p.pitched && rng() < 0.55) {
       // Parapet: a low wall standing above the roof slab.
       const t = 0.5;
       for (const [ox, oz, bw, bd] of [
-        [0, (p.d + t) / 2, p.w + t * 2, t], [0, -(p.d + t) / 2, p.w + t * 2, t],
-        [(p.w + t) / 2, 0, t, p.d + t], [-(p.w + t) / 2, 0, t, p.d + t],
+        [0, (td + t) / 2, tw + t * 2, t], [0, -(td + t) / 2, tw + t * 2, t],
+        [(tw + t) / 2, 0, t, td + t], [-(tw + t) / 2, 0, t, td + t],
       ]) {
         props.add('stone', box(bw, 1.0, bd,
           p.x + ox * cs + oz * sn, p.top + 0.5, p.z - ox * sn + oz * cs, yaw),
@@ -388,26 +448,35 @@ export function addRoofAndFrontage(props, terrain, plots, rng, dense) {
     const yaw = p.yaw || 0;
     const cs = Math.cos(yaw), sn = Math.sin(yaw);
 
-    if (p.flat !== false) {
+    if (p.flat !== false && !p.pitched) {
+      const tw = p.topW ?? p.w, td = p.topD ?? p.d;
       // A water tank on legs — unmistakable from above, and it breaks the
-      // silhouette of an otherwise blank roof.
-      if (rng() < 0.22 && Math.min(p.w, p.d) > 14) {
-        const x = p.x + (rng() - 0.5) * (p.w - 7);
-        const z = p.z + (rng() - 0.5) * (p.d - 7);
-        for (const [lx, lz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) {
-          props.add('dark', box(0.22, 1.7, 0.22, x + lx, p.top + 0.85, z + lz), 0x4a4238, 1);
+      // silhouette of an otherwise blank roof. On the roof's own axes, and on
+      // the roof: see `plotPoint` and `onRoof`.
+      if (rng() < 0.22 && Math.min(tw, td) > 14) {
+        const u = (rng() - 0.5) * (tw - 7), v = (rng() - 0.5) * (td - 7);
+        if (onRoof(p, u, v, 2.2, 2.2)) {
+          const c = plotPoint(p, u, v);
+          for (const [lx, lz] of [[-1.2, -1.2], [1.2, -1.2], [-1.2, 1.2], [1.2, 1.2]]) {
+            props.add('dark', box(0.22, 1.7, 0.22, c.x + lx, p.top + 0.85, c.z + lz), 0x4a4238, 1);
+          }
+          props.add('stone', cyl(1.6, 1.6, 2.0, 10, c.x, p.top + 2.7, c.z), 0x6d6257, 0.9 + rng() * 0.2);
+          tanks++;
         }
-        props.add('stone', cyl(1.6, 1.6, 2.0, 10, x, p.top + 2.7, z), 0x6d6257, 0.9 + rng() * 0.2);
-        tanks++;
       }
       // Rooftop plant: a low louvred box.
-      if (rng() < 0.3 && Math.min(p.w, p.d) > 12) {
+      if (rng() < 0.3 && Math.min(tw, td) > 12) {
         const w = 2.5 + rng() * 3, d = 2 + rng() * 2.5;
-        props.add('metal', box(w, 1.3, d,
-          p.x + (rng() - 0.5) * (p.w - w - 4), p.top + 0.65,
-          p.z + (rng() - 0.5) * (p.d - d - 4), yaw), 0x878d91, 0.9 + rng() * 0.2);
+        const u = (rng() - 0.5) * (tw - w - 4), v = (rng() - 0.5) * (td - d - 4);
+        if (onRoof(p, u, v, w / 2 + 0.5, d / 2 + 0.5)) {
+          const c = plotPoint(p, u, v);
+          props.add('metal', box(w, 1.3, d, c.x, p.top + 0.65, c.z, yaw), 0x878d91, 0.9 + rng() * 0.2);
+        }
       }
     }
+    // The frontage below is laid along the rectangle's sides, which on a
+    // surveyed outline are not its walls.
+    if (p.outline) continue;
 
     // An awning over the shopfront on one frontage: a bright sloped plane at
     // ground level, which is a rare spot of saturated colour in a stone city.

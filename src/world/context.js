@@ -17,10 +17,11 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
 // Shared with the OSM city builder, so the fallback layout and the real
 // footprints are the same city rather than two different ones.
-import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF } from './city.js';
+import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF, FLAT_ROOF_PALETTE as FLAT_ROOF,
+  TRIM_PALETTE as TRIM_STONE } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
-  addRiverEdge, addRoofAndFrontage, burnable, plotRanges, markBurnable } from './detail.js';
+  addRiverEdge, addRoofAndFrontage, burnable, plotRanges, markBurnable, plotPoint, onRoof } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
@@ -404,15 +405,20 @@ export function buildContext(terrain, quality, opts = {}) {
     // does the work a contact shadow would — the wall no longer appears to
     // float a few centimetres over its own pavement.
     if (Math.min(w, d) > 5) {
-      push(roofs, new THREE.BoxGeometry(w + 0.5, Math.min(1.5, 0.9 + fall), d + 0.5),
-        x, g + Math.min(1.5, 0.9 + fall) / 2, z, ry);
+      const plinth = new THREE.BoxGeometry(w + 0.5, Math.min(1.5, 0.9 + fall), d + 0.5);
+      plinth.userData.trim = true;
+      push(roofs, plinth, x, g + Math.min(1.5, 0.9 + fall) / 2, z, ry);
       if (bodyH > 9) {
-        push(roofs, new THREE.BoxGeometry(w + 0.45, 0.7, d + 0.45),
-          x, g + bodyH - 1.4, z, ry);
+        const course = new THREE.BoxGeometry(w + 0.45, 0.7, d + 0.45);
+        course.userData.trim = true;
+        push(roofs, course, x, g + bodyH - 1.4, z, ry);
       }
     }
 
     let top = g + bodyH;
+    // What stands on the roof stands on the top storey: a setback's terrace
+    // is the full plan, the roof above it two thirds of it.
+    let topW = w, topD = d;
     if (setback) {
       const sw = w * 0.66, sd = d * 0.66, sh = Math.max(3, h - (bodyH - fall - 0.3));
       const upper = new THREE.BoxGeometry(sw, sh, sd);
@@ -424,17 +430,25 @@ export function buildContext(terrain, quality, opts = {}) {
       // put a gun.
       push(roofs, new THREE.BoxGeometry(w + 0.7, 0.9, d + 0.7), x, g + bodyH + 0.45, z, ry);
       top = g + bodyH + sh + 1.0;
+      topW = sw; topD = sd;
     } else if (pitched) {
       // Two slopes and a ridge, built as a prism. The ridge runs along the
       // building's long axis, as it does on every terrace ever built.
+      //
+      // Apex up. A three-sided cylinder turned a quarter about x has one
+      // corner on the axis it was turned toward, and it was turned the wrong
+      // way: every pitched roof in the game was a wedge hanging point-down
+      // into its own top floor, with its broad base lying flat over the eaves
+      // a metre and more proud of every wall — and the cornice, laid at the
+      // "top", made a second slab of it. From above that is a flat roof too
+      // big for its building; from the street it is a green funnel. The base
+      // is now the building's own depth plus a short eave.
       const alongX = w >= d;
       const rise = Math.min(6.5, Math.max(2.6, Math.min(w, d) * 0.34));
-      const prism = new THREE.CylinderGeometry(
-        (alongX ? d : w) * 0.72, (alongX ? d : w) * 0.72, alongX ? w : d, 3, 1);
-      prism.rotateX(Math.PI / 2);
+      const prism = gableRoof((alongX ? w : d) + 0.6, (alongX ? d : w) + 0.8, rise);
       if (alongX) prism.rotateY(Math.PI / 2);
-      prism.scale(1, rise / ((alongX ? d : w) * 0.72 * 1.5), 1);
-      push(roofs, prism, x, g + bodyH + rise * 0.34, z, ry);
+      prism.userData.pitched = true;
+      push(roofs, prism, x, g + bodyH, z, ry);
       top = g + bodyH + rise;
     } else {
       push(roofs, new THREE.BoxGeometry(w + 0.7, 1.1, d + 0.7), x, g + bodyH + 0.5, z, ry);
@@ -443,6 +457,7 @@ export function buildContext(terrain, quality, opts = {}) {
 
     const ca = Math.abs(Math.cos(ry)), sa = Math.abs(Math.sin(ry));
     plots.push({ x, z, w, d, h: bodyH, top, base: g, yaw: ry, flat: !pitched, pitched,
+      eave: g + bodyH, topW, topD,
       ax: w * ca + d * sa, az: w * sa + d * ca,
       real: !!opts.real, front: opts.front || null });
     return true;
@@ -695,6 +710,10 @@ export function buildContext(terrain, quality, opts = {}) {
     plots.push({
       x: rect.x, z: rect.z, w: rect.w, d: rect.d, h: bodyH,
       top: g + bodyH + 1.2, base: g, yaw: rect.yaw, flat: true, pitched: false, real: true,
+      // The rectangle is only what the building is registered as; anything
+      // laid on its roof or round its walls goes by the outline.
+      eave: g + bodyH, topW: rect.w, topD: rect.d,
+      outline: pts.map((q) => ({ x: q[0], z: q[1] })),
       ax: rect.w * ca + rect.d * sa, az: rect.w * sa + rect.d * ca,
       front: null,
       // Over the water on purpose: the deployment rules and the suite read
@@ -787,7 +806,54 @@ export function buildContext(terrain, quality, opts = {}) {
     // meshes — and a budget stopping at nine hundred leaves Westminster as a
     // few streets of houses in a field, which the generated city never was.
     const budget = { low: 900, medium: 2100, high: 3400, ultra: 5000 }[quality.name] ?? 2100;
-    for (const { b, a } of survey) {
+
+    // Two surveyed outlines over the same ground.
+    //
+    // The survey is allowed to overlap itself — a building and its parts, an
+    // old outline and a new one, a podium traced twice — and the swallow test
+    // above only catches an outline wholly inside a taller one. Everything
+    // else was built twice: two roofs on the same plot within a metre of each
+    // other in two colours, which from above is a roof in camouflage and from
+    // the street is a roof that does not match its walls. Westminster had
+    // eighteen such pairs and Paris fifty-three. So each outline, largest
+    // first, is sampled against the ones already standing: mostly covered and
+    // no taller than them, it is part of them and is not built; partly
+    // covered at the same height, it is dropped a storey under its neighbour,
+    // so one roof shows where the two meet.
+    const built = new Map();
+    const CELL = 40;
+    const cellsOf = (x0, z0, x1, z1) => {
+      const out = [];
+      for (let cx = Math.floor(x0 / CELL); cx <= Math.floor(x1 / CELL); cx++) {
+        for (let cz = Math.floor(z0 / CELL); cz <= Math.floor(z1 / CELL); cz++) out.push(cx * 8192 + cz);
+      }
+      return out;
+    };
+    const topOf = (e, h) => {
+      let gHi = -Infinity;
+      for (const q of e.b.pts) gHi = Math.max(gHi, terrain.heightAt(q[0], q[1]));
+      return gHi + h;
+    };
+    const coverOf = (e) => {
+      const step = Math.max(1.2, Math.sqrt(Math.max(1, (e.x1 - e.x0) * (e.z1 - e.z0))) / 7);
+      const near = [];
+      for (const k of cellsOf(e.x0, e.z0, e.x1, e.z1)) for (const o of built.get(k) || []) if (!near.includes(o)) near.push(o);
+      let n = 0, hit = 0, top = -Infinity;
+      if (!near.length) return { frac: 0, top };
+      for (let x = e.x0 + step / 2; x < e.x1; x += step) {
+        for (let z = e.z0 + step / 2; z < e.z1; z += step) {
+          if (!inPoly(x, z, e.b.pts)) continue;
+          n++;
+          for (const o of near) {
+            if (x < o.x0 || x > o.x1 || z < o.z0 || z > o.z1 || !inPoly(x, z, o.b.pts)) continue;
+            hit++; top = Math.max(top, o.top); break;
+          }
+        }
+      }
+      return { frac: n ? hit / n : 0, top };
+    };
+    for (const e of survey) {
+      const { b, a } = e;
       if (realBuilt + realShaped >= budget) { rejects.budget = (rejects.budget || 0) + 1; continue; }
       if (a < 18) { rejects.tiny = (rejects.tiny || 0) + 1; continue; }
       const rect = boundingRect(b.pts);
@@ -801,7 +867,18 @@ export function buildContext(terrain, quality, opts = {}) {
       if (Math.abs(rect.x) > span || Math.abs(rect.z) > span) { rejects.far = (rejects.far || 0) + 1; continue; }
       if (Math.hypot(rect.x, rect.z) < CITY_EXCLUDE) { rejects.excl = (rejects.excl || 0) + 1; continue; }
       if (Math.min(rect.w, rect.d) < 3.5) { rejects.thin = (rejects.thin || 0) + 1; continue; }
-      const h = Math.max(3.5, b.h || 12);
+      let h = Math.max(3.5, b.h || 12);
+      const cover = coverOf(e);
+      if (cover.frac > 0.1) {
+        const top = topOf(e, h);
+        if (cover.frac >= 0.6 && top <= cover.top + 3) { rejects.parts = (rejects.parts || 0) + 1; continue; }
+        if (Math.abs(top - cover.top) < 1.6) {
+          const lower = h - (top - cover.top) - 1.8;
+          h = lower >= 3.5 ? lower : h - (top - cover.top) + 1.8;
+          rejects.relevelled = (rejects.relevelled || 0) + 1;
+        }
+      }
+      const placedBefore = realBuilt + realShaped;
       // How much of its own bounding rectangle the footprint actually fills.
       // Over four fifths and it is a rectangle with the corners traced off,
       // which is what most buildings are.
@@ -816,6 +893,14 @@ export function buildContext(terrain, quality, opts = {}) {
         })) realBuilt++;
       } else if (shapeBuilding(b.pts, rect, h)) {
         realShaped++;
+      }
+      if (realBuilt + realShaped > placedBefore) {
+        e.top = topOf(e, h);
+        for (const k of cellsOf(e.x0, e.z0, e.x1, e.z1)) {
+          let bucket = built.get(k);
+          if (!bucket) built.set(k, bucket = []);
+          bucket.push(e);
+        }
       }
     }
   }
@@ -1114,7 +1199,10 @@ export function buildContext(terrain, quality, opts = {}) {
   burnable(roofMat);
   const cityMeshes = [];
   if (bodies.length) cityMeshes.push(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
-  if (roofs.length) cityMeshes.push(mergeTinted(roofs, roofMat, ROOF, rng, quality));
+  if (roofs.length) {
+    cityMeshes.push(mergeTinted(roofs, roofMat,
+      { main: FLAT_ROOF, pitched: ROOF, trim: TRIM_STONE }, rng, quality));
+  }
   for (const m of cityMeshes) group.add(m);
   group.userData.cityMeshes = cityMeshes;
 
@@ -1352,14 +1440,67 @@ export function buildContext(terrain, quality, opts = {}) {
 }
 
 /** Merge a pile of box geometries into one mesh, tinting each per-vertex. */
+/**
+ * A gabled roof: two slopes and two gable ends, the ridge along z, the eaves
+ * at y = 0. Each face has vertices of its own, so it shades as planes — a
+ * three-sided cylinder shares its normals round the corners and lit like a
+ * barrel. Indexed, like every box it is merged with.
+ */
+function gableRoof(len, span, rise) {
+  const L = len / 2, W = span / 2;
+  const pos = [
+    // the two slopes
+    -W, 0, -L, 0, rise, -L, 0, rise, L, -W, 0, L,
+    W, 0, -L, W, 0, L, 0, rise, L, 0, rise, -L,
+    // the two gables
+    -W, 0, L, 0, rise, L, W, 0, L,
+    -W, 0, -L, W, 0, -L, 0, rise, -L,
+  ];
+  const idx = [0, 2, 1, 0, 3, 2, 4, 6, 5, 4, 7, 6, 8, 10, 9, 11, 13, 12];
+  const uv = [0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0.5, 1, 1, 0, 0, 0, 1, 0, 0.5, 1];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  // Outward and upward, whichever way the winding above came out.
+  const n = g.attributes.normal;
+  const fix = [];
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t];
+    const cx = (pos[a * 3] + pos[idx[t + 1] * 3] + pos[idx[t + 2] * 3]) / 3;
+    const cz = (pos[a * 3 + 2] + pos[idx[t + 1] * 3 + 2] + pos[idx[t + 2] * 3 + 2]) / 3;
+    const out = n.getX(a) * cx + n.getZ(a) * cz + n.getY(a) * 0.01;
+    if (out < 0) fix.push(t);
+  }
+  for (const t of fix) { const q = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = q; }
+  if (fix.length) { g.setIndex(idx); g.computeVertexNormals(); }
+  return g;
+}
+
 function mergeTinted(geos, material, palette, rng, quality) {
+  // One colour per building and part, not per piece. Every box used to draw
+  // its own colour, so a building's upper storey was a different stone from
+  // the storeys under it, its plinth and cornice were two more roof colours,
+  // and a flat roof could come out as clay tile — a roof that does not match
+  // the building under it, all over the town. A palette may be split by part:
+  // `{ main, pitched, trim }`.
+  const pick = new Map();
+  const parts = Array.isArray(palette) ? { main: palette } : palette;
   for (const g of geos) {
     const n = g.attributes.position.count;
-    // Value jitter, not hue jitter: multiplying a colour scales every channel,
-    // so this separates neighbouring buildings without ever inventing a colour
-    // that is not in the palette.
-    const c = new THREE.Color(palette[Math.floor(rng() * palette.length)]);
-    c.multiplyScalar(0.80 + rng() * 0.36);
+    const part = g.userData.trim ? 'trim' : g.userData.pitched ? 'pitched' : 'main';
+    const key = g.userData.plot !== undefined ? `${g.userData.plot}|${part}` : null;
+    let c = key && pick.get(key);
+    if (!c) {
+      const pal = parts[part] || parts.main;
+      // Value jitter, not hue jitter: multiplying a colour scales every
+      // channel, so this separates neighbouring buildings without ever
+      // inventing a colour that is not in the palette.
+      c = new THREE.Color(pal[Math.floor(rng() * pal.length)]);
+      c.multiplyScalar(0.80 + rng() * 0.36);
+      if (key) pick.set(key, c);
+    }
     const arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
@@ -2480,31 +2621,50 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
   // box; chimney stacks, lift housings and a parapet are what make it read as
   // a building. They are also the only detail on the surface the player spends
   // most of the game looking straight down at.
+  //
+  // On the roof's own axes and on the roof itself (`plotPoint`, `onRoof`):
+  // offsets added straight to x and z stood chimneys in mid-air beside every
+  // building not square to north. A pitched roof's stacks rise from inside
+  // the roof on the ridge line and clear the ridge, rather than standing on
+  // a ridge-high plane over the slopes.
   const roofBits = [];
   for (const p of plots) {
+    const tw = p.topW ?? p.w, td = p.topD ?? p.d;
     const stacks = 1 + Math.floor(rng() * 3);
     for (let k = 0; k < stacks; k++) {
       const w = 0.9 + rng() * 1.1;
-      const h = 1.6 + rng() * 1.8;
-      const x = p.x + (rng() - 0.5) * (p.w - 3);
-      const z = p.z + (rng() - 0.5) * (p.d - 3);
-      const stack = new THREE.BoxGeometry(w, h, w * (0.8 + rng() * 1.6));
+      let h = 1.6 + rng() * 1.8;
+      const sd = w * (0.8 + rng() * 1.6);
+      let u = (rng() - 0.5) * (tw - 3), v = (rng() - 0.5) * (td - 3);
+      let foot = p.top;
+      if (p.pitched) {
+        // On the ridge, which runs along the long side.
+        if (p.w >= p.d) v = 0; else u = 0;
+        foot = p.eave ?? p.top;
+        h += p.top - foot;
+      }
+      if (!onRoof(p, u, v, w / 2 + 0.3, sd / 2 + 0.3)) continue;
+      const c = plotPoint(p, u, v);
+      const stack = new THREE.BoxGeometry(w, h, sd);
       stack.rotateY(p.yaw || 0);
-      stack.translate(x, p.top + h / 2, z);
+      stack.translate(c.x, foot + h / 2, c.z);
       tintOne(stack, 0x8d5a4a, 0.8 + rng() * 0.4);
       stack.userData.plot = p.index;
       roofBits.push(stack);
     }
-    // A lift overrun or stair head on the bigger blocks.
-    if (Math.min(p.w, p.d) > 18 && rng() < 0.55) {
+    // A lift overrun or stair head on the bigger flat blocks.
+    if (!p.pitched && Math.min(tw, td) > 18 && rng() < 0.55) {
       const w = 4 + rng() * 3, d = 3 + rng() * 3, h = 2.4 + rng() * 1.4;
-      const hut = new THREE.BoxGeometry(w, h, d);
-      hut.rotateY(p.yaw || 0);
-      hut.translate(p.x + (rng() - 0.5) * (p.w - w - 3), p.top + h / 2,
-        p.z + (rng() - 0.5) * (p.d - d - 3));
-      tintOne(hut, 0x9a958c, 0.85 + rng() * 0.3);
-      hut.userData.plot = p.index;
-      roofBits.push(hut);
+      const u = (rng() - 0.5) * (tw - w - 3), v = (rng() - 0.5) * (td - d - 3);
+      if (onRoof(p, u, v, w / 2 + 0.5, d / 2 + 0.5)) {
+        const c = plotPoint(p, u, v);
+        const hut = new THREE.BoxGeometry(w, h, d);
+        hut.rotateY(p.yaw || 0);
+        hut.translate(c.x, p.top + h / 2, c.z);
+        tintOne(hut, 0x9a958c, 0.85 + rng() * 0.3);
+        hut.userData.plot = p.index;
+        roofBits.push(hut);
+      }
     }
   }
   if (roofBits.length) {

@@ -72,3 +72,11 @@ export const ROOF_PALETTE = [
   0x7a6154, 0x856a5b,                                 // clay tile ×2
   0x4f6b63,                                           // oxidised copper ×1
 ];
+// A flat roof is lead, felt, asphalt or gravel: grey, never tile.
+export const FLAT_ROOF_PALETTE = [
+  0x4a4f57, 0x53585f, 0x5b5f64, 0x63666a, 0x575a5e,   // lead and felt ×5
+  0x6f6e69, 0x77756f,                                 // gravel ×2
+  0x4f6b63,                                           // oxidised copper ×1
+];
+// The plinth and the string course: dressed stone, whatever the walls are.
+export const TRIM_PALETTE = [0xcfc6b2, 0xc6bda9, 0xbdb5a3, 0xd6cfbf];
