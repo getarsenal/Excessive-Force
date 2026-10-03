@@ -2436,8 +2436,8 @@ body.clear-view #lensdirt { display: none; }
 .ecx-near { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--edge); }
 .ecx-near span { color: #e6a3ff; }
 .ecx-near u { background: #c77dff; }
-.ecx-crates { margin-top: 10px; padding: 7px 10px; text-align: center; font: 700 11px/1.2 var(--f-data); letter-spacing: 0.1em;
-  color: #1a1206; background: linear-gradient(90deg, #d79a2b, #f3cf6a); animation: ecx-glow 1.6s ease-in-out infinite; }
+.ecx-crates { display: block; width: 100%; margin-top: 10px; padding: 7px 10px; text-align: center; font: 700 11px/1.2 var(--f-data); letter-spacing: 0.1em;
+  color: #1a1206; background: linear-gradient(90deg, #d79a2b, #f3cf6a); border: 0; cursor: pointer; animation: ecx-glow 1.6s ease-in-out infinite; }
 @keyframes ecx-glow { 50% { filter: brightness(1.18); } }
 
 /* ── The promotion: the whole screen, until it is tapped. ── */

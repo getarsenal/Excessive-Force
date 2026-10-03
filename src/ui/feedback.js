@@ -49,6 +49,10 @@ const EVENTS = {
   collapse:  { v: [50, 30, 90, 40, 180, 60, 260], gap: 2.0, s: null },
   win:       { v: [90, 70, 90, 70, 320], gap: 3.0, s: 'fanfare' },
   lose:      { v: [320], gap: 3.0, s: 'down' },
+  // A supply crate: the knocking as it rocks, the lid going, the payout.
+  rattle:    { v: [14, 30, 14], gap: 0.3, s: 'rattle' },
+  burst:     { v: [60, 30, 40], gap: 0.6, s: 'burst' },
+  jackpot:   { v: [40, 40, 40, 40, 200], gap: 1.0, s: 'jackpot' },
 };
 
 class Feedback {
@@ -158,7 +162,32 @@ class Feedback {
       node.connect(c.destination);
       o.start(t + at); o.stop(t + at + dur + 0.02);
     };
+    // A burst of noise, for things that crack rather than ring.
+    const noise = (dur, vol, at = 0, filt = 1800) => {
+      const len = Math.max(1, Math.floor(c.sampleRate * dur));
+      const buf = c.createBuffer(1, len, c.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+      const src = c.createBufferSource(), gn = c.createGain(), f = c.createBiquadFilter();
+      src.buffer = buf; f.type = 'lowpass'; f.frequency.value = filt;
+      gn.gain.value = vol * g;
+      src.connect(f).connect(gn).connect(c.destination);
+      src.start(t + at);
+    };
     switch (name) {
+      case 'rattle':
+        for (let i = 0; i < 3; i++) tone('square', 190 - i * 18, 120, 0.05, 0.05, i * 0.055, 900);
+        noise(0.08, 0.06, 0, 1400);
+        break;
+      case 'burst':
+        noise(0.45, 0.22, 0, 2600);
+        tone('sine', 120, 40, 0.5, 0.2);
+        tone('triangle', 660, 1320, 0.35, 0.04, 0.05, 3000);
+        break;
+      case 'jackpot':
+        [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.3], [1319, 0.42]].forEach(([f, at]) => tone('sawtooth', f, f, at > 0.4 ? 0.9 : 0.14, 0.045, at, 2600));
+        for (let i = 0; i < 6; i++) tone('sine', 2093 + i * 260, 2093 + i * 260, 0.18, 0.025, 0.5 + i * 0.06);
+        break;
       case 'tick': tone('square', 2400, 1800, 0.018, 0.035, 0, 5000); break;
       case 'blip': tone('sine', 880, 1320, 0.06, 0.07); break;
       case 'whoosh': tone('triangle', 300, 700, 0.09, 0.04, 0, 2400); break;

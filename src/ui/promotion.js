@@ -12,7 +12,8 @@
  * always printed beside it, and when it is close the report says so.
  */
 import { insignia } from '../game/career.js';
-import { TIERS, GRADES, ordersResetIn, PRESTIGE_INSIGNIA } from '../game/progress.js';
+import { TIERS, GRADES, ordersResetIn, PRESTIGE_INSIGNIA, career, openCrate } from '../game/progress.js';
+import { crateOverlay } from './crateopen.js';
 import { fanfare, tick } from '../core/synth.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -45,7 +46,11 @@ export function renderXp(el, rep, o = {}) {
   const nr = rep.nearest;
   const near = nr ? `<div class="ecx-near"><span>NEXT MEDAL · ${TIERS[nr.tier - 1]} ${esc(nr.name)}</span>`
     + `<i><u style="width:${(nr.frac * 100).toFixed(1)}%"></u></i><b>${fmt(nr.have)} / ${fmt(nr.need)}${nr.unit === 't' ? ' t' : ''}</b></div>` : '';
-  const crates = rep.crates ? `<div class="ecx-crates">${rep.crates} SUPPLY CRATE${rep.crates > 1 ? 'S' : ''} WAITING · OPEN THEM AT THE FRONT DOOR</div>` : '';
+  // Opened here, not only at the front door: the notice is a button, and it
+  // goes when the last crate does.
+  const crateLine = (n) => `${n} SUPPLY CRATE${n > 1 ? 'S' : ''} WAITING · OPEN NOW`;
+  const nCrates = Math.min(rep.crates || 0, career().crates);
+  const crates = nCrates ? `<button type="button" class="ecx-crates">${crateLine(nCrates)}</button>` : '';
   const head = `
     <div class="ecx-head">
       <span class="ecx-ins">${insignia(g0, 'ecx-insig')}</span>
@@ -68,6 +73,19 @@ export function renderXp(el, rep, o = {}) {
     if (P.crates) { P.crates.innerHTML = crates; P.crates.hidden = !crates; }
   } else {
     el.innerHTML = head + linesHtml + ordersHtml + crates;
+  }
+  const crateBtn = (P?.crates || el).querySelector('.ecx-crates');
+  if (crateBtn) {
+    crateBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const sync = () => {
+        const n = career().crates;
+        if (n) { crateBtn.textContent = crateLine(n); return; }
+        crateBtn.remove();
+        if (P?.crates) P.crates.hidden = true;
+      };
+      crateOverlay({ count: () => career().crates, open: () => openCrate(), onChange: sync, onClose: sync });
+    });
   }
   const lineEls = () => (P?.lines || el).querySelectorAll('.ecx-line');
   if (P?.lines) P.lines.classList.toggle('still', !!o.still);

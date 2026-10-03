@@ -55,8 +55,8 @@ for (const [act, n] of [['orders', '4-orders'], ['crates', '5-crates'], ['medals
   await page.waitForTimeout(900);
   if (act === 'crates') {
     await shot(n);
-    await page.evaluate(() => document.querySelector('#title [data-act="opencrate"]')?.click());
-    await page.waitForTimeout(1200);
+    await page.evaluate(() => document.querySelector('#title .cx-btn')?.click());
+    await page.waitForTimeout(3200);
     await page.evaluate(() => { for (const a of document.getAnimations()) { try { a.finish(); } catch {} } });
     await shot('6-opened');
   } else await shot(n);

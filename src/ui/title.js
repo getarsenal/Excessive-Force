@@ -26,6 +26,7 @@ import {
 import { menuMusic, eagle } from './music.js';
 import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
 import { feedback } from './feedback.js';
+import { crateStage } from './crateopen.js';
 import { showWorldMap, HOME } from './worldmap.js';
 import './title.css';
 
@@ -245,7 +246,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
       feedback.emit('open');
       requestAnimationFrame(() => sheet.classList.add('open'));
     };
+    let crateUi = null;
     const closeSheet = () => {
+      if (crateUi) { crateUi.destroy(); crateUi = null; }
       sheet.classList.remove('open');
       setTimeout(() => { sheet.hidden = true; }, 240);
     };
@@ -288,18 +291,18 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'orders':
           openSheet('DAILY ORDERS', ordersHtml(), 'orders');
           break;
-        case 'crates':
-          openSheet('SUPPLY CRATES', cratesHtml(null), 'crates');
-          break;
-        case 'opencrate': {
-          const got = openCrate();
-          if (!got) break;
-          feedback.emit(got.rarity === 'LEGENDARY' || got.rarity === 'RARE' ? 'rank' : 'confirm');
-          const body = sheetIn.querySelector('.tt-sh-body');
-          body.innerHTML = cratesHtml(got);
-          // The count on the front door's menu line goes with it.
-          const line = root.querySelector('[data-act="crates"] em');
-          if (line) line.textContent = got.crates ? `${got.crates} TO OPEN · WHAT'S INSIDE IS FOR YOUR NEXT BATTLE` : 'ALL OPENED';
+        case 'crates': {
+          openSheet('SUPPLY CRATES', cratesHtml(), 'crates');
+          if (crateUi) crateUi.destroy();
+          crateUi = crateStage(sheetIn.querySelector('.cx-host'), {
+            count: () => career().crates,
+            open: () => openCrate(),
+            onChange: () => {
+              const perks = sheetIn.querySelector('.tt-crate-perks');
+              if (perks) perks.innerHTML = perksHtml();
+              markCrates();
+            },
+          });
           break;
         }
         case 'unit': {
@@ -443,22 +446,35 @@ export function showTitle({ current = null, canResume = false } = {}) {
       <p class="tt-note">${done >= 3 ? 'All three done.' : `${3 - done} to go.`} New orders in ${ordersResetIn()}.</p>`;
   }
 
-  function cratesHtml(got) {
+  function perksHtml() {
     const c = career();
     const pend = [];
     if (c.perks.funds) pend.push(`+$${c.perks.funds.toLocaleString()} FIELD FUNDS`);
     if (c.perks.income) pend.push(`+${Math.round(c.perks.income * 100)}% INCOME`);
     if (c.perks.double) pend.push(`DOUBLE XP × ${c.perks.double} WIN${c.perks.double > 1 ? 'S' : ''}`);
-    const reveal = got ? `<div class="tt-loot r-${got.rarity.toLowerCase()}"><span>${got.rarity}</span><b>${esc(got.line.toUpperCase())}</b></div>` : '';
-    return `${reveal}
-      <div class="tt-crate-row">
-        <button class="tt-crate${c.crates ? '' : ' empty'}" type="button" data-act="opencrate" ${c.crates ? '' : 'disabled'}>
-          <span class="tt-crate-box"></span>
-          <b>${c.crates ? `OPEN · ${c.crates} LEFT` : 'NONE LEFT'}</b>
-        </button>
-      </div>
+    return pend.length ? `<div class="tt-sk">READY FOR YOUR NEXT BATTLE</div><div class="tt-perks">${pend.map((p) => `<span>${p}</span>`).join('')}</div>` : '';
+  }
+
+  function cratesHtml() {
+    return `<div class="cx-host"></div>
       <p class="tt-note">A crate for every grade you rise, two at every fifth, and one for finishing all three daily orders. What comes out is spent in your next battle.</p>
-      ${pend.length ? `<div class="tt-sk">READY FOR YOUR NEXT BATTLE</div><div class="tt-perks">${pend.map((p) => `<span>${p}</span>`).join('')}</div>` : ''}`;
+      <div class="tt-crate-perks">${perksHtml()}</div>`;
+  }
+
+  /**
+   * The menu line's notice, kept to the count: the badge and the hot marker
+   * go with the last crate. They used to stay lit after every crate was
+   * open, until the page was next built.
+   */
+  function markCrates() {
+    const n = career().crates;
+    const item = root.querySelector('[data-act="crates"]');
+    if (!item) return;
+    item.classList.toggle('hot', n > 0);
+    const em = item.querySelector('em');
+    if (em) em.textContent = n ? `${n} TO OPEN · WHAT'S INSIDE IS FOR YOUR NEXT BATTLE` : 'ALL OPENED · MORE WITH EVERY GRADE';
+    const badge = item.querySelector('b u');
+    if (badge) { if (n) badge.textContent = n; else badge.remove(); }
   }
 
   function armouryHtml() {

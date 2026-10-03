@@ -1,0 +1,160 @@
+/* A supply crate, opened (see crateopen.js). The box is 150 x 104 x 110. */
+
+.cx-stage { --rc: #f3cf6a; position: relative; height: 300px; margin: 4px auto 0; max-width: 420px;
+  perspective: 760px; perspective-origin: 50% 30%; overflow: hidden; cursor: pointer; user-select: none;
+  -webkit-tap-highlight-color: transparent; }
+.cx-stage.empty { cursor: default; opacity: 0.55; }
+.cx-floor { position: absolute; left: 50%; bottom: 26px; width: 210px; height: 34px; transform: translateX(-50%);
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent); }
+
+/* The glow behind it, rising with the shaking. */
+.cx-stage::before { content: ''; position: absolute; left: 50%; bottom: 40px; width: 320px; height: 320px;
+  transform: translateX(-50%); border-radius: 50%; opacity: 0; transition: opacity 0.4s;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--rc) 70%, transparent), transparent 70%); }
+.cx-stage[data-state="buck"]::before { opacity: 0.35; }
+.cx-stage[data-state="strain"]::before { opacity: 0.7; }
+.cx-stage[data-state="open"]::before, .cx-stage[data-state="rise"]::before,
+.cx-stage[data-state="reveal"]::before { opacity: 1; }
+.cx-stage[data-state="done"]::before { opacity: 0.55; }
+
+.cx-crate { position: absolute; left: 50%; bottom: 44px; width: 150px; height: 104px; margin-left: -75px;
+  transform-style: preserve-3d; }
+.cx-spin { position: absolute; inset: 0; transform-style: preserve-3d;
+  transform: rotateX(-16deg) rotateY(-32deg); }
+.cx-stage[data-state="idle"] .cx-spin { animation: cx-sway 6s ease-in-out infinite; }
+@keyframes cx-sway { 0%, 100% { transform: rotateX(-16deg) rotateY(-38deg); } 50% { transform: rotateX(-16deg) rotateY(-24deg); } }
+
+.cx-f { position: absolute; box-sizing: border-box; border: 3px solid #2a3216; backface-visibility: hidden;
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.22)),
+    repeating-linear-gradient(0deg, #56632f 0 24px, #3a4420 24px 26px);
+  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.2); }
+.cx-front { width: 150px; height: 104px; transform: translateZ(55px); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; }
+.cx-back { width: 150px; height: 104px; transform: rotateY(180deg) translateZ(55px); }
+.cx-left { width: 110px; height: 104px; left: 20px; transform: rotateY(-90deg) translateZ(75px); filter: brightness(0.78); }
+.cx-right { width: 110px; height: 104px; left: 20px; transform: rotateY(90deg) translateZ(75px); filter: brightness(0.78); }
+.cx-bottom { width: 150px; height: 110px; top: -3px; transform: rotateX(-90deg) translateZ(52px); }
+.cx-inside { width: 146px; height: 106px; top: -1px; left: 2px; border: 0; transform: rotateX(90deg) translateZ(44px);
+  backface-visibility: visible; opacity: 0; transition: opacity 0.2s;
+  background: radial-gradient(closest-side, #fff, var(--rc) 45%, color-mix(in srgb, var(--rc) 40%, #000) 100%); }
+.cx-st { font: 700 15px/1 var(--f-data, monospace); letter-spacing: 0.32em; color: rgba(232, 222, 170, 0.82); font-style: normal;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.cx-no { font: 600 9px/1 var(--f-data, monospace); letter-spacing: 0.2em; color: rgba(232, 222, 170, 0.5); font-style: normal; }
+
+/* The lid, hinged at the top of the box: a slab a little proud of the walls. */
+.cx-lid { position: absolute; width: 158px; height: 118px; left: -4px; top: -7px; transform-style: preserve-3d;
+  transform: rotateX(90deg) translateZ(54px); }
+.cx-top { width: 158px; height: 118px; backface-visibility: visible;
+  background:
+    linear-gradient(90deg, transparent 22%, #2a3216 22% 25%, transparent 25% 75%, #2a3216 75% 78%, transparent 78%),
+    repeating-linear-gradient(90deg, #5d6b33 0 26px, #3f4a22 26px 28px); }
+
+/* The straps, each in two halves that part when it snaps. */
+.cx-strap { position: absolute; top: -4px; width: 12px; height: 112px; transform: translateZ(57px); transform-style: preserve-3d; }
+.cx-s1 { left: 30px; } .cx-s2 { left: 108px; }
+.cx-strap u { position: absolute; left: 0; width: 12px; height: 56px; background: linear-gradient(90deg, #6d6f6a, #b4b6ae 50%, #5e605b);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.cx-strap u:first-child { top: 0; } .cx-strap u:last-child { top: 56px; }
+
+/* Rocking, bucking, straining: harder each time, and the seams lit. */
+.cx-stage[data-state="rock"] .cx-crate { animation: cx-rock 0.16s linear infinite; }
+.cx-stage[data-state="buck"] .cx-crate { animation: cx-buck 0.12s linear infinite; }
+.cx-stage[data-state="strain"] .cx-crate { animation: cx-strain 0.07s linear infinite; }
+@keyframes cx-rock { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-2.5deg); } 75% { transform: rotate(2.5deg); } }
+@keyframes cx-buck { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-7px) rotate(-4deg); } 75% { transform: translateY(-3px) rotate(4deg); } }
+@keyframes cx-strain { 0%, 100% { transform: translate(0, -3px) scale(1.03); } 25% { transform: translate(-3px, -9px) rotate(-5deg) scale(1.05); } 75% { transform: translate(3px, -6px) rotate(5deg) scale(1.04); } }
+.cx-stage[data-state="buck"] .cx-top { box-shadow: 0 0 14px 3px color-mix(in srgb, var(--rc) 60%, transparent); }
+.cx-stage[data-state="strain"] .cx-top { box-shadow: 0 0 26px 8px var(--rc); }
+.cx-stage[data-state="strain"] .cx-front { box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.2), 0 -6px 18px -4px var(--rc); }
+.cx-stage[data-state="strain"] .cx-strap u { animation: cx-flicker 0.08s steps(2) infinite; }
+@keyframes cx-flicker { 50% { filter: brightness(1.8); } }
+
+/* Open: the lid goes up and over, the straps part, light comes out. */
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"], [data-state="done"]) .cx-lid {
+  animation: cx-lid 1.1s cubic-bezier(.15,.7,.4,1) forwards; }
+@keyframes cx-lid {
+  0% { transform: rotateX(90deg) translateZ(54px); opacity: 1; }
+  100% { transform: translate3d(90px, -330px, -60px) rotateX(330deg) rotateZ(150deg) translateZ(54px); opacity: 0; } }
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"], [data-state="done"]) .cx-strap u:first-child {
+  animation: cx-strap-up 0.8s ease-out forwards; }
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"], [data-state="done"]) .cx-strap u:last-child {
+  animation: cx-strap-down 0.8s ease-in forwards; }
+@keyframes cx-strap-up { to { transform: translate3d(-30px, -150px, 30px) rotate(-120deg); opacity: 0; } }
+@keyframes cx-strap-down { to { transform: translate3d(26px, 60px, 20px) rotate(70deg); opacity: 0; } }
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"], [data-state="done"]) .cx-inside { opacity: 1; }
+.cx-stage[data-state="open"] .cx-crate { animation: cx-recoil 0.45s cubic-bezier(.3,1.6,.5,1); }
+@keyframes cx-recoil { 0% { transform: translateY(6px) scale(1.06, 0.92); } 100% { transform: none; } }
+
+.cx-rays { position: absolute; left: 50%; bottom: 40px; width: 560px; height: 560px; margin: 0 0 -280px -280px;
+  border-radius: 50%; opacity: 0; transform: scale(0.3);
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 55%, transparent) 0 7deg, transparent 7deg 22deg);
+  -webkit-mask: radial-gradient(closest-side, #000 10%, transparent 75%); mask: radial-gradient(closest-side, #000 10%, transparent 75%);
+  transition: opacity 0.35s, transform 0.6s cubic-bezier(.2,1.4,.4,1); }
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"]) .cx-rays { opacity: 1; transform: scale(1); animation: cx-turn 7s linear infinite; }
+.cx-stage[data-state="done"] .cx-rays { opacity: 0.45; transform: scale(1); animation: cx-turn 14s linear infinite; }
+@keyframes cx-turn { to { rotate: 360deg; } }
+
+.cx-beam { position: absolute; left: 50%; bottom: 96px; width: 120px; height: 320px; margin-left: -60px; opacity: 0;
+  transform-origin: 50% 100%; transform: scaleY(0);
+  background: linear-gradient(to top, #fff, color-mix(in srgb, var(--rc) 80%, transparent) 30%, transparent);
+  filter: blur(6px); transition: transform 0.35s cubic-bezier(.2,1.2,.4,1), opacity 0.3s; }
+.cx-stage:is([data-state="open"], [data-state="rise"]) .cx-beam { opacity: 0.95; transform: scaleY(1); }
+.cx-stage:is([data-state="reveal"], [data-state="done"]) .cx-beam { opacity: 0.35; transform: scaleY(0.7); }
+
+.cx-sparks { position: absolute; left: 50%; bottom: 120px; width: 0; height: 0; pointer-events: none; }
+.cx-sparks i { position: absolute; left: 0; top: 0; width: var(--w); height: var(--w); border-radius: 1px; opacity: 0;
+  box-shadow: 0 0 6px currentColor; }
+.cx-stage:is([data-state="open"], [data-state="rise"], [data-state="reveal"]) .cx-sparks i { animation: cx-spark var(--t) cubic-bezier(.1,.7,.3,1) forwards; }
+@keyframes cx-spark {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 140px)) rotate(var(--r)); opacity: 0; } }
+
+/* The card: up out of the box, then over. */
+.cx-card { position: absolute; left: 50%; bottom: 96px; width: 220px; height: 128px; margin-left: -110px;
+  perspective: 700px; opacity: 0; transform: translateY(70px) scale(0.45); pointer-events: none; }
+.cx-stage:is([data-state="rise"], [data-state="reveal"], [data-state="done"]) .cx-card {
+  opacity: 1; transform: translateY(-34px) scale(1); transition: transform 0.6s cubic-bezier(.2,1.5,.4,1), opacity 0.2s; }
+.cx-card-in { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(.3,1.4,.5,1); }
+.cx-stage:is([data-state="reveal"], [data-state="done"]) .cx-card-in { transform: rotateY(180deg); }
+.cx-cback, .cx-cfront { position: absolute; inset: 0; backface-visibility: hidden; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 7px; text-align: center; padding: 10px 14px; box-sizing: border-box; }
+.cx-cback { background: repeating-linear-gradient(45deg, #2b3318 0 10px, #36401e 10px 20px); border: 2px solid var(--rc);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--rc) 60%, transparent); }
+.cx-cback b { font: 700 46px/1 var(--f-data, monospace); color: var(--rc); text-shadow: 0 0 14px var(--rc); }
+.cx-cfront { transform: rotateY(180deg); background: rgba(10, 12, 9, 0.94); border: 2px solid var(--rc);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--rc) 70%, transparent), inset 0 0 22px color-mix(in srgb, var(--rc) 22%, transparent); }
+.cx-cfront span { font: 700 10px/1 var(--f-data, monospace); letter-spacing: 0.42em; color: var(--rc); }
+.cx-cfront b { font: 700 16px/1.25 var(--f-data, monospace); letter-spacing: 0.06em; color: #fff; }
+.cx-cfront i { font: 600 9px/1 var(--f-data, monospace); letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.5); font-style: normal; }
+.cx-stage.r-legendary:is([data-state="reveal"], [data-state="done"]) .cx-cfront { animation: cx-gold 1.6s ease-in-out infinite; }
+@keyframes cx-gold { 50% { box-shadow: 0 0 60px var(--rc), inset 0 0 30px color-mix(in srgb, var(--rc) 40%, transparent); } }
+
+.cx-ctl { display: flex; justify-content: center; padding: 6px 0 2px; }
+.cx-btn { min-width: 210px; padding: 12px 20px; font: 700 12px/1 var(--f-data, monospace); letter-spacing: 0.2em; cursor: pointer;
+  color: #f3cf6a; background: rgba(224, 163, 60, 0.1); border: 1px solid rgba(224, 163, 60, 0.6); }
+.cx-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* A legendary: the screen whites out and the whole page jumps. */
+.cx-whiteout { position: fixed; inset: 0; z-index: 100000; pointer-events: none; background: #fff8e0;
+  animation: cx-white 0.9s ease-out forwards; }
+@keyframes cx-white { from { opacity: 0.95; } to { opacity: 0; } }
+body.cx-quake { animation: cx-quake 0.5s linear; }
+@keyframes cx-quake { 0%, 100% { transform: none; } 20% { transform: translate(-6px, 3px); } 40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, -2px); } 80% { transform: translate(3px, 4px); } }
+
+/* Over the after-action report. */
+.cx-overlay { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(4, 6, 4, 0.78); backdrop-filter: blur(3px); }
+.cx-panel { width: min(440px, 100%); padding: 14px 16px 16px; box-sizing: border-box; background: rgba(14, 17, 12, 0.97);
+  border: 1px solid rgba(224, 163, 60, 0.45); color: #e8e2c8; font-family: var(--f-data, monospace); }
+.cx-head { display: flex; align-items: center; justify-content: space-between; }
+.cx-head b { font-size: 13px; letter-spacing: 0.3em; color: #f3cf6a; }
+.cx-close { padding: 8px 14px; font: 700 11px/1 var(--f-data, monospace); letter-spacing: 0.2em; cursor: pointer;
+  color: #e8e2c8; background: transparent; border: 1px solid rgba(232, 226, 200, 0.4); }
+.cx-note { margin: 8px 0 0; text-align: center; font-size: 11px; color: rgba(232, 226, 200, 0.6); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-stage *, .cx-stage::before { animation: none !important; transition: none !important; }
+}
