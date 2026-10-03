@@ -505,15 +505,17 @@ export class Garrison {
       base: { low: 200, medium: 288, high: 360, ultra: 420 }[quality.name] ?? 288,
       works: { low: 110, medium: 170, high: 220, ultra: 280 }[quality.name] ?? 170,
       air: { low: 170, medium: 250, high: 310, ultra: 370 }[quality.name] ?? 250,
+      // The counter-attack at three quarters (see `ASSAULT` in reinforce.js).
+      wave: { low: 260, medium: 380, high: 460, ultra: 540 }[quality.name] ?? 380,
     };
-    this.used = { base: 0, works: 0, air: 0 };
-    this.cap = this.pools.base + this.pools.works + this.pools.air;
+    this.used = { base: 0, works: 0, air: 0, wave: 0 };
+    this.cap = this.pools.base + this.pools.works + this.pools.air + this.pools.wave;
     // The rifleman in the shoulder, from `soldier.js`: the tones are baked into
     // the vertices and the instance colour is the uniform.
     this.mesh = mk(soldierGeometry('aim'), 0xffffff, this.cap);
     this.mesh.material.vertexColors = true;
-    this.mortarMesh = mk(mortarGeometry(), 0xffffff, 48);
-    this.bagMesh = mk(sandbagGeometry(), 0xffffff, 96);
+    this.mortarMesh = mk(mortarGeometry(), 0xffffff, 160);
+    this.bagMesh = mk(sandbagGeometry(), 0xffffff, 240);
     this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
     this.flakMesh = mk(flakGeometry(), 0xffffff, 24);
     this._mk = mk;
@@ -2170,7 +2172,13 @@ export class Garrison {
     // firing on a map reference and correcting by ear, and with one it is being
     // walked onto the target. The difference is worth a real amount, because
     // otherwise nobody would ever bother to kill him.
-    const observed = this.defenders.some((o) => o.alive && o.def.observer);
+    //
+    // An observer sees for the tubes near him, not for every tube on the map:
+    // the counter-attack drops its spotters with the squads, and one man left
+    // alive in a corner was walking every mortar in the city onto the guns.
+    // Within three hundred and twenty metres of the mortar, he counts.
+    const spotters = this.defenders.filter((o) => o.alive && o.def.observer);
+    const observed = spotters.length > 0;
     this.observed = observed;
     for (const d of this.defenders) {
       if (!d.alive || !d.def.indirect) continue;
@@ -2188,7 +2196,8 @@ export class Garrison {
 
       // Lead the shot a little and scatter it, so a mortar suppresses a
       // position rather than deleting whatever stands in it.
-      const spread = observed ? 4.5 : 11;
+      const seen = observed && spotters.some((o) => o.pos.distanceToSquared(d.pos) < 320 * 320);
+      const spread = seen ? 4.5 : 11;
       const aim = best.pos.clone();
       aim.x += (Math.random() - 0.5) * spread;
       aim.z += (Math.random() - 0.5) * spread;
@@ -2204,7 +2213,10 @@ export class Garrison {
         trail: sh.trail, hostile: true,
       });
       d.facing = Math.atan2(aim.x - d.pos.x, aim.z - d.pos.z);
-      d.cooldown = d.def.rof * (observed ? 0.6 : 1.0) * (0.75 + Math.random() * 0.5);
+      // The counter-attack's tubes were carried in by hand and are fed by
+      // hand: a little over half the rate of the garrison's, which has had
+      // all day to stack its rounds.
+      d.cooldown = d.def.rof * (seen ? 0.6 : 1.0) * (0.75 + Math.random() * 0.5) * (d.pool === 'wave' ? 1.8 : 1);
       if (d.pinned > this.time) d.cooldown *= 3;
       this.mortarsFired++;
       // With the aim and the flight, so a whistle can be timed to the landing.

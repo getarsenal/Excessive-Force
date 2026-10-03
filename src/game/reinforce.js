@@ -127,10 +127,39 @@ const MIX = [['rifleman', 58], ['mg', 16], ['at', 10], ['sniper', 8], ['mortar',
 /** How the men come down. */
 const JUMP = { freeFall: 0.9, open: 0.7, rate: 9.5, maxUnder: 17, steer: 16, stick: 0.2 };
 
-const pickType = (r) => {
+const pickType = (r, mix = MIX) => {
   let acc = 0;
-  for (const [t, w] of MIX) { acc += w / 100; if (r < acc) return t; }
+  for (const [t, w] of mix) { acc += w / 100; if (r < acc) return t; }
   return 'rifleman';
+};
+
+/**
+ * The counter-attack: the second wave, at three quarters.
+ *
+ * The first airborne is help; this is the brigade. Twice the men the
+ * garrison started with, heavy on the tubes, and only half of them on the
+ * building: the rest come down in squads all over the map, wherever there is
+ * open ground, the nearer ones within mortar reach of the battery. Each squad
+ * has its own tubes and every other one an observer to walk the bombs onto
+ * the guns. Three S-300 launchers come down with it on heavy-drop pallets and
+ * own the sky again for three and a half minutes after they land. It is
+ * warned of — signals intercept it at two thirds — and a player who has dug
+ * nothing in and spread nothing out by then is going to have a bad minute.
+ */
+export const ASSAULT = {
+  kind: 'assault',
+  warnAt: 0.66,
+  at: 0.75,
+  share: 2.0,
+  pool: 'wave',
+  spread: 0.55,
+  sams: 3,
+  // Round the building: the same men as before, with more tubes.
+  mix: [['rifleman', 52], ['mg', 18], ['at', 12], ['sniper', 8], ['mortar', 10]],
+  // In the squads across the map, after each squad's own tube or two and its
+  // spotter: the men to guard them.
+  squad: [['rifleman', 48], ['mg', 26], ['at', 18], ['sniper', 6], ['mortar', 2]],
+  fleet: { min: 14, max: 22, minLoad: 4 },
 };
 
 // ──────────────────────────────────────────────────────────── airframes ──
@@ -479,7 +508,10 @@ function canopyGeometry() {
 
 export class EnemyAirborne {
   /** @param {import('./battle.js').Battle} battle */
-  constructor(battle) {
+  constructor(battle, o = {}) {
+    this.cfg = { kind: 'airborne', at: AIRBORNE_AT, warnAt: null, share: SHARE, pool: 'air',
+      spread: 0, sams: 0, mix: MIX, squad: MIX, fleet: FLEET, ...o };
+    this.warned = false;
     this.battle = battle;
     this.scene = battle.scene;
     this.terrain = battle.terrain;
@@ -493,6 +525,7 @@ export class EnemyAirborne {
     this.state = 'waiting';     // → 'inbound' → 'done'
     this.planes = [];
     this.men = [];
+    this.cargo = [];
     this.landed = 0;
     this.lost = 0;
     this.total = 0;
@@ -511,15 +544,21 @@ export class EnemyAirborne {
     if (!this.enabled) return;
     const b = this.battle;
     if (this.state === 'waiting') {
-      if (this.auto && b.state === 'playing' && b.objectiveProgress >= AIRBORNE_AT) this.launch();
+      if (!this.auto || b.state !== 'playing') return;
+      if (this.cfg.warnAt != null && !this.warned && b.objectiveProgress >= this.cfg.warnAt) {
+        this.warned = true;
+        b.onEvent(`${this.cfg.kind}warn`, { at: this.cfg.at, nation: this.code });
+      }
+      if (b.objectiveProgress >= this.cfg.at) this.launch();
       return;
     }
     if (this.state !== 'inbound') return;
     this._fly(dt);
     this._fall(dt);
+    this._fallCargo(dt);
     this._publish();
     this._draw();
-    if (!this.planes.length && !this.men.length) this._finish();
+    if (!this.planes.length && !this.men.length && !this.cargo.length) this._finish();
   }
 
   /**
@@ -530,11 +569,20 @@ export class EnemyAirborne {
     if (this.state !== 'waiting' || !this.enabled) return null;
     const b = this.battle, g = b.garrison;
     this.state = 'done';
-    const base = g.defenders.filter((d) => d.pool !== 'air').length;
-    const room = g.pools.air - g.used.air;
-    const want = Math.min(room, Math.round(base * SHARE));
+    const C = this.cfg;
+    const base = g.defenders.filter((d) => d.pool === 'base' || d.pool === 'works' || !d.pool).length;
+    const room = (g.pools[C.pool] || 0) - (g.used[C.pool] || 0);
+    const want = Math.min(room, Math.round(base * C.share));
     if (want < 1) return null;
-    const slots = this._slots(want);
+    const near = Math.round(want * (1 - C.spread));
+    const slots = this._slots(near);
+    if (C.spread > 0) slots.push(...this._mapSlots(want - slots.length, slots));
+    // Heavy drop: what comes down on pallets rather than under a man.
+    if (C.sams && this.battle.samSites) {
+      for (const p of this.battle.samSites(C.sams)) {
+        slots.push({ pos: new THREE.Vector3(p.x, p.y, p.z), facing: p.yaw, type: 'sam', site: p });
+      }
+    }
     if (!slots.length) return null;
     this.state = 'inbound';
     this.total = slots.length;
@@ -566,8 +614,9 @@ export class EnemyAirborne {
 
     // Into aircraft by where they are going across the run, so each load is
     // the men for one strip of the ground.
-    const nPlanes = Math.max(1, Math.min(FLEET.max, Math.floor(slots.length / FLEET.minLoad),
-      Math.max(FLEET.min, Math.ceil(slots.length / F.cap))));
+    const FL = C.fleet;
+    const nPlanes = Math.max(1, Math.min(FL.max, Math.floor(slots.length / FL.minLoad),
+      Math.max(FL.min, Math.ceil(slots.length / F.cap))));
     for (const s of slots) {
       s.across = (s.pos.x - c.x) * side.x + (s.pos.z - c.z) * side.z;
       s.along = (s.pos.x - c.x) * dir.x + (s.pos.z - c.z) * dir.z;
@@ -608,9 +657,11 @@ export class EnemyAirborne {
     this.alt = alt;
     this._ensureMeshes();
     const eta = runIn / F.speed;
-    b.onEvent('airborne', {
+    const sams = slots.filter((x) => x.type === 'sam').length;
+    this.total -= sams;
+    b.onEvent(C.kind, {
       name: F.name, frame: this.nation.frame, planes: this.planes.length, men: this.total,
-      eta, nation: this.code, point: c,
+      eta, nation: this.code, point: c, sams, squads: this.squads || 0,
     });
     return { planes: this.planes.length, men: this.total, eta };
   }
@@ -697,10 +748,95 @@ export class EnemyAirborne {
           const tx = bx - x, tz = bz - z, tl = Math.hypot(tx, tz) || 1;
           if ((tx * nx + tz * nz) / tl > -0.2) facing = Math.atan2(tx, tz);
         }
-        const type = pickType(((k++ * 0.6180339887) + 0.31) % 1);
+        const type = pickType(((k++ * 0.6180339887) + 0.31) % 1, this.cfg.mix);
         out.push({ pos: new THREE.Vector3(x, t.heightAt(x, z), z), facing, type });
       }
     }
+    return out;
+  }
+
+  /**
+   * Squads all over the map: five to eight men each, round a point of open
+   * ground, a quarter of the points within mortar reach of the battery and the
+   * rest spread round the compass at every distance out to the edge, none
+   * of them within two hundred and fifty metres of a gun. A tube
+   * in every squad and a second in every third; a spotter in every other
+   * squad, and the mortars near him are the ones that hit. Facing the
+   * guns if there are guns, the building if not.
+   */
+  _mapSlots(n, already) {
+    if (n < 1) return [];
+    const b = this.battle, t = this.terrain;
+    const f = b.primary.footprint;
+    if (!f) return [];
+    const span = t.span * 0.86;
+    const fc = { x: (f.x0 + f.x1) / 2, z: (f.z0 + f.z1) / 2 };
+    const fr = Math.hypot(f.x1 - f.x0, f.z1 - f.z0) / 2;
+    const units = b.units.filter((u) => u.alive);
+    let bx = 0, bz = 0;
+    for (const u of units) { bx += u.pos.x; bz += u.pos.z; }
+    const haveBattery = units.length > 0;
+    if (haveBattery) { bx /= units.length; bz /= units.length; }
+    const taken = already.map((s) => ({ x: s.pos.x, z: s.pos.z }));
+    const crowded = (x, z, r) => taken.some((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < r * r);
+    // Out of rifle and machine-gun reach of the battery, and well inside a
+    // mortar's: the squads near the guns shell them, they do not overrun them.
+    // A man standing up four hundred metres off is the player's to find.
+    let clearOfGuns = 250;
+    const ok = (x, z) => {
+      if (Math.abs(x) > span || Math.abs(z) > span) return false;
+      if (Math.hypot(x - fc.x, z - fc.z) < fr + 40) return false;
+      if (t.isWater(x, z)) return false;
+      const h = t.heightAt(x, z);
+      const slope = Math.max(Math.abs(t.heightAt(x + 1.5, z) - h), Math.abs(t.heightAt(x, z + 1.5) - h)) / 1.5;
+      if (slope > 0.45) return false;
+      for (const q of b.cityPlots || []) {
+        if (Math.abs(q.x - x) < q.w / 2 + 1.5 && Math.abs(q.z - z) < q.d / 2 + 1.5) return false;
+      }
+      for (const u of units) if ((u.pos.x - x) ** 2 + (u.pos.z - z) ** 2 < clearOfGuns * clearOfGuns) return false;
+      return true;
+    };
+    const squads = Math.max(4, Math.round(n / 6.5));
+    const turn = Math.random() * Math.PI * 2;
+    const out = [];
+    let made = 0;
+    for (let i = 0; i < squads && out.length < n; i++) {
+      // The centre: near the guns for a third of them, anywhere for the rest.
+      let cx = null, cz = null;
+      for (let tries = 0; tries < 40 && cx === null; tries++) {
+        let x, z;
+        if (haveBattery && i % 4 === 0) {
+          const a = Math.random() * Math.PI * 2, r = 360 + Math.random() * 200;
+          x = bx + Math.cos(a) * r; z = bz + Math.sin(a) * r;
+        } else {
+          const a = turn + (i / squads) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+          const r = fr + 90 + Math.random() * (span - fr - 90);
+          x = fc.x + Math.cos(a) * r; z = fc.z + Math.sin(a) * r;
+        }
+        if (ok(x, z) && !crowded(x, z, 30)) { cx = x; cz = z; }
+      }
+      if (cx === null) continue;
+      made++;
+      const size = Math.min(n - out.length, 5 + Math.floor(Math.random() * 4));
+      const tx = haveBattery ? bx : fc.x, tz = haveBattery ? bz : fc.z;
+      let k = 0;
+      clearOfGuns = 230;
+      for (let tries = 0; tries < size * 8 && k < size; tries++) {
+        const a = Math.random() * Math.PI * 2, r = k === 0 ? 0 : 3 + Math.random() * 16;
+        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        if (crowded(x, z, 2.8) || !ok(x, z)) continue;
+        taken.push({ x, z });
+        // Two tubes a squad first, then a spotter every other squad, then
+        // whatever the mix gives.
+        const type = k === 0 || (k === 1 && i % 3 === 0) ? 'mortar'
+          : k === 2 && i % 2 === 0 ? 'spotter'
+            : pickType(((made * 7 + k) * 0.6180339887) % 1, this.cfg.squad);
+        out.push({ pos: new THREE.Vector3(x, t.heightAt(x, z), z), facing: Math.atan2(tx - x, tz - z), type, squad: i });
+        k++;
+      }
+      clearOfGuns = 250;
+    }
+    this.squads = made;
     return out;
   }
 
@@ -775,7 +911,7 @@ export class EnemyAirborne {
       }
       if (p.along > 1500) {
         // Anybody still aboard is going home with it.
-        this.lost += p.load.length - p.next;
+        this.lost += p.load.slice(p.next).filter((x) => x.type !== 'sam').length;
         this._remove(p, i);
       }
     }
@@ -789,6 +925,7 @@ export class EnemyAirborne {
   }
 
   _jump(p, slot) {
+    if (slot.type === 'sam') { this._dropCargo(p, slot); return; }
     const m = p.model;
     const pos = m.position.clone().addScaledVector(p.dir, -8);
     pos.y -= 2.4;
@@ -846,12 +983,74 @@ export class EnemyAirborne {
         // position, facing the way he was told.
         const at = s.clone();
         const placed = g.place(man.slot.type, at, man.slot.facing, 4,
-          { cover: 'ground', emplaced: true, pool: 'air' });
-        if (placed) this.landed++;
-        else this.lost++;
+          { cover: 'ground', emplaced: true, pool: this.cfg.pool });
+        if (placed) {
+          this.landed++;
+          // Off the canopy and into a scrape: a tube takes a while to set up.
+          const d = g.defenders[g.defenders.length - 1];
+          if (d && d.def.indirect && this.cfg.pool === 'wave') d.cooldown = 10 + Math.random() * 12;
+        } else this.lost++;
         if (this.battle.fx && this.battle.quality?.name !== 'low') this.battle.fx.impactDust(s.x, s.y, s.z, 0.4);
         man.alive = false;
         this.men.splice(i, 1);
+      }
+    }
+  }
+
+  /**
+   * A heavy-drop pallet: a launcher on a platform under three big canopies,
+   * out of the back of the aircraft and down at eight metres a second onto
+   * its site, where it becomes an S-300 launcher that is up for business.
+   */
+  _dropCargo(p, slot) {
+    const m = p.model;
+    const grp = new THREE.Group();
+    const pallet = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.4, 11),
+      new THREE.MeshStandardMaterial({ color: 0x4d5733, roughness: 0.85 }));
+    pallet.position.y = 1.2;
+    grp.add(pallet);
+    const chuteMat = new THREE.MeshStandardMaterial({ color: this.nation.chute ?? DEFAULT_CHUTE, roughness: 0.95,
+      side: THREE.DoubleSide, emissive: new THREE.Color(this.nation.chute ?? DEFAULT_CHUTE), emissiveIntensity: 0.3 });
+    const canopies = [];
+    for (const [ox, oz] of [[-7, 0], [7, 0], [0, 7]]) {
+      const c = new THREE.Mesh(canopyGeometry(), chuteMat);
+      c.scale.set(0.01, 0.01, 0.01);
+      c.position.set(ox, 2, oz);
+      grp.add(c);
+      canopies.push(c);
+    }
+    grp.position.copy(m.position).addScaledVector(p.dir, -10);
+    grp.position.y -= 3;
+    grp.rotation.y = m.rotation.y;
+    this.scene.add(grp);
+    this.cargo.push({ slot, grp, canopies, t: 0, vel: new THREE.Vector3(p.dir.x * p.speed * 0.7, -2, p.dir.z * p.speed * 0.7) });
+  }
+
+  _fallCargo(dt) {
+    for (let i = this.cargo.length - 1; i >= 0; i--) {
+      const c = this.cargo[i];
+      c.t += dt;
+      const s = c.slot.pos, P = c.grp.position;
+      const open = Math.min(1, Math.max(0, (c.t - 1.2) / 1.4));
+      for (const k of c.canopies) { const sc = 0.01 + open * 2.6; k.scale.set(sc, sc, sc); k.position.y = 2 + open * 24; }
+      if (open <= 0) { c.vel.multiplyScalar(Math.exp(-1.5 * dt)); c.vel.y -= 9.81 * dt; }
+      else {
+        const left = Math.max(0.8, (P.y - s.y) / 8);
+        let wx = (s.x - P.x) / left, wz = (s.z - P.z) / left;
+        const wl = Math.hypot(wx, wz);
+        if (wl > 22) { wx *= 22 / wl; wz *= 22 / wl; }
+        const k = Math.min(1, dt * 2 * open);
+        c.vel.x += (wx - c.vel.x) * k; c.vel.z += (wz - c.vel.z) * k;
+        c.vel.y += (-8 - c.vel.y) * Math.min(1, dt * 2 * open);
+      }
+      P.addScaledVector(c.vel, dt);
+      if (P.y <= s.y + 0.05 || (c.t > 5 && P.y < this.terrain.heightAt(P.x, P.z))) {
+        this.scene.remove(c.grp);
+        c.grp.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
+        this.cargo.splice(i, 1);
+        if (this.battle.fx && this.battle.quality?.name !== 'low') this.battle.fx.impactDust(s.x, s.y, s.z, 1.4);
+        if (this.battle.landSam) this.battle.landSam(c.slot.site);
+        this.samsLanded = (this.samsLanded || 0) + 1;
       }
     }
   }
@@ -867,7 +1066,7 @@ export class EnemyAirborne {
     p.down = true;
     p.alive = false;
     p.spin = Math.random() < 0.5 ? -1 : 1;
-    const aboard = p.load.length - p.next;
+    const aboard = p.load.slice(p.next).filter((x) => x.type !== 'sam').length;
     p.next = p.load.length;
     this.lost += aboard;
     if (aboard) this.battle._creditKills(aboard, p.model.position.clone());
@@ -887,7 +1086,6 @@ export class EnemyAirborne {
   /** What is up there, for the player's machine guns: the aircraft first. */
   _publish() {
     const list = this.battle.enemyAir;
-    list.length = 0;
     for (const p of this.planes) if (p.alive) list.push(p);
     for (const man of this.men) {
       // A man under a canopy is a small thing falling past at two hundred
@@ -931,9 +1129,9 @@ export class EnemyAirborne {
 
   _finish() {
     this.state = 'done';
-    this.battle.enemyAir.length = 0;
     for (const x of [this.manMesh, this.chuteMesh]) if (x) x.count = 0;
-    this.battle.onEvent('airbornelanded', { landed: this.landed, lost: this.lost, name: this.frame.name });
+    this.battle.onEvent(`${this.cfg.kind}landed`, { landed: this.landed, lost: this.lost, name: this.frame.name,
+      sams: this.samsLanded || 0, squads: this.squads || 0 });
   }
 
   /** For a save: it has been and gone, whatever it achieved. */

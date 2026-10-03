@@ -94,7 +94,7 @@ export function snapshotBattle({ level, battle, structures }) {
   const touched = structures.some((s) => s.destroyedCount > 0);
   if (!units.length && !touched && !battle.shotsFired) return null;
   const g = battle.garrison;
-  let nBase = g ? g.defenders.findIndex((d) => d.pool === 'air') : 0;
+  let nBase = g ? g.defenders.findIndex((d) => d.pool === 'air' || d.pool === 'wave') : 0;
   if (g && nBase < 0) nBase = g.defenders.length;
   const cf = battle.cityFire;
   const burnt = [];
@@ -123,8 +123,9 @@ export function snapshotBattle({ level, battle, structures }) {
     nDefenders: nBase,
     alive: g ? g.defenders.filter((d) => d.alive).length : 0,
     airborne: battle.airborne && battle.airborne.spent ? 1 : 0,
+    assault: battle.assault && battle.assault.spent ? 1 : 0,
     air: g ? g.defenders.slice(nBase).filter((d) => d.alive).map((d) => [
-      d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2)]) : [],
+      d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2), d.pool === 'wave' ? 1 : 0]) : [],
     burnt,
     units,
   };
@@ -184,9 +185,10 @@ export function restoreBattle(snap, { battle, structures }) {
   // The airborne, if they have been: dug in where they were, and not coming
   // a second time.
   if (snap.airborne && battle.airborne) battle.airborne.state = 'done';
+  if (snap.assault && battle.assault) { battle.assault.state = 'done'; battle.assault.warned = true; }
   if (g) {
-    for (const [type, x, y, z, f] of snap.air || []) {
-      g.place(type, new THREE.Vector3(x, y, z), f, 4, { cover: 'ground', emplaced: true, pool: 'air' });
+    for (const [type, x, y, z, f, wave] of snap.air || []) {
+      g.place(type, new THREE.Vector3(x, y, z), f, 4, { cover: 'ground', emplaced: true, pool: wave ? 'wave' : 'air' });
     }
   }
   // The guns, where they were standing, as they were — without the feed

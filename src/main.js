@@ -624,20 +624,30 @@ async function boot() {
   // strike tests fly aeroplanes in and measure what they do, and a battery
   // that brought one down at random would make every one of them a coin.
   if (!lensSuite && level.id !== 'tutorial' && level.sams !== false) {
-    const sites = siteSams(terrain, {
+    const samOpts = {
       exclude: level.contextExclude || level.cityExcludeRadius || 120,
       plots: contextGroup?.userData?.plots || [],
       net: contextGroup?.userData?.network || null,
       landmarks,
-    });
-    if (sites.length) {
-      // Sand where the ground is sand, olive drab everywhere else.
-      const u = level.palette?.urban;
-      const desert = !!(u && u.r > 0.5 && u.r > u.b * 1.25);
-      battle.sams = new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air,
-        camera: engine.camera, quality, sites, desert,
-        onEvent: (kind, data) => handleEvent(kind, data) });
-    }
+    };
+    // Sand where the ground is sand, olive drab everywhere else.
+    const u = level.palette?.urban;
+    const desert = !!(u && u.r > 0.5 && u.r > u.b * 1.25);
+    const makeSams = (sites) => new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air,
+      camera: engine.camera, quality, sites, desert,
+      onEvent: (kind, data) => handleEvent(kind, data) });
+    const sites = siteSams(terrain, samOpts);
+    if (sites.length) battle.sams = makeSams(sites);
+    // The counter-attack's battery: three more sites, clear of the first
+    // two, dropped on pallets and live from the moment each one lands.
+    battle.samSites = (n) => siteSams(terrain, { ...samOpts, count: n, seed: 0x9e1,
+      avoid: battle.sams ? battle.sams.launchers : [] });
+    battle.landSam = (site) => {
+      if (!site) return;
+      if (!battle.sams) battle.sams = makeSams([]);
+      battle.sams.add(site, battle.elapsed);
+      handleEvent('samlanded', { point: new THREE.Vector3(site.x, site.y, site.z) });
+    };
   }
   battle.cityFire = new CityFire({
     cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene,
@@ -983,6 +993,29 @@ async function boot() {
         break;
       case 'airbornelanded':
         hud.feed(`ENEMY AIRBORNE DOWN · ${data.landed} DUG IN · ${data.lost} LOST`, data.landed > data.lost ? 'bad' : 'big');
+        break;
+      case 'assaultwarn':
+        // Signals hear it coming: time to spread the guns, put the M240s up
+        // and buy what will be needed when the sky is shut again.
+        feedback.emit('strike');
+        hud.feed('SIGINT · ENEMY BRIGADE STAGING · HEAVY DROP AT 75% · SAMS ON PALLETS', 'warn');
+        hud.status('counter-attack coming at 75% · spread your guns · M240 teams up · strike before the SAMs land', 9);
+        if (comcard) comcard.assaultWarn();
+        break;
+      case 'assault':
+        feedback.emit('lost');
+        feedback.emit('strike');
+        hud.feed(`COUNTER-ATTACK · ${data.planes}× ${data.name} · ${data.men} MEN · ${data.squads} SQUADS ACROSS THE MAP${data.sams ? ` · ${data.sams} SAM LAUNCHERS` : ''}`, 'bad');
+        hud.status(`counter-attack inbound · ${data.men} men · mortar squads all over the map · M240 teams engage aircraft`, 8);
+        if (data.point) battle.pulse(data.point, 0xd04030, 60, true);
+        if (comcard) comcard.assault();
+        break;
+      case 'assaultlanded':
+        hud.feed(`COUNTER-ATTACK DOWN · ${data.landed} DUG IN · ${data.lost} LOST${data.sams ? ` · ${data.sams} SAM LAUNCHERS UP` : ''}`, data.landed > data.lost ? 'bad' : 'big');
+        break;
+      case 'samlanded':
+        hud.feed('S-300 LAUNCHER ON THE GROUND · AIRCRAFT AT RISK', 'warn');
+        if (data.point) battle.pulse(data.point, 0xff5030, 24, true);
         break;
       case 'flak':
         // Said before the INBOUND line, so the player reads "under fire" and

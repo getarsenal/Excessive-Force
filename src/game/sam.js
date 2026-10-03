@@ -151,7 +151,9 @@ export function siteSams(terrain, o = {}) {
   const plots = o.plots || [];
   const net = o.net || null;
   const landmarks = o.landmarks || [];
-  let seed = 0x5a3 + Math.round(span);
+  const count = o.count || 2;
+  const avoid = o.avoid || [];
+  let seed = (o.seed ?? 0x5a3) + Math.round(span);
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   let tol = 1.6;
   const clear = (x, z, r) => {
@@ -189,13 +191,14 @@ export function siteSams(terrain, o = {}) {
         const a = turn + (k / 48) * Math.PI * 2;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
         if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(220, r * 0.8))) continue;
+        if (avoid.some((f) => Math.hypot(f.x - x, f.z - z) < 160)) continue;
         if (!clear(x, z, 12)) continue;
         found.push({ x, z, a });
-        if (found.length >= 2) break;
+        if (found.length >= count) break;
       }
-      if (found.length >= 2) break;
+      if (found.length >= count) break;
     }
-    if (found.length >= 2) break;
+    if (found.length >= count) break;
   }
   // Bedded on the low side, so nothing hangs off a slope.
   const low = (x, z) => {
@@ -232,22 +235,8 @@ export class SamSites {
     this._q = new THREE.Quaternion();
     this._up = new THREE.Vector3(0, 1, 0);
     const desert = !!o.desert;
-    (o.sites || []).forEach((p, i) => {
-      const L = makeLauncher(desert);
-      L.group.position.set(p.x, p.y, p.z);
-      L.group.rotation.y = p.yaw;
-      this.group.add(L.group);
-      this.launchers.push({ ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: i * 2.5, alive: true });
-      if (i === 0) {
-        const R = makeRadar(desert);
-        const side = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
-        const rx = p.x + side.x * 22, rz = p.z + side.z * 22;
-        R.group.position.set(rx, this.terrain.heightAt(rx, rz), rz);
-        R.group.rotation.y = p.yaw + 0.4;
-        this.group.add(R.group);
-        this.radar = { ...R, x: rx, z: rz, alive: true };
-      }
-    });
+    this.desert = desert;
+    (o.sites || []).forEach((p, i) => this.add(p, 0, i));
     // The trails are their own pool: a white column hanging in the sky for
     // ten seconds is a thousand puffs, and taking those from the explosions'
     // pool would starve every shell that lands while a missile is up.
@@ -260,11 +249,36 @@ export class SamSites {
     this._time = 0;
   }
 
+  /**
+   * A launcher, set up and on the air until `from + SAM.window`. The battery
+   * the level starts with goes up at nought; the counter-attack drops three
+   * more on pallets at three quarters, each live for its own window from the
+   * moment it lands. The first launcher with no live radar brings one.
+   */
+  add(p, from = 0, i = this.launchers.length) {
+    const L = makeLauncher(this.desert);
+    L.group.position.set(p.x, p.y, p.z);
+    L.group.rotation.y = p.yaw;
+    this.group.add(L.group);
+    this.launchers.push({ ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
+      alive: true, until: from + SAM.window });
+    if (!this.radar?.alive) {
+      const R = makeRadar(this.desert);
+      const side = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
+      const rx = p.x + side.x * 22, rz = p.z + side.z * 22;
+      R.group.position.set(rx, this.terrain.heightAt(rx, rz), rz);
+      R.group.rotation.y = p.yaw + 0.4;
+      this.group.add(R.group);
+      this.radar = { ...R, x: rx, z: rz, alive: true };
+    }
+    if (from > 0) { this.quiet = false; this.announced = false; }
+  }
+
   get alive() { return this.launchers.filter((l) => l.alive).length; }
 
   /** Is the battery still a threat to anything sent in now? */
   get threat() {
-    return !this.quiet && this.launchers.some((l) => l.alive && l.rounds > 0);
+    return !this.quiet && this.launchers.some((l) => l.alive && l.rounds > 0 && (this._now ?? 0) <= l.until);
   }
 
   /** The launchers' and radar's positions, for the HUD and the harness. */
@@ -334,7 +348,8 @@ export class SamSites {
   update(dt, elapsed) {
     this._time += dt;
     if (this.radar?.alive) this.radar.head.rotation.y += dt * 0.9;
-    if (!this.quiet && elapsed > SAM.window) {
+    this._now = elapsed;
+    if (!this.quiet && !this.launchers.some((l) => l.alive && elapsed <= l.until)) {
       this.quiet = true;
       if (this.launchers.some((l) => l.alive)) this.onEvent('samquiet', {});
     }
@@ -357,7 +372,7 @@ export class SamSites {
       if (p.y - g < SAM.minAlt) continue;
       let best = null, bd = Infinity;
       for (const l of this.launchers) {
-        if (!l.alive || l.rounds <= 0 || l.cool > 0) continue;
+        if (!l.alive || l.rounds <= 0 || l.cool > 0 || (this._now ?? 0) > l.until) continue;
         const d = Math.hypot(p.x - l.x, p.z - l.z);
         if (d < SAM.range && d < bd) { bd = d; best = l; }
       }

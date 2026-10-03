@@ -132,6 +132,17 @@ export class ComCard {
       if (!document.body.classList.contains('ended')) this.say('us', pick(BUCK_AIRBORNE));
     }, 6500);
   }
+  /** Signals hear the counter-attack coming: Buck, telling the battery. */
+  assaultWarn() { this.say('us', "Intel says he's staging a whole brigade for the drop. Spread the guns, get the MGs up, and hit him before his SAMs are on the ground."); }
+  /** The counter-attack: his last throw, then Buck. */
+  assault() {
+    this.say('enemy', 'Every man I have, every tube, every missile. Now we see who is besieging whom.');
+    this._quietUntil = performance.now() + 20000;
+    clearTimeout(this._reply);
+    this._reply = setTimeout(() => {
+      if (!document.body.classList.contains('ended')) this.say('us', 'Mortars all over the map. Find the spotters, kill the tubes, and somebody shell those launchers.');
+    }, 6500);
+  }
   last() { this.say('enemy', pick(ENEMY_LAST)); }
   win() { this.say('us', pick(BUCK_WIN)); }
 }

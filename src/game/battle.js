@@ -10,7 +10,7 @@ import {
 } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
-import { EnemyAirborne } from './reinforce.js';
+import { EnemyAirborne, ASSAULT } from './reinforce.js';
 import { lineOfSight } from '../structure/occupancy.js';
 
 /**
@@ -147,6 +147,9 @@ export class Battle {
     // The enemy's airborne: half the garrison again, flown in over the
     // building when the bar is about halfway to the win.
     this.airborne = new EnemyAirborne(this);
+    // And at three quarters, the counter-attack: twice the garrison again,
+    // all over the map, with tubes and a SAM battery of its own.
+    this.assault = new EnemyAirborne(this, ASSAULT);
     this.air.gunner = {
       pick: (c, reach) => {
         let best = null, bd = reach * reach;
@@ -2494,7 +2497,9 @@ export class Battle {
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
       if (this.sams) this.sams.update(dt, this.elapsed);
+      this.enemyAir.length = 0;
       this.airborne.update(dt);
+      this.assault.update(dt);
       this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
       if (this.smokes) this.smokes.update(dt);
@@ -2522,7 +2527,9 @@ export class Battle {
     this._whistles();
     this.air.update(dt);
     if (this.sams) this.sams.update(dt, this.elapsed);
+    this.enemyAir.length = 0;
     this.airborne.update(dt);
+    this.assault.update(dt);
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
     if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
 
