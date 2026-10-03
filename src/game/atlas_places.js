@@ -13,6 +13,8 @@
  *   remote a site with little town round it (the street-furniture tests)
  *   pad    the bake's levelled pad, metres across (default 70), and
  *   padH   its height: land by declaration, for a building standing in water
+ *   ground 'bake': the runtime pad keeps the bake's height at the origin
+ *          instead of levelling to the ring round it (a building on a hill)
  *   zoom   the DEM zoom, where the tile server has a hole at 15 (Ulm: blank to 14)
  */
 /**
@@ -42,13 +44,13 @@ export const PLACES = [
   { id: 'versailles', landmark: 'Palace of Versailles', city: 'Versailles', lat: 48.80490, lon: 2.12037, iso: 'FRA', code: 'fr', clime: 'temperate' },
   { id: 'chambord', landmark: 'Château de Chambord', city: 'Chambord', lat: 47.61610, lon: 1.51704, iso: 'FRA', code: 'fr', clime: 'temperate', remote: true },
   { id: 'seville', landmark: 'Seville Cathedral', city: 'Seville', lat: 37.38583, lon: -5.99333, iso: 'ESP', code: 'es', clime: 'mediterranean' },
-  { id: 'alhambra', landmark: 'Alhambra', city: 'Granada', lat: 37.17607, lon: -3.58811, iso: 'ESP', code: 'es', clime: 'mediterranean', hill: true },
-  { id: 'malbork', landmark: 'Malbork Castle', city: 'Malbork', lat: 54.04003, lon: 19.02785, iso: 'POL', code: 'pl', clime: 'temperate', river: true, zoom: 13 },
+  { id: 'alhambra', landmark: 'Alhambra', city: 'Granada', lat: 37.17607, lon: -3.58811, iso: 'ESP', code: 'es', clime: 'mediterranean', hill: true, ground: 'bake' },
+  { id: 'malbork', landmark: 'Malbork Castle', city: 'Malbork', lat: 54.04003, lon: 19.02785, iso: 'POL', code: 'pl', clime: 'temperate', river: true, zoom: 13, ground: 'bake' },
   { id: 'warsaw', landmark: 'Palace of Culture and Science', city: 'Warsaw', lat: 52.23177, lon: 21.00597, iso: 'POL', code: 'pl', clime: 'temperate' },
   { id: 'bran', landmark: 'Bran Castle', city: 'Bran', lat: 45.51490, lon: 25.36725, iso: 'ROU', code: 'ro', clime: 'alpine', hill: true, remote: true },
-  { id: 'bucharest', landmark: 'Palace of the Parliament', city: 'Bucharest', lat: 44.42749, lon: 26.08745, iso: 'ROU', code: 'ro', clime: 'temperate' },
+  { id: 'bucharest', landmark: 'Palace of the Parliament', city: 'Bucharest', lat: 44.42749, lon: 26.08745, iso: 'ROU', code: 'ro', clime: 'temperate', ground: 'bake' },
   { id: 'kronborg', landmark: 'Kronborg Castle', city: 'Helsingør', lat: 56.03897, lon: 12.62165, iso: 'DNK', code: 'dk', clime: 'nordic', coast: true },
-  { id: 'stockholm', landmark: 'Stockholm Palace', city: 'Stockholm', lat: 59.32683, lon: 18.07161, iso: 'SWE', code: 'se', clime: 'nordic', coast: true },
+  { id: 'stockholm', landmark: 'Stockholm Palace', city: 'Stockholm', lat: 59.32683, lon: 18.07161, iso: 'SWE', code: 'se', clime: 'nordic', coast: true, ground: 'bake' },
   { id: 'hallgrimskirkja', landmark: 'Hallgrímskirkja', city: 'Reykjavík', lat: 64.14200, lon: -21.92667, iso: 'ISL', code: 'is', clime: 'nordic' },
   { id: 'trakai', landmark: 'Trakai Island Castle', city: 'Trakai', lat: 54.65222, lon: 24.93361, iso: 'LTU', code: 'lt', clime: 'nordic', coast: true, remote: true, padH: 146.0 },
   { id: 'winterpalace', landmark: 'Winter Palace', city: 'Saint Petersburg', lat: 59.94056, lon: 30.31389, iso: 'RUS', code: 'ru', clime: 'nordic', river: true },
@@ -88,7 +90,7 @@ export const PLACES = [
   { id: 'yamoussoukro', landmark: 'Basilica of Our Lady of Peace', city: 'Yamoussoukro', lat: 6.81194, lon: -5.29667, iso: 'CIV', code: 'ci', clime: 'tropical', remote: true },
   // The Americas and Oceania
   { id: 'cntower', landmark: 'CN Tower', city: 'Toronto', lat: 43.64256, lon: -79.38706, iso: 'CAN', code: 'ca', clime: 'temperate', coast: true },
-  { id: 'frontenac', landmark: 'Château Frontenac', city: 'Quebec City', lat: 46.81194, lon: -71.20528, iso: 'CAN', code: 'ca', clime: 'nordic', hill: true, river: true },
+  { id: 'frontenac', landmark: 'Château Frontenac', city: 'Quebec City', lat: 46.81194, lon: -71.20528, iso: 'CAN', code: 'ca', clime: 'nordic', hill: true, river: true, ground: 'bake' },
   { id: 'capitolio', landmark: 'El Capitolio', city: 'Havana', lat: 23.13528, lon: -82.35944, iso: 'CUB', code: 'cu', clime: 'tropical' },
   { id: 'bellasartes', landmark: 'Palacio de Bellas Artes', city: 'Mexico City', lat: 19.43528, lon: -99.14111, iso: 'MEX', code: 'mx', clime: 'highland' },
   { id: 'teatroamazonas', landmark: 'Teatro Amazonas', city: 'Manaus', lat: -3.13028, lon: -60.02333, iso: 'BRA', code: 'br', clime: 'tropical' },

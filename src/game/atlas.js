@@ -565,8 +565,10 @@ function levelRecord(P, i) {
     ...(P.fieldWorksShare != null ? { fieldWorksShare: P.fieldWorksShare } : {}),
     ...(P.aim ? { tutorialAim: { x: P.aim.x * spec.S, y: P.aim.y * spec.S, z: P.aim.z * spec.S } } : {}),
     // A pad the bake declared land is levelled to its own height, not to the
-    // water round it.
-    ...(P.padH != null ? { groundLevel: 'bake' } : {}),
+    // water round it; and a building on a hill to the hill's, not to the
+    // median of the slopes falling away from it, which cut ten metres off the
+    // top of the Sabika under the Alhambra and set Frontenac in a hole.
+    ...(P.padH != null || P.ground === 'bake' ? { groundLevel: 'bake' } : {}),
     atlas: i,
     ...(X ? X.record : {}),
   };
