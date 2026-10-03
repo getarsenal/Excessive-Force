@@ -1136,4 +1136,34 @@ export class EnemyAirborne {
 
   /** For a save: it has been and gone, whatever it achieved. */
   get spent() { return this.state !== 'waiting'; }
+
+  /**
+   * The men of this drop still in the fight: aboard a transport that is
+   * still flying, under a canopy, or dug in and alive. The level is not won
+   * while any are left (see `Battle._checkEnd`).
+   */
+  get outstanding() {
+    if (this.state === 'waiting') return 0;
+    let n = 0;
+    for (const p of this.planes) {
+      if (!p.alive) continue;
+      for (let i = p.next; i < p.load.length; i++) if (p.load[i].type !== 'sam') n++;
+    }
+    for (const m of this.men) if (m.alive && !m.dead) n++;
+    const g = this.battle.garrison;
+    if (g) for (const d of g.defenders) if (d.alive && d.pool === this.cfg.pool) n++;
+    return n;
+  }
+
+  /** Where the dug-in survivors are, for the markers. */
+  survivors(max = 16) {
+    const g = this.battle.garrison;
+    if (!g) return [];
+    const out = [];
+    for (const d of g.defenders) {
+      if (d.alive && d.pool === this.cfg.pool) out.push(d.pos);
+      if (out.length >= max) break;
+    }
+    return out;
+  }
 }

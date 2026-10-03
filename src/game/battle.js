@@ -2739,6 +2739,9 @@ export class Battle {
   /** The share of the bar that wins the level. */
   static WIN_AT = 0.90;
 
+  /** Men of a drop still in the fight while the building is down: the win waits on them. */
+  get dropsHolding() { return this._held ? [this.airborne, this.assault].reduce((n, a) => n + (a ? a.outstanding : 0), 0) : 0; }
+
   /** Has every objective been brought to nothing? For the readouts. */
   get flattened() { return !!this._flattened; }
 
@@ -2762,11 +2765,33 @@ export class Battle {
     // sixty per cent sat on 91% with nothing happening. The bar is the
     // promise, and now it is the rule too — and a level whose objectives are
     // all down is over whatever the arithmetic says.
+    //
+    // Not while a drop is in: the airborne and the counter-attack, once sent
+    // for, are part of the fight until every man of them is down, whatever
+    // is left of the building. The bar can be full with a brigade dug in round
+    // the rubble, and the level holds until it is cleared; every few seconds
+    // the survivors are marked, so the last of them can be found.
     if (this.objectiveProgress >= Battle.WIN_AT
         || this.objectives.every((o) => this.objectiveDone(o))) {
-      this.state = 'won';
-      this.onEvent('win', this.summary());
-      return;
+      const drops = [this.airborne, this.assault].filter((a) => a && a.outstanding > 0);
+      const left = drops.reduce((n, a) => n + a.outstanding, 0);
+      if (!left) {
+        this._held = null;
+        this.state = 'won';
+        this.onEvent('win', this.summary());
+        return;
+      }
+      if (!this._held) {
+        this._held = { at: this.elapsed, next: this.elapsed };
+        this.onEvent('winheld', { left });
+      }
+      if (this.elapsed >= this._held.next) {
+        this._held.next = this.elapsed + 6;
+        const points = drops.flatMap((a) => a.survivors(24));
+        this.onEvent('dropsleft', { left, points });
+      }
+    } else if (this._held) {
+      this._held = null;
     }
 
     // Loss: nothing deployed, nothing in flight, and not enough money for the

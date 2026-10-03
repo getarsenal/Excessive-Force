@@ -1013,6 +1013,16 @@ async function boot() {
       case 'assaultlanded':
         hud.feed(`COUNTER-ATTACK DOWN · ${data.landed} DUG IN · ${data.lost} LOST${data.sams ? ` · ${data.sams} SAM LAUNCHERS UP` : ''}`, data.landed > data.lost ? 'bad' : 'big');
         break;
+      case 'winheld':
+        // The building is down and the drop is not: the level waits for it.
+        feedback.emit('strike');
+        hud.feed(`OBJECTIVE DOWN · ${data.left} ENEMY FROM THE DROP STILL FIGHTING · CLEAR THEM TO WIN`, 'warn');
+        hud.status(`clear the drop to win · ${data.left} left · they are marked`, 8);
+        break;
+      case 'dropsleft':
+        hud.status(`clear the drop to win · ${data.left} left`, 6.5);
+        for (const p of data.points || []) battle.pulse(p.clone(), 0xff4a3a, 9, true);
+        break;
       case 'samlanded':
         hud.feed('S-300 LAUNCHER ON THE GROUND · AIRCRAFT AT RISK', 'warn');
         if (data.point) battle.pulse(data.point, 0xff5030, 24, true);
