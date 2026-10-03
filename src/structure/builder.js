@@ -46,6 +46,9 @@ export const MATERIALS = {
   LATTICE: 30,   // a hall's lattice doors, dark red, hung between the columns
   THATCH: 31,    // ichu grass thatch on an Andean roof, bundled over a pole frame
   TURF: 32,      // the earth and grass of a terrace's field, packed behind its wall
+  AZURE: 33,     // turquoise glazed tile: the domes and portals of Samarkand
+  ROSE: 34,      // Jaipur's pink-washed sandstone: the Hawa Mahal
+  COPPER: 35,    // weathered copper roofing, the bright green of verdigris
 };
 
 /**
@@ -281,6 +284,9 @@ export const MATERIAL_PROPS = {
   // A terrace's field: earth packed behind the wall, grassed over. Soft as
   // the rubble in a pyramid and the green of the slope round it.
   [MATERIALS.TURF]:      { density: 1.70, strength: 0.55, toughness: 24,  color: 0x5f7a3a, structural: true },
+  [MATERIALS.AZURE]:     { density: 2.40, strength: 1.00, toughness: 100, color: 0x2b9bb3, structural: true },
+  [MATERIALS.ROSE]:      { density: 2.30, strength: 0.82, toughness: 84,  color: 0xd98266, structural: true },
+  [MATERIALS.COPPER]:    { density: 2.60, strength: 0.70, toughness: 70,  color: 0x5fa38a, structural: true },
 };
 
 

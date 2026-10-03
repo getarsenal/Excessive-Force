@@ -195,13 +195,41 @@ export const SPECS = {
     ],
   },
   versailles: {
-    S: 1.0, yaw: 0.25, mat: M.LIMESTONE, roofMat: M.SLATE,
+    // The palace laid out from the town: the old brick-and-stone hunting
+    // lodge round the Marble Court with its gilded roofs, the two arms of
+    // the corps de logis reaching forward from it to the Royal Court, the
+    // ministers' wings either side of the forecourt, the Royal Chapel with
+    // its tall roof, and the garden front behind: the Hall of Mirrors in
+    // the middle and the North and South Wings running away from it, three
+    // storeys of stone under a flat roof and a balustrade.
+    S: 0.85, yaw: 0.25, mat: M.LIMESTONE, roofMat: M.SLATE, budget: 1.6,
     parts: [
-      { t: 'hall', tag: 'corps', x: 0, z: -20, w: 150, d: 26, h: 21, roof: 'flat', roofH: 1.4, mat: M.LIMESTONE, storey: 7 },
-      { t: 'hall', tag: 'wings', x: -58, z: 22, w: 34, d: 57.4, h: 21, roof: 'hip', roofH: 8, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7 },
-      { t: 'hall', tag: 'wings', x: 58, z: 22, w: 34, d: 57.4, h: 21, roof: 'hip', roofH: 8, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7 },
-      { t: 'hall', tag: 'chapel', x: -95, z: 10, w: 22, d: 46, h: 30, roof: 'gable', axis: 'z', roofH: 12, mat: M.LIMESTONE, roofMat: M.SLATE },
-      { t: 'tower', tag: 'pavilion', x: 0, z: 0.3, w: 28, d: 14, h: 24, cap: 'hip', capH: 7, capMat: M.GOLD, mat: M.LIMESTONE, ground: false },
+      // The garden front: the corps de logis and the two great wings, three
+      // storeys of stone with the slate roofs drawn up behind the balustrade.
+      { t: 'hall', tag: 'corps', x: 0, z: 30, w: 150, d: 34, h: 26, roof: 'hip', roofH: 7, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 8.6 },
+      { t: 'hall', tag: 'wings', x: -140, z: 50, w: 130, d: 30, h: 23, roof: 'hip', roofH: 6, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7.6 },
+      { t: 'hall', tag: 'wings', x: 140, z: 50, w: 130, d: 30, h: 23, roof: 'hip', roofH: 6, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7.6 },
+      // The end pavilions of the wings, a storey proud of them.
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'wings', x: s * 212, z: 50, w: 22, d: 36, h: 27, cap: 'hip', capH: 8, capMat: M.SLATE, mat: M.LIMESTONE, floors: 3 })),
+      // The arms of the corps de logis toward the town, slate mansards.
+      ...[-1, 1].map((s) => ({ t: 'hall', tag: 'corps', x: s * 55, z: -30, w: 30, d: 90, h: 24, roof: 'hip', roofH: 11, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 8 })),
+      // The Marble Court: Louis XIII's lodge, brick and stone, gilded roofs.
+      { t: 'hall', tag: 'marblecourt', x: 0, z: -40, w: 70, d: 18, h: 22, roof: 'hip', roofH: 11, mat: M.BRICK, roofMat: M.SLATE, storey: 7.2 },
+      { t: 'tower', tag: 'marblecourt', x: 0, z: -40, y0: 22, w: 26, d: 16, h: 7, cap: 'hip', capH: 9, capMat: M.GOLD, mat: M.LIMESTONE, ground: false, floors: 0 },
+      ...[-1, 1].map((s) => ({ t: 'hall', tag: 'marblecourt', x: s * 28, z: -62, w: 14, d: 30, h: 20, roof: 'hip', roofH: 10, mat: M.BRICK, roofMat: M.SLATE, storey: 6.6 })),
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'marblecourt', x: s * 28, z: -76, w: 12, d: 6, h: 22, cap: 'pyramid', capH: 6, capMat: M.GOLD, mat: M.BRICK, floors: 2 })),
+      // The ministers' wings, either side of the forecourt.
+      ...[-1, 1].map((s) => ({ t: 'hall', tag: 'ministers', x: s * 95, z: -100, w: 26, d: 110, h: 20, roof: 'hip', roofH: 10, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 6.8 })),
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'ministers', x: s * 95, z: -158, w: 30, d: 14, h: 22, cap: 'hip', capH: 9, capMat: M.SLATE, mat: M.LIMESTONE, floors: 2 })),
+      // The Royal Chapel: the tallest roof on the palace, a gilded ridge
+      // and a lantern on it.
+      { t: 'hall', tag: 'chapel', x: -100, z: 5, w: 26, d: 56, h: 34, roof: 'gable', axis: 'z', roofH: 18, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 11 },
+      { t: 'tower', tag: 'chapel', x: -100, z: 5, y0: 44, w: 5, d: 5, h: 8, cap: 'spire', capH: 8, capMat: M.GOLD, mat: M.GOLD, ground: false, floors: 0 },
+      // The roof pavilions over the garden front's centre.
+      ...[-1, 0, 1].map((s) => ({ t: 'tower', tag: 'corps', x: s * 50, z: 30, y0: 26, w: 18, d: 12, h: 4, cap: 'hip', capH: 4, capMat: M.GOLD, mat: M.LIMESTONE, ground: false, floors: 0 })),
+      // The gilded Royal Gate across the forecourt.
+      { t: 'box', tag: 'gate', x: 0, z: -172, w: 110, d: 1.6, h: 4.5, mat: M.GOLD },
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'gate', x: s * 14, z: -172, w: 4, d: 4, h: 9, cap: 'pyramid', capH: 2, capMat: M.GOLD, mat: M.LIMESTONE, floors: 0 })),
     ],
   },
   chambord: {
@@ -215,22 +243,57 @@ export const SPECS = {
     ],
   },
   seville: {
+    // The largest Gothic cathedral in the world: a hall church five aisles
+    // wide under stepped flat roofs, the nave and transept rising over them
+    // with a lantern at the crossing, a forest of buttress pinnacles down both
+    // flanks, the Court of the Oranges walled off the north side and the
+    // Giralda at its corner: a Moorish brick shaft with a Renaissance belfry
+    // in three white stages on top.
     S: 1.0, yaw: -0.55, mat: M.LIMESTONE, roofMat: M.LIMESTONE,
     parts: [
-      { t: 'hall', tag: 'cathedral', x: 0, z: 0, w: 83, d: 116, h: 36, roof: 'flat', roofH: 1.5, mat: M.LIMESTONE, storey: 9, bay: 9 },
+      { t: 'hall', tag: 'cathedral', x: 0, z: 0, w: 76, d: 116, h: 26, roof: 'flat', roofH: 1.2, mat: M.LIMESTONE, storey: 9, bay: 8 },
+      { t: 'hall', tag: 'nave', x: 0, z: 0, y0: 26, w: 22, d: 108, h: 14, roof: 'gable', axis: 'z', roofH: 7, mat: M.LIMESTONE, roofMat: M.LIMESTONE, storey: 7, ground: false },
+      { t: 'hall', tag: 'nave', x: 0, z: 6, y0: 26, w: 70, d: 18, h: 14, roof: 'gable', axis: 'x', roofH: 7, mat: M.LIMESTONE, roofMat: M.LIMESTONE, storey: 7, ground: false },
+      { t: 'tower', tag: 'crossing', x: 0, z: 6, y0: 40, w: 16, h: 8, sides: 8, cap: 'dome', capH: 9, capMat: M.LIMESTONE, mat: M.LIMESTONE, ground: false, floors: 0,
+        finial: { cap: 'spire', w: 2, h: 5, mat: M.LIMESTONE } },
+      ...[-1, 1].flatMap((s) => [-48, -33, -18, -3, 12, 27, 42].map((z) => ({ t: 'tower', tag: 'pinnacles', x: s * 39.5, z, w: 3.4, h: 30, cap: 'spire', capH: 9, capMat: M.LIMESTONE, mat: M.LIMESTONE, floors: 0, windows: false, roofPosts: false }))),
+      { t: 'hall', tag: 'sagrario', x: -46, z: 30, w: 16, d: 44, h: 22, roof: 'flat', mat: M.LIMESTONE, storey: 7 },
+      { t: 'curtain', tag: 'naranjos', pts: [[-36, -60], [36, -60], [36, -112], [-36, -112]], h: 9, thick: 2.2, mat: M.LIMESTONE },
       { t: 'tower', tag: 'giralda', x: 50, z: -52, w: 13.6, h: 70, mat: M.REDSTONE, cap: 'flat', capH: 1, floors: 3 },
-      { t: 'tower', tag: 'belfry', x: 50, z: -52, y0: 71, w: 9, h: 20, mat: M.TILE, cap: 'dome', capH: 8, capMat: M.GOLD, ground: false, finial: { cap: 'spire', w: 1.5, h: 5, mat: M.GOLD } },
+      { t: 'tower', tag: 'belfry', x: 50, z: -52, y0: 71, w: 11, h: 10, mat: M.MARBLE, cap: 'flat', capH: 0.8, ground: false, floors: 1 },
+      { t: 'tower', tag: 'belfry', x: 50, z: -52, y0: 81.8, w: 8.4, h: 8, mat: M.MARBLE, cap: 'flat', capH: 0.6, ground: false, floors: 0 },
+      { t: 'tower', tag: 'belfry', x: 50, z: -52, y0: 90.4, w: 6, h: 6, round: true, mat: M.MARBLE, cap: 'dome', capH: 5, capMat: M.GOLD, ground: false, floors: 0,
+        finial: { cap: 'spire', w: 1.4, h: 5, mat: M.GOLD } },
     ],
   },
   alhambra: {
-    S: 1.0, yaw: 0.4, mat: M.REDSTONE, roofMat: M.BRICK,
+    // The red fortress along the Sabika hill: the Alcazaba at the west end
+    // with the Torre de la Vela over the city, the Nasrid palaces round their
+    // courts behind the Comares tower, Charles V's square palace, the church
+    // of Santa Maria, and the curtain round the whole ridge with a square
+    // tower every few dozen metres, each battlemented.
+    S: 1.0, yaw: 0.4, mat: M.REDSTONE, roofMat: M.BRICK, budget: 1.3,
     parts: [
-      { t: 'curtain', tag: 'alcazaba', pts: [[-140, -30], [-80, -55], [60, -50], [140, -20], [130, 30], [0, 45], [-130, 25]], h: 14, thick: 3.5, mat: M.REDSTONE,
-        towers: { w: 11, h: 22, cap: 'flat', capH: 1, mat: M.REDSTONE } },
-      { t: 'tower', tag: 'comares', x: 20, z: -20, w: 16, h: 45, cap: 'flat', capH: 1, mat: M.REDSTONE, floors: 3 },
-      { t: 'tower', tag: 'vela', x: -110, z: -5, w: 16, h: 27, cap: 'flat', capH: 1, mat: M.REDSTONE },
-      { t: 'hall', tag: 'carlosv', x: 70, z: 5, w: 44, d: 44, h: 17, roof: 'flat', mat: M.LIMESTONE, storey: 8.5 },
-      { t: 'hall', tag: 'nasrid', x: -35, z: 10, w: 50, d: 24, h: 10, roof: 'hip', roofH: 5, mat: M.TILE, roofMat: M.BRICK },
+      { t: 'curtain', tag: 'alcazaba', pts: [[-150, -24], [-118, -48], [-70, -56], [-10, -58], [40, -54], [92, -46], [150, -22], [138, 28], [80, 40], [20, 46], [-40, 44], [-100, 36], [-150, 18]], h: 13, thick: 3.2, mat: M.REDSTONE,
+        towers: { w: 10, h: 20, cap: 'flat', capH: 1, mat: M.REDSTONE } },
+      // The Alcazaba's own inner wall and the watchtower.
+      { t: 'curtain', tag: 'alcazaba', pts: [[-148, -18], [-118, -40], [-92, -36], [-92, 28], [-146, 14]], h: 15, thick: 3, mat: M.REDSTONE,
+        towers: { w: 9, h: 21, cap: 'flat', capH: 1, mat: M.REDSTONE } },
+      { t: 'tower', tag: 'vela', x: -128, z: -6, w: 16, h: 27, cap: 'flat', capH: 1, mat: M.REDSTONE, floors: 3 },
+      { t: 'tower', tag: 'vela', x: -128, z: -6, y0: 28, w: 4, h: 5, cap: 'pyramid', capH: 3, capMat: M.BRICK, mat: M.REDSTONE, ground: false, floors: 0 },
+      // The Nasrid palaces: Comares, the Court of the Myrtles, the Court of the Lions.
+      { t: 'tower', tag: 'comares', x: -30, z: -40, w: 16, h: 45, cap: 'flat', capH: 1, mat: M.REDSTONE, floors: 3 },
+      { t: 'hall', tag: 'nasrid', x: -30, z: -14, w: 22, d: 36, h: 10, roof: 'hip', roofH: 4, mat: M.TILE, roofMat: M.BRICK, storey: 5 },
+      { t: 'hall', tag: 'nasrid', x: -6, z: -16, w: 30, d: 12, h: 10, roof: 'hip', roofH: 4, mat: M.TILE, roofMat: M.BRICK, storey: 5 },
+      { t: 'colonnade', tag: 'nasrid', x: 6, z: 6, w: 30, d: 18, podH: 0.6, colH: 5, colW: 0.8, bay: 3, rows: 'ring', roof: 'hip', roofH: 4, roofMat: M.BRICK, mat: M.TILE },
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'nasrid', x: 6 + s * 15, z: 6, w: 6, h: 12, cap: 'pyramid', capH: 4, capMat: M.BRICK, mat: M.TILE, floors: 0 })),
+      // Charles V's palace: a square of stone round a round court.
+      { t: 'hall', tag: 'carlosv', x: 50, z: -8, w: 63, d: 63, h: 17, roof: 'flat', mat: M.LIMESTONE, storey: 8.5 },
+      // Santa Maria, with its belfry.
+      { t: 'hall', tag: 'church', x: 92, z: 12, w: 34, d: 14, h: 14, roof: 'gable', axis: 'x', roofH: 5, mat: M.LIMESTONE, roofMat: M.BRICK, storey: 7 },
+      { t: 'tower', tag: 'church', x: 110, z: 12, w: 7, h: 22, cap: 'pyramid', capH: 5, capMat: M.BRICK, mat: M.LIMESTONE, floors: 2 },
+      // The Partal and the Torre de las Damas, on the north wall.
+      { t: 'hall', tag: 'nasrid', x: 20, z: 36, w: 20, d: 10, h: 9, roof: 'hip', roofH: 4, mat: M.TILE, roofMat: M.BRICK, storey: 4.5 },
     ],
   },
   malbork: {
@@ -254,13 +317,22 @@ export const SPECS = {
     ],
   },
   bran: {
+    // "Dracula's Castle": a white-rendered castle of four storeys round a
+    // tiny courtyard, packed onto the top of a rock that stands sixty metres
+    // over the pass, its red-tiled roofs at every height and a tower on every
+    // corner: the round tower on the east, the square keep on the south-west,
+    // the gate tower and a turret on the north.
     S: 2.0, yaw: -0.4, mat: M.TILE, roofMat: M.BRICK,
     parts: [
-      { t: 'steps', tag: 'rock', base: true, x: 0, z: 0, w: 46, d: 38, h: 8, n: 1, batter: 0.3, mat: M.VERDE, posts: false, ground: false },
-      { t: 'hall', tag: 'castle', x: -4, z: 2, y0: 8, w: 30, d: 22, h: 14, roof: 'hip', roofH: 8, mat: M.TILE, roofMat: M.BRICK, storey: 4.6 },
-      { t: 'tower', tag: 'towers', x: 16, z: -6, y0: 8, w: 8, h: 22, round: true, cap: 'cone', capH: 9, capMat: M.BRICK, mat: M.TILE },
-      { t: 'tower', tag: 'towers', x: -18, z: 10, y0: 8, w: 7, h: 18, cap: 'pyramid', capH: 7, capMat: M.BRICK, mat: M.TILE },
-      { t: 'tower', tag: 'towers', x: 12, z: 12, y0: 8, w: 7, h: 16, cap: 'flat', capH: 0.8, mat: M.TILE },
+      { t: 'steps', tag: 'rock', base: true, x: 0, z: 0, w: 40, d: 32, h: 14, n: 3, wTop: 30, dTop: 25, batter: 0.25, mat: M.GRANITE, posts: false, ground: false, coarse: 2.2 },
+      { t: 'hall', tag: 'castle', x: 0, z: -9, y0: 14, w: 26, d: 7, h: 14, roof: 'gable', axis: 'x', roofH: 5, mat: M.TILE, roofMat: M.BRICK, storey: 3.6, ground: false },
+      { t: 'hall', tag: 'castle', x: 0, z: 9, y0: 14, w: 26, d: 7, h: 12, roof: 'gable', axis: 'x', roofH: 5, mat: M.TILE, roofMat: M.BRICK, storey: 3.6, ground: false },
+      { t: 'hall', tag: 'castle', x: -10.5, z: 0, y0: 14, w: 7, d: 11, h: 16, roof: 'gable', axis: 'z', roofH: 5, mat: M.TILE, roofMat: M.BRICK, storey: 3.6, ground: false },
+      { t: 'hall', tag: 'castle', x: 10.5, z: 0, y0: 14, w: 7, d: 11, h: 13, roof: 'gable', axis: 'z', roofH: 5, mat: M.TILE, roofMat: M.BRICK, storey: 3.6, ground: false },
+      { t: 'tower', tag: 'towers', x: 15, z: 4, y0: 14, w: 9, h: 21, round: true, cap: 'cone', capH: 9, capMat: M.BRICK, mat: M.TILE, ground: false },
+      { t: 'tower', tag: 'towers', x: -13, z: 10, y0: 14, w: 7.5, h: 24, cap: 'pyramid', capH: 8, capMat: M.BRICK, mat: M.TILE, ground: false },
+      { t: 'tower', tag: 'towers', x: -4, z: -12.5, y0: 14, w: 6, h: 20, cap: 'pyramid', capH: 7, capMat: M.BRICK, mat: M.TILE, ground: false },
+      { t: 'tower', tag: 'towers', x: 12.5, z: -10.5, y0: 14, w: 4.5, h: 18, round: true, cap: 'cone', capH: 6, capMat: M.BRICK, mat: M.TILE, ground: false },
     ],
   },
   bucharest: {
@@ -329,14 +401,33 @@ export const SPECS = {
       extra: [{ t: 'hall', tag: 'front', x: 0, z: 68.8, w: 34, d: 2.4, h: 32, roof: 'flat', roofH: 0.8, mat: M.LIMESTONE, windows: false, floors: 0, roofPosts: false, ground: false }] }),
   },
   windsor: {
+    // The longest-inhabited castle in Europe, along its chalk ridge over the
+    // Thames: the Round Tower on its motte in the Middle Ward, the Upper Ward
+    // to the east closed by the State Apartments and the private apartments
+    // round a quadrangle, the Lower Ward to the west with St George's Chapel
+    // (Perpendicular, a pinnacle on every buttress) and the ranges along its
+    // walls, the curtain round the lot with a tower every sixty metres.
     S: 0.9, yaw: -0.3, mat: M.LIMESTONE, roofMat: M.SLATE,
     parts: [
-      { t: 'steps', tag: 'motte', base: true, x: 0, z: 0, w: 60, h: 14, n: 2, wTop: 44, round: true, mat: M.VERDE, posts: true },
-      { t: 'tower', tag: 'roundtower', x: 0, z: 0, y0: 14, w: 32, h: 22, round: true, cap: 'flat', capH: 1, mat: M.LIMESTONE, ground: false, floors: 2 },
-      { t: 'curtain', tag: 'upperward', pts: [[-110, -40], [70, -45], [85, 45], [-100, 55]], h: 15, thick: 3, mat: M.LIMESTONE,
-        towers: { w: 12, h: 22, cap: 'flat', capH: 1, mat: M.LIMESTONE } },
-      { t: 'hall', tag: 'stateapartments', x: -30, z: -25, w: 70, d: 18, h: 20, roof: 'flat', roofH: 1, mat: M.LIMESTONE, storey: 6.5 },
-      { t: 'hall', tag: 'stgeorge', x: -40, z: 30, w: 70, d: 16, h: 24, roof: 'flat', roofH: 1, mat: M.LIMESTONE, storey: 8 },
+      { t: 'curtain', tag: 'curtain', pts: [[-135, -34], [-60, -44], [-10, -46], [50, -50], [122, -44], [124, 44], [50, 48], [-10, 40], [-70, 38], [-135, 30]], h: 14, thick: 3.2, mat: M.LIMESTONE,
+        towers: { w: 11, h: 21, cap: 'flat', capH: 1, mat: M.LIMESTONE } },
+      // Middle Ward: the motte and the Round Tower, a flag turret on it.
+      { t: 'steps', tag: 'motte', base: true, x: -5, z: 0, w: 52, h: 16, n: 2, wTop: 38, round: true, mat: M.TURF, posts: true },
+      { t: 'tower', tag: 'roundtower', x: -5, z: 0, y0: 16, w: 30, h: 20, round: true, cap: 'flat', capH: 1, mat: M.LIMESTONE, ground: false, floors: 2 },
+      { t: 'tower', tag: 'roundtower', x: 3, z: -6, y0: 37, w: 6, h: 7, cap: 'flat', capH: 0.6, mat: M.LIMESTONE, ground: false, floors: 0 },
+      // Upper Ward: the quadrangle.
+      { t: 'hall', tag: 'stateapartments', x: 78, z: -34, w: 86, d: 18, h: 22, roof: 'flat', roofH: 1, mat: M.LIMESTONE, storey: 6.5 },
+      { t: 'hall', tag: 'stateapartments', x: 112, z: 0, w: 18, d: 52, h: 22, roof: 'flat', roofH: 1, mat: M.LIMESTONE, storey: 6.5 },
+      { t: 'hall', tag: 'stateapartments', x: 78, z: 34, w: 86, d: 16, h: 20, roof: 'flat', roofH: 1, mat: M.LIMESTONE, storey: 6.5 },
+      ...[[38, -40], [118, -38], [118, 38], [38, 38]].map(([x, z]) => ({ t: 'tower', tag: 'stateapartments', x, z, w: 13, h: 28, cap: 'flat', capH: 1, mat: M.LIMESTONE, floors: 3 })),
+      // Lower Ward: St George's Chapel and the ranges on its walls.
+      { t: 'hall', tag: 'stgeorge', x: -82, z: 2, w: 72, d: 20, h: 21, roof: 'gable', axis: 'x', roofH: 5, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 10.5 },
+      { t: 'hall', tag: 'stgeorge', x: -82, z: 2, w: 12, d: 34, h: 21, roof: 'gable', axis: 'z', roofH: 5, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 10.5 },
+      ...[-1, 1].flatMap((s) => [-112, -100, -88, -76, -64, -52].map((x) => ({ t: 'tower', tag: 'stgeorge', x, z: 2 + s * 10.8, w: 2.6, h: 25, cap: 'spire', capH: 6, capMat: M.LIMESTONE, mat: M.LIMESTONE, floors: 0, windows: false, roofPosts: false }))),
+      { t: 'hall', tag: 'lowerward', x: -95, z: 30, w: 60, d: 10, h: 12, roof: 'gable', axis: 'x', roofH: 4, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 6 },
+      { t: 'hall', tag: 'lowerward', x: -100, z: -28, w: 48, d: 10, h: 12, roof: 'gable', axis: 'x', roofH: 4, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 6 },
+      // Henry VIII's gate at the foot of the Lower Ward.
+      { t: 'arch', tag: 'gate', x: -60, z: 40, w: 16, d: 10, h: 16, span: 5, spring: 6, axis: 'z', mat: M.LIMESTONE },
     ],
   },
   nidaros: {
@@ -430,20 +521,60 @@ export const SPECS = {
       corners: { w: 11, h: 26, cap: 'dome', capH: 7, capMat: M.MARBLE, off: 40 } }),
   },
   hawamahal: {
-    S: 3.0, yaw: 0.2, mat: M.SANDSTONE, roofMat: M.SANDSTONE,
+    // The Palace of Winds: a screen, not a building. Five storeys of Jaipur's
+    // pink sandstone one room deep, stepping in to a narrow top like a
+    // crown, its face made entirely of jharokhas, the little projecting
+    // windows stacked in columns, each column and storey roofed with a small
+    // dome: nine hundred and fifty-three windows for the women of the court
+    // to watch the street through.
+    S: 3.0, yaw: 0.2, mat: M.ROSE, roofMat: M.ROSE, budget: 1.3,
     parts: [
-      { t: 'tiers', tag: 'palace', x: 0, z: 0, n: 5, w: 52, d: 12, wTop: 18, h0: 5, hk: 3.6, eave: 0.6, mat: M.SANDSTONE, roofMat: M.MARBLE, win: 1.2 },
-      ...[-6, 0, 6].map((x) => ({ t: 'tower', tag: 'chhatris', x, z: 0, y0: 5 + 1.1 + 4 * (3.6 + 1.1), w: 3.2, h: 2.4, round: true, cap: 'dome', capH: 2.2, capMat: M.MARBLE, mat: M.SANDSTONE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      { t: 'hall', tag: 'palace', x: 0, z: 2.5, w: 30, d: 5.5, h: 6.2, roof: 'flat', roofH: 0.5, mat: M.ROSE, storey: 3.1, win: 1.1, bay: 2.2 },
+      { t: 'hall', tag: 'palace', x: 0, z: 2.5, y0: 6.7, w: 24, d: 5, h: 3, roof: 'flat', roofH: 0.4, mat: M.ROSE, storey: 3, win: 1.1, bay: 2.2, ground: false },
+      { t: 'hall', tag: 'crown', x: 0, z: 2.5, y0: 10.1, w: 13, d: 4.2, h: 3, roof: 'flat', roofH: 0.4, mat: M.ROSE, storey: 3, win: 1.1, bay: 2.2, ground: false },
+      { t: 'hall', tag: 'crown', x: 0, z: 2.5, y0: 13.5, w: 7, d: 3.4, h: 2.8, roof: 'flat', roofH: 0.4, mat: M.ROSE, storey: 2.8, win: 1.0, bay: 2.2, ground: false },
+      // The jharokha columns across the face, as tall as the storeys behind
+      // them, each capped with its small dome.
+      ...[-13.5, -11.2, -8.9, -6.6, -4.4, -2.2, 0, 2.2, 4.4, 6.6, 8.9, 11.2, 13.5].map((x) => {
+        const a = Math.abs(x);
+        const top = a < 3 ? 16.3 : a < 6 ? 13.1 : a < 11.5 ? 9.7 : 6.7;
+        return { t: 'tower', tag: a < 6 ? 'crown' : 'palace', x, z: -0.9, w: 1.9, h: top, sides: 8, cap: 'dome', capH: 1.3, capMat: M.ROSE, mat: M.ROSE, floors: 0, roofPosts: false };
+      }),
+      // The three chhatris on the top, white domes.
+      ...[-2.6, 0, 2.6].map((x) => ({ t: 'tower', tag: 'crown', x, z: 2.5, y0: 16.7, w: 1.8, h: 1.4, round: true, cap: 'dome', capH: 1.6, capMat: M.MARBLE, mat: M.ROSE, ground: false, windows: false, floors: 0, roofPosts: false })),
     ],
   },
   redfort: {
-    S: 1.0, yaw: 0.25, mat: M.SANDSTONE,
+    // Shah Jahan's fort: a mile and a half of red sandstone rampart round an
+    // irregular octagon, a domed kiosk on every bastion, the Lahori Gate on
+    // the west under its row of seven white chhatris and the Delhi Gate on
+    // the south; inside, the Hall of Public Audience in red sandstone, the
+    // Hall of Private Audience and the Rang Mahal in white marble along the
+    // river wall, and the three marble domes of the Pearl Mosque.
+    S: 1.0, yaw: 0.25, mat: M.SANDSTONE, budget: 1.4,
     parts: [
-      { t: 'curtain', tag: 'ramparts', pts: [[-150, 40], [-150, -40], [150, -40], [150, 40]], h: 18, thick: 6, mat: M.SANDSTONE,
-        towers: { w: 14, h: 24, sides: 8, cap: 'dome', capH: 7, capMat: M.MARBLE, mat: M.SANDSTONE } },
-      { t: 'arch', tag: 'lahorigate', x: 0, z: 40, w: 36, d: 16, h: 24, span: 9, spring: 8, pointed: true, axis: 'z', mat: M.SANDSTONE, attic: { cap: 'flat', w: 20, d: 8, h: 4 } },
-      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'gatetowers', x: s * 22, z: 40, w: 8, h: 30, sides: 8, cap: 'dome', capH: 5, capMat: M.MARBLE, mat: M.SANDSTONE })),
-      { t: 'colonnade', tag: 'diwaniaam', x: 0, z: -10, w: 54, d: 24, podH: 1.2, colH: 7, colW: 1.4, bay: 5, rows: 'ring', roof: 'flat', mat: M.SANDSTONE },
+      { t: 'curtain', tag: 'ramparts', pts: [[-170, 30], [-150, -60], [-60, -95], [60, -95], [150, -70], [170, 0], [150, 75], [60, 100], [-60, 100], [-150, 80]], h: 20, thick: 6, mat: M.SANDSTONE,
+        towers: { w: 14, h: 25, sides: 8, cap: 'dome', capH: 6, capMat: M.MARBLE, mat: M.SANDSTONE } },
+      // The Lahori Gate on the west: a portal between two octagonal towers,
+      // the row of white chhatris over it.
+      { t: 'arch', tag: 'lahorigate', x: -165, z: 0, w: 16, d: 36, h: 26, span: 9, spring: 9, pointed: true, axis: 'x', mat: M.SANDSTONE, attic: { cap: 'flat', w: 8, d: 20, h: 4 } },
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'lahorigate', x: -165, z: s * 21, w: 9, h: 33, sides: 8, cap: 'dome', capH: 6, capMat: M.MARBLE, mat: M.SANDSTONE })),
+      ...[-9, -6, -3, 0, 3, 6, 9].map((z) => ({ t: 'tower', tag: 'lahorigate', x: -165, z, y0: 30, w: 2.6, h: 2.6, round: true, cap: 'dome', capH: 2.2, capMat: M.MARBLE, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      // The Delhi Gate on the south.
+      { t: 'arch', tag: 'delhigate', x: 0, z: 98, w: 30, d: 14, h: 22, span: 8, spring: 8, pointed: true, axis: 'z', mat: M.SANDSTONE },
+      ...[-1, 1].map((s) => ({ t: 'tower', tag: 'delhigate', x: s * 18, z: 98, w: 8, h: 28, sides: 8, cap: 'dome', capH: 5, capMat: M.MARBLE, mat: M.SANDSTONE })),
+      // Chhatta Chowk, the covered bazaar from the Lahori Gate.
+      { t: 'hall', tag: 'bazaar', x: -110, z: 0, w: 80, d: 14, h: 9, roof: 'flat', mat: M.SANDSTONE, storey: 4.5 },
+      // The Hall of Public Audience.
+      { t: 'colonnade', tag: 'diwaniaam', x: -10, z: 0, w: 54, d: 24, podH: 1.2, colH: 8, colW: 1.4, bay: 5, rows: 'ring', roof: 'flat', mat: M.SANDSTONE },
+      // Along the river wall: the Rang Mahal, the Diwan-i-Khas, the Khas Mahal, in marble.
+      { t: 'hall', tag: 'riverpalaces', x: 120, z: 20, w: 24, d: 46, h: 10, roof: 'flat', mat: M.MARBLE, storey: 5 },
+      { t: 'colonnade', tag: 'riverpalaces', x: 120, z: -30, w: 30, d: 20, podH: 1.2, colH: 7, colW: 1.2, bay: 4, rows: 'ring', roof: 'flat', mat: M.MARBLE },
+      ...[-1, 1].flatMap((s) => [[120 + s * 12, -30 + 8], [120 + s * 12, -30 - 8]]).map(([x, z]) => ({ t: 'tower', tag: 'riverpalaces', x, z, y0: 9, w: 3.4, h: 3, round: true, cap: 'dome', capH: 3, capMat: M.GOLD, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      { t: 'hall', tag: 'riverpalaces', x: 120, z: 65, w: 22, d: 30, h: 10, roof: 'flat', mat: M.MARBLE, storey: 5 },
+      // The Pearl Mosque: a little marble hall with three domes.
+      { t: 'hall', tag: 'motimasjid', x: 70, z: -60, w: 26, d: 14, h: 9, roof: 'flat', mat: M.MARBLE, storey: 4.5 },
+      ...[-8, 0, 8].map((x) => ({ t: 'dome', tag: 'motimasjid', x: 70 + x, z: -62, y0: 9.6, r: 3.4, drumH: 1.5, h: 5, mat: M.MARBLE, domeMat: M.MARBLE, lantern: true, lanternMat: M.GOLD })),
     ],
   },
   gatewayindia: {
@@ -524,21 +655,42 @@ export const SPECS = {
     ],
   },
   registan: {
-    S: 1.3, yaw: 0.2, mat: M.LIMESTONE, domeMat: M.VERDE,
+    // Three madrasas round the square, each a portal (pishtaq) taller than
+    // the building behind it, faced in turquoise and lapis tile, with a
+    // minaret at each front corner: Ulugh Beg on the west, Sher-Dor facing it
+    // on the east with a fluted blue dome either side of its portal,
+    // Tilya-Kori on the north with the great blue dome of its mosque.
+    S: 1.3, yaw: 0.2, mat: M.LIMESTONE, domeMat: M.AZURE, budget: 1.4,
     parts: [
-      // Three madrasas round the square: Ulugh Beg west, Sher-Dor east, Tilya-Kori north.
       ...[[-60, 0, 'x'], [60, 0, 'x'], [0, -60, 'z']].flatMap(([x, z, ax], i) => {
         const along = ax === 'x';
         const tag = ['ulughbeg', 'sherdor', 'tilyakori'][i];
         const out = x < 0 ? -1 : x > 0 ? 1 : -1;
         const bx = along ? x + out * 34 : x, bz = along ? z : z - 34;
+        // The face of the portal, toward the square.
+        const fx = along ? x - out * 6.4 : x, fz = along ? z : z + 6.4;
         return [
-          { t: 'arch', tag, x, z, w: along ? 12 : 34, d: along ? 34 : 12, h: 34, span: 14, spring: 14, pointed: true, solid: true, axis: along ? 'x' : 'z', mat: M.LIMESTONE },
-          { t: 'hall', tag, x: bx, z: bz, w: along ? 55.4 : 70, d: along ? 70 : 55.4, h: 14, roof: 'flat', mat: M.LIMESTONE, storey: 7 },
-          ...[-1, 1].map((s) => ({ t: 'tower', tag: `${tag}minarets`, x: along ? x + out * 12 : x + s * 36, z: along ? z + s * 36 : z - 12, w: 6, h: 33, round: true, cap: 'flat', capH: 1, mat: M.LIMESTONE, floors: 1 })),
+          { t: 'arch', tag, x, z, w: along ? 12 : 34, d: along ? 34 : 12, h: 36, span: 14, spring: 16, pointed: true, solid: true, axis: along ? 'x' : 'z', mat: M.LIMESTONE },
+          // The tile: a turquoise frame round the arch and a band over it.
+          ...[-1, 1].map((s) => ({ t: 'box', tag, x: along ? fx : x + s * 12.5, z: along ? z + s * 12.5 : fz, w: along ? 0.9 : 7, d: along ? 7 : 0.9, h: 32, mat: M.AZURE })),
+          { t: 'box', tag, x: fx, z: fz, y0: 30, w: along ? 0.9 : 32, d: along ? 32 : 0.9, h: 5, mat: M.AZURE },
+          { t: 'hall', tag, x: bx, z: bz, w: along ? 55.4 : 70, d: along ? 70 : 55.4, h: 15, roof: 'flat', mat: M.LIMESTONE, storey: 7.5 },
+          // Corner turrets (guldasta) on the back of the court.
+          ...[-1, 1].map((s) => ({ t: 'tower', tag, x: along ? bx + out * 26 : bx + s * 33, z: along ? bz + s * 33 : bz - 26, w: 5, h: 19, round: true, cap: 'dome', capH: 4, capMat: M.AZURE, mat: M.LIMESTONE, floors: 0, windows: false, roofPosts: false })),
+          // The minarets: brick to the gallery, tile over it.
+          ...[-1, 1].flatMap((s) => {
+            const mx = along ? x + out * 12 : x + s * 36, mz = along ? z + s * 36 : z - 12;
+            return [
+              { t: 'tower', tag: `${tag}minarets`, x: mx, z: mz, w: 6.5, h: 16, round: true, cap: 'flat', capH: 0.6, mat: M.LIMESTONE, floors: 1 },
+              { t: 'tower', tag: `${tag}minarets`, x: mx, z: mz, y0: 16.6, w: 5.8, h: 19, round: true, cap: 'flat', capH: 1.2, mat: M.AZURE, floors: 1, ground: false },
+            ];
+          }),
         ];
       }),
-      { t: 'dome', tag: 'tilyakoridome', x: 22, z: -95, y0: 14.8, r: 9, drumH: 6, h: 10, mat: M.LIMESTONE, domeMat: M.VERDE, lantern: false },
+      // Sher-Dor's two fluted domes, behind its portal.
+      ...[-1, 1].map((s) => ({ t: 'dome', tag: 'sherdordomes', x: 78, z: s * 22, y0: 15, r: 7.5, drumH: 7, h: 10, mat: M.LIMESTONE, domeMat: M.AZURE, profile: 'round', lantern: false })),
+      // Tilya-Kori's mosque dome, on its west side.
+      { t: 'dome', tag: 'tilyakoridome', x: -22, z: -94, y0: 15, r: 11, drumH: 9, h: 13, mat: M.LIMESTONE, domeMat: M.AZURE, lantern: false },
     ],
   },
   flametowers: {
@@ -609,13 +761,21 @@ export const SPECS = {
     ],
   },
   frontenac: {
-    S: 1.2, yaw: 0.45, mat: M.BRICK, roofMat: M.VERDE,
+    // A railway hotel built as a chateau over the St Lawrence: walls of
+    // brown brick and stone, roofs of green copper as tall as the storeys
+    // under them, a turret with a pointed copper hat on every corner, and
+    // the central tower of seventeen storeys under its own steep pyramid
+    // with turrets at its corners.
+    S: 1.2, yaw: 0.45, mat: M.BRICK, roofMat: M.COPPER, budget: 1.0,
     parts: [
-      { t: 'tower', tag: 'tower', x: 0, z: 0, w: 22, h: 58, cap: 'hip', capH: 20, capW: 15, capMat: M.VERDE, mat: M.BRICK, floors: 3 },
-      { t: 'hall', tag: 'wings', x: -38, z: 0, w: 53, d: 18, h: 34, roof: 'hip', roofH: 12, mat: M.BRICK, roofMat: M.VERDE, storey: 5.6 },
-      { t: 'hall', tag: 'wings', x: 38, z: 0, w: 53, d: 18, h: 30, roof: 'hip', roofH: 12, mat: M.BRICK, roofMat: M.VERDE, storey: 5.6 },
-      { t: 'hall', tag: 'wings', x: -58, z: 35, w: 18, d: 51.4, h: 28, roof: 'hip', roofH: 10, mat: M.BRICK, roofMat: M.VERDE, storey: 5.6 },
-      ...[[-1, 1], [1, 1]].map(([s]) => ({ t: 'tower', tag: 'turrets', x: s * 67.5, z: -11, w: 8, h: 34, round: true, cap: 'cone', capH: 12, capMat: M.VERDE, mat: M.BRICK })),
+      { t: 'tower', tag: 'tower', x: 0, z: 0, w: 22, h: 58, cap: 'pyramid', capH: 24, capMat: M.COPPER, mat: M.BRICK, floors: 3 },
+      ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => ({ t: 'tower', tag: 'tower', x: sx * 10, z: sz * 10, y0: 50, w: 4, h: 8, round: true, cap: 'cone', capH: 7, capMat: M.COPPER, mat: M.BRICK, ground: false, floors: 0, windows: false, roofPosts: false })),
+      { t: 'hall', tag: 'wings', x: -38, z: 0, w: 53, d: 18, h: 30, roof: 'hip', roofH: 15, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
+      { t: 'hall', tag: 'wings', x: 38, z: 0, w: 53, d: 18, h: 27, roof: 'hip', roofH: 14, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
+      { t: 'hall', tag: 'wings', x: -58, z: 35, w: 18, d: 51.4, h: 26, roof: 'hip', roofH: 13, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
+      { t: 'hall', tag: 'wings', x: 58, z: 33, w: 18, d: 48, h: 24, roof: 'hip', roofH: 12, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
+      // The turrets: every corner of every wing.
+      ...[[-67.5, -11, 34], [67.5, -11, 31], [-67.5, 61, 30], [67.5, 57, 28], [-49, 61, 28], [49, 57, 26], [-14, -11, 36], [14, -11, 34]].map(([x, z, h]) => ({ t: 'tower', tag: 'turrets', x, z, w: 7, h, round: true, cap: 'cone', capH: 11, capMat: M.COPPER, mat: M.BRICK })),
     ],
   },
   capitolio: {
@@ -648,11 +808,25 @@ export const SPECS = {
     ],
   },
   cartagena: {
-    S: 0.9, yaw: 0.35, mat: M.LIMESTONE,
+    // Castillo San Felipe de Barajas: the largest Spanish fort in the
+    // Americas, laid over San Lazaro hill in battered stone terraces that
+    // step up to a summit battery, its bastions thrust out at the corners
+    // of each level and a domed stone sentry box (garita) on every point.
+    S: 0.9, yaw: 0.35, mat: M.LIMESTONE, budget: 1.3,
     parts: [
-      { t: 'steps', tag: 'bastions', x: 0, z: 0, w: 190, d: 130, h: 36, n: 4, wTop: 90, dTop: 50, batter: 0.4, mat: M.LIMESTONE, coarse: 2.4 },
-      { t: 'hall', tag: 'barracks', x: -20, z: -5, y0: 36, w: 50, d: 20, h: 10, roof: 'flat', mat: M.LIMESTONE, storey: 5, ground: false },
-      ...[[-40, 22], [40, 22], [40, -22]].map(([x, z]) => ({ t: 'tower', tag: 'garitas', x, z, y0: 36, w: 4, h: 5, round: true, cap: 'dome', capH: 2.5, capMat: M.LIMESTONE, mat: M.LIMESTONE, ground: false, roofPosts: false, floors: 0 })),
+      { t: 'steps', tag: 'bastions', x: 0, z: 0, w: 170, d: 120, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 2.4 },
+      // The lower bastions, thrust out past the terrace.
+      ...[[-88, 46, 34], [92, 50, 30], [-80, -52, 32], [86, -46, 28], [0, 64, 26]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, w, d: w, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 2.4, posts: true })),
+      { t: 'steps', tag: 'bastions', x: 12, z: -6, y0: 14, w: 120, d: 82, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 2.4, ground: false },
+      ...[[-50, 36, 22], [70, 34, 20], [62, -42, 20]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, y0: 14, w, d: w, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 2.4, ground: false, posts: true })),
+      { t: 'steps', tag: 'bastions', x: 22, z: -10, y0: 26, w: 70, d: 46, h: 10, n: 1, batter: 0.3, mat: M.LIMESTONE, coarse: 2.2, ground: false },
+      { t: 'steps', tag: 'bastions', x: 28, z: -12, y0: 36, w: 38, d: 24, h: 6, n: 1, batter: 0.2, mat: M.LIMESTONE, coarse: 2.0, ground: false },
+      { t: 'hall', tag: 'barracks', x: 20, z: -12, y0: 42, w: 24, d: 10, h: 5, roof: 'flat', mat: M.LIMESTONE, storey: 5, ground: false },
+      // The garitas, on the points of the bastions at every level.
+      ...[[-102, 60, 14], [-74, 32, 14], [104, 62, 14], [80, 38, 14], [-94, -66, 14], [98, -58, 14], [12, 76, 14],
+        [-60, 46, 26], [-40, 26, 26], [79, 43, 26], [71, -51, 26], [-46, -45, 26], [70, 33, 26],
+        [-12, 12, 36], [56, 12, 36], [56, -32, 36], [-12, -32, 36],
+        [10, 0, 42], [46, 0, 42], [46, -24, 42], [10, -24, 42]].map(([x, z, y0]) => ({ t: 'tower', tag: 'garitas', x, z, y0, w: 3.2, h: 3.6, round: true, cap: 'dome', capH: 2.2, capMat: M.LIMESTONE, mat: M.LIMESTONE, ground: false, roofPosts: false, floors: 0, windows: false })),
     ],
   },
   skytower: {
@@ -691,7 +865,7 @@ export const GAME_SCALE = {
   brandenburg: 1.18,
   stephansdom: 1.45,
   hohensalzburg: 1.97,
-  versailles: 2.32,
+  versailles: 1.0,
   chambord: 2.40,
   seville: 1.80,
   alhambra: 1.44,
