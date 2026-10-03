@@ -191,6 +191,8 @@
   .tt-item:hover, .tt-item:focus-visible { transform: translateX(6px); }
 }
 .tt-no { font-style: normal; font-family: var(--f-data); font-size: 11px; color: var(--dim); width: 20px; flex: 0 0 auto; }
+.tt-ic { display: none; font-style: normal; color: var(--o2); }
+.tt-ic svg { width: 100%; height: 100%; display: block; }
 .tt-lbl { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
 .tt-lbl b {
   font-weight: 600; font-size: 18px; letter-spacing: 0.12em; line-height: 1.15;
@@ -295,10 +297,13 @@
 .tt-bcard.full .tt-bmain { min-height: 150px; }
 
 /* Recon caption and the wire. */
+/* Under the tagline, with the name: what the photograph behind it is. It
+   used to be pinned to the foot of the screen, where on a phone it landed on
+   the menu. */
 .tt-caption {
-  position: absolute; z-index: 2; right: 16px; bottom: calc(env(safe-area-inset-bottom, 0px) + 44px);
-  font-family: var(--f-data); font-size: 9.5px; letter-spacing: 0.14em; color: rgba(200, 213, 227, 0.55);
-  pointer-events: none; text-align: right; max-width: 70%;
+  margin: 6px 0 0; font-family: var(--f-data); font-size: 9.5px; letter-spacing: 0.14em; color: rgba(200, 213, 227, 0.6);
+  pointer-events: none; min-height: 1.2em; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tt-cap-k { color: var(--o); }
 .tt-wire {
@@ -483,13 +488,65 @@
   }
   .tt-arm { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+/* A phone: the name in the middle, CONTINUE across the screen, and the rest
+   as a grid of tiles, two abreast, each with its icon, its name and a two-line
+   status. Eleven full-width rows ran off the bottom of the screen and under
+   the wire, and everything hung off the left edge. */
+@media (max-width: 979px) {
+  .tt-hero { align-items: center; text-align: center; padding-top: 2px; }
+  .tt-name { align-items: center; font-size: clamp(40px, 11.6vw, 92px); }
+  .tt-logo { width: 40px; height: 40px; }
+  .tt-tag { font-size: 10px; letter-spacing: 0.14em; }
+  /* Filled from the top: a grid packed to the bottom of a box it overflows
+     spills off the top, and CONTINUE was the part that went where nothing
+     could scroll to it. It stays pinned over the tiles as they scroll. */
+  .tt-menu {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+    align-content: start; max-width: 620px; margin: 0 auto; padding: 0 0 4px;
+  }
+  .tt-item.primary { grid-column: 1 / -1; position: sticky; top: 0; z-index: 2; }
+  .tt-item:not(.primary) {
+    flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px;
+    min-height: 78px; padding: 9px 10px 9px 11px;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  }
+  /* An odd tile out at the end has the whole row. */
+  .tt-item:not(.primary):last-child:nth-child(even) { grid-column: 1 / -1; }
+  .tt-item:not(.primary) .tt-no, .tt-item:not(.primary) .tt-arrow { display: none; }
+  .tt-item:not(.primary) .tt-ic { display: block; width: 18px; height: 18px; color: rgba(255, 154, 77, 0.85); }
+  .tt-item:not(.primary) .tt-lbl { width: 100%; }
+  .tt-item:not(.primary) .tt-lbl b { font-size: 14.5px; letter-spacing: 0.1em; gap: 6px; }
+  .tt-item:not(.primary) .tt-lbl em {
+    white-space: normal; font-size: 9.5px; line-height: 1.35; letter-spacing: 0.04em;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* The hot marker, where the number used to carry it. */
+  .tt-item.hot:not(.primary)::after {
+    content: ''; position: absolute; top: 10px; right: 14px; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--o2); box-shadow: 0 0 0 0 rgba(255, 154, 77, 0.8); animation: tt-ping 1.8s ease-out infinite;
+  }
+  .tt-item.hot:not(.primary) .tt-no::before { display: none; }
+  .tt-item.primary .tt-ic { display: block; width: 22px; height: 22px; color: rgba(20, 9, 4, 0.7); order: 3; }
+  .tt-item.primary .tt-arrow { display: none; }
+  .tt-caption { text-align: center; }
+}
+/* A phone with the browser's bars taking their share: the name shrinks and
+   the logo goes, so the menu has the room. */
+@media (max-width: 979px) and (max-height: 820px) {
+  .tt-logo { display: none; }
+  .tt-name { font-size: clamp(36px, 10vw, 64px); }
+  .tt-tag { margin-top: 6px; }
+  .tt-item:not(.primary) { min-height: 70px; }
+}
 /* Short screens: the name gives way to the list. */
 @media (max-height: 700px) and (max-width: 979px) {
   .tt-logo { display: none; }
   .tt-name { font-size: clamp(34px, 10vw, 60px); flex-direction: row; gap: 10px; }
   .tt-tag { display: none; }
   .tt-item { min-height: 46px; padding-top: 7px; padding-bottom: 7px; }
+  .tt-item:not(.primary) { min-height: 64px; }
   .tt-item.primary { min-height: 58px; }
+  .tt-caption { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

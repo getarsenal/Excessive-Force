@@ -121,6 +121,24 @@ export function showTitle({ current = null, canResume = false } = {}) {
   for (const t of state.list) if (t.down) push(t.id);
   for (const t of state.list) if (pics.length < 10) push(t.id);
 
+  // The menu's icons, for the tiles on a phone: one stroke, one colour.
+  const IC = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const ICONS = {
+    go: IC('<path d="M7 4.5v15l12-7.5z"/>'),
+    campaign: IC('<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>'),
+    daily: IC('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
+    battles: IC('<path d="M6 3h12v18l-6-4.5L6 21z"/>'),
+    map: IC('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>'),
+    armoury: IC('<path d="M3 16h12l3-3h3v-3h-6l-2-2H5v3H3z"/><path d="M8 16v3h3v-3"/>'),
+    orders: IC('<rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V2.5h6V4M8.5 10l2 2 4-4M8.5 16h7"/>'),
+    crates: IC('<path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/>'),
+    medals: IC('<path d="M8 2l4 7 4-7"/><circle cx="12" cy="15" r="6"/><path d="M12 12l1 2h2l-1.6 1.3.6 2-2-1.2-2 1.2.6-2L9 14h2z"/>'),
+    boot: IC('<path d="M6 13l6-4 6 4M6 18l6-4 6 4"/>'),
+    commanders: IC('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-7 8-7s7 2.5 8 7"/>'),
+    records: IC('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  };
+  const iconFor = (it) => ICONS[it.primary ? 'go' : it.act] || '';
+
   const note = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>';
   const gear = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>';
 
@@ -152,11 +170,13 @@ export function showTitle({ current = null, canResume = false } = {}) {
         <img class="tt-logo" src="./logo-512.png" alt="" width="512" height="512">
         <h1 class="tt-name"><span>EXCESSIVE</span><span class="f">FORCE</span></h1>
         <p class="tt-tag">Real landmarks. Real ground. <em>Freedom, delivered.</em></p>
+        <p class="tt-caption" aria-hidden="true"><span class="tt-cap-k">RECON</span> <span class="tt-cap-v"></span></p>
       </div>
       <nav class="tt-menu">
         ${items.map((it, k) => `
           <button class="tt-item${it.primary ? ' primary' : ''}${it.hot ? ' hot' : ''}" type="button" data-act="${it.act}" style="--k:${k}">
             <i class="tt-no">${pad2(k + 1)}</i>
+            <i class="tt-ic" aria-hidden="true">${iconFor(it)}</i>
             <span class="tt-lbl"><b>${it.name}${it.count ? ` <u>${it.count}</u>` : ''}</b><em>${it.sub}</em></span>
             <span class="tt-arrow">›</span>
           </button>`).join('')}
@@ -166,7 +186,6 @@ export function showTitle({ current = null, canResume = false } = {}) {
         ${battles.length ? `<div class="tt-sk">BATTLES IN PROGRESS</div>${battles.slice(0, 3).map((b) => battleCard(b)).join('')}` : ''}
       </aside>
     </div>
-    <div class="tt-caption" aria-hidden="true"><span class="tt-cap-k">RECON</span> <span class="tt-cap-v"></span></div>
     <div class="tt-wire" aria-label="War wire"><span class="tt-wire-k">WAR WIRE</span><div class="tt-wire-view"><div class="tt-wire-track"></div></div></div>
     <div class="tt-sheet" hidden><div class="tt-sheet-in"></div></div>`;
   document.body.appendChild(root);
