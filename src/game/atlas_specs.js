@@ -205,10 +205,10 @@ export const SPECS = {
     S: 0.85, yaw: 0.25, mat: M.LIMESTONE, roofMat: M.SLATE, budget: 1.6,
     parts: [
       // The garden front: the corps de logis and the two great wings, three
-      // storeys of stone with the slate roofs drawn up behind the balustrade.
-      { t: 'hall', tag: 'corps', x: 0, z: 30, w: 150, d: 34, h: 26, roof: 'hip', roofH: 7, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 8.6 },
-      { t: 'hall', tag: 'wings', x: -140, z: 50, w: 130, d: 30, h: 23, roof: 'hip', roofH: 6, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7.6 },
-      { t: 'hall', tag: 'wings', x: 140, z: 50, w: 130, d: 30, h: 23, roof: 'hip', roofH: 6, mat: M.LIMESTONE, roofMat: M.SLATE, storey: 7.6 },
+      // storeys of stone under a flat roof and a balustrade, Italian fashion.
+      { t: 'hall', tag: 'corps', x: 0, z: 30, w: 150, d: 34, h: 26, roof: 'flat', roofH: 1.4, mat: M.LIMESTONE, storey: 8.6 },
+      { t: 'hall', tag: 'wings', x: -140, z: 50, w: 130, d: 30, h: 23, roof: 'flat', roofH: 1.4, mat: M.LIMESTONE, storey: 7.6 },
+      { t: 'hall', tag: 'wings', x: 140, z: 50, w: 130, d: 30, h: 23, roof: 'flat', roofH: 1.4, mat: M.LIMESTONE, storey: 7.6 },
       // The end pavilions of the wings, a storey proud of them.
       ...[-1, 1].map((s) => ({ t: 'tower', tag: 'wings', x: s * 212, z: 50, w: 22, d: 36, h: 27, cap: 'hip', capH: 8, capMat: M.SLATE, mat: M.LIMESTONE, floors: 3 })),
       // The arms of the corps de logis toward the town, slate mansards.
@@ -331,7 +331,7 @@ export const SPECS = {
       { t: 'hall', tag: 'castle', x: 10.5, z: 0, y0: 14, w: 7, d: 11, h: 13, roof: 'gable', axis: 'z', roofH: 5, mat: M.TILE, roofMat: M.BRICK, storey: 3.6, ground: false },
       { t: 'tower', tag: 'towers', x: 15, z: 4, y0: 14, w: 9, h: 21, round: true, cap: 'cone', capH: 9, capMat: M.BRICK, mat: M.TILE, ground: false },
       { t: 'tower', tag: 'towers', x: -13, z: 10, y0: 14, w: 7.5, h: 24, cap: 'pyramid', capH: 8, capMat: M.BRICK, mat: M.TILE, ground: false },
-      { t: 'tower', tag: 'towers', x: -4, z: -12.5, y0: 14, w: 6, h: 20, cap: 'pyramid', capH: 7, capMat: M.BRICK, mat: M.TILE, ground: false },
+      { t: 'tower', tag: 'towers', x: -4, z: -12.5, y0: 14, w: 6, h: 20, mat: M.TILE, ground: false },
       { t: 'tower', tag: 'towers', x: 12.5, z: -10.5, y0: 14, w: 4.5, h: 18, round: true, cap: 'cone', capH: 6, capMat: M.BRICK, mat: M.TILE, ground: false },
     ],
   },
@@ -774,6 +774,8 @@ export const SPECS = {
       { t: 'hall', tag: 'wings', x: 38, z: 0, w: 53, d: 18, h: 27, roof: 'hip', roofH: 14, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
       { t: 'hall', tag: 'wings', x: -58, z: 35, w: 18, d: 51.4, h: 26, roof: 'hip', roofH: 13, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
       { t: 'hall', tag: 'wings', x: 58, z: 33, w: 18, d: 48, h: 24, roof: 'hip', roofH: 12, mat: M.BRICK, roofMat: M.COPPER, storey: 5 },
+      // The entrance pavilion in the court, flat-roofed under the wings.
+      { t: 'hall', tag: 'wings', x: 0, z: 42, w: 30, d: 14, h: 10, roof: 'flat', roofH: 1, mat: M.BRICK, storey: 5 },
       // The turrets: every corner of every wing.
       ...[[-67.5, -11, 34], [67.5, -11, 31], [-67.5, 61, 30], [67.5, 57, 28], [-49, 61, 28], [49, 57, 26], [-14, -11, 36], [14, -11, 34]].map(([x, z, h]) => ({ t: 'tower', tag: 'turrets', x, z, w: 7, h, round: true, cap: 'cone', capH: 11, capMat: M.COPPER, mat: M.BRICK })),
     ],
@@ -814,14 +816,14 @@ export const SPECS = {
     // of each level and a domed stone sentry box (garita) on every point.
     S: 0.9, yaw: 0.35, mat: M.LIMESTONE, budget: 1.3,
     parts: [
-      { t: 'steps', tag: 'bastions', x: 0, z: 0, w: 170, d: 120, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 2.4 },
+      { t: 'steps', tag: 'bastions', x: 0, z: 0, w: 170, d: 120, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 1.6 },
       // The lower bastions, thrust out past the terrace.
-      ...[[-88, 46, 34], [92, 50, 30], [-80, -52, 32], [86, -46, 28], [0, 64, 26]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, w, d: w, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 2.4, posts: true })),
-      { t: 'steps', tag: 'bastions', x: 12, z: -6, y0: 14, w: 120, d: 82, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 2.4, ground: false },
-      ...[[-50, 36, 22], [70, 34, 20], [62, -42, 20]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, y0: 14, w, d: w, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 2.4, ground: false, posts: true })),
-      { t: 'steps', tag: 'bastions', x: 22, z: -10, y0: 26, w: 70, d: 46, h: 10, n: 1, batter: 0.3, mat: M.LIMESTONE, coarse: 2.2, ground: false },
-      { t: 'steps', tag: 'bastions', x: 28, z: -12, y0: 36, w: 38, d: 24, h: 6, n: 1, batter: 0.2, mat: M.LIMESTONE, coarse: 2.0, ground: false },
-      { t: 'hall', tag: 'barracks', x: 20, z: -12, y0: 42, w: 24, d: 10, h: 5, roof: 'flat', mat: M.LIMESTONE, storey: 5, ground: false },
+      ...[[-88, 46, 34], [92, 50, 30], [-80, -52, 32], [86, -46, 28], [0, 64, 26]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, w, d: w, h: 14, n: 1, batter: 0.35, mat: M.GRANITE, coarse: 1.6, posts: true })),
+      { t: 'steps', tag: 'bastions', x: 12, z: -6, y0: 14, w: 120, d: 82, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 1.6, ground: false },
+      ...[[-50, 36, 22], [70, 34, 20], [62, -42, 20]].map(([x, z, w]) => ({ t: 'steps', tag: 'bastions', x, z, y0: 14, w, d: w, h: 12, n: 1, batter: 0.35, mat: M.LIMESTONE, coarse: 1.6, ground: false, posts: true })),
+      { t: 'steps', tag: 'bastions', x: 22, z: -10, y0: 26, w: 70, d: 46, h: 10, n: 1, batter: 0.3, mat: M.LIMESTONE, coarse: 1.6, ground: false },
+      { t: 'steps', tag: 'bastions', x: 28, z: -12, y0: 36, w: 38, d: 24, h: 6, n: 1, batter: 0.2, mat: M.LIMESTONE, coarse: 1.6, ground: false },
+      { t: 'hall', tag: 'barracks', x: 24, z: -12, y0: 42, w: 30, d: 12, h: 9, roof: 'flat', mat: M.LIMESTONE, storey: 4.5, ground: false },
       // The garitas, on the points of the bastions at every level.
       ...[[-102, 60, 14], [-74, 32, 14], [104, 62, 14], [80, 38, 14], [-94, -66, 14], [98, -58, 14], [12, 76, 14],
         [-60, 46, 26], [-40, 26, 26], [79, 43, 26], [71, -51, 26], [-46, -45, 26], [70, 33, 26],
@@ -905,7 +907,7 @@ export const GAME_SCALE = {
   capitolio: 1.89,
   bellasartes: 1.86,
   teatroamazonas: 1.08,
-  cartagena: 2.46,
+  cartagena: 1.6,
   skytower: 1.11,
 };
 for (const [id, g] of Object.entries(GAME_SCALE)) {

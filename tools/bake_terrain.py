@@ -912,7 +912,7 @@ LEVELS = {
         "zoom": 15,
         "ceiling": "auto",
         "parks": [],
-        "flatten": [[0, 0, [70, 70], 30]],
+        "flatten": [[0, 0, [88, 116], 50, 146.0]],
     },
     "winterpalace": {
         "name": "Winter Palace, Saint Petersburg",
@@ -982,7 +982,7 @@ LEVELS = {
         "zoom": 15,
         "ceiling": "auto",
         "parks": [],
-        "flatten": [[0, 0, [70, 70], 30]],
+        "flatten": [[6, 0, [132, 52], 50, 373.5]],
     },
     "saintsava": {
         "name": "Church of Saint Sava, Belgrade",

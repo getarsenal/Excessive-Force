@@ -1113,6 +1113,76 @@ def bake_far_water(sink, level_id, lat0, lon0, span):
     return frac
 
 
+# A pond the size of a fountain basin, standing over the map's one waterline.
+PERCHED_MAX_PX = 1500      # about two hectares at 3.5 m to the pixel
+PERCHED_RISE = 5.0         # metres of bank over the surface before it is a pit
+
+
+def _drop_perched(w: np.ndarray, height: np.ndarray, surface: float):
+    """Take out the small water standing above the map's waterline.
+
+    The game has one sheet of water at one level, and every wet pixel is dug
+    to a bed under it. A garden pond at the top of a hill is wet, so it was
+    dug down to the river: Versailles' parterre basins came out as twenty-
+    metre craters in the lawn, the ponds of Windsor's Home Park, the pools of
+    the Old Town in Quebec sixty metres below their own streets. A small
+    piece whose bank stands well over the surface is a pond the sheet cannot
+    reach, and it is left as the ground it is on. Big water is never touched:
+    the survey's harbour has quays and buildings on its bank and reads high in
+    a surface model, and it is the coastline all the same.
+    """
+    wet = w > 0.5
+    size = w.shape[0]
+    lab = np.zeros(w.shape, np.int32)
+    keep = w.copy()
+    dropped = 0
+    n = 0
+    for y, x in zip(*np.nonzero(wet)):
+        if lab[y, x]:
+            continue
+        n += 1
+        lab[y, x] = n
+        stack = [(y, x)]
+        ys, xs = [], []
+        while stack:
+            a, b = stack.pop()
+            ys.append(a)
+            xs.append(b)
+            for c, d in ((a + 1, b), (a - 1, b), (a, b + 1), (a, b - 1)):
+                if 0 <= c < size and 0 <= d < size and wet[c, d] and not lab[c, d]:
+                    lab[c, d] = n
+                    stack.append((c, d))
+        if len(ys) > PERCHED_MAX_PX:
+            continue
+        ys, xs = np.array(ys), np.array(xs)
+        y0, y1 = max(ys.min() - 3, 0), min(ys.max() + 4, size)
+        x0, x1 = max(xs.min() - 3, 0), min(xs.max() + 4, size)
+        me = lab[y0:y1, x0:x1] == n
+        ring = me.copy()
+        for _ in range(2):
+            g = ring.copy()
+            g[1:] |= ring[:-1]
+            g[:-1] |= ring[1:]
+            g[:, 1:] |= ring[:, :-1]
+            g[:, :-1] |= ring[:, 1:]
+            ring = g
+        ring &= ~wet[y0:y1, x0:x1]
+        if not ring.any():
+            continue
+        if float(np.median(height[y0:y1, x0:x1][ring])) - surface > PERCHED_RISE:
+            keep[ys, xs] = 0.0
+            dropped += 1
+    if dropped:
+        print(f"  left {dropped} perched ponds dry: their banks stand over {PERCHED_RISE:.0f} m above the water")
+    return keep, dropped
+
+
+def perched_green(w_after: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Grass where a perched pond was taken out: it was a garden's water."""
+    was = (mask[:, :, 0] > 0.5) & (w_after <= 0.5)
+    return np.where(was, 0.7, 0.0)
+
+
 def _water_surface(w: np.ndarray, height: np.ndarray, size: int) -> float:
     """Where the surface of the water is.
 
@@ -1245,13 +1315,22 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
             if len(pad) < 5:
                 continue
             px, pn, rad, feather = pad[0], pad[1], pad[2], pad[3]
-            rx, rz = (rad if isinstance(rad, (list, tuple)) else (rad, rad))
-            rx, rz = float(rx) + feather * 0.5, float(rz) + feather * 0.5
             k = size / (2.0 * span)
             gx = (np.arange(size) - size / 2.0) / k
-            ex = (gx[None, :] - px) / rx
-            nn = (-gx[:, None] - pn) / rz
-            on_pad = (ex * ex + nn * nn) <= 1.0
+            if isinstance(rad, (list, tuple)):
+                # A rectangular pad is a rectangular island: the same rounded
+                # rectangle the flatten levels, out to half its feather. An
+                # ellipse inside it left the corners of Trakai's curtain wall
+                # standing in the lake.
+                d = np.hypot(np.maximum(np.abs(gx[None, :] - px) - float(rad[0]), 0.0),
+                             np.maximum(np.abs(-gx[:, None] - pn) - float(rad[1]), 0.0))
+                on_pad = d <= feather * 0.5
+                rx = float(rad[0]) + feather * 0.5
+            else:
+                rx = rz = float(rad) + feather * 0.5
+                ex = (gx[None, :] - px) / rx
+                nn = (-gx[:, None] - pn) / rz
+                on_pad = (ex * ex + nn * nn) <= 1.0
             if (w[on_pad] > 0.5).any():
                 print(f"  cleared the water off the {rx:.0f} m pad at ({px}, {pn}): "
                       f"{float((w[on_pad] > 0.5).mean() * 100):.0f}% of it was under the survey's sea")
@@ -1298,8 +1377,13 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
         # foreshore, while Sydney Harbour does not, and a surface pushed up to
         # 2.5 m there is above the quay — which took four hundred of the city's
         # seven hundred buildings out as standing in the water.
-        wet = w > 0.5
         surface = _water_surface(w, height, size)
+        w, perched = _drop_perched(w, height, surface)
+        if perched:
+            mask[:, :, 2] = np.maximum(mask[:, :, 2], perched_green(w, mask))
+            mask[:, :, 0] = w
+            soft = blur(w, 7) * w
+        wet = w > 0.5
         bed = surface - 4.5
         cut = np.minimum(height, bed)
         height = height * (1 - soft) + cut * soft
