@@ -1047,6 +1047,7 @@ async function boot() {
         feedback.emit('impact', 1.4);
         hud.feed(`${data.def.name} SHOT DOWN BY SAM`, 'big');
         battle.onEvent('stamp', { text: 'AIRCRAFT LOST', point: data.point, kind: 'loss' });
+        if (comcard) comcard.samKill();
         break;
       case 'sammiss':
         hud.feed(`SAM MISSED — ${data.def.name} STILL FLYING`, 'warn');
@@ -1116,6 +1117,7 @@ async function boot() {
       case 'unitlost':
         feedback.emit('lost');
         hud.feed(data.fell ? `${data.def.name} DOWN WITH THE BUILDING` : `${data.def.name} LOST`, 'bad');
+        if (comcard) comcard.firstLoss();
         break;
       case 'crushed':
         if (data > 2) feedback.emit('impact', 1.3);
@@ -1933,7 +1935,7 @@ async function boot() {
   const hazeBase = engine.scene.fog.density;
   const warmBase = engine.gradePass.uniforms.uWarm.value;
   const MILESTONES = [
-    { at: 0.75, label: 'A QUARTER OF IT DOWN' },
+    { at: 0.75, label: 'A QUARTER OF IT DOWN', taunt: 'quarter' },
     { at: 0.5, label: 'HALF STANDING', taunt: 'half' },
     { at: 0.25, label: 'A QUARTER STANDING' },
     { at: 0.2, label: 'ONE FIFTH STANDING — NEARLY THERE', taunt: 'last' },

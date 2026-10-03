@@ -1124,6 +1124,11 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .so-ghost, .so-text { unicode-bidi: plaintext; white-space: pre-wrap; overflow-wrap: anywhere; }
 .so-ghost { visibility: hidden; display: block; }
 .so-text { position: absolute; top: var(--pad-y); left: var(--pad-x); right: var(--pad-x); }
+/* What he really said: the English under his own language, once it is typed. */
+.so-sub { display: block; margin-top: 6px; font-size: 0.72em; font-style: italic; line-height: 1.3; color: rgba(232, 238, 246, 0.72);
+  opacity: 0; transition: opacity 0.35s; unicode-bidi: plaintext; text-align: left; }
+.so-sub.in { opacity: 1; }
+.so-sub[hidden] { display: none; }
 
 .so-hint {
   position: absolute; left: 50%; transform: translateX(-50%);
@@ -2074,6 +2079,11 @@ body.cine #cine i { height: 9vh; }
 #comcard.enemy .cc-body { text-align: right; }
 .cc-line { font-family: var(--f-ui); font-size: 15px; letter-spacing: 0.03em; color: #e8eef6; line-height: 1.3; min-height: 1.3em; }
 .cc-line.typing::after { content: '\258C'; margin-left: 1px; opacity: 0.8; animation: tw-caret 0.5s steps(1) infinite; }
+/* The English under a line in his own language: there from the end of the typing. */
+.cc-sub { font-family: var(--f-ui); font-size: 11.5px; font-style: italic; line-height: 1.3; color: rgba(232, 238, 246, 0.66);
+  opacity: 0; transition: opacity 0.3s; }
+.cc-sub.in { opacity: 1; }
+.cc-sub[hidden] { display: none; }
 body.standoff #comcard, body.ended #comcard { display: none !important; }
 /* 5. A tip while the level loads. */
 .load-tip {

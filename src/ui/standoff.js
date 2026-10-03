@@ -1,5 +1,6 @@
 import { Typewriter } from './typewriter.js';
 import { CAST, DEFENDER_OF, STANDOFF } from '../game/cast.js';
+import { STANDOFF_SUB } from '../game/subtitles.js';
 import { TAP } from './pointer.js';
 
 /**
@@ -48,6 +49,8 @@ export class Standoff {
     this.rig = o.rig;
     this.groundY = o.groundY;
     this.lines = o.lines || STANDOFF[o.level.id] || STANDOFF.westminster;
+    // What he really said, under his own language (see subtitles.js).
+    this.subLine = o.lines ? null : STANDOFF_SUB[o.level.id] || null;
     this.onDone = o.onDone || (() => {});
     // The keys under the lines: see typewriter.js.
     this.tw = new Typewriter(o.audio || null);
@@ -72,8 +75,8 @@ export class Standoff {
     root.innerHTML = `
       <img class="so-fig left" src="${CAST.us.file}" alt="${who(CAST.us)}" draggable="false" onerror="this.hidden=true">
       <img class="so-fig right" src="${enemy.file}" alt="${who(enemy)}" draggable="false" onerror="this.hidden=true">
-      <div class="so-bubble left" dir="auto"><span class="so-plate">${who(CAST.us)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
-      <div class="so-bubble right" dir="auto"><span class="so-plate">${who(enemy)}</span><span class="so-ghost"></span><span class="so-text"></span></div>
+      <div class="so-bubble left" dir="auto"><span class="so-plate">${who(CAST.us)}</span><span class="so-ghost"></span><span class="so-text"></span><span class="so-sub" dir="ltr"></span></div>
+      <div class="so-bubble right" dir="auto"><span class="so-plate">${who(enemy)}</span><span class="so-ghost"></span><span class="so-text"></span><span class="so-sub" dir="ltr"></span></div>
       <div class="so-hint">${TAP} TO CONTINUE</div>
       <button class="so-skip">SKIP</button>`;
     const [c0, c1, c2] = enemy.colours;
@@ -142,7 +145,12 @@ export class Standoff {
     void b.offsetWidth;
     b.querySelector('.so-ghost').textContent = line.line;
     b.querySelector('.so-text').textContent = '';
-    this._typing = { el: b.querySelector('.so-text'), text: line.line, n: 0, acc: 0 };
+    const sub = line.who !== 'us' ? (line.sub || this.subLine) : null;
+    const subEl = b.querySelector('.so-sub');
+    subEl.textContent = sub || '';
+    subEl.classList.remove('in');
+    subEl.hidden = !sub;
+    this._typing = { el: b.querySelector('.so-text'), text: line.line, n: 0, acc: 0, sub: sub ? subEl : null };
     this._typing.el.classList.add('typing');
     b.classList.add('in');
   }
@@ -196,7 +204,7 @@ export class Standoff {
         ty.el.textContent = ty.text.slice(0, n);
         this.tw.key(ty.text[n - 1]);
         // The last letter: the carriage comes back and the bell rings.
-        if (n >= ty.text.length) { ty.el.classList.remove('typing'); this.tw.ding(); }
+        if (n >= ty.text.length) { ty.el.classList.remove('typing'); this.tw.ding(); if (ty.sub) ty.sub.classList.add('in'); }
       }
     }
     if (this.beat < 0) {
@@ -206,7 +214,8 @@ export class Standoff {
     this.beatT += dt;
     const last = this.beat >= this.lines.length - 1;
     // A line stays up long enough to be read after it has finished typing.
-    const hold = (ty ? ty.text.length / 40 : 0) + (last ? BEAT.last : BEAT.line);
+    const hold = (ty ? ty.text.length / 40 : 0) + (last ? BEAT.last : BEAT.line)
+      + (ty && ty.sub ? ty.sub.textContent.length / 28 : 0);
     if (this.beatT >= hold) this.advance();
   }
 }
