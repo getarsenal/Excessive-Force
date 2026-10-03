@@ -2414,9 +2414,13 @@ export class Battle {
    */
   _splash(hit, w) {
     const t = this.terrain, p = hit.point;
-    if (!hit.groundHit || t.hasWater === false || !Number.isFinite(t.waterLevel)) return false;
-    if (p.y > t.waterLevel + 0.3 || !t.isWater(p.x, p.z)) return false;
-    if (this.fx.flourish) this.fx.flourish.waterPlume(p.x, t.waterLevel, p.z, w.fx || 1);
+    if (!hit.groundHit) return false;
+    if (!t.pondAt(p.x, p.z) && (t.hasWater === false || !Number.isFinite(t.waterLevel))) return false;
+    if (!t.isWater(p.x, p.z)) return false;
+    // A pond stands at a level of its own: the plume goes up off its surface.
+    const wl = t.waterLevelAt(p.x, p.z);
+    if (p.y > wl + 0.3) return false;
+    if (this.fx.flourish) this.fx.flourish.waterPlume(p.x, wl, p.z, w.fx || 1);
     if (this.audio && !hit.proj?.quiet) this.audio.play('explosion', p, { rate: 0.62, gain: 0.45, rolloff: 300 });
     if (this.life) this.life.startle(p.x, p.z, 80);
     return true;

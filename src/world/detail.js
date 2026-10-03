@@ -575,7 +575,7 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
       for (let t = 0; t < span * 1.95; t += 3) {
         const c = dir > 0 ? -span * 0.98 + t : span * 0.98 - t;
         const p = at(a, c);
-        if (terrain.isWater(p.x, p.z)) { found = c; break; }
+        if (terrain.isRiver(p.x, p.z)) { found = c; break; }
       }
       if (found === null) continue;
       // Step back from the waterline until the ground is above the water,
@@ -696,8 +696,8 @@ export function addRiverEdge(props, terrain, rng, opts = {}) {
       // through every bearing there is, and half of it would otherwise have
       // its parapet on the river side and its pavement in the Thames.
       let nx = -uz, nz = ux;
-      if (!terrain.isWater(cx + nx * 9, cz + nz * 9)) { nx = -nx; nz = -nz; }
-      if (!terrain.isWater(cx + nx * 9, cz + nz * 9)) continue;
+      if (!terrain.isRiver(cx + nx * 9, cz + nz * 9)) { nx = -nx; nz = -nz; }
+      if (!terrain.isRiver(cx + nx * 9, cz + nz * 9)) continue;
 
       /** A box in the piece's own frame: `l` along the bank, `t` across it. */
       const piece = (kind, t, hgt, l, off, y, color, jitter) => {

@@ -271,6 +271,8 @@ async function boot() {
   const green = ['lawn', 'charbagh'].includes(level.precinct?.ground);
   for (const g of pads.values()) {
     const cx = (g.x0 + g.x1) / 2, cz = (g.z0 + g.z1) / 2;
+    // No pond under the building (see `Terrain.clearPonds`).
+    terrain.clearPonds(g.x0, g.x1, g.z0, g.z1);
     // The pad is normally the landmark's own footprint, which is right for a
     // building that stands on ground and wrong for one that stands on a hill.
     // A structure four hundred metres across levels a four-hundred-metre disc,

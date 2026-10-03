@@ -38,6 +38,24 @@ export class Terrain {
       this.mask[i * 3 + 2] = maskData[i * 4 + 2] / 255;
     }
 
+    // Ponds: water standing at a level of its own, over the map's one
+    // waterline. Kinkaku-ji's mirror pond is twenty-five metres above the
+    // Kamo, the basins of Versailles' parterres twenty above the Grand Canal;
+    // dug to the main water they were pits, dried they were lawns. Each is
+    // kept on the bake's own grid, by id, with its level; the main mask never
+    // hears of them, so the river's reconcile and its quays leave them alone.
+    this.ponds = (meta.ponds || []).map((p) => ({ level: p.level }));
+    this._pondN = n;
+    this._pondId = null;
+    if (this.ponds.length) {
+      this._pondId = new Uint16Array(n * n);
+      meta.ponds.forEach((p, k) => {
+        for (const [r, c0, len] of p.rows) {
+          for (let c = c0; c < c0 + len; c++) this._pondId[r * n + c] = k + 1;
+        }
+      });
+    }
+
     // The distant coastline, if this level was baked with one.
     //
     // One byte a pixel over a square seven times the playfield: forty metres to
@@ -100,7 +118,7 @@ export class Terrain {
       for (let z = 0; z < n; z++) {
         for (let x = 0; x < n; x++) {
           const i = z * n + x;
-          if (m[i * 3] > 0.5) { tmp[i] = h[i]; continue; }
+          if (m[i * 3] > 0.5 || (this._pondId && this._pondId[i])) { tmp[i] = h[i]; continue; }
           let sum = 0, wsum = 0;
           for (let dz = -1; dz <= 1; dz++) {
             const zz = z + dz;
@@ -328,6 +346,8 @@ export class Terrain {
         if (this.mask[idx * 3] > 0.5) continue;
         const d = Math.hypot(-span + i * c - cx, span - j * c - cz);
         if (d >= rOut) continue;
+        // Nor a pond: the pad stops at the water's edge, as a terrace would.
+        if (this._pondId && this.pondAt(-span + i * c, span - j * c)) continue;
         const t = d <= radius ? 1 : 1 - (d - radius) / feather;
         const k = t * t * (3 - 2 * t);
         h[idx] += (level - h[idx]) * k;
@@ -815,7 +835,77 @@ export class Terrain {
     return this.mask[(v * n + u) * 3] > 0.5;
   }
 
+  /** The pond at (x, z), if there is one: `{ level }`. */
+  pondAt(x, z) {
+    if (!this._pondId) return null;
+    const n = this._pondN;
+    const u = Math.round((x + this.span) / (this.span * 2) * (n - 1));
+    const v = Math.round((this.span - z) / (this.span * 2) * (n - 1));
+    if (u < 0 || v < 0 || u > n - 1 || v > n - 1) return null;
+    const id = this._pondId[v * n + u];
+    return id ? this.ponds[id - 1] : null;
+  }
+
+  /**
+   * Take the ponds out from under a building's footprint.
+   *
+   * The survey's water includes the moat round Kronborg, the basins in
+   * Versailles' own courts and the edge of Kinkaku-ji's pond under the
+   * pavilion's platform; the landmark is laid over all of them, and a wall
+   * standing in a pond is a wall over a hole. The cells inside the box (and a
+   * few metres round it) stop being pond and are brought up out of the bed to
+   * the water's edge, for the pad to level; a pond that loses most of itself
+   * goes altogether rather than leaving a sliver along the wall.
+   */
+  clearPonds(x0, x1, z0, z1, margin = 4) {
+    if (!this._pondId) return 0;
+    const n = this._pondN, span = this.span, ids = this._pondId;
+    const native = this.size === n;
+    const uOf = (x) => Math.round((x + span) / (span * 2) * (n - 1));
+    const vOf = (z) => Math.round((span - z) / (span * 2) * (n - 1));
+    const u0 = Math.max(0, uOf(x0 - margin)), u1 = Math.min(n - 1, uOf(x1 + margin));
+    const v0 = Math.max(0, vOf(z1 + margin)), v1 = Math.min(n - 1, vOf(z0 - margin));
+    const lost = new Map();
+    for (let v = v0; v <= v1; v++) {
+      for (let u = u0; u <= u1; u++) {
+        const i = v * n + u, id = ids[i];
+        if (!id) continue;
+        ids[i] = 0;
+        lost.set(id, (lost.get(id) || 0) + 1);
+        if (native) this.heights[i] = Math.max(this.heights[i], this.ponds[id - 1].level + 0.4);
+      }
+    }
+    if (!lost.size) return 0;
+    const size = new Map();
+    for (let i = 0; i < n * n; i++) if (ids[i]) size.set(ids[i], (size.get(ids[i]) || 0) + 1);
+    for (const [id, k] of lost) {
+      if ((size.get(id) || 0) < k) {
+        for (let i = 0; i < n * n; i++) {
+          if (ids[i] !== id) continue;
+          ids[i] = 0;
+          if (native) this.heights[i] = Math.max(this.heights[i], this.ponds[id - 1].level + 0.4);
+        }
+      }
+    }
+    return lost.size;
+  }
+
+  /** The height of whatever water is at (x, z): a pond's own, or the river's. */
+  waterLevelAt(x, z) {
+    const p = this.pondAt(x, z);
+    return p ? p.level : this.waterLevel;
+  }
+
+  /**
+   * Is (x, z) wet: the river, the sea, or a pond. Everything that keeps off
+   * water asks this; what looks for the river itself — bridges, quays, the
+   * boats, the embankment walls — asks `isRiver`, which a garden pond is not.
+   */
   isWater(x, z) {
+    return this.isRiver(x, z) || !!this.pondAt(x, z);
+  }
+
+  isRiver(x, z) {
     // Past the DEM there is no mask, but there is still a river: the channel
     // carved out to the horizon is water as far as anything that asks is
     // concerned, or the farms and the airfield get built in it.

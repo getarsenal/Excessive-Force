@@ -176,7 +176,7 @@ export class Life {
    */
   _navigable(x, z) {
     const t = this.terrain;
-    return t.isWater(x, z) && t.heightAt(x, z) < t.waterLevel - 0.3 && !this._built(x, z);
+    return t.isRiver(x, z) && t.heightAt(x, z) < t.waterLevel - 0.3 && !this._built(x, z);
   }
 
   _waterways() {

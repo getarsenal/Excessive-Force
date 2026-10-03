@@ -1114,28 +1114,17 @@ def bake_far_water(sink, level_id, lat0, lon0, span):
 
 
 # A pond the size of a fountain basin, standing over the map's one waterline.
-PERCHED_MAX_PX = 1500      # about two hectares at 3.5 m to the pixel
+PERCHED_MAX_PX = 4000      # five hectares at 3.5 m to the pixel: a castle moat
 PERCHED_RISE = 5.0         # metres of bank over the surface before it is a pit
+POND_MIN_PX = 16           # two hundred square metres: smaller is a pool
+POND_MAX_PX = 6000         # seven hectares: Kinkaku-ji's mirror pond is a third of this
 
 
-def _drop_perched(w: np.ndarray, height: np.ndarray, surface: float):
-    """Take out the small water standing above the map's waterline.
-
-    The game has one sheet of water at one level, and every wet pixel is dug
-    to a bed under it. A garden pond at the top of a hill is wet, so it was
-    dug down to the river: Versailles' parterre basins came out as twenty-
-    metre craters in the lawn, the ponds of Windsor's Home Park, the pools of
-    the Old Town in Quebec sixty metres below their own streets. A small
-    piece whose bank stands well over the surface is a pond the sheet cannot
-    reach, and it is left as the ground it is on. Big water is never touched:
-    the survey's harbour has quays and buildings on its bank and reads high in
-    a surface model, and it is the coastline all the same.
-    """
-    wet = w > 0.5
-    size = w.shape[0]
-    lab = np.zeros(w.shape, np.int32)
-    keep = w.copy()
-    dropped = 0
+def _pieces(wet: np.ndarray):
+    """The connected pieces of a wet mask, as (ys, xs) index arrays."""
+    size = wet.shape[0]
+    lab = np.zeros(wet.shape, np.int32)
+    out = []
     n = 0
     for y, x in zip(*np.nonzero(wet)):
         if lab[y, x]:
@@ -1152,35 +1141,111 @@ def _drop_perched(w: np.ndarray, height: np.ndarray, surface: float):
                 if 0 <= c < size and 0 <= d < size and wet[c, d] and not lab[c, d]:
                     lab[c, d] = n
                     stack.append((c, d))
+        out.append((np.array(ys), np.array(xs)))
+    return out
+
+
+def _ring(ys, xs, wet, size, width=2):
+    """The dry pixels within `width` of a piece, and the window they are in."""
+    y0, y1 = max(ys.min() - width - 1, 0), min(ys.max() + width + 2, size)
+    x0, x1 = max(xs.min() - width - 1, 0), min(xs.max() + width + 2, size)
+    me = np.zeros((y1 - y0, x1 - x0), bool)
+    me[ys - y0, xs - x0] = True
+    ring = me.copy()
+    for _ in range(width):
+        g = ring.copy()
+        g[1:] |= ring[:-1]
+        g[:-1] |= ring[1:]
+        g[:, 1:] |= ring[:, :-1]
+        g[:, :-1] |= ring[:, 1:]
+        ring = g
+    ring &= ~wet[y0:y1, x0:x1]
+    return (y0, y1, x0, x1), ring
+
+
+def _split_perched(w: np.ndarray, height: np.ndarray, surface: float):
+    """Take the small water standing above the map's waterline out of it.
+
+    The game's main water is one sheet at one level, and every wet pixel of it
+    is dug to a bed under that level. A garden pond at the top of a hill is
+    wet, so it was dug down to the river: Versailles' parterre basins came out
+    as twenty-metre craters in the lawn, the ponds of Windsor's Home Park, the
+    pools of the Old Town in Quebec sixty metres below their own streets. A
+    small piece whose bank stands well over the surface is a pond with a level
+    of its own, and is handed back to be made one. Big water is never touched:
+    the survey's harbour has quays and buildings on its bank and reads high in
+    a surface model, and it is the coastline all the same.
+    """
+    wet = w > 0.5
+    size = w.shape[0]
+    keep = w.copy()
+    perched = []
+    for ys, xs in _pieces(wet):
         if len(ys) > PERCHED_MAX_PX:
             continue
-        ys, xs = np.array(ys), np.array(xs)
-        y0, y1 = max(ys.min() - 3, 0), min(ys.max() + 4, size)
-        x0, x1 = max(xs.min() - 3, 0), min(xs.max() + 4, size)
-        me = lab[y0:y1, x0:x1] == n
-        ring = me.copy()
-        for _ in range(2):
-            g = ring.copy()
-            g[1:] |= ring[:-1]
-            g[:-1] |= ring[1:]
-            g[:, 1:] |= ring[:, :-1]
-            g[:, :-1] |= ring[:, 1:]
-            ring = g
-        ring &= ~wet[y0:y1, x0:x1]
+        (y0, y1, x0, x1), ring = _ring(ys, xs, wet, size)
         if not ring.any():
             continue
         if float(np.median(height[y0:y1, x0:x1][ring])) - surface > PERCHED_RISE:
             keep[ys, xs] = 0.0
-            dropped += 1
-    if dropped:
-        print(f"  left {dropped} perched ponds dry: their banks stand over {PERCHED_RISE:.0f} m above the water")
-    return keep, dropped
+            perched.append((ys, xs))
+    return keep, perched
 
 
-def perched_green(w_after: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Grass where a perched pond was taken out: it was a garden's water."""
-    was = (mask[:, :, 0] > 0.5) & (w_after <= 0.5)
-    return np.where(was, 0.7, 0.0)
+def _make_ponds(pieces, height: np.ndarray, mask: np.ndarray):
+    """Each piece a pond at its own level, with a shallow bed under it.
+
+    The level is the DEM's own: Terrarium fills a water body flat at its
+    shoreline, so the median of the surface model over the pond is where the
+    water stands, held a little under the lowest of its banks so that it never
+    brims over onto the lawn. The bed is a metre and three quarters down,
+    feathered to the edge, and nothing wet is left above the water.
+
+    Returned as run-length rows of the mask grid, which is what the game
+    rebuilds the pond's extent from: one sheet a pond, at its own height.
+    """
+    size = height.shape[0]
+    wet_any = np.zeros(height.shape, bool)
+    for ys, xs in pieces:
+        wet_any[ys, xs] = True
+    ponds = []
+    for ys, xs in pieces:
+        if len(ys) < POND_MIN_PX or len(ys) > POND_MAX_PX:
+            continue
+        (y0, y1, x0, x1), ring = _ring(ys, xs, wet_any, size, 2)
+        if not ring.any():
+            continue
+        bank = height[y0:y1, x0:x1][ring]
+        level = min(float(np.median(height[ys, xs])), float(np.percentile(bank, 20)) - 0.25)
+        # The bed, feathered in from the bank over three pixels.
+        win = np.zeros((y1 - y0, x1 - x0))
+        win[ys - y0, xs - x0] = 1.0
+        soft = win.copy()
+        for _ in range(3):
+            soft = (soft + np.roll(soft, 1, 0) + np.roll(soft, -1, 0)
+                    + np.roll(soft, 1, 1) + np.roll(soft, -1, 1)) / 5.0
+        soft *= win
+        soft = np.clip(soft * 1.6, 0.0, 1.0)
+        sub = height[y0:y1, x0:x1]
+        bed = level - 1.75
+        sub = sub * (1 - soft) + np.minimum(sub, bed) * soft
+        sub = np.where(win > 0.5, np.minimum(sub, level - 0.35), sub)
+        height[y0:y1, x0:x1] = sub
+        # The survey's ground colour under a pond is whatever the park was.
+        mask[ys, xs, 2] = 0.0
+        rows = []
+        for r in np.unique(ys):
+            cs = np.sort(xs[ys == r])
+            start = prev = int(cs[0])
+            for c in cs[1:]:
+                c = int(c)
+                if c != prev + 1:
+                    rows.append([int(r), start, prev - start + 1])
+                    start = c
+                prev = c
+            rows.append([int(r), start, prev - start + 1])
+        ponds.append({"level": round(level, 2), "rows": rows})
+    return height, ponds
 
 
 def _water_surface(w: np.ndarray, height: np.ndarray, size: int) -> float:
@@ -1219,7 +1284,7 @@ def _water_surface(w: np.ndarray, height: np.ndarray, size: int) -> float:
 
 
 def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
-              cut_peak=False):
+              cut_peak=False, ponds_from=None):
     """Rewrite the water and green channels of the level's mask from real data,
     and cut the bed the new water needs.
 
@@ -1243,6 +1308,15 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
     hi_img = np.asarray(Image.open(hpath).convert("RGB"), dtype=np.float64)
     lo, hi = meta["minElevation"], meta["maxElevation"]
     height = (hi_img[:, :, 0] * 256 + hi_img[:, :, 1]) / 65535.0 * (hi - lo) + lo
+
+    pond_pieces = []
+    if ponds_from:
+        # A map whose survey water was too little to be its coastline still
+        # has the water: Kinkaku-ji's pond, the moat of a castle in a town on
+        # a hill. Each piece is a pond of its own, clear of the typed river.
+        pw = np.clip(rasterise(ponds_from, size, span), 0, 1) > 0.5
+        pw &= mask[:, :, 0] <= 0.5
+        pond_pieces += _pieces(pw)
 
     if water:
         w = np.clip(rasterise(water, size, span), 0, 1)
@@ -1378,11 +1452,11 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
         # 2.5 m there is above the quay — which took four hundred of the city's
         # seven hundred buildings out as standing in the water.
         surface = _water_surface(w, height, size)
-        w, perched = _drop_perched(w, height, surface)
+        w, perched = _split_perched(w, height, surface)
         if perched:
-            mask[:, :, 2] = np.maximum(mask[:, :, 2], perched_green(w, mask))
             mask[:, :, 0] = w
             soft = blur(w, 7) * w
+            pond_pieces += perched
         wet = w > 0.5
         bed = surface - 4.5
         cut = np.minimum(height, bed)
@@ -1393,6 +1467,14 @@ def bake_mask(sink, level_id, lat0, lon0, span, meta, water, roads=None,
         meta["waterSurface"] = round(surface, 3)
         print(f"  water surface at {surface:.2f} m, bed at {bed:.2f} m")
         print(f"  dredged the bed under {float(w.mean() * 100):.1f}% of the map")
+
+    meta.pop("ponds", None)
+    if pond_pieces:
+        height, ponds = _make_ponds(pond_pieces, height, mask)
+        if ponds:
+            meta["ponds"] = ponds
+            print(f"  {len(ponds)} ponds at their own levels "
+                  f"({min(p['level'] for p in ponds):.1f}..{max(p['level'] for p in ponds):.1f} m)")
 
     green = []
     if level_id in WILD_COVER:
@@ -1588,7 +1670,7 @@ def bake(level_id):
     if mpath.exists():
         bake_mask(sink, level_id, lat0, lon0, span,
                   json.loads(mpath.read_text()), water if natural else [], roads,
-                  cut_peak="peak" in cfg)
+                  cut_peak="peak" in cfg, ponds_from=None if natural else water)
         meta = json.loads(mpath.read_text())
         meta["farSpan"] = span * FAR
         meta["farWater"] = round(far, 4)

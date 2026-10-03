@@ -542,6 +542,51 @@ export function createWater(terrain, sunDirection, quality) {
     }
   }
 
+  // Ponds, each a sheet at its own level (see `Terrain.ponds`). On the bake's
+  // grid rather than the decimated one: a fountain basin is a few pixels
+  // across and a three-pixel step walks straight over it. A cell is drawn
+  // where any corner is in the pond or next to it, the same one-cell overlap
+  // under the bank the river has, and the ground hides what is past the edge.
+  const preQuads = index.length / 6;
+  if (terrain._pondId) {
+    const pn = terrain._pondN, ids = terrain._pondId;
+    const pc = (terrain.span * 2) / (pn - 1);
+    const near = (i, j) => {
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          const ii = i + di, jj = j + dj;
+          if (ii < 0 || jj < 0 || ii >= pn || jj >= pn) continue;
+          const id = ids[jj * pn + ii];
+          if (id) return id;
+        }
+      }
+      return 0;
+    };
+    const pIndex = new Map();
+    const pVert = (i, j, id) => {
+      const k = (id * pn + j) * pn + i;
+      let v = pIndex.get(k);
+      if (v !== undefined) return v;
+      v = pos.length / 3;
+      const x = -terrain.span + i * pc, z = terrain.span - j * pc;
+      const lv = terrain.ponds[id - 1].level;
+      pos.push(x, lv, z);
+      depth.push(Math.max(0, lv - terrain.heightAt(x, z)));
+      pIndex.set(k, v);
+      return v;
+    };
+    for (let j = 0; j < pn - 1; j++) {
+      for (let i = 0; i < pn - 1; i++) {
+        const id = near(i, j) || near(i + 1, j + 1);
+        if (!id) continue;
+        const a = pVert(i, j, id), b = pVert(i + 1, j, id);
+        const c = pVert(i + 1, j + 1, id), d = pVert(i, j + 1, id);
+        index.push(a, c, d, a, b, c);
+      }
+    }
+  }
+  const pondQuads = index.length / 6 - preQuads;
+
   const geo = new THREE.BufferGeometry();
   if (pos.length === 0) {
     // Landlocked level: hand back an empty object so callers need no branch.
@@ -593,6 +638,7 @@ export function createWater(terrain, sunDirection, quality) {
   mesh.renderOrder = 5;
   mesh.frustumCulled = false;
   mesh.userData.quads = nearQuads;
-  mesh.userData.farQuads = index.length / 6 - nearQuads;
+  mesh.userData.farQuads = index.length / 6 - nearQuads - pondQuads;
+  mesh.userData.pondQuads = pondQuads;
   return mesh;
 }

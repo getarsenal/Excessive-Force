@@ -770,7 +770,7 @@ function traceBank(terrain, reach) {
   for (let z = -reach; z <= reach; z += 26) {
     let found = null;
     for (let x = -reach * 0.2; x < reach; x += 5) {
-      if (terrain.isWater(x, z)) { found = x; break; }
+      if (terrain.isRiver(x, z)) { found = x; break; }
     }
     if (found === null) continue;
     raw.push({ x: found - 21, z });

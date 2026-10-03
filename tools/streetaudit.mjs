@@ -2,7 +2,7 @@
 // with no junction, a road lying along another, a street through a building,
 // a street ending in the water, and the dead ends left inside the map.
 //
-//   node tools/streetaudit.mjs <level>... [--tier medium] [--shots DIR] [--dead] [--wet]
+//   node tools/streetaudit.mjs <level>... [--tier medium] [--shots DIR] [--dead] [--wet] [--at x,z]...
 //
 // One line a level, then the worst few of each fault with where they are.
 // With --shots, a top-down picture of each worst case.
@@ -142,7 +142,8 @@ for (const level of levels) {
     mkdirSync(shots, { recursive: true });
     const pick = [...r.crossings.slice(0, 2), ...r.along.slice(0, 2), ...r.through.slice(0, 2),
       ...(args.includes('--dead') ? r.deadAt.slice(0, 4) : []),
-      ...(args.includes('--wet') ? r.wetAt.slice(0, 2) : [])];
+      ...(args.includes('--wet') ? r.wetAt.slice(0, 2) : []),
+      ...args.filter((a, i) => i > 0 && args[i - 1] === '--at').map((a) => { const [x, z] = a.split(',').map(Number); return { x, z }; })];
     let k = 0;
     for (const q of pick) {
       await page.evaluate((q) => {

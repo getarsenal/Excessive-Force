@@ -1775,7 +1775,7 @@ function bridgeLine(terrain, exclude = 66) {
   const cands = [];
   for (let z = -span * 0.75; z <= span * 0.75; z += 10) {
     for (let x = -span * 0.75; x <= span * 0.75; x += 10) {
-      if (!terrain.isWater(x, z)) continue;
+      if (!terrain.isRiver(x, z)) continue;
       const d = Math.hypot(x, z);
       if (d < exclude) continue;
       cands.push({ x, z, d });
@@ -1792,7 +1792,7 @@ function bridgeLine(terrain, exclude = 66) {
       const dx = Math.sin(a), dz = Math.cos(a);
       let run = 0;
       for (let t = -420; t <= 420; t += 7) {
-        if (terrain.isWater(near.x + dx * t, near.z + dz * t)) run++;
+        if (terrain.isRiver(near.x + dx * t, near.z + dz * t)) run++;
       }
       if (run > longest) { longest = run; dir = { x: dx, z: dz }; }
     }
@@ -1801,7 +1801,7 @@ function bridgeLine(terrain, exclude = 66) {
     const bank = (sign) => {
       let last = 0;
       for (let t = 0; t < 900; t += 4) {
-        if (terrain.isWater(near.x + nx * sign * t, near.z + nz * sign * t)) last = t;
+        if (terrain.isRiver(near.x + nx * sign * t, near.z + nz * sign * t)) last = t;
         else if (t > last + 26) break;
       }
       const d = last + 16;
@@ -1809,7 +1809,7 @@ function bridgeLine(terrain, exclude = 66) {
       // A landing that is still wet is no landing: the search ran off the end
       // of its nine hundred metres without finding a bank. Mont-Saint-Michel
       // got a steel arch out of this, from the rock into open sea.
-      return terrain.isWater(p.x, p.z) ? null : p;
+      return terrain.isRiver(p.x, p.z) ? null : p;
     };
     const from = bank(-1), to = bank(1);
     if (!from || !to) return null;
@@ -2166,7 +2166,7 @@ function buildSteelArch(g, line, terrain, quality, DECK_W) {
   let w0 = null, w1 = null;
   for (let t = 0; t <= 1; t += 0.005) {
     const p = at(t);
-    if (terrain.isWater(p.x, p.z)) { if (w0 === null) w0 = t; w1 = t; }
+    if (terrain.isRiver(p.x, p.z)) { if (w0 === null) w0 = t; w1 = t; }
   }
   if (w0 === null) { w0 = 0.3; w1 = 0.7; }
   const mid = (w0 + w1) / 2;
@@ -2270,7 +2270,7 @@ function buildEmbankment(terrain) {
   for (let z = -820; z <= 860; z += 28) {
     let found = null;
     for (let x = 20; x < 420; x += 4) {
-      if (terrain.isWater(x, z)) { found = x; break; }
+      if (terrain.isRiver(x, z)) { found = x; break; }
     }
     if (found !== null) pts.push(new THREE.Vector3(found - 2, 0, z));
   }
@@ -2780,9 +2780,9 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     // Walk out from the centre line until we find open water.
     let x = null, z = (rng() * 2 - 1) * span * 0.8;
     for (let probe = 40; probe < span * 0.9; probe += 14) {
-      if (terrain.isWater(probe, z)) { x = probe + (rng() - 0.5) * 20; break; }
+      if (terrain.isRiver(probe, z)) { x = probe + (rng() - 0.5) * 20; break; }
     }
-    if (x === null || !terrain.isWater(x, z)) continue;
+    if (x === null || !terrain.isRiver(x, z)) continue;
     const len = 16 + rng() * 22;
     const hull = new THREE.BoxGeometry(6.5, 2.6, len);
     hull.translate(x, terrain.waterLevel + 0.5, z);

@@ -10,7 +10,7 @@
   "metersPerDemPixel": 4.7424,
   "seaLevel": 5.522,
   "source": "AWS Terrain Tiles (Tilezen/Mapzen terrarium), public domain; water and land cover from Overture Maps Foundation",
-  "waterSurface": 6.849,
+  "waterSurface": 6.85,
   "coastline": "surveyed",
   "farSpan": 6300.0,
   "farWater": 0.4494,

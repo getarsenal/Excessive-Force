@@ -139,7 +139,25 @@ export function realNetwork(data, terrain, opts = {}) {
 
   for (const e of data.edges) {
     if (!Array.isArray(e.pts) || e.pts.length < 2) continue;
-    const pts = e.pts.map((p) => ({ x: p[0], z: p[1], y: terrain.heightAt(p[0], p[1]) }));
+    // Sampled every six metres, not only at the survey's vertices. The test
+    // below is a test of points, and a footpath is two vertices sixty metres
+    // apart: both on the grass, the straight line between them across the
+    // middle of Kinkaku-ji's pond, or the Wild Goose Pagoda's fountain, or
+    // the outer moat of Osaka Castle, and every one of them was laid as
+    // tarmac on the water.
+    const pts = [];
+    for (let k = 0; k < e.pts.length; k++) {
+      const [x, z] = e.pts[k];
+      if (k > 0 && !e.bridge) {
+        const [px, pz] = e.pts[k - 1];
+        const m = Math.floor(Math.hypot(x - px, z - pz) / 6);
+        for (let s2 = 1; s2 < m; s2++) {
+          const ix = px + ((x - px) * s2) / m, iz = pz + ((z - pz) * s2) / m;
+          pts.push({ x: ix, z: iz, y: terrain.heightAt(ix, iz) });
+        }
+      }
+      pts.push({ x, z, y: terrain.heightAt(x, z) });
+    }
     const ok = pts.map((p) => clear(p.x, p.z) && (e.bridge || dry(p.x, p.z)));
     // A quay road that grazes the water is moved onto the quay, not cut.
     //
@@ -310,16 +328,67 @@ export function realNetwork(data, terrain, opts = {}) {
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
   smoothRoads(edges, terrain);
+  const wetCut = cutWet(nodes, edges, terrain);
 
   const net = {
     nodes, edges, blocks, bridges,
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, shadowed, bridges: bridges.length },
+      welded, snapped, ...ends, shadowed, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
+}
+
+/**
+ * Out of the water, after everything else has moved the roads.
+ *
+ * The cut at the water is made on the survey's own line, and everything after
+ * it moves that line: junctions welded to a cluster's centre, nodes snapped
+ * onto the road they nearly meet, every bend rounded off. A road that ran
+ * along a pond's edge comes out of that a few metres in the pond — Osaka's
+ * moat path, the avenue round the Wild Goose Pagoda's fountain. Stepping the
+ * wet points sideways folded the ribbon into shards of kerb; cutting is what
+ * the first pass does, so this does the same: the wet stretch goes, and each
+ * dry stretch either side of it of eleven metres or more stays as a road of
+ * its own, ending at the bank.
+ */
+function cutWet(nodes, edges, terrain) {
+  let cut = 0;
+  const out = [];
+  for (const e of edges) {
+    if (e.bridge || e.bank || e.approach) { out.push(e); continue; }
+    const P = e.pts;
+    const wet = P.map((p) => terrain.isWater(p.x, p.z));
+    // Midpoints too: two dry points either side of a narrow channel.
+    for (let i = 0; i + 1 < P.length; i++) {
+      if (terrain.isWater((P[i].x + P[i + 1].x) / 2, (P[i].z + P[i + 1].z) / 2)) { wet[i] = true; wet[i + 1] = true; }
+    }
+    if (!wet.some(Boolean)) { out.push(e); continue; }
+    cut++;
+    let i = 0;
+    while (i < P.length) {
+      if (wet[i]) { i++; continue; }
+      let j = i;
+      while (j + 1 < P.length && !wet[j + 1]) j++;
+      const line = P.slice(i, j + 1);
+      let len = 0;
+      for (let k = 0; k + 1 < line.length; k++) len += Math.hypot(line[k + 1].x - line[k].x, line[k + 1].z - line[k].z);
+      if (line.length >= 2 && len >= 11) {
+        const end = (p) => { nodes.push({ x: p.x, z: p.z, y: p.y, links: [] }); return nodes.length - 1; };
+        const ai = i === 0 ? e.a : end(line[0]);
+        const bi = j === P.length - 1 ? e.b : end(line[line.length - 1]);
+        if (ai !== bi) out.push({ ...e, a: ai, b: bi, pts: line });
+      }
+      i = j + 1;
+    }
+  }
+  if (!cut) return 0;
+  edges.length = 0;
+  for (const e of out) edges.push(e);
+  relink(nodes, edges);
+  return cut;
 }
 
 const RANK = { avenue: 3, street: 2, mews: 1 };
@@ -1039,7 +1108,7 @@ function layDecks(edges, nodes, terrain, bridges) {
         for (let i = 0; i < e.pts.length - 1; i++) {
           const p = e.pts[i], q = e.pts[i + 1];
           const mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2;
-          if (terrain.isWater(mx, mz)) wet += Math.hypot(q.x - p.x, q.z - p.z);
+          if (terrain.isRiver(mx, mz)) wet += Math.hypot(q.x - p.x, q.z - p.z);
           else bank = Math.max(bank, p.y, q.y);
         }
       }
