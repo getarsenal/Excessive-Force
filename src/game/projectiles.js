@@ -106,8 +106,14 @@ export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5,
   // battery on the flank of the Corcovado firing at the summit was putting
   // rounds up on a thirty-second flight and the match was over before the
   // first one landed.
+  //
+  // To nearly twice the minimum, which is a shell at eighty degrees: a mortar
+  // dug in twelve metres off the flank of the Palace of the Parliament has
+  // eighty-four metres of wall over it, and at the old ceiling of 1.38 the
+  // steepest arc on offer was seventy-three degrees and ran into the wall, so
+  // the pit never fired at anything on the far side of the building at all.
   if (clear) {
-    for (let k = 0; k <= 9; k++) {
+    for (let k = 0; k <= 20; k++) {
       const sp = Math.min(maxSpeed, vMin * (1.004 + k * 0.042));
       const s = attempt(sp, true);
       if (ok(s)) return s;
