@@ -211,8 +211,8 @@ function planFieldWorks(opts = {}) {
 
   /**
    * How much of the sky a gun here cannot see: of twenty-four bearings, how
-   * many have a building standing above fifteen degrees within three hundred
-   * metres. A flak gun is sited for the sky, not just clear of the walls.
+   * many have a building standing above ten degrees within three hundred
+   * metres — a strike runs in low. A flak gun is sited for the sky, not just clear of the walls.
    */
   const skyBlocked = (x, z) => {
     const g = terrain.heightAt(x, z) + 1.5;
@@ -226,7 +226,7 @@ function planFieldWorks(opts = {}) {
         if (along <= 0) continue;
         const r = Math.max(p.w || 0, p.d || 0) / 2;
         if (Math.abs(dx * uz - dz * ux) > r) continue;       // not on this bearing
-        if ((p.top - g) > Math.max(1, along - r) * 0.27) { blocked++; break; }
+        if ((p.top - g) > Math.max(1, along - r) * 0.18) { blocked++; break; }
       }
     }
     return blocked;
@@ -330,33 +330,35 @@ function planFieldWorks(opts = {}) {
     // one of those is built on or faces a friend — further out along the same
     // bearing, too, since a flak gun is worth walking forty metres for open
     // sky. A belt with no flak at all hands the sky to the player's strikes.
-    let flak = 0;
-    // And if the diagonals are all street or building, which they are more
-    // often now the streets are kept clear, the cardinals and the bearings
-    // between: a belt that lost its second pit to a road left one gun to
-    // cover the whole sky, behind a block.
+    // The two pits with the most open sky of every spot round the building
+    // that will take one, sixty metres apart at least, the diagonals first
+    // where it is a tie. A flak gun is sited for the sky: the first spot that
+    // passed on each diagonal was often hard against a block once the streets
+    // were kept clear, and at Westminster and Pisa a house fifty metres off
+    // hid the run-in of every strike from the only gun there.
     const flakBearings = [[1, 1], [-1, -1], [1, -1], [-1, 1]].map(([ax, az]) => [ax * 0.7071, az * 0.7071])
       .concat([[1, 0], [-1, 0], [0, 1], [0, -1]])
       .concat([1, 3, 5, 7, 9, 11, 13, 15].map((k) => [Math.sin((k * Math.PI) / 8), Math.cos((k * Math.PI) / 8)]));
-    for (const [ax, az] of flakBearings) {
-      if (flak >= 2) break;
+    const cands = [];
+    flakBearings.forEach(([ax, az], bi) => {
       const [nx, nz] = rot(ax, az);
-      if (facesFriend(nx, nz)) continue;
-      // Of the spots on that bearing that will take a pit, the one with the
-      // most open sky, not the first. With the streets kept clear the first
-      // was often hard against a block, and at Westminster an office tower
-      // hid the whole run-in of every strike from the only flak gun there.
-      let pick = null, pickBlocked = Infinity;
-      for (const out of [6, 18, 30, 44, 60, 80]) {
+      if (facesFriend(nx, nz)) return;
+      for (const out of [6, 18, 30, 44, 60, 80, 105, 130]) {
         const x = L.x + nx * (stand + out), z = L.z + nz * (stand + out);
         if (!pit(x, z, nx, nz, 'aa', true)) continue;
-        // Not on top of the other pit.
-        if (lines.some((q) => q.pit && q.weapon === 'aa' && (q.x - x) ** 2 + (q.z - z) ** 2 < 60 * 60)) continue;
-        const b = skyBlocked(x, z);
-        if (b < pickBlocked) { pickBlocked = b; pick = [x, z]; }
-        if (b === 0) break;
+        cands.push({ x, z, nx, nz, score: skyBlocked(x, z) * 100 + bi * 2 + out / 40 });
       }
-      if (pick && pit(pick[0], pick[1], nx, nz, 'aa')) flak++;
+    });
+    cands.sort((p, q) => p.score - q.score);
+    // Apart, so one shell does not find both and the two see different sky:
+    // a building's width apart where the ground allows, sixty metres if not.
+    let flak = 0;
+    for (const apart of [Math.max(120, stand * 1.6), 60]) {
+      for (const c of cands) {
+        if (flak >= 2) break;
+        if (lines.some((q) => q.pit && q.weapon === 'aa' && (q.x - c.x) ** 2 + (q.z - c.z) ** 2 < apart * apart)) continue;
+        if (pit(c.x, c.z, c.nx, c.nz, 'aa')) flak++;
+      }
     }
     // An observer, far enough back to see the whole approach — and on land.
     for (const [ax, az] of [[1, -1], [-1, -1], [1, 1], [-1, 1]]) {
