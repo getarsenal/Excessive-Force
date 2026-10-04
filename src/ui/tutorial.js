@@ -11,7 +11,16 @@ import { Typewriter } from './typewriter.js';
  * and a two-line card beside it: what it is, and what it does. A step moves
  * on when the player actually does the thing (opens the drawer, arms the gun,
  * puts it down, designates the tower), or on GOT IT where there is nothing to
- * do but look. SKIP ends it at any point.
+ * do but look. SKIP ends it at any point; SKIP STEP turns up on a step that
+ * has not taken after forty seconds.
+ *
+ * Five chapters: the screen, the battery (the guns, the airlift, a line of
+ * them, the machine gun, a gun's own card), fire control (designating, the
+ * survey, fire modes, smoke), the high-value targets on a practice SAM
+ * compound and command post that main.js builds for Boot Camp alone, and the
+ * enemy (defenders, the drops, the hunt at the end). Steps whose subject is
+ * not there are left out. Between steps the General answers what the battle
+ * actually does, once each — see `onEvent`.
  *
  * It is written against the HUD as it is. Anything that changes the dock, the
  * drawers, the cards, targeting or the strikes changes a step here in the same
@@ -20,6 +29,11 @@ import { Typewriter } from './typewriter.js';
  */
 
 const DONE_KEY = 'tt.tutorial';
+const CHAPTERS = ['ORIENTATION', 'THE BATTERY', 'FIRE CONTROL', 'HIGH-VALUE TARGETS', 'THE ENEMY'];
+// A step the player is doing rather than reading offers SKIP STEP after this
+// long, so one that will not take (a gun that will not fit, a drop that did
+// not come) never strands them.
+const STUCK_S = 40;
 
 /** Has this browser been offered Boot Camp yet? */
 export function tutorialSeen() {
@@ -63,8 +77,14 @@ export class Tutorial {
     this.rowTo = at(0, -R * 0.8);
     this.yaw0 = null;
     this.i = -1;
+    this._w2 = new THREE.Vector3();
+    this._w3 = new THREE.Vector3();
+    this._queue = [];
+    this._told = new Set();
     this._build();
-    this.steps = this._steps();
+    // A step about something this Boot Camp has not got (no practice SAM on
+    // a suite run, say) is left out, so the count is honest.
+    this.steps = this._steps().filter((s) => !s.skip || !s.skip());
     if (typeof window !== 'undefined') window.__tutorial = this;   // for the harness and the console
     this.next();
   }
@@ -72,58 +92,123 @@ export class Tutorial {
   _steps() {
     const h = this.hud, b = this.battle;
     const armedGun = () => !!b.selectedUnitId && !this._isStrike(b.selectedUnitId);
+    const site = () => b.sams?.sites?.[0] || null;
+    const siteLive = () => {
+      const st = site();
+      if (!st) return null;
+      const l = st.launchers.find((x) => x.alive);
+      if (l) return new THREE.Vector3(l.x, l.y + 2, l.z);
+      if (st.radar?.alive) return new THREE.Vector3(st.radar.x, this.groundY + 2, st.radar.z);
+      return new THREE.Vector3(st.x, st.y + 2, st.z);
+    };
+    const hqAt = () => (b.hq ? new THREE.Vector3(b.hq.x, b.hq.y + 3, b.hq.z) : null);
     return [
-      { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar fills as it comes down, and the number is how much is down: fill it to the WIN mark at 90%. Everything is open here; in a real battle the marks along the bar are weapon unlocks, and a card that says AT 12% opens the moment the number reads 12%. Tap the name to fly back to it.', ok: true,
+      // ── 1. Orientation.
+      { ch: 0, el: '#topbar .tb-center', title: 'TARGET', ok: true,
+        text: 'The range tower. The bar fills as it comes down, and the number is how much is down: fill it to the WIN mark at 90%. In a real battle the marks along the bar are weapon unlocks. Tap the name any time to fly back here.',
         say: "Welcome to Fort Irwin, maggot. That tower cost the taxpayer eleven million dollars. Let's waste it." },
-      { el: null, title: 'LOOK AROUND', text: 'Drag to orbit. Pinch or scroll to zoom.', ok: true,
+      { ch: 0, el: null, title: 'LOOK AROUND', text: 'Drag to orbit the camera round the target.',
+        enter: () => { this.yaw0 = this.rig.yaw; },
         done: () => this.yaw0 != null && Math.abs(this.rig.yaw - this.yaw0) > 0.35 },
-      { el: '#topbar .tb-block:first-child', title: 'FUNDS', text: 'Pays for guns and strikes; damage earns more. Everything is free in Boot Camp.', ok: true,
+      { ch: 0, el: null, title: 'ZOOM', text: 'Pinch, or scroll, to zoom in and out.',
+        enter: () => { this.dist0 = this.rig.distance; },
+        done: () => this.dist0 != null && Math.abs(this.rig.distance - this.dist0) / this.dist0 > 0.22 },
+      { ch: 0, el: '#topbar .tb-block:first-child', title: 'FUNDS', ok: true,
+        text: 'Funds pay for guns and strikes; income ticks in, and everything you knock down pays: stone, men, and the gold-marked targets most of all. Everything is free in Boot Camp.',
         say: "It's all free today. Don't get used to it. Congress reads the receipts like a hawk with a hangover." },
-      { el: '#dock-units', title: 'UNITS', text: 'Your guns and troops. Tap to open.', done: () => h.openDrawer === 'units' || armedGun() },
-      { el: '#buildbar .unit-card[data-id="m119"]', fallback: '#dock-units', title: 'M119 HOWITZER',
-        text: 'Cheapest gun. Light shell, fast reload. Tap to arm.', done: () => armedGun() || this._placed(),
+
+      // ── 2. The battery.
+      { ch: 1, el: '#dock-units', title: 'UNITS', text: 'Your guns and troops, cheapest first. Tap to open.',
+        done: () => h.openDrawer === 'units' || armedGun() },
+      { ch: 1, el: '#buildbar .unit-card[data-id="m119"]', fallback: '#dock-units', title: 'M119 HOWITZER',
+        text: 'The cheapest gun: a light shell and a fast reload. Tap to arm it.', done: () => armedGun() || this._placed(),
         say: 'A howitzer. The loud end goes toward the building. Even a second lieutenant can manage that.' },
-      { world: () => this.groundAt, fallback: '#dock-units', title: 'DEPLOY',
-        text: 'Tap open ground. The ring is its reach.', done: () => this._placed() },
-      { world: () => this._dropAt(), title: 'AIRLIFT',
-        text: 'Guns come by air. Everything placed in the next 8 s ships on one aircraft — place more now.',
+      { ch: 1, world: () => this.groundAt, fallback: '#dock-units', title: 'DEPLOY',
+        text: 'Tap open ground. The ring is its reach. Roads and flat roofs take guns too.', done: () => this._placed() },
+      { ch: 1, world: () => this._dropAt(), title: 'AIRLIFT',
+        text: 'Guns come by air. Everything placed in the next 8 s ships on one aircraft, so place more now if you want them.',
         done: () => this._inbound() || this._deployed() },
-      { world: () => this._liftAt() || this._dropAt(), title: 'INBOUND',
-        text: 'A C-130 drops it by parachute; heavy guns hang under a Chinook. Flak can shoot them down.',
+      { ch: 1, world: () => this._liftAt() || this._dropAt(), title: 'INBOUND',
+        text: 'A C-130 drops it by parachute; heavy guns hang under a Chinook. In a real battle their flak and SAMs fire at the transports, and one shot down takes its cargo with it.',
         done: () => this._deployed(),
         say: "Watch the Herc. If they shoot it down, it comes out of your pay. You don't get paid. Figure it out." },
-      // A row of guns in one gesture: arm, press on open ground, pull.
-      { world: () => this.rowFrom, world2: () => this.rowTo, title: 'A BATTERY',
+      { ch: 1, world: () => this.rowFrom, world2: () => this.rowTo, title: 'A BATTERY',
         text: 'M119 is armed again. Press on open ground and drag: one gun every 11 m, all in one lift.',
-        enter: () => { if (!armedGun()) { b.selectUnit('m119'); } h.closeDrawer?.(); },
+        enter: () => {
+          if (!armedGun()) b.selectUnit('m119');
+          h.closeDrawer?.();
+          // Both ends of the drag on screen, wherever the camera has wandered.
+          this._fly(this._w3.copy(this.rowFrom).lerp(this.rowTo, 0.5).setY(this.groundY + 2), 150);
+        },
         done: () => this._count() >= 3,
         say: 'One gun is a hobby. A row of them is a foreign policy.' },
-      { el: '#buildbar .unit-card[data-id="m240"]', fallback: '#dock-units', title: 'M240 MG',
-        text: 'Two men and a machine gun, $40. Light damage, but whatever it fires at is pinned and fires a third as often. Shoots at aircraft too. Its fire is the red tracer: put it within 340 m of the enemy with a clear line to them.',
-        ok: true, enter: () => { if (h.openDrawer !== 'units') h.setDrawer?.('units'); },
-        say: 'Two boys and a belt of ammo. They won\'t knock anything down, but nobody shoots straight with their face in the dirt.' },
-      // A gun stays armed after it is placed, and a tap with one armed is a
-      // placement: put it away, so the tap on the tower is a designation.
-      { world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.', done: () => !!b.target,
-        enter: () => { b.selectedUnitId = null; h.closeDrawer?.(); h.hidePrompt?.(); } },
-      { el: '#targetcard', title: 'TARGET CARD', text: 'What you hit, how high, and how many guns are on it.', ok: true },
-      { el: '#survey-btn', title: 'SURVEY', text: `Paints the load. ${access.cb ? 'Yellow' : 'Red'} stone holds the rest up — cut it.`, done: () => h.survey,
+      { ch: 1, el: '#buildbar .unit-card[data-id="m240"]', fallback: '#dock-units', title: 'M240 MG',
+        text: 'Two men and a machine gun, $40. Light damage, but whatever it hits is pinned and fires a third as often, and it shoots at aircraft and parachutes. Arm it and put one down within 340 m of the enemy.',
+        enter: () => { b.selectedUnitId = null; if (h.openDrawer !== 'units') h.setDrawer?.('units'); },
+        done: () => this._has('m240'),
+        say: "Two boys and a belt of ammo. They won't knock anything down, but nobody shoots straight with their face in the dirt." },
+      { ch: 1, world: () => this._unitAt(), title: 'YOUR GUNS',
+        text: 'Tap one of your guns. Its card shows its health, its kills and its rank: crews that land rounds reload faster and group tighter. SELL gets half its price back.',
+        enter: () => { b.selectedUnitId = null; h.closeDrawer?.(); this._fly(this._unitAt(), 110); },
+        done: () => !!this.unitCard?.unit },
+
+      // ── 3. Fire control.
+      { ch: 2, world: () => this.towerAt, title: 'DESIGNATE', text: 'Tap the tower. Every gun lays on that spot.',
+        done: () => !!b.target,
+        enter: () => {
+          b.selectedUnitId = null; h.closeDrawer?.(); h.hidePrompt?.(); this.unitCard?.hide?.();
+          this._fly(this.towerAt, this.level.camera?.distance);
+        } },
+      { ch: 2, el: '#targetcard', title: 'TARGET CARD', text: 'What you are hitting, how high it stands, and how many guns are on it.', ok: true },
+      { ch: 2, el: '#survey-btn', title: 'SURVEY', text: `Paints the load on every stone. ${access.cb ? 'Yellow' : 'Red'} stone holds the rest up: cut it and what is above comes down.`, done: () => h.survey,
         say: access.cb ? 'Yellow is holding the rest up. Shoot the yellow. They taught you colours in basic, right?'
           : 'Red is holding the rest up. Shoot the red. They taught you colours in basic, right?' },
-      { el: '#survey-btn', title: 'SURVEY OFF', text: 'Tap again to see the stone. V on a keyboard.', done: () => !h.survey, ok: true },
-      { el: '#dock-orders', title: 'ORDERS', text: 'How the guns shoot. Tap to open.', done: () => h.openDrawer === 'orders' },
-      { el: '#orders-modes', fallback: '#dock-orders', title: 'FIRE MODE',
-        text: 'POINT: tight group. AREA: walked over it. DELAY: bursts inside the stone.', ok: true },
-      { el: '#orders-smoke', fallback: '#dock-orders', title: 'SMOKE', text: 'Blinds the garrison so your guns are not shot at.', ok: true },
-      { el: '#dock-strikes', title: 'STRIKES', text: 'Aircraft and a cruise missile, the same price on every map. Two or three SAM compounds, each a guarded ring of earth with two launchers and a radar, fire on every plane until destroyed, your C-130s and Chinooks too. Wreck a whole compound for $15,000 and a free air strike. Gold diamonds mark every high-value target: the SAMs, the command post (cuts their comms), the ammo depot, their artillery, the road checkpoint, and the general\'s car when he drives in. Three in a minute brings a fire mission. Tap to open.',
-        say: 'Air power. For when you can\'t be bothered to aim.',
-        done: () => h.openDrawer === 'strikes' || this._striking() },
-      { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',
-        text: 'LOITER cards first: they stay on station. Then the single passes, cheapest first. The A-10 strafes: press and drag along the line for its gun run; the rest make one pass at what you tap. Coloured smoke marks the spot, and the pilot\'s pod picture counts down in the corner.', done: () => this._striking(),
-        say: 'The Warthog. Draw it a line and it eats everything on it. Trenches, mostly. Not the tower.' },
-      { el: '#topbar .tb-block.right', title: 'DEFENDERS', text: 'They shoot your guns and flak hits aircraft. Hit their posts: the crates and drums by their guns go up. Halfway down, transports drop three quarters of their army again round the building; at three quarters a brigade lands all over the map with mortars and SAMs. Have M240s out for the transports and the chutes. Once a drop is in, you do not win until every man of it is down: once the building falls, each one left gets a red marker, and any hiding in the town break cover for the open.', ok: true },
-      { el: '#dock-menu', title: 'MENU', text: 'Pause, sound, haptics, OPTICS (thermal and night vision, or T), accessibility, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.', ok: true },
-      { el: '.integrity-wrap', title: 'BRING IT DOWN', text: 'Keep firing. It counts when it falls. Every battle pays XP toward your next rank, won or not; Boot Camp pays your first.', done: () => b.state === 'won',
+      { ch: 2, el: '#survey-btn', title: 'SURVEY OFF', text: 'Tap again to see the stone. V on a keyboard.', done: () => !h.survey, ok: true },
+      { ch: 2, el: '#dock-orders', title: 'ORDERS', text: 'How the guns shoot. Tap to open.', done: () => h.openDrawer === 'orders' },
+      { ch: 2, el: '#orders-modes [data-mode="area"]', fallback: '#orders-modes', title: 'FIRE MODE',
+        text: 'POINT keeps the group tight on the spot. AREA walks it over the ground round it, for a face or a trench line. DELAY bursts inside the stone. Tap AREA.',
+        enter: () => { if (h.openDrawer !== 'orders') h.setDrawer?.('orders'); },
+        done: () => b.fireMode === 'area' },
+      { ch: 2, el: '#orders-smoke', fallback: '#dock-orders', title: 'SMOKE',
+        text: 'A smoke screen between your guns and the target: the garrison cannot shoot through it. Tap SMOKE.',
+        enter: () => { if (h.openDrawer !== 'orders') h.setDrawer?.('orders'); },
+        done: () => b.smokeCooldown > 0,
+        say: 'Smoke. The poor man\'s invisibility cloak. Works better than the expensive kind.' },
+
+      // ── 4. High-value targets.
+      { ch: 3, world: () => siteLive(), title: 'GOLD DIAMONDS', ok: true, skip: () => !site(),
+        text: 'Gold diamonds mark the targets worth the most. This is a SAM compound: an earth ring, two launchers and a radar. In a real battle it is guarded, and it fires on every aircraft you send, the airlift too. This one is a dummy.',
+        enter: () => { h.closeDrawer?.(); this._fly(siteLive(), 170); },
+        say: 'That is a missile site. In a real war it shoots down my airplanes. I hate it already.' },
+      { ch: 3, world: () => siteLive(), title: 'TAKE IT OUT', skip: () => !site(),
+        text: 'Tap a launcher or the radar and every gun lays on it: a launcher takes about three square hits. The radar first pays a bonus. Or call a strike on it. Wreck everything in the ring and the compound is down.',
+        enter: () => { this._fly(siteLive(), 170); },
+        done: () => !!site()?.down },
+      { ch: 3, el: '#strikebar .unit-card.free', fallback: '#dock-strikes', title: 'FREE STRIKE', skip: () => !site(),
+        text: 'A compound down pays $15,000 and a free air strike, any up to the F-15: the cards say FREE. Open STRIKES and call one. The A-10 strafes a line you drag; the rest make one pass at what you tap; LOITER cards stay on station.',
+        enter: () => { this.credits0 = b.strikeCredits; },
+        done: () => b.strikeCredits < (this.credits0 ?? 0) || this._striking(),
+        say: 'A free one. Nothing in the Army is free. Somebody shot down a missile site for that.' },
+      { ch: 3, world: () => hqAt(), title: 'COMMAND POST', skip: () => !b.hq,
+        text: 'The command post runs their garrison: bunker, mast, dish. Destroy it and for 90 s their crews fire slower and their mortars go blind, and any drop they send for comes a third short.',
+        enter: () => { h.closeDrawer?.(); this._fly(hqAt(), 120); },
+        done: () => !!b.hq && !b.hq.alive,
+        say: 'Cut off the head and the body runs around for a while. That is a military term.' },
+      { ch: 3, el: null, title: 'MORE GOLD', ok: true,
+        text: 'In a real battle, also in gold: the ammo depot (they fire slower for the rest of the fight); their artillery battery (silence it and your guns reload faster); the road checkpoint (no more trucks of men up the road); and the general\'s own car when he drives in, $20,000. Three gold kills in a minute brings a free fire mission.',
+        enter: () => this._fly(this.towerAt, null) },
+
+      // ── 5. The enemy.
+      { ch: 4, el: '#topbar .tb-block.right', title: 'DEFENDERS', ok: true,
+        text: 'How many are left. They shoot your guns, and their flak fires at aircraft. Hit their posts: the crates and drums by their guns go up.' },
+      { ch: 4, el: null, title: 'DROPS', ok: true,
+        text: 'Halfway down, transports drop more men round the building; at three quarters a counter-attack lands all over the map with mortars and SAMs. Shoot the planes and the parachutes. A drop has to be cleared to win: once the building falls, every man left gets a red marker, and any hiding in the town break cover.',
+        say: 'You will want machine guns up when the airborne come. Lots of them. I am not asking.' },
+      { ch: 4, el: '#dock-menu', title: 'MENU', ok: true,
+        text: 'Pause, sound, OPTICS (thermal and night vision, or T), accessibility, the map, and MAIN MENU. Leave mid-fight and the battle is saved: CONTINUE picks it up.' },
+      { ch: 4, el: '.integrity-wrap', title: 'BRING IT DOWN',
+        text: 'Keep firing until it falls. Every battle pays XP toward your next rank, won or not; Boot Camp pays your first.',
+        done: () => b.state === 'won',
         say: "Stop admiring it and knock the damn thing over. I've got a tee time." },
     ];
   }
@@ -132,6 +217,13 @@ export class Tutorial {
   _deployed() { return this.battle.units.some((u) => u.alive); }
   _placed() { return this.battle.pending.length > 0 || this._deployed(); }
   _count() { return this.battle.units.filter((u) => u.alive).length + this.battle.pending.length; }
+  _has(id) {
+    return this.battle.units.some((u) => u.alive && u.def.id === id) || this.battle.pending.some((d) => d.def?.id === id);
+  }
+  _unitAt() {
+    const u = this.battle.units.find((x) => x.alive);
+    return u ? this._w2.copy(u.pos).setY(u.pos.y + 2) : this.groundAt;
+  }
   _inbound() { return !!this.battle.air?.sorties.some((s) => s.lift); }
   _dropAt() { const d = this.battle.pending[0]; return d ? d.pos : this.groundAt; }
   _liftAt() {
@@ -140,8 +232,10 @@ export class Tutorial {
   }
   _striking() {
     const a = this.battle.air;
-    return !!a && (a.sorties.some((s) => !s.lift) || (a.loiterStatus && a.loiterStatus().length > 0));
+    return !!a && (a.sorties.some((s) => !s.lift && !s.heli) || (a.loiterStatus && a.loiterStatus().length > 0));
   }
+  /** Fly the camera to a point, for a step about something off screen. */
+  _fly(p, dist) { if (p && this.rig?.focus) this.rig.focus(p, dist || undefined); }
 
   _build() {
     const root = document.createElement('div');
@@ -155,9 +249,14 @@ export class Tutorial {
       </div>
       <div class="tut-ring tut-ring2" hidden></div>
       <div class="tut-card">
+        <div class="tut-ch"></div>
         <div class="tut-head"><b class="tut-title"></b><span class="tut-count"></span><button type="button" class="tut-skip">SKIP</button></div>
         <div class="tut-text"></div>
-        <button type="button" class="tut-ok" hidden>GOT IT</button>
+        <div class="tut-foot">
+          <button type="button" class="tut-ok" hidden>GOT IT</button>
+          <button type="button" class="tut-skipstep" hidden>SKIP STEP</button>
+        </div>
+        <div class="tut-progress"><i></i></div>
       </div>`;
     document.body.appendChild(root);
     this.root = root;
@@ -168,21 +267,66 @@ export class Tutorial {
     this.genLine = root.querySelector('.tut-gen-line');
     root.querySelector('.tut-skip').addEventListener('click', () => this.finish('skipped'));
     root.querySelector('.tut-ok').addEventListener('click', () => this.next());
+    root.querySelector('.tut-skipstep').addEventListener('click', () => this.next());
     root.querySelector('.tut-gen-ok').addEventListener('click', () => this.hush());
     this._v = new THREE.Vector3();
   }
 
   next() {
+    if (!this.root) return;
     this.i++;
+    // Past any step whose subject has gone since the list was made.
+    while (this.i < this.steps.length && this.steps[this.i].skip?.()) this.i++;
     if (this.i >= this.steps.length) { this.finish('done'); return; }
-    const s = this.steps[this.i];
-    this.root.querySelector('.tut-title').textContent = s.title;
-    this.root.querySelector('.tut-text').textContent = s.text;
-    this.root.querySelector('.tut-count').textContent = `${this.i + 1}/${this.steps.length}`;
-    this.root.querySelector('.tut-ok').hidden = !s.ok;
-    if (s.title === 'LOOK AROUND') this.yaw0 = this.rig.yaw;
+    const s = this.steps[this.i], n = this.steps.length;
+    const q = (c) => this.root.querySelector(c);
+    const ch = s.ch ?? 0;
+    q('.tut-ch').textContent = `${ch + 1} · ${CHAPTERS[ch] || ''}`;
+    q('.tut-title').textContent = s.title;
+    q('.tut-text').textContent = s.text;
+    q('.tut-count').textContent = `${this.i + 1}/${n}`;
+    q('.tut-ok').hidden = !s.ok;
+    q('.tut-skipstep').hidden = true;
+    q('.tut-progress > i').style.width = `${Math.round((this.i / n) * 100)}%`;
+    // A new chapter is a beat: the card flashes its chapter line.
+    this.card.classList.toggle('tut-newch', ch !== this._ch);
+    this._ch = ch;
+    this.stepAt = performance.now();
     if (s.enter) s.enter();
     if (s.say) this.say(s.say);
+  }
+
+  /**
+   * The battle talking: the first time something worth a word happens — the
+   * airborne, a gun lost, the building down with men still in it — the
+   * General says what to do about it. Once each, queued behind whatever he
+   * is already saying.
+   */
+  onEvent(kind, data) {
+    if (!this.root) return;
+    const T = {
+      unithit: 'They found one of your guns. Smoke blinds them, machine guns pin them, and a dead crew shoots nobody.',
+      unitlost: 'You lost a gun. They come back the same way they came: UNITS, tap, drop. The Army has plenty. You, I am less sure about.',
+      airborne: 'Transports inbound. Get your machine guns on the parachutes: a man shot in the air does not need digging out.',
+      airbornelanded: 'They are on the ground and digging in round the building. Every one of them has to go before it counts.',
+      assaultwarn: 'Counter-attack coming. Mortars, SAMs, the works. Spread your guns out.',
+      assaultlanded: 'They landed all over. Find them, mark them, kill them. In that order.',
+      winheld: 'It is down but they are not. Red markers are men still alive: tap one and the guns go to work.',
+      flushed: 'The ones hiding in the town broke cover. Shoot them while they run.',
+      secondary: 'Hear that? Their ammunition. Hit the crates by their guns and they do your work for you.',
+      samhit: 'Hit. Keep the guns on it: a launcher takes a few.',
+      samdown: 'One launcher down. The ring has moved to what is left in there: tap it and the guns follow.',
+      samradar: 'Radar first. That is a bonus and the launchers are blind. Somebody read the manual.',
+      samsite: 'Compound down. That pays a free strike: the cards in STRIKES say FREE.',
+      hqdown: 'Command post gone. Their crews are deaf and slow for a minute and a half. Use it.',
+      rank: 'A crew ranked up. Veterans reload faster and shoot tighter. Keep them alive.',
+      strikehit: 'Air strike on target. Expensive, loud, worth it.',
+      badplace: 'Not there. Open ground, a road, or a flat roof, inside the cleared ground.',
+    };
+    const line = T[kind];
+    if (!line || this._told.has(kind)) return;
+    this._told.add(kind);
+    if (this.talking) this._queue.push(line); else this.say(line);
   }
 
   /**
@@ -224,6 +368,7 @@ export class Tutorial {
     const after = this._after;
     this._after = null;
     if (after) after();
+    else if (this._queue.length && this.root) this.say(this._queue.shift());
   }
 
   /** Where the current step points, as a screen rectangle, or null. */
@@ -257,6 +402,11 @@ export class Tutorial {
     this.card.hidden = this.ring.hidden = this.talking;
     if (this.talking) { this.ring2.hidden = true; return; }
     if (s.done && s.done()) { this.next(); return; }
+    if (s.done && !s.ok) {
+      const stuck = performance.now() - (this.stepAt || 0) > STUCK_S * 1000;
+      const b = this.root.querySelector('.tut-skipstep');
+      if (b.hidden === stuck) b.hidden = !stuck;
+    }
     const r = this._rect(s);
     const pad = 6;
     if (r) {
@@ -308,6 +458,7 @@ export class Tutorial {
     clearTimeout(this._genT);
     clearInterval(this._typeT);
     this._after = null;
+    this._queue.length = 0;
     this.talking = false;
     if (this.root) this.root.remove();
     this.root = null;

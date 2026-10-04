@@ -710,6 +710,26 @@ async function boot() {
       handleEvent('samlanded', { point: new THREE.Vector3(site.x, site.y, site.z) });
     };
   }
+  // Boot Camp's practice targets: a SAM compound that does not fire and a
+  // command post with nobody in it, close in, to learn the gold diamonds on.
+  if (!lensSuite && level.id === 'tutorial') {
+    const u = level.palette?.urban;
+    const desert = !!(u && u.r > 0.5 && u.r > u.b * 1.25);
+    const opts = { exclude: level.contextExclude || level.cityExcludeRadius || 120,
+      plots: contextGroup?.userData?.plots || [], net: contextGroup?.userData?.network || null, landmarks };
+    const ps = siteSams(terrain, { ...opts, count: 1, seed: 0x71, r0: 200, rMax: 460, sizes: [36, 28, 20] });
+    if (ps.length) {
+      battle.sams = new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air, camera: engine.camera,
+        quality, sites: ps, desert, training: true, onEvent: (kind, data) => handleEvent(kind, data) });
+    }
+    const hs = siteSams(terrain, { ...opts, count: 1, seed: 0x72, r0: 150, rMax: 420, sizes: [20, 16, 13],
+      avoid: ps, avoidR: 120 })[0];
+    if (hs) battle.hq = new CommandPost({ scene: engine.scene, terrain, fx, site: hs, desert, onEvent: (kind, data) => handleEvent(kind, data) });
+    clearGround(contextGroup, [
+      ...(battle.sams ? battle.sams.sites.map((st) => ({ x: st.x, z: st.z, r: st.r + 5 })) : []),
+      ...(battle.hq ? [{ x: battle.hq.x, z: battle.hq.z, r: 17 }] : []),
+    ]);
+  }
   battle.cityFire = new CityFire({
     cityGroup: contextGroup, fx, fires: battle.fires, audio, scene: engine.scene,
     onBurn: (p) => battle.cityCollapse(p),
@@ -958,6 +978,8 @@ async function boot() {
   }
   let sirenSounded = false;
   function handleEvent(kind, data) {
+    // Boot Camp coaches on what actually happens, as it happens.
+    if (level.id === 'tutorial' && window.__tutorial?.root) window.__tutorial.onEvent(kind, data);
     if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
     if (kind === 'shotdown') lostAircraft = true;
     switch (kind) {
@@ -1769,6 +1791,16 @@ async function boot() {
       battle.setTarget(hit.point, hit.label);
       hud.feed(`TARGET: ${(hit.label || 'structure').toUpperCase()}`, '');
     } else {
+      // A gold-marked target under the tap: the guns lay on it. A launcher,
+      // a radar or a truck is not masonry and not a man, and there was no way
+      // to put the battery on one but to hit the ground beside it.
+      const hv = nearestHvt(hit.point, 22);
+      if (hv) {
+        const p = new THREE.Vector3(hv.x, terrain.heightAt(hv.x, hv.z) + 1.5, hv.z);
+        battle.setTarget(p, HVT_LABEL[hv.kind] || 'target');
+        hud.feed(`TARGET: ${(HVT_LABEL[hv.kind] || 'target').toUpperCase()}`, 'big');
+        return;
+      }
       // Tapping bare ground with nothing selected still confirms the tap, so
       // it is obvious the game registered it and where.
       battle.pulse(hit.point, 0x7e8b9b, 9);
@@ -1911,10 +1943,23 @@ async function boot() {
     }
   });
 
+  // The high-value target nearest a point, within `r` metres, for a tap.
+  const HVT_LABEL = { launcher: 'SAM launcher', radar: 'SAM radar', hq: 'command post', depot: 'ammo depot',
+    checkpoint: 'checkpoint', howitzer: 'howitzer', car: "general's car", truck: 'escort truck' };
+  const hvtTap = [];
+  function nearestHvt(p, r) {
+    let best = null, bd = r * r;
+    for (const h of battle.hvtPoints(hvtTap)) {
+      const d = (h.x - p.x) ** 2 + (h.z - p.z) ** 2;
+      if (d < bd) { bd = d; best = h; }
+    }
+    return best;
+  }
+
   let tutorial = null;
   const firstPrompt = () => {
     if (level.id === 'tutorial') {
-      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio });
+      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio, unitCard });
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);

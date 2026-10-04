@@ -271,6 +271,9 @@ export class SamSites {
     this.camera = o.camera;
     this.onEvent = o.onEvent || (() => {});
     this.low = o.quality?.name === 'low';
+    // Boot Camp's practice compound: there to be shot at, not to shoot, and
+    // half as hard to kill.
+    this.training = !!o.training;
     this.group = new THREE.Group();
     this.group.name = 'sams';
     this.scene.add(this.group);
@@ -311,7 +314,7 @@ export class SamSites {
     L.group.rotation.y = p.yaw;
     this.group.add(L.group);
     const l = { ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
-      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0, hp: SAM.hp, site, _hitAt: -9 };
+      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0, hp: SAM.hp * (this.training ? 0.5 : 1), site, _hitAt: -9 };
     this.launchers.push(l);
     if (site) site.launchers.push(l);
     else if (!this.radar?.alive) {
@@ -575,7 +578,7 @@ export class SamSites {
         }
       }
     }
-    if (!this.quiet && this.air) this._engage();
+    if (!this.quiet && this.air && !this.training) this._engage();
     this._fly(dt);
     this.smoke.update(dt, this._time);
   }
