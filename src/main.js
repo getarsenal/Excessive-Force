@@ -838,6 +838,7 @@ async function boot() {
   // frame loop. Boot Camp has its own General and gets no heckling.
   const comcard = level.id === 'tutorial' ? null : new ComCard({ level, audio });
   window.__comcard = comcard;      // for the harness
+  window.__hunt = huntMarkers;
   let winOrbit = false;
   // What went into the fight, for the medals: every weapon deployed or
   // called, and whether an aircraft was lost doing it.

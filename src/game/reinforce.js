@@ -1193,7 +1193,8 @@ export class EnemyAirborne {
    * there is behind three walls from every gun on the map: the player was
    * left calling in a bomber for each of the last few. With the objective
    * down and the level waiting on them, a survivor who is inside a building's
-   * footprint, or walled in on three sides, gives up the position and makes
+   * footprint, walled in on three sides, or behind a roof from the battery's
+   * side too tall for a shell to come down over, gives up the position and makes
    * for the nearest open ground he can reach without walking through a wall,
    * on foot, where the battery can see him. Returns how many moved.
    */
@@ -1202,10 +1203,36 @@ export class EnemyAirborne {
     if (!g) return 0;
     const span = t.span * 0.93;
     const { nearPlots, inside, walledSides } = cityGeom(b.cityPlots || []);
+    // Where the battery is: the middle of the guns on the ground. A man with
+    // a block between him and that, close enough and tall enough that a shell
+    // coming down at forty degrees meets the roof first, is out of reach of
+    // every gun the player has, however open his own yard is — which is the
+    // man at the back of the town the player could only get with a bomber.
+    let cx = 0, cz = 0, cn = 0;
+    for (const u of b.units || []) {
+      if (!u.alive || !u.pos || u.def?.strike) continue;
+      cx += u.pos.x; cz += u.pos.z; cn++;
+    }
+    if (cn) { cx /= cn; cz /= cn; }
+    const shadowed = (x, z) => {
+      if (!cn) return false;
+      const L = Math.hypot(cx - x, cz - z);
+      if (L < 30) return false;
+      const ux = (cx - x) / L, uz = (cz - z) / L, y = t.heightAt(x, z) + 1.2;
+      const P = nearPlots(x + ux * 24, z + uz * 24, 28);
+      if (!P.length) return false;
+      for (let r = 3; r <= 48; r += 3) {
+        const px = x + ux * r, pz = z + uz * r;
+        for (const q of P) {
+          if (q.top - y > r * 0.84 && inside(px, pz, q, 0.3)) return true;
+        }
+      }
+      return false;
+    };
     const hemmed = (p) => {
       const P = nearPlots(p.x, p.z, 26);
       if (!P.length) return false;
-      return P.some((q) => inside(p.x, p.z, q, 2.5)) || walledSides(p.x, p.z, P) >= 3;
+      return P.some((q) => inside(p.x, p.z, q, 2.5)) || walledSides(p.x, p.z, P) >= 3 || shadowed(p.x, p.z);
     };
     const taken = [];
     const open = (x, z) => {
@@ -1214,7 +1241,7 @@ export class EnemyAirborne {
       if (Math.abs(t.heightAt(x + 2, z) - h) > 1.2 || Math.abs(t.heightAt(x, z + 2) - h) > 1.2) return false;
       const P = nearPlots(x, z, 24);
       if (P.some((q) => inside(x, z, q, 4))) return false;
-      if (walledSides(x, z, P) > 1) return false;
+      if (walledSides(x, z, P) > 1 || shadowed(x, z)) return false;
       return !taken.some((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < 9);
     };
     const clearPath = (ax, az, bx, bz) => {
