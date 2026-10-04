@@ -2769,8 +2769,8 @@ export class Battle {
     // Not while a drop is in: the airborne and the counter-attack, once sent
     // for, are part of the fight until every man of them is down, whatever
     // is left of the building. The bar can be full with a brigade dug in round
-    // the rubble, and the level holds until it is cleared; every few seconds
-    // the survivors are marked, so the last of them can be found.
+    // the rubble, and the level holds until it is cleared; the survivors are
+    // marked over their heads until they are down, so the last can be found.
     if (this.objectiveProgress >= Battle.WIN_AT
         || this.objectives.every((o) => this.objectiveDone(o))) {
       const drops = [this.airborne, this.assault].filter((a) => a && a.outstanding > 0);
@@ -2782,8 +2782,15 @@ export class Battle {
         return;
       }
       if (!this._held) {
-        this._held = { at: this.elapsed, next: this.elapsed };
+        this._held = { at: this.elapsed, next: this.elapsed, flush: this.elapsed };
         this.onEvent('winheld', { left });
+      }
+      // The ones dug in behind a block or in a gutted house are behind three
+      // walls from every gun on the map; they are sent out into the open,
+      // and again every few seconds for any who have gone to ground since.
+      if (this.elapsed >= this._held.flush) {
+        this._held.flush = this.elapsed + 8;
+        for (const a of drops) a.flush();
       }
       if (this.elapsed >= this._held.next) {
         this._held.next = this.elapsed + 6;

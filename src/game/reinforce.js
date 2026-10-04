@@ -506,6 +506,32 @@ function canopyGeometry() {
 
 // ────────────────────────────────────────────────────────────── the drop ──
 
+/**
+ * The town's buildings as rotated rectangles: which are near a point, whether
+ * a point is inside one, and how many of the four sides of it are walled
+ * within eighteen metres. For where a squad may land, and where it goes when
+ * it has to come out.
+ */
+function cityGeom(plots) {
+  const nearPlots = (x, z, r) => plots.filter((q) => Math.abs(q.x - x) < r + (q.w + q.d) / 2
+    && Math.abs(q.z - z) < r + (q.w + q.d) / 2);
+  const inside = (x, z, q, m) => {
+    const c = Math.cos(q.yaw || 0), sn = Math.sin(q.yaw || 0);
+    const dx = x - q.x, dz = z - q.z;
+    return Math.abs(dx * c - dz * sn) < q.w / 2 + m && Math.abs(dx * sn + dz * c) < q.d / 2 + m;
+  };
+  const walledSides = (x, z, P) => {
+    let n = 0;
+    for (const [ux, uz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      for (let r = 3; r <= 18; r += 2.5) {
+        if (P.some((q) => inside(x + ux * r, z + uz * r, q, 0.4))) { n++; break; }
+      }
+    }
+    return n;
+  };
+  return { nearPlots, inside, walledSides };
+}
+
 export class EnemyAirborne {
   /** @param {import('./battle.js').Battle} battle */
   constructor(battle, o = {}) {
@@ -542,6 +568,7 @@ export class EnemyAirborne {
 
   update(dt) {
     if (!this.enabled) return;
+    if (this.walkers) this._walk(dt);
     const b = this.battle;
     if (this.state === 'waiting') {
       if (!this.auto || b.state !== 'playing') return;
@@ -779,6 +806,7 @@ export class EnemyAirborne {
     if (haveBattery) { bx /= units.length; bz /= units.length; }
     const taken = already.map((s) => ({ x: s.pos.x, z: s.pos.z }));
     const crowded = (x, z, r) => taken.some((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < r * r);
+    const geom = cityGeom(b.cityPlots || []);
     // Out of rifle and machine-gun reach of the battery, and well inside a
     // mortar's: the squads near the guns shell them, they do not overrun them.
     // A man standing up four hundred metres off is the player's to find.
@@ -790,9 +818,11 @@ export class EnemyAirborne {
       const h = t.heightAt(x, z);
       const slope = Math.max(Math.abs(t.heightAt(x + 1.5, z) - h), Math.abs(t.heightAt(x, z + 1.5) - h)) / 1.5;
       if (slope > 0.45) return false;
-      for (const q of b.cityPlots || []) {
-        if (Math.abs(q.x - x) < q.w / 2 + 1.5 && Math.abs(q.z - z) < q.d / 2 + 1.5) return false;
-      }
+      // Not in a building, and not in a yard walled in on three sides: a
+      // squad the guns can never see is one the player has to bomb out.
+      const P = geom.nearPlots(x, z, 22);
+      if (P.some((q) => geom.inside(x, z, q, 3))) return false;
+      if (geom.walledSides(x, z, P) >= 3) return false;
       for (const u of units) if ((u.pos.x - x) ** 2 + (u.pos.z - z) ** 2 < clearOfGuns * clearOfGuns) return false;
       return true;
     };
@@ -1153,6 +1183,105 @@ export class EnemyAirborne {
     const g = this.battle.garrison;
     if (g) for (const d of g.defenders) if (d.alive && d.pool === this.cfg.pool) n++;
     return n;
+  }
+
+  /**
+   * Out of the town and into the open, once the building is down.
+   *
+   * The squads came down on open ground, but open ground in a city is a yard
+   * behind a block or the shell of a house the fire has gutted, and a man
+   * there is behind three walls from every gun on the map: the player was
+   * left calling in a bomber for each of the last few. With the objective
+   * down and the level waiting on them, a survivor who is inside a building's
+   * footprint, or walled in on three sides, gives up the position and makes
+   * for the nearest open ground he can reach without walking through a wall,
+   * on foot, where the battery can see him. Returns how many moved.
+   */
+  flush() {
+    const b = this.battle, g = b.garrison, t = this.terrain;
+    if (!g) return 0;
+    const span = t.span * 0.93;
+    const { nearPlots, inside, walledSides } = cityGeom(b.cityPlots || []);
+    const hemmed = (p) => {
+      const P = nearPlots(p.x, p.z, 26);
+      if (!P.length) return false;
+      return P.some((q) => inside(p.x, p.z, q, 2.5)) || walledSides(p.x, p.z, P) >= 3;
+    };
+    const taken = [];
+    const open = (x, z) => {
+      if (Math.abs(x) > span || Math.abs(z) > span || t.isWater(x, z)) return false;
+      const h = t.heightAt(x, z);
+      if (Math.abs(t.heightAt(x + 2, z) - h) > 1.2 || Math.abs(t.heightAt(x, z + 2) - h) > 1.2) return false;
+      const P = nearPlots(x, z, 24);
+      if (P.some((q) => inside(x, z, q, 4))) return false;
+      if (walledSides(x, z, P) > 1) return false;
+      return !taken.some((q) => (q.x - x) ** 2 + (q.z - z) ** 2 < 9);
+    };
+    const clearPath = (ax, az, bx, bz) => {
+      const L = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.ceil(L / 3));
+      const P = nearPlots((ax + bx) / 2, (az + bz) / 2, L / 2 + 6);
+      let hits = 0;
+      for (let i = 1; i < n; i++) {
+        const x = ax + ((bx - ax) * i) / n, z = az + ((bz - az) * i) / n;
+        if (P.some((q) => inside(x, z, q, 0.3))) hits++;
+      }
+      return hits;
+    };
+    let moved = 0;
+    for (const d of g.defenders) {
+      if (!d.alive || d.pool !== this.cfg.pool || d.walk) continue;
+      if (!hemmed(d.pos)) continue;
+      // The nearest open ground, preferring a way there that does not go
+      // through a building; failing that, the nearest at all.
+      let best = null, bestScore = Infinity;
+      for (let r = 8; r <= 150 && !best; r += 7) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2 + r * 0.071;
+          const x = d.pos.x + Math.cos(a) * r, z = d.pos.z + Math.sin(a) * r;
+          if (!open(x, z)) continue;
+          const score = r + clearPath(d.pos.x, d.pos.z, x, z) * 25;
+          if (score < bestScore) { bestScore = score; best = { x, z }; }
+        }
+      }
+      if (!best) continue;
+      taken.push(best);
+      d.walk = new THREE.Vector3(best.x, t.heightAt(best.x, best.z), best.z);
+      d.sandbags = false;
+      d.cover = 'ground';
+      moved++;
+    }
+    if (moved) {
+      this.walkers = true;
+      this.battle.onEvent('flushed', { n: moved });
+    }
+    return moved;
+  }
+
+  /** The men on their feet: three metres a second, holding fire till they are there. */
+  _walk(dt) {
+    const g = this.battle.garrison, t = this.terrain;
+    let any = false;
+    for (const d of g.defenders) {
+      if (!d.walk) continue;
+      if (!d.alive) { d.walk = null; continue; }
+      any = true;
+      const dx = d.walk.x - d.pos.x, dz = d.walk.z - d.pos.z;
+      const L = Math.hypot(dx, dz);
+      const step = 3.2 * dt;
+      if (L <= step) {
+        d.pos.set(d.walk.x, t.heightAt(d.walk.x, d.walk.z), d.walk.z);
+        d.walk = null;
+      } else {
+        d.pos.x += (dx / L) * step;
+        d.pos.z += (dz / L) * step;
+        d.pos.y = t.heightAt(d.pos.x, d.pos.z);
+        d.facing = Math.atan2(dx, dz);
+        d.cooldown = Math.max(d.cooldown, 0.5);
+      }
+      d.muzzle.copy(d.pos).y += d.def.eye ?? 1.25;
+      d.blocked = false;
+    }
+    if (!any) this.walkers = false;
   }
 
   /** Where the dug-in survivors are, for the markers. */

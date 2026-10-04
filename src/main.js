@@ -48,6 +48,7 @@ import * as synth from './core/synth.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
 import { SamSites, siteSams } from './game/sam.js';
+import { HuntMarkers } from './game/huntmarkers.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -438,6 +439,7 @@ async function boot() {
   const fx = new ExplosionFX(engine.scene, quality);
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
+  const huntMarkers = new HuntMarkers(engine.scene);
   // Dirt on the lens: a blast close enough to the camera throws it at the
   // glass. Spots of mud in a soft-edged splatter, sliding down as they fade.
   const lensSuite = (() => { try { return localStorage.getItem('tt.suite') === '1'; } catch { return false; } })();
@@ -1017,11 +1019,14 @@ async function boot() {
         // The building is down and the drop is not: the level waits for it.
         feedback.emit('strike');
         hud.feed(`OBJECTIVE DOWN · ${data.left} ENEMY FROM THE DROP STILL FIGHTING · CLEAR THEM TO WIN`, 'warn');
-        hud.status(`clear the drop to win · ${data.left} left · they are marked`, 8);
+        hud.status(`clear the drop to win · ${data.left} left · each one is marked in red`, 8);
         break;
       case 'dropsleft':
-        hud.status(`clear the drop to win · ${data.left} left`, 6.5);
-        for (const p of data.points || []) battle.pulse(p.clone(), 0xff4a3a, 9, true);
+        hud.status(`clear the drop to win · ${data.left} left · marked in red`, 6.5);
+        break;
+      case 'flushed':
+        // Survivors walled in by the town, sent out to where the guns can see them.
+        hud.feed(`${data.n} ENEMY BREAKING COVER · MOVING INTO THE OPEN`, 'warn');
         break;
       case 'samlanded':
         hud.feed('S-300 LAUNCHER ON THE GROUND · AIRCRAFT AT RISK', 'warn');
@@ -2035,6 +2040,7 @@ async function boot() {
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     whiteFlags.update(dt);
+    huntMarkers.update(rawDt, battle.garrison, engine.camera, !!battle._held && battle.state === 'playing');
     hud.update(rawDt);
     if (tutorial) tutorial.update();
     // A weapon armed, a drawer opened: felt and heard, from whichever of the
