@@ -26,7 +26,7 @@ const SLOTS_KEY = 'tt.slots';
 export const SLOT_IDS = ['A', 'B', 'C'];
 
 const get = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-const put = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* private mode */ } };
+const put = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch { return false; } };
 const parse = (s, d) => { try { const v = JSON.parse(s); return v ?? d; } catch { return d; } };
 
 function readSlots() {
@@ -48,10 +48,13 @@ export function switchSlot(id) {
   if (id === s.active || !SLOT_IDS.includes(id)) return false;
   s.data[s.active] = captureLive();
   const next = s.data[id] || {};
+  // The outgoing commander is written away first, and only once that has
+  // worked are the live keys swapped: the other way round, a full store lost
+  // them with the slot table still naming them active.
+  const parked = { ...s, data: { ...s.data }, active: id };
+  delete parked.data[id];
+  if (!put(SLOTS_KEY, JSON.stringify(parked))) return false;
   for (const k of SLOT_KEYS) put(k, next[k] ?? null);
-  delete s.data[id];
-  s.active = id;
-  put(SLOTS_KEY, JSON.stringify(s));
   return true;
 }
 
@@ -173,7 +176,10 @@ export function dailyFor(openIds, date = today()) {
 
 export function dailyState() {
   const v = parse(get('tt.daily'), {}) || {};
-  return { streak: v.streak || 0, best: v.best || 0, last: v.last || null, total: v.total || 0 };
+  // A streak with a missed day in it is over, whatever was last written.
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const live = v.last === today() || v.last === today(y);
+  return { streak: live ? (v.streak || 0) : 0, best: v.best || 0, last: v.last || null, total: v.total || 0 };
 }
 
 export function dailyDoneToday() { return dailyState().last === today(); }
@@ -182,7 +188,10 @@ export function dailyDoneToday() { return dailyState().last === today(); }
 export function markDailyDone(date = today()) {
   const s = dailyState();
   if (s.last === date) return s.streak;
-  const y = new Date(); y.setDate(y.getDate() - 1);
+  // The day before the daily's own date, not before now: one started at
+  // 23:55 and won at 00:05 still follows the day before it.
+  const [yy, mm, dd] = date.split('-').map(Number);
+  const y = new Date(yy, mm - 1, dd - 1);
   const streak = s.last === today(y) ? s.streak + 1 : 1;
   const out = { streak, best: Math.max(s.best, streak), last: date, total: s.total + 1 };
   put('tt.daily', JSON.stringify(out));

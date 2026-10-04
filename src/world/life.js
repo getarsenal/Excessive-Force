@@ -161,8 +161,11 @@ export class Life {
     const list = this._plotGrid.get(`${Math.floor(x / this._plotCell)},${Math.floor(z / this._plotCell)}`);
     if (!list) return false;
     for (const p of list) {
-      const a = -(p.yaw || 0), dx = x - p.x, dz = z - p.z;
-      const lx = dx * Math.cos(a) - dz * Math.sin(a), lz = dx * Math.sin(a) + dz * Math.cos(a);
+      // Into the plot's own frame: the inverse of the mesh's rotation.y. It
+      // was the forward rotation, so a yawed building was tested turned the
+      // other way and boats were routed through it.
+      const c = Math.cos(p.yaw || 0), sn = Math.sin(p.yaw || 0), dx = x - p.x, dz = z - p.z;
+      const lx = dx * c - dz * sn, lz = dx * sn + dz * c;
       if (Math.abs(lx) <= p.w / 2 + 2 && Math.abs(lz) <= p.d / 2 + 2) return true;
     }
     return false;

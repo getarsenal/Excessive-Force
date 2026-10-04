@@ -78,8 +78,10 @@ function planFieldWorks(opts = {}) {
       }
     }
   }
+  // The half-diagonal: half the long side left the corners of a square
+  // block outside the keep-out, and trench bays were dug in them.
   const footprints = plots.map((p) => ({
-    x: p.x, z: p.z, r: Math.max(p.ax || p.w, p.az || p.d) / 2 + 2.5,
+    x: p.x, z: p.z, r: Math.hypot(p.ax || p.w, p.az || p.d) / 2 + 2.5,
   }));
 
   /** Distance from a point to a segment, squared. */
@@ -352,8 +354,9 @@ function planFieldWorks(opts = {}) {
     const ux = p.x / away, uz = p.z / away;
     let bestN = null, bestDot = -Infinity;
     for (const [ax, az] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-      const nx = ax * Math.cos(py) - az * Math.sin(py);
-      const nz = ax * Math.sin(py) + az * Math.cos(py);
+      // The face normal in the world, turned the way the building's mesh is.
+      const nx = ax * Math.cos(py) + az * Math.sin(py);
+      const nz = -ax * Math.sin(py) + az * Math.cos(py);
       const dot = nx * ux + nz * uz;
       if (dot > bestDot) { bestDot = dot; bestN = [nx, nz]; }
     }
@@ -612,6 +615,10 @@ function mulberry(seed) {
 export function buildFieldWorks(terrain, quality, opts = {}) {
   const plan = planFieldWorks({
     terrain,
+    // The streets and the grid's bearing, which the caller gives and which
+    // were never passed on: trenches were dug across the carriageways.
+    net: opts.net || null,
+    yaw: opts.yaw || 0,
     plots: opts.plots || [],
     exclude: opts.exclude || 70,
     landmarks: opts.landmarks || [],

@@ -2630,10 +2630,14 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
   // side, which is the side away from the street.
   for (const p of plots) {
     if (rng() > 0.4 * dense) continue;
-    const f = p.front || { x: 0, z: 1 };
-    const back = 3 + rng() * 7;
-    treeAt(p.x - f.x * (p.d / 2 + back) + (rng() - 0.5) * p.w * 0.6,
-      p.z - f.z * (p.d / 2 + back) + (rng() - 0.5) * p.w * 0.6, 0.9);
+    // Behind the building's depth, which for a street-front plot is \`w\`
+    // (as the yards below have it), and spread along its run rather than
+    // along the world's axes. With \`d\` the tree stood inside the house.
+    const f = p.front || { x: Math.sin(p.yaw || 0), z: Math.cos(p.yaw || 0) };
+    const depth = p.front ? p.w : p.d, run = p.front ? p.d : p.w;
+    const back = 3 + rng() * 7, side = (rng() - 0.5) * run * 0.6;
+    treeAt(p.x - f.x * (depth / 2 + back) + f.z * side,
+      p.z - f.z * (depth / 2 + back) - f.x * side, 0.9);
   }
   // And scattered across the mapped parks, which are otherwise bare green.
   const span = terrain.span;

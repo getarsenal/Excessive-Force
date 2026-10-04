@@ -469,7 +469,14 @@ export function openCrate(rand = Math.random) {
   if (item.perk) {
     for (const [k, v] of Object.entries(item.perk)) c.perks[k] = (c.perks[k] || 0) + v;
   }
-  if (item.xp) c.xp += item.xp;
+  if (item.xp) {
+    // A grade crossed by a crate's XP pays its crates like any other: the
+    // next battle's award used to start from the raised XP and skip it.
+    const g0 = gradeFor(c.xp).i;
+    c.xp += item.xp;
+    const g1 = gradeFor(c.xp).i;
+    for (let i = g0 + 1; i <= g1; i++) c.crates += rewardFor(i).crates;
+  }
   save(c);
   return { ...item, crates: c.crates };
 }

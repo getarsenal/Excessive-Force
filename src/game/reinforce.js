@@ -576,7 +576,12 @@ export class EnemyAirborne {
         this.warned = true;
         b.onEvent(`${this.cfg.kind}warn`, { at: this.cfg.at, nation: this.code });
       }
-      if (b.objectiveProgress >= this.cfg.at) this.launch();
+      // Not when the shot that crossed the line also won the level: a drop
+      // sent for in the frame the building fell held the win for a wave
+      // nobody had been warned of.
+      const won = b.objectiveProgress >= (b.constructor.WIN_AT ?? 0.9)
+        || (b.objectives?.length && b.objectives.every((o) => b.objectiveDone(o)));
+      if (b.objectiveProgress >= this.cfg.at && !won) this.launch();
       return;
     }
     if (this.state !== 'inbound') return;
@@ -711,6 +716,7 @@ export class EnemyAirborne {
     };
     const ground = g.defenders.filter((d) => d.alive && d.emplaced);
     const plots = b.cityPlots || [];
+    const geom = cityGeom(plots);
     const units = b.units.filter((u) => u.alive);
     const ok = (x, z) => {
       if (Math.abs(x) > span || Math.abs(z) > span) return false;
@@ -727,8 +733,10 @@ export class EnemyAirborne {
           return false;
         }
       }
-      for (const q of plots) {
-        if (Math.abs(q.x - x) < q.w / 2 + 1.5 && Math.abs(q.z - z) < q.d / 2 + 1.5) return false;
+      // Turned with the building: an axis-aligned test let a man land inside
+      // a block set at forty-five degrees.
+      for (const q of geom.nearPlots(x, z, 2)) {
+        if (geom.inside(x, z, q, 1.5)) return false;
       }
       for (const u of units) if ((u.pos.x - x) ** 2 + (u.pos.z - z) ** 2 < 144) return false;
       for (const d of ground) if ((d.pos.x - x) ** 2 + (d.pos.z - z) ** 2 < 4) return false;
@@ -1120,15 +1128,19 @@ export class EnemyAirborne {
     for (const man of this.men) {
       // A man under a canopy is a small thing falling past at two hundred
       // metres: most of a burst goes through the silk or past him.
-      if (man.alive && man.open > 0.6) list.push({ pos: man.hitPos, alive: true, hit: man.hit, exposure: 0.15 });
+      // One target per man, alive for as long as he is: a gun holds its
+      // target for a burst, and a copy made with \`alive: true\` kept a gun
+      // firing at the point in the sky where a dead man had been.
+      if (man.alive && man.open > 0.6) {
+        list.push(man.target || (man.target = { pos: man.hitPos, hit: man.hit, exposure: 0.15, get alive() { return man.alive; } }));
+      }
     }
   }
 
   _draw() {
     let w = 0, c = 0;
     const mm = this.manMesh, cm = this.chuteMesh;
-    this._c.setHex(DEFENDER_TYPES.rifleman.colour);
-    const man = this._c.clone();
+    const man = this._manC || (this._manC = new THREE.Color(DEFENDER_TYPES.rifleman.colour));
     this._c.setHex(this.chuteColour);
     for (const m of this.men) {
       const sw = Math.sin(m.t * 1.7 + m.sway) * 0.12 * m.open;
@@ -1289,7 +1301,9 @@ export class EnemyAirborne {
     const g = this.battle.garrison, t = this.terrain;
     let any = false;
     for (const d of g.defenders) {
-      if (!d.walk) continue;
+      // This drop's men only: both drops step their walkers, and a man moved
+      // by both went at twice the pace.
+      if (!d.walk || d.pool !== this.cfg.pool) continue;
       if (!d.alive) { d.walk = null; continue; }
       any = true;
       const dx = d.walk.x - d.pos.x, dz = d.walk.z - d.pos.z;

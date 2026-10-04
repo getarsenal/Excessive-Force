@@ -27,8 +27,11 @@ function bar(label, frac, cls = '') {
 export function unitTipHTML(u, battle) {
   const w = u.warhead;
   const unlocked = battle ? battle.isUnlocked(u) : true;
-  const scale = battle?.level?.unlockScale ?? 1;
-  const need = Math.max(1, Math.round(((u.unlockFrac ?? 0) / scale) * 100));
+  // The card's own number, from the gate's own arithmetic; and a weapon the
+  // campaign has not released is not waiting on this bar at all.
+  const need = battle ? Math.round(battle.unlockAt(u) * 100) : 0;
+  const sealed = battle?.isReleased && !battle.isReleased(u);
+  const lockLine = sealed ? 'Released by a later contract' : `Unlocks when the bar reads ${need}%`;
   if (u.strike) {
     return `
     <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>
@@ -40,7 +43,7 @@ export function unitTipHTML(u, battle) {
       <span>called in</span><span>one bomb</span>
       <span>${Math.round(u.strike.frac * 100)}% of whatever it lands on</span>
     </div>
-    ${unlocked ? '' : `<div class="ut-lock">Unlocks at ${need}% of the target down</div>`}`;
+    ${unlocked ? '' : `<div class="ut-lock">${lockLine}</div>`}`;
   }
   return `
     <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>
@@ -54,7 +57,7 @@ export function unitTipHTML(u, battle) {
       <span>${u.range} m</span><span>${u.reload.toFixed(1)} s reload</span>
       <span>${u.salvo ? `${u.salvo.count}-round ripple` : `${w.radius.toFixed(0)} m burst`}</span>
     </div>
-    ${unlocked ? '' : `<div class="ut-lock">Unlocks at ${need}% of the target down</div>`}`;
+    ${unlocked ? '' : `<div class="ut-lock">${lockLine}</div>`}`;
 }
 
 /** Hook the tooltip onto the build bar's cards. */
@@ -141,6 +144,8 @@ export class UnitCard {
     this.unit = unit;
     this.el.hidden = false;
     this.q('uc2-name').textContent = unit.def.full;
+    this._w = {};
+    this._sell = null;
     this.update();
   }
 
@@ -150,14 +155,23 @@ export class UnitCard {
     const u = this.unit;
     if (!u) return;
     if (!u.alive) { this.hide(); return; }
+    // Written only when they change: this runs every frame the card is up.
+    const w = this._w || (this._w = {});
+    const put = (id, v, prop = 'textContent') => {
+      const k = id + prop;
+      if (w[k] === v) return;
+      w[k] = v;
+      if (prop === 'width') this.q(id).style.width = v; else this.q(id)[prop] = v;
+    };
     const frac = Math.max(0, u.health / u.maxHealth);
-    this.q('uc2-hp').style.width = `${Math.round(frac * 100)}%`;
-    this.q('uc2-hp').className = frac > 0.6 ? '' : frac > 0.28 ? 'hurt' : 'critical';
-    this.q('uc2-cond').textContent = u.dugIn ? 'DUG IN' : u.state === 'setup' ? 'SETTING UP' : 'READY';
-    this.q('uc2-kills').textContent = String(u.kills || 0);
-    this.q('uc2-hits').textContent = String(u.hits || 0);
+    put('uc2-hp', `${Math.round(frac * 100)}%`, 'width');
+    put('uc2-hp', frac > 0.6 ? '' : frac > 0.28 ? 'hurt' : 'critical', 'className');
+    put('uc2-cond', u.dugIn ? 'DUG IN' : u.state === 'setup' ? 'SETTING UP' : 'READY');
+    put('uc2-kills', String(u.kills || 0));
+    put('uc2-hits', String(u.hits || 0));
     const rank = u.rank || 0;
-    this.q('uc2-rank').textContent = rank >= 3 ? 'ELITE ★★★' : rank === 2 ? 'VETERAN ★★' : rank === 1 ? 'SEASONED ★' : 'GREEN';
-    this.q('uc2-sell').textContent = `SELL $${Math.round(u.def.cost * 0.5).toLocaleString()}`;
+    put('uc2-rank', rank >= 3 ? 'ELITE ★★★' : rank === 2 ? 'VETERAN ★★' : rank === 1 ? 'SEASONED ★' : 'GREEN');
+    const sell = this.battle?.freeBuild ? 'SELL' : `SELL $${Math.round(u.def.cost * 0.5).toLocaleString()}`;
+    if (this._sell !== sell) { this._sell = sell; this.q('uc2-sell').textContent = sell; }
   }
 }

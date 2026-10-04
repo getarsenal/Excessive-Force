@@ -260,9 +260,22 @@ export class Battle {
     return true;
   }
 
+  /**
+   * The rubble already down counts as paid for. A resumed battle restores
+   * its stones, its money and its tonnage from the save; without this the
+   * first frame saw all of that rubble as new, paid for it again and counted
+   * its tonnes twice.
+   */
+  rebaseEconomy() {
+    this._lastDestroyedMass = this.structures.reduce((a, s) => a + s.demolishedMass, 0);
+    this._paidMass = new Map(this.structures.map((s) => [s, s.demolishedMass]));
+  }
+
   /** Sell a placed unit back for half its price. */
   sellUnit(unit) {
-    if (!unit || !unit.alive) return false;
+    // Not after the battle is decided: selling between the win and the report
+    // lowered the spend the report and the medals read.
+    if (!unit || !unit.alive || this.state !== 'playing') return false;
     // Nothing was charged in free build, so nothing comes back.
     const refund = this.freeBuild ? 0 : Math.round(unit.def.cost * 0.5);
     this.money += refund;
@@ -851,8 +864,8 @@ export class Battle {
     if (this.craters) this.craters.add(point.x, g, point.z, 9);
     if (this.fires) this.fires.ignite(point.x, g, point.z, 4.5, 90);
     if (this.cityFire) this.cityFire.blast(point, 18, 30);
-    const killed = this.garrison.splash(point, 22, 400);
-    if (killed) this.defendersKilled += killed;
+    // Paid like every other kill.
+    this._creditKills(this.garrison.splash(point, 22, 400), point);
     const d = this.camera.position.distanceTo(point);
     this.engine?.addShake?.(THREE.MathUtils.clamp(140 / Math.max(d, 60), 0.1, 0.9));
   }
@@ -2514,6 +2527,9 @@ export class Battle {
       if (this.fires) this.fires.update(dt);
       if (this.cityFire) this.cityFire.update(dt);
       if (this.tracerFX) this.tracerFX.update(dt);
+      // The men on the falling masonry fall with it, and the dead lie down:
+      // the garrison was frozen, standing in the air, behind the report.
+      if (this.garrison) { this.garrison.reconcileStructure(this.originGround); this.garrison.sync(); }
       return;
     }
     this.elapsed += dt;
@@ -2808,6 +2824,9 @@ export class Battle {
     } else if (this._held) {
       this._held = null;
     }
+    // Not lost while the win only waits on the drop: the objectives are met,
+    // and the income will buy something to finish it with.
+    if (this._held) return;
 
     // Loss: nothing deployed, nothing in flight, and not enough money for the
     // cheapest thing that could still make progress.

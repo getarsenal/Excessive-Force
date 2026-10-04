@@ -69,7 +69,8 @@ export class Audio {
       if (this.ctx.state === 'suspended') await this.ctx.resume();
 
       this.master = this.ctx.createGain();
-      this.master.gain.value = 0.75;
+      // Muted before the first tap is still muted after it.
+      this.master.gain.value = this.enabled ? 0.75 : 0;
       // A limiter stops a barrage from clipping into distortion; without it a
       // HIMARS salvo plus its impacts is a wall of crackle.
       this.limiter = this.ctx.createDynamicsCompressor();
@@ -166,6 +167,9 @@ export class Audio {
    */
   play(name, pos, opts = {}) {
     if (!this.ready || !this.enabled || this._failed) return false;
+    // A suspended context (iOS: a call, Siri, the lock screen) has a stopped
+    // clock: sources queue on it and never end, and play at once on resume.
+    if (this.ctx.state !== 'running') return false;
     const buf = this.buffers.get(name);
     if (!buf) return false;
     if (this.voices >= MAX_VOICES && !opts.priority) return false;
@@ -177,7 +181,6 @@ export class Audio {
     if (cooldown > 0) {
       const last = this._lastPlayed.get(name) ?? -1e9;
       if (now - last < cooldown) return false;
-      this._lastPlayed.set(name, now);
     }
 
     let gain = opts.gain ?? 1;
@@ -216,6 +219,9 @@ export class Audio {
       src.connect(g).connect(this.master);
     }
 
+    // Stamped only for a sound that is actually played: a distant burst
+    // culled as inaudible used to block a near one for its cooldown.
+    if (opts.cooldown > 0) this._lastPlayed.set(name, now);
     this.voices++;
     src.onended = () => { this.voices--; };
     src.start(now + delay);
@@ -240,7 +246,7 @@ export class Audio {
    * @param {number} severity 0..1, how far past saving the structure is
    */
   groan(severity, pos) {
-    if (!this.ready || !this.enabled || this._failed) return;
+    if (!this.ready || !this.enabled || this._failed || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
     if (now - (this._lastPlayed.get('groan') ?? -1e9) < 1.8) return;
     this._lastPlayed.set('groan', now);
@@ -273,11 +279,13 @@ export class Audio {
       o.start(now);
       o.stop(now + dur + 0.05);
     }
-    g.connect(this.bus);
+    // Into the master, like everything else here: `bus` is Ambience's, and
+    // connecting to it threw, every 1.8 s, out of the middle of the frame.
+    g.connect(this.master);
   }
 
   rumble(magnitude, pos) {
-    if (!this.ready || !this.enabled || this._failed) return;
+    if (!this.ready || !this.enabled || this._failed || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
     if (now - (this._lastPlayed.get('rumble') ?? -1e9) < 0.5) return;
     this._lastPlayed.set('rumble', now);

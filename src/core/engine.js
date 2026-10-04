@@ -289,6 +289,9 @@ export class Engine {
     if (Math.abs(next - this.renderScale) < 0.01) return false;
     this.renderScale = next;
     this.renderer.setPixelRatio(this._pixelRatio());
+    // The composer keeps its own copy of the ratio and sizes every pass by
+    // it: without this the governor's scale only shrank the final blit.
+    this.composer.setPixelRatio(this._pixelRatio());
     this._onResize();
     return true;
   }
@@ -305,6 +308,9 @@ export class Engine {
    * Last, because the city is mostly shadow: this is the one a player sees.
    */
   setShadows(on) {
+    // A tier with no shadow map has nothing to switch, and switching it
+    // recompiles every material in the scene for nothing.
+    if (this.quality.shadowMapSize === 0) return false;
     if (this.renderer.shadowMap.enabled === on) return false;
     this.renderer.shadowMap.enabled = on;
     this.sun.castShadow = on && this.quality.shadowMapSize > 0;
@@ -318,6 +324,9 @@ export class Engine {
     this._sizedW = w; this._sizedH = h;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // The device ratio can change too: a window dragged to another screen.
+    const pr = this._pixelRatio();
+    if (this.renderer.getPixelRatio() !== pr) { this.renderer.setPixelRatio(pr); this.composer.setPixelRatio(pr); }
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
   }

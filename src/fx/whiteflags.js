@@ -34,6 +34,9 @@ export class WhiteFlags {
    * @param {object[]} defenders  each with `alive` and `pos`
    */
   raise(defenders, camera, max = 30) {
+    // Once a battle: a win played on and won again does not plant a second
+    // flag beside every first one.
+    if (this.flags.length) return 0;
     const alive = defenders.filter((d) => d.alive && d.pos);
     alive.sort((a, b) => a.pos.distanceToSquared(camera.position) - b.pos.distanceToSquared(camera.position));
     const n = Math.min(max, alive.length);

@@ -266,13 +266,19 @@ export function showTitle({ current = null, canResume = false } = {}) {
       requestAnimationFrame(() => sheet.classList.add('open'));
     };
     let crateUi = null;
+    // A battle abandoned from the sheet leaves the menu behind it out of date
+    // (CONTINUE, the count, the cards beside it): rebuilt when the sheet shuts.
+    let stale = false;
     const closeSheet = () => {
       if (crateUi) { crateUi.destroy(); crateUi = null; }
       sheet.classList.remove('open');
       setTimeout(() => { sheet.hidden = true; }, 240);
+      if (stale) setTimeout(() => done({ again: true }), 250);
     };
 
     const act = (a, el) => {
+      // Nothing else while the eagle is flying: the level is already chosen.
+      if (launching) return;
       thump();
       switch (a) {
         case 'back': done({ level: null }); break;
@@ -297,6 +303,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'discard': {
           const id = el.dataset.level;
           clearBattle(id);
+          const k = battles.findIndex((b) => b.level === id);
+          if (k >= 0) battles.splice(k, 1);
+          stale = true;
           el.closest('.tt-bcard')?.remove();
           root.querySelectorAll(`.tt-side .tt-bcard[data-level="${id}"]`).forEach((n) => n.remove());
           break;
@@ -378,6 +387,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       e.currentTarget.classList.toggle('off', !on);
     });
     const onKey = (e) => {
+      if (launching) return;
       if (e.key === 'Escape' && !sheet.hidden) closeSheet();
       else if (e.key === 'Enter' && sheet.hidden && document.activeElement === document.body) act(cont.act);
     };

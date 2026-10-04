@@ -57,7 +57,7 @@ import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
-import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS } from './game/career.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today } from './game/career.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -188,7 +188,10 @@ async function boot() {
     sessionStorage.removeItem('tt.resume');
   } catch { /* private mode */ }
   // Today's daily strike, if this load is one.
-  const daily = selftest ? null : takeDailyRun(level.id);
+  // A daily is read once per load, so a daily left mid-fight and resumed
+  // carries its terms in the save, while it is still the same day.
+  const daily = selftest ? null : (takeDailyRun(level.id)
+    || (resumeSnap?.daily && resumeSnap.daily.level === level.id && resumeSnap.daily.date === today() ? resumeSnap.daily : null));
   const dailyMod = daily ? DAILY_MODS.find((m) => m.id === daily.mod) : null;
   const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
@@ -574,7 +577,9 @@ async function boot() {
   if (level.freeBuild) battle.freeBuild = true;
   // The commander's commissions, and whatever the last crate left for this
   // battle. Not in Boot Camp, and never under the harness.
-  const perks = (!underHarness() && level.id !== 'tutorial') ? battlePerks() : null;
+  // Not on a resume: the save's money replaces whatever the perks would add,
+  // and spending them here threw a fresh crate's cheque away.
+  const perks = (!underHarness() && level.id !== 'tutorial' && !resumeSnap) ? battlePerks() : null;
   if (perks) {
     battle.money = Math.round(battle.money * (1 + perks.fundsPct)) + perks.funds;
     // Income is computed from the battle's progress; the perk scales it.
@@ -709,15 +714,18 @@ async function boot() {
       // looking at the world.
       const wasPaused = testMenu.paused;
       testMenu.paused = true;
-      coveredBy++;
+      cover(1);
       keepBattle();
       try {
         const { showWorldMap } = await import('./ui/worldmap.js');
-        const id = await showWorldMap({ current: level.id, canResume: true });
+        // A finished battle has nothing to go back to; picking it again
+        // starts it afresh, as the front door does.
+        const id = await showWorldMap({ current: level.id, canResume: !battleOver });
         if (id && id !== level.id) { goToLevel(id); return; }
+        if (id === level.id && battleOver) { goToLevel(id); return; }
       } finally {
         testMenu.paused = wasPaused;
-        coveredBy--;
+        cover(-1);
       }
       // Picking the level already in play, or backing out, just closes it.
     },
@@ -725,7 +733,7 @@ async function boot() {
     onHome: async () => {
       const wasPaused = testMenu.paused;
       testMenu.paused = true;
-      coveredBy++;
+      cover(1);
       keepBattle();
       try {
         const { openFrontDoor } = await import('./ui/title.js');
@@ -745,7 +753,7 @@ async function boot() {
         }
       } finally {
         testMenu.paused = wasPaused;
-        coveredBy--;
+        cover(-1);
       }
     },
     // The readouts fly the camera: the target's name back to the target, UNITS
@@ -1166,24 +1174,44 @@ async function boot() {
       //
       // Read *before* the result is banked, because banking it rewrites the
       // best — ask afterwards and every run is a personal best.
-      case 'win':
+      case 'win': {
         battleOver = true;
         feedback.emit('win');
         clearBattle(level.id);
         winOrbit = true;
         if (comcard) setTimeout(() => { if (!document.body.classList.contains('ended')) comcard.win(); }, 1400);
-        if (dailyMod) {
-          setTimeout(() => {
-            if (dailyMet(dailyMod.id, battle.summary())) {
-              const streak = markDailyDone(daily.date);
-              dailyBanked = streak;
-              hud.feed(`DAILY STRIKE COMPLETE · ${streak}-DAY STREAK`, 'big');
-            } else {
-              hud.feed('DAILY STRIKE MISSED · TOO SLOW FOR BLITZ', 'bad');
-            }
-            endDailyRun();
-          }, 1500);
-        }
+        // Banked once, by whichever comes first: the timers below, or the
+        // page going away. The report waits seven seconds for the collapse
+        // to finish, and a player who restarted or closed the tab inside them
+        // lost the win, the XP, the medals and the daily, with the save
+        // already gone.
+        let dailyDone = !dailyMod;
+        const bankDaily = () => {
+          if (dailyDone) return;
+          dailyDone = true;
+          if (dailyMet(dailyMod.id, battle.summary())) {
+            const streak = markDailyDone(daily.date);
+            dailyBanked = streak;
+            hud.feed(`DAILY STRIKE COMPLETE · ${streak}-DAY STREAK`, 'big');
+          } else {
+            hud.feed('DAILY STRIKE MISSED · TOO SLOW FOR BLITZ', 'bad');
+          }
+          endDailyRun();
+        };
+        let banked = null;
+        const bankWin = () => {
+          if (banked) return banked;
+          bankDaily();
+          const sum = battle.summary();
+          const marks = markRun(sum);
+          if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
+          recordTheatre(level.id, true, sum);
+          const feats = awardMedals(sum);
+          banked = { sum, marks, feats, xp: payOut(true, sum, { marks, feats }) };
+          return banked;
+        };
+        window.addEventListener('pagehide', bankWin);
+        if (dailyMod) setTimeout(bankDaily, 1500);
         // Let the collapse actually finish before covering it with a panel —
         // the tower coming down is the thing the player came for.
         hud.feed('STRUCTURE FAILING', 'big');
@@ -1198,18 +1226,15 @@ async function boot() {
         rig.focus(new THREE.Vector3(0, groundY + level.camera.height * 0.7, 0),
           level.camera.distance * 1.3);
         setTimeout(() => {
-          const sum = battle.summary();
-          const marks = markRun(sum);
-          if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
-          recordTheatre(level.id, true, sum);
+          const { sum, marks, feats, xp } = bankWin();
+          window.removeEventListener('pagehide', bankWin);
           hud.nextTargetLabel = nextTarget(level.id).target;
           takeBeforeAfter(sum);
           hideNewsflash();
-          const feats = awardMedals(sum);
-          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: feats,
-            xp: payOut(true, sum, { marks, feats }) });
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: feats, xp });
         }, 7000);
         break;
+      }
       case 'flattened':
         battleOver = true;
         clearBattle(level.id);
@@ -1690,6 +1715,7 @@ async function boot() {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
     if (battle.state !== 'playing' || document.body.classList.contains('ended')) return;
+    if (document.body.classList.contains('covered')) return;
     if (e.code === 'Escape') {
       battle.selectedUnitId = null;
       hud.hidePrompt();
@@ -1791,9 +1817,15 @@ async function boot() {
   // The battle as it was left, before the player sees the board.
   if (resumeSnap) {
     try {
-      restoreBattle(resumeSnap, { battle, structures });
-      for (const st of structures) st.solveStability(true);
-      console.log(`[tumble] resumed ${level.id}: ${resumeSnap.units.length} units, $${resumeSnap.money}`);
+      if (restoreBattle(resumeSnap, { battle, structures })) {
+        for (const st of structures) st.solveStability(true);
+        battle.rebaseEconomy();
+        for (const id of resumeSnap.used || []) used.add(id);
+        console.log(`[tumble] resumed ${level.id}: ${resumeSnap.units.length} units, $${resumeSnap.money}`);
+      } else {
+        console.warn('[tumble] saved battle does not fit this build of the level; starting fresh');
+        resumeSnap = null;
+      }
     } catch (err) {
       console.warn('[tumble] could not resume the battle', err);
     }
@@ -1810,10 +1842,17 @@ async function boot() {
   let battleOver = false;
   // The frame loop's pacing and its end (see power.js and `release` below).
   let released = false, menuOpen = false, coveredBy = 0;
+  // The front door or the map over the battle. Said on the body as well, so
+  // the battle's keys (and the HUD's) can stand down while it is covered:
+  // a digit pressed on the map armed a gun behind it.
+  function cover(n) {
+    coveredBy = Math.max(0, coveredBy + n);
+    document.body.classList.toggle('covered', coveredBy > 0);
+  }
   const keepBattle = () => {
     if (battleOver || level.id === 'tutorial' || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
-    try { saveBattle(snapshotBattle({ level, battle, structures })); } catch (err) { console.warn('[tumble] battle not saved', err); }
+    try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
   window.__keepBattle = keepBattle;
   setInterval(keepBattle, 10000);

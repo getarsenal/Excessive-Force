@@ -511,10 +511,20 @@ export class Flourish {
       if (this.wilsons.length >= 2) return;
       const mat = new THREE.ShaderMaterial({
         uniforms: { uA: { value: 0 } },
-        vertexShader: `varying vec3 vN; varying vec3 vV;
-          void main() { vec4 w = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-w.xyz); gl_Position = projectionMatrix * w; }`,
-        fragmentShader: `uniform float uA; varying vec3 vN; varying vec3 vV;
-          void main() { float rim = 1.0 - abs(dot(vN, vV)); float a = uA * (0.18 + 0.82 * pow(rim, 2.2)); gl_FragColor = vec4(vec3(0.97, 0.98, 1.0), a); }`,
+        // With the log-depth chunks every custom shader here carries: on a
+        // phone with log depth on, the dome was depth-tested in the wrong space.
+        vertexShader: `#include <common>
+          #include <logdepthbuf_pars_vertex>
+          varying vec3 vN; varying vec3 vV;
+          void main() { vec4 w = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-w.xyz); gl_Position = projectionMatrix * w;
+            #include <logdepthbuf_vertex>
+          }`,
+        fragmentShader: `#include <common>
+          #include <logdepthbuf_pars_fragment>
+          uniform float uA; varying vec3 vN; varying vec3 vV;
+          void main() {
+            #include <logdepthbuf_fragment>
+            float rim = 1.0 - abs(dot(vN, vV)); float a = uA * (0.18 + 0.82 * pow(rim, 2.2)); gl_FragColor = vec4(vec3(0.97, 0.98, 1.0), a); }`,
         transparent: true, depthWrite: false, side: THREE.DoubleSide,
       });
       const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.55), mat);

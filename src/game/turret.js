@@ -333,7 +333,7 @@ export class CoastalTurret {
     // walls — a mounting this size cannot depress onto the terrace below it.
     let best = null, bd = this.range * this.range;
     for (const u of units) {
-      if (!u.alive) continue;
+      if (!u.alive || u.health <= 0) continue;
       const d = u.pos.distanceToSquared(this.pos);
       if (d < this.minRange * this.minRange) continue;
       if (d < bd) { bd = d; best = u; }
@@ -361,6 +361,9 @@ export class CoastalTurret {
     this._placeColliders();
 
     this.cooldown -= dt;
+    // A salvo whose target is gone is over: left at one, the next gun to
+    // come into range anywhere took the second shell before it was laid on.
+    if (this.salvo > 0 && !best) { this.salvo = 0; this.cooldown = Math.max(this.cooldown, 2); return; }
     if (this.salvo > 0) {
       this.salvoGap -= dt;
       if (this.salvoGap <= 0 && best) this._fire(best, projectiles, battle);
@@ -374,9 +377,6 @@ export class CoastalTurret {
 
   _fire(target, projectiles, battle) {
     const i = 2 - this.salvo;
-    this.salvo--;
-    this.salvoGap = 0.45;
-    if (this.salvo === 0) this.cooldown = this.rof * (0.85 + Math.random() * 0.3);
     // Out of the tube, along the tube: the guns are already laid on the
     // solution, so the shell is the solution's speed along the barrel's own
     // line, with a little scatter — a heavy gun suppresses a position.
@@ -389,11 +389,16 @@ export class CoastalTurret {
     const vel = dir.clone().multiplyScalar(speed);
     // Spawned a little past the muzzle, and owned by the mounting, so the
     // first thing the round's ray finds is not the barrel it came out of.
-    projectiles.fire({
+    const shell = projectiles.fire({
       pos: from.clone().addScaledVector(dir, 1.5), vel, gravity: 9.81, kind: 'arc', speed,
       warhead: { lethal: 2.4, radius: 24, power: 9000, fx: 2.6 },
       owner: this, target: target.pos.clone(), trail: 1.3, hostile: true,
     });
+    // The pool full: nothing left the barrel, so no recoil, flash or count.
+    if (!shell) { this.salvoGap = 0.45; return; }
+    this.salvo--;
+    this.salvoGap = 0.45;
+    if (this.salvo === 0) this.cooldown = this.rof * (0.85 + Math.random() * 0.3);
     this.recoil[i] = 1;
     this.fired++;
     this.fx.muzzleFlash(from, dir, 4.5);
@@ -471,6 +476,10 @@ export class CoastalTurret {
     this.turret.rotation.z = -0.16;
     this.pitch = -0.1;
     this.trunnion.rotation.x = -this.pitch;
+    // The colliders go with the wreck: left where they were, two invisible
+    // barrels stood in the sky at the last elevation and caught shells.
+    this.turret.updateMatrixWorld(true);
+    this._placeColliders();
     this.turret.traverse((m) => {
       if (m.isMesh && m.material) {
         m.material = m.material.clone();

@@ -1960,7 +1960,9 @@ export class Garrison {
     this.time += dt;
     if (!this.fireEnabled) return;
     for (const d of this.defenders) {
-      if (!d.alive || d.def.indirect) continue;
+      // The observer kills nobody: he spots for the tubes (see the mortars)
+      // and used to fire damageless tracer, and flash the screen, besides.
+      if (!d.alive || d.def.indirect || d.def.observer) continue;
       d.cooldown -= dt;
       if (d.cooldown > 0) continue;
       // Head down: nothing until the shelling stops.
@@ -1997,7 +1999,7 @@ export class Garrison {
       d.facing = Math.atan2(best.pos.x - d.pos.x, best.pos.z - d.pos.z);
 
       if (d.def.burst) {
-        d.burstLeft = d.burstLeft > 0 ? d.burstLeft - 1 : d.def.burst;
+        d.burstLeft = d.burstLeft > 0 ? d.burstLeft - 1 : d.def.burst - 1;
         d.cooldown = d.burstLeft > 0 ? d.def.rof : d.def.burstGap;
       } else {
         d.cooldown = d.def.rof * (0.8 + Math.random() * 0.4);
@@ -2122,7 +2124,7 @@ export class Garrison {
     this.airShots++;
     d.facing = Math.atan2(t.pos.x - d.pos.x, t.pos.z - d.pos.z);
     if (d.def.burst) {
-      d.burstLeft = d.burstLeft > 0 ? d.burstLeft - 1 : d.def.burst;
+      d.burstLeft = d.burstLeft > 0 ? d.burstLeft - 1 : d.def.burst - 1;
       d.cooldown = d.burstLeft > 0 ? d.def.rof : d.def.burstGap;
     } else {
       d.cooldown = d.def.rof * (0.8 + Math.random() * 0.4);
@@ -2139,7 +2141,8 @@ export class Garrison {
     const blockedOnly = this._cand || (this._cand = []);
     blockedOnly.length = 0;
     for (const u of playerUnits) {
-      if (!u.alive) continue;
+      // Killed this frame is dead, though \`alive\` waits for the next.
+      if (!u.alive || u.health <= 0) continue;
       const dx = u.pos.x - d.pos.x, dy = u.pos.y - d.pos.y, dz = u.pos.z - d.pos.z;
       const dd = dx * dx + dy * dy + dz * dz;
       if (dd >= bestD) continue;
@@ -2187,7 +2190,7 @@ export class Garrison {
       if (d.suppressed > this.time) { d.cooldown = 0.5; continue; }
       let best = null, bestD = d.def.range * d.def.range;
       for (const u of units) {
-        if (!u.alive) continue;
+        if (!u.alive || u.health <= 0) continue;
         const dd = d.pos.distanceToSquared(u.pos);
         if (dd < d.def.shell.minRange * d.def.shell.minRange) continue;
         if (dd < bestD) { bestD = dd; best = u; }
@@ -2207,11 +2210,14 @@ export class Garrison {
       if (!sol) { d.cooldown = 1.4; continue; }
       const sh = d.def.shell;
 
-      projectiles.fire({
+      // The pool can refuse a round when it is full; a tube that "fired"
+      // anyway spent its cooldown and set off an incoming whistle for nothing.
+      const shell = projectiles.fire({
         pos: d.muzzle, vel: sol.vel, gravity: sh.gravity, kind: 'arc',
         speed: sh.speed, warhead: sh.warhead, owner: null, target: aim,
         trail: sh.trail, hostile: true,
       });
+      if (!shell) { d.cooldown = 0.5; continue; }
       d.facing = Math.atan2(aim.x - d.pos.x, aim.z - d.pos.z);
       // The counter-attack's tubes were carried in by hand and are fed by
       // hand: a little over half the rate of the garrison's, which has had
@@ -2280,7 +2286,8 @@ export class Garrison {
     for (const d of this.defenders) {
       if (!d.alive || !d.def.flak) continue;
       if (d.suppressed > this.time) continue;
-      const reach = d.def.range + radius;
+      // The reach it engages aircraft at, which is what the warning is about.
+      const reach = (d.def.airRange || d.def.range) + radius;
       if (d.pos.distanceToSquared(point) > reach * reach) continue;
       n++;
     }
@@ -2331,8 +2338,9 @@ export class Garrison {
           d.pos.z - Math.sin(d.facing) * 1.5);
       }
 
+      // Round the position, not round the crewman beside the piece.
       if (d.sandbags && bw < this.bagMesh.instanceMatrix.count) {
-        this._m4.compose(this._v, this._q, this._s);
+        this._m4.compose(d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' ? d.pos : this._v, this._q, this._s);
         this.bagMesh.setMatrixAt(bw, this._m4);
         this._col.setHex(0x8b8163);
         this.bagMesh.instanceColor.setXYZ(bw, this._col.r, this._col.g, this._col.b);
@@ -2350,6 +2358,9 @@ export class Garrison {
       w++;
     }
     this.mesh.count = w;
+    // The pick's bounding sphere is computed once, from whoever stood there
+    // at the first tap: men dropped in later, outside it, were never hit.
+    this.mesh.boundingSphere = null;
     this.mortarMesh.count = mw;
     this.bagMesh.count = bw;
     this.gunMesh.count = gw;

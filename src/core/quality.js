@@ -163,9 +163,9 @@ function forPhone(tier) {
 }
 
 export function detectQuality(override) {
-  const stored = override || (typeof localStorage !== 'undefined'
-    ? localStorage.getItem('tt.quality')
-    : null);
+  // Storage can be there and still throw (site data blocked): a guess, then.
+  let stored = override || null;
+  if (!stored) { try { stored = localStorage.getItem('tt.quality'); } catch { stored = null; } }
   const id = TIERS[stored] ? stored : guessTier();
   return { ...forPhone(TIERS[id]), id, simd: hasWasmSimd() };
 }

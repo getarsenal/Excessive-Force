@@ -1450,8 +1450,8 @@ export class Structure {
     // changed. `explode` says so; this did not, so a clump of masonry sitting
     // on a stone that a landing section then pulverised stayed exactly where it
     // was — twenty stones welded together, at rest, twenty metres up, with
-    // nothing at all underneath them.
-    this.physics.wakeNear(point, radius * 2.4);
+    // nothing at all underneath them. Asked after the stones have gone, not
+    // before: the footing test otherwise still finds them.
     let killed = 0;
     for (let i = 0; i < this.count; i++) {
       if (!(this.flags[i] & ALIVE)) continue;
@@ -1467,6 +1467,7 @@ export class Structure {
       killed++;
       if (killed > 120) break;
     }
+    this.physics.wakeNear(point, radius * 2.4);
     if (killed) {
       // Everything round the crater has just lost a neighbour.
       this.shockMortar(point, radius * 2.0, Math.min(0.7, force / 160000));
@@ -1776,12 +1777,9 @@ export class Structure {
     const destroyed = [];
     const thrown = [];
     const ejected = new Set();
+    const wasDown = new Set();
     const r2 = radius * radius;
 
-    // Rubble that settled on this wall is about to have the wall taken out
-    // from under it. It is fixed scenery by now, so nothing in the solver will
-    // ever notice — this is where to notice, once per blast.
-    this.physics.wakeNear(center, radius * 2.4);
 
     // Only stones near the blast can be involved; walk the spatial extent
     // cheaply by testing all chunks against a squared distance. For 7k chunks
@@ -1794,6 +1792,9 @@ export class Structure {
       const dz = this.pz[i] - center.z;
       const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 > r2) continue;
+      // Already down before this blast (see the blast mass below), taken now,
+      // before the loop throws stones loose and changes their flags.
+      if ((this.flags[i] & (FREE | ISLAND)) && !this._isSettling(i)) wasDown.add(i);
 
       const d = Math.sqrt(d2) || 0.001;
       // Inverse-square-ish falloff, clamped so the core is uniformly lethal.
@@ -1911,12 +1912,22 @@ export class Structure {
       }
     }
 
-    for (const i of ejected) this.blastMass += this.mass[i];
+    // What the blast itself brought down, for the leverage: rubble already
+    // lying in the heap, and sections already counted as fallen, were
+    // demolished before this shell, and shelling the pile used to dilute the
+    // ratio for play that had done nothing wrong.
+    const fresh = (i) => !wasDown.has(i);
+    for (const i of ejected) if (fresh(i)) this.blastMass += this.mass[i];
     for (const i of destroyed) {
       if (ejected.has(i)) continue;
-      this.blastMass += this.mass[i];
+      if (fresh(i)) this.blastMass += this.mass[i];
       this.destroyChunk(i, center);
     }
+    // Rubble that settled on this wall has just had the wall taken out from
+    // under it. It is fixed scenery by now, so nothing in the solver will ever
+    // notice: this is where to notice, once per blast — after the stones have
+    // gone, or the footing test still finds them and leaves it in the air.
+    this.physics.wakeNear(center, radius * 2.4);
 
     // Soot. The stone round a hit is blackened, and stays blackened: a wall
     // that has been shelled should look shelled from across the map, not
@@ -2212,6 +2223,9 @@ export class Structure {
       this.bodyOf[i] = null;
       this.flags[i] &= ~FREE;
     }
+    // Out of its island too, and the island gone with its last stone: a
+    // section shelled out entirely left an empty body drifting in a slot.
+    if (this.flags[i] & ISLAND) this._removeFromIsland(i);
     this.flags[i] &= ~ISLAND;
     this._writeMatrix(i);
     this._meshDirty = true;
@@ -2788,7 +2802,10 @@ export class Structure {
           if (this._isSettling(i)) remaining += this.mass[i];
           continue;
         }
-        if (reach[i]) remaining += this.mass[i];
+        // The leaning section is still standing (see above): recounted
+        // without it, a crush during the lean read the whole section as
+        // demolished and paid for it.
+        if (reach[i] || (this.lean && this._leaning(i))) remaining += this.mass[i];
       }
       this.standingMass = remaining;
     }

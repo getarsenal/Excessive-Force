@@ -83,7 +83,7 @@ function unpackBits(b64, n, fn) {
  * The battle as it stands, or null if there is nothing worth keeping: no gun
  * on the ground and not a stone touched is a contract not yet started.
  */
-export function snapshotBattle({ level, battle, structures }) {
+export function snapshotBattle({ level, battle, structures, daily = null, used = null }) {
   if (!battle || battle.state !== 'playing') return null;
   const units = battle.units.filter((u) => u.alive && u.health > 0).map((u) => ({
     id: u.def.id,
@@ -115,19 +115,41 @@ export function snapshotBattle({ level, battle, structures }) {
     killed: battle.defendersKilled || 0,
     lost: battle.unitsLost || 0,
     integrity: +(battle.primary.monumentIntegrity ?? 1).toFixed(3),
-    stones: structures.map((s) => ({ n: s.count, dead: packBits(s.count, (i) => !s.isAlive(i)) })),
+    // Gone is not only destroyed: a stone blown loose and lying in the
+    // rubble, or riding a section that has fallen, is alive and counted as
+    // demolished, and a resume that put it back in the wall filled every
+    // crater in and stood every fallen spire up again. (Flags: 2 free, 8 in
+    // a welded island.) The blast mass goes with it, or the leverage read
+    // everything before the save over the blasts after it.
+    stones: structures.map((s) => ({ n: s.count, dead: packBits(s.count, (i) => !s.isAlive(i) || (s.flags[i] & (2 | 8))),
+      b: Math.round(s.blastMass || 0) })),
+    quality: battle.quality?.id || null,
     // The garrison the level was built with, by index. The airborne come
     // after it in the list and are saved by where they dug in instead,
     // because a fresh level does not have them.
     defenders: g ? packBits(nBase, (i) => !g.defenders[i].alive) : '',
     nDefenders: nBase,
     alive: g ? g.defenders.filter((d) => d.alive).length : 0,
-    airborne: battle.airborne && battle.airborne.spent ? 1 : 0,
-    assault: battle.assault && battle.assault.spent ? 1 : 0,
-    air: g ? g.defenders.slice(nBase).filter((d) => d.alive).map((d) => [
+    // Spent only once it is all on the ground. A save taken with the drop
+    // still in the air lost every man aboard and under a canopy, and the
+    // drop never came again; now it is not spent, it comes again, and the
+    // part of it already down is not kept twice.
+    airborne: battle.airborne && battle.airborne.state === 'done' ? 1 : 0,
+    assault: battle.assault && battle.assault.state === 'done' ? 1 : 0,
+    air: g ? g.defenders.slice(nBase).filter((d) => d.alive
+      && (d.pool === 'wave' ? battle.assault?.state === 'done' : battle.airborne?.state === 'done')).map((d) => [
       d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2), d.pool === 'wave' ? 1 : 0]) : [],
     burnt,
     units,
+    // The SAM sites: which of the level's own are wrecked, and the ones the
+    // counter-attack brought, which a fresh level does not have.
+    sams: battle.sams ? {
+      dead: battle.sams.launchers.map((l, i) => (!l.alive && !l.dropped ? i : -1)).filter((i) => i >= 0),
+      radar: battle.sams.radar && !battle.sams.radar.alive ? 1 : 0,
+      added: battle.sams.launchers.filter((l) => l.dropped && l.alive).map((l) => [+l.x.toFixed(1), +l.y.toFixed(2), +l.z.toFixed(1), +l.yaw.toFixed(3)]),
+    } : null,
+    daily,
+    used: used ? [...used] : [],
   };
 }
 
@@ -153,6 +175,12 @@ export function saveBattle(snap) {
  */
 export function restoreBattle(snap, { battle, structures }) {
   if (!snap || !battle) return false;
+  // All of it or none of it. A level built differently (another quality
+  // tier coarsens the stones) used to come back with the building whole and
+  // the garrison full under the old clock, score and money.
+  if (!snap.stones || snap.stones.length !== structures.length
+      || structures.some((s, k) => snap.stones[k].n !== s.count)) return false;
+  if (battle.garrison && snap.nDefenders !== battle.garrison.defenders.length) return false;
   // The stones.
   structures.forEach((s, k) => {
     const rec = snap.stones && snap.stones[k];
@@ -164,6 +192,7 @@ export function restoreBattle(snap, { battle, structures }) {
     } finally {
       s.onChunkDestroyed = hook;
     }
+    if (rec.b != null) s.blastMass = rec.b;
     s.stabilityDirty = true;
   });
   // The town.
@@ -209,6 +238,16 @@ export function restoreBattle(snap, { battle, structures }) {
   }
   } finally {
     battle.onEvent = say;
+  }
+  // The SAMs.
+  const S = battle.sams;
+  if (S && snap.sams) {
+    for (const i of snap.sams.dead || []) {
+      const l = S.launchers[i];
+      if (l && l.alive) { l.alive = false; S._wreck(l.group); }
+    }
+    if (snap.sams.radar && S.radar?.alive) { S.radar.alive = false; S._wreck(S.radar.group); }
+    for (const [x, y, z, yaw] of snap.sams.added || []) S.add({ x, y, z, yaw }, Math.max(1, snap.elapsed || 1));
   }
   battle.money = snap.money;
   battle.spent = snap.spent;

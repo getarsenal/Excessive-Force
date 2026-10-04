@@ -274,7 +274,7 @@ export class SamSites {
     L.group.rotation.y = p.yaw;
     this.group.add(L.group);
     this.launchers.push({ ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
-      alive: true, until: from + SAM.window, reload: 0 });
+      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0 });
     if (!this.radar?.alive) {
       const R = makeRadar(this.desert);
       const side = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
@@ -394,6 +394,8 @@ export class SamSites {
     const now = this._time;
     for (const s of this.air.sorties) {
       if (s.done || s.downed || !s.model || (s._samNext ?? 0) > now) continue;
+      // Already lost: a transport turning for home on fire, a gunship going in.
+      if (s.dumping || s.loiter?.phase === 'down') continue;
       const a = s.def?.aircraft;
       if (!a || a.consumed) continue;
       if (s.heli || (s.loiter && !s.loiter.orbit)) continue;
@@ -484,10 +486,10 @@ export class SamSites {
           const tp = s.model.position;
           const tv = M.prev ? this._v.copy(tp).sub(M.prev).divideScalar(Math.max(1e-3, dt)) : this._v.set(0, 0, 0);
           M.prev = (M.prev || new THREE.Vector3()).copy(tp);
-          const rel = new THREE.Vector3().copy(tp).sub(M.pos);
+          const rel = (this._rel || (this._rel = new THREE.Vector3())).copy(tp).sub(M.pos);
           const dist = rel.length();
           const tgo = dist / Math.max(200, M.speed);
-          const aim = new THREE.Vector3().copy(tp).addScaledVector(tv, Math.min(4, tgo));
+          const aim = (this._aimV || (this._aimV = new THREE.Vector3())).copy(tp).addScaledVector(tv, Math.min(4, tgo));
           if (!M.kill) aim.add(M.off);
           M.aim = (M.aim || new THREE.Vector3()).copy(aim);
           want = aim.sub(M.pos).normalize();
@@ -502,7 +504,7 @@ export class SamSites {
             this.onEvent('sammiss', { def: s.def, point: M.pos.clone() });
           }
         }
-        if (M.lost) want = this._v.copy(M.dir).add(new THREE.Vector3(0, 0.35, 0)).normalize();
+        if (M.lost) { want = this._v.copy(M.dir); want.y += 0.35; want.normalize(); }
         // Turn toward it at a rate a missile can pull: a hard curve, not a
         // snap. Hardest just after the motor lights, while it is slow and
         // still pointing at the sky: that is the pitch-over.

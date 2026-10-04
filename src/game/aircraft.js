@@ -1184,7 +1184,10 @@ export class AirWing {
     s.hits++;
     this._popFlares(s);
     s.hp -= damage;
-    if (s.lift || s.heli) {
+    // A helicopter's lift has no dumping branch: it was told it had been
+    // hit, the feed said so, and it carried on and landed the gun anyway.
+    if (s.heli) return;
+    if (s.lift) {
       // A transport does not abort — it is already over the drop zone and the
       // load is no use to anybody still in the aeroplane. It dumps the rest of
       // the sticks where it is and turns away, and the men come down wherever
@@ -1231,7 +1234,9 @@ export class AirWing {
    * turns for home on fire. Returns whether anything happened.
    */
   destroy(s) {
-    if (!s || s.done || s.downed) return false;
+    // Not twice: a transport already dumping and a gunship already going
+    // down are lost aircraft, and a second missile does not lose them again.
+    if (!s || s.done || s.downed || s.dumping || s.loiter?.phase === 'down') return false;
     const m = s.model;
     if (this.fx) this.fx.detonate(m.position, 2.6, { ground: false });
     if (s.lift || s.loiter) {
@@ -1985,7 +1990,8 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
       // them does not arrive at all.
       const dead = L.deadMen || 0;
       const streamed = L.streamed || 0;
-      L.drop.lost = L.troops && dead >= L.toGo;
+      // Already lost stays lost: a roof that burned under the drop.
+      L.drop.lost = L.drop.lost || (L.troops && dead >= L.toGo);
       L.drop.arrivalHealth = L.troops
         ? Math.max(0.2, 1 - dead / Math.max(1, L.toGo))
         : (streamed ? 0.45 : 1);

@@ -21,6 +21,9 @@ export { TAP } from './pointer.js';
  * chance of the bar and the simulation disagreeing about what you can afford.
  */
 
+
+/** Text written only when it changes: for the paths that run every frame. */
+const putText = (el, t) => { if (el.__t !== t) { el.__t = t; el.textContent = t; } };
 export class HUD {
   constructor(battle, opts = {}) {
     this.battle = battle;
@@ -142,7 +145,7 @@ export class HUD {
       // and left only the faint SHOW UI pill on a screen the player thought
       // had frozen.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (document.body.classList.contains('ended')) return;
+      if (document.body.classList.contains('ended') || document.body.classList.contains('covered')) return;
       if (this.el.menu && !this.el.menu.hidden) return;
       if (e.code === 'KeyH') this.setClearView(!this.clearView);
       if (e.code === 'KeyV') this.setSurvey(!this.survey);
@@ -215,10 +218,14 @@ export class HUD {
     win.title = 'Level won';
     el.appendChild(win);
     const seen = new Set();
+    // No marks where nothing is earned on the bar: Boot Camp has everything
+    // open, and a weapon the campaign has not released is not on this bar.
+    if (b.unlockAll) return;
     for (const u of UNITS) {
+      if (b.isReleased && !b.isReleased(u)) continue;
       // The battle's own conversion: the gate reads the same number.
       const frac = b.unlockAt(u);
-      if (frac <= 0.001 || frac >= 0.97) continue;
+      if (frac <= 0.001) continue;
       const key = frac.toFixed(3);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -299,7 +306,9 @@ export class HUD {
         if (on) {
           el.hidden = false;
           // Two frames: one to land in the layout closed, one to open.
-          requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('on')));
+          // Only if it is still the one wanted: open and shut inside two
+          // frames left it on, visible, with no drawer recorded as open.
+          requestAnimationFrame(() => requestAnimationFrame(() => { if (this.openDrawer === key) el.classList.add('on'); }));
         } else if (!el.hidden) {
           el.classList.remove('on');
           const hide = () => { if (!el.classList.contains('on')) el.hidden = true; };
@@ -370,7 +379,7 @@ export class HUD {
       const mine = holder === key;
       btn.classList.toggle('armed', mine);
       const label = btn.querySelector('.db-label');
-      if (label) label.textContent = mine ? u.name : key.toUpperCase();
+      if (label) putText(label, mine ? u.name : key.toUpperCase());
       const want = mine ? u.id : null;
       if (this._dockIconIds[key] === want) continue;
       this._dockIconIds[key] = want;
@@ -466,6 +475,9 @@ export class HUD {
     window.addEventListener('keydown', (e) => {
       // Not during the stand-off: the menu would open unseen under it.
       if (document.getElementById('ui')?.classList.contains('standoff')) return;
+      // Nor under the front door or the map, which restore the pause they
+      // found when they close: a pause set under them was undone unseen.
+      if (document.body.classList.contains('covered')) return;
       if (e.code === 'KeyP' || (e.code === 'Escape' && !menu.hidden)) open(menu.hidden && e.code === 'KeyP');
     });
   }
@@ -638,7 +650,7 @@ export class HUD {
       const el = this._badges[w++];
       if (sc.behind) { el.hidden = true; continue; }
       el.hidden = false;
-      el.textContent = '★'.repeat(u.rank);
+      putText(el, '★'.repeat(u.rank));
       el.style.left = `${sc.x}px`;
       el.style.top = `${sc.y}px`;
     }
@@ -887,7 +899,8 @@ export class HUD {
     const objs = b.objectives;
     const done = b.objectiveProgress;
     const integ = 1 - done;
-    const pct = Math.floor(done * 100 + 1e-6);
+    // The epsilon is the gate's (1e-6 of the fraction), in per cent.
+    const pct = Math.floor(done * 100 + 1e-4);
     const w = `${Math.min(100, Math.max(0, done * 100)).toFixed(2)}%`;
     if (this.el.integrity.__w !== w) {
       // A sheen runs along the bar each time it drops: two identical

@@ -846,7 +846,9 @@ export function buildHorizon(props, terrain, rng, opts = null) {
     // Clustered: a few districts of tall ones rather than an even sprinkle,
     // which is what a real skyline looks like from twenty kilometres.
     const cluster = valueNoise(x * 0.0009 + 4.2, z * 0.0009 - 1.7);
-    const h = (18 + rng() * 34) * (0.5 + cluster * 2.2);
+    // valueNoise is already centred on nought: shifted up, so a sparse
+    // district is low rather than a box of negative height under the ground.
+    const h = (18 + rng() * 34) * (0.5 + (cluster + 0.5) * 2.2);
     const w = 16 + rng() * 26, d = 16 + rng() * 26;
     props.add('dark', box(w, h, d, x, g + h / 2, z, rng() * 3.1),
       0x6e7788, 0.82 + rng() * 0.3);
