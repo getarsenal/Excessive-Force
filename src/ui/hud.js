@@ -979,6 +979,13 @@ export class HUD {
       card.classList.toggle('locked', !unlocked);
       card.classList.toggle('unaffordable', unlocked && !affordable);
       card.classList.toggle('selected', b.selectedUnitId === u.id);
+      // A free strike (a SAM compound's reward) shows on the cards it covers.
+      if (u.strike) {
+        const free = !!b.isFreeStrike?.(u);
+        card.classList.toggle('free', free);
+        const costEl = card.__cost || (card.__cost = card.querySelector('.uc-cost'));
+        if (costEl) putText(costEl, free ? 'FREE' : `$${b.costOf(u).toLocaleString()}`);
+      }
 
       if (!unlocked) {
         // Two ways to be locked and they want different words. A weapon the

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HQ } from './hq.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { part, loft, surface, pair, makeHercules } from './aircraft.js';
 import { soldierGeometry } from './soldier.js';
@@ -532,6 +533,9 @@ function cityGeom(plots) {
   return { nearPlots, inside, walledSides };
 }
 
+
+/** Money for an enemy transport shot down, on top of the men aboard. */
+export const TRANSPORT_BOUNTY = 2500;
 export class EnemyAirborne {
   /** @param {import('./battle.js').Battle} battle */
   constructor(battle, o = {}) {
@@ -604,7 +608,10 @@ export class EnemyAirborne {
     const C = this.cfg;
     const base = g.defenders.filter((d) => d.pool === 'base' || d.pool === 'works' || !d.pool).length;
     const room = (g.pools[C.pool] || 0) - (g.used[C.pool] || 0);
-    const want = Math.min(room, Math.round(base * C.share));
+    // With its command post gone the enemy cannot coordinate a full drop:
+    // what is sent for afterwards comes a third short (see hq.js).
+    const cut = b.hq && !b.hq.alive ? HQ.dropShare : 1;
+    const want = Math.min(room, Math.round(base * C.share * cut));
     if (want < 1) return null;
     const near = Math.round(want * (1 - C.spread));
     const slots = this._slots(near);
@@ -1108,7 +1115,11 @@ export class EnemyAirborne {
     p.next = p.load.length;
     this.lost += aboard;
     if (aboard) this.battle._creditKills(aboard, p.model.position.clone());
-    this.battle.onEvent('airbornedown', { name: this.frame.name, aboard });
+    // A transport is a target in its own right: paid for, whatever it carried.
+    const at = p.model.position.clone();
+    this.battle.money += TRANSPORT_BOUNTY;
+    this.battle.onEvent('bounty', { point: at, amount: TRANSPORT_BOUNTY, kind: 'kill' });
+    this.battle.onEvent('airbornedown', { name: this.frame.name, aboard, bounty: TRANSPORT_BOUNTY, point: at });
   }
 
   _hitMan(man, dmg) {

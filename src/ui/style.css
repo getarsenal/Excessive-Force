@@ -2577,3 +2577,7 @@ body.clear-view #lensdirt { display: none; }
 .ec-row:not(:has(> :not([hidden]))) { display: none; }
 .ec-row.ec-small > .ec-btn { min-height: 38px; font-size: 10px; letter-spacing: 0.14em; color: var(--dim); }
 .ec-row.ec-small > .ec-btn.clip { color: #fff; }
+
+/* A strike on the house, from a SAM compound wrecked: the price says so. */
+.unit-card.free .uc-cost { color: #f3c14a; font-weight: 700; letter-spacing: 0.12em; }
+.unit-card.free { box-shadow: inset 0 0 0 1px rgba(243, 193, 74, 0.7); }

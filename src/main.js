@@ -49,6 +49,7 @@ import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
 import { SamSites, siteSams, SAM } from './game/sam.js';
 import { HuntMarkers } from './game/huntmarkers.js';
+import { CommandPost } from './game/hq.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -443,6 +444,10 @@ async function boot() {
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
   const huntMarkers = new HuntMarkers(engine.scene);
+  // Gold diamonds over the high-value targets: the SAM launchers and radars
+  // and the command post, while they stand.
+  const hvtMarkers = new HuntMarkers(engine.scene, { color: 0xf3c14a, shape: 'diamond', cap: 40 });
+  const hvtPts = [];
   // Dirt on the lens: a blast close enough to the camera throws it at the
   // glass. Spots of mud in a soft-edged splatter, sliding down as they fade.
   const lensSuite = (() => { try { return localStorage.getItem('tt.suite') === '1'; } catch { return false; } })();
@@ -648,7 +653,25 @@ async function boot() {
     for (const ch of level.id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
     const count = level.samCount ?? (SAM.sites[0] + (hash % (SAM.sites[1] - SAM.sites[0] + 1)));
     const sites = siteSams(terrain, { ...samOpts, count });
-    if (sites.length) battle.sams = makeSams(sites);
+    if (sites.length) {
+      battle.sams = makeSams(sites);
+      // Each compound with its own guard round the ring.
+      for (const st of battle.sams.sites) battle.sams.garrisonSite(st, garrison);
+    }
+    // The command post: inside the belt, nearer the objective than the SAMs,
+    // clear of them, on ground a bunker and a mast can stand on.
+    if (level.hq !== false) {
+      const ex = samOpts.exclude;
+      const hs = siteSams(terrain, { ...samOpts, count: 1, seed: 0x4c2, r0: Math.max(90, ex * 0.95),
+        rMax: Math.max(260, ex * 2.4), sizes: [20, 16, 13], avoid: sites, avoidR: 140 })[0]
+        || siteSams(terrain, { ...samOpts, count: 1, seed: 0x4c2, r0: Math.max(90, ex * 0.95),
+          sizes: [16, 13], avoid: sites, avoidR: 140 })[0];
+      if (hs) {
+        battle.hq = new CommandPost({ scene: engine.scene, terrain, fx, site: hs, desert,
+          onEvent: (kind, data) => handleEvent(kind, data) });
+        battle.hq.garrison(garrison);
+      }
+    }
     // The counter-attack's battery: three more sites, clear of the first
     // two, dropped on pallets and live from the moment each one lands.
     battle.samSites = (n) => siteSams(terrain, { ...samOpts, count: n, seed: 0x9e1,
@@ -851,6 +874,7 @@ async function boot() {
   const comcard = level.id === 'tutorial' ? null : new ComCard({ level, audio });
   window.__comcard = comcard;      // for the harness
   window.__hunt = huntMarkers;
+  window.__hvt = hvtMarkers;
   let winOrbit = false;
   // What went into the fight, for the medals: every weapon deployed or
   // called, and whether an aircraft was lost doing it.
@@ -1004,7 +1028,7 @@ async function boot() {
       case 'airbornedown':
         feedback.emit('impact', 1.2);
         ribbon('downed'); runStats.downed++;
-        hud.feed(`${data.name} SHOT DOWN${data.aboard ? ` — ${data.aboard} ABOARD` : ''}`, 'big');
+        hud.feed(`${data.name} SHOT DOWN${data.bounty ? ` · +$${data.bounty.toLocaleString()}` : ''}${data.aboard ? ` — ${data.aboard} ABOARD` : ''}`, 'big');
         break;
       case 'airbornelanded':
         hud.feed(`ENEMY AIRBORNE DOWN · ${data.landed} DUG IN · ${data.lost} LOST`, data.landed > data.lost ? 'bad' : 'big');
@@ -1085,11 +1109,53 @@ async function boot() {
         break;
       case 'samdown':
         feedback.emit('impact', 1.0);
-        hud.feed(data.left ? `SAM LAUNCHER DESTROYED · ${data.left} LEFT` : 'LAST SAM LAUNCHER DESTROYED — THE SKY IS YOURS', 'big');
+        ribbon('samkill');
+        hud.feed(data.left ? `SAM LAUNCHER DESTROYED · +$6,000 · ${data.left} LEFT` : 'LAST SAM LAUNCHER DESTROYED — THE SKY IS YOURS', 'big');
         battle.onEvent('stamp', { text: 'SAM DESTROYED', point: data.point, kind: 'hit' });
         break;
       case 'samradar':
-        hud.feed('SAM RADAR DESTROYED — THE BATTERY IS FIRING BLIND', 'big');
+        ribbon('samkill');
+        hud.feed('SAM RADAR DESTROYED · +$4,000 — ITS LAUNCHERS ARE FIRING BLIND', 'big');
+        battle.onEvent('stamp', { text: 'RADAR DOWN', point: data.point, kind: 'hit' });
+        break;
+      case 'samhit': {
+        // Damage that did not finish it: said, with what is left, so the player
+        // knows the rounds are going in and to keep them coming.
+        const pct = Math.max(1, Math.round(data.frac * 100));
+        hud.feed(`SAM ${data.what === 'radar' ? 'RADAR' : 'LAUNCHER'} HIT · ${pct}% LEFT`, 'warn');
+        break;
+      }
+      case 'samsite': {
+        // A whole compound: the money, a free strike, and the general.
+        battle.onSamSite();
+        feedback.emit('jackpot');
+        ribbon('samsite');
+        hud.feed(`SAM SITE DESTROYED · +$15,000 · FREE AIR STRIKE EARNED${data.left ? ` · ${data.left} SITE${data.left > 1 ? 'S' : ''} LEFT` : ''}`, 'big');
+        hud.status('free air strike: any up to the F-15 is on the house — open STRIKES', 8);
+        battle.onEvent('stamp', { text: 'SAM SITE DESTROYED', point: data.point, kind: 'hit' });
+        if (!data.left) {
+          ribbon('supremacy');
+          hud.feed('EVERY SAM SITE DESTROYED — AIR SUPREMACY', 'big');
+        }
+        if (comcard) comcard.samSite(!data.left);
+        break;
+      }
+      case 'hqhit': {
+        const pct = Math.max(1, Math.round(data.frac * 100));
+        hud.feed(`COMMAND POST HIT · ${pct}% LEFT`, 'warn');
+        break;
+      }
+      case 'hqdown':
+        battle.cutComms();
+        feedback.emit('jackpot');
+        ribbon('hq');
+        hud.feed('ENEMY COMMAND POST DESTROYED · +$12,000 · COMMS CUT: THEIR FIRE IS RAGGED, THEIR MORTARS BLIND', 'big');
+        hud.status('comms cut for 90 s · any drop they send for now comes a third short', 8);
+        battle.onEvent('stamp', { text: 'COMMAND POST DESTROYED', point: data.point, kind: 'hit' });
+        if (comcard) comcard.hqDown();
+        break;
+      case 'freestrike':
+        hud.feed(`FREE STRIKE USED · ${data.def.name}${data.left ? ` · ${data.left} MORE` : ''}`, 'big');
         break;
       case 'samquiet':
         hud.feed('SAM SITES HAVE GONE QUIET', 'big');
@@ -2088,6 +2154,7 @@ async function boot() {
     fx.update(dt);
     whiteFlags.update(dt);
     huntMarkers.update(rawDt, battle.garrison, engine.camera, !!battle._held && battle.state === 'playing');
+    hvtMarkers.updatePoints(rawDt, battle.hvtPoints(hvtPts), engine.camera, battle.state === 'playing' && !document.body.classList.contains('clear-view'));
     hud.update(rawDt);
     if (tutorial) tutorial.update();
     // A weapon armed, a drawer opened: felt and heard, from whichever of the

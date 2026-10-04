@@ -92,6 +92,21 @@ const BUCK_WARN = [
   "Signals picked up a brigade on the move. Heavy drop at three quarters. Dig in, spread out, and keep some money back.",
   "He's emptying the barracks for one last throw. Guns apart, machine guns up, and buy me something that reaches.",
 ];
+const BUCK_SAMSITE = [
+  "That's one SAM site off the board. Flyboys, your next run is on me.",
+  "Launchers burning, radar down. Tell the Air Force the drinks are on the house: one free sortie.",
+  "Somebody spent a lot of money on that missile site. Now it's a crater with a fence round it.",
+  "Ring's empty. Send a jet in on my dime, they've earned it.",
+];
+const BUCK_SUPREMACY = [
+  "That's the last of his missiles. The sky is ours. Bomb whatever you like.",
+  "No more SAMs. I want aircraft over that thing every minute of every hour.",
+];
+const BUCK_HQ = [
+  "Command post's gone. They're shouting into dead radios now. Push.",
+  "Cut the head off the snake. Ninety seconds before somebody figures out who's in charge. Use them.",
+  "That was his headquarters. Every gun he has is guessing now.",
+];
 const BUCK_LOST = [
   "We lost a gun. Somebody owes me a gun.",
   "That was a perfectly good howitzer. Find whoever did that.",
@@ -238,4 +253,11 @@ export class ComCard {
     this.say('us', this._deal('lost', BUCK_LOST));
   }
   win() { this.say('us', this._deal('win', BUCK_WIN)); }
+  /** A SAM compound wrecked; the last of them, the sky. */
+  samSite(last = false) {
+    this.say('us', last ? this._deal('supremacy', BUCK_SUPREMACY) : this._deal('samsite', BUCK_SAMSITE));
+    this._quietUntil = performance.now() + 7000;
+  }
+  /** The enemy command post down. */
+  hqDown() { this.say('us', this._deal('hq', BUCK_HQ)); this._quietUntil = performance.now() + 7000; }
 }

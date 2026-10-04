@@ -16,17 +16,29 @@ const CAP = 600;
 const DROP_POOLS = new Set(['air', 'wave']);
 
 export class HuntMarkers {
-  constructor(scene) {
+  /**
+   * `color` and `shape`: the drop's survivors are red arrows; the high-value
+   * targets (see `updatePoints`) are gold diamonds.
+   */
+  constructor(scene, { color = 0xff4a24, shape = 'arrow', cap = CAP } = {}) {
     // A short cone, point down, with a flat collar on top so it reads as an
-    // arrow from the side and as a ring from above.
-    const cone = new THREE.ConeGeometry(0.55, 1.3, 4, 1);
-    cone.rotateX(Math.PI);
-    cone.translate(0, 0.65, 0);
+    // arrow from the side and as a ring from above; or a diamond.
+    let cone;
+    if (shape === 'diamond') {
+      cone = new THREE.OctahedronGeometry(0.75, 0);
+      cone.scale(0.8, 1.25, 0.8);
+      cone.translate(0, 0.95, 0);
+    } else {
+      cone = new THREE.ConeGeometry(0.55, 1.3, 4, 1);
+      cone.rotateX(Math.PI);
+      cone.translate(0, 0.65, 0);
+    }
+    this.cap = cap;
     const mat = new THREE.MeshBasicMaterial({
-      color: 0xff4a24, transparent: true, opacity: 0.95,
+      color, transparent: true, opacity: 0.95,
       depthTest: false, depthWrite: false, fog: false, toneMapped: false,
     });
-    this.mesh = new THREE.InstancedMesh(cone, mat, CAP);
+    this.mesh = new THREE.InstancedMesh(cone, mat, cap);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 999;
@@ -43,6 +55,35 @@ export class HuntMarkers {
     this.shown = 0;
   }
 
+  /**
+   * Over fixed points instead of men: the SAM launchers and radars and the
+   * command post, while they stand. Higher over them and slower, since they
+   * are vehicles and buildings, not a man's head.
+   */
+  updatePoints(dt, points, camera, on) {
+    this.t += dt;
+    let n = 0;
+    if (on) {
+      const cam = camera.position;
+      for (const p of points) {
+        if (n >= this.cap) break;
+        this._p.set(p.x, p.y, p.z);
+        const dist = cam.distanceTo(this._p);
+        const s = Math.min(14, Math.max(1.4, dist * 0.016));
+        const bounce = Math.abs(Math.sin(this.t * 2.2 + n * 0.9));
+        this._p.y += 9 + 1.6 * s + bounce * 0.7 * s;
+        this._q.setFromAxisAngle(this._up, this.t * 1.4 + n);
+        this._s.setScalar(s);
+        this._m.compose(this._p, this._q, this._s);
+        this.mesh.setMatrixAt(n++, this._m);
+      }
+    }
+    this.mesh.count = n;
+    this.mesh.visible = n > 0;
+    if (n) this.mesh.instanceMatrix.needsUpdate = true;
+    this.shown = n;
+  }
+
   /** `on` is whether the level is waiting on the drop; the men come from the garrison. */
   update(dt, garrison, camera, on) {
     this.t += dt;
@@ -51,7 +92,7 @@ export class HuntMarkers {
       const cam = camera.position;
       for (const d of garrison.defenders) {
         if (!d.alive || !DROP_POOLS.has(d.pool)) continue;
-        if (n >= CAP) break;
+        if (n >= this.cap) break;
         const dist = cam.distanceTo(d.pos);
         const s = Math.min(9, Math.max(0.8, dist * 0.012));
         const bounce = Math.abs(Math.sin(this.t * 4 + n * 0.7));

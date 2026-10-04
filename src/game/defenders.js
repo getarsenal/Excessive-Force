@@ -507,9 +507,15 @@ export class Garrison {
       air: { low: 170, medium: 250, high: 310, ultra: 370 }[quality.name] ?? 250,
       // The counter-attack at three quarters (see `ASSAULT` in reinforce.js).
       wave: { low: 260, medium: 380, high: 460, ultra: 540 }[quality.name] ?? 380,
+      // The high-value targets' own guards: the SAM compounds and the
+      // command post (see sam.js and hq.js).
+      hvt: { low: 48, medium: 60, high: 66, ultra: 72 }[quality.name] ?? 60,
     };
-    this.used = { base: 0, works: 0, air: 0, wave: 0 };
-    this.cap = this.pools.base + this.pools.works + this.pools.air + this.pools.wave;
+    this.used = { base: 0, works: 0, air: 0, wave: 0, hvt: 0 };
+    // Set by the battle while the command post is down (see hq.js).
+    this.commsDown = false;
+    this.commsRof = 1;
+    this.cap = this.pools.base + this.pools.works + this.pools.air + this.pools.wave + this.pools.hvt;
     // The rifleman in the shoulder, from `soldier.js`: the tones are baked into
     // the vertices and the instance colour is the uniform.
     this.mesh = mk(soldierGeometry('aim'), 0xffffff, this.cap);
@@ -517,7 +523,7 @@ export class Garrison {
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 160);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 240);
     this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
-    this.flakMesh = mk(flakGeometry(), 0xffffff, 24);
+    this.flakMesh = mk(flakGeometry(), 0xffffff, 36);
     this._mk = mk;
 
     this._m4 = new THREE.Matrix4();
@@ -1963,7 +1969,8 @@ export class Garrison {
       // The observer kills nobody: he spots for the tubes (see the mortars)
       // and used to fire damageless tracer, and flash the screen, besides.
       if (!d.alive || d.def.indirect || d.def.observer) continue;
-      d.cooldown -= dt;
+      // Without its command post the garrison fights on its own, and slower.
+      d.cooldown -= this.commsDown ? dt * this.commsRof : dt;
       if (d.cooldown > 0) continue;
       // Head down: nothing until the shelling stops.
       if (d.suppressed > this.time) { d.cooldown = 0.3; continue; }
@@ -2181,11 +2188,12 @@ export class Garrison {
     // alive in a corner was walking every mortar in the city onto the guns.
     // Within three hundred and twenty metres of the mortar, he counts.
     const spotters = this.defenders.filter((o) => o.alive && o.def.observer);
-    const observed = spotters.length > 0;
+    // And nobody to report to once the command post is gone.
+    const observed = spotters.length > 0 && !this.commsDown;
     this.observed = observed;
     for (const d of this.defenders) {
       if (!d.alive || !d.def.indirect) continue;
-      d.cooldown -= dt;
+      d.cooldown -= this.commsDown ? dt * this.commsRof : dt;
       if (d.cooldown > 0) continue;
       if (d.suppressed > this.time) { d.cooldown = 0.5; continue; }
       let best = null, bestD = d.def.range * d.def.range;

@@ -11,6 +11,7 @@ import {
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
 import { EnemyAirborne, ASSAULT } from './reinforce.js';
+import { HQ } from './hq.js';
 import { lineOfSight } from '../structure/occupancy.js';
 
 /**
@@ -27,6 +28,8 @@ const START_MONEY = 900;
 const BASE_INCOME = 14;
 const MONEY_PER_TONNE = 1.15;
 const MONEY_PER_DEFENDER = 22;
+/** The dearest strike a SAM compound's free strike covers: anything up to the F-15. */
+const FREE_STRIKE_CAP = 100000;
 // The job, in tonnes, that the rubble rate is quoted for (see payScale).
 const JOB_REF_TONNES = 600000;
 
@@ -92,6 +95,11 @@ export class Battle {
     this.fires = null;         // Fires, likewise
     this.stores = null;        // the garrison's dumps, set by main
     this.sams = null;          // the S-300 battery, set by main (see sam.js)
+    this.hq = null;            // the enemy command post, set by main (see hq.js)
+    // In-battle rewards for the high-value targets. A SAM compound wrecked
+    // earns a free air strike; the command post cuts the garrison's comms.
+    this.strikeCredits = 0;
+    this.commsDownUntil = -1;
 
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
@@ -836,10 +844,14 @@ export class Battle {
   isReleased(u) { return this.unlockAll || isReleased(u.id); }
   canAfford(u) { return this.freeBuild || this.money >= this.costOf(u); }
 
-  /** A round landing near the SAM battery: a wrecked launcher pays. */
-  _samBlast(point, radius) {
-    if (!this.sams) return;
-    const pay = this.sams.blast(point, radius);
+  /**
+   * A round landing near a high-value target: the SAM launchers and radars
+   * and the command post take it as damage, and what is wrecked pays.
+   */
+  _samBlast(point, radius, power = 3000) {
+    let pay = 0;
+    if (this.sams) pay += this.sams.blast(point, radius, power);
+    if (this.hq) pay += this.hq.blast(point, radius, power);
     if (pay > 0) {
       this.money += pay;
       this.onEvent('bounty', { point, amount: Math.round(pay), kind: 'kill' });
@@ -883,7 +895,27 @@ export class Battle {
    * and it is the pay that is evened out (`payScale`).
    */
   costOf(def) {
+    if (def?.strike && this.strikeCredits > 0 && def.cost <= FREE_STRIKE_CAP) return 0;
     return def?.cost ?? 0;
+  }
+
+  /** Is this strike on the house? A SAM compound's reward (see `onSamSite`). */
+  isFreeStrike(def) { return !!def?.strike && this.strikeCredits > 0 && def.cost <= FREE_STRIKE_CAP; }
+
+  /** A SAM compound wrecked: one air strike, any up to the F-15, free. */
+  onSamSite() { this.strikeCredits++; }
+
+  /** The command post down: the garrison without its orders for a while. */
+  cutComms() { this.commsDownUntil = this.elapsed + HQ.commsCut; }
+
+  get commsDown() { return this.elapsed < this.commsDownUntil; }
+
+  /** The high-value targets still standing, for the markers. */
+  hvtPoints(out = []) {
+    out.length = 0;
+    if (this.sams) for (const p of this.sams.points) out.push(p);
+    if (this.hq?.alive) out.push({ x: this.hq.x, y: this.hq.y + 2, z: this.hq.z, kind: 'hq' });
+    return out;
   }
 
   /**
@@ -1102,6 +1134,11 @@ export class Battle {
     if (!this.freeBuild) {
       this.money -= price;
       this.spent += price;
+    }
+    // The free strike is spent on the call.
+    if (this.isFreeStrike(def)) {
+      this.strikeCredits--;
+      this.onEvent('freestrike', { def, left: this.strikeCredits });
     }
     const at = point.clone();
     // Aim at the ground under the point if it is in the open, or at the
@@ -2171,7 +2208,7 @@ export class Battle {
         { dir: down, kinetic: w.kinetic ?? 0.35, shock: st.shock ?? 2.4, eject: 0.34 });
     }
     if (this.stores) this.stores.blast(point, rMax * 1.5);
-    this._samBlast(point, rMax * 1.5);
+    this._samBlast(point, rMax * 1.5, w.power * this.powerScale);
     const killed = this.garrison.splash(point, rMax * 1.5, w.power);
     if (killed) {
       this.defendersKilled += killed;
@@ -2347,7 +2384,7 @@ export class Battle {
     }
 
     if (this.stores) this.stores.blast(at, splashR);
-    this._samBlast(at, splashR);
+    this._samBlast(at, splashR, blastPower);
     const killed = this.garrison.splash(at, splashR, power);
     if (killed) {
       this.defendersKilled += killed;
@@ -2518,6 +2555,7 @@ export class Battle {
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
       if (this.sams) this.sams.update(dt, this.elapsed);
+      if (this.hq) this.hq.update(dt);
       this.enemyAir.length = 0;
       this.airborne.update(dt);
       this.assault.update(dt);
@@ -2551,6 +2589,11 @@ export class Battle {
     this._whistles();
     this.air.update(dt);
     if (this.sams) this.sams.update(dt, this.elapsed);
+    if (this.hq) this.hq.update(dt);
+    if (this.garrison) {
+      this.garrison.commsDown = this.commsDown;
+      this.garrison.commsRof = HQ.rof;
+    }
     this.enemyAir.length = 0;
     this.airborne.update(dt);
     this.assault.update(dt);

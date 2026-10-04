@@ -53,8 +53,19 @@ export const SAM = {
   engage: 0.9,
   /** Seconds between launches from one launcher. */
   cooldown: 4,
-  /** Money for a launcher, and for the radar. */
-  bounty: 260,
+  /** Money for a launcher, and for a radar. */
+  bounty: 6000,
+  radarBounty: 4000,
+  /** And for a whole compound: everything in the ring wrecked. */
+  siteBonus: 15000,
+  /** What it takes. A 105 mm round square on a launcher does a third of
+   *  this; a bomb does all of it. */
+  hp: 150,
+  radarHp: 100,
+  /** Blast power to hit points: a round's \`power\` over this, at the centre. */
+  powerPerHp: 60,
+  /** What the earth ring keeps off a launcher from a round landing outside it. */
+  berm: 0.3,
 };
 
 const OLIVE = 0x4d5733, SAND = 0xb09468, DARK = 0x1d2023, TYRE = 0x161616;
@@ -163,6 +174,9 @@ export function siteSams(terrain, o = {}) {
   const landmarks = o.landmarks || [];
   const count = o.count || 2;
   const avoid = o.avoid || [];
+  // The compound's clear radius: a full ring if the ground allows, a tighter
+  // one if not, and a bare launcher pad at the least.
+  const sizes = o.sizes || [36, 28, 20, 12];
   let seed = (o.seed ?? 0x5a3) + Math.round(span);
   const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
   let tol = 1.6;
@@ -186,27 +200,39 @@ export function siteSams(terrain, o = {}) {
     }
     return true;
   };
-  const r0 = Math.max(150, Math.min(span * 0.6, exclude * 1.35));
-  const rings = [r0, r0 * 1.3, r0 * 1.65, r0 * 2.0, r0 * 2.5, r0 * 3.1].filter((r) => r < span - 90);
+  const r0 = o.r0 ?? Math.max(150, Math.min(span * 0.6, exclude * 1.35));
+  let rings = [r0, r0 * 1.3, r0 * 1.65, r0 * 2.0, r0 * 2.5, r0 * 3.1].filter((r) => r < span - 90);
   if (!rings.length || rings[rings.length - 1] < span - 160) rings.push(span - 120);
+  // A site that belongs near the objective (the command post) says how near.
+  if (o.rMax) {
+    rings = rings.filter((r) => r <= o.rMax);
+    for (let r = r0 * 1.15; r <= o.rMax; r += 22) rings.push(r);
+    rings.sort((a, b) => a - b);
+  }
   const turn = rnd() * Math.PI * 2;
   const found = [];
   // Level ground first; on a mountain, whatever a crew could dig a launcher
   // into. The Corcovado has nothing within two metres of flat for a quarter
   // of a kilometre in any direction, and a battery is still there.
-  for (const t of [1.6, 2.6, 4.2]) {
-    tol = t;
-    for (const r of rings) {
-      for (let k = 0; k < 48; k++) {
-        const a = turn + (k / 48) * Math.PI * 2;
-        const x = Math.cos(a) * r, z = Math.sin(a) * r;
-        if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(220, r * 0.8))) continue;
-        // Round the map, not bunched on one side of it: on level ground a
-        // launcher keeps a wide arc from the others.
-        if (t < 4 && found.some((f) => Math.abs(Math.atan2(Math.sin(f.a - a), Math.cos(f.a - a))) < (Math.PI * 2) / (count + 1.5))) continue;
-        if (avoid.some((f) => Math.hypot(f.x - x, f.z - z) < 160)) continue;
-        if (!clear(x, z, 12)) continue;
-        found.push({ x, z, a });
+  // The full compound anywhere on the map before a smaller one anywhere: a
+  // ring of earth is worth walking further out for, and taking the first spot
+  // that held anything at all left dense cities with bare launcher pads.
+  for (const size of sizes) {
+    for (const t of [1.6, 2.6, 4.2]) {
+      tol = t;
+      for (const r of rings) {
+        for (let k = 0; k < 48; k++) {
+          const a = turn + (k / 48) * Math.PI * 2;
+          const x = Math.cos(a) * r, z = Math.sin(a) * r;
+          if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(220, r * 0.8))) continue;
+          // Round the map, not bunched on one side of it: on level ground a
+          // site keeps a wide arc from the others.
+          if (t < 4 && found.some((f) => Math.abs(Math.atan2(Math.sin(f.a - a), Math.cos(f.a - a))) < (Math.PI * 2) / (count + 1.5))) continue;
+          if (avoid.some((f) => Math.hypot(f.x - x, f.z - z) < (o.avoidR ?? 160))) continue;
+          if (!clear(x, z, size)) continue;
+          found.push({ x, z, a, size });
+          if (found.length >= count) break;
+        }
         if (found.length >= count) break;
       }
       if (found.length >= count) break;
@@ -222,7 +248,7 @@ export function siteSams(terrain, o = {}) {
     }
     return g;
   };
-  return found.map((f) => ({ x: f.x, z: f.z, y: low(f.x, f.z), yaw: Math.atan2(f.x, f.z) }));
+  return found.map((f) => ({ x: f.x, z: f.z, y: low(f.x, f.z), yaw: Math.atan2(f.x, f.z), r: f.size - 5 }));
 }
 
 export class SamSites {
@@ -239,7 +265,8 @@ export class SamSites {
     this.group.name = 'sams';
     this.scene.add(this.group);
     this.launchers = [];
-    this.radar = null;
+    this.radar = null;          // the drop's own radar, for launchers brought by the counter-attack
+    this.sites = [];            // the compounds the level starts with
     this.missiles = [];
     this.quiet = false;
     this.announced = false;
@@ -249,7 +276,7 @@ export class SamSites {
     this._up = new THREE.Vector3(0, 1, 0);
     const desert = !!o.desert;
     this.desert = desert;
-    (o.sites || []).forEach((p, i) => this.add(p, 0, i));
+    (o.sites || []).forEach((p, i) => this.addSite(p, i));
     // The trails are their own pool: a white column hanging in the sky for
     // ten seconds is a thousand puffs, and taking those from the explosions'
     // pool would starve every shell that lands while a missile is up.
@@ -268,24 +295,136 @@ export class SamSites {
    * more on pallets at three quarters, each live for its own window from the
    * moment it lands. The first launcher with no live radar brings one.
    */
-  add(p, from = 0, i = this.launchers.length) {
+  add(p, from = 0, i = this.launchers.length, site = null) {
     const L = makeLauncher(this.desert);
     L.group.position.set(p.x, p.y, p.z);
     L.group.rotation.y = p.yaw;
     this.group.add(L.group);
-    this.launchers.push({ ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
-      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0 });
-    if (!this.radar?.alive) {
-      const R = makeRadar(this.desert);
+    const l = { ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
+      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0, hp: SAM.hp, site, _hitAt: -9 };
+    this.launchers.push(l);
+    if (site) site.launchers.push(l);
+    else if (!this.radar?.alive) {
       const side = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
-      const rx = p.x + side.x * 22, rz = p.z + side.z * 22;
-      R.group.position.set(rx, this.terrain.heightAt(rx, rz), rz);
-      R.group.rotation.y = p.yaw + 0.4;
-      this.group.add(R.group);
-      this.radar = { ...R, x: rx, z: rz, alive: true };
+      this.radar = this._radarAt(p.x + side.x * 22, p.z + side.z * 22, p.yaw + 0.4);
     }
     if (from > 0) { this.quiet = false; this.announced = false; }
+    return l;
   }
+
+  _radarAt(x, z, yaw) {
+    const R = makeRadar(this.desert);
+    R.group.position.set(x, this.terrain.heightAt(x, z), z);
+    R.group.rotation.y = yaw;
+    this.group.add(R.group);
+    return { ...R, x, z, alive: true, hp: SAM.radarHp, _hitAt: -9 };
+  }
+
+  /**
+   * A compound: a ring of bulldozed earth with a gap for the trucks, the two
+   * launchers dug into revetments either side of its middle, and the radar
+   * on its mast at the back. The garrison round the ring is posted by
+   * \`garrisonSite\`. Everything in the ring wrecked is the compound gone.
+   */
+  addSite(p, i) {
+    const r = Math.max(8, p.r ?? 14);
+    const site = { id: i, x: p.x, z: p.z, y: p.y, r, yaw: p.yaw, launchers: [], radar: null, down: false };
+    const earth = mat(this.desert ? 0xa88a5c : 0x6b5d45, 0.97, 0);
+    const out = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));      // away from the objective
+    const tan = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
+    // The ring: a bank of bulldozed earth, sloped both sides, with a gap
+    // toward the objective for the trucks, laid on the ground as it lies
+    // rather than as a flat hoop over it. And a gravel apron inside.
+    if (r >= 14) {
+      const gap = 0.5;
+      const prof = [[r - 3.6, -0.6], [r - 1.4, 2.3], [r + 1.4, 2.3], [r + 3.8, -0.6]]
+        .map(([x, y]) => new THREE.Vector2(x, y));
+      // Lathe angle phi runs from +z toward +x; the gap is centred inward.
+      const inward = Math.atan2(-out.x, -out.z);
+      const bank = new THREE.LatheGeometry(prof, 72, inward + gap / 2, Math.PI * 2 - gap);
+      const pos = bank.attributes.position;
+      for (let k = 0; k < pos.count; k++) {
+        const wx = p.x + pos.getX(k), wz = p.z + pos.getZ(k);
+        pos.setY(k, pos.getY(k) + this.terrain.heightAt(wx, wz) - p.y);
+      }
+      bank.computeVertexNormals();
+      const bankMat = earth.clone();
+      bankMat.side = THREE.DoubleSide;
+      const ring = new THREE.Mesh(bank, bankMat);
+      ring.position.set(p.x, p.y, p.z);
+      ring.castShadow = true; ring.receiveShadow = true;
+      this.group.add(ring);
+      const apron = new THREE.CircleGeometry(r - 3.5, 40);
+      apron.rotateX(-Math.PI / 2);
+      const ap = apron.attributes.position;
+      for (let k = 0; k < ap.count; k++) {
+        ap.setY(k, this.terrain.heightAt(p.x + ap.getX(k), p.z + ap.getZ(k)) - p.y + 0.12);
+      }
+      apron.computeVertexNormals();
+      const gravel = new THREE.MeshStandardMaterial({ color: this.desert ? 0xb09a72 : 0x6f6a5a, roughness: 1,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      const floor = new THREE.Mesh(apron, gravel);
+      floor.position.set(p.x, p.y, p.z);
+      floor.receiveShadow = true;
+      this.group.add(floor);
+    }
+    // The launchers, either side of the middle, facing out, in revetments.
+    const off = Math.min(9, r * 0.42);
+    [-1, 1].forEach((sg, k) => {
+      const lx = p.x + tan.x * off * sg, lz = p.z + tan.z * off * sg;
+      let ly = this.terrain.heightAt(lx, lz);
+      for (let a = 0; a < 6; a++) ly = Math.min(ly, this.terrain.heightAt(lx + Math.cos(a) * 5, lz + Math.sin(a) * 5));
+      this.add({ x: lx, y: ly, z: lz, yaw: p.yaw }, 0, i * 2 + k, site);
+      for (const w of [-1, 1]) {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.4, 14), earth);
+        wall.position.set(lx + tan.x * w * 2.9, ly + 0.9, lz + tan.z * w * 2.9);
+        wall.rotation.y = p.yaw;
+        wall.castShadow = true; wall.receiveShadow = true;
+        this.group.add(wall);
+      }
+    });
+    // The radar at the back of the ring, on the side away from the gap.
+    const back = Math.min(r * 0.55, 12);
+    site.radar = this._radarAt(p.x + out.x * back, p.z + out.z * back, p.yaw + 0.4);
+    this.sites.push(site);
+    return site;
+  }
+
+  /**
+   * The men round a compound: flak on the ring either side, machine guns
+   * covering the gap, riflemen and an anti-tank team between. Posted in the
+   * garrison's own \`hvt\` allowance, so they come on top of the belt.
+   */
+  garrisonSite(site, garrison, terrain = this.terrain) {
+    if (!garrison) return 0;
+    const n0 = garrison.defenders.length;
+    const big = site.r >= 14;
+    // On the crest of the bank where there is one (it stands 2.3 m), on the
+    // ground round the pad where there is not.
+    const ringR = big ? site.r : Math.max(6, site.r - 1);
+    const post = (type, ang, rr = ringR) => {
+      const a = site.yaw + ang;
+      const x = site.x + Math.sin(a) * rr, z = site.z + Math.cos(a) * rr;
+      if (terrain.isWater(x, z)) return;
+      const crest = big && rr === ringR ? 2.3 : 0;
+      garrison.place(type, new THREE.Vector3(x, terrain.heightAt(x, z) + crest, z), a, 4,
+        { cover: 'ground', emplaced: true, sandbags: type !== 'aa', pool: 'hvt' });
+    };
+    post('aa', Math.PI / 2); post('aa', -Math.PI / 2);
+    post('mg', Math.PI - 0.5); post('mg', Math.PI + 0.5);
+    for (const a of big ? [0.35, -0.35, 1.1, -1.1, 2.1, -2.1] : [0.6, -0.6]) post('rifleman', a);
+    if (big) { post('at', Math.PI); post('sniper', 0, ringR * 0.4); }
+    return garrison.defenders.length - n0;
+  }
+
+  /** The radar this launcher is guided by, if it is still up. */
+  _radarUp(l) {
+    const r = l.site ? l.site.radar : this.radar;
+    return !!(r && r.alive);
+  }
+
+  /** The live compounds, for the markers and the HUD. */
+  get sitesLeft() { return this.sites.filter((s) => !s.down).length; }
 
   get alive() { return this.launchers.filter((l) => l.alive).length; }
 
@@ -297,21 +436,44 @@ export class SamSites {
   /** The launchers' and radar's positions, for the HUD and the harness. */
   get points() {
     const out = this.launchers.filter((l) => l.alive).map((l) => ({ x: l.x, y: l.y, z: l.z, kind: 'launcher' }));
-    if (this.radar?.alive) out.push({ x: this.radar.x, y: this.terrain.heightAt(this.radar.x, this.radar.z), z: this.radar.z, kind: 'radar' });
+    for (const R of [this.radar, ...this.sites.map((s) => s.radar)]) {
+      if (R?.alive) out.push({ x: R.x, y: this.terrain.heightAt(R.x, R.z), z: R.z, kind: 'radar' });
+    }
     return out;
   }
 
   /**
-   * Shells and bombs landing. A launcher within the blast is wrecked and its
-   * remaining rounds go up with it; so is the radar. Returns the money the
-   * kills are worth.
+   * Shells and bombs landing. Damage, not a switch: a round's power falls
+   * off across its burst, a launcher or a radar takes it as hit points, and
+   * the earth ring takes most of what lands outside it. A 105 mm round square
+   * on a launcher does a third of it; a bomb does all of it. A wrecked
+   * launcher's remaining rounds go up with it; a compound with everything in
+   * it wrecked is a compound gone. Returns the money it was worth.
    */
-  blast(point, radius) {
+  blast(point, radius, power = 3000) {
     let pay = 0;
-    const hit = (x, z) => Math.hypot(point.x - x, point.z - z) < radius + 5
-      && Math.abs(point.y - this.terrain.heightAt(x, z)) < radius + 12;
+    const now = this._time;
+    const R = radius + 4;
+    const dmgAt = (x, z, y0, site) => {
+      const d = Math.hypot(point.x - x, point.z - z);
+      if (d > R || Math.abs(point.y - y0) > radius + 12) return 0;
+      let dmg = (power / SAM.powerPerHp) * Math.pow(1 - d / R, 1.2);
+      if (site && site.r >= 14 && point.y < y0 + 4
+          && Math.hypot(point.x - site.x, point.z - site.z) > site.r - 1.5) dmg *= SAM.berm;
+      return dmg;
+    };
     for (const l of this.launchers) {
-      if (!l.alive || !hit(l.x, l.z)) continue;
+      if (!l.alive) continue;
+      const dmg = dmgAt(l.x, l.z, l.y, l.site);
+      if (dmg <= 0) continue;
+      l.hp -= dmg;
+      if (l.hp > 0) {
+        if (now - l._hitAt > 1.5) {
+          l._hitAt = now;
+          this.onEvent('samhit', { point: new THREE.Vector3(l.x, l.y, l.z), frac: l.hp / SAM.hp, what: 'launcher' });
+        }
+        continue;
+      }
       l.alive = false;
       pay += SAM.bounty;
       this._wreck(l.group);
@@ -325,12 +487,32 @@ export class SamSites {
       if (this.fx) this.fx.detonate(this._v.set(l.x, l.y + 3, l.z), 3.2, { ground: true, groundY: l.y });
       this.onEvent('samdown', { point: new THREE.Vector3(l.x, l.y, l.z), left: this.alive });
     }
-    if (this.radar?.alive && hit(this.radar.x, this.radar.z)) {
-      this.radar.alive = false;
-      pay += SAM.bounty * 0.6;
-      this._wreck(this.radar.group);
-      if (this.fx) this.fx.detonate(this._v.set(this.radar.x, this.terrain.heightAt(this.radar.x, this.radar.z) + 3, this.radar.z), 2.2, { ground: true });
-      this.onEvent('samradar', { point: new THREE.Vector3(this.radar.x, 0, this.radar.z) });
+    for (const Rd of [this.radar, ...this.sites.map((s) => s.radar)]) {
+      if (!Rd?.alive) continue;
+      const gy = this.terrain.heightAt(Rd.x, Rd.z);
+      const site = this.sites.find((s) => s.radar === Rd) || null;
+      const dmg = dmgAt(Rd.x, Rd.z, gy, site);
+      if (dmg <= 0) continue;
+      Rd.hp -= dmg;
+      if (Rd.hp > 0) {
+        if (now - Rd._hitAt > 1.5) {
+          Rd._hitAt = now;
+          this.onEvent('samhit', { point: new THREE.Vector3(Rd.x, gy, Rd.z), frac: Rd.hp / SAM.radarHp, what: 'radar' });
+        }
+        continue;
+      }
+      Rd.alive = false;
+      pay += SAM.radarBounty;
+      this._wreck(Rd.group);
+      if (this.fx) this.fx.detonate(this._v.set(Rd.x, gy + 3, Rd.z), 2.2, { ground: true });
+      this.onEvent('samradar', { point: new THREE.Vector3(Rd.x, gy, Rd.z) });
+    }
+    // A compound with nothing left in it.
+    for (const site of this.sites) {
+      if (site.down || site.radar?.alive || site.launchers.some((l) => l.alive)) continue;
+      site.down = true;
+      pay += SAM.siteBonus;
+      this.onEvent('samsite', { point: new THREE.Vector3(site.x, site.y, site.z), left: this.sitesLeft, site });
     }
     return pay;
   }
@@ -352,10 +534,10 @@ export class SamSites {
    * about one time in three; never two in a row, and never a long run of
    * luck — the ninth since the last is the one that does not miss.
    */
-  _decide() {
+  _decide(l) {
     this.since++;
     const p = this.since >= 9 ? 1 : this.since <= 1 ? 0.06 : 0.12;
-    const hit = Math.random() < (this.radar && !this.radar.alive ? p * 0.5 : p);
+    const hit = Math.random() < (this._radarUp(l) ? p : p * 0.5);
     if (hit) this.since = 0;
     return hit;
   }
@@ -363,6 +545,7 @@ export class SamSites {
   update(dt, elapsed) {
     this._time += dt;
     if (this.radar?.alive) this.radar.head.rotation.y += dt * 0.9;
+    for (const st of this.sites) if (st.radar?.alive) st.radar.head.rotation.y += dt * 0.9;
     this._now = elapsed;
     if (!this.quiet && !this.launchers.some((l) => l.alive && elapsed <= l.until)) {
       this.quiet = true;
@@ -413,7 +596,7 @@ export class SamSites {
       s._samNext = now + SAM.again;
       if (!this.announced) { this.announced = true; this.onEvent('samactive', {}); }
       if (Math.random() > SAM.engage) continue;
-      const kill = this._decide();
+      const kill = this._decide(best);
       const mouth = best.mouths[SAM.rounds - best.rounds] || best.mouths[0];
       best.rounds--;
       best.cool = SAM.cooldown;

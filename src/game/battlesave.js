@@ -153,9 +153,16 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
     // counter-attack brought, which a fresh level does not have.
     sams: battle.sams ? {
       dead: battle.sams.launchers.map((l, i) => (!l.alive && !l.dropped ? i : -1)).filter((i) => i >= 0),
+      // What is left of each, and of each compound's radar.
+      hp: battle.sams.launchers.filter((l) => !l.dropped).map((l) => Math.round(l.alive ? l.hp : 0)),
+      radars: battle.sams.sites.map((st) => Math.round(st.radar?.alive ? st.radar.hp : 0)),
+      down: battle.sams.sites.map((st) => (st.down ? 1 : 0)),
       radar: battle.sams.radar && !battle.sams.radar.alive ? 1 : 0,
       added: battle.sams.launchers.filter((l) => l.dropped && l.alive).map((l) => [+l.x.toFixed(1), +l.y.toFixed(2), +l.z.toFixed(1), +l.yaw.toFixed(3)]),
     } : null,
+    hq: battle.hq ? Math.round(battle.hq.alive ? battle.hq.hp : 0) : null,
+    credits: battle.strikeCredits || 0,
+    comms: Math.max(0, +((battle.commsDownUntil ?? -1) - battle.elapsed).toFixed(1)),
     daily,
     used: used ? [...used] : [],
   };
@@ -254,12 +261,34 @@ export function restoreBattle(snap, { battle, structures }) {
       const l = S.launchers[i];
       if (l && l.alive) { l.alive = false; S._wreck(l.group); }
     }
+    const own = S.launchers.filter((l) => !l.dropped);
+    (snap.sams.hp || []).forEach((hp, i) => { if (own[i] && own[i].alive && hp > 0) own[i].hp = hp; });
+    (snap.sams.radars || []).forEach((hp, i) => {
+      const R = S.sites[i]?.radar;
+      if (!R?.alive) return;
+      if (hp > 0) R.hp = hp; else { R.alive = false; S._wreck(R.group); }
+    });
+    (snap.sams.down || []).forEach((d, i) => { if (d && S.sites[i]) S.sites[i].down = true; });
     if (snap.sams.radar && S.radar?.alive) { S.radar.alive = false; S._wreck(S.radar.group); }
     for (const [x, y, z, yaw] of snap.sams.added || []) S.add({ x, y, z, yaw }, Math.max(1, snap.elapsed || 1));
   }
+  // The command post, the free strikes banked and the comms still cut.
+  if (battle.hq && snap.hq != null) {
+    if (snap.hq <= 0) {
+      const say2 = battle.hq.onEvent;
+      battle.hq.onEvent = () => {};
+      const keepFx = battle.hq.fx;
+      battle.hq.fx = null;
+      battle.hq.hp = 0.001;
+      battle.hq.blast({ x: battle.hq.x, y: battle.hq.y, z: battle.hq.z }, 1, 1e6);
+      battle.hq.onEvent = say2; battle.hq.fx = keepFx;
+    } else battle.hq.hp = snap.hq;
+  }
+  battle.strikeCredits = snap.credits || 0;
   battle.money = snap.money;
   battle.spent = snap.spent;
   battle.elapsed = snap.elapsed;
+  if (snap.comms > 0) battle.commsDownUntil = snap.elapsed + snap.comms;
   battle.score = snap.score;
   battle.shotsFired = snap.shots;
   battle.defendersKilled = snap.killed;

@@ -177,6 +177,11 @@ export const RIBBONS = {
   crushed: { name: 'CRUSHED', xp: 150 },
   charge: { name: 'DEMOLITION CHARGE', xp: 300 },
   collapse: { name: 'COLLAPSE', xp: 250 },
+  // The high-value targets.
+  samkill: { name: 'SAM KILL', xp: 150 },
+  samsite: { name: 'SAM SITE', xp: 500 },
+  supremacy: { name: 'AIR SUPREMACY', xp: 750 },
+  hq: { name: 'DECAPITATION', xp: 600 },
 };
 
 // ── Daily orders.
