@@ -153,7 +153,7 @@ export function realNetwork(data, terrain, opts = {}) {
         const m = Math.floor(Math.hypot(x - px, z - pz) / 6);
         for (let s2 = 1; s2 < m; s2++) {
           const ix = px + ((x - px) * s2) / m, iz = pz + ((z - pz) * s2) / m;
-          pts.push({ x: ix, z: iz, y: terrain.heightAt(ix, iz) });
+          pts.push({ x: ix, z: iz, y: terrain.heightAt(ix, iz), ins: true });
         }
       }
       pts.push({ x, z, y: terrain.heightAt(x, z) });
@@ -213,6 +213,11 @@ export function realNetwork(data, terrain, opts = {}) {
     };
     if (i0 > 0) line = [reach(i0, i0 - 1), ...line];
     if (i1 < pts.length - 1) line = [...line, reach(i1, i1 + 1)];
+    // The six-metre samples were for the water test. Kept, they went on
+    // through the welding, the snapping and the bend-rounding as vertices of
+    // their own, and every rounded bend in a surveyed town came out a
+    // different shape: the road is the survey's vertices and its cut ends.
+    line = line.filter((p, k) => !p.ins || k === 0 || k === line.length - 1);
     let len = 0;
     for (let k = 0; k < line.length - 1; k++) {
       len += Math.hypot(line[k + 1].x - line[k].x, line[k + 1].z - line[k].z);
