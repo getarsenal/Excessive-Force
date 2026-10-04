@@ -73,7 +73,7 @@ export class Tutorial {
     const h = this.hud, b = this.battle;
     const armedGun = () => !!b.selectedUnitId && !this._isStrike(b.selectedUnitId);
     return [
-      { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar is what still stands — get it under 10%. Tap its name to fly back to it.', ok: true,
+      { el: '#topbar .tb-center', title: 'TARGET', text: 'The range tower. The bar fills as it comes down, and the number is how much is down: fill it to the WIN mark at 90%. The marks along it are weapon unlocks: a card that says AT 12% opens the moment the number reads 12%. Tap the name to fly back to it.', ok: true,
         say: "Welcome to Fort Irwin, maggot. That tower cost the taxpayer eleven million dollars. Let's waste it." },
       { el: null, title: 'LOOK AROUND', text: 'Drag to orbit. Pinch or scroll to zoom.', ok: true,
         done: () => this.yaw0 != null && Math.abs(this.rig.yaw - this.yaw0) > 0.35 },

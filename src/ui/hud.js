@@ -225,8 +225,10 @@ export class HUD {
       const t = document.createElement('i');
       t.className = 'tick unlock';
       t.style.left = `${(frac * 100).toFixed(2)}%`;
-      t.title = `${u.name} unlocks`;
+      t.title = `${u.name} unlocks at ${Math.round(frac * 100)}%`;
+      t.__at = frac;
       el.appendChild(t);
+      (this._unlockTicks || (this._unlockTicks = [])).push(t);
     }
   }
 
@@ -875,11 +877,18 @@ export class HUD {
     // The bar is the whole job, not just the landmark. A level with a second
     // garrisoned building in it is not four fifths finished because the tower
     // has gone.
+    //
+    // It fills as the job is done, left to right, on the same scale as the
+    // number beside it and the marks along it. It used to be the building
+    // still standing, a fill that started full and shrank, under a number
+    // and marks that counted what had come down: at 4 % its edge stood at
+    // 96 %, nowhere near the 4 % mark the gun opened at. The number is
+    // rounded down, never up, so it does not claim a threshold not yet met.
     const objs = b.objectives;
     const done = b.objectiveProgress;
     const integ = 1 - done;
-    const pct = Math.round(done * 100);
-    const w = `${Math.max(0, integ * 100).toFixed(2)}%`;
+    const pct = Math.floor(done * 100 + 1e-6);
+    const w = `${Math.min(100, Math.max(0, done * 100)).toFixed(2)}%`;
     if (this.el.integrity.__w !== w) {
       // A sheen runs along the bar each time it drops: two identical
       // animations taken in turn, so a new hit restarts it without a reflow.
@@ -887,6 +896,13 @@ export class HUD {
       this.el.integrity.__w = w; this.el.integrity.style.width = w;
     }
     setText(this.el.integrityPct, `${pct}%`);
+    // A mark the bar has passed is a weapon earned: lit.
+    if (this._unlockTicks) {
+      for (const t of this._unlockTicks) {
+        const got = done >= t.__at - 1e-6;
+        if (t.__got !== got) { t.__got = got; t.classList.toggle('got', got); }
+      }
+    }
     const cls = `integrity-fill${integ < 0.45 ? ' critical' : integ < 0.78 ? ' hurt' : ''}${this._sheen ? ` ${this._sheen}` : ''}`;
     if (this.el.integrity.className !== cls) this.el.integrity.className = cls;
 
@@ -970,7 +986,7 @@ export class HUD {
           // game contradicting itself in two places a thumb's width apart.
           // Same conversion the tick marks on the bar already use.
           const at = b.unlockAt(u);
-          setText(card.querySelector('.uc-lock'), `AT ${Math.max(1, Math.round(at * 100))}%`);
+          setText(card.querySelector('.uc-lock'), `AT ${Math.round(at * 100)}%`);
         }
       } else if (!this._lastUnlocked.has(u.id)) {
         card.classList.remove('sealed');

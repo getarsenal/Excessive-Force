@@ -783,6 +783,13 @@ export class Battle {
    * are four fifths of it and are scored against nobody, so the bar read 6 %
    * under a card that said "AT 2 %" and stayed locked. The gate reads the
    * bar now, so whatever a card says is what happens.
+   *
+   * And on a whole number. The threshold used to be wherever the arithmetic
+   * put it — 4.4 % — while the card and the bar both rounded: the bar read
+   * 4 % under a card saying "AT 4 %" and the gun stayed locked. Thresholds
+   * are rounded up to the whole per cent the card quotes, and the bar's
+   * number is rounded down, so the gun opens on the frame the number first
+   * reads what the card says, and never before.
    */
   unlockAt(u) {
     if (this._unlockDenom == null) {
@@ -792,7 +799,8 @@ export class Battle {
     const scale = this.level?.unlockScale ?? 1;
     const frac = u.unlockFrac ?? 0;
     if (frac <= 0) return 0;
-    return Math.min(0.999, (frac / scale) / Math.max(0.05, this._unlockDenom));
+    const raw = Math.min(0.99, (frac / scale) / Math.max(0.05, this._unlockDenom));
+    return Math.max(1, Math.ceil(raw * 100 - 1e-6)) / 100;
   }
 
   /**
