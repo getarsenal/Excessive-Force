@@ -245,10 +245,12 @@ function makeVehicle(kind, desert) {
  */
 export function roadRoute(net, from, to) {
   if (!net || !net.nodes?.length || !net.edges?.length) return null;
-  const N = net.nodes.length;
+  const adj = roadGraph(net);
+  // Only nodes a road actually reaches: the graph keeps many that the
+  // welding and dissolving left with nothing attached.
   const nearest = (p) => {
     let best = -1, bd = Infinity;
-    for (let i = 0; i < N; i++) {
+    for (const i of adj.keys()) {
       const n = net.nodes[i];
       if (!n) continue;
       const d = (n.x - p.x) ** 2 + (n.z - p.z) ** 2;
@@ -258,6 +260,12 @@ export function roadRoute(net, from, to) {
   };
   const a = nearest(from), b = nearest(to);
   if (a < 0 || b < 0 || a === b) return null;
+  return dijkstra(net, adj, a, b);
+}
+
+/** The road graph: node index to its legs, built once per network. */
+export function roadGraph(net) {
+  if (net._roadGraph) return net._roadGraph;
   const adj = new Map();
   for (const e of net.edges) {
     if (!e.pts || e.pts.length < 2) continue;
@@ -267,6 +275,11 @@ export function roadRoute(net, from, to) {
     adj.get(e.a).push({ to: e.b, e, len, fwd: true });
     adj.get(e.b).push({ to: e.a, e, len, fwd: false });
   }
+  net._roadGraph = adj;
+  return adj;
+}
+
+function dijkstra(net, adj, a, b) {
   const dist = new Map([[a, 0]]), prev = new Map();
   const open = [a], done = new Set();
   while (open.length) {

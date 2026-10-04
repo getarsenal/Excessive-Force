@@ -10,11 +10,26 @@
  * it every frame (`update`) and asks it what to mark (`points`).
  */
 import * as THREE from 'three';
-import { AmmoDepot, Checkpoint, Convoy, roadRoute, TARGETS } from './targets.js';
+import { AmmoDepot, Checkpoint, Convoy, roadRoute, roadGraph, TARGETS } from './targets.js';
 
 /** A run of high-value kills inside this window earns a fire mission. */
 export const STREAK = { window: 60, need: 3, rounds: 12, seconds: 8, spread: 16,
   warhead: { lethal: 1.9, radius: 6.6, power: 6400, fx: 2.2, kinetic: 0.85 } };
+
+/** The last `len` metres of a polyline. */
+function tail(pts, len) {
+  let acc = 0;
+  for (let k = pts.length - 1; k > 0; k--) {
+    const seg = Math.hypot(pts[k].x - pts[k - 1].x, pts[k].z - pts[k - 1].z);
+    if (acc + seg >= len) {
+      const t = (len - acc) / Math.max(seg, 1e-3);
+      const a = pts[k], b = pts[k - 1];
+      return [{ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t }, ...pts.slice(k)];
+    }
+    acc += seg;
+  }
+  return pts;
+}
 
 export class HighValue {
   constructor({ battle, scene, terrain, fx, net, garrison, desert, origin, exclude, sites, onEvent }) {
@@ -43,11 +58,38 @@ export class HighValue {
     const g = this.garrison;
     this.guns = [];
     const c = Math.cos(site.yaw), s = Math.sin(site.yaw);
+    // What reads as a battery from across the map: each gun in a horseshoe
+    // of earth open to the front, a net over it, and a dug-in ammunition
+    // bunker behind the line.
+    const look = new THREE.Group();
+    look.position.set(site.x, 0, site.z);
+    look.rotation.y = site.yaw;
+    this.scene.add(look);
+    const earth = new THREE.MeshStandardMaterial({ color: this.desert ? 0xa88a5c : 0x6b5d45, roughness: 0.97, side: THREE.DoubleSide });
+    const net = new THREE.MeshStandardMaterial({ color: this.desert ? 0xa8946a : 0x55603f, roughness: 1, side: THREE.DoubleSide });
+    const at = (lx, lz) => this.terrain.heightAt(site.x + lx * c + lz * s, site.z - lx * s + lz * c);
+    for (const [lx, lz] of [[-12, 0], [0, 4], [12, 0]]) {
+      const prof = [[4.2, -0.4], [5.0, 1.5], [6.4, 1.5], [7.4, -0.4]].map(([x, y]) => new THREE.Vector2(x, y));
+      // Open toward the enemy's front, which is the site's yaw turned about.
+      const bank = new THREE.Mesh(new THREE.LatheGeometry(prof, 24, Math.PI * 1.25, Math.PI * 1.5), earth);
+      bank.position.set(lx, at(lx, lz), lz);
+      bank.castShadow = true; bank.receiveShadow = true;
+      look.add(bank);
+      const cover = new THREE.Mesh(new THREE.PlaneGeometry(9, 8), net);
+      cover.rotation.x = -Math.PI / 2 + 0.12;
+      cover.position.set(lx, at(lx, lz) + 3.4, lz - 0.6);
+      look.add(cover);
+    }
+    const bunker = new THREE.Mesh(new THREE.BoxGeometry(7, 1.6, 4), earth);
+    bunker.position.set(0, at(0, -10) + 0.5, -10);
+    bunker.castShadow = true;
+    look.add(bunker);
+    this.batteryLook = look;
     for (const [lx, lz] of [[-12, 0], [0, 4], [12, 0]]) {
       const x = site.x + lx * c + lz * s, z = site.z - lx * s + lz * c;
       const n0 = g.defenders.length;
       g.place('howitzer', new THREE.Vector3(x, this.terrain.heightAt(x, z), z), site.yaw + Math.PI, 4,
-        { cover: 'ground', emplaced: true, sandbags: true, pool: 'hvt' });
+        { cover: 'ground', emplaced: true, sandbags: false, pool: 'hvt' });
       if (g.defenders.length > n0) this.guns.push(g.defenders[g.defenders.length - 1]);
     }
     for (const [type, lx, lz] of [['mg', 0, -12], ['rifleman', -18, -6], ['rifleman', 18, -6], ['spotter', 0, -20]]) {
@@ -67,16 +109,19 @@ export class HighValue {
     const span = this.terrain.span;
     // The entry: the node furthest out that is still on the map, on the side
     // away from where the player's guns usually stand (the camera's side).
-    const nodes = net.nodes.filter((n) => n && Math.abs(n.x) < span * 0.93 && Math.abs(n.z) < span * 0.93
-      && !this.terrain.isWater(n.x, n.z));
+    const graph = roadGraph(net);
+    const nodes = [...graph.keys()].map((i) => net.nodes[i]).filter((n) => n && Math.abs(n.x) < span * 0.93
+      && Math.abs(n.z) < span * 0.93 && !this.terrain.isWater(n.x, n.z));
     if (nodes.length < 4) return;
     const far = [...nodes].sort((a, b) => Math.hypot(b.x - o.x, b.z - o.z) - Math.hypot(a.x - o.x, a.z - o.z));
-    const dest = { x: o.x + (this.exclude + 40), z: o.z };
-    for (const entry of far.slice(0, 12)) {
+    for (const entry of far.slice(0, 40)) {
       const ang = Math.atan2(entry.x - o.x, entry.z - o.z);
       const goal = { x: o.x + Math.sin(ang) * (this.exclude + 30), z: o.z + Math.cos(ang) * (this.exclude + 30) };
-      const route = roadRoute(net, entry, goal);
+      let route = roadRoute(net, entry, goal);
       if (!route) continue;
+      // The last kilometre and a bit of it: the trucks come on to the road
+      // there, out of sight past the town, rather than crossing the map.
+      route = tail(route, 1100);
       let len = 0;
       for (let k = 1; k < route.length; k++) len += Math.hypot(route[k].x - route[k - 1].x, route[k].z - route[k - 1].z);
       if (len < 260) continue;
@@ -96,7 +141,6 @@ export class HighValue {
       }
       break;
     }
-    void dest;
   }
 
   _along(route, d) {
@@ -159,14 +203,15 @@ export class HighValue {
     const span = this.terrain.span;
     const cr = this.columns.route;
     const avoidAng = cr ? Math.atan2(cr[0].x - this.origin.x, cr[0].z - this.origin.z) : 0;
-    const nodes = net.nodes.filter((n) => n && Math.abs(n.x) < span * 0.93 && Math.abs(n.z) < span * 0.93
-      && Math.hypot(n.x - goal.x, n.z - goal.z) > 450 && !this.terrain.isWater(n.x, n.z));
+    const graph = roadGraph(net);
+    const nodes = [...graph.keys()].map((i) => net.nodes[i]).filter((n) => n && Math.abs(n.x) < span * 0.93
+      && Math.abs(n.z) < span * 0.93 && Math.hypot(n.x - goal.x, n.z - goal.z) > 450 && !this.terrain.isWater(n.x, n.z));
     nodes.sort((p, q) => {
       const da = (n) => Math.abs(Math.atan2(Math.sin(Math.atan2(n.x - this.origin.x, n.z - this.origin.z) - avoidAng),
         Math.cos(Math.atan2(n.x - this.origin.x, n.z - this.origin.z) - avoidAng)));
       return da(q) - da(p);
     });
-    for (const start of nodes.slice(0, 10)) {
+    for (const start of nodes.slice(0, 40)) {
       const route = roadRoute(net, start, goal);
       if (!route) continue;
       const C = TARGETS.general;
