@@ -50,6 +50,7 @@ import { SmokeScreens } from './game/smoke.js';
 import { SamSites, siteSams, SAM } from './game/sam.js';
 import { HuntMarkers } from './game/huntmarkers.js';
 import { CommandPost } from './game/hq.js';
+import { clearGround } from './world/clearing.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -672,6 +673,12 @@ async function boot() {
         battle.hq.garrison(garrison);
       }
     }
+    // The trees and props inside a compound's ring and round the command
+    // post: the town was grown before they were sited.
+    clearGround(contextGroup, [
+      ...(battle.sams ? battle.sams.sites.map((st) => ({ x: st.x, z: st.z, r: st.r + 5 })) : []),
+      ...(battle.hq ? [{ x: battle.hq.x, z: battle.hq.z, r: 17 }] : []),
+    ]);
     // The counter-attack's battery: three more sites, clear of the first
     // two, dropped on pallets and live from the moment each one lands.
     battle.samSites = (n) => siteSams(terrain, { ...samOpts, count: n, seed: 0x9e1,

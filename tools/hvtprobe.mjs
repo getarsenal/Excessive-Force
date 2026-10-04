@@ -39,7 +39,7 @@ const info = await page.evaluate(() => {
 console.log(JSON.stringify(info));
 const s0 = info.sites[0];
 if (s0) {
-  await look(s0.x, s0.y + 3, s0.z, 95, 0.5, null);
+  await look(s0.x, s0.y + 3, s0.z, 95, +(process.env.PITCH || 0.5), null);
   await page.waitForTimeout(1500);
   await page.evaluate(() => document.body.classList.remove('clear-view'));
   await page.screenshot({ path: `/tmp/out/hvt-${level}-site.png` });
