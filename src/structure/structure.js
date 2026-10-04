@@ -763,7 +763,7 @@ export class Structure {
       const b = this.bandOf[i];
       const m = this.mass[i];
       let x = this.px[i], z = this.pz[i];
-      if (basis && b >= basis.band && !(this.flags[i] & (FREE | ISLAND))) {
+      if (basis && (basis.mask ? basis.mask[i] : b >= basis.band) && !(this.flags[i] & (FREE | ISLAND))) {
         this._leanApply(basis, x, this.py[i], z, lp);
         x = lp.x; z = lp.z;
       }
@@ -2732,7 +2732,7 @@ export class Structure {
     // thirteen-thousand-tonne welded body resting on a damaged base sinks
     // through it. Falling is the right answer eventually — but only after it
     // has visibly gone over, and by then it is falling through air.
-    if (leanBand > 0) this._armLean(leanBand, leanRatio, loadMask, reach);
+    if (leanBand > 0) this._armLean(leanBand, leanRatio, loadMask, reach, deferred);
 
     // Nothing may be deferred to a lean that never comes.
     //
@@ -2762,7 +2762,9 @@ export class Structure {
       // Both of the reported floaters are this: a minaret cut off its drum
       // while the Taj leaned somewhere else, and the Elizabeth Tower hanging
       // over its own severed base while the base crumbled underneath it.
-      const carried = this.lean && group.lowBand >= this.lean.band;
+      const LM = this.lean?.mask;
+      const carried = this.lean && group.lowBand >= this.lean.band
+        && (!LM || group.some((i) => LM[i]));
       if (carried) {
         this._markDeferred(group);
         continue;
@@ -2854,10 +2856,15 @@ export class Structure {
     const offset = (L.off0 ?? 0) * Math.cos(L.angle) + (L.comH ?? 20) * Math.sin(L.angle);
     let widest = 0;
     const from = Math.max(0, L.band - 3);
+    // What is under this piece, not everything at that height: a wall forty
+    // metres away does not catch a tower going over.
+    const F = L.foot, pad = F ? 3 + 0.25 * Math.max(F.x1 - F.x0, F.z1 - F.z0) : 0;
     for (let b = from; b < L.band; b++) {
       for (let k = this.bandStart[b]; k < this.bandStart[b + 1]; k++) {
         const j = this.bandList[k];
         if (!(this.flags[j] & ALIVE)) continue;
+        if (F && (this.px[j] < F.x0 - pad || this.px[j] > F.x1 + pad
+          || this.pz[j] < F.z0 - pad || this.pz[j] > F.z1 + pad)) continue;
         // Rubble counts. A section coming over does not care whether what
         // catches it is masonry that is still standing or the heap of its own
         // building that fell an hour ago — and the heap is usually wider than
@@ -2873,7 +2880,7 @@ export class Structure {
     return offset > widest;
   }
 
-  _armLean(band, ratio, loadMask, reach) {
+  _armLean(band, ratio, loadMask, reach, hint = null) {
     const b = band;
     if (b <= 0) return;
     if (this._fallenBand !== undefined && b >= this._fallenBand) return;
@@ -2882,93 +2889,181 @@ export class Structure {
     // still has to be re-measured, because the thing that decides whether a
     // tower recovers or goes over is how far its bearing still reaches, and
     // every shell that lands takes some of that away.
-    let refresh = false;
+    let refresh = false, prior = null;
     if (this.lean) {
-      // Keep feeding the running lean: the creep rate is driven by how hard
-      // the bearing is working *now*, so without this it stalls at whatever
-      // angle it reached in the first second and never moves again.
-      this.lean.ratio = Math.max(this.lean.ratio, ratio);
       if (this.lean.band < b) return;
+      prior = this.lean.mask || null;
       if (this.lean.band === b) refresh = true;
-      else {
-        // Something lower has started to fail. That becomes the new hinge, and
-        // the tilt it has already accumulated carries over.
-        const carryAngle = this.lean.angle, carryVel = this.lean.vel;
-        const carryTarget = this.lean.target;
-        this.lean = null;
-        this._leanCarry = { angle: carryAngle, vel: carryVel, target: carryTarget };
+    }
+
+    // What leans is one piece, not one height.
+    //
+    // A band is every stone at that height across the whole structure, and a
+    // landmark is rarely one stack: the range tower stands in a compound of
+    // walls and a gatehouse, a palace has wings, a cathedral has two spires.
+    // Leaning "everything above eighteen metres" because a shell cut the
+    // gatehouse at eighteen metres rotated the tower too — about the centroid
+    // of all the stone at that height, which was twenty-six metres away from
+    // it, so the tower's top rose four metres off its own stump, hung there
+    // at an angle, and ten seconds later was handed to the physics engine and
+    // fell. Nobody had touched it. So the masonry above the slice is split
+    // into the pieces that actually touch, each is weighed against its own
+    // footing, and the lean takes the one that is failing.
+    const pieces = this._piecesAbove(b, reach, hint);
+    if (!pieces.length) return;
+    let pick = null;
+    if (prior) {
+      // A running lean stays with the piece it is already tilting.
+      let best = 0;
+      for (const P of pieces) {
+        let k = 0;
+        for (const i of P.members) if (prior[i]) k++;
+        if (k > best) { best = k; pick = P; }
       }
     }
-
-    // Which way is it going? The direction from the surviving bearing's
-    // centroid toward the centre of mass it is carrying.
-    const s0 = this.bandStart[b - 1], s1 = this.bandStart[b];
-    let area = 0, cx = 0, cz = 0;
-    for (let k = s0; k < s1; k++) {
-      const j = this.bandList[k];
-      if (!reach[j] || !this.structural[j]) continue;
-      const a = 4 * this.hx[j] * this.hz[j];
-      area += a; cx += this.px[j] * a; cz += this.pz[j] * a;
-    }
-    if (area <= 0.01) return;
-    cx /= area; cz /= area;
-
-    const basis = this._leanBasis();
-    const lp = this._leanPt || (this._leanPt = { x: 0, y: 0, z: 0 });
-    let mAbove = 0, mx = 0, mz = 0, my = 0;
-    for (let i = 0; i < this.count; i++) {
-      if (this.bandOf[i] < b) continue;
-      if (!(this.flags[i] & ALIVE) || (this.flags[i] & FREE)) continue;
-      if ((this.flags[i] & ISLAND) && !this._isSettling(i)) continue;
-      const m = this.mass[i];
-      let x = this.px[i], z = this.pz[i];
-      if (basis && this.bandOf[i] >= basis.band && !(this.flags[i] & ISLAND)) {
-        this._leanApply(basis, x, this.py[i], z, lp);
-        x = lp.x; z = lp.z;
+    const carryOk = !!pick;
+    if (!pick) {
+      for (const P of pieces) {
+        if (!P.implicated) continue;
+        if (!pick || P.tip > pick.tip || (P.tip === pick.tip && P.mass > pick.mass)) pick = P;
       }
-      mAbove += m; mx += x * m; mz += z * m; my += this.py[i] * m;
     }
-    // Nothing worth tilting above this slice.
-    if (mAbove < this._significantLoad * 3) return;
-    const pivotY = this.groundY + b * this.bandHeight;
-    let dx = mx / mAbove - cx, dz = mz / mAbove - cz;
-    const off = Math.hypot(dx, dz);
-    if (off < 0.05) { dx = 1; dz = 0; } else { dx /= off; dz /= off; }
-
-    // How far the surviving bearing still reaches the way the load is going.
-    // This is the tipping edge: a building goes over when the resultant walks
-    // past it, and the whole of the drama is in how close it gets.
-    let reachOut = 0;
-    for (let k = s0; k < s1; k++) {
-      const j = this.bandList[k];
-      if (!reach[j] || !this.structural[j]) continue;
-      const proj = (this.px[j] - cx) * dx + (this.pz[j] - cz) * dz
-        + Math.abs(this.hx[j] * dx) + Math.abs(this.hz[j] * dz);
-      if (proj > reachOut) reachOut = proj;
-    }
-    // Lever arm of the load above the hinge. Rotating by theta walks the
-    // centre of mass out by comH * sin(theta) — which for a tower is metres
-    // per degree, and is why a lean that starts never simply stops.
-    const comH = Math.max(0.5, my / mAbove - pivotY);
+    // Nothing above this slice is actually failing: whatever the band-wide
+    // arithmetic said, it was about some other piece too small to lean.
+    if (!pick) return;
+    const fed = pick.implicated ? ratio : 0;
 
     if (refresh && this.lean) {
-      this.lean.reachOut = reachOut;
-      this.lean.comH = comH;
-      this.lean.off0 = off;
+      this.lean.ratio = Math.max(this.lean.ratio, fed);
+      this.lean.reachOut = pick.reachOut;
+      this.lean.comH = pick.comH;
+      this.lean.off0 = pick.off;
+      this.lean.mask = pick.mask;
+      this.lean.foot = pick.foot;
       return;
     }
-
-    const carry = this._leanCarry || { angle: 0, vel: 0, target: 0 };
-    this._leanCarry = null;
+    // Something lower has started to fail. That becomes the new hinge, and
+    // the tilt it has already accumulated carries over — if it is the same
+    // piece; a different piece starts upright.
+    let carry = { angle: 0, vel: 0, target: 0 };
+    if (this.lean) {
+      if (carryOk) carry = { angle: this.lean.angle, vel: this.lean.vel, target: this.lean.target };
+      // Put the old piece's colliders back where it is drawn before letting
+      // go of it.
+      if (!carryOk) { this._syncLeanColliders(); this._leanDirty = true; }
+      this.lean = null;
+    }
+    // A fresh lean on a piece whose own footing is sound, with nothing
+    // overloaded, would only straighten back up: do not start it.
+    if (!carryOk && pick.tip < 0.45 && fed <= 0.6) return;
     this.lean = {
       band: b,
-      pivotX: cx, pivotY, pivotZ: cz,
+      pivotX: pick.cx, pivotY: this.groundY + b * this.bandHeight, pivotZ: pick.cz,
       // It rotates *toward* (dx, dz), which is a rotation about the horizontal
       // axis perpendicular to that.
-      axisX: -dz, axisZ: dx,
+      axisX: -pick.dz, axisZ: pick.dx,
       angle: carry.angle, vel: carry.vel, target: carry.target,
-      ratio, reachOut, comH, off0: off,
+      ratio: fed, reachOut: pick.reachOut, comH: pick.comH, off0: pick.off,
+      mask: pick.mask, foot: pick.foot,
     };
+  }
+
+  /**
+   * The separate pieces of masonry standing above slice `b`, each with its
+   * own footing measured: where the bearing under it is centred, which way
+   * its load leans off that, how far the bearing reaches that way, the lever
+   * arm, and whether anything has actually happened to it — its footing cut
+   * (stones gone from under it), its load off-centre, or a section of it that
+   * has lost its support (`hint`, the deferred groups).
+   */
+  _piecesAbove(b, reach, hint) {
+    const n = this.count;
+    const stamp = this._pcStamp || (this._pcStamp = new Int32Array(n));
+    const tag = (this._pcTag = (this._pcTag || 0) + 1);
+    const hinted = this._pcHint || (this._pcHint = new Uint8Array(n));
+    if (hint) for (const g of hint) for (const i of g) hinted[i] = 1;
+    const basis = this._leanBasis();
+    const lp = this._leanPt || (this._leanPt = { x: 0, y: 0, z: 0 });
+    const takes = (i) => this.bandOf[i] >= b && (this.flags[i] & ALIVE) && !(this.flags[i] & FREE)
+      && (!(this.flags[i] & ISLAND) || this._isSettling(i));
+    const pieces = [];
+    const queue = this._pcQueue || (this._pcQueue = new Int32Array(n));
+    const seen = this._pcSeen || (this._pcSeen = new Int32Array(n));
+    for (let k0 = this.bandStart[b]; k0 < this.bandStart[b + 1]; k0++) {
+      const s0 = this.bandList[k0];
+      if (stamp[s0] === tag || !takes(s0)) continue;
+      // Flood the piece.
+      let head = 0, tail = 0;
+      queue[tail++] = s0; stamp[s0] = tag;
+      while (head < tail) {
+        const i = queue[head++];
+        for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+          const j = this.adjList[a];
+          if (stamp[j] === tag || !takes(j)) continue;
+          stamp[j] = tag; queue[tail++] = j;
+        }
+      }
+      const members = Array.from(queue.subarray(0, tail));
+      let mass = 0, mx = 0, my = 0, mz = 0, hit = false;
+      let fx0 = Infinity, fx1 = -Infinity, fz0 = Infinity, fz1 = -Infinity;
+      for (const i of members) {
+        const m = this.mass[i];
+        let x = this.px[i], z = this.pz[i];
+        if (basis && this._leaning(i)) {
+          this._leanApply(basis, x, this.py[i], z, lp);
+          x = lp.x; z = lp.z;
+        }
+        mass += m; mx += x * m; mz += z * m; my += this.py[i] * m;
+        if (hinted[i]) hit = true;
+        if (this.bandOf[i] === b) {
+          fx0 = Math.min(fx0, this.px[i] - this.hx[i]); fx1 = Math.max(fx1, this.px[i] + this.hx[i]);
+          fz0 = Math.min(fz0, this.pz[i] - this.hz[i]); fz1 = Math.max(fz1, this.pz[i] + this.hz[i]);
+        }
+      }
+      if (mass < this._significantLoad * 3) continue;
+      // Its footing: the stones in the slice below that it sits on, standing
+      // and gone.
+      const sTag = tag;
+      let area = 0, area0 = 0, cx = 0, cz = 0;
+      const bear = [];
+      for (const i of members) {
+        if (this.bandOf[i] !== b) continue;
+        for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+          const j = this.adjList[a];
+          if (this.bandOf[j] !== b - 1 || !this.structural[j] || seen[j] === sTag) continue;
+          seen[j] = sTag;
+          const ar = 4 * this.hx[j] * this.hz[j];
+          area0 += ar;
+          if (!(this.flags[j] & ALIVE) || (this.flags[j] & FREE) || !reach[j]) continue;
+          area += ar; cx += this.px[j] * ar; cz += this.pz[j] * ar;
+          bear.push(j);
+        }
+      }
+      if (area <= 0.01) continue;
+      cx /= area; cz /= area;
+      let dx = mx / mass - cx, dz = mz / mass - cz;
+      const off = Math.hypot(dx, dz);
+      if (off < 0.05) { dx = 1; dz = 0; } else { dx /= off; dz /= off; }
+      let reachOut = 0;
+      for (const j of bear) {
+        const proj = (this.px[j] - cx) * dx + (this.pz[j] - cz) * dz
+          + Math.abs(this.hx[j] * dx) + Math.abs(this.hz[j] * dz);
+        if (proj > reachOut) reachOut = proj;
+      }
+      const pivotY = this.groundY + b * this.bandHeight;
+      const comH = Math.max(0.5, my / mass - pivotY);
+      const tip = off / Math.max(0.25, reachOut);
+      const cut = area0 > 0 ? area / area0 : 1;
+      const mask = new Uint8Array(n);
+      for (const i of members) if (!(this.flags[i] & ISLAND)) mask[i] = 1;
+      pieces.push({
+        members, mass, cx, cz, dx, dz, off, reachOut, comH, tip, cut, mask,
+        foot: { x0: fx0, x1: fx1, z0: fz0, z1: fz1 },
+        implicated: hit || cut < 0.95 || tip >= 0.45,
+      });
+    }
+    if (hint) for (const g of hint) for (const i of g) hinted[i] = 0;
+    return pieces;
   }
 
   /**
@@ -3159,7 +3254,7 @@ export class Structure {
         pivotX: L.pivotX, pivotY: L.pivotY, pivotZ: L.pivotZ,
       };
       this._bakeLean();
-      const moved = this._goDynamic(band, this._reach);
+      const moved = this._goDynamic(band, this._reach, L.mask);
       this.lean = null;
       this.stabilityDirty = true;
       // A slice that has let go cannot lean again — there is nothing standing
@@ -3212,7 +3307,7 @@ export class Structure {
       ax: L.axisX / n, az: L.axisZ / n,
       c: Math.cos(L.angle), s: Math.sin(L.angle),
       ox: L.pivotX, oy: L.pivotY, oz: L.pivotZ,
-      band: L.band,
+      band: L.band, mask: L.mask || null,
     };
   }
 
@@ -3241,7 +3336,7 @@ export class Structure {
   /** Is this stone carried by the current lean? */
   _leaning(i) {
     const L = this.lean;
-    return !!L && this.bandOf[i] >= L.band
+    return !!L && (L.mask ? L.mask[i] === 1 : this.bandOf[i] >= L.band)
       && (this.flags[i] & ALIVE) && !(this.flags[i] & (FREE | ISLAND));
   }
 
@@ -3434,7 +3529,7 @@ export class Structure {
    * resting on a stack of loose one-tonne stones is a mass ratio of ten
    * thousand to one, which it does not.
    */
-  _goDynamic(band, reach) {
+  _goDynamic(band, reach, only = null) {
     // Everything above the hinge that is still standing masonry — *not* only
     // what the support flood can still reach.
     //
@@ -3451,6 +3546,9 @@ export class Structure {
       for (let k = this.bandStart[bb]; k < this.bandStart[bb + 1]; k++) {
         const j = this.bandList[k];
         if (!(this.flags[j] & ALIVE) || (this.flags[j] & (FREE | ISLAND))) continue;
+        // Only the piece that went over; the rest of the slice is another
+        // building as far as this fall is concerned.
+        if (only && !only[j]) continue;
         doomed.push(j);
       }
     }
