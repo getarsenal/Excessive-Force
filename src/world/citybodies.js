@@ -47,6 +47,23 @@ export function buildCityBodies(physics, plots) {
       hw: p.w / 2, hd: p.d / 2, ca: Math.cos(yaw), sa: Math.sin(yaw),
       r: Math.hypot(p.w, p.d) / 2,
     });
+    // A setback's upper storeys: two thirds of the plan, from the terrace to
+    // the roof. The box above stopped at the terrace, so shells and sight
+    // lines went through the top of every tall block in the town.
+    const eave = p.base + Math.max(1.5, p.h);
+    if (p.topW && p.topD && p.topW < p.w * 0.95 && p.top > eave + 2) {
+      const uh = (p.top - eave) / 2;
+      physics.world.createCollider(rapier.ColliderDesc.cuboid(p.topW / 2, uh, p.topD / 2)
+        .setTranslation(p.x, eave + uh, p.z)
+        .setRotation({ x: 0, y: half, z: 0, w: Math.cos(yaw * 0.5) })
+        .setFriction(0.9)
+        .setRestitution(0.02), body);
+      boxes.push({
+        x: p.x, z: p.z, y0: eave, y1: p.top,
+        hw: p.topW / 2, hd: p.topD / 2, ca: Math.cos(yaw), sa: Math.sin(yaw),
+        r: Math.hypot(p.topW, p.topD) / 2,
+      });
+    }
   }
 
   // A grid over the boxes, because the firing solution asks "is there a

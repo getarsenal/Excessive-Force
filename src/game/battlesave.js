@@ -91,6 +91,14 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
     r: u.pos.onRoof ? 1 : 0, k: u.pos.onDeck ? 1 : 0,
     h: Math.round(u.health), kills: u.kills || 0, rank: u.rank || 0,
   }));
+  // Bought and still in the lift, or under the canopies: paid for, so saved
+  // as on the ground where it was going. A save taken during the airlift
+  // used to keep the money spent and lose the gun.
+  for (const d of battle.pending || []) {
+    if (d.lost || !d.def || !d.pos) continue;
+    units.push({ id: d.def.id, x: +d.pos.x.toFixed(2), y: +d.pos.y.toFixed(2), z: +d.pos.z.toFixed(2),
+      r: d.pos.onRoof ? 1 : 0, k: d.pos.onDeck ? 1 : 0, h: 1e6, kills: 0, rank: 0 });
+  }
   const touched = structures.some((s) => s.destroyedCount > 0);
   if (!units.length && !touched && !battle.shotsFired) return null;
   const g = battle.garrison;
