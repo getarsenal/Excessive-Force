@@ -2636,6 +2636,9 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     const f = p.front || { x: Math.sin(p.yaw || 0), z: Math.cos(p.yaw || 0) };
     const depth = p.front ? p.w : p.d, run = p.front ? p.d : p.w;
     const back = 3 + rng() * 7, side = (rng() - 0.5) * run * 0.6;
+    // A fourth draw, as before: the town after this is laid from the same
+    // stream, and one fewer moved every building generated after it.
+    rng();
     treeAt(p.x - f.x * (depth / 2 + back) + f.z * side,
       p.z - f.z * (depth / 2 + back) - f.x * side, 0.9);
   }
