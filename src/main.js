@@ -47,7 +47,7 @@ import { WhiteFlags } from './fx/whiteflags.js';
 import * as synth from './core/synth.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
-import { SamSites, siteSams } from './game/sam.js';
+import { SamSites, siteSams, SAM } from './game/sam.js';
 import { HuntMarkers } from './game/huntmarkers.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
@@ -638,7 +638,11 @@ async function boot() {
     const makeSams = (sites) => new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air,
       camera: engine.camera, quality, sites, desert,
       onEvent: (kind, data) => handleEvent(kind, data) });
-    const sites = siteSams(terrain, samOpts);
+    // Two or three launchers round the map, by the level.
+    let hash = 0;
+    for (const ch of level.id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+    const count = level.samCount ?? (SAM.sites[0] + (hash % (SAM.sites[1] - SAM.sites[0] + 1)));
+    const sites = siteSams(terrain, { ...samOpts, count });
     if (sites.length) battle.sams = makeSams(sites);
     // The counter-attack's battery: three more sites, clear of the first
     // two, dropped on pallets and live from the moment each one lands.
@@ -1053,11 +1057,14 @@ async function boot() {
         hud.feed(`${data.def.name} OFF STATION — ${data.stones} STONES · ${data.kills} KILLED`, 'big');
         break;
       case 'samactive':
-        hud.feed('SAM SITES ACTIVE — S-300 OVER THE TARGET · STRIKES AT RISK', 'warn');
+        hud.feed('SAM SITES ACTIVE — THEY FIRE ON EVERY AIRCRAFT UNTIL DESTROYED', 'warn');
         break;
       case 'samlaunch':
+        // Every launch, marked at the launcher, so the player can find it; the
+        // feed says so once per aeroplane rather than every few seconds.
         feedback.emit('impact', 0.4);
-        hud.feed(`SAM LAUNCH — ${data.def.name} ENGAGED`, 'bad');
+        if (data.first) hud.feed(`SAM LAUNCH — ${data.def.name} ENGAGED`, 'bad');
+        if (data.point) battle.pulse(data.point.clone(), 0xff5030, 26, true);
         break;
       case 'samkill':
         feedback.emit('impact', 1.4);

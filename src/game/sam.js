@@ -21,28 +21,38 @@
  * aeroplane and keeps climbing until the motor burns out and the trail ends
  * high in the sky.
  *
- * What stops it. A battery has eight rounds, and its crews do not stay on one
- * spot under artillery: after `SAM.window` seconds the sites go quiet. The
- * launchers can be shelled — a near miss wrecks one and its rounds cook off —
- * and a battery whose radar is gone guesses. Killing the SAMs first is the
- * way to buy the sky early; waiting buys it late.
+ * What stops it. Nothing but the player. The sites are two or three
+ * launchers spread round the map on different sides of the objective, and
+ * each one fires at every aeroplane in reach, again every few seconds for as
+ * long as it stays in reach, reloading its four canisters when they are
+ * spent, for the whole battle. (It used to go quiet three and a half minutes
+ * in, which was before most players had called their first strike: the
+ * battery that was meant to own the sky had never been seen to fire.) A
+ * near miss wrecks a launcher and its rounds cook off, and a battery whose
+ * radar is gone guesses. Killing the SAMs is the way to buy the sky.
  */
 import * as THREE from 'three';
 import { BillboardParticles, makeSmokeTexture } from '../fx/particles.js';
 
 export const SAM = {
-  /** Seconds from the start of the battle the battery is up for. */
-  window: 210,
+  /** Seconds a launcher is up for once it is set up: the whole battle. */
+  window: Infinity,
   /** Rounds per launcher: four canisters. */
   rounds: 4,
+  /** Seconds to reload the four canisters once they are spent. */
+  reload: 22,
+  /** Seconds before the same aeroplane is fired at again while in reach. */
+  again: 6,
+  /** Launchers the level starts with: two or three, by the level. */
+  sites: [2, 3],
   /** Horizontal reach of the battery, metres. */
   range: 5200,
   /** Height over the ground an aeroplane has to be to be engaged. */
-  minAlt: 45,
-  /** Chance an aeroplane in reach is shot at at all. */
-  engage: 0.85,
+  minAlt: 30,
+  /** Chance a launcher in reach of an aeroplane fires at it on a pass. */
+  engage: 0.9,
   /** Seconds between launches from one launcher. */
-  cooldown: 5,
+  cooldown: 4,
   /** Money for a launcher, and for the radar. */
   bounty: 260,
 };
@@ -191,6 +201,9 @@ export function siteSams(terrain, o = {}) {
         const a = turn + (k / 48) * Math.PI * 2;
         const x = Math.cos(a) * r, z = Math.sin(a) * r;
         if (found.some((f) => Math.hypot(f.x - x, f.z - z) < Math.max(220, r * 0.8))) continue;
+        // Round the map, not bunched on one side of it: on level ground a
+        // launcher keeps a wide arc from the others.
+        if (t < 4 && found.some((f) => Math.abs(Math.atan2(Math.sin(f.a - a), Math.cos(f.a - a))) < (Math.PI * 2) / (count + 1.5))) continue;
         if (avoid.some((f) => Math.hypot(f.x - x, f.z - z) < 160)) continue;
         if (!clear(x, z, 12)) continue;
         found.push({ x, z, a });
@@ -261,7 +274,7 @@ export class SamSites {
     L.group.rotation.y = p.yaw;
     this.group.add(L.group);
     this.launchers.push({ ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
-      alive: true, until: from + SAM.window });
+      alive: true, until: from + SAM.window, reload: 0 });
     if (!this.radar?.alive) {
       const R = makeRadar(this.desert);
       const side = new THREE.Vector3(Math.cos(p.yaw), 0, -Math.sin(p.yaw));
@@ -333,13 +346,15 @@ export class SamSites {
   }
 
   /**
-   * Whether this one comes down. About one aeroplane in four or five that
-   * the battery shoots at: never two in a row, and never a long run of
-   * luck — the fifth since the last is the one that does not come back.
+   * Whether this missile brings its aeroplane down. Asked per missile now
+   * that an aeroplane in reach is fired at more than once: about one in
+   * eight, so an aeroplane that stays in reach for three of them comes down
+   * about one time in three; never two in a row, and never a long run of
+   * luck — the ninth since the last is the one that does not miss.
    */
   _decide() {
     this.since++;
-    const p = this.since >= 6 ? 1 : this.since <= 1 ? 0.12 : 0.3;
+    const p = this.since >= 9 ? 1 : this.since <= 1 ? 0.06 : 0.12;
     const hit = Math.random() < (this.radar && !this.radar.alive ? p * 0.5 : p);
     if (hit) this.since = 0;
     return hit;
@@ -353,16 +368,32 @@ export class SamSites {
       this.quiet = true;
       if (this.launchers.some((l) => l.alive)) this.onEvent('samquiet', {});
     }
-    for (const l of this.launchers) l.cool -= dt;
+    for (const l of this.launchers) {
+      l.cool -= dt;
+      // Spent: the crew loads four more and the caps go back on.
+      if (l.alive && l.rounds <= 0) {
+        l.reload += dt;
+        if (l.reload >= SAM.reload) {
+          l.reload = 0;
+          l.rounds = SAM.rounds;
+          for (const m of l.mouths) if (m.cap) m.cap.visible = true;
+        }
+      }
+    }
     if (!this.quiet && this.air) this._engage();
     this._fly(dt);
     this.smoke.update(dt, this._time);
   }
 
-  /** Every aeroplane coming into reach is looked at once. */
+  /**
+   * Every aeroplane in reach is fired at, and fired at again every few
+   * seconds for as long as it stays in reach, by the nearest launcher that
+   * is loaded.
+   */
   _engage() {
+    const now = this._time;
     for (const s of this.air.sorties) {
-      if (s._sam || s.done || s.downed || !s.model) continue;
+      if (s.done || s.downed || !s.model || (s._samNext ?? 0) > now) continue;
       const a = s.def?.aircraft;
       if (!a || a.consumed) continue;
       if (s.heli || (s.loiter && !s.loiter.orbit)) continue;
@@ -377,7 +408,7 @@ export class SamSites {
         if (d < SAM.range && d < bd) { bd = d; best = l; }
       }
       if (!best) continue;
-      s._sam = true;
+      s._samNext = now + SAM.again;
       if (!this.announced) { this.announced = true; this.onEvent('samactive', {}); }
       if (Math.random() > SAM.engage) continue;
       const kill = this._decide();
@@ -385,9 +416,8 @@ export class SamSites {
       best.rounds--;
       best.cool = SAM.cooldown;
       this._launch(best, mouth, s, kill, false);
-      // A second round after a miss, if there is one to spare: a battery
-      // fires a pair at anything it means to bring down.
-      this.onEvent('samlaunch', { def: s.def, point: new THREE.Vector3(best.x, best.y, best.z) });
+      this.onEvent('samlaunch', { def: s.def, point: new THREE.Vector3(best.x, best.y, best.z), first: !s._samShot });
+      s._samShot = true;
     }
   }
 
