@@ -100,6 +100,10 @@ export class Battle {
     // earns a free air strike; the command post cuts the garrison's comms.
     this.strikeCredits = 0;
     this.commsDownUntil = -1;
+    // The rest of the high-value targets (see highvalue.js), set by main; and
+    // the counter-battery reward, a faster reload for a while.
+    this.hv = null;
+    this.counterBatteryUntil = -1;
 
     this.totalMass = this.structures.reduce((a, s) => a + s.totalMass, 0);
     this.startHeight = this.primary.standingHeight();
@@ -852,6 +856,7 @@ export class Battle {
     let pay = 0;
     if (this.sams) pay += this.sams.blast(point, radius, power);
     if (this.hq) pay += this.hq.blast(point, radius, power);
+    if (this.hv) pay += this.hv.blast(point, radius, power);
     if (pay > 0) {
       this.money += pay;
       this.onEvent('bounty', { point, amount: Math.round(pay), kind: 'kill' });
@@ -910,11 +915,17 @@ export class Battle {
 
   get commsDown() { return this.elapsed < this.commsDownUntil; }
 
+  /** The reload, with the counter-battery reward while it lasts. */
+  get reloadFactor() {
+    return this.reloadScale * (this.elapsed < this.counterBatteryUntil ? 0.75 : 1);
+  }
+
   /** The high-value targets still standing, for the markers. */
   hvtPoints(out = []) {
     out.length = 0;
     if (this.sams) for (const p of this.sams.points) out.push(p);
     if (this.hq?.alive) out.push({ x: this.hq.x, y: this.hq.y + 2, z: this.hq.z, kind: 'hq' });
+    if (this.hv) this.hv.points(out);
     return out;
   }
 
@@ -1865,7 +1876,7 @@ export class Battle {
           u.salvoLeft--;
           u.salvoTimer = u.def.salvo.interval;
           if (u.salvoLeft === 0) {
-            u.cooldown = u.def.reload * this.reloadScale;
+            u.cooldown = u.def.reload * this.reloadFactor;
             u.salvoAim = null;
           }
         }
@@ -1886,7 +1897,7 @@ export class Battle {
         u.salvoLeft = u.def.salvo.count;
         u.salvoTimer = 0;
       } else {
-        if (this._fireOne(u, aim)) u.cooldown = u.def.reload * this.reloadScale;
+        if (this._fireOne(u, aim)) u.cooldown = u.def.reload * this.reloadFactor;
         else u.cooldown = 1.0;
       }
     }
@@ -1913,7 +1924,7 @@ export class Battle {
       u.burstTimer = mg.interval;
       u.burstLeft--;
       this._mgRound(u);
-      if (u.burstLeft === 0) u.cooldown = u.def.reload * this.reloadScale * (0.85 + Math.random() * 0.3);
+      if (u.burstLeft === 0) u.cooldown = u.def.reload * this.reloadFactor * (0.85 + Math.random() * 0.3);
       return;
     }
     u.cooldown -= dt;
@@ -2556,6 +2567,7 @@ export class Battle {
       this.air.update(dt);
       if (this.sams) this.sams.update(dt, this.elapsed);
       if (this.hq) this.hq.update(dt);
+      if (this.hv) this.hv.update(dt);
       this.enemyAir.length = 0;
       this.airborne.update(dt);
       this.assault.update(dt);
@@ -2590,6 +2602,7 @@ export class Battle {
     this.air.update(dt);
     if (this.sams) this.sams.update(dt, this.elapsed);
     if (this.hq) this.hq.update(dt);
+    if (this.hv) this.hv.update(dt);
     if (this.garrison) {
       this.garrison.commsDown = this.commsDown;
       this.garrison.commsRof = HQ.rof;

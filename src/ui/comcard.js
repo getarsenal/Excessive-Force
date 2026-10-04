@@ -107,6 +107,28 @@ const BUCK_HQ = [
   "Cut the head off the snake. Ninety seconds before somebody figures out who's in charge. Use them.",
   "That was his headquarters. Every gun he has is guessing now.",
 ];
+const BUCK_HVT = {
+  depot: [
+    "That was his ammunition. Every gun he has is counting rounds now.",
+    "Ammo dump's gone up. Listen to that. That's his whole afternoon.",
+  ],
+  road: [
+    "Checkpoint's down. Nothing's coming up that road again.",
+    "Road's cut. Whatever he was trucking in, he can walk it.",
+  ],
+  battery: [
+    "His guns are quiet. Ours aren't. Load faster, we've got the floor.",
+    "Counter-battery, textbook. Now pour it on before he finds more.",
+  ],
+  generalinbound: [
+    "Intel says the man himself is driving in. Black car, two trucks. I want that car.",
+    "The general's on the road. Somebody get eyes on that convoy.",
+  ],
+  general: [
+    "Black car's burning. That was the general. Somebody frame that.",
+    "Got him. There goes his whole chain of command.",
+  ],
+};
 const BUCK_LOST = [
   "We lost a gun. Somebody owes me a gun.",
   "That was a perfectly good howitzer. Find whoever did that.",
@@ -256,6 +278,13 @@ export class ComCard {
   /** A SAM compound wrecked; the last of them, the sky. */
   samSite(last = false) {
     this.say('us', last ? this._deal('supremacy', BUCK_SUPREMACY) : this._deal('samsite', BUCK_SAMSITE));
+    this._quietUntil = performance.now() + 7000;
+  }
+  /** The other high-value targets: a line from Buck for each. */
+  hvt(what) {
+    const lines = BUCK_HVT[what];
+    if (!lines) return;
+    this.say('us', this._deal(`hvt-${what}`, lines));
     this._quietUntil = performance.now() + 7000;
   }
   /** The enemy command post down. */

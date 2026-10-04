@@ -142,6 +142,21 @@ export const DEFENDER_TYPES = {
     accuracy: 1, colour: 0x6f7a52, threat: 2, eye: 1.35,
     emplaced: true, observer: true,
   },
+  /**
+   * A towed howitzer in the enemy's own battery (see highvalue.js): indirect
+   * and long, the heaviest thing he has, and three of them together are a
+   * target worth a fire mission of the player's own.
+   */
+  howitzer: {
+    key: 'howitzer', look: 'fieldgun',
+    name: 'Howitzer', health: 230, damage: 0, rof: 15, range: 2100,
+    accuracy: 1, colour: 0x4a5238, threat: 12, eye: 1.2, emplaced: true,
+    indirect: true,
+    shell: {
+      speed: 260, gravity: 9.81, trail: 0.9, minRange: 220,
+      warhead: { lethal: 1.5, radius: 9.0, power: 5000, fx: 1.5 },
+    },
+  },
   mortar: {
     key: 'mortar', look: 'mortar',
     name: 'Mortar', health: 60, damage: 0, rof: 7.5, range: 620,
@@ -509,13 +524,19 @@ export class Garrison {
       wave: { low: 260, medium: 380, high: 460, ultra: 540 }[quality.name] ?? 380,
       // The high-value targets' own guards: the SAM compounds and the
       // command post (see sam.js and hq.js).
-      hvt: { low: 48, medium: 60, high: 66, ultra: 72 }[quality.name] ?? 60,
+      hvt: { low: 80, medium: 96, high: 104, ultra: 112 }[quality.name] ?? 96,
+      // The men the trucks bring up the road (see highvalue.js).
+      column: { low: 32, medium: 40, high: 40, ultra: 40 }[quality.name] ?? 40,
     };
-    this.used = { base: 0, works: 0, air: 0, wave: 0, hvt: 0 };
+    this.used = { base: 0, works: 0, air: 0, wave: 0, hvt: 0, column: 0 };
     // Set by the battle while the command post is down (see hq.js).
     this.commsDown = false;
     this.commsRof = 1;
-    this.cap = this.pools.base + this.pools.works + this.pools.air + this.pools.wave + this.pools.hvt;
+    // Set while the ammunition depot is gone (see highvalue.js): crews short
+    // of rounds, the tubes shortest.
+    this.supplyRof = 1;
+    this.tubeRof = 1;
+    this.cap = Object.values(this.pools).reduce((a, n) => a + n, 0);
     // The rifleman in the shoulder, from `soldier.js`: the tones are baked into
     // the vertices and the instance colour is the uniform.
     this.mesh = mk(soldierGeometry('aim'), 0xffffff, this.cap);
@@ -1970,7 +1991,7 @@ export class Garrison {
       // and used to fire damageless tracer, and flash the screen, besides.
       if (!d.alive || d.def.indirect || d.def.observer) continue;
       // Without its command post the garrison fights on its own, and slower.
-      d.cooldown -= this.commsDown ? dt * this.commsRof : dt;
+      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.supplyRof;
       if (d.cooldown > 0) continue;
       // Head down: nothing until the shelling stops.
       if (d.suppressed > this.time) { d.cooldown = 0.3; continue; }
@@ -2193,7 +2214,7 @@ export class Garrison {
     this.observed = observed;
     for (const d of this.defenders) {
       if (!d.alive || !d.def.indirect) continue;
-      d.cooldown -= this.commsDown ? dt * this.commsRof : dt;
+      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.tubeRof;
       if (d.cooldown > 0) continue;
       if (d.suppressed > this.time) { d.cooldown = 0.5; continue; }
       let best = null, bestD = d.def.range * d.def.range;
@@ -2314,7 +2335,7 @@ export class Garrison {
       if (!d.alive) continue;
       this._q.setFromAxisAngle(this._axis, d.facing);
 
-      if (d.def.indirect) {
+      if (d.def.indirect && d.def.key !== 'howitzer') {
         this._v.copy(d.pos);
         this._m4.compose(this._v, this._q, this._s);
         if (mw < this.mortarMesh.instanceMatrix.count) {
@@ -2332,7 +2353,7 @@ export class Garrison {
 
       // The piece, where there is one, and a crewman standing to the side of
       // it rather than inside the breech.
-      if (d.def.key === 'fieldgun' || d.def.key === 'aa') {
+      if (d.def.key === 'fieldgun' || d.def.key === 'aa' || d.def.key === 'howitzer') {
         const pit = d.def.key === 'aa' ? this.flakMesh : this.gunMesh;
         const cur = d.def.key === 'aa' ? fw : gw;
         if (cur < pit.instanceMatrix.count) {
@@ -2348,7 +2369,7 @@ export class Garrison {
 
       // Round the position, not round the crewman beside the piece.
       if (d.sandbags && bw < this.bagMesh.instanceMatrix.count) {
-        this._m4.compose(d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' ? d.pos : this._v, this._q, this._s);
+        this._m4.compose(d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' || d.def.key === 'howitzer' ? d.pos : this._v, this._q, this._s);
         this.bagMesh.setMatrixAt(bw, this._m4);
         this._col.setHex(0x8b8163);
         this.bagMesh.instanceColor.setXYZ(bw, this._col.r, this._col.g, this._col.b);

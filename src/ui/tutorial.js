@@ -115,7 +115,7 @@ export class Tutorial {
       { el: '#orders-modes', fallback: '#dock-orders', title: 'FIRE MODE',
         text: 'POINT: tight group. AREA: walked over it. DELAY: bursts inside the stone.', ok: true },
       { el: '#orders-smoke', fallback: '#dock-orders', title: 'SMOKE', text: 'Blinds the garrison so your guns are not shot at.', ok: true },
-      { el: '#dock-strikes', title: 'STRIKES', text: 'Aircraft and a cruise missile, the same price on every map. Two or three SAM compounds round the map, each a guarded ring of earth with two launchers and a radar, fire on every plane until destroyed. Wreck a whole compound for $15,000 and a free air strike. Gold diamonds mark them, and the enemy command post: destroy it to cut their comms. Tap to open.',
+      { el: '#dock-strikes', title: 'STRIKES', text: 'Aircraft and a cruise missile, the same price on every map. Two or three SAM compounds, each a guarded ring of earth with two launchers and a radar, fire on every plane until destroyed, your C-130s and Chinooks too. Wreck a whole compound for $15,000 and a free air strike. Gold diamonds mark every high-value target: the SAMs, the command post (cuts their comms), the ammo depot, their artillery, the road checkpoint, and the general\'s car when he drives in. Three in a minute brings a fire mission. Tap to open.',
         say: 'Air power. For when you can\'t be bothered to aim.',
         done: () => h.openDrawer === 'strikes' || this._striking() },
       { el: '#strikebar .unit-card:not(.locked)', fallback: '#dock-strikes', title: 'CALL A STRIKE',

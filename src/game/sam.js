@@ -58,6 +58,9 @@ export const SAM = {
   radarBounty: 4000,
   /** And for a whole compound: everything in the ring wrecked. */
   siteBonus: 15000,
+  /** Extra for taking a compound's radar while both its launchers stand:
+   *  the clever order, since it blinds them before they are even touched. */
+  radarFirst: 3000,
   /** What it takes. A 105 mm round square on a launcher does a third of
    *  this; a bomb does all of it. */
   hp: 150,
@@ -67,6 +70,13 @@ export const SAM = {
   /** What the earth ring keeps off a launcher from a round landing outside it. */
   berm: 0.3,
 };
+
+/** What the feed calls an aircraft: a transport by its type, a strike by its name. */
+function labelOf(s) {
+  if (s.lift) return 'C-130';
+  if (s.heli) return 'CHINOOK';
+  return s.def?.name || 'AIRCRAFT';
+}
 
 const OLIVE = 0x4d5733, SAND = 0xb09468, DARK = 0x1d2023, TYRE = 0x161616;
 
@@ -503,9 +513,11 @@ export class SamSites {
       }
       Rd.alive = false;
       pay += SAM.radarBounty;
+      const first = !!site && site.launchers.length > 0 && site.launchers.every((l) => l.alive);
+      if (first) pay += SAM.radarFirst;
       this._wreck(Rd.group);
       if (this.fx) this.fx.detonate(this._v.set(Rd.x, gy + 3, Rd.z), 2.2, { ground: true });
-      this.onEvent('samradar', { point: new THREE.Vector3(Rd.x, gy, Rd.z) });
+      this.onEvent('samradar', { point: new THREE.Vector3(Rd.x, gy, Rd.z), first });
     }
     // A compound with nothing left in it.
     for (const site of this.sites) {
@@ -578,10 +590,14 @@ export class SamSites {
     for (const s of this.air.sorties) {
       if (s.done || s.downed || !s.model || (s._samNext ?? 0) > now) continue;
       // Already lost: a transport turning for home on fire, a gunship going in.
-      if (s.dumping || s.loiter?.phase === 'down') continue;
+      if (s.dumping || s.wrecked || s.loiter?.phase === 'down') continue;
+      // The player's transports too, the C-130s and the Chinooks bringing
+      // the guns in: a battery that let the airlift through untouched was a
+      // battery the player had no reason to go after before the strikes.
+      const transport = !!(s.lift || s.heli);
       const a = s.def?.aircraft;
-      if (!a || a.consumed) continue;
-      if (s.heli || (s.loiter && !s.loiter.orbit)) continue;
+      if (!transport && (!a || a.consumed)) continue;
+      if (!transport && s.loiter && !s.loiter.orbit) continue;
       if (s.climb > 0.9) continue;
       const p = s.model.position;
       const g = this.terrain.heightAt(p.x, p.z);
@@ -601,7 +617,7 @@ export class SamSites {
       best.rounds--;
       best.cool = SAM.cooldown;
       this._launch(best, mouth, s, kill, false);
-      this.onEvent('samlaunch', { def: s.def, point: new THREE.Vector3(best.x, best.y, best.z), first: !s._samShot });
+      this.onEvent('samlaunch', { def: s.def, label: labelOf(s), point: new THREE.Vector3(best.x, best.y, best.z), first: !s._samShot });
       s._samShot = true;
     }
   }
@@ -678,13 +694,13 @@ export class SamSites {
           want = aim.sub(M.pos).normalize();
           if (M.kill && dist < 16) {
             this._burst(M);
-            if (this.air.destroy(s)) this.onEvent('samkill', { def: s.def, point: M.pos.clone() });
+            if (this.air.destroy(s)) this.onEvent('samkill', { def: s.def, label: labelOf(s), transport: !!(s.lift || s.heli), point: M.pos.clone() });
             continue;
           }
           // Past it and opening: it has missed, and it goes on.
           if (!M.kill && (dist < 70 && M.dir.dot(rel) < 0)) {
             M.lost = true;
-            this.onEvent('sammiss', { def: s.def, point: M.pos.clone() });
+            this.onEvent('sammiss', { def: s.def, label: labelOf(s), point: M.pos.clone() });
           }
         }
         if (M.lost) { want = this._v.copy(M.dir); want.y += 0.35; want.normalize(); }

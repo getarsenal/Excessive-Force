@@ -1239,11 +1239,14 @@ export class AirWing {
     if (!s || s.done || s.downed || s.dumping || s.loiter?.phase === 'down') return false;
     const m = s.model;
     if (this.fx) this.fx.detonate(m.position, 2.6, { ground: false });
-    if (s.lift || s.loiter) {
+    // The transports go down with what is still aboard (see _downLift).
+    if (s.lift) return this._downLift(s);
+    if (s.heli) return this._downHeli(s);
+    if (s.wrecked) return false;
+    if (s.loiter) {
       this.hitAir({ kind: 'aircraft', sortie: s }, 1e6);
       return true;
     }
-    if (s.heli) return false;
     if (!s.released) {
       s.released = true;
       s.aborted = true;
@@ -1260,6 +1263,79 @@ export class AirWing {
     s.smoking = true;
     if (this.onAirEvent) this.onAirEvent('missiled', { def: s.def, point: m.position.clone() });
     return true;
+  }
+
+  /**
+   * A transport brought down by a missile. Not a hit it can limp home from:
+   * the airframe goes in, and every load not yet out of the door goes with
+   * it. Sticks already under canopy come down where they are. The player is
+   * told what was lost, because it was paid for.
+   */
+  _downLift(s) {
+    if (s.wrecked || s.done) return false;
+    const m = s.model;
+    s.wrecked = {
+      vel: s.dir.clone().multiplyScalar((s.speed || 100) * 0.6).setY(-5),
+      spin: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random()), dive: 0.3 + Math.random() * 0.3,
+      t: 0, fire: 0, down: false,
+    };
+    s.smoking = true;
+    s.dumping = true;
+    const lost = [];
+    for (const L of s.lift.loads) {
+      if (L.out >= L.toGo) continue;
+      if (L.out === 0) {
+        L.toGo = 0;
+        L.landed = true;
+        L.drop.lost = true;
+        lost.push(L.drop.def?.name || 'LOAD');
+        if (s.lift.onLand) s.lift.onLand(L.drop);
+      } else {
+        L.toGo = L.out;
+      }
+    }
+    if (this.onAirEvent) this.onAirEvent('liftdown', { kind: 'C-130', lost, point: m.position.clone() });
+    return true;
+  }
+
+  /** A Chinook brought down: it goes in, and the gun on the sling with it. */
+  _downHeli(s) {
+    if (s.downed || s.done) return false;
+    const H = s.heli, m = s.model;
+    const lost = [];
+    if (!H.released) {
+      H.released = true;
+      if (H.sling?.parent) H.sling.parent.remove(H.sling);
+      H.drop.lost = true;
+      lost.push(H.drop.def?.name || 'GUN');
+      if (H.onLand) H.onLand(H.drop);
+    }
+    const v = H.vel.clone();
+    s.downed = { vel: v.setY(-4), spin: (Math.random() < 0.5 ? -1 : 1) * 2.4, dive: 0.5, t: 0, fire: 0 };
+    s.smoking = true;
+    if (this.onAirEvent) this.onAirEvent('liftdown', { kind: 'CHINOOK', lost, point: m.position.clone() });
+    return true;
+  }
+
+  /** A transport's fall: as _fall, but the sortie stays up for its canopies. */
+  _liftFall(s, dt) {
+    const m = s.model, d = s.wrecked;
+    if (d.down) return;
+    d.t += dt;
+    d.vel.y -= 9.8 * dt;
+    d.vel.multiplyScalar(1 - 0.05 * dt);
+    m.position.addScaledVector(d.vel, dt);
+    m.rotation.z += d.spin * dt;
+    m.rotation.x = Math.min(1.0, m.rotation.x + d.dive * dt);
+    if (this.fx) this.fx.trail(m.position, 9);
+    const g = this.terrain.surfaceAt ? this.terrain.surfaceAt(m.position.x, m.position.z)
+      : this.terrain.heightAt(m.position.x, m.position.z);
+    if (m.position.y <= g + 1 || d.t > 40) {
+      m.position.y = g;
+      d.down = true;
+      m.visible = false;
+      if (this.onAirEvent) this.onAirEvent('wreck', { def: s.def, point: m.position.clone() });
+    }
   }
 
   /** The wreck: ballistic, rolling, nose dropping, on fire, until the ground. */
@@ -2001,6 +2077,11 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
     if (!L.landed || L.chutes.length) allDown = false;
   }
   s.lift.allDown = allDown;
+  if (s.wrecked) {
+    this._liftFall(s, dt);
+    s.life = s.wrecked.down ? 99 : 0;
+    return;
+  }
 
   // Flight. Straight and level on the run; past the last load, ease into a
   // turn away and a shallow climb, hold the turn a while, roll out.

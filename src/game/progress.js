@@ -182,6 +182,11 @@ export const RIBBONS = {
   samsite: { name: 'SAM SITE', xp: 500 },
   supremacy: { name: 'AIR SUPREMACY', xp: 750 },
   hq: { name: 'DECAPITATION', xp: 600 },
+  depot: { name: 'SUPPLY CUT', xp: 450 },
+  checkpoint: { name: 'ROAD CUT', xp: 400 },
+  battery: { name: 'COUNTER-BATTERY', xp: 500 },
+  general: { name: 'HIGH VALUE KILL', xp: 800 },
+  streak: { name: 'KILL STREAK', xp: 350 },
 };
 
 // ── Daily orders.

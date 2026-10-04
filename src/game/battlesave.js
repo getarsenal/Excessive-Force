@@ -102,7 +102,7 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
   const touched = structures.some((s) => s.destroyedCount > 0);
   if (!units.length && !touched && !battle.shotsFired) return null;
   const g = battle.garrison;
-  let nBase = g ? g.defenders.findIndex((d) => d.pool === 'air' || d.pool === 'wave') : 0;
+  let nBase = g ? g.defenders.findIndex((d) => d.pool === 'air' || d.pool === 'wave' || d.pool === 'column') : 0;
   if (g && nBase < 0) nBase = g.defenders.length;
   const cf = battle.cityFire;
   const burnt = [];
@@ -145,8 +145,11 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
     airborne: battle.airborne && battle.airborne.state === 'done' ? 1 : 0,
     assault: battle.assault && battle.assault.state === 'done' ? 1 : 0,
     air: g ? g.defenders.slice(nBase).filter((d) => d.alive
-      && (d.pool === 'wave' ? battle.assault?.state === 'done' : battle.airborne?.state === 'done')).map((d) => [
-      d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2), d.pool === 'wave' ? 1 : 0]) : [],
+      && (d.pool === 'column' || (d.pool === 'wave' ? battle.assault?.state === 'done' : battle.airborne?.state === 'done'))).map((d) => [
+      d.type, +d.pos.x.toFixed(1), +d.pos.y.toFixed(2), +d.pos.z.toFixed(1), +d.facing.toFixed(2),
+      d.pool === 'wave' ? 1 : d.pool === 'column' ? 2 : 0]) : [],
+    hv: battle.hv ? battle.hv.save() : null,
+    counter: Math.max(0, +((battle.counterBatteryUntil ?? -1) - battle.elapsed).toFixed(1)),
     burnt,
     units,
     // The SAM sites: which of the level's own are wrecked, and the ones the
@@ -232,7 +235,8 @@ export function restoreBattle(snap, { battle, structures }) {
   if (snap.assault && battle.assault) { battle.assault.state = 'done'; battle.assault.warned = true; }
   if (g) {
     for (const [type, x, y, z, f, wave] of snap.air || []) {
-      g.place(type, new THREE.Vector3(x, y, z), f, 4, { cover: 'ground', emplaced: true, pool: wave ? 'wave' : 'air' });
+      g.place(type, new THREE.Vector3(x, y, z), f, 4, { cover: 'ground', emplaced: true,
+        pool: wave === 2 ? 'column' : wave ? 'wave' : 'air' });
     }
   }
   // The guns, where they were standing, as they were — without the feed
@@ -285,10 +289,12 @@ export function restoreBattle(snap, { battle, structures }) {
     } else battle.hq.hp = snap.hq;
   }
   battle.strikeCredits = snap.credits || 0;
+  if (battle.hv && snap.hv) battle.hv.load(snap.hv);
   battle.money = snap.money;
   battle.spent = snap.spent;
   battle.elapsed = snap.elapsed;
   if (snap.comms > 0) battle.commsDownUntil = snap.elapsed + snap.comms;
+  if (snap.counter > 0) battle.counterBatteryUntil = snap.elapsed + snap.counter;
   battle.score = snap.score;
   battle.shotsFired = snap.shots;
   battle.defendersKilled = snap.killed;

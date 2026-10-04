@@ -51,6 +51,7 @@ import { SamSites, siteSams, SAM } from './game/sam.js';
 import { HuntMarkers } from './game/huntmarkers.js';
 import { CommandPost } from './game/hq.js';
 import { clearGround } from './world/clearing.js';
+import { HighValue } from './game/highvalue.js';
 import { attachUnitTips, UnitCard } from './ui/inspector.js';
 import { Standoff, introsEnabled, preloadCast } from './ui/standoff.js';
 import { Tutorial } from './ui/tutorial.js';
@@ -673,11 +674,30 @@ async function boot() {
         battle.hq.garrison(garrison);
       }
     }
+    // The depot, inside the belt like the command post; the enemy battery
+    // further out, where howitzers stand; and the road in, its checkpoint,
+    // its trucks and the general (see highvalue.js).
+    if (level.hvt !== false) {
+      const ex = samOpts.exclude;
+      const taken = [...sites, ...(battle.hq ? [{ x: battle.hq.x, z: battle.hq.z }] : [])];
+      const depot = siteSams(terrain, { ...samOpts, count: 1, seed: 0x7d1, r0: Math.max(100, ex * 1.1),
+        rMax: Math.max(340, ex * 2.8), sizes: [20, 16], avoid: taken, avoidR: 120 })[0] || null;
+      if (depot) taken.push(depot);
+      const battery = siteSams(terrain, { ...samOpts, count: 1, seed: 0x3b7, r0: Math.max(260, ex * 2.2),
+        sizes: [26, 20, 16], avoid: taken, avoidR: 150 })[0] || null;
+      if (battery) taken.push(battery);
+      battle.hv = new HighValue({ battle, scene: engine.scene, terrain, fx, garrison, desert,
+        net: contextGroup?.userData?.network || null, origin: new THREE.Vector3(origin.x, groundY, origin.z),
+        exclude: ex, sites: { depot, battery, avoid: taken },
+        onEvent: (kind, data) => handleEvent(kind, data) });
+    }
     // The trees and props inside a compound's ring and round the command
-    // post: the town was grown before they were sited.
+    // post, the depot and the battery: the town was grown before they were sited.
     clearGround(contextGroup, [
       ...(battle.sams ? battle.sams.sites.map((st) => ({ x: st.x, z: st.z, r: st.r + 5 })) : []),
       ...(battle.hq ? [{ x: battle.hq.x, z: battle.hq.z, r: 17 }] : []),
+      ...(battle.hv?.depot ? [{ x: battle.hv.depot.x, z: battle.hv.depot.z, r: 19 }] : []),
+      ...(battle.hv?.batterySite ? [{ x: battle.hv.batterySite.x, z: battle.hv.batterySite.z, r: 24 }] : []),
     ]);
     // The counter-attack's battery: three more sites, clear of the first
     // two, dropped on pallets and live from the moment each one lands.
@@ -1102,28 +1122,101 @@ async function boot() {
         // Every launch, marked at the launcher, so the player can find it; the
         // feed says so once per aeroplane rather than every few seconds.
         feedback.emit('impact', 0.4);
-        if (data.first) hud.feed(`SAM LAUNCH — ${data.def.name} ENGAGED`, 'bad');
+        if (data.first) hud.feed(`SAM LAUNCH — ${data.label || data.def.name} ENGAGED`, 'bad');
         if (data.point) battle.pulse(data.point.clone(), 0xff5030, 26, true);
         break;
       case 'samkill':
         feedback.emit('impact', 1.4);
-        hud.feed(`${data.def.name} SHOT DOWN BY SAM`, 'big');
+        // A transport's loss is said by the air wing, with what it carried.
+        if (!data.transport) hud.feed(`${data.label || data.def.name} SHOT DOWN BY SAM`, 'big');
         battle.onEvent('stamp', { text: 'AIRCRAFT LOST', point: data.point, kind: 'loss' });
         if (comcard) comcard.samKill();
         break;
+      case 'liftdown':
+        lostAircraft = true;
+        hud.feed(data.lost.length
+          ? `${data.kind} SHOT DOWN — ${data.lost.join(', ')} LOST WITH IT`
+          : `${data.kind} SHOT DOWN — ITS LOAD WAS ALREADY OUT`, 'bad');
+        if (data.lost.length) hud.status('the SAM sites are hitting the airlift · knock them out before you buy heavy', 6);
+        break;
       case 'sammiss':
-        hud.feed(`SAM MISSED — ${data.def.name} STILL FLYING`, 'warn');
+        hud.feed(`SAM MISSED — ${data.label || data.def.name} STILL FLYING`, 'warn');
         break;
       case 'samdown':
         feedback.emit('impact', 1.0);
         ribbon('samkill');
+        battle.hv?.noteKill(data.point);
         hud.feed(data.left ? `SAM LAUNCHER DESTROYED · +$6,000 · ${data.left} LEFT` : 'LAST SAM LAUNCHER DESTROYED — THE SKY IS YOURS', 'big');
         battle.onEvent('stamp', { text: 'SAM DESTROYED', point: data.point, kind: 'hit' });
         break;
       case 'samradar':
         ribbon('samkill');
-        hud.feed('SAM RADAR DESTROYED · +$4,000 — ITS LAUNCHERS ARE FIRING BLIND', 'big');
-        battle.onEvent('stamp', { text: 'RADAR DOWN', point: data.point, kind: 'hit' });
+        battle.hv?.noteKill(data.point);
+        hud.feed(data.first
+          ? 'RADAR FIRST · +$4,000 +$3,000 BONUS — BOTH ITS LAUNCHERS BLIND BEFORE THEY WERE TOUCHED'
+          : 'SAM RADAR DESTROYED · +$4,000 — ITS LAUNCHERS ARE FIRING BLIND', 'big');
+        battle.onEvent('stamp', { text: data.first ? 'RADAR FIRST' : 'RADAR DOWN', point: data.point, kind: 'hit' });
+        break;
+      // ── The rest of the high-value targets (see highvalue.js).
+      case 'depothit':
+      case 'checkpointhit':
+        hud.feed(`${kind === 'depothit' ? 'AMMO DEPOT' : 'CHECKPOINT'} HIT · ${Math.max(1, Math.round(data.frac * 100))}% LEFT`, 'warn');
+        break;
+      case 'depotdown':
+        feedback.emit('jackpot');
+        ribbon('depot');
+        hud.feed('AMMO DEPOT DESTROYED · +$10,000 — THEY ARE SHORT OF ROUNDS: EVERY GUN SLOWER, THE MORTARS SLOWEST', 'big');
+        battle.onEvent('stamp', { text: 'AMMO DEPOT DESTROYED', point: data.point, kind: 'hit' });
+        if (comcard) comcard.hvt('depot');
+        break;
+      case 'checkpointdown':
+        feedback.emit('jackpot');
+        ribbon('checkpoint');
+        hud.feed('CHECKPOINT DESTROYED · +$8,000 — THE ROAD IS CUT: NO MORE TRUCKS COME UP IT', 'big');
+        battle.onEvent('stamp', { text: 'ROAD CUT', point: data.point, kind: 'hit' });
+        if (comcard) comcard.hvt('road');
+        break;
+      case 'batterydown':
+        feedback.emit('jackpot');
+        ribbon('battery');
+        hud.feed('ENEMY BATTERY SILENCED · +$10,000 — COUNTER-BATTERY: YOUR GUNS RELOAD 25% FASTER FOR 2 MINUTES', 'big');
+        battle.onEvent('stamp', { text: 'BATTERY SILENCED', point: data.point, kind: 'hit' });
+        if (comcard) comcard.hvt('battery');
+        break;
+      case 'generalinbound':
+        feedback.emit('strike');
+        hud.feed(`INTEL: THE ENEMY GENERAL IS ON THE ROAD — THREE VEHICLES, ${data.eta} s TO COVER · $20,000 ON THE BLACK CAR`, 'warn');
+        hud.status('the general\'s convoy is marked in gold · catch it before it gets in', 8);
+        if (data.point) battle.pulse(data.point, 0xf3c14a, 30, true);
+        if (comcard) comcard.hvt('generalinbound');
+        break;
+      case 'generalkilled':
+        feedback.emit('jackpot');
+        ribbon('general');
+        hud.feed('THE ENEMY GENERAL IS DEAD · +$20,000', 'big');
+        battle.onEvent('stamp', { text: 'GENERAL KILLED', point: data.point, kind: 'hit' });
+        if (comcard) comcard.hvt('general');
+        break;
+      case 'escortdown':
+        hud.feed('ESCORT VEHICLE DESTROYED · +$2,000', 'big');
+        break;
+      case 'generalescaped':
+        hud.feed('THE GENERAL GOT AWAY', 'bad');
+        break;
+      case 'columninbound':
+        hud.feed(`ENEMY TRUCKS ON THE ROAD · ${data.eta} s OUT · DESTROY THE CHECKPOINT TO CUT IT`, 'warn');
+        break;
+      case 'columnlanded':
+        hud.feed(`ENEMY TRUCKS UNLOADED · ${data.men} MEN UP FROM THE ROAD`, 'bad');
+        break;
+      case 'truckdown':
+        hud.feed(`ENEMY TRUCK DESTROYED · +$1,500${data.aboard ? ` · ${data.aboard} ABOARD` : ''}`, 'big');
+        break;
+      case 'firemission':
+        feedback.emit('strike');
+        ribbon('streak');
+        hud.feed(`KILL STREAK — FIRE MISSION: TWELVE 155 mm ROUNDS ON THE ${String(data.what || 'TARGET').toUpperCase()}`, 'big');
+        if (data.point) battle.pulse(data.point, 0xf3c14a, 40, true);
         break;
       case 'samhit': {
         // Damage that did not finish it: said, with what is left, so the player
@@ -1154,6 +1247,7 @@ async function boot() {
       }
       case 'hqdown':
         battle.cutComms();
+        battle.hv?.noteKill(data.point);
         feedback.emit('jackpot');
         ribbon('hq');
         hud.feed('ENEMY COMMAND POST DESTROYED · +$12,000 · COMMS CUT: THEIR FIRE IS RAGGED, THEIR MORTARS BLIND', 'big');
