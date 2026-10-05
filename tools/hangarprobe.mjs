@@ -25,6 +25,12 @@ await page.click('.hg-chip[data-kind="lancer"]');
 await page.waitForTimeout(1500);
 await page.click('.hg-piece[data-art="beer"]');
 await page.waitForTimeout(2500);
+// Pulled in close and turned to the nose, the way a player looks at the art.
+await page.evaluate(() => {
+  const c = document.querySelector('.hg-canvas'); const r = c.getBoundingClientRect();
+  c.dispatchEvent(new WheelEvent('wheel', { deltaY: -900, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true }));
+});
+await page.waitForTimeout(2500);
 await page.screenshot({ path: '/tmp/out/hangar-phone-2.png' });
 const r2 = await page.evaluate(() => ({ choice: localStorage.getItem('tt.noseart'), on: document.querySelector('.hg-piece.on')?.dataset.art, name: document.querySelector('.hg-name b')?.textContent }));
 console.log(JSON.stringify({ r1, r2, errors }));
