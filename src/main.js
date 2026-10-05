@@ -268,7 +268,17 @@ async function boot() {
     const off = sp.offset || { x: 0, z: 0 };
     const key = `${Math.round(off.x)},${Math.round(off.z)}`;
     const L = landmarks[i];
-    const g = pads.get(key) || { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity };
+    const g = pads.get(key) || { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity, rects: [] };
+    // The course that sits on the ground, for the pad to make ground under
+    // (see `Terrain.levelPad`). Not scenery, and not a level that says its
+    // building stands in the water on purpose (a bridge on its piers).
+    if (!sp.scenery && level.padFill !== false) {
+      for (const b of sp.blocks.blocks || sp.blocks) {
+        if (b.y - b.hy > 0.5 || b.y + b.hy <= 0) continue;
+        const c = Math.abs(Math.cos(b.ry || 0)), s = Math.abs(Math.sin(b.ry || 0));
+        g.rects.push([b.x + off.x, b.z + off.z, b.hx * c + b.hz * s, b.hx * s + b.hz * c]);
+      }
+    }
     g.x0 = Math.min(g.x0, L.x - L.w / 2); g.x1 = Math.max(g.x1, L.x + L.w / 2);
     g.z0 = Math.min(g.z0, L.z - L.d / 2); g.z1 = Math.max(g.z1, L.z + L.d / 2);
     pads.set(key, g);
@@ -301,7 +311,8 @@ async function boot() {
     // to its real height, so the pad is levelled to that and not to the
     // median of whatever the ring round it happens to be standing on.
     const lvl = level.groundLevel === 'bake' ? terrain.heightAt(cx, cz) : undefined;
-    terrain.levelPad(cx, cz, r, 40, { park: green, level: lvl });
+    const cover = g.rects.length ? terrain.coverOf(g.rects, 5) : null;
+    terrain.levelPad(cx, cz, r, 40, { park: green, level: lvl, cover });
   }
 
   // The surround needs to know what country it is in before it is drawn.

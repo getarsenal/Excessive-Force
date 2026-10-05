@@ -856,13 +856,18 @@ export const SPECS = {
  * its row already gives it, and nothing grows past about 420 m across, which
  * is the widest original site; supertalls stay at their real height, which
  * is already the point of them. A level standing on a baked pad is held
- * inside the pad. The stone budget grows with the area (up to three times),
+ * inside the pad, and none outgrows its own ground: where the rule above
+ * ran a building off its island or into its river (Stockholm at 313 x 394 m
+ * on 187 m of level rock, the Winter Palace over the Neva), it is brought
+ * back to halfway, geometrically, between that and the largest scale that
+ * stands on the ground (tools/footcheck.py --fit), and the pad makes ground
+ * under whatever still overhangs. The stone budget grows with the area (up to three times),
  * so a bigger building is more stone, not the same stone in bigger blocks.
  * Explicit clearance radii grow with it.
  */
 export const GAME_SCALE = {
-  milan: 1.62,
-  stvitus: 1.62,
+  milan: 1.43,
+  stvitus: 1.33,
   ulm: 1.48,
   brandenburg: 1.18,
   stephansdom: 1.45,
@@ -870,18 +875,18 @@ export const GAME_SCALE = {
   versailles: 1.0,
   chambord: 2.40,
   seville: 1.80,
-  alhambra: 1.44,
+  alhambra: 1.18,
   malbork: 2.06,
   warsaw: 1.25,
   bran: 1.30,
-  bucharest: 2.50,
+  bucharest: 1.90,
   kronborg: 1.35,        // held to its headland: at 1.89 the bastions stood out over the Sound
-  stockholm: 2.60,
+  stockholm: 1.72,
   hallgrimskirkja: 1.16,
   trakai: 1.62,
-  winterpalace: 2.33,
+  winterpalace: 1.55,
   salisbury: 1.52,
-  windsor: 2.26,
+  windsor: 2.08,
   nidaros: 1.64,
   helsinki: 1.28,
   chillon: 1.62,
@@ -894,16 +899,16 @@ export const GAME_SCALE = {
   osaka: 1.21,
   juche: 1.20,
   monas: 1.01,
-  prambanan: 1.43,
-  registan: 1.33,
+  prambanan: 1.26,
+  registan: 1.01,
   flametowers: 1.40,
   azadi: 1.26,
   kingdomcentre: 1.25,
   baalbek: 1.62,
   ur: 1.18,
   djoser: 1.7,           // a solid pyramid: past this its blocks outgrew what a 155 mm round can break
-  yamoussoukro: 2.05,
-  frontenac: 1.70,
+  yamoussoukro: 1.48,
+  frontenac: 1.36,
   capitolio: 1.89,
   bellasartes: 1.86,
   teatroamazonas: 1.08,

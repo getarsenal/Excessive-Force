@@ -300,6 +300,23 @@ export class Terrain {
    * out so the result reads as a terrace rather than as a plug. Wet cells are
    * left alone, or a landmark on a bank would dam its own river.
    */
+  /**
+   * A footprint as a mask on the height grid: every cell within `margin`
+   * metres of one of the rectangles [x, z, halfX, halfZ].
+   */
+  coverOf(rects, margin = 5) {
+    const n = this.size, span = this.span;
+    const out = new Uint8Array(n * n);
+    const uOf = (x) => (x + span) / (span * 2) * (n - 1);
+    const vOf = (z) => (span - z) / (span * 2) * (n - 1);
+    for (const [x, z, hx, hz] of rects) {
+      const i0 = Math.max(0, Math.floor(uOf(x - hx - margin))), i1 = Math.min(n - 1, Math.ceil(uOf(x + hx + margin)));
+      const j0 = Math.max(0, Math.floor(vOf(z + hz + margin))), j1 = Math.min(n - 1, Math.ceil(vOf(z - hz - margin)));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) out[j * n + i] = 1;
+    }
+    return out;
+  }
+
   levelPad(cx, cz, radius, feather = 30, opts = {}) {
     const n = this.size, h = this.heights, span = this.span, c = this.cellSize;
     const uOf = (x) => (x + span) / (span * 2) * (n - 1);
@@ -340,14 +357,29 @@ export class Terrain {
     // after the coarsen, which is after the pads.
     (this._pads || (this._pads = [])).push({ cx, cz, r: rOut });
 
+    // Under the building itself the pad does not stop at the water. A
+    // terrace stops at the water's edge; a palace does not stand in it. The
+    // Winter Palace's river front and the Stockholm palace's north range
+    // were drawn standing on the Neva and on Norrström, with the harbour
+    // lapping round their footings and nothing underneath: the building's
+    // own footprint is made ground, levelled with the pad, the way a quay
+    // is.
+    const cover = opts.cover || null;
     for (let j = j0; j <= j1; j++) {
       for (let i = i0; i <= i1; i++) {
         const idx = j * n + i;
+        const under = !!(cover && cover[idx]);
+        if (under && this.mask[idx * 3] > 0.5) {
+          this.mask[idx * 3] = 0;
+          h[idx] = level;
+          continue;
+        }
         if (this.mask[idx * 3] > 0.5) continue;
         const d = Math.hypot(-span + i * c - cx, span - j * c - cz);
-        if (d >= rOut) continue;
+        if (d >= rOut && !under) continue;
         // Nor a pond: the pad stops at the water's edge, as a terrace would.
-        if (this._pondId && this.pondAt(-span + i * c, span - j * c)) continue;
+        if (!under && this._pondId && this.pondAt(-span + i * c, span - j * c)) continue;
+        if (under) { h[idx] = level; continue; }
         const t = d <= radius ? 1 : 1 - (d - radius) / feather;
         const k = t * t * (3 - 2 * t);
         h[idx] += (level - h[idx]) * k;

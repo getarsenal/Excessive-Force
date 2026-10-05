@@ -1133,6 +1133,8 @@ export const LEVELS = {
   },
   towerbridge: {
     id: 'towerbridge',
+    // Its piers stand in the Thames on purpose: no made ground under them.
+    padFill: false,
     terrain: 'towerbridge',
     lat: 51.5076, lon: -0.0761,
     name: 'Tower Bridge, London',
