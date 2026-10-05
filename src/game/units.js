@@ -1,3 +1,4 @@
+import { stylizeTree } from '../world/look.js';
 import * as THREE from 'three';
 import { soldierFigure } from './soldier.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -529,6 +530,8 @@ export class ModelLibrary {
     // Wrap so callers can rotate the wrapper without fighting the normalisation.
     const wrapper = new THREE.Group();
     wrapper.add(flattenModel(root));
+    // The same shading as the world they stand in (see world/look.js).
+    stylizeTree(wrapper);
     this.cache.set(key, wrapper);
     return wrapper;
   }
@@ -549,6 +552,8 @@ export class ModelLibrary {
     root.position.y -= box.min.y;
     const wrapper = new THREE.Group();
     wrapper.add(flattenModel(root));
+    // The same shading as the world they stand in (see world/look.js).
+    stylizeTree(wrapper);
     this.cache.set(key, wrapper);
     return wrapper;
   }

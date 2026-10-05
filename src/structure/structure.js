@@ -3,6 +3,7 @@ import { MATERIALS, MATERIAL_PROPS } from './builder.js';
 import { Occupancy } from './occupancy.js';
 import { PhysicsWorld } from '../core/physics.js';
 import { surveyRamp } from '../core/access.js';
+import { stylize } from '../world/look.js';
 
 /**
  * A destructible masonry structure.
@@ -1527,6 +1528,8 @@ export class Structure {
         material.emissive = new THREE.Color(0x3a2a08);
         material.emissiveIntensity = 1.0;
       }
+      // Every stone with its edges caught (see world/look.js).
+      stylize(material, { edges: true });
 
       const mesh = new THREE.InstancedMesh(geo, material, list.length);
       mesh.castShadow = shadows;

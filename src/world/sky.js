@@ -57,9 +57,11 @@ const SKY_FRAG = /* glsl */`
 
     // Three-stop gradient. A two-stop sky always reads as a flat wash; the
     // middle band is where the depth in a real sky actually lives.
+    // Blue well down toward the skyline: the horizon stop is a thin band,
+    // the way a clear day reads, not a third of the dome.
     float t = pow(clamp(h, 0.0, 1.0), 0.44);
-    vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.45, t));
-    col = mix(col, uZenith, smoothstep(0.35, 1.0, t));
+    vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.24, t));
+    col = mix(col, uZenith, smoothstep(0.30, 1.0, t));
 
     // Below the horizon fade to a warm ground haze rather than hard black.
     col = mix(col, uGround, clamp(-h * 4.0, 0.0, 1.0));
@@ -71,11 +73,12 @@ const SKY_FRAG = /* glsl */`
     if (h > 0.02) {
       vec2 cp = dir.xz / max(h + 0.22, 0.06) * 0.55 + vec2(uTime * 0.0035, 0.0);
       float f = fbm(cp) * 0.55 + fbm(cp * 2.3 + 17.0) * 0.3 + fbm(cp * 5.1) * 0.15;
-      float cover = smoothstep(0.52, 0.78, f) * smoothstep(0.02, 0.22, h);
-      // Lit from the sun's side, grey underneath.
+      // Chunky, with a hard-ish edge: a cumulus reads as a shape, a haze
+      // does not. Lit from the sun's side, lavender underneath.
+      float cover = smoothstep(0.50, 0.62, f) * smoothstep(0.02, 0.22, h);
       float lit = 0.55 + 0.45 * max(dot(normalize(uSunDir), dir), 0.0);
-      col = mix(col, mix(vec3(0.62, 0.65, 0.70), vec3(1.02, 0.99, 0.94), lit),
-                cover * 0.88);
+      col = mix(col, mix(vec3(0.74, 0.76, 0.86), vec3(1.04, 1.02, 0.98), lit),
+                cover * 0.96);
     }
 
     // Golden hour along the horizon on the sun's side: a warm band that
@@ -83,14 +86,14 @@ const SKY_FRAG = /* glsl */`
     // late-afternoon sky does and a gradient dome does not.
     vec2 sunXZ = normalize(uSunDir.xz + vec2(1e-4));
     float side = max(dot(normalize(dir.xz + vec2(1e-4)), sunXZ), 0.0);
-    col += uSunColor * pow(side, 2.5) * exp(-abs(h) * 11.0) * 0.16;
+    col += uSunColor * pow(side, 3.5) * exp(-abs(h) * 14.0) * 0.09;
 
     float sd = max(dot(dir, normalize(uSunDir)), 0.0);
     // Disc, then forward scatter, then a broad warm bias across that half of
     // the sky — which is what stops the dome looking like a colour ramp.
     col += uSunColor * pow(sd, 900.0) * 16.0;
     col += uSunColor * pow(sd, 26.0) * 0.30;
-    col += uSunColor * pow(sd, 4.0) * 0.075;
+    col += uSunColor * pow(sd, 4.0) * 0.04;
 
     gl_FragColor = vec4(col, 1.0);
   }

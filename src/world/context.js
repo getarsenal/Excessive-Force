@@ -1535,6 +1535,18 @@ function mergeTinted(geos, material, palette, rng, quality) {
   // `{ main, pitched, trim }`.
   const pick = new Map();
   const parts = Array.isArray(palette) ? { main: palette } : palette;
+  // Each building's foot and crown, so the gradient below runs the whole
+  // height of the building and not of each storey in it.
+  const span = new Map();
+  for (const g of geos) {
+    if (g.userData.plot === undefined) continue;
+    const pa = g.attributes.position.array;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 1; i < pa.length; i += 3) { if (pa[i] < lo) lo = pa[i]; if (pa[i] > hi) hi = pa[i]; }
+    const sp = span.get(g.userData.plot) || { lo: Infinity, hi: -Infinity };
+    sp.lo = Math.min(sp.lo, lo); sp.hi = Math.max(sp.hi, hi);
+    span.set(g.userData.plot, sp);
+  }
   for (const g of geos) {
     const n = g.attributes.position.count;
     const part = g.userData.trim ? 'trim' : g.userData.pitched ? 'pitched' : 'main';
@@ -1549,8 +1561,16 @@ function mergeTinted(geos, material, palette, rng, quality) {
       c.multiplyScalar(0.80 + rng() * 0.36);
       if (key) pick.set(key, c);
     }
+    // Darker at the foot, lighter at the crown: the painted look's baked
+    // light, and what separates a wall from the street it stands on (see
+    // world/look.js). Eighteen per cent over the height of the building.
+    const sp = span.get(g.userData.plot);
+    const pa = g.attributes.position.array;
     const arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+    for (let i = 0; i < n; i++) {
+      const k = sp && sp.hi > sp.lo + 0.5 ? 0.82 + 0.18 * Math.min(1, Math.max(0, (pa[i * 3 + 1] - sp.lo) / (sp.hi - sp.lo))) : 1;
+      arr[i * 3] = c.r * k; arr[i * 3 + 1] = c.g * k; arr[i * 3 + 2] = c.b * k;
+    }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   }
   // Where each building ends up in the merge, by vertex, so it can be burnt.
@@ -2426,7 +2446,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
         f.rotateZ(-0.42 - rng() * 0.25);
         f.rotateY((k / 6) * Math.PI * 2 + rng() * 0.4);
         f.translate(x, y + h * 0.92, z);
-        tintOne(f, 0x3e7a2e, 0.7 + rng() * 0.5);
+        tintOne(f, 0x3e8a2e, 0.7 + rng() * 0.5, 0.4);
         crowns.push(f);
       }
       return;
@@ -2445,8 +2465,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
       lower.translate(x, y + h * 0.50, z);
       const upper = new THREE.ConeGeometry(h * 0.21, h * 0.46, 7).toNonIndexed();
       upper.translate(x, y + h * 0.80, z);
-      tintOne(lower, 0x355c28, 0.7 + rng() * 0.5);
-      tintOne(upper, 0x406e2d, 0.7 + rng() * 0.5);
+      tintOne(lower, 0x2f6a28, 0.7 + rng() * 0.5, 0.6);
+      tintOne(upper, 0x3f8a32, 0.7 + rng() * 0.5, 0.6);
       crowns.push(lower, upper);
       return;
     }
@@ -2462,7 +2482,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
       const off = k === 0 ? 0 : r * (0.4 + rng() * 0.4);
       lobe.translate(x + Math.cos(a) * off, cy + (k === 0 ? 0 : (rng() - 0.35) * r * 0.7),
         z + Math.sin(a) * off);
-      tintOne(lobe, 0x4a7534, 0.72 + rng() * 0.5);
+      tintOne(lobe, 0x4a8a30, 0.72 + rng() * 0.5, 0.7);
       crowns.push(lobe);
     }
   };
@@ -2815,11 +2835,19 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
 }
 
 /** Paint one geometry a single colour, for the merged detail meshes. */
-function tintOne(geo, hex, mul = 1) {
+function tintOne(geo, hex, mul = 1, grad = 0) {
   const n = geo.attributes.position.count;
   const c = new THREE.Color(hex).multiplyScalar(mul);
   const arr = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+  // With `grad`, lighter at the top and darker underneath: a crown in three
+  // tones instead of one, which is what a stylized tree is (see world/look.js).
+  let lo = Infinity, hi = -Infinity;
+  const pa = geo.attributes.position.array;
+  if (grad) for (let i = 1; i < pa.length; i += 3) { if (pa[i] < lo) lo = pa[i]; if (pa[i] > hi) hi = pa[i]; }
+  for (let i = 0; i < n; i++) {
+    const k = grad && hi > lo ? 1 - grad * 0.5 + grad * ((pa[i * 3 + 1] - lo) / (hi - lo)) : 1;
+    arr[i * 3] = c.r * k; arr[i * 3 + 1] = c.g * k; arr[i * 3 + 2] = c.b * k;
+  }
   geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
 }
 

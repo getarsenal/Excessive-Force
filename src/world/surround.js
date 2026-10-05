@@ -119,8 +119,15 @@ function merge(geos, palette, rng, roughness) {
     const n = g.attributes.position.count;
     c.setHex(palette[Math.floor(rng() * palette.length)]);
     c.multiplyScalar(0.80 + rng() * 0.34);
+    // Darker at the foot, lighter at the crown (see world/look.js).
+    const pa = g.attributes.position.array;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 1; i < pa.length; i += 3) { if (pa[i] < lo) lo = pa[i]; if (pa[i] > hi) hi = pa[i]; }
     const arr = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+    for (let i = 0; i < n; i++) {
+      const k = hi > lo + 0.5 ? 0.82 + 0.18 * ((pa[i * 3 + 1] - lo) / (hi - lo)) : 1;
+      arr[i * 3] = c.r * k; arr[i * 3 + 1] = c.g * k; arr[i * 3 + 2] = c.b * k;
+    }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
     g.deleteAttribute('uv');
   }

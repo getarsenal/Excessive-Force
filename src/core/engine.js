@@ -366,7 +366,7 @@ export class Engine {
     // north-facing roofs and the shaded side of every street read as black —
     // a hemisphere light alone gives them one flat ambient tone and nothing to
     // reflect.
-    this.scene.environmentIntensity = 1.08;
+    this.scene.environmentIntensity = 0.72;
     this.envMap = rt.texture;
     pmrem.dispose();
     // Hand the dome back; the caller adds it to the real scene.

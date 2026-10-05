@@ -317,6 +317,38 @@ export class Terrain {
     return out;
   }
 
+  /**
+   * Contact shadow under the town: the ground darkens under every building
+   * and for a few metres round it, the baked ambient occlusion a painted
+   * scene has under every object (see world/look.js). Rewrites the ground's
+   * vertex colours once, after the town is laid; no cost in the frame.
+   */
+  contactShade(plots) {
+    const geo = this.mesh?.geometry;
+    const col = geo?.attributes.color;
+    if (!col || !plots?.length) return 0;
+    const rects = plots.map((p) => {
+      const c = Math.abs(Math.cos(p.yaw || 0)), sn = Math.abs(Math.sin(p.yaw || 0));
+      return [p.x, p.z, (p.w / 2) * c + (p.d / 2) * sn, (p.w / 2) * sn + (p.d / 2) * c];
+    });
+    const inside = this.coverOf(rects, 0.5), near = this.coverOf(rects, 3.5);
+    const pos = geo.attributes.position, n = this.size, span = this.span;
+    const a = col.array;
+    let touched = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const u = Math.round((x + span) / (span * 2) * (n - 1)), v = Math.round((span - z) / (span * 2) * (n - 1));
+      if (u < 0 || v < 0 || u >= n || v >= n) continue;
+      const idx = v * n + u;
+      const k = inside[idx] ? 0.74 : near[idx] ? 0.86 : 1;
+      if (k === 1) continue;
+      a[i * 3] *= k; a[i * 3 + 1] *= k; a[i * 3 + 2] *= k;
+      touched++;
+    }
+    col.needsUpdate = true;
+    return touched;
+  }
+
   levelPad(cx, cz, radius, feather = 30, opts = {}) {
     const n = this.size, h = this.heights, span = this.span, c = this.cellSize;
     const uOf = (x) => (x + span) / (span * 2) * (n - 1);
@@ -1098,6 +1130,19 @@ export class Terrain {
       bed: new THREE.Color(0x2b4239),     // wet riverbed, cold green
       dry: new THREE.Color(0xc2b184),     // sun-bleached ground on high spots
     });
+    // The ground a step more saturated than the palettes were written: the
+    // palettes were tuned under a beige haze and a white sky, and under a blue
+    // one they read as grey-green. Lightness is left alone, so the value
+    // spread the palette was built on survives (see world/look.js).
+    if (!this._paletteLifted) {
+      this._paletteLifted = true;
+      const hsl = { h: 0, s: 0, l: 0 };
+      for (const k of Object.keys(P)) {
+        if (k === 'road') continue;
+        P[k].getHSL(hsl);
+        P[k].setHSL(hsl.h, Math.min(1, hsl.s * 1.35 + 0.03), hsl.l);
+      }
+    }
     const tmp = new THREE.Color();
     const tmp2 = new THREE.Color();
 
@@ -1376,6 +1421,19 @@ export class Terrain {
     for (let i = 0; i < ap.count; i++) {
       const c = apronColour(ap.getX(i), ap.getZ(i), chan[i]);
       apColors[i * 3] = c.r; apColors[i * 3 + 1] = c.g; apColors[i * 3 + 2] = c.b;
+    }
+    // Aerial perspective, baked: the far country leans toward the colour of
+    // the air (see world/look.js) so distance goes blue the way it does from
+    // a hill, whatever the fog manages at that range.
+    if (this.farTint) {
+      const ft = new THREE.Color(this.farTint);
+      for (let i = 0; i < ap.count; i++) {
+        const d = Math.max(Math.abs(ap.getX(i)), Math.abs(ap.getZ(i)));
+        const k = THREE.MathUtils.smoothstep(d, this.span * 1.1, this.span * 4.5) * 0.55;
+        apColors[i * 3] += (ft.r - apColors[i * 3]) * k;
+        apColors[i * 3 + 1] += (ft.g - apColors[i * 3 + 1]) * k;
+        apColors[i * 3 + 2] += (ft.b - apColors[i * 3 + 2]) * k;
+      }
     }
     apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
     const apron = new THREE.Mesh(apronGeo, new THREE.MeshStandardMaterial({

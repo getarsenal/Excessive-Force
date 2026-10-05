@@ -144,6 +144,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
+- `src/world/look.js` the art direction: the climate's sky, fog, water
+  and light palette (`LOOKS`), and the shared material hook (`stylize`:
+  wrapped diffuse, value by face, stone edges). Perf is measured against
+  `docs/snapshots/pre-beauty-v1-perf-westminster.txt`; revert recipe in
+  `docs/snapshots/pre-beauty-v1.txt`.
 - `src/game/operations.js` the campaign's operations, stars, gating,
   bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·

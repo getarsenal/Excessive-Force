@@ -44,6 +44,7 @@ import { damageBill, money } from './ui/bill.js';
 import { CollapseClip } from './ui/clip.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
+import { applyLook, applyWaterLook, stylizeTree, lookFor } from './world/look.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
@@ -336,6 +337,7 @@ async function boot() {
     if (haze.colour !== undefined) engine.scene.fog.color.setHex(haze.colour);
     if (haze.density !== undefined) engine.scene.fog.density = haze.density;
   }
+  terrain.farTint = lookFor(level).fog;
   engine.scene.add(terrain.buildMesh());
   // The ground, kept by handle: anything resting on the terrain is settled for
   // good, and the freezing bookkeeping can stop worrying about it.
@@ -343,10 +345,15 @@ async function boot() {
 
   const sunDir = engine.sun.position.clone().normalize();
   const sky = createSky(sunDir);
+  // The look (see world/look.js): the climate's sky, fog, lights and grade,
+  // set before the sky is baked into the environment map so metals reflect
+  // the sky that is there.
+  const look = applyLook(engine, level, sky);
   // Pre-filter the sky into an environment map before the dome joins the
   // scene, so metals have something to reflect.
   engine.scene.add(engine.useEnvironmentFrom(sky));
   const water = createWater(terrain, sunDir, quality);
+  applyWaterLook(water, look, engine.scene.fog);
   engine.scene.add(water);
   console.log(`[tumble] water: ${water.userData.quads} quads over the river mask`);
 
@@ -784,6 +791,8 @@ async function boot() {
   const flags = new Flags(engine.scene, quality);
   flags.raise(FLAG_SITES[level.id] || [], sites && Object.fromEntries(structures.map((st) => [st.key, st])));
 
+  // The ground darkens under the town and round its feet (see world/look.js).
+  terrain.contactShade(contextGroup?.userData?.plots || []);
   // Cloud shadows drifting over the ground and the town.
   cloudShadows(terrain.mesh.material, 0.30);
   contextGroup?.traverse((o) => {
@@ -792,6 +801,10 @@ async function boot() {
       cloudShadows(o.material, 0.26);
     }
   });
+  // The shading (see world/look.js) on everything standing so far: the
+  // ground, the town, the garrison, the works. The stones took theirs with
+  // edges as they were built; the units take theirs as their models load.
+  console.log(`[tumble] stylized ${stylizeTree(engine.scene)} materials`);
 
   hud = new HUD(battle, {
     onSelect: (id) => {
