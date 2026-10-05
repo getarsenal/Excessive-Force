@@ -173,15 +173,16 @@ export class Barks {
     if (this.el.hidden) return;
     const u = this.unit;
     if (this.t > this.until || !u || !u.alive) { this.el.hidden = true; return; }
-    // Over the crew, a little above the gun; off screen, not shown at all.
+    // In the talk band under the top bar, over the gun's column: never in
+    // the lower middle of the screen, where the fingers are. Off screen,
+    // not shown at all.
     const p = this._v.copy(u.pos);
     p.y += 4.5;
     p.project(this.camera);
     if (p.z > 1 || Math.abs(p.x) > 1.0 || Math.abs(p.y) > 1.0) { this.el.style.opacity = '0'; return; }
     this.el.style.opacity = '';
-    const x = (p.x + 1) / 2 * innerWidth, y = (1 - p.y) / 2 * innerHeight;
-    // Drifts up a touch and fades as it goes, the way a thought does.
-    const life = (this.t - (this.until - (2.4 + this.el.querySelector('span').textContent.length * 0.05))) ;
-    this.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - life * 4)}px) translate(-50%, -100%)`;
+    const x = (p.x + 1) / 2 * innerWidth;
+    const cx = Math.max(120, Math.min(innerWidth - 120, x));
+    this.el.style.transform = `translate(${Math.round(cx)}px, 0) translate(-50%, 0)`;
   }
 }
