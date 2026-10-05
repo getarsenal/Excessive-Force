@@ -5,7 +5,6 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 /**
  * Grade: saturation, contrast, warmth, vignette, and a chromatic punch driven
@@ -24,6 +23,7 @@ const GradeShader = {
     uSaturation: { value: 1.05 },
     uContrast: { value: 1.055 },
     uShake: { value: new THREE.Vector2(0, 0) },
+    toneMappingExposure: { value: 1 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -37,6 +37,14 @@ const GradeShader = {
     uniform float uContrast;
     uniform vec2 uShake;
     varying vec2 vUv;
+    // The tone curve and the transfer to the screen's colour space, which
+    // used to be a pass of their own (OutputPass) after this one: a whole
+    // extra read and write of the frame, every frame, on a phone that is
+    // short of fill rate before anything else. The grade is the last thing
+    // done to the linear picture, so it is also where the picture leaves
+    // linear. The two defines below are set from the renderer in
+    // _setupComposer, the way OutputPass sets its own.
+    #include <tonemapping_pars_fragment>
     void main(){
       vec2 uv = vUv + uShake;
       // Chromatic split scales with distance from centre; during a big hit the
@@ -64,11 +72,25 @@ const GradeShader = {
       col *= mix(vec3(1.0), vec3(0.94, 0.98, 1.09), shadow * 0.5);
 
       col *= smoothstep(0.95, uVignette * 0.35, r2 * 1.6);
-      // Dither, so the sky's gradient and the fog do not band on an 8-bit
-      // phone panel: a hash per pixel, under a level either way.
-      float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-      col += (dn - 0.5) * (1.0 / 255.0);
       gl_FragColor = vec4(max(col, 0.0), 1.0);
+      #ifdef ACES_FILMIC_TONE_MAPPING
+        gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+      #elif defined(NEUTRAL_TONE_MAPPING)
+        gl_FragColor.rgb = NeutralToneMapping(gl_FragColor.rgb);
+      #elif defined(AGX_TONE_MAPPING)
+        gl_FragColor.rgb = AgXToneMapping(gl_FragColor.rgb);
+      #elif defined(LINEAR_TONE_MAPPING)
+        gl_FragColor.rgb = LinearToneMapping(gl_FragColor.rgb);
+      #endif
+      #ifdef SRGB_TRANSFER
+        gl_FragColor = sRGBTransferOETF(gl_FragColor);
+      #endif
+      // Dither, so the sky's gradient and the fog do not band on an 8-bit
+      // phone panel: a hash per pixel, under a level either way. After the
+      // transfer, because the levels it is hiding the steps between are the
+      // panel's, not the linear picture's.
+      float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+      gl_FragColor.rgb += (dn - 0.5) * (1.0 / 255.0);
     }
   `,
 };
@@ -264,13 +286,27 @@ export class Engine {
       this.composer.addPass(this.bloom);
     }
 
+    // The grade also tone-maps and writes sRGB (see GradeShader): the
+    // renderer's own tone mapping is kept off this material so it is not
+    // applied twice, and the defines say which curve and transfer to use.
     this.gradePass = new ShaderPass(GradeShader);
+    this.gradePass.material.toneMapped = false;
+    const defines = {};
+    if (THREE.ColorManagement.getTransfer(this.renderer.outputColorSpace) === THREE.SRGBTransfer) defines.SRGB_TRANSFER = '';
+    const tm = this.renderer.toneMapping;
+    if (tm === THREE.ACESFilmicToneMapping) defines.ACES_FILMIC_TONE_MAPPING = '';
+    else if (tm === THREE.NeutralToneMapping) defines.NEUTRAL_TONE_MAPPING = '';
+    else if (tm === THREE.AgXToneMapping) defines.AGX_TONE_MAPPING = '';
+    else if (tm === THREE.LinearToneMapping) defines.LINEAR_TONE_MAPPING = '';
+    this.gradePass.material.defines = defines;
     this.composer.addPass(this.gradePass);
 
+    // Anti-aliasing works on the finished, display-referred picture, so it
+    // comes after the grade now rather than before the output pass it
+    // replaced; that is where SMAA is meant to run.
     if (q.name === 'high' || q.name === 'ultra') {
       this.composer.addPass(new SMAAPass(size.x, size.y));
     }
-    this.composer.addPass(new OutputPass());
   }
 
   _pixelRatio() {
@@ -411,7 +447,11 @@ export class Engine {
     return this._shakeVec;
   }
 
-  render() { this._checkSize(); this.composer.render(); }
+  render() {
+    this._checkSize();
+    this.gradePass.uniforms.toneMappingExposure.value = this.renderer.toneMappingExposure;
+    this.composer.render();
+  }
 
   dispose() {
     window.removeEventListener('resize', this._onResize);
