@@ -423,6 +423,9 @@ export function makeWarthog() {
   g.add(part(new THREE.CylinderGeometry(0.2, 0.2, 1.9, 12).rotateX(Math.PI / 2), lower, -0.95, -1.1, 0.5));
   g.add(part(new THREE.SphereGeometry(0.2, 12, 8), glass, -0.95, -1.1, 1.45));
 
+  // The nose art: behind the shark's mouth, on the flat side under the
+  // canopy, so the two pictures do not crowd each other.
+  g.userData.noseArt = { z: 3.75, y: 0.22, w: 1.55 };
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
   return g;
 }

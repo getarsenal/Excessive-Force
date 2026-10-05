@@ -219,6 +219,9 @@ export function makeLancer() {
   g.add(part(new THREE.SphereGeometry(0.1, 6, 4), wht, 0, 0.5, -22.4));
   g.add(part(new THREE.SphereGeometry(0.09, 6, 4), red, 0, 1.9, 8.0));
 
+  // The nose art: on the flat side under the flight deck, sized to the
+  // body's depth there so the picture does not wrap under the belly.
+  g.userData.noseArt = { z: 14.0, y: 0.1, w: 3.4 };
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
   return g;
 }

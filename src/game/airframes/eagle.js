@@ -336,6 +336,10 @@ export function makeEagle({ store } = {}) {
   }
   bomb.name = 'bomb';
   g.add(bomb);
+  // The nose art: on the flat of the forward fuselage beside the front
+  // seat, ahead of the intake, sized to the depth of the body there so the
+  // picture does not wrap under the belly.
+  g.userData.noseArt = { z: 5.3, y: 0.08, w: 1.9 };
 
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
   return g;

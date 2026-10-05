@@ -68,7 +68,13 @@ const out = await page.evaluate(async (kinds) => {
     // Paint the first nose art on it, the way a sortie is.
     const art = nose.ART[0];
     let panel = 'NONE';
-    try { nose.paintNoseArt(obj, art, 3, 1); const m = obj.getObjectByName('noseart'); if (m) panel = `${m.position.x.toFixed(2)},${m.position.y.toFixed(2)},${m.position.z.toFixed(2)} w${m.geometry.parameters.width.toFixed(2)}`; } catch (e) { panel = 'ERR ' + String(e).slice(0, 80); }
+    try {
+      nose.paintNoseArt(obj, art, 3, 1);
+      const parts = []; obj.traverse((m) => { if (m.name === 'noseart') parts.push(m); });
+      panel = parts.map((m) => { m.geometry.computeBoundingBox(); const b = m.geometry.boundingBox; const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
+        return `[${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)} ${s.z.toFixed(2)}x${s.y.toFixed(2)} ${m.geometry.attributes.position.count / 3}tri]`; }).join(' ') || 'NONE';
+    } catch (e) { panel = 'ERR ' + String(e).slice(0, 120); }
+    await new Promise((r) => setTimeout(r, 600));
     obj.traverse((m) => { if (m.isMesh && m.material?.transparent && m.material.opacity < 0.5 && m.name !== 'noseart') m.visible = false; });
     scene.add(obj); obj.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(obj);
@@ -82,6 +88,16 @@ const out = await page.evaluate(async (kinds) => {
       const v = new THREE.Vector3(x, y, z).normalize().multiplyScalar(d);
       cam.position.copy(c).add(v); cam.lookAt(c); cam.updateProjectionMatrix();
       imgs[name] = shot();
+    }
+    // And close on the nose art, from a little forward and above, the way
+    // the hangar's camera sees it pulled in.
+    const art0 = []; obj.traverse((m) => { if (m.name === 'noseart') art0.push(m); });
+    const pa = art0.find((m) => { m.geometry.computeBoundingBox(); return m.geometry.boundingBox.getCenter(new THREE.Vector3()).x > 0; });
+    if (pa) {
+      const ac = pa.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(obj.matrixWorld);
+      const span = pa.geometry.boundingBox.getSize(new THREE.Vector3()).z;
+      cam.position.set(ac.x + span * 2.3, ac.y + span * 0.55, ac.z + span * 0.9); cam.lookAt(ac); cam.updateProjectionMatrix();
+      imgs.nose = shot();
     }
     scene.remove(obj);
     res[k] = { box: [size.x, size.y, size.z].map((v) => +v.toFixed(2)), tris: Math.round(tris), panel, imgs };

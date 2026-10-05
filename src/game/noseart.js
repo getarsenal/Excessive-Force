@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import { totalStars, operationsState } from './operations.js';
 
 /**
@@ -21,17 +22,17 @@ export const ART = [
   // Every piece is a painting: the picture carries its own lettering, so
   // only the tally is drawn under it. The colours are what each one was
   // before it was painted, kept for the drawn fallback if a picture fails.
-  { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', img: 'assets/noseart/demeanor.jpg', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
-  { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', img: 'assets/noseart/damsel.jpg', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
-  { id: 'beer', name: 'Hold My Beer', kind: 'bomb', img: 'assets/noseart/beer.jpg', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
-  { id: 'deductible', name: 'Tax Deductible', kind: 'pin', img: 'assets/noseart/deductible.jpg', skin: '#d9a77f', hair: '#3b2416', suit: '#2f6b3a', need: { stars: 15 }, how: '15 stars' },
-  { id: 'trigger', name: 'Trigger Happy', kind: 'bomb', img: 'assets/noseart/trigger.jpg', body: '#3c4a2a', need: { wins: 10 }, how: 'Win ten battles' },
-  { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', img: 'assets/noseart/renewal.jpg', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
-  { id: 'refunds', name: 'No Refunds', kind: 'pin', img: 'assets/noseart/refunds.jpg', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
-  { id: 'actofgod', name: 'Act of God', kind: 'halo', img: 'assets/noseart/actofgod.jpg', body: '#2e3338', need: { stars: 50 }, how: '50 stars' },
-  { id: 'exwife', name: "Buck's Ex-Wife", kind: 'pin', img: 'assets/noseart/exwife.jpg', skin: '#e2b896', hair: '#b4361a', suit: '#141414', need: { bosses: 4 }, how: 'Beat four bosses' },
-  { id: 'sender', name: 'Return to Sender', kind: 'dice', img: 'assets/noseart/sender.jpg', need: { stars: 80 }, how: '80 stars' },
-  { id: 'service', name: 'Thank You For Your Service', kind: 'pin', img: 'assets/noseart/service.jpg', skin: '#e8c4a0', hair: '#e8c35a', suit: '#b22234', stars: true, need: { finale: 1 }, how: 'Take the Great Wall' },
+  { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', img: 'assets/noseart/demeanor.jpg', cut: 'assets/noseart/demeanor-cut.webp', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
+  { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', img: 'assets/noseart/damsel.jpg', cut: 'assets/noseart/damsel-cut.webp', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
+  { id: 'beer', name: 'Hold My Beer', kind: 'bomb', img: 'assets/noseart/beer.jpg', cut: 'assets/noseart/beer-cut.webp', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
+  { id: 'deductible', name: 'Tax Deductible', kind: 'pin', img: 'assets/noseart/deductible.jpg', cut: 'assets/noseart/deductible-cut.webp', skin: '#d9a77f', hair: '#3b2416', suit: '#2f6b3a', need: { stars: 15 }, how: '15 stars' },
+  { id: 'trigger', name: 'Trigger Happy', kind: 'bomb', img: 'assets/noseart/trigger.jpg', cut: 'assets/noseart/trigger-cut.webp', body: '#3c4a2a', need: { wins: 10 }, how: 'Win ten battles' },
+  { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', img: 'assets/noseart/renewal.jpg', cut: 'assets/noseart/renewal-cut.webp', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
+  { id: 'refunds', name: 'No Refunds', kind: 'pin', img: 'assets/noseart/refunds.jpg', cut: 'assets/noseart/refunds-cut.webp', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
+  { id: 'actofgod', name: 'Act of God', kind: 'halo', img: 'assets/noseart/actofgod.jpg', cut: 'assets/noseart/actofgod-cut.webp', body: '#2e3338', need: { stars: 50 }, how: '50 stars' },
+  { id: 'exwife', name: "Buck's Ex-Wife", kind: 'pin', img: 'assets/noseart/exwife.jpg', cut: 'assets/noseart/exwife-cut.webp', skin: '#e2b896', hair: '#b4361a', suit: '#141414', need: { bosses: 4 }, how: 'Beat four bosses' },
+  { id: 'sender', name: 'Return to Sender', kind: 'dice', img: 'assets/noseart/sender.jpg', cut: 'assets/noseart/sender-cut.webp', need: { stars: 80 }, how: '80 stars' },
+  { id: 'service', name: 'Thank You For Your Service', kind: 'pin', img: 'assets/noseart/service.jpg', cut: 'assets/noseart/service-cut.webp', skin: '#e8c4a0', hair: '#e8c35a', suit: '#b22234', stars: true, need: { finale: 1 }, how: 'Take the Great Wall' },
 ];
 
 /** What this commander has, from the record. */
@@ -171,7 +172,10 @@ function artImage(art) {
   if (IMG.has(art.id)) return IMG.get(art.id);
   const im = new Image();
   im.decoding = 'async';
-  im.src = art.img;
+  // The cut-out: the figure and the lettering without the poster's dark
+  // ground, which on an aircraft was a black card stuck to the skin
+  // (tools/noseart_cut.py makes them from the paintings).
+  im.src = art.cut || art.img;
   IMG.set(art.id, im);
   return im;
 }
@@ -180,9 +184,10 @@ function artImage(art) {
 if (typeof document !== 'undefined') for (const a of ART) if (a.img) artImage(a);
 
 /**
- * The painted picture onto the texture's canvas: fitted above the tally
- * row with its edges feathered into the airframe's own paint, so it reads
- * as a panel painted on the skin rather than a photograph stuck to it.
+ * The painted picture onto the texture's canvas, above the tally: the cut-out
+ * as it is, then worn the way paint on an airframe wears — flecked off at
+ * the edges where the skin flexes and the crew chief's boots go, faded a
+ * shade overall by the sun.
  */
 function drawPainted(ctx, im, tex, fallback) {
   const paint = () => {
@@ -190,13 +195,22 @@ function drawPainted(ctx, im, tex, fallback) {
     const x = 256 - W / 2, y = 2;
     ctx.save();
     ctx.clearRect(0, 0, 512, H + 4);
-    ctx.beginPath(); ctx.roundRect(x, y, W, H, 26); ctx.clip();
+    ctx.globalAlpha = 0.96;
     ctx.drawImage(im, x, y, W, H);
-    // Feather: keep the middle, let the rim go.
-    ctx.globalCompositeOperation = 'destination-in';
-    const g = ctx.createRadialGradient(256, y + H / 2, H * 0.30, 256, y + H / 2, W * 0.62);
-    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.72, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+    ctx.globalAlpha = 1;
+    // Chips: a scatter of small flecks out of the paint, more of them
+    // towards the edges, seeded by the picture so a piece always wears the
+    // same way.
+    ctx.globalCompositeOperation = 'destination-out';
+    let seed = (im.naturalWidth * 31 + im.naturalHeight * 17) >>> 0;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 260; i++) {
+      const px = x + rnd() * W, py = y + rnd() * H;
+      const edge = Math.max(Math.abs(px - 256) / (W / 2), Math.abs(py - (y + H / 2)) / (H / 2));
+      if (rnd() > 0.25 + edge * 0.7) continue;
+      ctx.fillStyle = `rgba(0,0,0,${0.35 + rnd() * 0.5})`;
+      ctx.beginPath(); ctx.ellipse(px, py, 0.6 + rnd() * 2.2, 0.5 + rnd() * 1.4, rnd() * Math.PI, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
     if (tex) tex.needsUpdate = true;
   };
@@ -218,8 +232,10 @@ export function artTexture(art, wins = 0, bosses = 0) {
   const key = `${art.id}:${Math.min(24, wins)}:${Math.min(8, bosses)}`;
   if (TEX.has(key)) return TEX.get(key);
   const c = document.createElement('canvas');
-  c.width = 512; c.height = 320;
+  c.width = 1024; c.height = 640;
   const ctx = c.getContext('2d');
+  // Everything below is drawn in 512 x 320 units.
+  ctx.scale(2, 2);
   const s = 2.4, ox = 30, oy = -10;
   // The drawn version: the silhouette in the piece's colours and the name
   // in sign-writer's script, cream on a dark keyline. What every piece was
@@ -245,7 +261,7 @@ export function artTexture(art, wins = 0, bosses = 0) {
   for (let i = 0; i < n; i++, x += 18) tallyBomb(ctx, x + 8, 298);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   if (painted) drawPainted(ctx, painted, tex, () => { drawn(); tex.needsUpdate = true; });
   TEX.set(key, tex);
   return tex;
@@ -312,23 +328,43 @@ function paintInPlace(group, tex) {
   const hint = group.userData.noseArt || null;
   const z = hint?.z ?? (box.max.z - L * 0.2);
   const meshes = [];
-  group.traverse((o) => { if (o.isMesh && o.name !== 'noseart') meshes.push(o); });
-  let best = null;
+  group.traverse((o) => { if (o.isMesh && o.name !== 'noseart' && o.visible && !(o.material?.transparent)) meshes.push(o); });
   const ys = hint?.y !== undefined ? [hint.y] : Array.from({ length: 9 }, (_, k) => box.min.y + (box.max.y - box.min.y) * (0.25 + k * 0.05));
-  for (const y of ys) {
-    _ray.set(_o.set(box.max.x + 5, y, z), _d.set(-1, 0, 0));
-    const hit = _ray.intersectObjects(meshes, false)[0];
-    if (hit && Math.abs(hit.point.x) < (box.max.x - box.min.x) * 0.3 && (!best || hit.point.x > best.x)) best = { x: hit.point.x, y };
-  }
-  if (!best) return;
   const w = hint?.w ?? Math.max(1.4, L * 0.115), h = w * 0.625;
-  const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.7, depthWrite: false,
-    polygonOffset: true, polygonOffsetFactor: -2 });
-  for (const side of [-1, 1]) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
-    m.position.set(side * (best.x + 0.04), best.y - h * 0.08, z);
-    m.rotation.y = side * Math.PI / 2;
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex, transparent: true, depthWrite: false, roughness: 0.62, metalness: 0.2,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  });
+  // Each side on its own: cast in from that side, and the paint projected
+  // onto whatever skin the cast struck, so it follows the curve of the
+  // fuselage the way paint does instead of standing off it as a card.
+  for (const side of [1, -1]) {
+    let best = null;
+    for (const y of ys) {
+      _ray.set(_o.set(side * (Math.max(Math.abs(box.max.x), Math.abs(box.min.x)) + 5), y, z), _d.set(-side, 0, 0));
+      const hit = _ray.intersectObjects(meshes, false)[0];
+      if (hit && Math.abs(hit.point.x) < (box.max.x - box.min.x) * 0.3 && (!best || Math.abs(hit.point.x) > Math.abs(best.p.x))) best = { p: hit.point.clone(), mesh: hit.object };
+    }
+    if (!best) continue;
+    const half = Math.abs(best.p.x);
+    // The projector looks straight in from the side, so the picture stays
+    // upright and reads the right way round on both; it reaches no further
+    // in than most of the way to the centreline, so it never comes out on
+    // the far side.
+    const aim = new THREE.Object3D();
+    aim.position.copy(best.p);
+    aim.lookAt(best.p.x + side, best.p.y, best.p.z);
+    const depth = Math.max(0.2, Math.min(half * 1.7, w));
+    let geo;
+    try {
+      geo = new DecalGeometry(best.mesh, best.p, aim.rotation, new THREE.Vector3(w, h, depth));
+    } catch { continue; }
+    if (!geo.attributes.position || geo.attributes.position.count === 0) continue;
+    const m = new THREE.Mesh(geo, mat);
     m.name = 'noseart';
+    m.renderOrder = 1;
+    // The projected surface is in the airframe's frame already (it is
+    // measured with the airframe at the origin): it goes on as it is.
     group.add(m);
   }
 }

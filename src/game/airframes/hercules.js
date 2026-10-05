@@ -59,7 +59,7 @@ function herculesSkin(S, gunship) {
   g.fillStyle = S.marks;
   for (const u of [0.05, 0.45]) { g.save(); g.translate(col(u), (row(0.5) + row(-1.5)) / 2); g.rotate(Math.PI / 2); star(0, 0, 20); g.restore(); }
   g.font = 'bold 20px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (const u of [0.05, 0.45]) { g.save(); g.translate(col(u), (row(11.0) + row(9.6)) / 2); g.rotate(Math.PI / 2); g.fillText(gunship ? 'USAF' : 'U.S. AIR FORCE', 0, 0); g.restore(); }
+  for (const u of [0.05, 0.45]) { g.save(); g.translate(col(u), (row(-5.0) + row(-6.8)) / 2); g.rotate(Math.PI / 2); g.fillText(gunship ? 'USAF' : 'U.S. AIR FORCE', 0, 0); g.restore(); }
   // Walkway lines along the top over the wing.
   g.strokeStyle = 'rgba(0,0,0,0.4)'; g.lineWidth = 2; g.setLineDash([12, 8]);
   for (const u of [0.21, 0.29]) { g.beginPath(); g.moveTo(col(u), row(6)); g.lineTo(col(u), row(-6)); g.stroke(); }
@@ -289,6 +289,9 @@ export function makeGhostrider() {
     g.add(part(new THREE.SphereGeometry(0.3, 10, 8), dark, s * 22.0, 1.95, 2.9));
     g.add(part(new THREE.BoxGeometry(0.9, 0.36, 0.6), dark, s * 6.9, -1.6, -1.2));
   }
+  // The nose art goes ahead of the sensor plate by the crew door, under the
+  // flight deck: where the transport carries it, the gunship carries kit.
+  g.userData.noseArt = { z: 10.3, y: 0.1, w: 2.5 };
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
   return g;
 }
