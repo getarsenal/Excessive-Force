@@ -14,7 +14,7 @@
  * the page is hidden. It is the menu of a game that is about to ask a phone
  * for everything it has.
  */
-import { ART, unlockedArt, artDataUrl } from '../game/noseart.js';
+import { ART, unlockedArt } from '../game/noseart.js';
 import { spentPoints } from '../game/doctrine.js';
 import { LEVELS } from '../game/levels.js';
 import { UNITS, STRIKES } from '../game/units.js';
@@ -61,14 +61,6 @@ export async function openFrontDoor({ current = null, canResume = false } = {}) 
 }
 
 let introPlayed = false;
-
-/** The nose art: what is painted on the fleet, and how to earn the rest. */
-function noseArtHtml(prog) {
-  const have = new Set(unlockedArt(prog).map((a) => a.id));
-  return `<button class="tt-sbtn go tt-tohangar" type="button" data-act="hangar">OPEN THE HANGAR · PAINT IT ON A PLANE</button><div class="tt-art">${ART.map((a) => have.has(a.id)
-    ? `<figure class="tt-art-i"><img src="${artDataUrl(a)}" alt=""><figcaption>${a.name}</figcaption></figure>`
-    : `<figure class="tt-art-i locked"><div class="tt-art-q">?</div><figcaption>${a.how}</figcaption></figure>`).join('')}</div>`;
-}
 
 /** A short list of rows inside a sheet: TODAY and MORE. */
 function listSheet(rows) {
@@ -134,11 +126,10 @@ export function showTitle({ current = null, canResume = false } = {}) {
     battles.length && { act: 'battles', name: 'BATTLES', count: battles.length },
     { act: 'map', name: 'MAP' },
     { act: 'armoury', name: 'ARMOURY' },
-    { act: 'hangar', name: 'HANGAR' },
     { act: 'orders', name: 'ORDERS', hot: ordersDone < 3, count: 3 - ordersDone },
     crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
     { act: 'medals', name: 'MEDALS' },
-    { act: 'noseart', name: 'NOSE ART' },
+    { act: 'hangar', name: 'HANGAR' },
     { act: 'boot', name: 'BOOT CAMP' },
     { act: 'commanders', name: 'COMMANDERS' },
     { act: 'records', name: 'SETTINGS' },
@@ -170,7 +161,6 @@ export function showTitle({ current = null, canResume = false } = {}) {
     records: IC('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     today: IC('<rect x="4" y="5" width="16" height="16" rx="1"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
     more: IC('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
-    noseart: IC('<path d="M3 13c4-1 8-1 12 0l6 2-6 2c-4 1-8 1-12 0z"/><path d="M7 13l2-5h3l-1 5M9 15l-2 4"/>'),
   };
   const iconFor = (it) => ICONS[it.primary ? 'go' : it.act] || '';
 
@@ -348,9 +338,8 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'more':
           openSheet('MORE', listSheet([
             { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} RELEASED` },
-            { act: 'hangar', name: 'HANGAR', sub: 'THE FLEET UP CLOSE · PICK ITS NOSE ART' },
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
-            { act: 'noseart', name: 'NOSE ART', sub: `${unlockedArt(prog).length} OF ${ART.length} PAINTED` },
+            { act: 'hangar', name: 'HANGAR', sub: `THE FLEET \u00b7 ${unlockedArt(prog).length} OF ${ART.length} NOSE ART` },
             { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
             { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
@@ -368,9 +357,6 @@ export function showTitle({ current = null, canResume = false } = {}) {
         }
         case 'armoury':
           openSheet('ARMOURY', armouryHtml(), 'armoury');
-          break;
-        case 'noseart':
-          openSheet('NOSE ART', noseArtHtml(prog), 'noseart');
           break;
         case 'hangar':
           openSheet('HANGAR', '<div class="hg-host"></div>', 'hangar');
