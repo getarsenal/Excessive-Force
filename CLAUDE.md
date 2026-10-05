@@ -181,7 +181,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/ui/hangar.js` is the HANGAR sheet off the title: the fleet on the
   apron, turnable, and the nose art each type wears (`tt.noseart`), which
   `decorate(model, kind)` then paints on every sortie;
-  `node tools/hangarprobe.mjs` drives it on a phone.
+  `node tools/hangarprobe.mjs` drives it on a phone. Nose art is painted,
+  not stuck on: `paintNoseArt` projects it onto the fuselage with three's
+  `DecalGeometry`, from the cut-out (`<id>-cut.webp`, the poster's dark
+  ground removed by `python3 tools/noseart_cut.py SRC OUT --check SHEET`);
+  the gallery shows the whole painting (`<id>.jpg`). A new piece needs both.
+  The contact sheet's `-nose.png` view is the close-up to judge it by.
 - `src/game/operations.js` the campaign's operations, stars, gating,
   bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·
