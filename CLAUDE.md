@@ -170,6 +170,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `node tools/unitshot.mjs <level>` photographs a battery from close.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
+- `src/game/airframes/` the aircraft, one module each (`geo.js` is the
+  loft/surface vocabulary they are built from); the A-10 is still in
+  `aircraft.js`. Each keeps its real dimensions, nose along +Z, and the
+  named parts the sorties drive (`bomb`, `prop`, `rotorA`/`rotorB`,
+  `tailrotor`), and leaves a clean flat panel either side of the forward
+  fuselage for the nose art (`userData.noseArt` says where, when the box
+  would mislead the painter). `node tools/hangarshot.mjs [kinds]` builds
+  and photographs them from four sides and prints where the art lands.
+  `src/ui/hangar.js` is the HANGAR sheet off the title: the fleet on the
+  apron, turnable, and the nose art each type wears (`tt.noseart`), which
+  `decorate(model, kind)` then paints on every sortie;
+  `node tools/hangarprobe.mjs` drives it on a phone.
 - `src/game/operations.js` the campaign's operations, stars, gating,
   bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·
