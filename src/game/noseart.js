@@ -18,8 +18,9 @@ import { totalStars, operationsState } from './operations.js';
  */
 
 export const ART = [
-  // Most of them are the real thing, painted: the picture carries its own
-  // lettering, so only the tally is drawn under it. Two are still drawn.
+  // Every piece is a painting: the picture carries its own lettering, so
+  // only the tally is drawn under it. The colours are what each one was
+  // before it was painted, kept for the drawn fallback if a picture fails.
   { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', img: 'assets/noseart/demeanor.jpg', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
   { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', img: 'assets/noseart/damsel.jpg', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
   { id: 'beer', name: 'Hold My Beer', kind: 'bomb', img: 'assets/noseart/beer.jpg', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
@@ -28,8 +29,8 @@ export const ART = [
   { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', img: 'assets/noseart/renewal.jpg', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
   { id: 'refunds', name: 'No Refunds', kind: 'pin', img: 'assets/noseart/refunds.jpg', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
   { id: 'actofgod', name: 'Act of God', kind: 'halo', img: 'assets/noseart/actofgod.jpg', body: '#2e3338', need: { stars: 50 }, how: '50 stars' },
-  { id: 'exwife', name: "Buck's Ex-Wife", kind: 'pin', skin: '#e2b896', hair: '#b4361a', suit: '#141414', need: { bosses: 4 }, how: 'Beat four bosses' },
-  { id: 'sender', name: 'Return to Sender', kind: 'dice', need: { stars: 80 }, how: '80 stars' },
+  { id: 'exwife', name: "Buck's Ex-Wife", kind: 'pin', img: 'assets/noseart/exwife.jpg', skin: '#e2b896', hair: '#b4361a', suit: '#141414', need: { bosses: 4 }, how: 'Beat four bosses' },
+  { id: 'sender', name: 'Return to Sender', kind: 'dice', img: 'assets/noseart/sender.jpg', need: { stars: 80 }, how: '80 stars' },
   { id: 'service', name: 'Thank You For Your Service', kind: 'pin', img: 'assets/noseart/service.jpg', skin: '#e8c4a0', hair: '#e8c35a', suit: '#b22234', stars: true, need: { finale: 1 }, how: 'Take the Great Wall' },
 ];
 
@@ -183,7 +184,7 @@ if (typeof document !== 'undefined') for (const a of ART) if (a.img) artImage(a)
  * row with its edges feathered into the airframe's own paint, so it reads
  * as a panel painted on the skin rather than a photograph stuck to it.
  */
-function drawPainted(ctx, im, tex) {
+function drawPainted(ctx, im, tex, fallback) {
   const paint = () => {
     const H = 278, W = Math.min(500, Math.round(H * im.naturalWidth / im.naturalHeight));
     const x = 256 - W / 2, y = 2;
@@ -200,7 +201,11 @@ function drawPainted(ctx, im, tex) {
     if (tex) tex.needsUpdate = true;
   };
   if (im.complete && im.naturalWidth) paint();
-  else im.addEventListener('load', paint, { once: true });
+  else if (im.complete) fallback?.();
+  else {
+    im.addEventListener('load', paint, { once: true });
+    if (fallback) im.addEventListener('error', fallback, { once: true });
+  }
 }
 
 /**
@@ -216,20 +221,23 @@ export function artTexture(art, wins = 0, bosses = 0) {
   c.width = 512; c.height = 320;
   const ctx = c.getContext('2d');
   const s = 2.4, ox = 30, oy = -10;
-  let painted = null;
-  if (art.img) painted = artImage(art);
-  else if (art.kind === 'pin') drawPin(ctx, art, ox, oy, s);
-  else if (art.kind === 'dice') drawDice(ctx, ox, oy, s);
-  else drawBomb(ctx, art, ox, oy, s);
-  if (!painted) {
-    // The name, in sign-writer's script: cream on a dark keyline.
+  // The drawn version: the silhouette in the piece's colours and the name
+  // in sign-writer's script, cream on a dark keyline. What every piece was
+  // before it was painted, and what it falls back to if its picture does
+  // not arrive.
+  const drawn = () => {
+    if (art.kind === 'pin') drawPin(ctx, art, ox, oy, s);
+    else if (art.kind === 'dice') drawDice(ctx, ox, oy, s);
+    else drawBomb(ctx, art, ox, oy, s);
     ctx.font = `italic bold ${art.name.length > 18 ? 40 : 52}px Georgia, 'Times New Roman', serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.lineWidth = 9; ctx.strokeStyle = '#141210';
     ctx.strokeText(art.name, 256, 268);
     ctx.fillStyle = '#f6d66a';
     ctx.fillText(art.name, 256, 268);
-  }
+  };
+  const painted = art.img ? artImage(art) : null;
+  if (!painted) drawn();
   // The tally.
   const n = Math.min(24, wins), k = Math.min(8, bosses);
   let x = 256 - ((n + k) * 18) / 2;
@@ -238,7 +246,7 @@ export function artTexture(art, wins = 0, bosses = 0) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  if (painted) drawPainted(ctx, painted, tex);
+  if (painted) drawPainted(ctx, painted, tex, () => { drawn(); tex.needsUpdate = true; });
   TEX.set(key, tex);
   return tex;
 }
