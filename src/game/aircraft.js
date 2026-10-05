@@ -2107,14 +2107,24 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
       if (this.audio) this.audio.play('rocket', m.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
     }
     L.nextGun -= dt;
+    // The chin gun slews to what it is shooting at, or to the mark between
+    // bursts, so it is seen to pick its targets; the burst goes when it is
+    // laid on, from wherever the muzzle is.
+    const gun = m.userData.gun;
+    if (gun) this._layGun(m, gun, L.gunAim || s.target, dt);
     if (L.nextGun <= 0 && this.gunner) {
       L.nextGun = a.gun.every;
       const to = this.gunner.pick(s.target, a.gun.reach);
       if (to) {
-        const from = this._v.set(0, -1.0, 6.2).applyEuler(m.rotation).add(m.position).clone();
+        L.gunAim = to.clone();
+        L.gunAimFor = 1.6;
+        const from = gun
+          ? gun.userData.muzzle.getWorldPosition(new THREE.Vector3())
+          : this._v.set(0, -1.0, 6.2).applyEuler(m.rotation).add(m.position).clone();
         s.kills += this.gunner.fire(from, to.clone(), a.gun) || 0;
       }
     }
+    if (L.gunAimFor !== undefined && (L.gunAimFor -= dt) <= 0) { L.gunAim = null; L.gunAimFor = undefined; }
   }
   if ((L.phase === 'station' || L.phase === 'transit')
     && (L.time > a.station || (L.rockets <= 0 && L.time > a.station * 0.8))) {
@@ -2135,6 +2145,23 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
   } else if (L.phase === 'down') {
     this._fallLoiter(s, dt, 2 + L.fall * 2.5);
   }
+};
+
+/**
+ * Lay a chin turret on a point in the world: the turret turns, the barrel
+ * elevates, both at the rate a real one slews and inside its real arcs —
+ * a hundred and ten degrees either side, sixty down, eleven up.
+ */
+AirWing.prototype._layGun = function _layGun(m, gun, at, dt) {
+  m.updateMatrixWorld(true);
+  const local = m.worldToLocal(this._v.copy(at));
+  const dx = local.x - gun.position.x, dy = local.y - gun.position.y, dz = local.z - gun.position.z;
+  const yaw = THREE.MathUtils.clamp(Math.atan2(dx, dz), -1.92, 1.92);
+  const pitch = THREE.MathUtils.clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.19, 1.05);
+  const k = Math.min(1, dt * 3.2);
+  gun.rotation.y += (yaw - gun.rotation.y) * k;
+  const el = gun.userData.pitch;
+  el.rotation.x += (pitch - el.rotation.x) * k;
 };
 
 /** The gunship's orbit, and its guns. */

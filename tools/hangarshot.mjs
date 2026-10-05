@@ -20,7 +20,7 @@ page.on('pageerror', (e) => console.log('PAGEERROR', e.message.slice(0, 300)));
 await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.autostart', '1'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); } catch {} });
 await page.goto(`http://localhost:${port}/?level=westminster`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
-const out = await page.evaluate(async (kinds) => {
+const out = await page.evaluate(async ([kinds, focus, gunPose]) => {
   const THREE = window.THREE, R = window.engine.renderer;
   const air = await import('/src/game/aircraft.js');
   const nose = await import('/src/game/noseart.js');
@@ -75,6 +75,11 @@ const out = await page.evaluate(async (kinds) => {
         return `[${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)} ${s.z.toFixed(2)}x${s.y.toFixed(2)} ${m.geometry.attributes.position.count / 3}tri]`; }).join(' ') || 'NONE';
     } catch (e) { panel = 'ERR ' + String(e).slice(0, 120); }
     await new Promise((r) => setTimeout(r, 600));
+    // GUN="yaw,elevation" in degrees lays a chin turret for the pictures.
+    if (gunPose && obj.userData.gun) {
+      obj.userData.gun.rotation.y = gunPose[0] / 57.3;
+      obj.userData.gun.userData.pitch.rotation.x = gunPose[1] / 57.3;
+    }
     obj.traverse((m) => { if (m.isMesh && m.material?.transparent && m.material.opacity < 0.5 && m.name !== 'noseart') m.visible = false; });
     scene.add(obj); obj.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(obj);
@@ -99,11 +104,19 @@ const out = await page.evaluate(async (kinds) => {
       cam.position.set(ac.x + span * 2.3, ac.y + span * 0.55, ac.z + span * 0.9); cam.lookAt(ac); cam.updateProjectionMatrix();
       imgs.nose = shot();
     }
+    // FOCUS="x,y,z,dx,dy,dz" adds a close-up from (x+dx, y+dy, z+dz) at (x, y, z),
+    // in the airframe's own metres.
+    if (focus) {
+      const [fx, fy, fz, dx, dy, dz] = focus;
+      const p = new THREE.Vector3(fx, fy, fz).applyMatrix4(obj.matrixWorld);
+      cam.position.set(p.x + dx, p.y + dy, p.z + dz); cam.lookAt(p); cam.updateProjectionMatrix();
+      imgs.focus = shot();
+    }
     scene.remove(obj);
     res[k] = { box: [size.x, size.y, size.z].map((v) => +v.toFixed(2)), tris: Math.round(tris), panel, imgs };
   }
   return res;
-}, kinds);
+}, [kinds, process.env.FOCUS ? process.env.FOCUS.split(',').map(Number) : null, process.env.GUN ? process.env.GUN.split(',').map(Number) : null]);
 for (const [k, r] of Object.entries(out)) {
   if (r.error) { console.log(`${k}: ERROR ${r.error}`); continue; }
   for (const [n, d] of Object.entries(r.imgs)) writeFileSync(`${OUT}/${k}-${n}.png`, Buffer.from(d.split(',')[1], 'base64'));
