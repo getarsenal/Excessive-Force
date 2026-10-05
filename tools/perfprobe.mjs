@@ -13,7 +13,7 @@ await page.addInitScript(() => { try {
   localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
   localStorage.setItem('tt.tutorial', 'done'); } catch {} });
-await page.goto(`http://localhost:5177/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 await page.waitForTimeout(2000);
 const r = await page.evaluate(([n, secs, warm]) => {
@@ -52,6 +52,15 @@ const r = await page.evaluate(([n, secs, warm]) => {
   const wall = performance.now() - t0;
   const eng = window.engine; eng.renderer.info.autoReset = false; eng.renderer.info.reset();
   const tr = performance.now(); window.__frame(); const frameMs = performance.now() - tr;
+  // The render alone, properly: three frames to compile whatever is new,
+  // then the median of twenty. One frame after the fast-forward is mostly
+  // shader compiles and says nothing about the frame.
+  for (let k = 0; k < 3; k++) window.__frame();
+  const rs = [];
+  for (let k = 0; k < 20; k++) { const t1 = performance.now(); window.__frame(); rs.push(performance.now() - t1); }
+  rs.sort((a, b) => a - b);
+  const renderMs = rs[10];
+  eng.renderer.info.reset(); window.__frame();
   const inf = eng.renderer.info;
   const withUnits = { calls: inf.render.calls, tris: inf.render.triangles };
   const byRoot = {};
@@ -61,7 +70,7 @@ const r = await page.evaluate(([n, secs, warm]) => {
   const unitTris = {}; for (const u of bt.units) if (u.alive) unitTris[u.def?.id || u.type] = triOf(u.group);
   const rootTris = {}; for (const c of eng.scene.children) { const k = (c.name || c.type); rootTris[k] = (rootTris[k] || 0) + triOf(c); }
   const unitsHidden = (() => { for (const u of bt.units) u.group.visible = false; inf.reset(); window.__frame(); const r = { calls: inf.render.calls, tris: inf.render.triangles }; for (const u of bt.units) u.group.visible = true; return r; })();
-  const render = { withUnits, unitTris, rootTris, unitsHidden, calls: inf.render.calls, tris: inf.render.triangles, geos: inf.memory.geometries, tex: inf.memory.textures, frameMs: frameMs.toFixed(0), unitMeshes, byRoot };
+  const render = { withUnits, unitTris, rootTris, unitsHidden, calls: inf.render.calls, tris: inf.render.triangles, geos: inf.memory.geometries, tex: inf.memory.textures, frameMs: frameMs.toFixed(0), renderMs: renderMs.toFixed(1), unitMeshes, byRoot };
   const per = {}; for (const k in T) per[k] = `${(T[k] / secs).toFixed(1)} ms/s  (${C[k]} calls)`;
   return { placed, alive: bt.units.filter((u) => u.alive).length, defenders: g.defenders.filter((d) => d.alive).length,
     shells: bt.projectiles?.list?.length ?? bt.projectiles?.active?.length, awake: window.physics.awakeCount, sim: window.physics.dynamicSet.size,

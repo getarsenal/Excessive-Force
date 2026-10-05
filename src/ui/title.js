@@ -124,12 +124,22 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const crates = car.crates || 0;
   const todayCount = (daily && !dDone ? 1 : 0) + (3 - ordersDone) + crates;
   const pts = Math.max(0, (state.ops?.total || 0) - spentPoints());
+  // Every button, one or two words each and nothing else: the counts are the
+  // only other thing on a row. What a row leads to says the rest.
   const items = [
-    { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', sub: cont.line, primary: true },
-    { act: 'campaign', name: 'CAMPAIGN', sub: `\u2605 ${state.ops?.total || 0}${pts >= 2 ? ` \u00b7 DOCTRINE: ${pts} TO SPEND` : ''}` },
-    { act: 'today', name: 'TODAY', sub: '', hot: todayCount > 0, count: todayCount },
-    battles.length > 1 && { act: 'battles', name: 'BATTLES', sub: '', count: battles.length },
-    { act: 'more', name: 'MORE', sub: '' },
+    { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', primary: true },
+    { act: 'campaign', name: 'CAMPAIGN', count: pts >= 2 ? pts : 0 },
+    daily && { act: 'daily', name: 'DAILY STRIKE', hot: !dDone, count: dDone ? 0 : 1 },
+    battles.length && { act: 'battles', name: 'BATTLES', count: battles.length },
+    { act: 'map', name: 'MAP' },
+    { act: 'armoury', name: 'ARMOURY' },
+    { act: 'orders', name: 'ORDERS', hot: ordersDone < 3, count: 3 - ordersDone },
+    crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
+    { act: 'medals', name: 'MEDALS' },
+    { act: 'noseart', name: 'NOSE ART' },
+    { act: 'boot', name: 'BOOT CAMP' },
+    { act: 'commanders', name: 'COMMANDERS' },
+    { act: 'records', name: 'SETTINGS' },
   ].filter(Boolean);
 
   // The backdrop: what has been brought down, then what is next, then the rest.
@@ -157,6 +167,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     records: IC('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     today: IC('<rect x="4" y="5" width="16" height="16" rx="1"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
     more: IC('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
+    noseart: IC('<path d="M3 13c4-1 8-1 12 0l6 2-6 2c-4 1-8 1-12 0z"/><path d="M7 13l2-5h3l-1 5M9 15l-2 4"/>'),
   };
   const iconFor = (it) => ICONS[it.primary ? 'go' : it.act] || '';
 
@@ -179,7 +190,6 @@ export function showTitle({ current = null, canResume = false } = {}) {
             <b>${esc(cmd.name)}</b>
             <i>${rank.name}${car.prestige ? ` · ${'★'.repeat(Math.min(5, car.prestige))}` : ''} · SLOT ${slot}</i>
             <span class="tt-xp"><span style="width:${(rank.frac * 100).toFixed(1)}%"></span></span>
-            <small class="tt-xpto">${rank.next ? `${rank.need.toLocaleString()} XP TO ${rank.next}` : 'THE TOP OF THE LADDER'}</small>
           </span>
         </button>
         <div class="tt-tools">
