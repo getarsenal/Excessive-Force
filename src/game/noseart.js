@@ -317,9 +317,28 @@ export function paintNoseArt(group, art, wins, bosses) {
 const FLEET = { list: [], wins: 0, bosses: 0 };
 export function setFleetArt(list, wins, bosses) { FLEET.list = list; FLEET.wins = wins; FLEET.bosses = bosses; }
 
-/** Paint a sortie's airframe with one of the pieces earned, if any are. */
-export function decorate(group) {
+/**
+ * Which piece each type of aircraft wears, chosen in the hangar: airframe
+ * kind to art id, or nothing for a different piece every sortie.
+ */
+const CHOICE_KEY = 'tt.noseart';
+export function artChoice() {
+  try { return JSON.parse(localStorage.getItem(CHOICE_KEY) || '{}') || {}; } catch { return {}; }
+}
+export function setArtChoice(kind, id) {
+  const c = artChoice();
+  if (id) c[kind] = id; else delete c[kind];
+  try { localStorage.setItem(CHOICE_KEY, JSON.stringify(c)); } catch { /* private mode */ }
+}
+
+/**
+ * Paint a sortie's airframe: the piece the commander chose for this type of
+ * aircraft in the hangar if it is one they have earned, otherwise one of
+ * the pieces earned, at random.
+ */
+export function decorate(group, kind = null) {
   if (!FLEET.list.length || !group) return;
-  const art = FLEET.list[(Math.random() * FLEET.list.length) | 0];
+  const want = kind ? artChoice()[kind] : null;
+  const art = (want && FLEET.list.find((a) => a.id === want)) || FLEET.list[(Math.random() * FLEET.list.length) | 0];
   try { paintNoseArt(group, art, FLEET.wins, FLEET.bosses); } catch { /* a frame with no skin to paint */ }
 }

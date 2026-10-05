@@ -29,6 +29,7 @@ import { menuMusic, eagle } from './music.js';
 import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
 import { feedback } from './feedback.js';
 import { crateStage } from './crateopen.js';
+import { hangarStage } from './hangar.js';
 import { showWorldMap, HOME } from './worldmap.js';
 import './title.css';
 
@@ -64,7 +65,7 @@ let introPlayed = false;
 /** The nose art: what is painted on the fleet, and how to earn the rest. */
 function noseArtHtml(prog) {
   const have = new Set(unlockedArt(prog).map((a) => a.id));
-  return `<div class="tt-art">${ART.map((a) => have.has(a.id)
+  return `<button class="tt-sbtn go tt-tohangar" type="button" data-act="hangar">OPEN THE HANGAR · PAINT IT ON A PLANE</button><div class="tt-art">${ART.map((a) => have.has(a.id)
     ? `<figure class="tt-art-i"><img src="${artDataUrl(a)}" alt=""><figcaption>${a.name}</figcaption></figure>`
     : `<figure class="tt-art-i locked"><div class="tt-art-q">?</div><figcaption>${a.how}</figcaption></figure>`).join('')}</div>`;
 }
@@ -133,6 +134,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     battles.length && { act: 'battles', name: 'BATTLES', count: battles.length },
     { act: 'map', name: 'MAP' },
     { act: 'armoury', name: 'ARMOURY' },
+    { act: 'hangar', name: 'HANGAR' },
     { act: 'orders', name: 'ORDERS', hot: ordersDone < 3, count: 3 - ordersDone },
     crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
     { act: 'medals', name: 'MEDALS' },
@@ -159,6 +161,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     battles: IC('<path d="M6 3h12v18l-6-4.5L6 21z"/>'),
     map: IC('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>'),
     armoury: IC('<path d="M3 16h12l3-3h3v-3h-6l-2-2H5v3H3z"/><path d="M8 16v3h3v-3"/>'),
+    hangar: IC('<path d="M3 20v-9l9-6 9 6v9"/><path d="M7 20v-6h10v6"/><path d="M3 20h18"/>'),
     orders: IC('<rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V2.5h6V4M8.5 10l2 2 4-4M8.5 16h7"/>'),
     crates: IC('<path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/>'),
     medals: IC('<path d="M8 2l4 7 4-7"/><circle cx="12" cy="15" r="6"/><path d="M12 12l1 2h2l-1.6 1.3.6 2-2-1.2-2 1.2.6-2L9 14h2z"/>'),
@@ -288,7 +291,11 @@ export function showTitle({ current = null, canResume = false } = {}) {
     };
     const sheet = root.querySelector('.tt-sheet');
     const sheetIn = root.querySelector('.tt-sheet-in');
+    let hangarUi = null;
     const openSheet = (title, html, cls = '') => {
+      // A hangar left running under a new sheet would keep drawing to a
+      // canvas that is no longer in the page.
+      if (hangarUi) { hangarUi.destroy(); hangarUi = null; }
       sheetIn.className = `tt-sheet-in ${cls}`;
       sheetIn.innerHTML = `<header class="tt-sh-top"><b>${title}</b><button class="tt-x" type="button" data-act="close" aria-label="Close">✕</button></header><div class="tt-sh-body">${html}</div>`;
       sheet.hidden = false;
@@ -301,6 +308,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     let stale = false;
     const closeSheet = () => {
       if (crateUi) { crateUi.destroy(); crateUi = null; }
+      if (hangarUi) { hangarUi.destroy(); hangarUi = null; }
       sheet.classList.remove('open');
       setTimeout(() => { sheet.hidden = true; }, 240);
       if (stale) setTimeout(() => done({ again: true }), 250);
@@ -340,6 +348,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'more':
           openSheet('MORE', listSheet([
             { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} RELEASED` },
+            { act: 'hangar', name: 'HANGAR', sub: 'THE FLEET UP CLOSE · PICK ITS NOSE ART' },
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
             { act: 'noseart', name: 'NOSE ART', sub: `${unlockedArt(prog).length} OF ${ART.length} PAINTED` },
             { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
@@ -362,6 +371,10 @@ export function showTitle({ current = null, canResume = false } = {}) {
           break;
         case 'noseart':
           openSheet('NOSE ART', noseArtHtml(prog), 'noseart');
+          break;
+        case 'hangar':
+          openSheet('HANGAR', '<div class="hg-host"></div>', 'hangar');
+          hangarUi = hangarStage(sheetIn.querySelector('.hg-host'), { prog });
           break;
         case 'medals':
           openSheet('MEDALS', medalsHtml(), 'medals');
@@ -570,7 +583,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     // what makes one pass, each cheapest first.
     const sec = (u) => (u.strike ? 'STRIKE' : u.tier);
     const tiers = [...new Set(UNITS.map(sec))];
-    return `<p class="tt-arm-intro">Tap a card for the brief.</p>` + tiers.map((tier) => `
+    return `<p class="tt-arm-intro">Tap a card for the brief.</p><button class="tt-sbtn go tt-tohangar" type="button" data-act="hangar">THE HANGAR · SEE THE AIRCRAFT UP CLOSE</button>` + tiers.map((tier) => `
       <div class="tt-sk">${tierName(tier)}</div>
       <div class="tt-arm">${(tier === 'STRIKE' ? STRIKES : UNITS.filter((u) => sec(u) === tier)).map((u) => {
         const ok = isReleased(u.id);
