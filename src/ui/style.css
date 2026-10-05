@@ -742,9 +742,12 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 /* The switch sits where the key used to, and the key stacks on top of it, so
    the pair reads as one instrument whether or not it is lit. */
 #survey-btn {
+  /* Top left, in the rail under the readouts: the one corner nothing else
+     wants. Above the dock it sat on the unit card, the drawers and the
+     thumb; up here it is a reach away and overlaps nothing. */
   position: absolute; z-index: 27;
   left: var(--ui-pad);
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  top: var(--hud-top);
   display: flex; align-items: center; gap: 7px;
   padding: 6px 9px;
   background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
@@ -768,15 +771,14 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 }
 #survey-btn.on kbd { border-color: rgba(88, 166, 255, 0.42); color: var(--accent); }
 
-/* Out of the way while a drawer is up: the drawers rise into this corner. */
-body.drawer-open #survey-btn, body.drawer-open #survey-key { display: none; }
 
 #survey-key {
+  /* Beside the button, on its row, so it sits over nothing. */
   position: absolute; z-index: 26;
-  left: var(--ui-pad);
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px + 36px);
-  width: min(238px, calc(100vw - var(--ui-pad) * 2));
-  padding: 9px 10px 8px;
+  left: calc(var(--ui-pad) + 100px);
+  top: var(--hud-top);
+  width: min(238px, calc(100vw - var(--ui-pad) * 2 - 100px - 150px));
+  padding: 6px 10px 6px;
   background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
   font-family: var(--f-data);
@@ -2177,7 +2179,7 @@ body.a11y-text2 .tut-card, body.a11y-text2 #unit-card { zoom: 1.3; }
 body.a11y-still #cine i { transition: none; height: 0 !important; }
 /* Left-handed: the dock to the left edge, the survey button to the right. */
 body.a11y-lefty #dock { justify-content: flex-start; }
-body.a11y-lefty #survey-btn { left: auto; right: var(--ui-pad); }
+
 
 /* ── House style: every text box is a sight plate ─────────────────────────
    One box for everything that carries words — the feed, the prompt, the
@@ -2748,3 +2750,6 @@ body.ended .bark, body.clear-view .bark { display: none; }
 #bossintro b { display: block; font: 400 clamp(22px, 6vw, 36px)/1.05 var(--f-display); color: #fff; margin: 4px 0; text-transform: uppercase; }
 #bossintro span { font: 600 11px/1.2 var(--f-ui); letter-spacing: 0.14em; color: #f1c0b8; }
 @keyframes boss-in { from { transform: scaleX(0.1); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* On a phone the key is the ramp and its ends; the notes are Boot Camp's. */
+@media (pointer: coarse) { #survey-key .sk-notes { display: none; } #survey-key { width: 140px; padding: 7px 8px 6px; } }

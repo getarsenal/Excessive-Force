@@ -36,6 +36,7 @@ await page.evaluate(async () => {
   window.__comcard?.heard?.() ; try { window.__comcard?.warn?.(); } catch {}
   for (let k = 0; k < 3; k++) window.__frame();
 });
+if (process.env.SURVEY) { await page.click('#survey-btn'); await page.waitForTimeout(800); }
 await page.waitForTimeout(600);
 await page.screenshot({ path: '/tmp/out/bark-phone.png' });
 console.log(await page.evaluate(() => ({ units: window.battle.units.length, alive: window.battle.units.filter((u) => u.alive).length })));
