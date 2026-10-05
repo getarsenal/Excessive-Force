@@ -4,100 +4,101 @@ import { crewName } from '../game/crews.js';
 /**
  * The crews talk.
  *
- * Not much, and never over each other: one line on screen at a time, over
- * the gun whose crew said it, for long enough to read, and a few seconds'
- * quiet after it. The lines answer what the battle actually did — a gun hit,
- * a gun lost, a big piece down, the airborne coming in, a crew ranking up —
- * and between those, now and then, they just complain, because that is what
- * soldiers do. Most lines are common; some are rare; a handful are one in a
- * hundred, there for the player who has heard everything else.
+ * Small, and out of the way: a line of little text floating over the gun
+ * whose crew said it, the kind of thing you catch if you are looking at
+ * them and miss if you are not. No box, no bubble. One at a time, for long
+ * enough to read, and a few seconds' quiet after it. The lines answer what
+ * the battle actually did — a gun hit, a gun lost, a big piece down, the
+ * airborne coming in — and between those, now and then, they complain,
+ * because that is what soldiers do, and they are not polite about any of
+ * it. Most lines are common; some are rare; a handful are one in a hundred.
  */
 
 // [weight, text]. Weight 1 is rare, 0.15 is a legend.
 const L = (...xs) => xs.map((x) => (Array.isArray(x) ? x : [6, x]));
 const LINES = {
   deployed: L(
-    "Gun's down. Somebody tell the locals to cover their ears.",
-    'Emplaced. Lovely view. Shame about it.',
-    'Set up and ready. What are we breaking today?',
-    'In position. Do we get a souvenir?',
-    'Ready to fire. My therapist is going to hear about this.',
-    [1, "Mom said I'd end up in Europe. She didn't say how."],
-    [0.15, 'I was promised a beach. This is a parking lot.'],
+    "Gun's up. Somebody wake me when there's something worth shooting.",
+    'Set. Lovely view. Shame about what we\'re about to do to it.',
+    'In position. Whose brilliant idea was this spot?',
+    "Ready. Tell the locals to kiss their windows goodbye.",
+    "Emplaced. Where's the damn coffee?",
+    [1, 'Recruiter said travel. Didn\'t say we\'d bring the demolition.'],
+    [0.15, 'I was promised a beach. This is a car park with a view.'],
   ),
   unithit: L(
-    "We're taking fire! Rude!",
-    'Incoming! Who told them where we are?',
-    'They have our range! Somebody owes me a helmet!',
-    'Getting shot at! Is this in my contract?',
-    [1, "Medic! ...Never mind, it's the coffee."],
+    'Taking fire! Who the hell told them where we are?',
+    'Incoming! Somebody shoot back, I\'m busy flinching!',
+    "They've got our range. Fantastic. Love that for us.",
+    'Getting shot at. Is this in the brochure?',
+    [1, 'Medic! ...False alarm. Spilled my coffee.'],
   ),
   unitlost: L(
-    'We lost a gun! Somebody is paying for that.',
-    'Gun down! That was a rental!',
-    "That's coming out of somebody's pay. Not mine.",
-    [1, 'They got the Paladin! I owed that guy twenty bucks!'],
+    'We lost a gun! That\'s coming out of somebody\'s pay. Not mine.',
+    'Gun down! It was a rental, you animals!',
+    'Well, that one\'s scrap. Hope it was insured.',
+    [1, 'They got the Paladin. Guy owed me twenty bucks. Typical.'],
   ),
   rank: L(
-    "That's what I'm talking about! Promote us again!",
-    'Crew is getting good at this. Should I be worried?',
-    "Another chevron. Mom's putting it on the fridge.",
-    [1, 'Sergeant now. I demand a better chair.'],
+    'Promoted! Still doing the same job for the same pay. Hooah.',
+    "We're getting good at this. Should probably worry about that.",
+    "Another stripe. Mom's putting it on the fridge next to the restraining order.",
+    [1, 'Sergeant. I want a chair. A real one. With a back.'],
   ),
   bigimpact: L(
-    "Ooh, that's gonna leave a mark!",
-    'Did you see that? DID YOU SEE THAT?',
-    "Somebody call the gift shop. Tell 'em to close early.",
-    "That was load-bearing! I'm almost sure!",
-    'Timber! ...Partial timber!',
-    [1, 'Was that the bakery? I was told there would be a bakery.'],
-    [0.15, 'Five hundred years it stood. Eleven minutes with us.'],
+    "Oh, that's gonna leave a mark.",
+    'Did you SEE that? Somebody tell the gift shop to close early.',
+    'That was load-bearing. Pretty sure. Mostly sure.',
+    'Timber! Partial timber. Shut up, it counts.',
+    "Five hundred years to build. Eleven minutes with us. You're welcome.",
+    [1, 'Was that the bakery? I was told there\'d be a bakery.'],
+    [0.15, 'Somewhere an architect just felt a chill.'],
   ),
   secondary: L(
-    'Secondary! They kept their ammo in THERE?',
-    'Something in there did NOT like that.',
-    'Ammo dump! Free fireworks!',
+    'Secondary! They kept their ammo in THERE? Idiots.',
+    'Something in there did not enjoy that one bit.',
+    'Free fireworks! Courtesy of their own damn supply sergeant.',
   ),
   strike: L(
-    'Air support inbound. Show-offs.',
-    'Here come the fly boys. Act natural.',
-    "Danger close! For them, I mean.",
-    [1, 'Fifty million dollars of airplane to drop a rock on a rock.'],
+    'Air support inbound. Here come the show-offs.',
+    'Fly boys on the way. Everybody act casual.',
+    "Danger close. For them. Mostly them.",
+    [1, 'Fifty million bucks of jet to drop a rock on a rock. Your taxes.'],
   ),
   shotdown: L(
-    'Bird down! Bird down!',
-    "That's a very expensive lawn dart.",
-    'Somebody find whatever shot that and make it sorry.',
+    'Bird down! That is a very expensive lawn dart.',
+    "Plane's gone. Somebody find what shot it and make it regret it.",
+    'There goes the Air Force budget. Again.',
   ),
   samlaunch: L(
-    'SAM in the air! Flares, fly boys, flares!',
-    'Missile launch! Somebody find that launcher!',
+    'SAM in the air! Flares, fly boy, flares!',
+    'Missile launch! Somebody find that damn launcher!',
   ),
   airborne: L(
-    'Paratroopers! Guns up!',
-    "They're dropping in. Literally.",
-    'Here come the reinforcements. Theirs, unfortunately.',
+    'Paratroopers! Guns up, aim for the pretty canopies.',
+    "They're dropping in. Literally. Shoot 'em on the way down.",
+    'Reinforcements. Theirs. Of course theirs.',
   ),
   hqdown: L(
-    'Command post is toast! They are deaf and dumb now. Dumber.',
+    'Command post is toast! They\'re deaf, dumb and dumber now.',
     "That's their phone bill sorted.",
   ),
   win: L(
     'TIMBER!',
-    'And that is why you never skip leg day, architecture.',
-    'Rounds complete. Next tourist attraction!',
-    "Somebody's getting a strongly worded letter.",
-    [1, 'Can we keep a brick? Just one brick?'],
+    'Rounds complete. Next tourist trap!',
+    "Somebody's getting a very strongly worded letter.",
+    'And THAT is why you never skip leg day, architecture.',
+    [1, 'Can we keep a brick? One brick. For my mom.'],
   ),
   idle: L(
-    'Sarge, can we shoot the coffee shop? Nobody is using it.',
-    'Is it lunch yet?',
-    "I've been staring at that thing so long I named it.",
-    "Anyone else think it's leaning? No? Just me?",
-    'My feet hurt.',
-    'Remind me which one is the target. The big one? Got it.',
-    [1, 'When they said see the world I did not think redecorate it.'],
-    [0.15, 'Pretty sure we are on the postcard now.'],
+    'Sarge, can we shoot the coffee shop? Nobody\'s using it.',
+    'Is it lunch yet? It\'s lunch somewhere.',
+    "Been staring at that thing so long I named it. It's Gary.",
+    "Anyone else think it's leaning? No? Just me? Fine.",
+    'My feet hurt. My back hurts. The gun\'s fine though.',
+    'Remind me which one\'s the target. The big one? Great, got it.',
+    [1, 'They said see the world. Didn\'t mention we\'d flatten it.'],
+    [0.15, 'Pretty sure we\'re on the postcard now.'],
   ),
 };
 
@@ -157,9 +158,9 @@ export class Barks {
     this.el.classList.remove('in');
     void this.el.offsetWidth;
     this.el.classList.add('in');
-    const read = 2.2 + line.length * 0.045;
+    const read = 2.4 + line.length * 0.05;
     this.until = this.t + read;
-    this.quiet = this.t + read + 3.5;
+    this.quiet = this.t + read + 4;
     this.cool[kind] = this.t + (kind === 'idle' ? 50 : 14);
   }
 
@@ -172,16 +173,15 @@ export class Barks {
     if (this.el.hidden) return;
     const u = this.unit;
     if (this.t > this.until || !u || !u.alive) { this.el.hidden = true; return; }
+    // Over the crew, a little above the gun; off screen, not shown at all.
     const p = this._v.copy(u.pos);
-    p.y += 6;
+    p.y += 4.5;
     p.project(this.camera);
-    if (p.z > 1 || Math.abs(p.x) > 1.05 || Math.abs(p.y) > 1.05) {
-      // Off screen: pinned to the bottom edge, so it is still read.
-      this.el.style.transform = `translate(${Math.round(innerWidth / 2)}px, ${Math.round(innerHeight * 0.72)}px) translate(-50%, -100%)`;
-      return;
-    }
+    if (p.z > 1 || Math.abs(p.x) > 1.0 || Math.abs(p.y) > 1.0) { this.el.style.opacity = '0'; return; }
+    this.el.style.opacity = '';
     const x = (p.x + 1) / 2 * innerWidth, y = (1 - p.y) / 2 * innerHeight;
-    const cx = Math.max(130, Math.min(innerWidth - 130, x));
-    this.el.style.transform = `translate(${Math.round(cx)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
+    // Drifts up a touch and fades as it goes, the way a thought does.
+    const life = (this.t - (this.until - (2.4 + this.el.querySelector('span').textContent.length * 0.05))) ;
+    this.el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - life * 4)}px) translate(-50%, -100%)`;
   }
 }
