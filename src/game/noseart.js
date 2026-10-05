@@ -287,6 +287,22 @@ const _o = new THREE.Vector3(), _d = new THREE.Vector3();
 export function paintNoseArt(group, art, wins, bosses) {
   const tex = artTexture(art, wins, bosses);
   if (!tex) return;
+  // Measured in the airframe's own frame, wherever it happens to be: the
+  // panel is placed in that frame, and a model already moved or turned (in
+  // the hangar it is stood on the apron first) measured in the world's put
+  // the art beside it rather than on it.
+  const parent = group.parent;
+  if (parent) parent.remove(group);
+  const pos = group.position.clone(), quat = group.quaternion.clone(), scl = group.scale.clone();
+  group.position.set(0, 0, 0); group.quaternion.identity(); group.scale.set(1, 1, 1);
+  try { paintInPlace(group, tex); } finally {
+    group.position.copy(pos); group.quaternion.copy(quat); group.scale.copy(scl);
+    if (parent) parent.add(group);
+    group.updateMatrixWorld(true);
+  }
+}
+
+function paintInPlace(group, tex) {
   group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(group);
   const L = box.max.z - box.min.z;
