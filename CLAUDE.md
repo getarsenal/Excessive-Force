@@ -174,7 +174,10 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   loft/surface vocabulary they are built from); the A-10 is still in
   `aircraft.js`. Each keeps its real dimensions, nose along +Z, and the
   named parts the sorties drive (`bomb`, `prop`, `rotorA`/`rotorB`,
-  `tailrotor`), and leaves a clean flat panel either side of the forward
+  `tailrotor`, the Apache's chin turret `userData.gun`, which the sortie
+  slews with `_layGun`; `node tools/apacheprobe.mjs` follows it in a
+  fight, and `GUN=yaw,el FOCUS=x,y,z,dx,dy,dz` on the contact sheet poses
+  and frames a close-up), and leaves a clean flat panel either side of the forward
   fuselage for the nose art (`userData.noseArt` says where, when the box
   would mislead the painter). `node tools/hangarshot.mjs [kinds]` builds
   and photographs them from four sides and prints where the art lands.
