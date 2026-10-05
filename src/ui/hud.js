@@ -1218,6 +1218,12 @@ export class HUD {
           + (op.line ? `<div class="eco-line">${op.line}</div>` : '');
       }
     }
+    // The General's verdict.
+    const buckEl = document.getElementById('ec-buck');
+    if (buckEl) {
+      buckEl.hidden = !opts.buck;
+      if (opts.buck) buckEl.innerHTML = `<i>BUCK</i>\u201c${opts.buck}\u201d`;
+    }
     // A stalled assault says how close it came: the near miss is the reason
     // to go again.
     if (!won && opts.short != null) {
@@ -1327,6 +1333,13 @@ export class HUD {
       }).join('');
     }
 
+    // Nose art this run unlocked: the picture, big enough to see.
+    const artEl = document.getElementById('ec-art');
+    if (artEl) {
+      const arts = won ? (opts.newArt || []) : [];
+      artEl.hidden = !arts.length;
+      artEl.innerHTML = arts.map((a) => `<div class="ec-art-i"><img src="${a.img}" alt=""><span><i>NEW NOSE ART</i><b>${a.name}</b></span></div>`).join('');
+    }
     // Medals this run won for the first time.
     if (this.el.ecMedals) {
       const got = won ? (opts.medals || []) : [];

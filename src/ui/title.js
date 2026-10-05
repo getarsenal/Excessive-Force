@@ -14,6 +14,7 @@
  * the page is hidden. It is the menu of a game that is about to ask a phone
  * for everything it has.
  */
+import { ART, unlockedArt, artDataUrl } from '../game/noseart.js';
 import { spentPoints } from '../game/doctrine.js';
 import { LEVELS } from '../game/levels.js';
 import { UNITS, STRIKES } from '../game/units.js';
@@ -59,6 +60,14 @@ export async function openFrontDoor({ current = null, canResume = false } = {}) 
 }
 
 let introPlayed = false;
+
+/** The nose art: what is painted on the fleet, and how to earn the rest. */
+function noseArtHtml(prog) {
+  const have = new Set(unlockedArt(prog).map((a) => a.id));
+  return `<div class="tt-art">${ART.map((a) => have.has(a.id)
+    ? `<figure class="tt-art-i"><img src="${artDataUrl(a)}" alt=""><figcaption>${a.name}</figcaption></figure>`
+    : `<figure class="tt-art-i locked"><div class="tt-art-q">?</div><figcaption>${a.how}</figcaption></figure>`).join('')}</div>`;
+}
 
 /** A short list of rows inside a sheet: TODAY and MORE. */
 function listSheet(rows) {
@@ -322,6 +331,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
           openSheet('MORE', listSheet([
             { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} RELEASED` },
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
+            { act: 'noseart', name: 'NOSE ART', sub: `${unlockedArt(prog).length} OF ${ART.length} PAINTED` },
             { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
             { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
@@ -339,6 +349,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
         }
         case 'armoury':
           openSheet('ARMOURY', armouryHtml(), 'armoury');
+          break;
+        case 'noseart':
+          openSheet('NOSE ART', noseArtHtml(prog), 'noseart');
           break;
         case 'medals':
           openSheet('MEDALS', medalsHtml(), 'medals');

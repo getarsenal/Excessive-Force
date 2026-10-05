@@ -24,6 +24,7 @@ import { threatOf, operationsState, operationOf, isBoss, warlordOf, challengeOf 
 import { LEVELS } from './game/levels.js';
 import { applyDoctrine } from './game/doctrine.js';
 import { Barks } from './ui/barks.js';
+import { unlockedArt, warStats, setFleetArt, artDataUrl } from './game/noseart.js';
 import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
@@ -616,6 +617,16 @@ async function boot() {
   garrison.damageScale *= threat;
   garrison.threatRof = Math.sqrt(threat);
   battle.threat = threat;
+  // The fleet's nose art: what this commander has earned, and the tally of
+  // what they have brought down (see noseart.js).
+  const artAtStart = new Set();
+  {
+    const prog0 = loadProgress();
+    const arts = unlockedArt(prog0);
+    for (const a of arts) artAtStart.add(a.id);
+    const ws = warStats(prog0);
+    setFleetArt(arts, ws.wins, ws.bosses);
+  }
   // The doctrine the stars bought (see doctrine.js). Not in Boot Camp, not
   // under the harness.
   if (!underHarness() && level.id !== 'tutorial') applyDoctrine(battle, garrison);
@@ -934,6 +945,34 @@ async function boot() {
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
   });
 
+  // What the General thinks of it, by the stars it earned.
+  const BUCK_GRADE = {
+    lost: [
+      'My grandmother levels cathedrals faster, and she has been dead since Korea.',
+      'It is still standing. You are still employed. One of those is going to change.',
+      'Close is for horseshoes and hand grenades. This was neither.',
+    ],
+    1: [
+      'Adequate. Adequate is what they carve on the headstones of men who almost got promoted.',
+      'It fell down. Eventually. I aged.',
+      'One star. Hotels with one star have bedbugs. Think about that.',
+    ],
+    2: [
+      'Not bad. Not good. Somewhere in the middle, like your career.',
+      'Two stars. The third one is out there, son. Go and get it.',
+      'Decent work. I will tell Congress it was my idea.',
+    ],
+    3: [
+      'Three stars. Don\'t let it go to your head, cupcake.',
+      'Textbook. I am putting you in for a medal. Then I am taking credit for it.',
+      'Beautiful. I have not been this happy since the divorce.',
+    ],
+    boss: [
+      'That warlord is going to need a new hobby. And a new bunker. And a new face.',
+      'Dug him out like a tick. Your mother would be proud. I am, a little.',
+      'Another fortress, another flag. Pack the guns, there is more where that came from.',
+    ],
+  };
   // The campaign's view of a finished battle: its stars, its place in its
   // operation, and where the big button goes next (see operations.js).
   let campaignNextId = null;
@@ -958,7 +997,14 @@ async function boot() {
     campaignNextId = nx?.id || null;
     hud.nextTargetLabel = nx ? (LEVELS[nx.id]?.target || nx.id) : nextTarget(level.id).target;
     hud.nextIsBoss = !!nx?.boss;
-    return { stars: stars ? { labels: ['WIN', 'PAR', ch.label], ...stars } : null, op: opOut };
+    // The General's verdict, graded on the stars (see BUCK_GRADE).
+    const nStars = stars ? stars.run.filter(Boolean).length : 0;
+    const pool = !stars ? BUCK_GRADE.lost : isBoss(level.id) && nStars ? BUCK_GRADE.boss : BUCK_GRADE[nStars] || BUCK_GRADE[1];
+    const buck = pool[(Math.random() * pool.length) | 0];
+    const fresh = unlockedArt(loadProgress()).filter((a) => !artAtStart.has(a.id));
+    for (const a of fresh) artAtStart.add(a.id);
+    const newArt = fresh.map((a) => ({ name: a.name, img: artDataUrl(a) }));
+    return { stars: stars ? { labels: ['WIN', 'PAR', ch.label], ...stars } : null, op: opOut, newArt, buck };
   };
   // The win is written to the campaign once, whichever report shows it.
   let winRecorded = false;
@@ -2032,9 +2078,22 @@ async function boot() {
   let bossEl = null, bossW = -1;
   function bossBar(b) {
     if (!bossEl) {
+      if (document.getElementById('loading')?.style.display !== 'none') return;
       bossEl = document.getElementById('bossbar');
       if (!bossEl) return;
       const w = b.boss.warlord;
+      if (!resumeSnap) {
+        hud.feed('BRING IT DOWN AND DIG HIM OUT OF HIS BUNKER', 'big');
+        // The splash: the warlord himself, his name, and what he holds.
+        const el = document.createElement('div');
+        el.id = 'bossintro';
+        el.innerHTML = `${w.file ? `<img src="${w.file}" alt="">` : ''}<div><i>\u2620 BOSS BATTLE \u00b7 ${b.boss.op?.name || ''}</i>`
+          + `<b>${w.rank} ${w.name}</b><span>${(level.target || '').toUpperCase()} \u00b7 HIS BUNKER MUST FALL</span></div>`;
+        document.getElementById('ui')?.appendChild(el);
+        const gone = () => { el.classList.add('out'); setTimeout(() => el.remove(), 500); };
+        el.addEventListener('click', gone);
+        setTimeout(gone, 4200);
+      }
       bossEl.querySelector('.bb-name').textContent = `${w.rank} ${w.name}`.toUpperCase();
       bossEl.hidden = false;
     }
@@ -2066,11 +2125,6 @@ async function boot() {
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
-    if (battle.boss) {
-      const w = battle.boss.warlord;
-      hud.feed(`BOSS · ${w.rank} ${w.name.toUpperCase()}`, 'big');
-      hud.feed('BRING IT DOWN AND DIG HIM OUT OF HIS BUNKER', 'big');
-    }
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     const ch = getChallenge();

@@ -2726,3 +2726,19 @@ body.ended .bark, body.clear-view .bark { display: none; }
 .ec-more > summary::-webkit-details-marker { display: none; }
 .ec-medal.chip { display: inline-flex; padding: 5px 9px; border: 1px solid rgba(255, 197, 61, 0.45); border-radius: 14px; margin: 3px; }
 .ec-medal.chip b { font: 600 11px/1 var(--f-ui); letter-spacing: 0.1em; color: #ffc53d; }
+.ec-art { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.ec-art-i { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid rgba(246, 214, 106, 0.5); border-radius: 8px; background: rgba(90, 97, 102, 0.55); }
+.ec-art-i img { width: 120px; height: auto; }
+.ec-art-i i { display: block; font-style: normal; font: 700 10px/1 var(--f-ui); letter-spacing: 0.18em; color: #f6d66a; margin-bottom: 4px; }
+.ec-art-i b { font: italic 700 18px/1.1 Georgia, serif; color: #fff; }
+.ec-buck { max-width: 380px; margin: 4px auto 8px; text-align: center; font: italic 500 13.5px/1.35 var(--f-ui); color: #e9eee3; }
+.ec-buck i { display: block; font-style: normal; font: 700 9.5px/1 var(--f-ui); letter-spacing: 0.2em; color: #ff8a8a; margin-bottom: 3px; }
+#bossintro { position: absolute; left: 0; right: 0; top: 32%; display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 14px 16px; background: linear-gradient(90deg, rgba(60, 6, 10, 0), rgba(60, 6, 10, 0.92) 18%, rgba(60, 6, 10, 0.92) 82%, rgba(60, 6, 10, 0));
+  border-top: 2px solid #d4313f; border-bottom: 2px solid #d4313f; z-index: 8; pointer-events: auto; animation: boss-in 0.45s cubic-bezier(.2,1.4,.4,1); }
+#bossintro.out { opacity: 0; transform: scaleY(0.2); transition: all 0.4s ease-in; }
+#bossintro img { height: 110px; width: auto; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.6)); }
+#bossintro i { display: block; font-style: normal; font: 700 11px/1 var(--f-ui); letter-spacing: 0.22em; color: #ff8a8a; }
+#bossintro b { display: block; font: 400 clamp(22px, 6vw, 36px)/1.05 var(--f-display); color: #fff; margin: 4px 0; text-transform: uppercase; }
+#bossintro span { font: 600 11px/1.2 var(--f-ui); letter-spacing: 0.14em; color: #f1c0b8; }
+@keyframes boss-in { from { transform: scaleX(0.1); opacity: 0; } to { transform: none; opacity: 1; } }

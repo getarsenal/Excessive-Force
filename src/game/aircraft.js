@@ -1,3 +1,4 @@
+import { decorate } from './noseart.js';
 import * as THREE from 'three';
 import { flyby, crack } from '../core/synth.js';
 
@@ -875,6 +876,7 @@ export class AirWing {
     const drop = alt - target.y;
     const rel = solveRelease(drop, a.speed, p.gravity, p.drag || 0);
     const model = makeAirframe(def);
+    if (def.aircraft?.kind !== 'tomahawk') decorate(model);
     // Yaw first, then pitch about the aircraft's own lateral axis, then roll
     // about its nose. In the default order the pitch is about the world's x
     // axis, which is nose-up flying north, a roll flying east and nose-down
@@ -1000,6 +1002,7 @@ export class AirWing {
     open.y = from.y + R * Math.sin(theta);
     const rollY = open.y + v * Math.sin(D) * preDive;
     const model = makeAirframe(def);
+    if (def.aircraft?.kind !== 'tomahawk') decorate(model);
     model.rotation.order = 'YXZ';
     model.position.copy(from).addScaledVector(dir, -(backFor(R) + a.runIn));
     model.position.y = rollY;
@@ -1750,6 +1753,7 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlon
     const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
     const model = makeHercules();
+    decorate(model);
     // Formation: each aircraft off to its own side of the camera's line and
     // a little behind the last, then aimed through its own group.
     const lateral = (i - (n - 1) / 2) * LIFT.spacing + 30;
@@ -2697,6 +2701,7 @@ AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts 
   const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
   const side = new THREE.Vector3(-dir.z, 0, dir.x);
   const model = makeAirframe(def);
+  if (def.aircraft?.kind !== 'tomahawk') decorate(model);
   model.rotation.order = 'YXZ';
   model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
   this.scene.add(model);
