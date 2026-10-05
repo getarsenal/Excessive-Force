@@ -2373,8 +2373,18 @@ export const DEFAULT_LEVEL = 'westminster';
  * levels are not a difficulty curve so much as four different problems — a
  * cantilever, a dome, a lattice, and a mountain.
  */
-export const LEVEL_ORDER = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow', 'rio',
-  'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala', 'colosseum', 'towerbridge', 'florence', 'segovia', 'atomium', 'tokyotower', 'budapest', 'sagrada', 'edinburgh', 'neuschwanstein', 'montstmichel', 'pena', 'hassan', 'kuwait', 'karnak', 'forbidden', 'gyeongbok', 'watarun', 'shwedagon', 'angkor', 'borobudur', 'tikal', 'teotihuacan', 'machupicchu', 'greatwall', ...ATLAS_ORDER];
+// In the operations' order (src/game/operations.js `OPERATIONS`): four battles
+// and a boss, eight times, and the wall.
+export const LEVEL_ORDER = [
+  'westminster', 'paris', 'pisa', 'agra', 'moscow',
+  'giza', 'chichen', 'athens', 'istanbul', 'colosseum',
+  'sydney', 'rio', 'towerbridge', 'cologne', 'himeji',
+  'petronas', 'tokyotower', 'atomium', 'dubai', 'kuwait',
+  'florence', 'segovia', 'budapest', 'sagrada', 'edinburgh',
+  'pena', 'montstmichel', 'hassan', 'karnak', 'neuschwanstein',
+  'gyeongbok', 'watarun', 'shwedagon', 'angkor', 'forbidden',
+  'borobudur', 'tikal', 'teotihuacan', 'machupicchu', 'potala',
+  'greatwall', ...ATLAS_ORDER];
 
 /** One line on the target-select card, saying what kind of problem this is. */
 export const LEVEL_BLURB = {

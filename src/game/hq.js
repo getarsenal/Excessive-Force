@@ -120,7 +120,7 @@ export class CommandPost {
     if (this.hp > 0) {
       if (this._t - this._hitAt > 1.5) {
         this._hitAt = this._t;
-        this.onEvent('hqhit', { point: this.point, frac: this.hp / HQ.hp });
+        this.onEvent('hqhit', { point: this.point, frac: this.hp / (this.maxHp || HQ.hp) });
       }
       return 0;
     }

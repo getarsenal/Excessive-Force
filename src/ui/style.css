@@ -124,7 +124,7 @@ html, body {
      looked like it was being shaken by the explosions. Fractions hold their
      width whatever the numbers do. */
   grid-template-columns:
-    minmax(72px, 0.9fr) minmax(66px, 0.9fr) minmax(0, 3.2fr)
+    minmax(84px, 1fr) minmax(0, 3.2fr)
     minmax(66px, 0.9fr) minmax(54px, 0.7fr);
   gap: clamp(8px, 2vw, 22px);
   align-items: center;
@@ -137,7 +137,7 @@ html, body {
    of the screen underneath them. */
 @media (max-width: 620px) {
   #topbar {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     row-gap: 5px; column-gap: 10px;
     padding-bottom: 6px;
   }
@@ -1380,6 +1380,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .ef[data-view="map"] .ef-view[data-view="map"],
 .ef[data-view="dossier"] .ef-view[data-view="dossier"],
 .ef[data-view="records"] .ef-view[data-view="records"] { display: flex; }
+.ef[data-view="doctrine"] .ef-view[data-view="doctrine"] { display: flex; flex-direction: column; overflow-y: auto; }
 
 /* The hero: the contract itself, at the size the game is actually about. */
 .ef-hero {
@@ -2595,3 +2596,133 @@ body.clear-view #lensdirt { display: none; }
 /* A strike on the house, from a SAM compound wrecked: the price says so. */
 .unit-card.free .uc-cost { color: #f3c14a; font-weight: 700; letter-spacing: 0.12em; }
 .unit-card.free { box-shadow: inset 0 0 0 1px rgba(243, 193, 74, 0.7); }
+
+/* ── The campaign on the report: stars, the operation strip, the boss ───── */
+.ec-stars { display: flex; justify-content: center; gap: clamp(10px, 4vw, 28px); margin: 10px 0 6px; }
+.ecs { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px; text-align: center; }
+.ecs i { font-style: normal; font-size: 44px; line-height: 1; color: rgba(150, 168, 190, 0.22); }
+.ecs.on i { color: #ffc53d; text-shadow: 0 0 18px rgba(255, 197, 61, 0.45); }
+.ecs.fresh i { animation: ecs-land 0.55s cubic-bezier(.2,1.6,.4,1) both; animation-delay: var(--d, 0s); }
+.ecs span { font: 600 10.5px/1.15 var(--f-ui); letter-spacing: 0.12em; color: var(--dim); }
+.ecs.on span { color: var(--text); }
+@keyframes ecs-land { 0% { transform: scale(2.6) rotate(-25deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.ec-op { margin: 6px auto 10px; max-width: 360px; padding: 8px 12px; border: 1px solid var(--edge); border-radius: 8px; background: rgba(0,0,0,0.25); }
+.eco-head { display: flex; justify-content: space-between; font: 600 12px/1 var(--f-ui); letter-spacing: 0.16em; color: var(--text); }
+.eco-head span { color: #ffc53d; }
+.eco-pips { display: flex; gap: 6px; margin: 8px 0 6px; }
+.eco-pips i { flex: 1; height: 22px; border-radius: 4px; background: rgba(150,168,190,0.14); font-style: normal;
+  display: flex; align-items: center; justify-content: center; font-size: 10px; color: #ffc53d; letter-spacing: -1px; }
+.eco-pips i.won { background: rgba(111, 208, 140, 0.28); }
+.eco-pips i.here { outline: 2px solid #ffc53d; outline-offset: 1px; }
+.eco-pips i.boss { flex: 1.4; background: rgba(232, 96, 76, 0.22); color: #ff9a8a; font-size: 14px; }
+.eco-pips i.boss.won { background: rgba(232, 96, 76, 0.5); color: #fff; }
+.eco-line { font: 600 11px/1.3 var(--f-ui); letter-spacing: 0.1em; color: var(--dim); text-align: center; }
+#ec-next.boss { background: #d4313f; color: #fff; }
+#ec-next.boss::before { content: '\2620\00a0'; }
+
+#bossbar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 92px);
+  width: min(420px, calc(100vw - 32px)); display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center;
+  padding: 6px 10px; background: rgba(40, 6, 8, 0.78); border: 1px solid rgba(232, 96, 76, 0.55); border-radius: 6px; pointer-events: none; z-index: 5; }
+#bossbar .bb-tag { font: 700 10px/1 var(--f-ui); letter-spacing: 0.2em; color: #ff8a8a; }
+#bossbar .bb-name { font: 600 12px/1 var(--f-ui); letter-spacing: 0.12em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bossbar .bb-track { grid-column: 1 / -1; height: 7px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+#bossbar .bb-track > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #d4313f, #ff7a4d); transition: width 0.3s; }
+#bossbar.dead { opacity: 0.5; }
+body.ended #bossbar, body.clear-view #bossbar { display: none; }
+@media (max-width: 620px) { #bossbar { top: calc(max(8px, env(safe-area-inset-top)) + 118px); } }
+
+/* ── The campaign screen: operations, stars, bosses ─────────────────────── */
+.ef-star { color: #ffc53d; }
+.ef-obj i, .wm-star { font-style: normal; margin-right: 5px; color: rgba(150,168,190,0.45); }
+.ef-obj.met i, li.met .wm-star { color: #ffc53d; }
+.ef-obj.met i { color: #0b0f16; }
+.ef-opstrip { margin: 10px 0 4px; }
+.ef-opstrip[hidden] { display: none; }
+.ef-op-head { display: flex; justify-content: space-between; font: 600 11.5px/1 var(--f-ui); letter-spacing: 0.16em; color: var(--dim); margin-bottom: 6px; }
+.ef-op-head b { color: #ffc53d; font-weight: 600; }
+.ef-op-pips { display: grid; grid-template-columns: repeat(4, 1fr) 1.3fr; gap: 5px; }
+.ef-op-pip { min-height: 46px; border: 1px solid var(--edge); border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--dim);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; cursor: pointer; font: inherit; }
+.ef-op-pip b { font: 600 9.5px/1.1 var(--f-ui); letter-spacing: 0.06em; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.ef-op-pip em { font-style: normal; font-size: 10px; color: #ffc53d; letter-spacing: 0; }
+.ef-op-pip.open { color: var(--text); border-color: var(--edge-bright); }
+.ef-op-pip.won { background: rgba(111, 208, 140, 0.16); color: var(--text); }
+.ef-op-pip.here { outline: 2px solid #ffc53d; outline-offset: 1px; }
+.ef-op-pip.boss { border-color: rgba(232, 96, 76, 0.6); background: rgba(232, 96, 76, 0.14); color: #ffb1a6; }
+.ef-op-pip.boss em { color: #ff9a8a; }
+.ef-op-pip.boss.won { background: rgba(232, 96, 76, 0.38); color: #fff; }
+.ef-op-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 4px 6px; font: 600 11.5px/1 var(--f-ui);
+  letter-spacing: 0.16em; color: var(--text); border-bottom: 1px solid var(--edge); }
+.ef-op-row b { color: #ffc53d; font-weight: 600; }
+.ef-op-row.locked { color: var(--dim); }
+.ef-op-row.side { color: var(--dim); font-size: 10.5px; }
+.ef-row.boss .ef-row-no { color: #ff8a8a; }
+.ef-row.boss .ef-row-name { color: #ffb1a6; }
+.ef-stars i { font-style: normal; font-size: 12px; color: rgba(150,168,190,0.3); }
+.ef-stars i.on { color: #ffc53d; }
+.ef-go.boss { background: #d4313f; color: #fff; }
+
+/* ── Doctrine ───────────────────────────────────────────────────────────── */
+.ef-card.ef-doct .ef-card-sub { color: #ffc53d; }
+.ef-card.ef-doct.glow { border-color: rgba(255, 197, 61, 0.6); box-shadow: 0 0 18px rgba(255, 197, 61, 0.18) inset; }
+.ef-doct-pts { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 12px; }
+.ef-doct-pts b { font: 700 30px/1 var(--f-display); color: #ffc53d; }
+.ef-doct-pts span { font: 600 11px/1 var(--f-ui); letter-spacing: 0.18em; color: var(--dim); }
+.ef-doct-list { display: flex; flex-direction: column; gap: 10px; }
+.ef-br { border: 1px solid #23303d; background: #0d141c; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px 10px; align-items: center; }
+.ef-br-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+.ef-br-head i { font-style: normal; color: #ffc53d; width: 18px; text-align: center; }
+.ef-br-head b { font: 600 12.5px/1 var(--f-ui); letter-spacing: 0.16em; color: var(--text); flex: 1; }
+.ef-br-undo { background: none; border: 0; color: var(--dim); font: 600 10px/1 var(--f-ui); letter-spacing: 0.12em; cursor: pointer; padding: 4px 0; }
+.ef-br-ranks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.ef-rk { border: 1px solid #23303d; border-radius: 5px; padding: 6px; display: flex; flex-direction: column; gap: 3px; color: var(--dim); min-height: 46px; }
+.ef-rk em { font-style: normal; font: 500 11px/1.25 var(--f-ui); }
+.ef-rk small { font-size: 10px; color: rgba(255, 197, 61, 0.6); }
+.ef-rk.on { border-color: rgba(255, 197, 61, 0.55); background: rgba(255, 197, 61, 0.12); color: var(--text); }
+.ef-rk.next { border-style: dashed; color: var(--text); }
+.ef-br-buy { background: #ffc53d; color: #111; border: 0; border-radius: 6px; padding: 10px 12px; font: 700 11.5px/1 var(--f-ui); letter-spacing: 0.1em; cursor: pointer; white-space: nowrap; }
+.ef-br-buy.poor { background: #2a333d; color: var(--dim); cursor: default; }
+.ef-br-max { font: 700 11px/1 var(--f-ui); letter-spacing: 0.16em; color: #ffc53d; }
+.ef-doct-foot { margin: 14px 2px 4px; font: 500 12px/1.4 var(--f-ui); color: var(--dim); }
+@media (max-width: 520px) { .ef-br { grid-template-columns: 1fr; } .ef-br-buy { width: 100%; } }
+
+/* ── Crew chatter ───────────────────────────────────────────────────────── */
+.bark { position: absolute; left: 0; top: 0; max-width: min(260px, 70vw); pointer-events: none; z-index: 6;
+  background: rgba(244, 240, 226, 0.95); color: #1a1a14; border-radius: 10px; padding: 6px 10px 7px;
+  font: 500 13px/1.3 var(--f-ui); box-shadow: 0 4px 14px rgba(0,0,0,0.45); will-change: transform; }
+.bark::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: rgba(244, 240, 226, 0.95); }
+.bark b { display: block; font: 700 9.5px/1 var(--f-ui); letter-spacing: 0.14em; color: #5b6b3a; margin-bottom: 3px; }
+.bark.in { animation: bark-in 0.18s ease-out; }
+@keyframes bark-in { from { opacity: 0; margin-top: 8px; } to { opacity: 1; margin-top: 0; } }
+body.ended .bark, body.clear-view .bark { display: none; }
+.wm-parline { display: flex; flex-wrap: wrap; gap: 6px; }
+.wm-parline span { font: 600 11px/1 var(--f-data); padding: 5px 7px; border: 1px solid var(--edge); border-radius: 4px; color: var(--dim); }
+.wm-parline span i { font-style: normal; color: var(--text); margin-right: 5px; }
+.wm-parline span.beat { border-color: #ffc53d; color: #ffc53d; }
+.wm-boss { margin: 6px 0; padding: 7px 10px; background: rgba(212, 49, 63, 0.18); border-left: 3px solid #d4313f; font: 600 11.5px/1.3 var(--f-ui); letter-spacing: 0.08em; color: #ffb1a6; }
+.wm-more { margin: 6px 0 10px; }
+.wm-more summary { cursor: pointer; font: 600 10.5px/1 var(--f-ui); letter-spacing: 0.18em; color: var(--dim); }
+
+/* Income lives under the funds it pays into. */
+.tb-income { font: 600 10.5px/1 var(--f-data); color: rgba(111, 208, 140, 0.75); margin-top: 2px; }
+/* Keyboard hints are for keyboards. */
+@media (pointer: coarse) { #survey-btn kbd, .uc-key { display: none; } }
+/* A weapon the campaign has not released is not on the shelf this battle;
+   the armoury says when it comes. And the tier stamp on every card was a
+   label nobody read. */
+.unit-card.sealed { display: none; }
+.uc-tier { display: none; }
+#drawer-orders .dr-title { display: none; }
+/* The pause menu: three ways out, and the settings folded. */
+.menu-grid.main { grid-template-columns: 1fr; max-width: 320px; margin: 0 auto; }
+.menu-grid.main #menu-resume { background: var(--plate-mark, #ec7b3f); color: #140904; }
+.menu-settings { margin-top: 14px; }
+.menu-settings > summary { cursor: pointer; text-align: center; font: 600 12px/1 var(--f-ui); letter-spacing: 0.2em; color: var(--dim); padding: 10px; list-style: none; }
+.menu-settings > summary::after { content: ' \203a'; }
+.menu-settings[open] > summary::after { content: ' \2039'; }
+@media (pointer: coarse) { .menu-label.keys, .menu-keys { display: none; } }
+.ec-more { margin-top: 6px; }
+.ec-more > summary { list-style: none; cursor: pointer; text-align: center; color: var(--dim); font: 700 16px/1 var(--f-ui); letter-spacing: 0.3em; padding: 6px; }
+.ec-more > summary::-webkit-details-marker { display: none; }
+.ec-medal.chip { display: inline-flex; padding: 5px 9px; border: 1px solid rgba(255, 197, 61, 0.45); border-radius: 14px; margin: 3px; }
+.ec-medal.chip b { font: 600 11px/1 var(--f-ui); letter-spacing: 0.1em; color: #ffc53d; }

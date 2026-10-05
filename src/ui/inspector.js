@@ -1,3 +1,4 @@
+import { crewName } from '../game/crews.js';
 import { UNITS_BY_ID, UNITS } from '../game/units.js';
 
 /**
@@ -144,6 +145,9 @@ export class UnitCard {
     this.unit = unit;
     this.el.hidden = false;
     this.q('uc2-name').textContent = unit.def.full;
+    // The crew chief, by name and chevrons (see crews.js).
+    const t = this.el.querySelector('.uc2-title');
+    if (t) t.textContent = unit.crew ? crewName(unit) : 'YOUR UNIT';
     this._w = {};
     this._sell = null;
     this.update();

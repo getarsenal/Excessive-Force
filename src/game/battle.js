@@ -1,3 +1,4 @@
+import { newCrew } from './crews.js';
 import * as THREE from 'three';
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
@@ -901,6 +902,8 @@ export class Battle {
    */
   costOf(def) {
     if (def?.strike && this.strikeCredits > 0 && def.cost <= FREE_STRIKE_CAP) return 0;
+    // The Air Power doctrine (see doctrine.js) takes a share off every strike.
+    if (def?.strike && this.strikeScale && this.strikeScale !== 1) return Math.round(def.cost * this.strikeScale);
     return def?.cost ?? 0;
   }
 
@@ -1146,6 +1149,7 @@ export class Battle {
       this.money -= price;
       this.spent += price;
     }
+    this.strikesCalled = (this.strikesCalled || 0) + 1;
     // The free strike is spent on the call.
     if (this.isFreeStrike(def)) {
       this.strikeCredits--;
@@ -1335,7 +1339,7 @@ export class Battle {
     const y = pos.y;
     const unit = {
       def, pos,
-      health: def.health, maxHealth: def.health,
+      health: def.health * (this.unitHealthScale || 1), maxHealth: def.health * (this.unitHealthScale || 1),
       alive: true,
       state: 'setup',
       setupLeft: def.setup,
@@ -1347,7 +1351,9 @@ export class Battle {
       yaw: 0,
       kills: 0,
       hits: 0,
-      rank: 0,
+      // Veteran crews from the Armor doctrine start a chevron up.
+      rank: this.startRank || 0,
+      crew: newCrew(),
       age: 0,
       dugIn: false,
       damageDealt: 0,
@@ -2399,9 +2405,10 @@ export class Battle {
     const killed = this.garrison.splash(at, splashR, power);
     if (killed) {
       this.defendersKilled += killed;
-      this.money += killed * MONEY_PER_DEFENDER;
+      const bounty = Math.round(killed * MONEY_PER_DEFENDER * (this.bountyScale || 1));
+      this.money += bounty;
       if (proj.owner) proj.owner.kills += killed;
-      this.onEvent('bounty', { point: at, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
+      this.onEvent('bounty', { point: at, amount: bounty, kind: 'kill' });
     }
     if (killed >= 3) this.onEvent('stamp', { text: killed >= 6 ? `MASSACRE ×${killed}` : `MULTI-KILL ×${killed}`, point: at, kind: 'kill' });
     // The crew's record. Rounds that actually took stone out count toward
@@ -2855,7 +2862,14 @@ export class Battle {
         || this.objectives.every((o) => this.objectiveDone(o))) {
       const drops = [this.airborne, this.assault].filter((a) => a && a.outstanding > 0);
       const left = drops.reduce((n, a) => n + a.outstanding, 0);
-      if (!left) {
+      // A boss is not beaten while the warlord is in his bunker (see
+      // operations.js): the building down is half of it.
+      const bossUp = !!(this.boss && this.hq && this.hq.alive);
+      if (bossUp && !this._bossHeld) {
+        this._bossHeld = true;
+        this.onEvent('bossheld', { warlord: this.boss.warlord });
+      }
+      if (!left && !bossUp) {
         this._held = null;
         this.state = 'won';
         this.onEvent('win', this.summary());
@@ -2941,6 +2955,12 @@ export class Battle {
       spent: Math.round(this.spent),
       time: this.elapsed,
       leverage: this.leverage,
+      // For the stars (see operations.js): what the battle asked of the
+      // player besides the building.
+      strikes: this.strikesCalled || 0,
+      samSites: this.sams?.sites?.length || 0,
+      samSitesDown: this.sams?.sites ? this.sams.sites.filter((st) => st.down).length : 0,
+      hqDown: !!this.hq && !this.hq.alive,
     };
   }
 }

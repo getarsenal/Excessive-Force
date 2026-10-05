@@ -52,7 +52,12 @@ Levels 42 to 100 are the catalogue, generated from data by
 is `src/game/atlas_places.js`. `node tools/kitcheck.mjs <id> --solve` is the
 building dry, and a level there is new rows in three files, not a module.
 
-Levels, in campaign order: `westminster`, `paris`, `agra`, `giza`,
+The campaign is eight operations of four battles and a boss, then the
+Great Wall (`src/game/operations.js`): stars per battle (win, par, the
+battle's challenge), six of an operation's twelve to open its boss, a boss
+is won only with the warlord's bunker (the command post) destroyed, and
+the catalogue opens as side operations, seven per boss. The original
+sixteen, in suite order: `westminster`, `paris`, `agra`, `giza`,
 `chichen`, `pisa`, `sydney`, `moscow`, `rio`, `athens`, `istanbul`,
 `cologne`, `himeji`, `petronas`, `dubai`, `potala`. Tiers: `low` (phones;
 the grid is coarsened) to `ultra`. Giza at high and Paris at ultra time out
@@ -139,6 +144,9 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
+- `src/game/operations.js` the campaign's operations, stars, gating,
+  bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
+  `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·
 - `src/structure/landmarks/kit.js` the landmark kit · `src/game/atlas*.js`
   the catalogue's places, specs and words ·
   `src/game/levels.js` level records · `src/structure/landmarks/` the

@@ -62,6 +62,14 @@ export class TestMenu {
     btn.addEventListener('click', () => this.toggle());
     document.getElementById('ui').appendChild(btn);
     this.btn = btn;
+    // A developer's tool, not a player's: on screen with ?test=1, under the
+    // harness, or once `tt.dev` is set; the panel itself still opens by key.
+    let dev = false;
+    try {
+      const q = new URLSearchParams(location.search);
+      dev = q.get('test') === '1' || localStorage.getItem('tt.dev') === '1' || localStorage.getItem('tt.suite') === '1';
+    } catch { /* no storage */ }
+    btn.hidden = !dev;
 
     const panel = document.createElement('div');
     panel.id = 'testmenu';

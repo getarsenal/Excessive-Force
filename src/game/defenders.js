@@ -536,6 +536,9 @@ export class Garrison {
     // of rounds, the tubes shortest.
     this.supplyRof = 1;
     this.tubeRof = 1;
+    // How hard this battle is (see `threatOf` in operations.js): the crews
+    // fire this much faster.
+    this.threatRof = 1;
     this.cap = Object.values(this.pools).reduce((a, n) => a + n, 0);
     // The rifleman in the shoulder, from `soldier.js`: the tones are baked into
     // the vertices and the instance colour is the uniform.
@@ -1991,7 +1994,7 @@ export class Garrison {
       // and used to fire damageless tracer, and flash the screen, besides.
       if (!d.alive || d.def.indirect || d.def.observer) continue;
       // Without its command post the garrison fights on its own, and slower.
-      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.supplyRof;
+      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.supplyRof * this.threatRof;
       if (d.cooldown > 0) continue;
       // Head down: nothing until the shelling stops.
       if (d.suppressed > this.time) { d.cooldown = 0.3; continue; }
@@ -2214,7 +2217,7 @@ export class Garrison {
     this.observed = observed;
     for (const d of this.defenders) {
       if (!d.alive || !d.def.indirect) continue;
-      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.tubeRof;
+      d.cooldown -= (this.commsDown ? dt * this.commsRof : dt) * this.tubeRof * this.threatRof;
       if (d.cooldown > 0) continue;
       if (d.suppressed > this.time) { d.cooldown = 0.5; continue; }
       let best = null, bestD = d.def.range * d.def.range;

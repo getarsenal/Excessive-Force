@@ -60,14 +60,10 @@
       <div class="tb-block">
         <div class="tb-label">FUNDS</div>
         <div class="tb-value money" id="hud-money">$0</div>
-      </div>
-      <div class="tb-block">
-        <div class="tb-label">INCOME</div>
-        <div class="tb-value" id="hud-income">$0/s</div>
+        <div class="tb-income" id="hud-income">+$0/s</div>
       </div>
       <div class="tb-center">
         <div class="tb-target-name" id="hud-target">ELIZABETH TOWER</div>
-        <div class="tb-barlabel">DEMOLITION &middot; MARKS ARE WEAPON UNLOCKS</div>
         <div class="integrity-wrap">
           <div class="integrity-bar"><div class="integrity-fill" id="hud-integrity"></div><div class="integrity-ticks" id="hud-ticks"></div></div>
           <div class="integrity-pct" id="hud-integrity-pct">0%</div>
@@ -86,6 +82,8 @@
         <div class="tb-value" id="hud-units">0</div>
       </div>
     </header>
+    <!-- A boss battle's warlord, and how much of his bunker is left. -->
+    <div id="bossbar" hidden><span class="bb-tag">WARLORD</span><span class="bb-name"></span><div class="bb-track"><i></i></div></div>
 
     <!-- The dock.
          Four round buttons and two drawers that glide up out of them. Each
@@ -208,32 +206,37 @@
     <div id="menu" hidden>
       <div class="menu-inner">
         <div class="menu-title">PAUSED</div>
-        <div class="menu-grid">
+        <div class="menu-grid main">
           <button id="menu-resume">RESUME</button>
-          <button id="menu-sound">SOUND: ON</button>
-          <button id="menu-haptics">HAPTICS: ON</button>
-          <button id="menu-optics">OPTICS: DAY</button>
-          <button id="menu-saver">BATTERY SAVER: ON</button>
           <button id="menu-restart">RESTART</button>
           <button id="menu-home">MAIN MENU</button>
-          <button id="menu-targets">CAMPAIGN MAP</button>
-          <button id="menu-intros">INTROS: ON</button>
-          <button id="menu-opening">OPENING: ON</button>
+          <button id="menu-targets" hidden>CAMPAIGN MAP</button>
         </div>
-        <div class="menu-label">ACCESSIBILITY</div>
-        <div class="menu-grid a11y">
-          <button id="menu-cb">COLOUR: STANDARD</button>
-          <button id="menu-text">TEXT: NORMAL</button>
-          <button id="menu-still">MOTION: FULL</button>
-          <button id="menu-lefty">DOCK: CENTRE</button>
-        </div>
-        <div class="menu-label">QUALITY · reloads the level</div>
-        <div class="menu-grid quality">
-          <button data-quality="low">LOW</button>
-          <button data-quality="medium">MEDIUM</button>
-          <button data-quality="high">HIGH</button>
-          <button data-quality="ultra">ULTRA</button>
-        </div>
+        <!-- Everything that is a setting rather than a way out: one fold. -->
+        <details class="menu-settings">
+          <summary>SETTINGS</summary>
+          <div class="menu-grid">
+            <button id="menu-sound">SOUND: ON</button>
+            <button id="menu-haptics">HAPTICS: ON</button>
+            <button id="menu-optics">OPTICS: DAY</button>
+            <button id="menu-saver">BATTERY SAVER: ON</button>
+            <button id="menu-intros">INTROS: ON</button>
+            <button id="menu-opening">OPENING: ON</button>
+          </div>
+          <div class="menu-label">ACCESSIBILITY</div>
+          <div class="menu-grid a11y">
+            <button id="menu-cb">COLOUR: STANDARD</button>
+            <button id="menu-text">TEXT: NORMAL</button>
+            <button id="menu-still">MOTION: FULL</button>
+            <button id="menu-lefty">DOCK: CENTRE</button>
+          </div>
+          <div class="menu-label">QUALITY · reloads the level</div>
+          <div class="menu-grid quality">
+            <button data-quality="low">LOW</button>
+            <button data-quality="medium">MEDIUM</button>
+            <button data-quality="high">HIGH</button>
+            <button data-quality="ultra">ULTRA</button>
+          </div>
         <div class="menu-label keys">MOUSE &amp; KEYS</div>
         <div class="menu-keys">
           <span><b>drag</b> orbit</span><span><b>wheel</b> zoom</span>
@@ -243,6 +246,7 @@
           <span><b>1–9 0 -</b> pick a unit</span><span><b>Esc</b> cancel</span>
           <span><b>P</b> pause</span><span><b>H</b> clear view</span><span><b>click</b> to aim &amp; deploy</span>
         </div>
+        </details>
       </div>
     </div>
 
@@ -283,13 +287,16 @@
         <div class="ec-inner">
           <div class="ec-title" id="ec-title">TOWER DOWN</div>
           <div class="ec-sub" id="ec-sub"></div>
+          <!-- The three stars this battle can be closed with, and where it
+               sits in its operation. -->
+          <div class="ec-stars" id="ec-stars" hidden></div>
+          <div class="ec-op" id="ec-op" hidden></div>
           <!-- The pay: the rank bar and the total. The lines it is made of
                fold away below. -->
           <div class="ec-xp" id="ec-xp" hidden></div>
           <div class="ec-hero" id="ec-hero"></div>
           <!-- The three marks. A contract is closed or it is not; these are how
                well, and they are the reason to run one twice. -->
-          <div class="ec-marks" id="ec-marks" hidden></div>
           <div class="ec-badges">
             <div class="ec-release" id="ec-release" hidden></div>
             <div class="ec-medals" id="ec-medals" hidden></div>
@@ -306,7 +313,7 @@
             </details>
             <details class="ec-fold" id="ec-fold-report">
               <summary><span>BATTLE REPORT</span><b id="ec-fold-report-sum"></b></summary>
-              <div class="ec-fold-body"><div class="ec-stats" id="ec-stats"></div></div>
+              <div class="ec-fold-body"><div class="ec-marks" id="ec-marks" hidden></div><div class="ec-stats" id="ec-stats"></div></div>
             </details>
             <details class="ec-fold" id="ec-fold-bill" hidden>
               <summary><span>INSURANCE CLAIM</span><b id="ec-fold-bill-sum"></b></summary>
@@ -320,14 +327,18 @@
           <button id="ec-next" class="ec-btn primary">NEXT TARGET</button>
           <div class="ec-row">
             <button id="ec-again" class="ec-btn">RUN IT AGAIN</button>
-            <button id="ec-keep" class="ec-btn">KEEP GOING</button>
+            <button id="ec-home" class="ec-btn">MENU</button>
           </div>
-          <div class="ec-row ec-small">
-            <button id="ec-clip" class="ec-btn sm clip" hidden>&#9654;&nbsp;SHARE</button>
-            <button id="ec-ba" class="ec-btn sm" hidden>BEFORE / AFTER</button>
-            <button id="ec-targets" class="ec-btn sm">MAP</button>
-            <button id="ec-home" class="ec-btn sm">MENU</button>
-          </div>
+          <!-- The rest, one tap in. -->
+          <details class="ec-more">
+            <summary>&middot;&middot;&middot;</summary>
+            <div class="ec-row ec-small">
+              <button id="ec-keep" class="ec-btn sm">KEEP GOING</button>
+              <button id="ec-clip" class="ec-btn sm clip" hidden>&#9654;&nbsp;SHARE</button>
+              <button id="ec-ba" class="ec-btn sm" hidden>BEFORE / AFTER</button>
+              <button id="ec-targets" class="ec-btn sm">MAP</button>
+            </div>
+          </details>
         </div>
       </div>
     </div>

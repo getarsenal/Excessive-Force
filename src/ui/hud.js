@@ -1,3 +1,4 @@
+import { tick } from '../core/synth.js';
 import { feedback } from './feedback.js';
 import { initOptics, cycleOptics, opticsLabel } from './optics.js';
 import { power } from '../core/power.js';
@@ -877,7 +878,7 @@ export class HUD {
     else if (Math.abs(money - this._moneyShown) < 1) this._moneyShown = money;
     else this._moneyShown += (money - this._moneyShown) * Math.min(1, dt * 8);
     setText(this.el.money, `$${Math.round(this._moneyShown).toLocaleString()}`);
-    setText(this.el.income, `$${b.income.toFixed(0)}/s`);
+    setText(this.el.income, `+$${b.income.toFixed(0)}/s`);
     if (!this._flyBound) {
       this._flyBound = true;
       this.el.target?.addEventListener('click', () => this.onFocusTarget());
@@ -1191,11 +1192,43 @@ export class HUD {
     const site = this.battle.level?.subtitle ?? '';
     this.el.ecSub.textContent = opts.sub ?? (won ? site : 'Out of funds with the target still standing');
 
+    // The stars: three, each with what it was for, the ones this run took
+    // lit, the new ones landing one after another.
+    const starsEl = document.getElementById('ec-stars');
+    if (starsEl) {
+      const st = opts.stars || null;
+      starsEl.hidden = !st;
+      if (st) {
+        starsEl.innerHTML = st.labels.map((lab, i) => `<div class="ecs${st.have[i] ? ' on' : ''}${st.fresh[i] ? ' fresh' : ''}" style="--d:${0.35 + i * 0.45}s">`
+          + `<i>★</i><span>${lab}</span></div>`).join('');
+        if (st.fresh.some(Boolean)) {
+          st.fresh.forEach((f, i) => { if (f) setTimeout(() => tick(this.audio, 1.6 + i * 0.25), (350 + i * 450)); });
+        }
+      }
+    }
+    // Where this battle sits in its operation, and what is next: the reason
+    // to press the big button.
+    const opEl = document.getElementById('ec-op');
+    if (opEl) {
+      const op = opts.op || null;
+      opEl.hidden = !op;
+      if (op) {
+        opEl.innerHTML = `<div class="eco-head"><b>${op.name}</b><span>★ ${op.total}</span></div>`
+          + `<div class="eco-pips">${op.pips.map((p) => `<i class="${p.won ? 'won' : ''}${p.here ? ' here' : ''}${p.boss ? ' boss' : ''}">${p.boss ? '☠' : p.stars ? '★'.repeat(p.stars) : ''}</i>`).join('')}</div>`
+          + (op.line ? `<div class="eco-line">${op.line}</div>` : '');
+      }
+    }
+    // A stalled assault says how close it came: the near miss is the reason
+    // to go again.
+    if (!won && opts.short != null) {
+      this.el.ecSub.textContent = `${Math.round(opts.pct)}% DOWN — ${Math.max(1, Math.round(opts.short))}% SHORT`;
+    }
+
     const mins = Math.floor(summary.time / 60);
     const secs = Math.floor(summary.time % 60);
+    // What the hero tiles do not already say.
     const rows = [
-      ['Masonry brought down', `${summary.score.toLocaleString()} t`],
-      ['Height remaining', `${summary.heightStanding.toFixed(1)} m of ${summary.startHeight.toFixed(1)} m`],
+      ...(won ? [] : [['Height remaining', `${summary.heightStanding.toFixed(1)} m of ${summary.startHeight.toFixed(1)} m`]]),
       ['Defenders neutralised', summary.defendersKilled],
       ['Units lost', summary.unitsLost],
       ['Rounds fired', summary.shotsFired],
@@ -1204,8 +1237,6 @@ export class HUD {
         : this.battle.collapseRounds < this.challenge.rounds ? `BEATEN · ${this.battle.collapseRounds} vs ${this.challenge.rounds}`
           : this.battle.collapseRounds === this.challenge.rounds ? `MATCHED · ${this.challenge.rounds}`
             : `${this.battle.collapseRounds} vs ${this.challenge.rounds}`]] : []),
-      ['Spent', `$${summary.spent.toLocaleString()}`],
-      ['Time', `${mins}:${String(secs).padStart(2, '0')}`],
     ];
     const $ = (id) => document.getElementById(id);
     const fold = (id, show, sum) => {
@@ -1225,7 +1256,7 @@ export class HUD {
       const xp = opts.xp || null;
       renderXp(this.el.ecXp, xp, { audio: this.audio, still,
         parts: { lines: $('ec-xp-lines'), orders: $('ec-xp-orders'), crates: $('ec-crates') } });
-      fold('ec-fold-xp', !!xp, xp ? `+${Math.round(xp.total).toLocaleString()} XP` : '');
+      fold('ec-fold-xp', !!xp, '');
       const orders = xp?.orders || [];
       fold('ec-fold-orders', orders.length > 0,
         `${orders.filter((o) => o.done).length} OF ${orders.length} DONE`);
@@ -1270,6 +1301,7 @@ export class HUD {
       this.el.ecNext.hidden = !won;
       this.el.ecNext.textContent = this.nextTargetLabel
         ? `NEXT: ${this.nextTargetLabel}` : 'NEXT TARGET';
+      this.el.ecNext.classList.toggle('boss', !!this.nextIsBoss);
     }
     // The marks.
     //
@@ -1299,8 +1331,7 @@ export class HUD {
     if (this.el.ecMedals) {
       const got = won ? (opts.medals || []) : [];
       this.el.ecMedals.hidden = !got.length;
-      this.el.ecMedals.innerHTML = got.map((m) => `<div class="ec-medal"><span class="emd-tag">MEDAL</span>`
-        + `<b>${m.name}</b><span class="emd-line">${m.line}</span></div>`).join('');
+      this.el.ecMedals.innerHTML = got.map((m) => `<div class="ec-medal chip" title="${m.line}"><b>\u2726 ${m.name}</b></div>`).join('');
     }
 
     // What closing the contract bought. Said here rather than on the map,
@@ -1309,7 +1340,8 @@ export class HUD {
       const r = won ? opts.release : null;
       this.el.ecRelease.hidden = !r;
       if (r) {
-        this.el.ecRelease.innerHTML = `<span class="ec-rel-tag">CONTRACT CLOSED</span>`
+        this.el.ecRelease.hidden = !r.unlockLine;
+        this.el.ecRelease.innerHTML = `<span class="ec-rel-tag">NEW WEAPON</span>`
           + `<span class="ec-rel-line">${r.unlockLine}</span>`;
       }
     }

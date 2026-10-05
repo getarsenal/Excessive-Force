@@ -14,6 +14,7 @@
  * the page is hidden. It is the menu of a game that is about to ask a phone
  * for everything it has.
  */
+import { spentPoints } from '../game/doctrine.js';
 import { LEVELS } from '../game/levels.js';
 import { UNITS, STRIKES } from '../game/units.js';
 import { THEATRES, campaignState, isReleased } from '../game/campaign.js';
@@ -59,6 +60,12 @@ export async function openFrontDoor({ current = null, canResume = false } = {}) 
 
 let introPlayed = false;
 
+/** A short list of rows inside a sheet: TODAY and MORE. */
+function listSheet(rows) {
+  return `<div class="tt-list">${rows.filter(Boolean).map((r) => `<button class="tt-row" type="button" data-act="${r.act}">`
+    + `<b>${r.name}${r.count ? ` <u>${r.count}</u>` : ''}</b><em>${r.sub || ''}</em><span>\u203a</span></button>`).join('')}</div>`;
+}
+
 export function showTitle({ current = null, canResume = false } = {}) {
   menuMusic.play();
   const state = campaignState();
@@ -91,26 +98,29 @@ export function showTitle({ current = null, canResume = false } = {}) {
     const b = battles[0];
     cont = { act: 'resume', id: b.level, line: `${esc(b.target)} · ${Math.round(b.integrity * 100)}% STANDING · ${clock(b.elapsed)}` };
   } else if (next) {
-    cont = { act: 'deploy', id: next.id, line: `CONTRACT ${pad2(next.no)} · ${esc(next.city.toUpperCase())}` };
+    // Where it sits in the war, not a contract number: the operation, the
+    // battle in it, or the boss.
+    const op = state.ops?.next?.op;
+    const lv = LEVELS[next.id] || {};
+    const where = op ? (state.ops.next.battle.boss ? `\u2620 BOSS \u00b7 ${op.name}` : `${op.name} \u00b7 ${op.battles.findIndex((b) => b.id === next.id) + 1} OF ${op.battles.length - 1}`) : 'SIDE OPERATION';
+    cont = { act: 'deploy', id: next.id, line: `${esc((lv.target || next.city).toUpperCase())} \u00b7 ${where}` };
   } else {
     cont = { act: 'campaign', line: 'EVERY CONTRACT CLOSED' };
   }
 
   const dLv = daily && LEVELS[daily.level];
   const dT = daily && state.list.find((t) => t.id === daily.level);
+  // Four rows. Everything else is one tap further in: TODAY holds what
+  // resets every day, MORE holds what is looked at now and then.
+  const crates = car.crates || 0;
+  const todayCount = (daily && !dDone ? 1 : 0) + (3 - ordersDone) + crates;
+  const pts = Math.max(0, (state.ops?.total || 0) - spentPoints());
   const items = [
     { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', sub: cont.line, primary: true },
-    { act: 'campaign', name: 'CAMPAIGN', sub: `${pad2(state.done)} / ${state.total} CLOSED${next ? ` · NEXT: ${esc((LEVELS[next.id] || {}).target || next.title)}` : ''}` },
-    daily && { act: 'daily', name: 'DAILY STRIKE', sub: dDone ? `DONE TODAY · ${dstate.streak}-DAY STREAK` : `${esc(dT ? dT.city.toUpperCase() : '')} · ${daily.mod.name}${dstate.streak ? ` · STREAK ${dstate.streak}` : ''}`, hot: !dDone },
-    battles.length && { act: 'battles', name: 'BATTLES IN PROGRESS', sub: `${battles.length} SAVED · LAST ${ago(battles[0].at).toUpperCase()}`, count: battles.length },
-    { act: 'map', name: 'THEATRE MAP', sub: `${state.done} ${state.done === 1 ? 'COUNTRY' : 'COUNTRIES'} BURNT · ${state.total - state.done} STANDING` },
-    { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} WEAPONS RELEASED` },
-    { act: 'orders', name: 'DAILY ORDERS', sub: ordersDone >= 3 ? `ALL THREE DONE · NEW ORDERS IN ${ordersResetIn().toUpperCase()}` : `${ordersDone} OF 3 DONE · ${orders.find((o) => !o.done)?.line.toUpperCase() || ''}`, hot: ordersDone < 3, count: 3 - ordersDone },
-    car.crates > 0 && { act: 'crates', name: 'SUPPLY CRATES', sub: `${car.crates} TO OPEN · WHAT'S INSIDE IS FOR YOUR NEXT BATTLE`, hot: true, count: car.crates },
-    { act: 'medals', name: 'MEDALS', sub: `${careerTiers} OF ${mc.career.length * 4} CAREER GRADES · ${featsWon} OF ${mc.feats.length} FEATS` },
-    { act: 'boot', name: 'BOOT CAMP', sub: 'THE CONTROLS, ONE AT A TIME · FORT IRWIN' },
-    { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot} · ${esc(cmd.name)} · THREE SAVES` },
-    { act: 'records', name: 'RECORDS & SETTINGS', sub: `${fmtTons(tons)} TONNES DOWN · QUALITY, INTROS, SOUND` },
+    { act: 'campaign', name: 'CAMPAIGN', sub: `\u2605 ${state.ops?.total || 0}${pts >= 2 ? ` \u00b7 DOCTRINE: ${pts} TO SPEND` : ''}` },
+    { act: 'today', name: 'TODAY', sub: '', hot: todayCount > 0, count: todayCount },
+    battles.length > 1 && { act: 'battles', name: 'BATTLES', sub: '', count: battles.length },
+    { act: 'more', name: 'MORE', sub: '' },
   ].filter(Boolean);
 
   // The backdrop: what has been brought down, then what is next, then the rest.
@@ -136,6 +146,8 @@ export function showTitle({ current = null, canResume = false } = {}) {
     boot: IC('<path d="M6 13l6-4 6 4M6 18l6-4 6 4"/>'),
     commanders: IC('<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-7 8-7s7 2.5 8 7"/>'),
     records: IC('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+    today: IC('<rect x="4" y="5" width="16" height="16" rx="1"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+    more: IC('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
   };
   const iconFor = (it) => ICONS[it.primary ? 'go' : it.act] || '';
 
@@ -175,9 +187,8 @@ export function showTitle({ current = null, canResume = false } = {}) {
       <nav class="tt-menu">
         ${items.map((it, k) => `
           <button class="tt-item${it.primary ? ' primary' : ''}${it.hot ? ' hot' : ''}" type="button" data-act="${it.act}" style="--k:${k}">
-            <i class="tt-no">${pad2(k + 1)}</i>
             <i class="tt-ic" aria-hidden="true">${iconFor(it)}</i>
-            <span class="tt-lbl"><b>${it.name}${it.count ? ` <u>${it.count}</u>` : ''}</b><em>${it.sub}</em></span>
+            <span class="tt-lbl"><b>${it.name}${it.count ? ` <u>${it.count}</u>` : ''}</b>${it.sub ? `<em>${it.sub}</em>` : ''}</span>
             <span class="tt-arrow">›</span>
           </button>`).join('')}
       </nav>
@@ -300,6 +311,22 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'battles':
           openSheet('BATTLES IN PROGRESS', battles.map((b) => battleCard(b, true)).join(''), 'battles');
           break;
+        case 'today':
+          openSheet('TODAY', listSheet([
+            daily && { act: 'daily', name: 'DAILY STRIKE', sub: dDone ? `DONE \u00b7 ${dstate.streak}-DAY STREAK` : `${daily.mod.name}${dstate.streak ? ` \u00b7 STREAK ${dstate.streak}` : ''}`, count: dDone ? 0 : 1 },
+            { act: 'orders', name: 'DAILY ORDERS', sub: `${ordersDone} OF 3 DONE`, count: 3 - ordersDone },
+            { act: 'crates', name: 'SUPPLY CRATES', sub: crates ? `${crates} TO OPEN` : 'NONE WAITING', count: crates },
+          ]), 'list');
+          break;
+        case 'more':
+          openSheet('MORE', listSheet([
+            { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} RELEASED` },
+            { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
+            { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
+            { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
+            { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
+          ]), 'list');
+          break;
         case 'discard': {
           const id = el.dataset.level;
           clearBattle(id);
@@ -416,7 +443,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
         <span><b>${ds.best}</b>BEST STREAK</span>
         <span><b>${ds.total}</b>STRIKES FLOWN</span>
       </div>
-      <p class="tt-dsheet-foot">One target a day, the same for everyone. Close it today to keep the streak; miss a day and it starts again.</p>
+      <p class="tt-dsheet-foot">Same target for everyone. Miss a day, lose the streak.</p>
       <button class="tt-big${isDone ? ' ghost' : ''}" type="button" data-act="strike">${isDone ? 'FLY IT AGAIN' : 'STRIKE'}</button>
     </div>`;
   }
@@ -458,7 +485,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       return `<div class="tt-medal${f.won ? ' won' : ''}"><b>${f.won ? esc(f.name) : '?'.repeat(Math.min(12, f.name.length))}</b><span>${esc(f.line)}</span>`
         + `<i>${f.won ? `WON ${esc(f.won.at)}${where}` : 'NOT YET · 750 XP'}</i></div>`;
     }).join('');
-    return `<p class="tt-arm-intro">Career medals come in four grades, each worth more XP than the last; the bar says how far to the next. Feats are won once.</p>
+    return `<p class="tt-arm-intro">Four grades each. Feats are won once.</p>
       <div class="tt-sk">CAREER</div><div class="tt-cmedals">${careerHtml}</div>
       <div class="tt-sk">FEATS</div><div class="tt-medals">${featsHtml}</div>`;
   }
@@ -466,7 +493,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
   function ordersHtml() {
     const os = dailyOrders(career());
     const done = os.filter((o) => o.done).length;
-    return `<p class="tt-arm-intro">Three jobs a day, the same for every commander on the date. 750 XP each, and a supply crate and 1,000 XP more for all three. Progress counts from any battle.</p>
+    return `<p class="tt-arm-intro">750 XP each \u00b7 a crate for all three.</p>
       <div class="tt-orders">${os.map((o) => `<div class="tt-order${o.done ? ' done' : ''}">
         <b>${esc(o.line.toUpperCase())}</b>
         <span class="tt-cm-bar"><u style="width:${(Math.min(1, o.have / o.n) * 100).toFixed(1)}%"></u></span>
@@ -486,7 +513,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
 
   function cratesHtml() {
     return `<div class="cx-host"></div>
-      <p class="tt-note">A crate for every grade you rise, two at every fifth, and one for finishing all three daily orders. What comes out is spent in your next battle.</p>
+      <p class="tt-note">Used in your next battle.</p>
       <div class="tt-crate-perks">${perksHtml()}</div>`;
   }
 
@@ -520,7 +547,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     // what makes one pass, each cheapest first.
     const sec = (u) => (u.strike ? 'STRIKE' : u.tier);
     const tiers = [...new Set(UNITS.map(sec))];
-    return `<p class="tt-arm-intro">Everything the contract pays for, at list price: a strike costs more on a big target and less on a small one. Tap a card for the brief.</p>` + tiers.map((tier) => `
+    return `<p class="tt-arm-intro">Tap a card for the brief.</p>` + tiers.map((tier) => `
       <div class="tt-sk">${tierName(tier)}</div>
       <div class="tt-arm">${(tier === 'STRIKE' ? STRIKES : UNITS.filter((u) => sec(u) === tier)).map((u) => {
         const ok = isReleased(u.id);
@@ -578,7 +605,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       ${ahead ? `<div class="tt-sk">COMMISSIONS AHEAD</div><div class="tt-perks">${ahead}</div>` : ''}
       <div class="tt-sk">SAVE SLOTS</div>
       ${commandersInner()}
-      <p class="tt-note">Each commander keeps their own record, campaign, battles in progress and streak. Settings are shared.</p>`;
+`;
   }
 }
 

@@ -20,6 +20,10 @@ import {
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
 import { recordTheatre, releaseNoteFor } from './game/campaign.js';
+import { threatOf, operationsState, operationOf, isBoss, warlordOf, challengeOf } from './game/operations.js';
+import { LEVELS } from './game/levels.js';
+import { applyDoctrine } from './game/doctrine.js';
+import { Barks } from './ui/barks.js';
 import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
@@ -604,6 +608,17 @@ async function boot() {
     battle.incomeScale *= 1 + perks.incomePct + perks.income;
     if (perks.funds || perks.income) spendBattlePerks();
   }
+  // The campaign's sawtooth (see operations.js): this battle's place in its
+  // operation sets how hard the garrison bites. Not in Boot Camp, and not
+  // under the harness, whose numbers are calibrated on the bare garrison.
+  const threat = (!underHarness() && level.id !== 'tutorial')
+    ? threatOf(level.id, operationsState(loadProgress()).bossesDown) : 1;
+  garrison.damageScale *= threat;
+  garrison.threatRof = Math.sqrt(threat);
+  battle.threat = threat;
+  // The doctrine the stars bought (see doctrine.js). Not in Boot Camp, not
+  // under the harness.
+  if (!underHarness() && level.id !== 'tutorial') applyDoctrine(battle, garrison);
   if (dailyMod) {
     if (dailyMod.id === 'chest') battle.money *= 2;
     if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
@@ -683,6 +698,14 @@ async function boot() {
         battle.hq = new CommandPost({ scene: engine.scene, terrain, fx, site: hs, desert,
           onEvent: (kind, data) => handleEvent(kind, data) });
         battle.hq.garrison(garrison);
+        // A boss: the command post is the warlord's bunker. Two and a half
+        // times the concrete, a bar of its own, and the battle is not won
+        // until it is dug out.
+        if (isBoss(level.id)) {
+          battle.hq.hp *= 2.5;
+          battle.hq.maxHp = battle.hq.hp;
+          battle.boss = { warlord: warlordOf(level.id), op: operationOf(level.id) };
+        }
       }
     }
     // The depot, inside the belt like the command post; the enemy battery
@@ -783,7 +806,7 @@ async function boot() {
     // the address bar by the time anyone can press this, so a reload would
     // land on the map.
     onRestart: () => { battleOver = true; clearBattle(level.id); goToLevel(level.id); },
-    onNextTarget: () => goToLevel(nextTarget(level.id).id),
+    onNextTarget: () => goToLevel(campaignNextId || nextTarget(level.id).id),
     // The win is already banked; this just lets play carry on against
     // whatever is still standing.
     onKeepGoing: () => {
@@ -911,6 +934,32 @@ async function boot() {
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
   });
 
+  // The campaign's view of a finished battle: its stars, its place in its
+  // operation, and where the big button goes next (see operations.js).
+  let campaignNextId = null;
+  const campaignCard = (stars) => {
+    const st = operationsState(loadProgress());
+    const op = operationOf(level.id);
+    const ch = challengeOf(level.id, level);
+    let opOut = null;
+    if (op) {
+      const o = st.ops.find((x) => x.id === op.id);
+      const boss = o.battles[o.battles.length - 1];
+      const bossName = LEVELS[o.boss]?.target || o.boss.toUpperCase();
+      const left = o.battles.filter((b) => !b.boss && !b.won).length;
+      const line = o.done ? (level.id === o.boss ? 'OPERATION COMPLETE' : '')
+        : boss.needStars ? `BOSS LOCKED · ${boss.needStars} MORE ★ IN THIS OPERATION`
+          : boss.open ? `BOSS UNLOCKED · ${bossName}`
+            : `${left} TO GO, THEN THE BOSS · ${bossName}`;
+      opOut = { name: o.name, total: st.total, line,
+        pips: o.battles.map((b) => ({ won: b.won, boss: b.boss, here: b.id === level.id, stars: b.stars.filter(Boolean).length })) };
+    }
+    const nx = st.next?.battle || null;
+    campaignNextId = nx?.id || null;
+    hud.nextTargetLabel = nx ? (LEVELS[nx.id]?.target || nx.id) : nextTarget(level.id).target;
+    hud.nextIsBoss = !!nx?.boss;
+    return { stars: stars ? { labels: ['WIN', 'PAR', ch.label], ...stars } : null, op: opOut };
+  };
   // The win is written to the campaign once, whichever report shows it.
   let winRecorded = false;
   /**
@@ -946,7 +995,8 @@ async function boot() {
   const ribbon = (id, n = 1) => {
     ribbons[id] = (ribbons[id] || 0) + n;
     const rb = RIBBONS[id];
-    if (rb && !suiteHold) hud.feed(`+${(rb.xp * n).toLocaleString()} XP · ${rb.name}`, 'xp');
+    // Said once a battle per ribbon; the rest bank quietly for the report.
+    if (rb && !suiteHold && ribbons[id] === n) hud.feed(`+${(rb.xp * n).toLocaleString()} XP · ${rb.name}`, 'xp');
   };
   let paid = false;
   const payOut = (won, sum, extra = {}) => {
@@ -988,7 +1038,17 @@ async function boot() {
     }
   }
   let sirenSounded = false;
+  // The crews' chatter (see barks.js): not in Boot Camp, where the General
+  // has the floor, and not under the harness.
+  const barks = (!underHarness() && level.id !== 'tutorial') ? new Barks({ camera: engine.camera, battle }) : null;
+  window.__barks = barks;
+  const BARK = { deployed: 'deployed', unithit: 'unithit', unitlost: 'unitlost', rank: 'rank', secondary: 'secondary',
+    strike: 'strike', shotdown: 'shotdown', samlaunch: 'samlaunch', airborne: 'airborne', hqdown: 'hqdown', win: 'win' };
   function handleEvent(kind, data) {
+    if (barks && battle.state !== 'lost') {
+      if (BARK[kind]) barks.say(BARK[kind], kind === 'unithit' ? data?.unit : kind === 'rank' || kind === 'deployed' ? data : data?.point || null);
+      else if (kind === 'bigimpact' && data?.destroyed > 40) barks.say('bigimpact', data.point);
+    }
     // Boot Camp coaches on what actually happens, as it happens.
     if (level.id === 'tutorial' && window.__tutorial?.root) window.__tutorial.onEvent(kind, data);
     if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
@@ -1275,10 +1335,21 @@ async function boot() {
       }
       case 'hqhit': {
         const pct = Math.max(1, Math.round(data.frac * 100));
-        hud.feed(`COMMAND POST HIT · ${pct}% LEFT`, 'warn');
+        hud.feed(`${battle.boss ? 'WARLORD\'S BUNKER' : 'COMMAND POST'} HIT · ${pct}% LEFT`, 'warn');
+        break;
+      }
+      case 'bossheld': {
+        const w = data.warlord;
+        hud.feed(`IT'S DOWN — ${w.rank} ${w.name.toUpperCase()} IS STILL IN HIS BUNKER`, 'big');
+        hud.status('tap the gold diamond on the bunker: every gun lays on it', 8);
         break;
       }
       case 'hqdown':
+        if (battle.boss) {
+          const w = battle.boss.warlord;
+          hud.feed(`${w.rank} ${w.name.toUpperCase()} IS FINISHED`, 'big');
+          battle.onEvent('stamp', { text: 'WARLORD DOWN', point: data.point, kind: 'hit' });
+        }
         battle.cutComms();
         battle.hv?.noteKill(data.point);
         feedback.emit('jackpot');
@@ -1405,9 +1476,9 @@ async function boot() {
           const sum = battle.summary();
           const marks = markRun(sum);
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
-          recordTheatre(level.id, true, sum);
+          const th = recordTheatre(level.id, true, sum, marks);
           const feats = awardMedals(sum);
-          banked = { sum, marks, feats, xp: payOut(true, sum, { marks, feats }) };
+          banked = { sum, marks, feats, stars: th?.stars || null, xp: payOut(true, sum, { marks, feats }) };
           return banked;
         };
         window.addEventListener('pagehide', bankWin);
@@ -1426,12 +1497,12 @@ async function boot() {
         rig.focus(new THREE.Vector3(0, groundY + level.camera.height * 0.7, 0),
           level.camera.distance * 1.3);
         setTimeout(() => {
-          const { sum, marks, feats, xp } = bankWin();
+          const { sum, marks, feats, xp, stars } = bankWin();
           window.removeEventListener('pagehide', bankWin);
-          hud.nextTargetLabel = nextTarget(level.id).target;
+          const cc = campaignCard(stars);
           takeBeforeAfter(sum);
           hideNewsflash();
-          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: feats, xp });
+          hud.showEnd('win', sum, { release: releaseNoteFor(level.id), marks, medals: feats, xp, ...cc });
         }, 7000);
         break;
       }
@@ -1451,8 +1522,8 @@ async function boot() {
           const marks = markRun(sum);
           // One play is one result, however many reports it shows.
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
-          recordTheatre(level.id, true, sum);
-          hud.nextTargetLabel = nextTarget(level.id).target;
+          const th = recordTheatre(level.id, true, sum, marks);
+          const cc = campaignCard(th?.stars || null);
           takeBeforeAfter(sum);
           hideNewsflash();
           const feats = awardMedals(sum);
@@ -1463,6 +1534,7 @@ async function boot() {
             sub: `${level.subtitle} · nothing left standing`,
             release: releaseNoteFor(level.id),
             marks,
+            ...cc,
           });
         }, 3000);
         break;
@@ -1474,7 +1546,9 @@ async function boot() {
         setTimeout(() => {
           recordResult(level.id, false, data);
           recordTheatre(level.id, false, data);
-          hud.showEnd('lose', data, { xp: payOut(false, data) });
+          const pct = Math.min(100, battle.objectiveProgress * 100);
+          hud.showEnd('lose', data, { xp: payOut(false, data), ...campaignCard(null),
+            pct, short: Math.max(0, Battle.WIN_AT * 100 - pct) });
         }, 1500);
         break;
       default: break;
@@ -1954,6 +2028,24 @@ async function boot() {
     }
   });
 
+  // The warlord's bunker, as a bar of its own under the top bar.
+  let bossEl = null, bossW = -1;
+  function bossBar(b) {
+    if (!bossEl) {
+      bossEl = document.getElementById('bossbar');
+      if (!bossEl) return;
+      const w = b.boss.warlord;
+      bossEl.querySelector('.bb-name').textContent = `${w.rank} ${w.name}`.toUpperCase();
+      bossEl.hidden = false;
+    }
+    const f = b.hq ? Math.max(0, b.hq.hp / (b.hq.maxHp || 1)) : 0;
+    const w = Math.round(f * 1000);
+    if (w === bossW) return;
+    bossW = w;
+    bossEl.querySelector('.bb-track > i').style.width = `${(f * 100).toFixed(1)}%`;
+    bossEl.classList.toggle('dead', !b.hq?.alive);
+  }
+
   // The high-value target nearest a point, within `r` metres, for a tap.
   const HVT_LABEL = { launcher: 'SAM launcher', radar: 'SAM radar', hq: 'command post', depot: 'ammo depot',
     checkpoint: 'checkpoint', howitzer: 'howitzer', car: "general's car", truck: 'escort truck' };
@@ -1974,6 +2066,11 @@ async function boot() {
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
+    if (battle.boss) {
+      const w = battle.boss.warlord;
+      hud.feed(`BOSS · ${w.rank} ${w.name.toUpperCase()}`, 'big');
+      hud.feed('BRING IT DOWN AND DIG HIM OUT OF HIS BUNKER', 'big');
+    }
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     const ch = getChallenge();
@@ -1988,7 +2085,7 @@ async function boot() {
     // a tool nobody uses, and every level was being ground down from the top.
     setTimeout(() => {
       if (battle.state === 'playing' && !hud.survey) {
-        hud.status(`SURVEY (V) \u2014 ${access.cb ? 'yellow' : 'red'} stone is holding the rest up`, 6);
+        hud.status(`${access.cb ? "Yellow" : "Red"} stone holds it up \u2014 SURVEY`, 6);
       }
     }, 9000);
   };
@@ -2311,6 +2408,8 @@ async function boot() {
     fx.update(dt);
     whiteFlags.update(dt);
     huntMarkers.update(rawDt, battle.garrison, engine.camera, !!battle._held && battle.state === 'playing');
+    if (battle.boss) bossBar(battle);
+    if (barks) barks.update(rawDt);
     hvtMarkers.updatePoints(rawDt, battle.hvtPoints(hvtPts), engine.camera, battle.state === 'playing' && !document.body.classList.contains('clear-view'));
     hud.update(rawDt);
     if (tutorial) tutorial.update();
@@ -2454,10 +2553,10 @@ async function boot() {
   window.__frame = frame;
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
-recordResult(level.id, true, sum);
-    recordTheatre(level.id, true, sum);
-    hud.nextTargetLabel = nextTarget(level.id).target;
-    hud.showEnd('win', sum);
+    recordResult(level.id, true, sum);
+    const marks = markRun(sum);
+    const th = recordTheatre(level.id, true, sum, marks);
+    hud.showEnd('win', sum, { marks, release: releaseNoteFor(level.id), ...campaignCard(th?.stars || null) });
   };
   // The headless harness drives the same suite the panel does, so a regression
   // fails CI and the in-game panel identically.

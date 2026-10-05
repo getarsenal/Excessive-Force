@@ -11,6 +11,8 @@ import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { menuMusic, eagle } from './music.js';
 import { feedback } from './feedback.js';
+import { operationOf, isBoss, warlordOf, starsOf } from '../game/operations.js';
+import { BRANCHES, doctrine, freePoints, buyRank, refund } from '../game/doctrine.js';
 
 /**
  * The par marks: R, $, T and L on the contract list, and the same four
@@ -176,7 +178,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   root.innerHTML = `
     <div class="ef" data-view="door">
       <header class="ef-top">
-        <div class="ef-ledger"><b>${String(state.done).padStart(2, '0')}</b> / ${state.total} CLOSED</div>
+        <div class="ef-ledger"><b class="ef-star">\u2605 ${state.ops?.total ?? 0}</b> &middot; ${String(state.done).padStart(2, '0')} / ${state.total} CLOSED</div>
         <div class="ef-brand">
           <img class="ef-logo" src="./logo-512.png" alt="" width="512" height="512">
           <span>EXCESSIVE FORCE</span>
@@ -191,24 +193,18 @@ export async function showWorldMap({ current = null, canResume = false, view: st
 
         <section class="ef-view" data-view="door">
           <button class="ef-hero" id="ef-hero" type="button"></button>
+          <div class="ef-opstrip" id="ef-opstrip"></div>
           <div class="ef-cards">
             <button class="ef-card" id="ef-tomap" type="button">
               <span class="ef-mini" id="ef-mini"></span>
               <span class="ef-card-name">MAP</span>
               <span class="ef-card-sub">${state.done} ${state.done === 1 ? 'country' : 'countries'} burnt · ${state.total - state.done} open</span>
             </button>
-            <button class="ef-card" id="ef-torecords" type="button">
-              <span class="ef-figs">
-                <span class="ef-fig">${tons}<i>t</i></span>
-                <span class="ef-card-sub">${sorties} sortie${sorties === 1 ? '' : 's'} flown</span>
-              </span>
-              <span class="ef-card-name">RECORDS</span>
-              <span class="ef-card-sub" id="ef-last">and settings</span>
+            <button class="ef-card ef-doct" id="ef-todoct" type="button">
+              <span class="ef-card-name">DOCTRINE</span>
+              <span class="ef-card-sub" id="ef-doct-sub"></span>
             </button>
-            <button class="ef-card ef-boot" id="ef-boot" type="button">
-              <span class="ef-card-name">BOOT CAMP</span>
-              <span class="ef-card-sub">The controls, one at a time &middot; Fort Irwin</span>
-            </button>
+
           </div>
         </section>
 
@@ -223,12 +219,18 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             <div class="wm-hint">DRAG TO PAN · PINCH OR SCROLL TO ZOOM</div>
           </div>
           <div class="ef-list-k">CONTRACTS</div>
-          <div class="ef-legend"><i>R</i> rounds <i>$</i> budget <i>T</i> clock <i>L</i> leverage <span>· lit when you beat par</span></div>
+
           <div class="ef-list" id="ef-list"></div>
         </section>
 
         <section class="ef-view" data-view="dossier">
           <div class="wm-panel"></div>
+        </section>
+
+        <section class="ef-view" data-view="doctrine">
+          <div class="ef-doct-pts" id="ef-doct-pts"></div>
+          <div class="ef-doct-list" id="ef-doct-list"></div>
+          <div class="ef-doct-foot">Every star you earn is a point here. Take a branch back any time and spend it again.</div>
         </section>
 
         <section class="ef-view" data-view="records">
@@ -561,9 +563,10 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   /** The dossier for one contract, under the map. */
   const show = (t) => {
     const rec = progress[t.id] || {};
-    const objectives = objectivesFor(t.id).map((o) => {
-      const met = o.key === 'primary' ? t.down : !!t.met[o.key];
-      return `<li class="${met ? 'met' : ''}">${o.label}</li>`;
+    const held = starsOf(t.id, progress);
+    const objectives = objectivesFor(t.id).map((o, i) => {
+      const met = held[i];
+      return `<li class="${met ? 'met' : ''}"><i class="wm-star">\u2605</i>${o.label}</li>`;
     }).join('');
     const lv = LEVELS[t.id] || {};
     // Rounds and money beside the clock, and the par beside each of them.
@@ -583,8 +586,13 @@ export async function showWorldMap({ current = null, canResume = false, view: st
         <div class="wm-mark-fig"><em>par ${par ? m.par(par) : '—'}</em><b>${best != null ? m.fmt(best) : '—'}</b></div>
       </div>`;
     }).join('');
-    const record = `<div class="wm-marks">${markRows}</div>`
-      + `<div class="wm-rec-foot">${rec.runs ? `${rec.runs} attempt${rec.runs === 1 ? '' : 's'} on record · lit marks are par beaten` : 'No attempts yet · beat par to light a mark'}</div>`;
+    void markRows;
+    // One line: the four pars, lit where this player has beaten them.
+    const record = `<div class="wm-parline">${PAR_MARKS.map((m) => {
+      const best = m.best(rec);
+      const beat = !!par && best != null && m.beat(best, par);
+      return `<span class="${beat ? 'beat' : ''}"><i>${m.k}</i>${par ? m.par(par) : '\u2014'}</span>`;
+    }).join('')}</div>`;
     const status = t.down ? 'closed' : (t.open ? 'active' : 'sealed');
     const stamp = t.down ? 'CLOSED' : (t.open ? 'ACTIVE' : 'SEALED');
     const cmdr = CAST[DEFENDER_OF[t.id]];
@@ -601,12 +609,13 @@ export async function showWorldMap({ current = null, canResume = false, view: st
         <div class="wm-doss-grid">
           <div class="wm-doss-main">
             <div class="wm-doss-target">${lv.target || t.title}</div>
-            <div class="wm-doss-place">${lv.place || t.city} <span class="wm-coord">${dms(t.lat, t.lon)}</span></div>
-            <p class="wm-doss-brief">${t.brief}</p>
+            <div class="wm-doss-place">${lv.place || t.city}</div>
+            ${isBoss(t.id) ? `<div class="wm-boss">\u2620 BOSS \u00b7 ${warlordOf(t.id).rank} ${warlordOf(t.id).name} \u00b7 bring it down and destroy his bunker</div>` : ''}
             <p class="wm-doss-hint">${hintFor(lv)}</p>
+            <details class="wm-more"><summary>BRIEFING</summary><p class="wm-doss-brief">${t.brief}</p></details>
             <div class="wm-doss-cols">
               <div>
-                <div class="wm-k">Objectives</div>
+                <div class="wm-k">Stars</div>
                 <ul class="wm-doss-obj">${objectives}</ul>
               </div>
               <div>
@@ -614,17 +623,13 @@ export async function showWorldMap({ current = null, canResume = false, view: st
                 ${record}
               </div>
             </div>
-            ${t.unlockLine ? `<div class="wm-release">${unlockIcon}<div><div class="wm-k">On close</div><div class="wm-rel-line">${t.unlockLine}</div>${unlockName ? `<div class="wm-rel-sub">${unlockName}</div>` : ''}</div></div>` : ''}
-            <div class="wm-doss-go">
-              ${t.open
-    ? `<button class="wm-go" data-level="${t.id}" type="button">${t.down ? 'RETURN TO THE THEATRE' : 'DEPLOY'}</button>`
-    : '<div class="wm-sealed">SEALED — CLOSE THE CONTRACT BEFORE IT</div>'}
-            </div>
+            ${t.unlockLine ? `<div class="wm-release">${unlockIcon}<div><div class="wm-k">Win it for</div><div class="wm-rel-line">${t.unlockLine}</div>${unlockName ? `<div class="wm-rel-sub">${unlockName}</div>` : ''}</div></div>` : ''}
+
           </div>
           <aside class="wm-doss-side">
             <figure class="wm-recon">
               <img src="assets/recon/${t.id}.jpg" alt="" loading="lazy" onerror="this.closest('figure').hidden = true">
-              <figcaption>RECON · ${(lv.target || t.title).toUpperCase()}</figcaption>
+
             </figure>
             ${cmdr ? `<div class="wm-cmdr">
               <img class="wm-cmdr-img" src="${cmdr.file}" alt="" loading="lazy">
@@ -657,7 +662,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   const hero = root.querySelector('#ef-hero');
   const listEl = root.querySelector('#ef-list');
 
-  const BANNERS = { door: 'NEXT CONTRACT', map: 'THEATRE OF OPERATIONS', records: 'RECORDS' };
+  const BANNERS = { door: 'NEXT CONTRACT', map: 'THEATRE OF OPERATIONS', records: 'RECORDS', doctrine: 'DOCTRINE' };
   let viewName = 'door';
   let mapReady = false;
 
@@ -682,38 +687,53 @@ export async function showWorldMap({ current = null, canResume = false, view: st
 
   const paintFoot = () => {
     const t = selected;
-    if (viewName === 'records') {
+    if (viewName === 'records' || viewName === 'doctrine') {
       goBtn.className = 'ef-go ghost';
       goBtn.innerHTML = 'DONE';
       return;
     }
     if (!t || !t.open) {
       goBtn.className = 'ef-go sealed';
-      goBtn.innerHTML = t
-        ? 'SEALED <em>close the contract before it</em>'
-        : 'CHOOSE A TARGET';
+      const ob = t && opFor(t.id)?.battles.find((b) => b.id === t.id);
+      goBtn.innerHTML = !t ? 'CHOOSE A TARGET'
+        : ob?.needStars ? `SEALED <em>${ob.needStars} more \u2605 in this operation opens the boss</em>`
+          : operationOf(t.id) ? 'SEALED <em>win the battle before it</em>'
+            : 'SEALED <em>beat another boss to open more side operations</em>';
       return;
     }
     goBtn.className = 'ef-go';
-    goBtn.innerHTML = `${t.down ? 'RETURN' : 'DEPLOY'} <em>${String(t.no).padStart(2, '0')} · ${t.city.toUpperCase()}</em>`;
+    goBtn.className = `ef-go${isBoss(t.id) && !t.down ? ' boss' : ''}`;
+    goBtn.innerHTML = `${t.down ? 'RETURN' : isBoss(t.id) ? 'ASSAULT' : 'DEPLOY'} <em>${String(t.no).padStart(2, '0')} · ${t.city.toUpperCase()}</em>`;
   };
 
+  const heroKicker = (t) => {
+    const o = opFor(t.id);
+    if (!o) return t.boot ? 'TRAINING' : `SIDE OPERATION \u00b7 ${t.iso}`;
+    if (isBoss(t.id)) {
+      const w = warlordOf(t.id);
+      return `\u2620 BOSS \u00b7 ${w.rank} ${w.name}`.toUpperCase();
+    }
+    const i = o.battles.findIndex((b) => b.id === t.id);
+    return `${o.name} \u00b7 BATTLE ${i + 1} OF ${o.battles.length - 1}`;
+  };
   /** The hero: the contract itself, at the size the game is about. */
   const paintDoor = (t) => {
+    paintOpStrip(t);
     const lv = LEVELS[t.id] || {};
-    const objectives = objectivesFor(t.id).slice(0, 3).map((o) => {
-      const met = o.key === 'primary' ? t.down : !!t.met[o.key];
-      return `<span class="ef-obj${met ? ' met' : ''}">${o.label}</span>`;
+    const held = starsOf(t.id, progress);
+    const objectives = objectivesFor(t.id).slice(0, 3).map((o, i) => {
+      const met = held[i];
+      return `<span class="ef-obj${met ? ' met' : ''}"><i>\u2605</i>${o.label}</span>`;
     }).join('');
     hero.innerHTML = `
       <span class="ef-hero-art">
         <img src="assets/recon/${t.id}.jpg" alt="" loading="lazy" onerror="this.hidden = true">
         <span class="ef-hero-fade"></span>
-        <span class="ef-hero-no">CONTRACT ${String(t.no).padStart(2, '0')} · ${t.iso}</span>
+        <span class="ef-hero-no">${heroKicker(t)}</span>
         ${t.down ? '<span class="ef-hero-stamp">CLOSED</span>' : ''}
         <span class="ef-hero-text">
           <span class="ef-hero-target">${lv.target || t.title}</span>
-          <span class="ef-hero-place">${lv.place || t.city} <i>${dms(t.lat, t.lon)}</i></span>
+          <span class="ef-hero-place">${lv.place || t.city}</span>
         </span>
       </span>
       <span class="ef-hero-objs">${objectives}</span>`;
@@ -741,9 +761,48 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     holder.replaceChildren(m);
   };
 
-  /** The contracts as a list you can hit with a thumb. */
+  // The stars a contract holds, as three glyphs.
+  const starGlyphs = (id) => starsOf(id, progress).map((on) => `<i class="${on ? 'on' : ''}">\u2605</i>`).join('');
+  // The operation a contract sits in, from the state the campaign computed.
+  const opFor = (id) => {
+    const op = operationOf(id);
+    return op && state.ops ? state.ops.ops.find((o) => o.id === op.id) : null;
+  };
+  /** The operation strip on the door: the next contract's operation, pip by pip. */
+  const paintOpStrip = (t) => {
+    const holder = root.querySelector('#ef-opstrip');
+    if (!holder) return;
+    const o = t && opFor(t.id);
+    if (!o) { holder.innerHTML = ''; holder.hidden = true; return; }
+    holder.hidden = false;
+    const n = o.battles.length;
+    holder.innerHTML = `<div class="ef-op-head"><span>${o.finale ? 'FINALE' : `OPERATION ${o.index + 1}`} \u00b7 ${o.name}</span>`
+      + `<b>\u2605 ${o.opStars}/${(n - 1) * 3 || 3}</b></div>`
+      + `<div class="ef-op-pips">${o.battles.map((b) => {
+        const lv = LEVELS[b.id] || {};
+        const cls = `${b.won ? 'won' : ''}${b.open ? ' open' : ''}${b.boss ? ' boss' : ''}${b.id === t.id ? ' here' : ''}`;
+        const sub = b.boss && b.needStars ? `NEED ${b.needStars}\u2605` : b.stars.filter(Boolean).length ? '\u2605'.repeat(b.stars.filter(Boolean).length) : (b.open ? 'OPEN' : '');
+        return `<button type="button" class="ef-op-pip ${cls}" data-level="${b.id}">`
+          + `<b>${b.boss ? '\u2620 ' : ''}${(lv.place || b.id).toUpperCase()}</b><em>${sub}</em></button>`;
+      }).join('')}</div>`;
+    for (const b of holder.querySelectorAll('.ef-op-pip')) {
+      b.addEventListener('click', (e) => { e.stopPropagation(); select(b.dataset.level); });
+    }
+  };
+
+  /** The contracts as a list you can hit with a thumb, in their operations. */
   const paintList = () => {
+    let lastOp = null, side = false;
     listEl.innerHTML = state.list.map((t) => {
+      let head = '';
+      const o = opFor(t.id);
+      if (o && o !== lastOp) {
+        lastOp = o;
+        head = `<div class="ef-op-row${o.open ? '' : ' locked'}"><span>${o.finale ? 'FINALE' : `OP ${o.index + 1}`} \u00b7 ${o.name}</span><b>\u2605 ${o.opStars}</b></div>`;
+      } else if (!o && !side && t.id !== 'tutorial') {
+        side = true;
+        head = '<div class="ef-op-row side"><span>SIDE OPERATIONS \u00b7 SEVEN MORE OPEN WITH EVERY BOSS</span></div>';
+      }
       const rec = progress[t.id] || {};
       // The four par marks, as four letters: rounds, spend, time, leverage.
       // A closed contract that only said DOWN gave no reason to open it twice.
@@ -753,15 +812,39 @@ export async function showWorldMap({ current = null, canResume = false, view: st
         const hit = best != null && m.beat(best, par);
         return `<i class="${hit ? 'hit' : ''}" title="${m.name}: ${hit ? 'par beaten' : `par ${m.par(par)}`}">${m.k}</i>`;
       }).join('') + '</span>' : '';
+      void marks;
       const right = t.down
-        ? `${marks}<em class="down">DOWN · ${fmtTime(rec.bestTime)}</em>`
+        ? `<span class="ef-stars">${starGlyphs(t.id)}</span><em class="down">${fmtTime(rec.bestTime)}</em>`
         : (t === state.next ? '<em class="next">NEXT</em>'
           : (t.open ? '<em>OPEN</em>' : '<em class="locked">SEALED</em>'));
-      return `<button class="ef-row${t.open ? '' : ' locked'}" type="button" data-level="${t.id}">
-        <span class="ef-row-no">${String(t.no).padStart(2, '0')}</span>
+      const boss = isBoss(t.id);
+      return `${head}<button class="ef-row${t.open ? '' : ' locked'}${boss ? ' boss' : ''}" type="button" data-level="${t.id}">
+        <span class="ef-row-no">${boss ? '\u2620' : String(t.no).padStart(2, '0')}</span>
         <span class="ef-row-name">${(LEVELS[t.id] || {}).target || t.title}</span>
         ${right}
       </button>`;
+    }).join('');
+  };
+
+  /** The doctrine tree: five branches, three ranks each, bought with stars. */
+  const paintDoctrine = () => {
+    const d = doctrine();
+    const pts = freePoints(progress);
+    const sub = root.querySelector('#ef-doct-sub');
+    if (sub) sub.textContent = pts > 0 ? `\u2605 ${pts} to spend` : 'Spend your stars';
+    root.querySelector('#ef-todoct')?.classList.toggle('glow', pts >= 2);
+    const head = root.querySelector('#ef-doct-pts');
+    if (!head) return;
+    head.innerHTML = `<b>\u2605 ${pts}</b><span>POINTS TO SPEND</span>`;
+    root.querySelector('#ef-doct-list').innerHTML = BRANCHES.map((b) => {
+      const have = d[b.id];
+      const nxt = b.ranks[have];
+      const can = nxt && pts >= nxt.cost;
+      return `<div class="ef-br">
+        <div class="ef-br-head"><i>${b.icon}</i><b>${b.name}</b>${have ? `<button type="button" class="ef-br-undo" data-undo="${b.id}">TAKE BACK</button>` : ''}</div>
+        <div class="ef-br-ranks">${b.ranks.map((r, k) => `<span class="ef-rk${k < have ? ' on' : ''}${k === have ? ' next' : ''}"><em>${r.line}</em><small>\u2605${r.cost}</small></span>`).join('')}</div>
+        ${nxt ? `<button type="button" class="ef-br-buy${can ? '' : ' poor'}" data-buy="${b.id}">${can ? `BUY \u00b7 \u2605${nxt.cost}` : `NEED \u2605${nxt.cost}`}</button>` : '<span class="ef-br-max">FULL</span>'}
+      </div>`;
     }).join('');
   };
 
@@ -825,6 +908,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   paintMini();
   paintList();
   paintRecords();
+  paintDoctrine();
   const opening = state.list.find((t) => t.id === current) || state.next || state.list[0];
   if (opening) select(opening.id, { move: false });
   paintFoot();
@@ -984,8 +1068,16 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     // ── The shell's own controls.
     hero.addEventListener('click', () => setView('dossier'));
     root.querySelector('#ef-tomap').addEventListener('click', () => setView('map'));
-    root.querySelector('#ef-torecords').addEventListener('click', () => setView('records'));
-    root.querySelector('#ef-boot').addEventListener('click', () => finish('tutorial'));
+    root.querySelector('#ef-torecords')?.addEventListener('click', () => setView('records'));
+    root.querySelector('#ef-todoct').addEventListener('click', () => setView('doctrine'));
+    root.querySelector('#ef-doct-list').addEventListener('click', (e) => {
+      const buy = e.target.closest('[data-buy]');
+      const undo = e.target.closest('[data-undo]');
+      if (buy && buyRank(buy.dataset.buy, progress)) feedback.emit('select');
+      if (undo) refund(undo.dataset.undo);
+      if (buy || undo) paintDoctrine();
+    });
+    root.querySelector('#ef-boot')?.addEventListener('click', () => finish('tutorial'));
     root.querySelector('#ef-gear').addEventListener('click', () => setView('records'));
     root.querySelector('#ef-music').addEventListener('click', (e) => {
       const on = !menuMusic.enabled;
@@ -998,6 +1090,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     });
     goBtn.addEventListener('click', () => {
       if (viewName === 'records') { if (home && startView === 'records') finish(HOME); else setView('door'); return; }
+      if (viewName === 'doctrine') { setView('door'); return; }
       if (!selected) { setView('map'); return; }
       if (!selected.open) { setView('map'); return; }
       finish(selected.id);

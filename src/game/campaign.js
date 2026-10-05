@@ -1,6 +1,7 @@
 import { atlasContracts } from './atlas.js';
 import { LEVELS, LEVEL_ORDER } from './levels.js';
 import { loadProgress, getChallenge } from '../ui/levelselect.js';
+import { CAMPAIGN_ORDER, releaseOf, releaseLine, operationsState, recordStars, challengeOf, operationOf, isBoss } from './operations.js';
 
 /**
  * The campaign.
@@ -580,6 +581,20 @@ export const THEATRES = [
   },
 ];
 // The catalogue's contracts, numbered on from the last hand-made one.
+// The campaign order is the operations' (see operations.js): the hand-made
+// contracts sorted into it and numbered again, and what each releases taken
+// from the operation, so a weapon arrives with the battle that introduces it
+// and the big ones on the bosses.
+{
+  const hand = THEATRES.splice(0, THEATRES.length);
+  hand.sort((a, b) => CAMPAIGN_ORDER.indexOf(a.id) - CAMPAIGN_ORDER.indexOf(b.id));
+  hand.forEach((t, k) => {
+    t.no = k + 1;
+    t.unlocks = releaseOf(t.id);
+    t.unlockLine = releaseLine(t.id) || '';
+  });
+  THEATRES.push(...hand);
+}
 THEATRES.push(...atlasContracts(THEATRES.length + 1));
 
 /** The contract for a level id, if that level is one. */
@@ -598,24 +613,17 @@ export function theatreOf(id) {
 export function objectivesFor(id) {
   const lv = LEVELS[id];
   if (!lv) return [];
+  const c = challengeOf(id, lv);
   return [
     {
       key: 'primary',
-      label: lv.victory === 'Eiffel-down' ? 'Bring the tower down'
-        : lv.traits && lv.traits.topples === false ? 'Break the structure'
-          : 'Bring it down',
+      label: isBoss(id) ? 'Bring it down and dig out the warlord'
+        : lv.traits && lv.traits.topples === false ? 'Break the structure' : 'Bring it down',
+      star: 0,
       test: (s, won) => !!won,
     },
-    {
-      key: 'quick',
-      label: 'Finish inside eight minutes',
-      test: (s) => s && s.time > 0 && s.time <= 480,
-    },
-    {
-      key: 'clean',
-      label: 'Finish without losing a gun',
-      test: (s) => s && s.unitsLost === 0,
-    },
+    { key: 'par', label: 'Beat two of the four par marks', star: 1, test: () => false },
+    { key: 'challenge', label: c.label.charAt(0) + c.label.slice(1).toLowerCase(), star: 2, test: (s) => !!s && c.test(s) },
   ];
 }
 
@@ -666,13 +674,22 @@ export function campaignState() {
       open: false,
     };
   });
+  // The operations decide what is open in the campaign (see operations.js);
+  // the side operations open seven at a time as the bosses fall.
+  const ops = operationsState(prog, free);
+  const openIds = new Set();
+  for (const o of ops.ops) for (const b of o.battles) if (b.open) openIds.add(b.id);
+  let side = 0;
   for (const t of list) {
-    if (t.down) { t.open = true; continue; }
-    if (free) { t.open = true; continue; }
-    if (!openedNext) { t.open = true; openedNext = true; }
+    if (t.down || free) { t.open = true; continue; }
+    if (operationOf(t.id)) { t.open = openIds.has(t.id); continue; }
+    if (side < ops.sideOpen) { t.open = true; side++; }
   }
+  void openedNext;
   const done = list.filter((t) => t.down).length;
-  return { list, done, total: list.length, free, next: list.find((t) => !t.down) || null };
+  const nextId = ops.next?.battle?.id;
+  return { list, done, total: list.length, free, ops,
+    next: (nextId && list.find((t) => t.id === nextId)) || list.find((t) => t.open && !t.down) || null };
 }
 
 /** The contracts closed before this one, which is what decides the arsenal. */
@@ -755,9 +772,10 @@ export function markBurnSeen(iso) {
  * next has met both, which is the only reading that makes coming back worth
  * anything.
  */
-export function recordTheatre(id, won, summary) {
+export function recordTheatre(id, won, summary, marks = null) {
   const t = theatreOf(id);
   if (!t) return null;
+  const stars = recordStars(id, won, summary, LEVELS[id], marks);
   const v = read();
   v.met = v.met || {};
   const met = v.met[id] || {};
@@ -767,9 +785,11 @@ export function recordTheatre(id, won, summary) {
     // left the building standing is not a fast run, it is a failed one.
     if (won && o.test(summary, won)) met[o.key] = true;
   }
+  if (stars.have[1]) met.par = true;
+  if (stars.have[2]) met.challenge = true;
   v.met[id] = met;
   write(v);
-  return met;
+  return { met, stars };
 }
 
 /** What closing this contract has just released, for the after-action card. */
