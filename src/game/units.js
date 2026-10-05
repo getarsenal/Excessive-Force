@@ -311,12 +311,15 @@ export const UNITS = [
       kind: 'ghostrider', orbit: true, speed: 110, runIn: 2000,
       station: 75, radius: 450, height: 300,
       shells: 30, every: 2.4, spread: 1.8, muzzle: 500,
+      // The GAU-23 forward of the 105, on the garrison round the mark: a
+      // short burst on the man nearest it every couple of seconds.
+      gun: { every: 2.2, burst: 8, reach: 55, radius: 2.6, power: 2600 },
     },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'bomb', speed: 500, gravity: 9.81, drag: 0, trail: 0.6 },
     warhead: { lethal: 6, radius: 9, power: 9000, fx: 1.8, kinetic: 0.7 },
     dispersion: 0,
-    blurb: 'Circles high over the target for seventy-five seconds, 105 mm down its port side in direct fire. Follows your target.',
+    blurb: 'Circles high over the target for seventy-five seconds, 105 mm down its port side in direct fire and the 30 mm on the garrison round it. Follows your target.',
   },
   {
     id: 'tomahawk', name: 'TOMAHAWK', full: 'BGM-109 Tomahawk · 450 kg unitary', tier: 'SEA',

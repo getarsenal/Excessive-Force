@@ -34,6 +34,35 @@ export const FLEET_KINDS = [
   { kind: 'chinook', name: 'CH-47F', full: 'Chinook · the sling lift' },
 ];
 
+/**
+ * What each airframe shoots on the range. The Apache's chin gun is a turret
+ * (`turret`), laid by the same law the sortie lays it by. Every other gun is
+ * fixed in the airframe, so the aircraft is swung on its stand to lay it, the
+ * way a real one is jacked and turned to harmonise its gun on a butt. `at` and
+ * `dir` are the muzzle in the airframe's own frame (`port` reads it from the
+ * airframe's `userData.gunPort`); `side` turns the aircraft so the guns out of
+ * its port side face down the lane, `lane` and `scale` move the boards and
+ * make them vehicle-sized for a gunship, and `cam`/`look` frame the range. A gun too fast to hear round by round (`tone`) is heard as the note
+ * its rate makes, which is what a GAU-8 or an M61 sounds like. Only the M230
+ * throws its brass overboard: the GAU-8 and the M61 keep theirs, and the
+ * gunship's fall inside it.
+ */
+const GUNS = {
+  apache: { guns: [
+    { name: 'M230 · 30 MM', key: '30 MM', turret: true, rpm: 625, rounds: 1200, look: 'chaingun', spread: 0.006, hole: 0.05, brass: true, crack: 900 },
+  ] },
+  warthog: { cam: [5.5, 13, -26], look: [-1.5, 0.5, 22], guns: [
+    { name: 'GAU-8 · 30 MM', key: '30 MM', at: [0.2, -0.36, 8.8], rpm: 3900, rounds: 1174, look: 'gau8', spread: 0.0045, hole: 0.05, tone: 65 },
+  ] },
+  eagle: { guns: [
+    { name: 'M61 · 20 MM', key: '20 MM', port: true, rpm: 6000, rounds: 510, look: 'gau8', spread: 0.006, hole: 0.035, tone: 100 },
+  ] },
+  ghostrider: { side: true, lane: -12, scale: 1.6, cam: [-9, 19, -30], look: [1, 1.5, 40], guns: [
+    { name: 'GAU-23 · 30 MM', key: '30 MM', at: [3.8, -0.55, 6.2], dir: [1, 0, 0], rpm: 200, rounds: 500, look: 'chaingun', spread: 0.003, hole: 0.05, crack: 520 },
+    { name: 'M102 · 105 MM', key: '105', at: [4.85, -0.45, -5.6], dir: [1, 0, 0], rpm: 10, rounds: 100, look: 'at', spread: 0.002, shell: true },
+  ] },
+};
+
 function build(kind) {
   if (kind === 'hercules') return makeHercules();
   if (kind === 'chinook') return makeChinook();
@@ -101,6 +130,7 @@ export function hangarStage(host, { prog } = {}) {
       <div class="hg-hint">DRAG TO TURN · PINCH TO ZOOM</div>
       <div class="hg-ammo" hidden><b>1200</b><i>ROUNDS</i><u>0 HITS</u></div>
       <button class="hg-fire" type="button" hidden aria-label="Fire the gun">FIRE</button>
+      <button class="hg-wpn" type="button" hidden aria-label="Change gun"></button>
     </div>
     <div class="hg-chips" role="tablist">${FLEET_KINDS.map((f) => `<button class="hg-chip" type="button" role="tab" data-kind="${f.kind}">${f.name}</button>`).join('')}</div>
     <div class="hg-k">NOSE ART ON THIS AIRFRAME</div>
@@ -193,7 +223,7 @@ export function hangarStage(host, { prog } = {}) {
     b.position.set(x, 0, z);
     b.lookAt(0, 0, 0);
     range.add(b);
-    boards.push({ g: b, face, wob: 0, holes: [] });
+    boards.push({ g: b, face, wob: 0, holes: [], down: 0, ang: 0, q0: b.quaternion.clone() });
   }
   const bagMat = new THREE.MeshStandardMaterial({ color: 0x8a7a58, roughness: 1 });
   for (let i = 0; i < 26; i++) {
@@ -205,6 +235,7 @@ export function hangarStage(host, { prog } = {}) {
     }
   }
   const shootables = [...boards.map((b) => b.face), apron];
+  const _qx = new THREE.Quaternion(), _xAxis = new THREE.Vector3(1, 0, 0);
 
   // Brass and links: thrown out of the gun, bouncing on the concrete and
   // staying there in a growing pile.
@@ -220,9 +251,26 @@ export function hangarStage(host, { prog } = {}) {
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 400);
   const tracers = new TracerFX(scene, { name: 'high' });
   tracers.setCamera(camera);
-  const pivot = new THREE.Group(); scene.add(pivot);
+  // The stand: `tilt` pitches the aircraft on it, `pivot` turns it; a
+  // fixed gun is laid by both.
+  const tilt = new THREE.Group(); scene.add(tilt);
+  const pivot = new THREE.Group(); tilt.add(pivot);
+  pivot.rotation.order = 'YXZ';
   const fireBtn = host.querySelector('.hg-fire'), ammoEl = host.querySelector('.hg-ammo'), hintEl = host.querySelector('.hg-hint');
-  const live = { aim: null, firing: false, next: 0, rounds: 1200, hits: 0, range: false, rk: 0, shake: 0, reload: 0 };
+  const wpnBtn = host.querySelector('.hg-wpn');
+  const live = { aim: null, firing: false, hits: 0, range: false, rk: 0, shake: 0, gi: 0 };
+  // The guns of the aircraft on the stand, each with its own belt.
+  let arms = null, kit = null, baseYaw = 0;
+  const later = [];
+  const muzzleFor = (m, d) => {
+    if (d.turret) return m.userData.gun?.userData.muzzle || null;
+    const o = new THREE.Object3D();
+    const at = d.port ? m.userData.gunPort : null;
+    if (at) o.position.set(at.x, at.y, at.z); else o.position.fromArray(d.at);
+    o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), new THREE.Vector3().fromArray(d.dir || [0, 0, 1]));
+    m.add(o);
+    return o;
+  };
   let model = null, radius = 10;
   const cam = { yaw: 0.65, pitch: 0.28, dist: 1.0, spin: true };
 
@@ -236,6 +284,8 @@ export function hangarStage(host, { prog } = {}) {
 
   const show = (k) => {
     kind = k;
+    stopFire();
+    pivot.rotation.set(0, 0, 0); tilt.rotation.set(0, 0, 0);
     if (model) { pivot.remove(model); model.traverse((m) => { if (m.isMesh) { m.geometry?.dispose?.(); } }); }
     model = build(k);
     model.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = false; } });
@@ -257,11 +307,21 @@ export function hangarStage(host, { prog } = {}) {
     nameEl.textContent = f.name; fullEl.textContent = f.full;
     host.querySelectorAll('.hg-chip').forEach((b) => { b.classList.toggle('on', b.dataset.kind === k); b.setAttribute('aria-selected', b.dataset.kind === k ? 'true' : 'false'); });
     cam.dist = 1.0;
-    const gun = model.userData.gun;
-    fireBtn.hidden = !gun; ammoEl.hidden = !gun;
-    hintEl.textContent = gun ? 'TAP A TARGET · HOLD FIRE' : 'DRAG TO TURN · PINCH TO ZOOM';
-    live.aim = gun ? boards[1].face.getWorldPosition(new THREE.Vector3()) : null;
-    live.firing = false; live.range = false;
+    kit = GUNS[k] || null;
+    arms = kit ? kit.guns.map((d) => ({ d, rounds: d.rounds, reload: 0, next: 0, muzzle: muzzleFor(model, d) })).filter((a) => a.muzzle) : null;
+    if (arms && !arms.length) arms = null;
+    live.gi = 0;
+    baseYaw = kit?.side ? -Math.PI / 2 : 0;
+    pivot.rotation.y = baseYaw;
+    range.position.z = kit?.lane || 0;
+    range.scale.setScalar(kit?.scale || 1);
+    range.updateMatrixWorld(true);
+    fireBtn.hidden = !arms; ammoEl.hidden = !arms; wpnBtn.hidden = !arms || arms.length < 2;
+    hintEl.textContent = arms ? 'TAP A TARGET · HOLD FIRE' : 'DRAG TO TURN · PINCH TO ZOOM';
+    live.aim = arms ? boards[1].face.getWorldPosition(new THREE.Vector3()) : null;
+    live.range = false;
+    if (arms?.some((a) => a.d.shell)) loadBoom();
+    updateAmmo();
   };
 
   const resize = () => {
@@ -278,8 +338,10 @@ export function hangarStage(host, { prog } = {}) {
     // looks down the lane, so the gun, the stream and the boards are all in
     // the one picture.
     if (live.rk > 0.001) {
-      camera.position.lerp(_rangeAt.set(radius * 0.5, radius * 0.9 + 1.5, -radius * 2.0), live.rk);
-      _look.lerp(_rangeLook.set(-1.5, 0.5, 22), live.rk);
+      if (kit?.cam) { _rangeAt.fromArray(kit.cam); _rangeLook.fromArray(kit.look); }
+      else { _rangeAt.set(radius * 0.5, radius * 0.9 + 1.5, -radius * 2.0); _rangeLook.set(-1.5, 0.5, 22); }
+      camera.position.lerp(_rangeAt, live.rk);
+      _look.lerp(_rangeLook, live.rk);
     }
     camera.lookAt(_look);
   };
@@ -293,7 +355,7 @@ export function hangarStage(host, { prog } = {}) {
   const onDown = (e) => { pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (pointers.size === 1) { drag = { x: e.clientX, y: e.clientY }; press = { x: e.clientX, y: e.clientY }; } cam.spin = false; try { canvas.setPointerCapture?.(e.pointerId); } catch { /* a synthetic press */ } };
   const ray = new THREE.Raycaster();
   const aimAtScreen = (x, y) => {
-    if (!model?.userData.gun) return;
+    if (!arms) return;
     const r = canvas.getBoundingClientRect();
     ray.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
     const hit = ray.intersectObjects(shootables, false)[0];
@@ -333,14 +395,26 @@ export function hangarStage(host, { prog } = {}) {
 
   const startFire = (e) => {
     e.preventDefault();
-    if (!model?.userData.gun) return;
+    if (!arms) return;
     try { fireBtn.setPointerCapture?.(e.pointerId); } catch { /* a synthetic press */ }
     live.firing = true;
+    const arm = arms[live.gi];
+    const now = performance.now();
+    if (arm.next < now) arm.next = now;
+    if (arm.d.tone && arm.reload <= 0) startTone(arm.d.tone);
     // Swing round behind the aircraft so the range is in the picture.
     if (!live.range) { live.range = true; cam.spin = false; }
     fireBtn.classList.add('on');
   };
-  const stopFire = () => { live.firing = false; fireBtn.classList.remove('on'); idleAt = performance.now() + 6000; };
+  function stopFire() { live.firing = false; fireBtn.classList.remove('on'); stopTone(); idleAt = performance.now() + 6000; }
+  wpnBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!arms || arms.length < 2) return;
+    stopFire();
+    live.gi = (live.gi + 1) % arms.length;
+    feedback.emit('select');
+    updateAmmo();
+  });
   fireBtn.addEventListener('pointerdown', startFire);
   fireBtn.addEventListener('pointerup', stopFire);
   fireBtn.addEventListener('pointercancel', stopFire);
@@ -361,9 +435,31 @@ export function hangarStage(host, { prog } = {}) {
   });
 
   const _local = new THREE.Vector3(), _from = new THREE.Vector3(), _dir = new THREE.Vector3(), _q = new THREE.Quaternion();
-  const updateAmmo = () => {
-    ammoEl.querySelector('b').textContent = live.reload > 0 ? 'WINCHESTER' : String(live.rounds);
+  function updateAmmo() {
+    const arm = arms?.[live.gi];
+    if (!arm) return;
+    ammoEl.querySelector('b').textContent = arm.reload > 0 ? 'WINCHESTER' : String(arm.rounds);
+    ammoEl.classList.toggle('dry', arm.reload > 0);
+    ammoEl.querySelector('i').textContent = arm.d.name;
     ammoEl.querySelector('u').textContent = `${live.hits} HIT${live.hits === 1 ? '' : 'S'}`;
+    if (arms.length > 1) wpnBtn.textContent = arms[(live.gi + 1) % arms.length].d.key;
+  }
+  // A fixed gun: the aircraft turns and pitches on its stand until the
+  // muzzle's line is on the point, half a radian either way and a tenth up
+  // or down, which is as far as a stand goes.
+  const _want = new THREE.Vector3();
+  const swing = (arm, at, dt) => {
+    tilt.updateMatrixWorld(true);
+    arm.muzzle.getWorldPosition(_from);
+    arm.muzzle.getWorldQuaternion(_q);
+    _dir.set(0, 0, 1).applyQuaternion(_q);
+    _want.copy(at).sub(_from);
+    let dy = Math.atan2(_want.x, _want.z) - Math.atan2(_dir.x, _dir.z);
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    const dp = Math.atan2(_want.y, Math.hypot(_want.x, _want.z)) - Math.atan2(_dir.y, Math.hypot(_dir.x, _dir.z));
+    const k = Math.min(1, dt * 2.2);
+    pivot.rotation.y = THREE.MathUtils.clamp(pivot.rotation.y + dy * k, baseYaw - 0.5, baseYaw + 0.5);
+    tilt.rotation.x = THREE.MathUtils.clamp(tilt.rotation.x - dp * k, -0.1, 0.1);
   };
   // The same law the sortie lays its gun by (AirWing._layGun): turret on
   // its ring, barrel in its cradle, inside the M230's arcs.
@@ -377,27 +473,44 @@ export function hangarStage(host, { prog } = {}) {
     gun.rotation.y += (yaw - gun.rotation.y) * k;
     gun.userData.pitch.rotation.x += (pitch - gun.userData.pitch.rotation.x) * k;
   };
-  const fireRound = (gun) => {
-    if (live.rounds <= 0) return;
-    live.rounds--;
-    model.updateMatrixWorld(true);
-    const muzzle = gun.userData.muzzle;
-    muzzle.getWorldPosition(_from);
-    muzzle.getWorldQuaternion(_q);
+  const fireRound = (arm) => {
+    if (arm.rounds <= 0) return;
+    const d = arm.d;
+    arm.rounds--;
+    tilt.updateMatrixWorld(true);
+    arm.muzzle.getWorldPosition(_from);
+    arm.muzzle.getWorldQuaternion(_q);
     _dir.set(0, 0, 1).applyQuaternion(_q);
-    // The M230's spread: a few milliradians, more as the barrel heats.
-    _dir.x += (Math.random() - 0.5) * 0.012; _dir.y += (Math.random() - 0.5) * 0.012; _dir.z += (Math.random() - 0.5) * 0.012;
+    // The gun's spread: a few milliradians, the round's own scatter on top.
+    _dir.x += (Math.random() - 0.5) * d.spread * 2; _dir.y += (Math.random() - 0.5) * d.spread * 2; _dir.z += (Math.random() - 0.5) * d.spread * 2;
     _dir.normalize();
     ray.set(_from, _dir); ray.far = 260;
     const hit = ray.intersectObjects(shootables, false)[0];
     const to = hit ? hit.point.clone() : _from.clone().addScaledVector(_dir, 260);
-    tracers.fire(_from.clone(), to, { look: 'chaingun' }, !!hit);
-    if (hit) {
+    tracers.fire(_from.clone(), to, { look: d.look }, !!hit);
+    if (d.shell) {
+      // The 105: a shell, not a bullet. It lands when it gets there, blows
+      // over every board within a few metres and shakes the camera.
+      const at = to.clone();
+      later.push({ t: _from.distanceTo(at) / 210, fn: () => {
+        tracers.impact(at, 0xffc070, 22, 2.6, true);
+        tracers.impact(at, 0x9c8f7c, 16, 1.8, true);
+        let down = 0;
+        for (const b of boards) {
+          if (b.face.getWorldPosition(_local).distanceTo(at) < 6) { b.down = 3.5; down++; }
+        }
+        if (down) live.hits += down;
+        live.shake = 1;
+        boom(0.9);
+        updateAmmo();
+      } });
+    } else if (hit) {
       const board = boards.find((b) => b.face === hit.object);
-      if (board) {
+      if (board && board.ang < 0.3) {
         live.hits++;
         board.wob = 1;
         const hole = new THREE.Mesh(holeGeo, holeMat);
+        hole.scale.setScalar((d.hole || 0.045) / 0.045);
         const p = board.face.worldToLocal(hit.point.clone());
         hole.position.set(p.x, p.y, 0.045);
         board.face.add(hole);
@@ -405,17 +518,23 @@ export function hangarStage(host, { prog } = {}) {
         if (board.holes.length > 90) { const o = board.holes.shift(); board.face.remove(o); }
       }
     }
-    // Brass out of the side of the gun.
-    const c = cases[caseNext] || (cases[caseNext] = { p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Euler(), w: 0, rest: false });
-    gun.getWorldPosition(c.p); c.p.y -= 0.2;
-    c.v.set((Math.random() - 0.5) * 2.4, -0.5 - Math.random(), (Math.random() - 0.5) * 1.2);
-    c.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); c.w = 12 + Math.random() * 10; c.rest = false;
-    caseNext = (caseNext + 1) % BRASS;
-    brass.count = Math.max(brass.count, cases.length);
-    live.shake = Math.min(1, live.shake + 0.18);
-    shot();
-    if (live.rounds <= 0) { live.reload = 2.2; live.firing = false; fireBtn.classList.remove('on'); }
-    updateAmmo();
+    if (d.brass) {
+      // Brass out of the side of the gun.
+      const c = cases[caseNext] || (cases[caseNext] = { p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Euler(), w: 0, rest: false });
+      model.userData.gun.getWorldPosition(c.p); c.p.y -= 0.2;
+      c.v.set((Math.random() - 0.5) * 2.4, -0.5 - Math.random(), (Math.random() - 0.5) * 1.2);
+      c.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6); c.w = 12 + Math.random() * 10; c.rest = false;
+      caseNext = (caseNext + 1) % BRASS;
+      brass.count = Math.max(brass.count, cases.length);
+    }
+    live.shake = Math.min(1, live.shake + (d.shell ? 0.5 : d.tone ? 0.04 : 0.18));
+    if (d.shell) boom(0.6);
+    else if (!d.tone) shot(d.crack || 900);
+    if (arm.rounds <= 0) {
+      arm.reload = 2.2;
+      stopTone();
+      if (arms[live.gi] === arm) { live.firing = false; fireBtn.classList.remove('on'); }
+    }
   };
   const _m4 = new THREE.Matrix4(), _qq = new THREE.Quaternion(), _one = new THREE.Vector3(1, 1, 1);
   const stepBrass = (dt) => {
@@ -439,7 +558,7 @@ export function hangarStage(host, { prog } = {}) {
   };
   // A round: a crack of noise over a short low thump, the gun's own.
   let actx = null;
-  const shot = () => {
+  const shot = (crack = 900) => {
     if (!menuMusic.enabled) return;
     try {
       actx = actx || new (window.AudioContext || window.webkitAudioContext)();
@@ -449,7 +568,7 @@ export function hangarStage(host, { prog } = {}) {
       const d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
       const n = actx.createBufferSource(); n.buffer = buf;
-      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + Math.random() * 300; bp.Q.value = 0.8;
+      const bp = actx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = crack + Math.random() * crack * 0.33; bp.Q.value = 0.8;
       const g = actx.createGain(); g.gain.value = 0.32;
       n.connect(bp).connect(g).connect(actx.destination);
       n.start(t);
@@ -460,6 +579,57 @@ export function hangarStage(host, { prog } = {}) {
     } catch { /* no audio */ }
   };
 
+  // A gun too fast to hear round by round is heard as the note of its
+  // rate: a saw at sixty-five cycles is a GAU-8, at a hundred an M61.
+  let tone = null;
+  function startTone(hz) {
+    if (!menuMusic.enabled || tone) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const t = actx.currentTime;
+      const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = hz;
+      const o2 = actx.createOscillator(); o2.type = 'square'; o2.frequency.value = hz * 0.5;
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500; lp.Q.value = 0.7;
+      const g2 = actx.createGain(); g2.gain.value = 0.35;
+      const g = actx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.28, t + 0.05);
+      o.connect(lp); o2.connect(g2).connect(lp); lp.connect(g).connect(actx.destination);
+      o.start(t); o2.start(t);
+      tone = { o, o2, g };
+    } catch { tone = null; }
+  }
+  function stopTone() {
+    if (!tone) return;
+    try {
+      const t = actx.currentTime;
+      tone.g.gain.cancelScheduledValues(t);
+      tone.g.gain.setValueAtTime(Math.max(0.0001, tone.g.gain.value), t);
+      tone.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      tone.o.stop(t + 0.15); tone.o2.stop(t + 0.15);
+    } catch { /* already stopped */ }
+    tone = null;
+  }
+  // The 105 is the game's own cannon recording, fetched when the gunship is
+  // first put on the stand.
+  let boomBuf = null, boomLoading = false;
+  function loadBoom() {
+    if (boomLoading) return;
+    boomLoading = true;
+    fetch('assets/cannon.mp3').then((r) => r.arrayBuffer()).then((b) => {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      return actx.decodeAudioData(b);
+    }).then((b) => { boomBuf = b; }).catch(() => { /* the synthetic one will do */ });
+  }
+  function boom(gain) {
+    if (!menuMusic.enabled) return;
+    try {
+      if (!boomBuf) { shot(160); return; }
+      const n = actx.createBufferSource(); n.buffer = boomBuf;
+      n.playbackRate.value = 0.85 + Math.random() * 0.1;
+      const g = actx.createGain(); g.gain.value = gain;
+      n.connect(g).connect(actx.destination); n.start();
+    } catch { /* no audio */ }
+  }
+
   let raf = 0, last = performance.now();
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
@@ -468,10 +638,29 @@ export function hangarStage(host, { prog } = {}) {
     if (cam.spin) cam.yaw += dt * 0.22;
     // On the range: glide round to just behind the aircraft's shoulder.
     live.rk += ((live.range ? 1 : 0) - live.rk) * Math.min(1, dt * 2.5);
-    const gun = model?.userData.gun;
-    if (gun && live.aim) layGun(model, gun, live.aim, dt);
-    if (gun && live.firing && now >= live.next && live.reload <= 0) { live.next = now + 100; fireRound(gun); }
-    if (live.reload > 0 && (live.reload -= dt) <= 0) { live.rounds = 1200; updateAmmo(); }
+    const arm = arms?.[live.gi];
+    if (arm && live.aim) {
+      if (arm.d.turret) layGun(model, model.userData.gun, live.aim, dt);
+      else swing(arm, live.aim, dt);
+    }
+    if (arm && live.firing && arm.reload <= 0) {
+      // As many rounds as the gun's rate owes by now, a frame's worth at a
+      // time; a stall does not bank them.
+      const iv = 60000 / arm.d.rpm;
+      if (arm.next < now - 250) arm.next = now;
+      for (let n = 0; n < 14 && now >= arm.next && arm.rounds > 0; n++) { arm.next += iv; fireRound(arm); }
+      updateAmmo();
+    }
+    if (arms) for (const a of arms) if (a.reload > 0 && (a.reload -= dt) <= 0) { a.rounds = a.d.rounds; updateAmmo(); }
+    for (let i = later.length - 1; i >= 0; i--) if ((later[i].t -= dt) <= 0) { const f = later[i].fn; later.splice(i, 1); f(); }
+    for (const b of boards) {
+      // A board blown over lies there a few seconds, then the range crew
+      // stands it back up.
+      if (b.down > 0) b.down -= dt;
+      const want = b.down > 0 ? 1.45 : 0;
+      b.ang += (want - b.ang) * Math.min(1, dt * (want ? 9 : 2.5));
+      b.g.quaternion.copy(b.q0).multiply(_qx.setFromAxisAngle(_xAxis, -b.ang));
+    }
     stepBrass(dt);
     for (const b of boards) { if (b.wob > 0) { b.wob = Math.max(0, b.wob - dt * 3); b.face.rotation.x = Math.sin(now * 0.05) * b.wob * 0.05; } }
     tracers.update(dt);
@@ -491,6 +680,7 @@ export function hangarStage(host, { prog } = {}) {
     destroy() {
       cancelAnimationFrame(raf);
       live.firing = false;
+      stopTone();
       try { actx?.close(); } catch { /* already closed */ }
       tracers.clear?.();
       ro?.disconnect();

@@ -688,7 +688,14 @@
   color: #fff3e8; font: 700 13px/1 var(--f-ui, sans-serif); letter-spacing: 0.16em; box-shadow: 0 2px 10px rgba(0,0,0,0.5);
 }
 .hg-fire.on { transform: scale(0.94); background: radial-gradient(circle at 50% 40%, #ff7a3c, #c7432c 70%); border-color: #ffd2a8; }
-.hg-fire[hidden], .hg-ammo[hidden] { display: none; }
+.hg-fire[hidden], .hg-ammo[hidden], .hg-wpn[hidden] { display: none; }
+/* The other gun, for an airframe with two: names the one it changes to. */
+.hg-wpn {
+  position: absolute; left: 12px; bottom: 86px; min-width: 64px; min-height: 44px; padding: 0 10px; cursor: pointer;
+  background: rgba(16, 20, 26, 0.82); border: 1px solid rgba(255, 214, 190, 0.45); border-radius: 22px;
+  color: #fff3e8; font: 700 12px/1 var(--f-ui, sans-serif); letter-spacing: 0.14em; touch-action: manipulation;
+}
+.hg-wpn::before { content: '\21C4  '; color: var(--o); }
 .hg-ammo { position: absolute; right: 12px; top: 10px; text-align: right; pointer-events: none; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .hg-ammo b { display: block; font: 700 22px/1 var(--f-data, monospace); color: var(--ink); letter-spacing: 0.06em; }
 .hg-ammo i, .hg-ammo u { display: block; margin-top: 3px; font: 500 10px/1 var(--f-data, monospace); letter-spacing: 0.14em; color: var(--mute); font-style: normal; text-decoration: none; }

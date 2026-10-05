@@ -1933,8 +1933,9 @@ export function makeTomahawk() {
  *
  * The AC-130 flies a banked left-hand orbit high over the target with its
  * guns on the inside of the turn, which is the only way a gunship can shoot,
- * and puts 105 mm shells down its port side straight at the mark. Its orbit
- * follows the target when it changes.
+ * and puts 105 mm shells down its port side straight at the mark, with the
+ * 30 mm on the defenders round it. Its orbit follows the target when it
+ * changes.
  *
  * Both are in the garrison's airspace the whole time and can be shot down.
  */
@@ -1969,7 +1970,7 @@ AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts 
     s.alt = alt;
     s.loiter = {
       phase: 'inbound', orbit: true, centre: target.clone(), theta, entry, tangent,
-      eta: a.runIn / a.speed, time: 0, shells: a.shells, nextShell: 1.0,
+      eta: a.runIn / a.speed, time: 0, shells: a.shells, nextShell: 1.0, nextGun: 2.0,
     };
   } else {
     s.slot = this.sorties.filter((o) => o.loiter && !o.loiter.orbit && !o.done
@@ -2201,6 +2202,19 @@ AirWing.prototype._updateOrbit = function _updateOrbit(s, dt) {
       L.nextShell = a.every;
       L.shells--;
       this._gunshipShell(s);
+    }
+    // The 30 mm, forward of the 105 on the same side: bursts on whoever is
+    // nearest the mark, so the men round the building have the whole orbit
+    // to keep their heads down in.
+    L.nextGun -= dt;
+    if (a.gun && L.nextGun <= 0 && this.gunner) {
+      L.nextGun = a.gun.every * (0.85 + Math.random() * 0.3);
+      const to = this.gunner.pick(s.target, a.gun.reach);
+      if (to) {
+        const from = new THREE.Vector3(3.77, -0.55, 6.2).applyEuler(m.rotation).add(m.position);
+        s.kills += this.gunner.fire(from, to.clone(), a.gun) || 0;
+        if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(to).sub(from).normalize(), 0.7);
+      }
     }
     if (L.time > a.station || L.shells <= 0) {
       L.phase = 'egress';

@@ -184,10 +184,14 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/ui/hangar.js` is the HANGAR sheet off the title: the fleet on the
   apron, turnable, and the nose art each type wears (`tt.noseart`), which
   `decorate(model, kind)` then paints on every sortie;
-  `node tools/hangarprobe.mjs` drives it on a phone. An airframe with
-  `userData.gun` gets the live-fire range (three boards down the lane, a
-  FIRE button, tap to lay the gun by the sortie's own arcs);
-  `node tools/rangeprobe.mjs` holds the trigger and reads the count. Nose art is painted,
+  `node tools/hangarprobe.mjs` drives it on a phone. An airframe in the
+  hangar's `GUNS` table gets the live-fire range: three boards down the
+  lane, a FIRE button, tap a board to lay the gun (the Apache's turret by
+  the sortie's own arcs; a fixed gun by swinging the aircraft on its
+  stand), each gun at its real rate and belt — M230, GAU-8, the F-15E's
+  M61 out of `userData.gunPort`, the gunship's 30 mm and 105 with a switch.
+  `KIND=<kind> WPN=1 node tools/rangeprobe.mjs` holds the trigger and reads
+  the count. Nose art is painted,
   not stuck on: `paintNoseArt` projects it onto the fuselage with three's
   `DecalGeometry`, from the cut-out (`<id>-cut.webp`, the poster's dark
   ground removed by `python3 tools/noseart_cut.py SRC OUT --check SHEET`);

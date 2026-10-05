@@ -198,6 +198,17 @@ export function makeEagle({ store } = {}) {
       { z: -4.8, w: 0.34, h: 0.42, n: 3.0 },
     ], 10), upper, s * 1.62, 0.30, 0));
   }
+  // The M61's port, in the starboard wing root over the intake: a dark
+  // slot faired into the shoulder, the barrels' muzzles just inside it.
+  // `userData.gunPort` is where the rounds come out, along the nose.
+  g.add(part(loft([
+    { z: 2.20, w: 0.24, h: 0.20, n: 2.4 },
+    { z: 1.90, w: 0.32, h: 0.26, n: 2.4 },
+    { z: 0.60, w: 0.34, h: 0.26, n: 2.6 },
+    { z: 0.00, w: 0.12, h: 0.08, n: 2.4 },
+  ], 10), upper, -2.06, 0.56, 0));
+  g.add(part(new THREE.CylinderGeometry(0.075, 0.075, 0.04, 12).rotateX(Math.PI / 2), black, -2.06, 0.56, 2.2));
+  g.userData.gunPort = { x: -2.06, y: 0.56, z: 2.25 };
   // The speedbrake on the spine, a panel of its own.
   g.add(part(new THREE.BoxGeometry(1.1, 0.05, 2.9), lower, 0, 0.80, -2.1));
   // Gear doors: nose and the two mains, drawn as slightly proud panels.
