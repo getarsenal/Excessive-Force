@@ -4,6 +4,7 @@
   "description": "Bring down the world's landmarks, one stone at a time.",
   "start_url": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#0b0d10",
   "theme_color": "#0b0d10",
   "icons": [

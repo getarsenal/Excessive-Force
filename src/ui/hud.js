@@ -105,6 +105,9 @@ export class HUD {
       menuBtn: document.getElementById('dock-menu'),
       menu: document.getElementById('menu'),
     };
+    // The kill feed lives under the target card and the aircraft on station,
+    // in the one column, so it can only ever be below them (see style.css).
+    document.getElementById('hud-right')?.appendChild(this.el.feed);
 
     if (this.el.target && battle.level) this.el.target.textContent = battle.level.target;
 

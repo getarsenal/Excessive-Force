@@ -79,7 +79,7 @@
   position: relative; z-index: 2;
   height: 100%;
   max-width: 1320px; margin: 0 auto;
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 50px);
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 50px) max(16px, env(safe-area-inset-left, 0px));
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -662,3 +662,8 @@
 .tt-art-i.locked { background: rgba(255,255,255,0.04); }
 .tt-art-i.locked figcaption { color: var(--dim, #8a98a6); }
 .tt-art-q { height: 72px; display: flex; align-items: center; justify-content: center; font-size: 34px; color: rgba(255,255,255,0.18); }
+
+/* A finger: the tools are forty-four a side. */
+@media (pointer: coarse) {
+  .tt-tool { width: 44px; height: 44px; padding: 11px; }
+}

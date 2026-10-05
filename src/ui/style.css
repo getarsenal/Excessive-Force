@@ -24,6 +24,15 @@
   --warn: #e0a33c;
   --accent: #58a6ff;
   --ui-pad: 14px;
+  /* The side gutters, which on a phone held sideways have to clear the
+     notch and the rounded corners: the larger of the gutter and the
+     safe-area inset on that side. Everything anchored to an edge uses these
+     rather than the bare gutter. */
+  --pad-l: max(var(--ui-pad), env(safe-area-inset-left, 0px));
+  --pad-r: max(var(--ui-pad), env(safe-area-inset-right, 0px));
+  /* One dock button: 64 where the screen has the width for five of them, 
+     shrinking on a narrow phone so the row never runs off the sides. */
+  --dock-h: clamp(52px, 16vw, 64px);
   /* How far down the screen the top bar actually reaches, published by the
      HUD once it can measure itself. The fallback covers the frames before
      that and any browser without ResizeObserver; everything anchored to it
@@ -53,6 +62,7 @@ html, body {
   font-family: var(--f-ui); font-weight: 500;
   -webkit-user-select: none; user-select: none;
   overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 /* The box is the viewport by CSS, not by the drawing buffer. A canvas with
@@ -61,7 +71,7 @@ html, body {
    tenths of the screen and the rest was black. */
 #game-canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
 
-#ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; touch-action: manipulation; }
 #ui > * { pointer-events: auto; }
 
 /* ── Touch ripples ───────────────────────────────────────────────────────
@@ -119,7 +129,7 @@ html, body {
 /* ── Top bar ─────────────────────────────────────────────────────────── */
 #topbar {
   position: absolute; top: 0; left: 0; right: 0;
-  padding: max(8px, env(safe-area-inset-top)) var(--ui-pad) 10px;
+  padding: max(8px, env(safe-area-inset-top)) var(--pad-r) 10px var(--pad-l);
   display: grid;
   /* Fractional, not `auto`.
      With `auto` every column is as wide as whatever is in it, so the centre
@@ -149,7 +159,7 @@ html, body {
   /* Explicitly placed, so the four readouts auto-fill the row above it. */
   .tb-center { grid-column: 1 / -1; grid-row: 2; }
   .tb-value { font-size: clamp(14px, 4.4vw, 19px); }
-  .tb-label { font-size: 8px; letter-spacing: 0.16em; }
+  .tb-label { font-size: 9.5px; letter-spacing: 0.14em; }
 }
 
 .tb-block { min-width: 0; }
@@ -209,7 +219,7 @@ html, body {
    bring down. Kept to one compact row so it never competes with the bar. */
 .objectives {
   display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
-  font-size: 9px; letter-spacing: 0.09em; color: var(--dim);
+  font-size: 10.5px; letter-spacing: 0.09em; color: var(--dim);
 }
 .objectives .obj {
   display: inline-flex; gap: 4px; align-items: baseline;
@@ -239,8 +249,8 @@ html, body {
 #dock {
   position: absolute; left: 0; right: 0;
   bottom: max(8px, env(safe-area-inset-bottom));
-  display: flex; gap: 14px; justify-content: center; align-items: flex-end;
-  padding: 0 var(--ui-pad); z-index: 16; pointer-events: none;
+  display: flex; gap: clamp(6px, 2.2vw, 14px); justify-content: center; align-items: flex-end;
+  padding: 0 var(--pad-r) 0 var(--pad-l); z-index: 16; pointer-events: none;
 }
 /* The button is the badge.
    Each face is a rendered disc with its symbol and its word already on it, so
@@ -254,7 +264,7 @@ html, body {
    five pixels tall. */
 .dock-btn {
   pointer-events: auto;
-  width: 64px; height: 64px; flex: 0 0 auto;
+  width: var(--dock-h); height: var(--dock-h); flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   border-radius: 50%; cursor: pointer; padding: 0;
   background: none; border: 0; color: var(--dim);
@@ -290,7 +300,7 @@ html, body {
 .db-icon { align-items: center; justify-content: center; height: 22px; }
 .db-icon svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
 .db-icon img, .db-icon canvas { max-width: 30px; max-height: 22px; object-fit: contain; }
-.db-label { font-size: 7.5px; letter-spacing: 0.13em; line-height: 1; }
+.db-label { font-size: 8.5px; letter-spacing: 0.12em; line-height: 1; }
 /* A dot for a drawer with something waiting in it. */
 .dock-btn .db-dot {
   position: absolute; top: 7px; right: 9px; width: 6px; height: 6px;
@@ -301,7 +311,7 @@ html, body {
 /* ── The drawers ─────────────────────────────────────────────────────── */
 #drawers {
   position: absolute; left: 0; right: 0;
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 74px);
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 10px);
   z-index: 15; pointer-events: none;
 }
 .drawer {
@@ -317,7 +327,7 @@ html, body {
 .drawer.on { transform: translateY(0) scale(1); opacity: 1; }
 .drawer[hidden] { display: none; }
 .dr-title {
-  font-size: 8.5px; letter-spacing: 0.22em; color: var(--dim);
+  font-size: 9.5px; letter-spacing: 0.22em; color: var(--dim);
   text-align: center; margin-bottom: 6px;
 }
 #drawer-orders {
@@ -337,7 +347,7 @@ html, body {
 .dr-row { display: flex; gap: 5px; margin-top: 5px; }
 .dr-row button {
   flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 9.5px; letter-spacing: 0.13em;
+  font-family: inherit; font-size: 10.5px; letter-spacing: 0.13em;
   padding: 0; min-height: 34px; cursor: pointer;
 }
 .dr-row button:hover { border-color: var(--edge-bright); color: var(--text); }
@@ -346,8 +356,9 @@ html, body {
 .dr-row button.unaffordable { color: var(--danger); }
 
 .cardbar {
-  display: flex; gap: 6px; padding: 0 var(--ui-pad);
+  display: flex; gap: 6px; padding: 0 var(--pad-r) 0 var(--pad-l);
   overflow-x: auto; overflow-y: visible;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   justify-content: safe center;
   align-items: stretch;
@@ -393,7 +404,7 @@ html, body {
    named by the aircraft that flies them now: B-1 LANCER, F-15E GBU-28. The
    longest name in the roster fits at this size, so anything past seven
    takes it rather than an ellipsis. */
-.uc-name.long { font-size: 8.5px; letter-spacing: 0.03em; }
+.uc-name.long { font-size: 9.5px; letter-spacing: 0.02em; }
 .uc-cost { font-size: 11px; color: var(--money); font-variant-numeric: tabular-nums; }
 .uc-tier {
   position: absolute; top: 3px; left: 4px; font-size: 8px;
@@ -451,11 +462,11 @@ html, body {
 
 /* ── Your unit ───────────────────────────────────────────────────────── */
 #unit-card {
-  position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 118px);
+  position: absolute; left: var(--pad-l); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 118px);
   width: 190px; background: var(--panel); border: 1px solid var(--edge);
   padding: 9px 11px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); z-index: 12;
 }
-.uc2-title { font-size: 9px; letter-spacing: 0.2em; color: var(--accent); }
+.uc2-title { font-size: 10px; letter-spacing: 0.2em; color: var(--accent); }
 .uc2-name { font-size: 12px; font-weight: 600; margin: 2px 0 6px; }
 .uc2-hp { height: 5px; background: rgba(255, 255, 255, 0.08); margin-bottom: 6px; }
 .uc2-hp i { display: block; height: 100%; background: var(--money); }
@@ -466,7 +477,7 @@ html, body {
 .uc2-buttons { display: flex; gap: 4px; margin-top: 8px; }
 .uc2-buttons button {
   flex: 1; background: transparent; border: 1px solid var(--edge); color: var(--dim);
-  font-family: inherit; font-size: 10px; letter-spacing: 0.12em; padding: 0 2px; min-height: 30px; cursor: pointer;
+  font-family: inherit; font-size: 10.5px; letter-spacing: 0.12em; padding: 0 2px; min-height: 30px; cursor: pointer;
 }
 .uc2-buttons button:hover { border-color: var(--edge-bright); color: var(--text); }
 #uc2-sell:hover { border-color: var(--warn); color: var(--warn); }
@@ -498,7 +509,7 @@ html, body {
    the pause menu, so this is the only thing left up here — and in a dev build
    at that. */
 #test-btn {
-  position: absolute; left: var(--ui-pad); top: var(--hud-top); z-index: 20;
+  position: absolute; left: var(--pad-l); top: var(--hud-top); z-index: 20;
   /* Small to look at, big enough to hit. Thirty points was not: a thumb wants
      forty-four, and this one sits directly under the readouts with the kill
      feed writing across the line below it, so a miss lands on the map. */
@@ -509,17 +520,23 @@ html, body {
 }
 #test-btn:hover { border-color: var(--edge-bright); color: var(--text); opacity: 1; }
 #menu {
-  position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; z-index: 40; display: flex; align-items: flex-start; justify-content: center;
+  /* Scrolls when it is taller than the screen, which a phone on its side
+     is: centred with align-items the title and the quality row were off
+     both ends and nothing could reach them. The inner margin:auto still
+     centres it when it fits. */
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--pad-r) calc(env(safe-area-inset-bottom, 0px) + 14px) var(--pad-l);
   background: rgba(5, 7, 10, 0.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
 }
-.menu-inner { width: min(360px, 92vw); text-align: center; }
+.menu-inner { width: min(360px, 92vw); text-align: center; margin: auto; }
 .menu-title { font-size: 26px; letter-spacing: 0.3em; font-weight: 700; margin-bottom: 18px; }
-.menu-label { font-size: 9px; letter-spacing: 0.24em; color: var(--dim); margin: 16px 0 6px; }
+.menu-label { font-size: 10px; letter-spacing: 0.24em; color: var(--dim); margin: 16px 0 6px; }
 .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .menu-grid.quality { grid-template-columns: repeat(4, 1fr); }
 .menu-grid button {
   background: transparent; border: 1px solid var(--edge-bright); color: var(--text);
-  font-family: inherit; font-size: 10px; letter-spacing: 0.18em; padding: 10px 6px; cursor: pointer;
+  font-family: inherit; font-size: 11px; letter-spacing: 0.18em; padding: 10px 6px; min-height: 40px; cursor: pointer;
 }
 .menu-grid button:hover, .menu-grid button.on { background: rgba(88, 166, 255, 0.14); border-color: var(--accent); }
 .menu-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: 10px; color: var(--dim); text-align: left; }
@@ -539,9 +556,9 @@ html, body {
   /* The row under the rail, at the rail's left: never on its buttons, and
      never under the target card, which lives on the right. */
   /* On the rail row, level with the target card across from it. */
-  position: absolute; left: var(--ui-pad);
+  position: absolute; left: var(--pad-l);
   top: var(--hud-top);
-  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--dim); background: rgba(10, 13, 17, 0.45); padding: 3px 10px;
   pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 15;
   max-width: 56vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -613,7 +630,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
   padding: 9px 11px; backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
 }
 #hud-right {
-  position: absolute; right: var(--ui-pad); top: var(--hud-top); z-index: 19;
+  position: absolute; right: var(--pad-r); top: var(--hud-top); z-index: 19;
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
   pointer-events: none;
 }
@@ -670,7 +687,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
   display: flex; align-items: center; gap: 6px; width: 100%;
   /* Tighter than the other small caps in here, because the caret now takes a
      bite out of a 142px card and DESIGNATED TARGET wrapped onto two lines. */
-  font-family: inherit; font-size: 9px; letter-spacing: 0.13em; color: var(--danger);
+  font-family: inherit; font-size: 10px; letter-spacing: 0.12em; color: var(--danger);
   text-transform: uppercase; margin: 0 0 7px; padding: 2px 0;
   background: none; border: 0; cursor: pointer; text-align: left;
   min-height: 22px;                    /* a thumb can find it */
@@ -709,7 +726,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 #targets-btn { display: none; }
 #perf.on {
   display: block;
-  position: absolute; left: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
+  position: absolute; left: var(--pad-l); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 108px);
   font-family: var(--f-data);
   font-size: 10px; color: rgba(160, 176, 194, 0.62);
   pointer-events: none; letter-spacing: 0.02em;
@@ -747,7 +764,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
      wants. Above the dock it sat on the unit card, the drawers and the
      thumb; up here it is a reach away and overlaps nothing. */
   position: absolute; z-index: 27;
-  left: var(--ui-pad);
+  left: var(--pad-l);
   top: calc(var(--hud-top) + var(--rail-step));
   display: flex; align-items: center; gap: 7px;
   padding: 6px 9px;
@@ -776,7 +793,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 #survey-key {
   /* Beside the button, on its row, so it sits over nothing. */
   position: absolute; z-index: 26;
-  left: calc(var(--ui-pad) + 100px);
+  left: calc(var(--pad-l) + 100px);
   top: calc(var(--hud-top) + var(--rail-step));
   width: min(238px, calc(100vw - var(--ui-pad) * 2 - 100px - 150px));
   padding: 6px 10px 6px;
@@ -795,12 +812,12 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 #survey-key .sk-ramp i:nth-child(5) { background: #d13828; }
 #survey-key .sk-ends {
   display: flex; justify-content: space-between; margin-top: 5px;
-  font-size: 8px; letter-spacing: 0.10em; color: rgba(219, 227, 236, 0.62);
+  font-size: 9px; letter-spacing: 0.10em; color: rgba(219, 227, 236, 0.62);
 }
 #survey-key .sk-notes {
   display: flex; flex-direction: column; gap: 3px; margin-top: 7px;
   padding-top: 6px; border-top: 1px solid rgba(150, 168, 190, 0.16);
-  font-size: 8px; letter-spacing: 0.08em; color: rgba(219, 227, 236, 0.62);
+  font-size: 9px; letter-spacing: 0.08em; color: rgba(219, 227, 236, 0.62);
 }
 #survey-key .sk-notes span { display: flex; align-items: center; gap: 6px; }
 #survey-key .sk-notes i { width: 9px; height: 9px; flex: none; }
@@ -817,7 +834,7 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 #test-btn.on { color: var(--accent); border-color: rgba(88, 166, 255, 0.55); }
 
 #testmenu {
-  position: absolute; left: var(--ui-pad); top: calc(var(--hud-top) + 8px + var(--rail-step));
+  position: absolute; left: var(--pad-l); top: calc(var(--hud-top) + 8px + var(--rail-step));
   width: min(330px, calc(100vw - var(--ui-pad) * 2));
   max-height: calc(100vh - 240px);
   display: flex; flex-direction: column;
@@ -914,11 +931,12 @@ body.clear-view #ui > *:not(#restore-btn) { display: none !important; }
 
 /* ── Kill feed ───────────────────────────────────────────────────────── */
 #feed {
-  /* Above the prompt band rather than beside it: the prompt is centred and
-     on a tablet it is wide enough to reach this corner. */
-  position: absolute; right: var(--ui-pad); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 202px);
+  /* In the right-hand column, under the target card and the aircraft on
+     station: it used to be pinned to a guessed height above the dock, which
+     on a phone held sideways put it straight through the card. In the column
+     it can only ever be under whatever is above it. */
   display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
-  pointer-events: none; max-width: 46vw;
+  pointer-events: none; max-width: min(46vw, 280px);
 }
 .feed-line {
   font-size: 11px; letter-spacing: 0.06em; padding: 3px 9px;
@@ -1036,7 +1054,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
      on a phone is a third of the screen. Drop the height line there: the
      objectives carry the same information per structure. */
   .tb-meta .tb-sub { display: none; }
-  .objectives { gap: 8px; font-size: 8px; }
+  .objectives { gap: 8px; font-size: 10px; }
   :root { --ui-pad: 8px; }
   /* Widths and padding only. The vertical placement of everything down the
      sides comes from the measured bar and must not be second-guessed here:
@@ -1044,14 +1062,12 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
      is what put them back through the readouts on a tall bar. */
   #targetcard { width: 142px; padding: 7px 9px; }
   #perf { font-size: 9px; }
-  #feed { display: none; }
+  /* Two lines of the feed, not none: the kills are the score. */
+  .feed-line:nth-last-child(n+3) { display: none; }
   .tb-block { min-width: 0; }
   #testmenu { top: calc(var(--hud-top) + 8px + var(--rail-step)); max-height: calc(100vh - var(--hud-top) - 130px); }
 }
 @media (max-height: 480px) {
-  /* Smaller, not gone: with the card gone there was no way to clear a
-     designated target or change the fire mode on a phone held sideways. */
-  #targetcard { transform: scale(0.82); transform-origin: top right; }
   #testmenu { max-height: calc(100vh - 130px); }
 }
 
@@ -1348,8 +1364,8 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   margin: auto;
   width: min(1180px, 100%);
   height: 100%;
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px
-           calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) max(16px, env(safe-area-inset-right, 0px))
+           calc(env(safe-area-inset-bottom, 0px) + 14px) max(16px, env(safe-area-inset-left, 0px));
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -2096,7 +2112,7 @@ body.cine #cine i { height: 9vh; }
 #comcard[hidden] { display: none; }
 .cc-fig { width: 64px; height: 72px; flex: 0 0 auto; object-fit: cover; object-position: 50% 6%; background: #0b1017; border: 1px solid rgba(120, 150, 180, 0.25); }
 .cc-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
-.cc-plate { font-family: var(--f-data); font-size: 9.5px; letter-spacing: 0.16em; color: var(--cc, #e06c34); text-transform: uppercase; }
+.cc-plate { font-family: var(--f-data); font-size: 10px; letter-spacing: 0.16em; color: var(--cc, #e06c34); text-transform: uppercase; }
 #comcard.enemy .cc-body { text-align: right; }
 .cc-line { font-family: var(--f-ui); font-size: 15px; letter-spacing: 0.03em; color: #e8eef6; line-height: 1.3; min-height: 1.3em; }
 .cc-line.typing::after { content: '\258C'; margin-left: 1px; opacity: 0.8; animation: tw-caret 0.5s steps(1) infinite; }
@@ -2700,7 +2716,7 @@ body.ended #bossbar, body.clear-view #bossbar { display: none; }
   color: #f4f0e4; text-align: center; font: italic 500 11.5px/1.25 var(--f-ui);
   text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.7), 0 0 1px #000; will-change: transform, opacity;
   transition: opacity 0.3s; }
-.bark b { display: block; font: 700 8.5px/1 var(--f-ui); letter-spacing: 0.14em; color: #c9d7a8; margin-bottom: 2px; opacity: 0.85; }
+.bark b { display: block; font: 700 9px/1 var(--f-ui); letter-spacing: 0.14em; color: #c9d7a8; margin-bottom: 2px; opacity: 0.85; }
 .bark.in { animation: bark-in 0.25s ease-out; }
 @keyframes bark-in { from { opacity: 0; margin-top: 6px; } to { opacity: 1; margin-top: 0; } }
 body.ended .bark, body.clear-view .bark { display: none; }
@@ -2754,3 +2770,80 @@ body.ended .bark, body.clear-view .bark { display: none; }
 
 /* On a phone the key is the ramp and its ends; the notes are Boot Camp's. */
 @media (pointer: coarse) { #survey-key .sk-notes { display: none; } #survey-key { width: 140px; padding: 7px 8px 6px; } }
+
+
+/* ── Mobile ──────────────────────────────────────────────────────────────
+   What a thumb needs, by Apple's and Google's own numbers: forty-four points
+   a side (forty-eight on Android), eight apart, nothing a thumb has to read
+   under ten pixels, every edge clear of the notch and the home indicator,
+   the primary actions in the lower part of the screen. Sizes here, under
+   `pointer: coarse`, so a mouse keeps the finer furniture; the one layout
+   that is really different — a phone on its side — under its own query. */
+@media (pointer: coarse) {
+  .menu-grid button { min-height: 44px; font-size: 11px; }
+  .dr-row button { min-height: 44px; font-size: 10.5px; }
+  .uc2-buttons button { min-height: 44px; }
+  .tc-title { min-height: 36px; padding: 4px 0; }
+  #targetcard.collapsed .tc-title { margin-bottom: 0; }
+  #survey-btn { min-height: 44px; padding: 0 12px; font-size: 11px; }
+  .ec-row.ec-small > .ec-btn { min-height: 44px; font-size: 10.5px; }
+  .ec-more > summary { min-height: 44px; display: flex; align-items: center; justify-content: center; }
+  .ec-fold > summary { min-height: 46px; }
+  .ef-row { min-height: 48px; }
+  .ef-gear, .ef-music { width: 44px; height: 44px; padding: 11px; }
+  .wm-zoom button { width: 44px; height: 44px; }
+  .wm-more summary { min-height: 44px; display: flex; align-items: center; }
+  circle.wm-hit { r: 16; }
+  .unit-card { scroll-snap-align: center; }
+  .unit-card .uc-lock { font-size: 9.5px; }
+}
+/* The unit strip on a phone is wider than the screen, and nothing said so:
+   the two ends fade, which is the oldest way of saying "more this way". */
+@media (max-width: 620px) {
+  .cardbar {
+    mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  }
+  /* Portrait phone: the talk band sits under the opened target card, which
+     on this width reaches about 150 points below the bar. Still the upper
+     half of the screen, still out of the fingers' way. */
+  :root { --talk-top: calc(var(--hud-top) + 164px); }
+}
+/* A phone on its side. The bar is one row and the screen is under four
+   hundred points tall, so everything that stacked under the bar has to
+   share a single band: the status line and SURVEY on the left, the target
+   card and the feed on the right, and the generals in the middle, straight
+   under the bar where the two sides leave the room. The pause menu goes to
+   three columns so it fits without scrolling. */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root { --talk-top: calc(var(--hud-top) + 6px); }
+  #comcard { width: min(360px, calc(100vw - 2 * 300px)); }
+  .cc-fig { width: 52px; height: 60px; }
+  .cc-line { font-size: 14px; }
+  .bark { top: calc(var(--talk-top) + 100px); }
+  .tut-gen { width: min(620px, calc(100vw - 2 * var(--pad-l) - 220px)); }
+  .tut-gen-face { width: 110px; }
+  #status { max-width: 24vw; }
+  /* The key stacks under its button rather than beside it: beside, it
+     reached the band the generals talk in. */
+  #survey-key { left: var(--pad-l); top: calc(var(--hud-top) + 2 * var(--rail-step)); width: 140px; }
+  #prompt { max-width: min(360px, calc(100vw - 2 * 300px)); }
+  .menu-inner { width: min(620px, 94vw); }
+  .menu-grid { grid-template-columns: repeat(3, 1fr); }
+  .menu-grid.quality { grid-template-columns: repeat(4, 1fr); }
+  .menu-title { font-size: 22px; margin-bottom: 10px; }
+  .menu-label { margin: 10px 0 5px; }
+  /* The report beside its buttons rather than over them: the buttons took
+     half the height of a sideways phone and the report had two hundred
+     points to scroll in. */
+  #endcard { flex-direction: row; }
+  #endcard .ec-scroll { padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px 12px max(16px, env(safe-area-inset-left, 0px)); }
+  .ec-dock {
+    flex: 0 0 300px; flex-direction: column; justify-content: center;
+    border-top: 0; border-left: 1px solid var(--edge);
+    padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) 16px;
+    background: rgba(5, 7, 10, 0.9);
+  }
+  .ec-dock-inner { width: 100%; }
+  .ec-row.ec-small { flex-wrap: wrap; }
+}

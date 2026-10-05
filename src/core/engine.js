@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { access } from './access.js';
+
+const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -310,7 +312,11 @@ export class Engine {
   }
 
   _pixelRatio() {
-    return Math.min(window.devicePixelRatio, this.quality.pixelRatioCap) * this.renderScale;
+    // Anything worked with a finger — a phone whatever its tier, a tablet —
+    // is capped at one and a half: at arm's length the half of the pixels
+    // above that cannot be seen, and the frame they cost can.
+    const cap = Math.min(this.quality.pixelRatioCap, COARSE ? 1.5 : Infinity);
+    return Math.min(window.devicePixelRatio, cap) * this.renderScale;
   }
 
   /**
