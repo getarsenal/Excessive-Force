@@ -124,6 +124,51 @@ const LEAN_GRAVITY = 2.6;
  */
 const TOPPLE_NUDGE = 1.6;
 
+/**
+ * One stone's face, as a texture every stone shares: grain, a lighter middle,
+ * and a dark mortar line round the rim. Each instance is one stone and a
+ * box's faces each span the whole texture, so this is what makes a wall read
+ * stone by stone up close, the way a painted block does (see world/look.js).
+ * The instance colour supplies every variation; this is the same on all.
+ */
+let STONE_TEX = null;
+function stoneTexture() {
+  if (STONE_TEX !== null) return STONE_TEX;
+  if (typeof document === 'undefined') return (STONE_TEX = false);
+  const size = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const hash = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); };
+  const vnoise = (x, y) => {
+    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = hash(ix, iy), b = hash(ix + 1, iy), cc = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    return (a + (b - a) * sx) * (1 - sy) + (cc + (d - cc) * sx) * sy;
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = (x + 0.5) / size, v = (y + 0.5) / size;
+      const grain = vnoise(x * 0.09, y * 0.09) * 0.5 + vnoise(x * 0.23 + 7, y * 0.23 + 3) * 0.3 + vnoise(x * 0.6 + 2, y * 0.6 + 9) * 0.2;
+      // How far in from the nearest edge, 0 at the rim.
+      const e = Math.min(u, 1 - u, v, 1 - v);
+      const mortar = 1 - 0.30 * (1 - Math.min(1, e / 0.045));           // a dark line at the very rim
+      const bevel = 1 + 0.06 * Math.max(0, 1 - Math.abs(e - 0.09) / 0.05); // a light stroke just inside it
+      const lift = 1 + 0.05 * (0.5 - v);                                   // lighter toward the top
+      const val = (0.92 + (grain - 0.5) * 0.22) * mortar * bevel * lift;
+      const o = (y * size + x) * 4;
+      img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.max(0, Math.min(255, Math.round(val * 255)));
+      img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return (STONE_TEX = t);
+}
+
 export class Structure {
   /**
    * @param {import('../core/physics.js').PhysicsWorld} physics
@@ -1528,6 +1573,11 @@ export class Structure {
         material.emissive = new THREE.Color(0x3a2a08);
         material.emissiveIntensity = 1.0;
       }
+      // The stone's face: grain and a mortar line, on anything that is
+      // masonry rather than metal or glass.
+      const metalOrGlass = [MATERIALS.GLASS, MATERIALS.IRON, MATERIALS.STEEL, MATERIALS.GILT].includes(matId);
+      const tex = metalOrGlass ? null : stoneTexture();
+      if (tex) material.map = tex;
       // Every stone with its edges caught (see world/look.js).
       stylize(material, { edges: true });
 

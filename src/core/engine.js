@@ -64,6 +64,10 @@ const GradeShader = {
       col *= mix(vec3(1.0), vec3(0.94, 0.98, 1.09), shadow * 0.5);
 
       col *= smoothstep(0.95, uVignette * 0.35, r2 * 1.6);
+      // Dither, so the sky's gradient and the fog do not band on an 8-bit
+      // phone panel: a hash per pixel, under a level either way.
+      float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
+      col += (dn - 0.5) * (1.0 / 255.0);
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }
   `,
