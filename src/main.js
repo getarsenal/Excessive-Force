@@ -50,6 +50,7 @@ import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
 import { newsflash, hideNewsflash } from './ui/newsflash.js';
 import { WhiteFlags } from './fx/whiteflags.js';
+import { ContactShadows } from './fx/contactshadows.js';
 import * as synth from './core/synth.js';
 import { airRaidSiren } from './core/synth.js';
 import { SmokeScreens } from './game/smoke.js';
@@ -468,6 +469,7 @@ async function boot() {
   const fx = new ExplosionFX(engine.scene, quality);
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
+  const contactShadows = new ContactShadows(engine.scene);
   const huntMarkers = new HuntMarkers(engine.scene);
   // Gold diamonds over the high-value targets: the SAM launchers and radars
   // and the command post, while they stand.
@@ -2474,6 +2476,7 @@ async function boot() {
     while (pendingCharges.length) battle.demolitionCharge(pendingCharges.pop());
     fx.update(dt);
     whiteFlags.update(dt);
+    contactShadows.update(battle.units, !engine.renderer.shadowMap.enabled);
     huntMarkers.update(rawDt, battle.garrison, engine.camera, !!battle._held && battle.state === 'playing');
     if (battle.boss) bossBar(battle);
     if (barks) barks.update(rawDt);
