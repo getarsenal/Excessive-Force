@@ -75,7 +75,7 @@ const out = await page.evaluate(async (kinds) => {
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
     let tris = 0; obj.traverse((m) => { if (m.isMesh && m.geometry) { const g = m.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; } });
     const r = Math.max(size.x, size.y, size.z) * 0.5;
-    const d = r / Math.tan((24 / 2) * Math.PI / 180) * 1.15;
+    const d = r / Math.tan((24 / 2) * Math.PI / 180) * 0.78;
     const views = { side: [1, 0.12, 0.05], front: [0.15, 0.1, 1], quarter: [0.75, 0.42, 0.62], below: [0.6, -0.5, 0.55] };
     const imgs = {};
     for (const [name, [x, y, z]] of Object.entries(views)) {

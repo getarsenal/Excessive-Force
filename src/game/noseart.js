@@ -290,18 +290,22 @@ export function paintNoseArt(group, art, wins, bosses) {
   group.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(group);
   const L = box.max.z - box.min.z;
-  const z = box.max.z - L * 0.2;
+  // An airframe can say where its panel is (`userData.noseArt`: z, y, w).
+  // A helicopter needs to: its rotor discs reach far past the nose, so a
+  // fifth of the way back from the front of its box is the nose cone.
+  const hint = group.userData.noseArt || null;
+  const z = hint?.z ?? (box.max.z - L * 0.2);
   const meshes = [];
-  group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  group.traverse((o) => { if (o.isMesh && o.name !== 'noseart') meshes.push(o); });
   let best = null;
-  for (let k = 0; k <= 8; k++) {
-    const y = box.min.y + (box.max.y - box.min.y) * (0.25 + k * 0.05);
+  const ys = hint?.y !== undefined ? [hint.y] : Array.from({ length: 9 }, (_, k) => box.min.y + (box.max.y - box.min.y) * (0.25 + k * 0.05));
+  for (const y of ys) {
     _ray.set(_o.set(box.max.x + 5, y, z), _d.set(-1, 0, 0));
     const hit = _ray.intersectObjects(meshes, false)[0];
     if (hit && Math.abs(hit.point.x) < (box.max.x - box.min.x) * 0.3 && (!best || hit.point.x > best.x)) best = { x: hit.point.x, y };
   }
   if (!best) return;
-  const w = Math.max(1.4, L * 0.115), h = w * 0.625;
+  const w = hint?.w ?? Math.max(1.4, L * 0.115), h = w * 0.625;
   const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.7, depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2 });
   for (const side of [-1, 1]) {

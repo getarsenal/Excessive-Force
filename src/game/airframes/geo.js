@@ -210,4 +210,3 @@ export function engine(group, mat, glow, x, y, z, r, len, flame) {
   }
 }
 
-/** F-15E Strike Eagle. 19.4 m long, 13.1 m span, nose along +Z. */
