@@ -1402,7 +1402,11 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 .ef[data-view="door"] .ef-view[data-view="door"],
 .ef[data-view="map"] .ef-view[data-view="map"],
 .ef[data-view="dossier"] .ef-view[data-view="dossier"],
-.ef[data-view="records"] .ef-view[data-view="records"] { display: flex; }
+.ef[data-view="records"] .ef-view[data-view="records"] {
+  /* Scrolls above the footer: on a phone held sideways the settings rows
+     ran on under DONE and could not be reached. */
+  display: flex; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: 6px;
+}
 .ef[data-view="doctrine"] .ef-view[data-view="doctrine"] { display: flex; flex-direction: column; overflow-y: auto; }
 
 /* The hero: the contract itself, at the size the game is actually about. */
