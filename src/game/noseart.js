@@ -18,9 +18,11 @@ import { totalStars, operationsState } from './operations.js';
  */
 
 export const ART = [
-  { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
+  // Two of them are the real thing, painted: the picture carries its own
+  // lettering, so only the tally is drawn under it. The rest are drawn.
+  { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', img: 'assets/noseart/demeanor.jpg', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
   { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
-  { id: 'beer', name: 'Hold My Beer', kind: 'bomb', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
+  { id: 'beer', name: 'Hold My Beer', kind: 'bomb', img: 'assets/noseart/beer.jpg', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
   { id: 'deductible', name: 'Tax Deductible', kind: 'pin', skin: '#d9a77f', hair: '#3b2416', suit: '#2f6b3a', need: { stars: 15 }, how: '15 stars' },
   { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
   { id: 'refunds', name: 'No Refunds', kind: 'pin', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
@@ -160,6 +162,45 @@ function drawDice(ctx, ox, oy, s) {
 }
 
 const TEX = new Map();
+const IMG = new Map();
+
+/** A painted piece's picture, loading; the first ask starts it. */
+function artImage(art) {
+  if (IMG.has(art.id)) return IMG.get(art.id);
+  const im = new Image();
+  im.decoding = 'async';
+  im.src = art.img;
+  IMG.set(art.id, im);
+  return im;
+}
+// Started at load, so the first sortie's airframe has its picture ready
+// rather than taking off blank and painting itself a second later.
+if (typeof document !== 'undefined') for (const a of ART) if (a.img) artImage(a);
+
+/**
+ * The painted picture onto the texture's canvas: fitted above the tally
+ * row with its edges feathered into the airframe's own paint, so it reads
+ * as a panel painted on the skin rather than a photograph stuck to it.
+ */
+function drawPainted(ctx, im, tex) {
+  const paint = () => {
+    const H = 278, W = Math.min(500, Math.round(H * im.naturalWidth / im.naturalHeight));
+    const x = 256 - W / 2, y = 2;
+    ctx.save();
+    ctx.clearRect(0, 0, 512, H + 4);
+    ctx.beginPath(); ctx.roundRect(x, y, W, H, 26); ctx.clip();
+    ctx.drawImage(im, x, y, W, H);
+    // Feather: keep the middle, let the rim go.
+    ctx.globalCompositeOperation = 'destination-in';
+    const g = ctx.createRadialGradient(256, y + H / 2, H * 0.30, 256, y + H / 2, W * 0.62);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.72, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(x, y, W, H);
+    ctx.restore();
+    if (tex) tex.needsUpdate = true;
+  };
+  if (im.complete && im.naturalWidth) paint();
+  else im.addEventListener('load', paint, { once: true });
+}
 
 /**
  * The art as a texture, with the tally under it: `wins` little bombs and
@@ -174,16 +215,20 @@ export function artTexture(art, wins = 0, bosses = 0) {
   c.width = 512; c.height = 320;
   const ctx = c.getContext('2d');
   const s = 2.4, ox = 30, oy = -10;
-  if (art.kind === 'pin') drawPin(ctx, art, ox, oy, s);
+  let painted = null;
+  if (art.img) painted = artImage(art);
+  else if (art.kind === 'pin') drawPin(ctx, art, ox, oy, s);
   else if (art.kind === 'dice') drawDice(ctx, ox, oy, s);
   else drawBomb(ctx, art, ox, oy, s);
-  // The name, in sign-writer's script: cream on a dark keyline.
-  ctx.font = `italic bold ${art.name.length > 18 ? 40 : 52}px Georgia, 'Times New Roman', serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.lineWidth = 9; ctx.strokeStyle = '#141210';
-  ctx.strokeText(art.name, 256, 268);
-  ctx.fillStyle = '#f6d66a';
-  ctx.fillText(art.name, 256, 268);
+  if (!painted) {
+    // The name, in sign-writer's script: cream on a dark keyline.
+    ctx.font = `italic bold ${art.name.length > 18 ? 40 : 52}px Georgia, 'Times New Roman', serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.lineWidth = 9; ctx.strokeStyle = '#141210';
+    ctx.strokeText(art.name, 256, 268);
+    ctx.fillStyle = '#f6d66a';
+    ctx.fillText(art.name, 256, 268);
+  }
   // The tally.
   const n = Math.min(24, wins), k = Math.min(8, bosses);
   let x = 256 - ((n + k) * 18) / 2;
@@ -192,6 +237,7 @@ export function artTexture(art, wins = 0, bosses = 0) {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
+  if (painted) drawPainted(ctx, painted, tex);
   TEX.set(key, tex);
   return tex;
 }
@@ -212,6 +258,8 @@ function skull(ctx, x, y) {
 
 /** A picture of the art for the collection screen. */
 export function artDataUrl(art) {
+  // A painted piece is shown whole, lettering and all.
+  if (art.img) return art.img;
   const t = artTexture(art, 0, 0);
   return t?.image?.toDataURL ? t.image.toDataURL('image/png') : '';
 }
