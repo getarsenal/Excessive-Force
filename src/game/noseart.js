@@ -18,18 +18,19 @@ import { totalStars, operationsState } from './operations.js';
  */
 
 export const ART = [
-  // Two of them are the real thing, painted: the picture carries its own
-  // lettering, so only the tally is drawn under it. The rest are drawn.
+  // Most of them are the real thing, painted: the picture carries its own
+  // lettering, so only the tally is drawn under it. Two are still drawn.
   { id: 'demeanor', name: 'Miss Demeanor', kind: 'pin', img: 'assets/noseart/demeanor.jpg', skin: '#e8c4a0', hair: '#962328', suit: '#cd2832', need: { wins: 1 }, how: 'Win a battle' },
-  { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
+  { id: 'damsel', name: 'Collateral Damsel', kind: 'pin', img: 'assets/noseart/damsel.jpg', skin: '#f0cfae', hair: '#e8c35a', suit: '#24407a', need: { stars: 6 }, how: '6 stars' },
   { id: 'beer', name: 'Hold My Beer', kind: 'bomb', img: 'assets/noseart/beer.jpg', body: '#3c4a2a', need: { bosses: 1 }, how: 'Beat a boss' },
-  { id: 'deductible', name: 'Tax Deductible', kind: 'pin', skin: '#d9a77f', hair: '#3b2416', suit: '#2f6b3a', need: { stars: 15 }, how: '15 stars' },
-  { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
-  { id: 'refunds', name: 'No Refunds', kind: 'pin', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
-  { id: 'actofgod', name: 'Act of God', kind: 'halo', body: '#2e3338', need: { stars: 50 }, how: '50 stars' },
+  { id: 'deductible', name: 'Tax Deductible', kind: 'pin', img: 'assets/noseart/deductible.jpg', skin: '#d9a77f', hair: '#3b2416', suit: '#2f6b3a', need: { stars: 15 }, how: '15 stars' },
+  { id: 'trigger', name: 'Trigger Happy', kind: 'bomb', img: 'assets/noseart/trigger.jpg', body: '#3c4a2a', need: { wins: 10 }, how: 'Win ten battles' },
+  { id: 'renewal', name: 'Urban Renewal', kind: 'hardhat', img: 'assets/noseart/renewal.jpg', body: '#5a5f63', need: { bosses: 2 }, how: 'Beat two bosses' },
+  { id: 'refunds', name: 'No Refunds', kind: 'pin', img: 'assets/noseart/refunds.jpg', skin: '#efd2b6', hair: '#141414', suit: '#f2f2ee', dots: '#c8202c', need: { stars: 30 }, how: '30 stars' },
+  { id: 'actofgod', name: 'Act of God', kind: 'halo', img: 'assets/noseart/actofgod.jpg', body: '#2e3338', need: { stars: 50 }, how: '50 stars' },
   { id: 'exwife', name: "Buck's Ex-Wife", kind: 'pin', skin: '#e2b896', hair: '#b4361a', suit: '#141414', need: { bosses: 4 }, how: 'Beat four bosses' },
   { id: 'sender', name: 'Return to Sender', kind: 'dice', need: { stars: 80 }, how: '80 stars' },
-  { id: 'service', name: 'Thank You For Your Service', kind: 'pin', skin: '#e8c4a0', hair: '#e8c35a', suit: '#b22234', stars: true, need: { finale: 1 }, how: 'Take the Great Wall' },
+  { id: 'service', name: 'Thank You For Your Service', kind: 'pin', img: 'assets/noseart/service.jpg', skin: '#e8c4a0', hair: '#e8c35a', suit: '#b22234', stars: true, need: { finale: 1 }, how: 'Take the Great Wall' },
 ];
 
 /** What this commander has, from the record. */
