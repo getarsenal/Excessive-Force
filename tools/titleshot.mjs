@@ -33,6 +33,7 @@ await page.evaluate(async () => {
   const u = B.units.find((x) => x.alive);
   if (u) { const R = window.rig; R.target.copy(u.pos); R.desiredTarget.copy(u.pos); R.distance = R.desiredDistance = 60; R.pitch = R.desiredPitch = 0.5; for (let k = 0; k < 20; k++) R.update(0.1); }
   const bk = window.__barks; bk.quiet = 0; bk.cool = {}; bk.say('unitlost', u);
+  window.__comcard?.heard?.() ; try { window.__comcard?.warn?.(); } catch {}
   for (let k = 0; k < 3; k++) window.__frame();
 });
 await page.waitForTimeout(600);
