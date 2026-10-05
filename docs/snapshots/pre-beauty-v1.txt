@@ -1,0 +1,1 @@
+pre-beauty-v1 = d44805d9a24b5d37230ce13f602a8e09c18472d5 (branch snapshot/pre-beauty-v1, local tag pre-beauty-v1). Revert: git push origin snapshot/pre-beauty-v1:main --force-with-lease
