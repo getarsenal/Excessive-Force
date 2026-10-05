@@ -24,6 +24,23 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   to the HUD, the dock, the arsenal, targeting, strikes or the win rules
   updates the tutorial's steps in the same commit, and the tutorial's own
   suite run (`sh tools/suiteall.sh tutorial`) stays green.
+- **Keep it a phone game.** The HUD is laid out for a thumb first: every
+  control forty-four points a side under `pointer: coarse`, nothing a
+  player must read under ten pixels, every edge anchored to `--pad-l` /
+  `--pad-r` (the gutter or the safe-area inset, whichever is larger), the
+  dock sized by `--dock-h` so five fit a 360-wide phone. Everything that
+  talks in a fight sits in the talk band (`--talk-top`), never in the lower
+  middle where the fingers go; on a portrait phone the band hangs under the
+  right-hand column (`--right-bottom`, published by the HUD). A phone on
+  its side (`orientation: landscape` and `max-height: 500px`) is the
+  two-thumb layout: dock split to the two bottom corners, drawers as a
+  side panel up the left edge. After any HUD change run
+  `node tools/mobaudit_run.mjs iphone15pro-portrait iphone15pro-landscape`
+  (sets the real insets through CDP, screenshots every state into
+  `/tmp/out/mobaudit/`, prints small targets / overlaps / clipping /
+  safe-area hits per screen) and read the numbers before the pictures;
+  `node tools/landshot.mjs` and `W=393 H=852 node tools/landshot.mjs` are
+  the quick two-shot versions.
 
 ## Verify
 
@@ -148,7 +165,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against
   `docs/snapshots/pre-beauty-v1-perf-westminster.txt`; revert recipe in
-  `docs/snapshots/pre-beauty-v1.txt`.
+  `docs/snapshots/pre-beauty-v1.txt`. `node tools/renderprobe.mjs <level>`
+  is the render-only A/B (median frame, calls, triangles, programs) and
+  `node tools/unitshot.mjs <level>` photographs a battery from close.
+  `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
+  the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/operations.js` the campaign's operations, stars, gating,
   bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·
