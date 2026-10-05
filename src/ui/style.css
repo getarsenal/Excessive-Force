@@ -538,12 +538,13 @@ html, body {
 #status {
   /* The row under the rail, at the rail's left: never on its buttons, and
      never under the target card, which lives on the right. */
+  /* On the rail row, level with the target card across from it. */
   position: absolute; left: var(--ui-pad);
-  top: calc(var(--hud-top) + var(--rail-step) + 2px);
+  top: var(--hud-top);
   font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--dim); background: rgba(10, 13, 17, 0.45); padding: 3px 10px;
   pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 15;
-  max-width: 60vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 56vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #status.on { opacity: 1; }
 
@@ -747,7 +748,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
      thumb; up here it is a reach away and overlaps nothing. */
   position: absolute; z-index: 27;
   left: var(--ui-pad);
-  top: var(--hud-top);
+  top: calc(var(--hud-top) + var(--rail-step));
   display: flex; align-items: center; gap: 7px;
   padding: 6px 9px;
   background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
@@ -776,7 +777,7 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
   /* Beside the button, on its row, so it sits over nothing. */
   position: absolute; z-index: 26;
   left: calc(var(--ui-pad) + 100px);
-  top: var(--hud-top);
+  top: calc(var(--hud-top) + var(--rail-step));
   width: min(238px, calc(100vw - var(--ui-pad) * 2 - 100px - 150px));
   padding: 6px 10px 6px;
   background: rgba(10, 13, 17, 0.72); border: 1px solid rgba(150, 168, 190, 0.20);
