@@ -2783,7 +2783,8 @@ body.ended .bark, body.clear-view .bark { display: none; }
   .menu-grid button { min-height: 44px; font-size: 11px; }
   .dr-row button { min-height: 44px; font-size: 10.5px; }
   .uc2-buttons button { min-height: 44px; }
-  .tc-title { min-height: 36px; padding: 4px 0; }
+  .tc-title { min-height: 44px; padding: 4px 0; }
+  .menu-settings > summary { min-height: 44px; display: flex; align-items: center; justify-content: center; }
   #targetcard.collapsed .tc-title { margin-bottom: 0; }
   #survey-btn { min-height: 44px; padding: 0 12px; font-size: 11px; }
   .ec-row.ec-small > .ec-btn { min-height: 44px; font-size: 10.5px; }
@@ -2804,10 +2805,12 @@ body.ended .bark, body.clear-view .bark { display: none; }
     mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
   }
-  /* Portrait phone: the talk band sits under the opened target card, which
-     on this width reaches about 150 points below the bar. Still the upper
-     half of the screen, still out of the fingers' way. */
-  :root { --talk-top: calc(var(--hud-top) + 164px); }
+  /* Portrait phone: the generals' card is as wide as the screen, so the
+     talk band sits under whatever the right-hand column holds (the HUD
+     publishes --right-bottom as it changes), and never higher than the row
+     under SURVEY. Still the upper half of the screen, still out of the
+     fingers' way. */
+  :root { --talk-top: max(calc(var(--hud-top) + 2 * var(--rail-step) + 8px), calc(var(--right-bottom, 0px) + 10px)); }
 }
 /* A phone on its side. The bar is one row and the screen is under four
    hundred points tall, so everything that stacked under the bar has to

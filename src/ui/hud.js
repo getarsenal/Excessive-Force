@@ -712,14 +712,24 @@ export class HUD {
   _measureTopBar() {
     const bar = document.getElementById('topbar');
     if (!bar) return;
+    // And how far down the right-hand column reaches — the target card, the
+    // aircraft on station, the feed — so that on a phone, where the generals'
+    // card is as wide as the screen, it can sit just under the column rather
+    // than at a guessed offset through it.
+    const right = document.getElementById('hud-right');
     const publish = () => {
       const h = Math.round(bar.getBoundingClientRect().height);
       if (h > 0) document.documentElement.style.setProperty('--hud-top', `${h}px`);
+      if (right) {
+        const r = right.getBoundingClientRect();
+        document.documentElement.style.setProperty('--right-bottom', `${Math.round(r.bottom)}px`);
+      }
     };
     publish();
     if (typeof ResizeObserver === 'function') {
       this._topObserver = new ResizeObserver(publish);
       this._topObserver.observe(bar);
+      if (right) this._topObserver.observe(right);
     } else {
       window.addEventListener('resize', publish);
       window.addEventListener('orientationchange', publish);
