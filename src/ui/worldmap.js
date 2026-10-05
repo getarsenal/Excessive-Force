@@ -1018,11 +1018,24 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     };
     stage.addEventListener('wheel', onWheel, { passive: false });
 
+    // A tap on a dot in a crowd zooms in on the crowd rather than guessing
+    // which contract was meant: fitted to a phone, the Gulf is six dots
+    // inside one fingertip, and picking the one the finger's centre was
+    // nearest to was right about one time in six. Zoomed in, or on a dot
+    // with its name showing, a tap is a pick.
+    const tapPin = (p) => {
+      if (!p) return;
+      const crowded = p.g.classList.contains('mute') && view.k < kFit * 6
+        && pins.some((q) => q !== p && !q.g.classList.contains('off') && q._px !== undefined
+          && Math.hypot(q._px - p._px, q._py - p._py) < 26);
+      if (crowded) { zoomAt(p._px, p._py, 2.4); return; }
+      select(p.t.id);
+    };
     // A tap that was really a drag selects nothing.
     const onClick = (e) => {
       if (moved > 8) return;
       const pin = e.target.closest('.wm-pin');
-      if (pin) { select(pin.getAttribute('data-level')); return; }
+      if (pin) { tapPin(pins.find((q) => q.g === pin)); return; }
       const land = e.target.closest('.wm-target');
       if (land) {
         const t = state.list.find((k) => k.iso === land.getAttribute('data-iso'));
@@ -1045,7 +1058,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     root.addEventListener('keydown', onKey);
 
     for (const p of pins) {
-      p.g.addEventListener('click', () => select(p.t.id));
+      p.g.addEventListener('click', (e) => { e.stopPropagation(); if (moved <= 8) tapPin(p); });
       p.g.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.t.id); }
       });
