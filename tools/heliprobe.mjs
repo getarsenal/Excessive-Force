@@ -32,7 +32,7 @@ const snap = (label) => page.evaluate((label) => {
     sorties: S.length, helis: S.filter((s) => s.heli).length, downed: S.filter((s) => s.downed).length, hits: S.reduce((a, s) => a + (s.hits || 0), 0),
     heapMB: mem, geos: I?.memory.geometries, tex: I?.memory.textures, programs: I?.programs?.length, tris, calls,
     bodies: B.physics?.world?.bodies?.len?.() ?? null, projectiles: B.projectiles?.list?.length ?? null, voices: window.audio?.voices ?? null,
-    ctxLost: window.__ctxLost, renderMs: rMs, updateMs: uMs, maxStepMs: window.__maxStep, sceneObjs: objs, fxObjs };
+    ctxLost: window.__ctxLost, renderMs: rMs, updateMs: uMs, maxStepMs: window.__maxStep, worst: window.__worst, sceneObjs: objs, fxObjs };
 }, label);
 await page.evaluate(() => {
   const B = window.battle; B.freeBuild = true; B.unlockAll = true;
@@ -62,8 +62,25 @@ const placed = await page.evaluate(([kind, n]) => {
 console.log(JSON.stringify({ placed }));
 for (let t = 0; t < seconds; t += 5) {
   await page.evaluate(() => {
+    // The frame's own systems, timed apart (the same order main.js steps
+    // them), so a slow step names its system: the worst single step of
+    // each over the five seconds.
     window.__maxStep = 0;
-    for (let s = 0; s < 5 * 30; s++) { const t0 = performance.now(); window.__fastForward(1 / 30, 1 / 30); const d = performance.now() - t0; if (d > window.__maxStep) window.__maxStep = d; }
+    const worst = {};
+    const P = window.physics, Q = window.quality, T = window.terrain, S = window.structures, B = window.battle, F = window.fx;
+    const time = (k, fn) => { const t0 = performance.now(); fn(); const d = performance.now() - t0; if (!(worst[k] >= d)) worst[k] = d; return d; };
+    for (let s = 0; s < 5 * 30; s++) {
+      const step = 1 / 30;
+      let d = 0;
+      d += time('physics', () => P.step(step));
+      d += time('recycle', () => { P.recycleSettled(Q.settleFrames); P.auditFrozen(); P.cullRunaways(T.span * 1.6); });
+      d += time('solve', () => { for (const st of S) st.solveStability(); });
+      d += time('islands', () => { for (const st of S) { st.maintainIslands(step); st.tickLean(step); st.syncTransforms(); } });
+      d += time('battle', () => B.update(step));
+      d += time('fx', () => F.update(step));
+      if (d > window.__maxStep) window.__maxStep = d;
+    }
+    window.__worst = Object.fromEntries(Object.entries(worst).map(([k, v]) => [k, +v.toFixed(0)]));
   });
   const s = await snap(t + 5); rows.push(s);
   console.log(JSON.stringify(s));
