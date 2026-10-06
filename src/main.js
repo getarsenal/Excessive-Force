@@ -1900,10 +1900,12 @@ async function boot() {
     const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
     // High over the breech, looking down the line: a camera at the gun's
     // own height in a street is a camera inside the house next door.
-    rig.desiredTarget.set(u.pos.x + fx * 22, u.pos.y + 6, u.pos.z + fz * 22);
+    // Pitched to keep a tower three hundred metres off inside a portrait
+    // screen as well as the gun: steeper and the player aims at a line.
+    rig.desiredTarget.set(u.pos.x + fx * 30, u.pos.y + 9, u.pos.z + fz * 30);
     rig.desiredYaw = L.yaw + Math.PI;
-    rig.desiredPitch = 0.62;
-    rig.desiredDistance = 40;
+    rig.desiredPitch = 0.46;
+    rig.desiredDistance = 44;
     const ready = u.state === 'ready' && u.cooldown <= 0;
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
     const deg = Math.round(L.elev * 180 / Math.PI);

@@ -65,7 +65,7 @@ await page.waitForTimeout(300);
 const laid1 = await page.evaluate(() => { const L = window.battle.lay; return L && { yaw: +L.yaw.toFixed(3), elev: +L.elev.toFixed(3), range: Math.round(L.range), masonry: L.masonry }; });
 // Back onto the stone for the shot, then fire.
 await page.evaluate(() => { const B = window.battle, L = B.lay, u = L.unit; const o = B.primary.origin; const from = u.pos; const yaw = Math.atan2(o.x - from.x, o.z - from.z); B.layTurn(yaw - L.yaw, 0); let n = 0; while (n++ < 60 && !(L.masonry && L.impact.y > B.originGround + 18)) B.layTurn(0, 0.01); });
-await page.waitForTimeout(2200);
+await page.waitForTimeout(4500);
 const laid2 = await page.evaluate(() => { const L = window.battle.lay; return { range: Math.round(L.range), masonry: L.masonry, elev: +L.elev.toFixed(3), ready: document.getElementById('lay-fire').classList.contains('ready'), fireBox: (() => { const r = document.getElementById('lay-fire').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); })(), doneBox: (() => { const r = document.getElementById('lay-done').getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); })() }; });
 await page.screenshot({ path: '/tmp/out/lay-laid.png' });
 const fired = await page.evaluate(() => {
