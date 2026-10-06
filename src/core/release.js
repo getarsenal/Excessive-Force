@@ -14,7 +14,8 @@ import * as THREE from 'three';
  * `pinned`: the model cache, whose wrappers live outside the scene and
  * are cloned into every unit) crosses off what it shares; the rest goes.
  * A texture goes only when no material left in the scene has it, and one
- * marked `userData.keep` never does. Disposing something still wanted is
+ * marked `userData.keep` never does; materials stay (see below: their
+ * programs are the shared thing). Disposing something still wanted is
  * not fatal in three.js — it is re-uploaded on its next draw — so the
  * cost of a wrong guess is a hitch, not a hole; the cost of never
  * disposing was the crash.
@@ -41,11 +42,16 @@ export function releaseTree(root, scene, pinned = null) {
   if (pinned) for (const p of pinned) if (p && p.traverse) p.traverse(live);
   let n = 0;
   for (const g of geos) { g.dispose(); n++; }
+  // The materials themselves are left alone. A material's GPU footprint is
+  // its shader program, and that is shared by every material like it;
+  // dispose the last one and the program goes with it, and the next sortie
+  // of that type compiles it again — a fifth of a second here, a hitch on a
+  // phone, on every lift. What a material holds that is worth having back
+  // is its textures: an airframe's skin is painted afresh for every flight.
   if (materials.size) {
     const texs = new Set();
     for (const m of materials) {
       for (const k of TEX_KEYS) if (m[k] && m[k].isTexture && !m[k].userData?.keep) texs.add(m[k]);
-      m.dispose(); n++;
     }
     if (texs.size) {
       const used = new Set();

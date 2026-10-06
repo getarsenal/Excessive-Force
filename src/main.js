@@ -24,7 +24,14 @@ import { threatOf, operationsState, operationOf, isBoss, warlordOf, challengeOf 
 import { LEVELS } from './game/levels.js';
 import { applyDoctrine } from './game/doctrine.js';
 import { Barks } from './ui/barks.js';
-import { unlockedArt, warStats, setFleetArt, artDataUrl } from './game/noseart.js';
+import { unlockedArt, warStats, setFleetArt, artDataUrl, decorate } from './game/noseart.js';
+import { makeAirframe, makeHercules, makeChinook } from './game/aircraft.js';
+import { releaseTree } from './core/release.js';
+
+// The materials of the air wing built for the shader warm-up, held so their
+// programs are not released with them (see the warm-up in startLevel).
+let warmMaterials = [];
+const _warmV = new THREE.Vector3();
 import { MATERIAL_PROPS, MATERIALS } from './structure/builder.js';
 import { ExplosionFX } from './fx/explosion.js';
 import { CraterFX } from './fx/craters.js';
@@ -2301,7 +2308,36 @@ async function boot() {
   // thread where the driver supports it. It costs a second here, where a
   // second is already being spent, and buys back every stall out there.
   await progress(97, 'building shaders');
+  // The aircraft too. None is in the scene yet, and the first heavy lift of
+  // a fight brought the Chinook's four programs with it, all at once, on the
+  // frame the player had just bought a gun on. One of each kind stands in
+  // the scene for the compile and is taken out after; its materials stay
+  // referenced (so the programs stay built) and its geometry goes back.
+  const warmWing = new THREE.Group();
+  warmWing.visible = false;
   try {
+    for (const kind of ['warthog', 'eagle', 'lancer', 'apache', 'ghostrider', 'tomahawk']) {
+      const m = makeAirframe({ aircraft: { kind } });
+      if (kind !== 'tomahawk') decorate(m, kind);
+      warmWing.add(m);
+    }
+    warmWing.add(makeHercules());
+    warmWing.add(makeChinook());
+    warmWing.traverse((o) => { o.visible = true; });
+    engine.scene.add(warmWing);
+  } catch (err) {
+    console.warn('[tumble] air wing warm-up skipped:', err?.message || err);
+  }
+  // Compiled into the composer's render target, not the screen. A program's
+  // identity includes whether it tone-maps, and three.js tone-maps only when
+  // drawing to the screen; the scene is drawn into the composer's buffer
+  // (the grade pass is the output pass), so a compile with no target bound
+  // built a whole set of programs the fight never used, and every material
+  // compiled again on its first real draw — the Chinook's four on the
+  // frame the player had just bought a gun on.
+  const warmTarget = engine.composer?.writeBuffer || engine.composer?.renderTarget1 || null;
+  try {
+    if (warmTarget) engine.renderer.setRenderTarget(warmTarget);
     if (engine.renderer.compileAsync) {
       await engine.renderer.compileAsync(engine.scene, engine.camera);
     } else {
@@ -2311,6 +2347,25 @@ async function boot() {
     // A driver that will not pre-compile still runs the game; it just pays
     // for each shader when it first needs it, as it did before.
     console.warn('[tumble] shader pre-compile skipped:', err?.message || err);
+  } finally {
+    engine.renderer.setRenderTarget(null);
+  }
+  if (warmWing.parent) {
+    // And drawn once, behind the loading screen. A driver finishes a
+    // program at its first draw as well as at its link (the pipeline state
+    // on Metal, the whole JIT in a software rasteriser), and a compile does
+    // not reach that. The wing stands where the camera looks for one frame.
+    try {
+      engine.camera.getWorldDirection(_warmV).multiplyScalar(60);
+      warmWing.position.copy(engine.camera.position).add(_warmV);
+      engine.render();
+    } catch (err) {
+      console.warn('[tumble] air wing warm draw skipped:', err?.message || err);
+    }
+    engine.scene.remove(warmWing);
+    releaseTree(warmWing, engine.scene);
+    warmMaterials = [];
+    warmWing.traverse((o) => { if (o.isMesh) for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m) warmMaterials.push(m); });
   }
 
   // The battle as it was left, before the player sees the board.
