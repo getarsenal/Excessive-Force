@@ -334,7 +334,8 @@ export class Battle {
     const L = this.lay;
     const u = L.unit;
     const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
-    const rx = Math.cos(L.yaw), rz = -Math.sin(L.yaw);
+    // Forward is (sin yaw, cos yaw); forward crossed with up is the right hand.
+    const rx = -Math.cos(L.yaw), rz = Math.sin(L.yaw);
     const want = (u.def.modelLength || 6) * 0.5 + 2.2;
     let back = want;
     const res = this.physics.castRay({ x: u.pos.x, y: u.pos.y + 1.6, z: u.pos.z }, { x: -fx, y: 0, z: -fz }, want + 0.8);
