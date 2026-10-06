@@ -275,7 +275,9 @@ export class Battle {
       const low = solveArc(from, aim, p.speed, p.gravity, false);
       if (low) elev = Math.atan2(low.y, Math.hypot(low.x, low.z));
     }
-    this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [] };
+    this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
+      // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
+      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0 };
     unit.handHeld = true;
     this._layBuild();
     this.layTurn(0, 0);
@@ -319,6 +321,28 @@ export class Battle {
 
   _layMuzzle(unit) {
     return unit.pos.clone().setY(unit.pos.y + (unit.def.model === 'infantry' ? 1.3 : 2.2));
+  }
+
+  /**
+   * Where the gunner stands: behind the trail, a step to the right of it,
+   * eye at standing height. The step back is the gun's own half-length and
+   * a pace, shortened when the house behind the gun is nearer than that
+   * (the ray from the breech says), and the eye never goes under the
+   * ground it stands on.
+   */
+  layEye(out) {
+    const L = this.lay;
+    const u = L.unit;
+    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
+    const rx = Math.cos(L.yaw), rz = -Math.sin(L.yaw);
+    const want = (u.def.modelLength || 6) * 0.5 + 2.2;
+    let back = want;
+    const res = this.physics.castRay({ x: u.pos.x, y: u.pos.y + 1.6, z: u.pos.z }, { x: -fx, y: 0, z: -fz }, want + 0.8);
+    if (res && !(res.owner && res.owner === u)) back = Math.max(1.6, res.toi - 0.8);
+    out.set(u.pos.x - fx * back + rx * 1.5, 0, u.pos.z - fz * back + rz * 1.5);
+    const g = this.terrain.heightAt(out.x, out.z);
+    out.y = Math.max(g, u.pos.y - 0.6) + 1.75;
+    return out;
   }
 
   _layVel(L) {
@@ -409,6 +433,8 @@ export class Battle {
     const ok = this._fireOne(u, L.impact.clone(), { vel: this._layVel(L), hand: true });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
+      L.reloadTotal = u.cooldown;
+      L.kick = 1;
       this.handShots++;
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }

@@ -492,8 +492,11 @@ html, body {
 #lay { position: absolute; inset: 0; pointer-events: none; z-index: 17; }
 #lay[hidden] { display: none; }
 #lay-read {
-  position: absolute; left: 50%; top: var(--talk-top); transform: translateX(-50%);
-  max-width: calc(100vw - var(--pad-l) - var(--pad-r)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Down with the controls, between DONE and FIRE: the talk band lands in
+     the middle of the picture on a portrait phone with a tall right-hand
+     column, which is exactly where the gunner is looking. */
+  position: absolute; left: 50%; bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 54px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - var(--pad-l) - var(--pad-r) - 184px); text-align: center; white-space: normal; line-height: 1.5;
   background: var(--panel); border: 1px solid var(--edge-bright); padding: 7px 14px;
   font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text);
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
@@ -510,6 +513,16 @@ html, body {
   box-shadow: 0 2px 10px rgba(0,0,0,0.5); transition: background 0.2s, border-color 0.2s, transform 0.1s;
 }
 #lay-fire.ready { background: radial-gradient(circle at 50% 40%, #e2553a, #9a2c1b 70%); border-color: rgba(255, 214, 190, 0.7); }
+/* The reload: the seconds on the button, the ring round it filling as the
+   breech is loaded (`--p`, set by main.js layFrame). */
+#lay-fire:not(.ready) { font: 700 22px/1 var(--f-ui); letter-spacing: 0; font-variant-numeric: tabular-nums; color: #f3dccb; }
+#lay-fire::before {
+  content: ''; position: absolute; inset: -8px; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#ffb020 var(--p, 0%), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+}
+#lay-fire.ready::before { background: conic-gradient(rgba(255, 176, 32, 0.55) 100%, transparent 0); }
 #lay-fire:active { transform: scale(0.94); }
 #lay-done {
   position: absolute; left: var(--pad-l); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 24px);
@@ -517,7 +530,7 @@ html, body {
   background: var(--panel); border: 1px solid var(--edge-bright); color: var(--text);
   font: 600 11px/1 var(--f-ui); letter-spacing: 0.18em;
 }
-body.laying #dock, body.laying #survey-btn, body.laying #survey-key, body.laying #targetcard, body.laying #status { opacity: 0.3; pointer-events: none; }
+body.laying #dock, body.laying #survey-btn, body.laying #survey-key, body.laying #targetcard, body.laying #status, body.laying #hud-right, body.laying #bossbar { opacity: 0.3; pointer-events: none; }
 
 /* ── Popups and badges ───────────────────────────────────────────────── */
 #popups { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }

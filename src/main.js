@@ -1844,10 +1844,12 @@ async function boot() {
   let aiming = null;
   const armedDef = () => (battle.selectedUnitId ? UNITS_BY_ID[battle.selectedUnitId] : null);
 
-  // ── The player on a gun (battle.startLay). The camera is parked behind
-  // the breech and the rig's own gestures are off; one finger lays the gun,
-  // FIRE sends the round, DONE gives it back to its crew. The readout sits
-  // in the talk band; the trigger is under the right thumb, above the dock.
+  // ── The player on a gun (battle.startLay). The camera is the gunner's
+  // own eye, standing behind the trail (`layCamera`, after the rig has had
+  // its turn each frame), and the rig's own gestures are off; one finger
+  // lays the gun, FIRE sends the round, DONE gives it back to its crew. The
+  // readout sits in the talk band; the trigger is under the right thumb,
+  // above the dock, and wears the reload as a ring filling round it.
   const layEl = document.createElement('div');
   layEl.id = 'lay';
   layEl.hidden = true;
@@ -1856,7 +1858,7 @@ async function boot() {
     <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
   document.getElementById('ui').appendChild(layEl);
   const layRead = layEl.querySelector('#lay-read'), layFire = layEl.querySelector('#lay-fire');
-  let layDrag = null, layWas = null, layReady = null, layFov = null;
+  let layDrag = null, layWas = null, layReady = null, layFov = null, layNear = null, layPct = -1;
   const enterLay = (u) => {
     if (!battle.startLay(u)) return;
     unitCard.hide();
@@ -1868,20 +1870,25 @@ async function boot() {
     layEl.hidden = false;
     layReady = null;
     document.body.classList.add('laying');
-    // A wider lens for the lay: fifty-two degrees could not hold a gun
-    // and a tower in one portrait frame from anywhere over the roofs.
-    layFov = engine.camera.fov;
-    engine.camera.fov = 66; engine.camera.updateProjectionMatrix();
-    // A cut to the breech, not a glide: the pose is set and then held.
+    // A wider lens for the lay, and a near plane that lets the breech a
+    // pace away stay in the picture: the game's own three and a half
+    // metres would cut the gun off at the trunnions.
+    layFov = engine.camera.fov; layNear = engine.camera.near;
+    engine.camera.fov = 66; engine.camera.near = 0.4; engine.camera.updateProjectionMatrix();
+    layPct = -1;
+    // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
-    rig.yaw = rig.desiredYaw; rig.pitch = rig.desiredPitch; rig.distance = rig.desiredDistance; rig.target.copy(rig.desiredTarget);
+    layCamera(0);
     feedback.emit('open');
   };
   const exitLay = () => {
     if (layEl.hidden && !battle.lay) return;
     battle.endLay();
     rig.enabled = true;
-    if (layFov != null) { engine.camera.fov = layFov; engine.camera.updateProjectionMatrix(); layFov = null; }
+    if (layFov != null) { engine.camera.fov = layFov; engine.camera.near = layNear; engine.camera.updateProjectionMatrix(); layFov = null; layNear = null; }
+    // Back up from the gun to where the player was: the glide starts low
+    // and close, over the gun, and climbs out.
+    rig.distance = rig.minDistance; rig.pitch = 0.12;
     if (layWas) { rig.desiredDistance = layWas.dist; rig.desiredPitch = layWas.pitch; layWas = null; }
     layEl.hidden = true;
     layDrag = null;
@@ -1907,31 +1914,48 @@ async function boot() {
     // A hundred points of drag is a quarter turn; up is up.
     battle.layTurn(-dx * 0.0045, -dy * 0.0032);
   });
-  /** Each frame while laying: the camera behind the breech, the readout. */
+  /** Each frame while laying: the readout, and the reload clock on the trigger. */
   const layFrame = () => {
     const L = battle.lay;
     if (!L) { if (!layEl.hidden) exitLay(); return; }
     const u = L.unit;
-    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
-    // High over the breech, looking down the line: a camera at the gun's
-    // own height in a street is a camera inside the house next door.
-    // From the gun's own geometry: sixty metres behind the breech and
-    // forty up, over the roofs of the town, looking seventy down the lane.
-    // Through the wider lens the lay opens (sixty-six degrees), that puts
-    // the gun seventeen degrees under the centre, just clear of the
-    // trigger, and a hit a hundred metres up a tower three hundred metres
-    // off inside the top, so the gun, the line and what it ends on share
-    // the one picture, in portrait too.
-    const F = 70, BK = 60, H = 40, LY = 2;
-    rig.desiredTarget.set(u.pos.x + fx * F, u.pos.y + LY, u.pos.z + fz * F);
-    rig.desiredYaw = L.yaw + Math.PI;
-    rig.desiredPitch = Math.atan2(H - LY, F + BK);
-    rig.desiredDistance = Math.hypot(F + BK, H - LY);
     const ready = u.state === 'ready' && u.cooldown <= 0;
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
+    // The ring round FIRE fills as the breech is loaded, and the button
+    // itself counts the seconds down: how long a reload is, and how far
+    // through it the crew are, without reading a word.
+    const left = Math.max(0, u.cooldown);
+    const total = Math.max(L.reloadTotal || 0, left, 0.01);
+    const pct = ready ? 100 : Math.round(100 * (1 - left / total));
+    if (pct !== layPct) { layPct = pct; layFire.style.setProperty('--p', `${pct}%`); }
+    const label = ready ? 'FIRE' : left.toFixed(1);
+    if (layFire.textContent !== label) layFire.textContent = label;
     const deg = Math.round(L.elev * 180 / Math.PI);
-    const t = `${u.def.name} · ${Math.round(L.range)} m · ${deg}°${L.masonry ? ' · ON THE STONE' : L.blocked ? ' · BLOCKED' : ''} · ${ready ? 'LOADED' : `RELOADING ${Math.max(0, u.cooldown).toFixed(1)} s`}`;
+    const t = `${u.def.name} · ${Math.round(L.range)} m · ${deg}°${L.masonry ? ' · ON THE STONE' : L.blocked ? ' · BLOCKED' : ''} · ${ready ? 'LOADED' : 'RELOADING'}`;
     if (layRead.textContent !== t) layRead.textContent = t;
+  };
+  /**
+   * The gunner's eye, after the rig has placed the camera for the frame:
+   * standing behind the trail (`battle.layEye`), looking down the barrel,
+   * the look lifted with the elevation so the climb of the arc is in the
+   * frame and not just its first metres, and kicked up a touch by the shot.
+   * The rig's own focus is kept on the gun, so DONE is a step back from
+   * here and not a cut across the map.
+   */
+  const _eye = new THREE.Vector3(), _look = new THREE.Vector3();
+  const layCamera = (dt) => {
+    const L = battle.lay;
+    if (!L) return;
+    const u = L.unit;
+    battle.layEye(_eye);
+    L.kick = Math.max(0, L.kick - dt * 2.5);
+    const pitch = Math.min(0.72, 0.05 + L.elev * 0.55) + L.kick * L.kick * 0.06;
+    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw), cp = Math.cos(pitch);
+    _look.set(_eye.x + fx * cp, _eye.y + Math.sin(pitch), _eye.z + fz * cp);
+    engine.camera.position.copy(_eye);
+    engine.camera.lookAt(_look);
+    rig.target.copy(u.pos).setY(u.pos.y + 2); rig.desiredTarget.copy(rig.target);
+    rig.yaw = rig.desiredYaw = L.yaw + Math.PI;
   };
   window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand };   // for the harness
   const endAiming = () => {
@@ -2708,6 +2732,7 @@ async function boot() {
 
     const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
+    layCamera(rawDt);
     engine.sun.target.position.set(rig.target.x, rig.target.y, rig.target.z);
     engine.sun.position.set(
       rig.target.x + SUN_OFFSET.x, rig.target.y + SUN_OFFSET.y, rig.target.z + SUN_OFFSET.z);

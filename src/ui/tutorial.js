@@ -175,7 +175,7 @@ export class Tutorial {
         done: () => b.smokeCooldown > 0,
         say: 'Smoke. The poor man\'s invisibility cloak. Works better than the expensive kind.' },
       { ch: 2, el: '#uc2-lay', fallback: '#dock-units', title: 'LAY IT YOURSELF',
-        text: 'Tap a gun, then LAY: the gun is yours. Drag to aim it — the line is the shell\'s flight, the ring where it lands — and press FIRE. A hand-laid hit pays a bonus. DONE hands it back to the crew.',
+        text: 'Tap a gun, then LAY: you are standing at the breech. Drag to aim it — the line is the shell\'s flight, the ring where it lands — and press FIRE. The ring round FIRE fills as the crew reload. A hand-laid hit pays a bonus. DONE hands it back.',
         enter: () => {
           b.selectedUnitId = null; h.closeDrawer?.();
           const u = b.units.find((x) => x.alive && b.canLay(x));

@@ -222,7 +222,8 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift
   package, and the player's own hand on a gun (`startLay`/`layTurn`/
-  `handFire`: LAY on a gun's card, the camera behind the breech, a drag
+  `handFire`: LAY on a gun's card, the camera the gunner's own eye behind
+  the trail (`layEye`; the reload is a ring filling round FIRE), a drag
   lays it with the shell's flight drawn by the shell's own physics ray,
   FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
   the HAND LAID stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
