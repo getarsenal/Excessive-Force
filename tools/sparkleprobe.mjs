@@ -3,7 +3,7 @@
 // the same shot with each suspect switched off in turn.
 //   node tools/sparkleprobe.mjs [level=westminster] -> /tmp/out/sparkle-*.png
 import { chromium } from 'playwright';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 
 /** A PNG, 8-bit RGB or RGBA, not interlaced: what a screenshot is. */
@@ -102,32 +102,41 @@ const out = { setup, shots: [] };
 out.shadows = await page.evaluate(() => { const E = window.__engine; return { enabled: E.renderer.shadowMap.enabled, type: E.renderer.shadowMap.type, size: E.sun?.shadow?.mapSize?.x, bias: E.sun?.shadow?.bias, normalBias: E.sun?.shadow?.normalBias, radius: E.sun?.shadow?.radius }; });
 out.bloom = await page.evaluate(() => { const E = window.__engine; return E.bloom ? { enabled: E.bloom.enabled, threshold: E.bloom.threshold, strength: E.bloom.strength, radius: E.bloom.radius } : null; });
 out.shots.push(await shot('asis'));
-const unitMats = `(fn) => { const B = window.battle; const seen = new Set(); for (const q of B.units) q.group.traverse((m) => { if (!m.isMesh) return; for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm && !seen.has(mm)) { seen.add(mm); fn(mm, m); } }); return seen.size; }`;
-// No environment: the sky's reflection off the metal, or not.
+// The same frame twice: as it is, then with the two shader guards patched
+// into three's chunks at run time and every program rebuilt. Same scene,
+// same instant, so the difference is the guards and nothing else.
+const asisPng = readPng(readFileSync(`/tmp/out/${process.env.TAG ? process.env.TAG + '-' : ''}sparkle-asis.png`));
+out.guard = await page.evaluate(() => {
+  const T = window.THREE; if (!T) return 'no window.THREE';
+  const FROM = 'float EssMs = material.dfg.x + material.dfg.y;', TO = 'float EssMs = max( material.dfg.x + material.dfg.y, 0.3 );';
+  const RFROM = 'radiance += iblRadiance;', RTO = 'radiance += iblRadiance * smoothstep( 0.0, 0.18, saturate( dot( geometryNormal, geometryViewDir ) ) );';
+  const a = T.ShaderChunk.lights_fragment_begin.includes(FROM), b = T.ShaderChunk.lights_fragment_maps.includes(RFROM);
+  T.ShaderChunk.lights_fragment_begin = T.ShaderChunk.lights_fragment_begin.replace(FROM, TO);
+  T.ShaderChunk.lights_fragment_maps = T.ShaderChunk.lights_fragment_maps.replace(RFROM, RTO);
+  let n = 0; window.__engine.scene.traverse((o) => { if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m && m.isMeshStandardMaterial) { m.needsUpdate = true; n++; } });
+  return { patchedBegin: a, patchedMaps: b, materials: n, alreadyGuarded: !a && T.ShaderChunk.lights_fragment_begin.includes(TO) };
+});
+out.shots.push(await shot('guard'));
+const guardPng = readPng(readFileSync(`/tmp/out/${process.env.TAG ? process.env.TAG + '-' : ''}sparkle-guard.png`));
+// Where the guards changed the picture: pixels darker by forty or more, and how many of those were white.
+{
+  const { width: W, height: H } = asisPng; let changed = 0, whiteGone = 0, brighter = 0;
+  const lum = (d, i) => 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+  const diff = Buffer.alloc(W * H * 4);
+  for (let i = 0; i < W * H * 4; i += 4) {
+    const a = lum(asisPng.data, i), b = lum(guardPng.data, i);
+    const d = a - b;
+    if (d >= 40) { changed++; if (a > 235) whiteGone++; }
+    if (d <= -40) brighter++;
+    const v = Math.min(255, Math.max(0, Math.round(Math.abs(d) * 3)));
+    diff[i] = d > 0 ? v : 0; diff[i + 1] = d < 0 ? v : 0; diff[i + 2] = 0; diff[i + 3] = 255;
+  }
+  out.diff = { changed, whiteGone, brighter };
+  writeFileSync(`/tmp/out/${process.env.TAG ? process.env.TAG + '-' : ''}sparkle-diff.raw`, diff);
+  out.diffNote = 'raw RGBA, red = darker after the guards, green = brighter';
+}
 await page.evaluate(() => { const E = window.__engine; E.__env = E.scene.environment; E.scene.environment = null; });
-out.shots.push(await shot('noenv'));
+out.shots.push(await shot('guard-noenv'));
 await page.evaluate(() => { const E = window.__engine; E.scene.environment = E.__env; });
-// No specular at all: the same colour and map on a Lambert material.
-out.lambert = await page.evaluate(`(${unitMats})((mm, m) => { if (!mm.isMeshStandardMaterial) return; const T = window.THREE; const L = new T.MeshLambertMaterial({ color: mm.color, map: mm.map, side: mm.side, transparent: mm.transparent, opacity: mm.opacity }); mm.__swap = L; m.__orig = m.material; m.material = Array.isArray(m.material) ? m.material.map((x) => x.__swap || x) : L; })`);
-out.shots.push(await shot('lambert'));
-await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.__orig) { m.material = m.__orig; delete m.__orig; } }); });
-// Matte: metalness nought, roughness one, specular on.
-await page.evaluate(`(${unitMats})((mm) => { if (mm.metalness == null) return; mm.__m = mm.metalness; mm.__r = mm.roughness; mm.metalness = 0; mm.roughness = 1; })`);
-out.shots.push(await shot('matte'));
-await page.evaluate(`(${unitMats})((mm) => { if (mm.__m != null) { mm.metalness = mm.__m; mm.roughness = mm.__r; } })`);
-// Hard normals: every face its own, so no interpolated normal ever leans away from the eye.
-out.hardnormals = await page.evaluate(() => { const B = window.battle; const seen = new Set(); for (const q of B.units) q.group.traverse((m) => { if (!m.isMesh || seen.has(m.geometry)) return; seen.add(m.geometry); const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone(); g.computeVertexNormals(); m.__geo = m.geometry; m.geometry = g; }); return seen.size; });
-out.shots.push(await shot('hardnormals'));
-await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.__geo) { m.geometry = m.__geo; delete m.__geo; } }); });
-if (out.shadows.enabled) {
-  await page.evaluate(() => { const E = window.__engine; E.setShadows(false); });
-  out.shots.push(await shot('noshadow'));
-  await page.evaluate(() => { const E = window.__engine; E.setShadows(true); });
-}
-if (out.bloom?.enabled) {
-  await page.evaluate(() => { const E = window.__engine; E.bloom.enabled = false; });
-  out.shots.push(await shot('nobloom'));
-  await page.evaluate(() => { const E = window.__engine; E.bloom.enabled = true; });
-}
 console.log(JSON.stringify(out, null, 1));
 await b.close();
