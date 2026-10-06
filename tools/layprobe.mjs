@@ -54,7 +54,7 @@ const cardLay = await box('#uc2-lay');
 await page.screenshot({ path: '/tmp/out/lay-card.png' });
 await page.click('#uc2-lay');
 await page.waitForTimeout(2500);
-const laid0 = await page.evaluate(() => { const L = window.battle.lay; const R = window.rig; const proj = (v) => { const q = v.clone().project(R.camera); return [Math.round((q.x + 1) / 2 * innerWidth), Math.round((1 - q.y) / 2 * innerHeight)]; }; return L && { rigYaw: +R.yaw.toFixed(2), wantYaw: +((L.yaw + Math.PI) % (2 * Math.PI)).toFixed(2), dist: Math.round(R.distance), gunPx: proj(L.unit.pos), impactPx: proj(L.impact), yaw: +L.yaw.toFixed(3), elev: +L.elev.toFixed(3), range: Math.round(L.range), masonry: L.masonry, hit: L.hit, held: L.unit.handHeld, rigOff: !window.rig.enabled, laying: document.body.classList.contains('laying'), read: document.getElementById('lay-read').textContent }; });
+const laid0 = await page.evaluate(() => { const L = window.battle.lay; const R = window.rig; const proj = (v) => { const q = v.clone().project(R.camera); return [Math.round((q.x + 1) / 2 * innerWidth), Math.round((1 - q.y) / 2 * innerHeight)]; }; const cam = R.camera, T = window.terrain; return L && { eye: { offGun: +cam.position.distanceTo(L.unit.pos).toFixed(1), above: +(cam.position.y - T.heightAt(cam.position.x, cam.position.z)).toFixed(2), near: cam.near, fov: cam.fov }, gunPx: proj(L.unit.pos), muzzlePx: proj(L.from), impactPx: proj(L.impact), apexPx: proj(L.pts.reduce((a, q) => (q.y > a.y ? q : a), L.pts[0])), yaw: +L.yaw.toFixed(3), elev: +L.elev.toFixed(3), range: Math.round(L.range), masonry: L.masonry, hit: L.hit, held: L.unit.handHeld, rigOff: !window.rig.enabled, laying: document.body.classList.contains('laying'), read: document.getElementById('lay-read').textContent }; });
 // A drag on the canvas: left 60 px, up 30 px.
 const cv = await (await page.$('canvas')).boundingBox();
 const cx = cv.x + cv.width * 0.5, cy = cv.y + cv.height * 0.45;
@@ -80,9 +80,14 @@ const fired = await page.evaluate(() => {
   B._onImpact = (hit) => { if (hit.proj.hand) impacts.push({ at: [hit.point.x, hit.point.y, hit.point.z].map((v) => +v.toFixed(1)), structureHit: hit.structureHit, owner: hit.owner ? (hit.owner.def ? hit.owner.def.id : 'stone/other') : null, offPred: +hit.point.distanceTo(pred).toFixed(1) }); return oi(hit); };
   document.getElementById('lay-fire').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 9 }));
   const shots = B.handShots, inFlight = B.projectiles.list.filter((p) => p.hand).length, cooldown = +B.lay.unit.cooldown.toFixed(1);
+  window.__frame();
+  const fireBtn = document.getElementById('lay-fire');
+  const clock0 = { text: fireBtn.textContent, p: fireBtn.style.getPropertyValue('--p'), ready: fireBtn.classList.contains('ready'), total: B.lay.reloadTotal, read: document.getElementById('lay-read').textContent };
+  window.__fastForward(3, 1 / 30); window.__frame();
+  const clock1 = { text: fireBtn.textContent, p: fireBtn.style.getPropertyValue('--p'), ready: fireBtn.classList.contains('ready') };
   for (let k = 0; k < 16 && !ev.some((e) => e.k === 'handhit'); k++) window.__fastForward(1, 1 / 30);
   B.onEvent = f; B._onImpact = oi;
-  return { shots, inFlight, cooldown, ev, pred: { at: [pred.x, pred.y, pred.z].map((v) => +v.toFixed(1)), masonry: predMasonry, range: predRange }, impacts, money: B.money - m0, stamp: [...document.querySelectorAll('.stamp')].map((e) => e.textContent).filter(Boolean) };
+  return { shots, inFlight, cooldown, clock0, clock1, ev, pred: { at: [pred.x, pred.y, pred.z].map((v) => +v.toFixed(1)), masonry: predMasonry, range: predRange }, impacts, money: B.money - m0, stamp: [...document.querySelectorAll('.stamp')].map((e) => e.textContent).filter(Boolean) };
 });
 await page.waitForTimeout(600);
 await page.screenshot({ path: '/tmp/out/lay-after.png' });
