@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { part, loft, surface, pair } from './geo.js';
+import { part, loft, surface, pair, cachedSkin, bakeAirframe } from './geo.js';
 
 /**
  * B-1B Lancer, wings swept. 44.5 m long, 24.1 m span, nose along +Z; port
@@ -18,7 +18,8 @@ import { part, loft, surface, pair } from './geo.js';
 const GREY = 0x3a3e43;
 const Z0 = -22.3, Z1 = 22.2;
 
-function lancerSkin() {
+const lancerSkin = () => cachedSkin('lancer', paintLancerSkin);
+function paintLancerSkin() {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 1024;
   const c = document.createElement('canvas');
@@ -68,7 +69,8 @@ function lancerSkin() {
   return tex;
 }
 
-function finSkin(code) {
+const finSkin = (code) => cachedSkin(`lancer-fin:${code}`, () => paintFinSkin(code));
+function paintFinSkin(code) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
@@ -223,5 +225,5 @@ export function makeLancer() {
   // body's depth there so the picture does not wrap under the belly.
   g.userData.noseArt = { z: 14.0, y: 0.1, w: 3.4 };
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-  return g;
+  return bakeAirframe(g);
 }

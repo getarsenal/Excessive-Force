@@ -1,4 +1,99 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+/**
+ * Painted skins, one per kind for the session. Every sortie used to paint
+ * its own canvas and upload its own texture, so a lift of ten Chinooks was
+ * ten skins; one is enough, and `userData.keep` says a sortie's end must
+ * not take it (see core/release.js).
+ */
+const SKINS = new Map();
+export function cachedSkin(key, paint) {
+  let t = SKINS.get(key);
+  if (t) return t;
+  t = paint();
+  if (t) { t.userData.keep = true; SKINS.set(key, t); }
+  return t;
+}
+
+/**
+ * Bake an airframe for flight: every static part that shares a material
+ * into one mesh, in the airframe's own frame.
+ *
+ * The builders say what an aircraft is made of a part at a time, which is
+ * the right way to write one and the wrong way to draw one: an Apache was
+ * two hundred and eighteen meshes, a Hercules a hundred and twenty-five, a
+ * Chinook seventy-nine, each a draw call and a second in the shadow pass.
+ * A lift of ten Chinooks put sixteen hundred draw calls on a phone, and
+ * the phone did not keep up. Baked, each is one mesh per material, ten to
+ * eighteen.
+ *
+ * What the sorties move stays its own object: anything named (`prop`,
+ * `rotorA`, `rotorB`, `tailrotor`, `bomb`) and the Apache's chin turret
+ * (`userData.gun`), with everything under them. A kept part under a baked
+ * one is re-hung from the root at the same place in the world. Materials
+ * are the same objects as before, so a repaint by material still lands.
+ */
+export function bakeAirframe(g) {
+  g.updateMatrixWorld(true);
+  const keep = new Set(), roots = [];
+  const hold = (o) => { if (o && o.traverse && o !== g && !keep.has(o)) { roots.push(o); o.traverse((c) => keep.add(c)); } };
+  // What moves, and what a part's own record points at (the Apache's
+  // elevation pivot and muzzle hang off `gun.userData`): kept whole, then
+  // baked on their own below, so a rotor head is one mesh per material too.
+  g.traverse((o) => {
+    if (o !== g && o.name) hold(o);
+    for (const v of Object.values(o.userData || {})) if (v && v.isObject3D) hold(v);
+  });
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  const batches = new Map();
+  const tmp = new THREE.Matrix4();
+  g.traverse((o) => {
+    if (!o.isMesh || keep.has(o) || !o.visible || Array.isArray(o.material) || o.isInstancedMesh || o.isSkinnedMesh) return;
+    let b = batches.get(o.material);
+    if (!b) batches.set(o.material, b = { geos: [], meshes: [], cast: false, culled: true });
+    const geo = o.geometry.clone();
+    geo.applyMatrix4(tmp.multiplyMatrices(inv, o.matrixWorld));
+    b.geos.push(geo); b.meshes.push(o);
+    b.cast = b.cast || o.castShadow; b.culled = b.culled && o.frustumCulled;
+  });
+  for (const [mat, b] of batches) {
+    if (b.geos.length < 2) continue;
+    // mergeGeometries wants the same attributes and the same indexing on
+    // every part: the common attributes are kept, and a mixed batch goes
+    // non-indexed.
+    let names = null;
+    for (const q of b.geos) { const n = Object.keys(q.attributes); names = names ? names.filter((x) => n.includes(x)) : n; }
+    const indexed = b.geos.every((q) => q.index);
+    const parts = b.geos.map((q0) => {
+      const q = indexed || !q0.index ? q0 : q0.toNonIndexed();
+      for (const n of Object.keys(q.attributes)) if (!names.includes(n)) q.deleteAttribute(n);
+      q.morphAttributes = {};
+      q.clearGroups();
+      return q;
+    });
+    const merged = mergeGeometries(parts, false);
+    if (!merged) continue;
+    for (const o of b.meshes) {
+      // A kept part under a baked one keeps its place in the world.
+      for (const c of [...o.children]) if (keep.has(c)) g.attach(c);
+      o.removeFromParent();
+    }
+    const m = new THREE.Mesh(merged, mat);
+    m.castShadow = b.cast;
+    m.frustumCulled = b.culled;
+    g.add(m);
+  }
+  // Into the moving parts: each held root that is not inside another is an
+  // airframe of its own for this purpose.
+  for (const r of roots) {
+    let p = r.parent, nested = false;
+    while (p && p !== g) { if (keep.has(p)) { nested = true; break; } p = p.parent; }
+    if (!nested && r.parent) bakeAirframe(r);
+  }
+  g.updateMatrixWorld(true);
+  return g;
+}
 
 /**
  * The airframe vocabulary: what every aircraft in the game is built from.

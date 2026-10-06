@@ -32,7 +32,7 @@ import { flyby, crack } from '../core/synth.js';
 const WINGSPAN = { eagle: 6.5, lancer: 12, warthog: 8.5 };
 const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62, warthog: 0.48 };
 
-import { part, loft, twoTone, surface, solid, mirrorX, pair, engine } from './airframes/geo.js';
+import { part, loft, twoTone, surface, solid, mirrorX, pair, engine, cachedSkin, bakeAirframe } from './airframes/geo.js';
 export { part, loft, twoTone, surface, mirrorX, pair };
 
 export { makeEagle } from './airframes/eagle.js';
@@ -52,7 +52,8 @@ import { makeEagle } from './airframes/eagle.js';
  * most recognisable nose art of the last fifty years, the shark mouth and
  * eyes that the 23rd Wing has worn since the Flying Tigers.
  */
-export function warthogSkin(z0, z1) {
+export const warthogSkin = (z0, z1) => cachedSkin(`warthog:${z0}:${z1}`, () => paintWarthogSkin(z0, z1));
+function paintWarthogSkin(z0, z1) {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 512;
   const c = document.createElement('canvas');
@@ -200,7 +201,8 @@ export function warthogSkin(z0, z1) {
 }
 
 /** The two letters on the fin: the 23rd Wing's tail code. */
-function tailCode(text) {
+const tailCode = (text) => cachedSkin(`warthog-tail:${text}`, () => paintTailCode(text));
+function paintTailCode(text) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 128; c.height = 96;
@@ -428,7 +430,7 @@ export function makeWarthog() {
   // canopy, so the two pictures do not crowd each other.
   g.userData.noseArt = { z: 3.75, y: 0.22, w: 1.55 };
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-  return g;
+  return bakeAirframe(g);
 }
 
 /**
@@ -1922,7 +1924,7 @@ export function makeTomahawk() {
     g.add(f);
   }
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
-  return g;
+  return bakeAirframe(g);
 }
 
 /**

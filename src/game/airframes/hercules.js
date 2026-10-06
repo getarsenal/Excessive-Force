@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { part, loft, twoTone, surface, pair } from './geo.js';
+import { part, loft, twoTone, surface, pair, cachedSkin, bakeAirframe } from './geo.js';
 
 /**
  * C-130J Hercules, 29.8 m long, 40.4 m span, nose along +Z; port is +X.
@@ -18,7 +18,8 @@ const TRANSPORT = { grey: 0x6d7378, hex: '#6d7378', lines: 'rgba(20,22,26,0.22)'
 const GUNSHIP = { grey: 0x484e53, hex: '#484e53', lines: 'rgba(200,210,220,0.14)', marks: '#5e646b' };
 const Z0 = -14.9, Z1 = 14.9;
 
-function herculesSkin(S, gunship) {
+const herculesSkin = (S, gunship) => cachedSkin(`hercules:${gunship ? 'gunship' : 'lift'}`, () => paintHerculesSkin(S, gunship));
+function paintHerculesSkin(S, gunship) {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 768;
   const c = document.createElement('canvas');
@@ -70,7 +71,8 @@ function herculesSkin(S, gunship) {
   return tex;
 }
 
-function finSkin(S, code, serial) {
+const finSkin = (S, code, serial) => cachedSkin(`hercules-fin:${code}:${serial}`, () => paintFinSkin(S, code, serial));
+function paintFinSkin(S, code, serial) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
@@ -229,7 +231,7 @@ export function makeHercules({ gunship = false } = {}) {
   g.add(part(new THREE.SphereGeometry(0.1, 6, 4), red, 0, -2.25, 0.0));
 
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-  return g;
+  return bakeAirframe(g);
 }
 
 /**
@@ -293,5 +295,5 @@ export function makeGhostrider() {
   // flight deck: where the transport carries it, the gunship carries kit.
   g.userData.noseArt = { z: 10.3, y: 0.1, w: 2.5 };
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
-  return g;
+  return bakeAirframe(g);
 }

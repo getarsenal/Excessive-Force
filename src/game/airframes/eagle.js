@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { part, loft, twoTone, surface, mirrorX, pair, engine } from './geo.js';
+import { part, loft, twoTone, surface, mirrorX, pair, engine, cachedSkin, bakeAirframe } from './geo.js';
 
 /**
  * F-15E Strike Eagle. 19.4 m long, 13.1 m span, nose along +Z; port is +X.
@@ -23,7 +23,8 @@ const UPPER = 0x5f656d;   // FS 36176, the darker Mod Eagle grey
 const LOWER = 0x858b92;   // FS 36251, the lighter
 const Z0 = -9.7, Z1 = 9.7;
 
-function eagleSkin() {
+const eagleSkin = () => cachedSkin('eagle', paintEagleSkin);
+function paintEagleSkin() {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 512;
   const c = document.createElement('canvas');
@@ -92,7 +93,8 @@ function eagleSkin() {
 }
 
 /** The fin: the tail code and the serial, both sides. */
-function finSkin(code, serial) {
+const finSkin = (code, serial) => cachedSkin(`eagle-fin:${code}:${serial}`, () => paintFinSkin(code, serial));
+function paintFinSkin(code, serial) {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
@@ -353,7 +355,7 @@ export function makeEagle({ store } = {}) {
   g.userData.noseArt = { z: 5.3, y: 0.08, w: 1.9 };
 
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
-  return g;
+  return bakeAirframe(g);
 }
 
 /** For the contact sheet: the Eagle with the bunker buster under it. */

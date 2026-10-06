@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { part, loft, surface, pair } from './geo.js';
+import { part, loft, surface, pair, cachedSkin, bakeAirframe } from './geo.js';
 
 /**
  * AH-64E Apache. 15.1 m of fuselage under a 14.6 m rotor, nose along +Z;
@@ -31,7 +31,8 @@ const DRAB = 0x3a3f36;
  * U.S. ARMY on the boom and the serial on the tail, the walkways on the
  * engine deck.
  */
-function apacheSkin() {
+const apacheSkin = () => cachedSkin('apache', paintApacheSkin);
+function paintApacheSkin() {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 512;
   const c = document.createElement('canvas');
@@ -360,5 +361,5 @@ export function makeApache() {
   // the gear leg and ahead of the stub wing.
   g.userData.noseArt = { z: 3.15, y: -0.12, w: 1.35 };
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
-  return g;
+  return bakeAirframe(g);
 }

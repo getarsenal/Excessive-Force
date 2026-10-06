@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { part, loft } from './geo.js';
+import { part, loft, cachedSkin, bakeAirframe } from './geo.js';
 
 /**
  * CH-47F Chinook. 15.5 m fuselage, two 18.3 m rotors, nose along +Z; port
@@ -15,7 +15,8 @@ import { part, loft } from './geo.js';
 
 const Z0 = -7.8, Z1 = 7.7;
 
-function chinookSkin() {
+const chinookSkin = () => cachedSkin('chinook', paintChinookSkin);
+function paintChinookSkin() {
   if (typeof document === 'undefined') return null;
   const W = 1024, H = 512;
   const c = document.createElement('canvas');
@@ -171,5 +172,5 @@ export function makeChinook() {
   // ahead of the forward door, clear of the sponson below it.
   g.userData.noseArt = { z: 3.95, y: 0.25, w: 2.4 };
   g.traverse((m) => { if (m.isMesh) { m.frustumCulled = false; m.castShadow = true; } });
-  return g;
+  return bakeAirframe(g);
 }
