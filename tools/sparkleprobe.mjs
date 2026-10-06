@@ -83,7 +83,7 @@ const setup = await page.evaluate(() => {
 const shot = async (name) => {
   await page.evaluate(() => { for (let k = 0; k < 3; k++) window.__frame(); });
   await page.waitForTimeout(300);
-  const path = `/tmp/out/sparkle-${name}.png`;
+  const path = `/tmp/out/${process.env.TAG ? process.env.TAG + '-' : ''}sparkle-${name}.png`;   // TAG= keeps two runs apart
   await page.screenshot({ path, timeout: 420000 });
   const png = readPng(readFileSync(path));
   // Near-white pixels in the middle of the frame (where the gun is), isolated: brighter than all four neighbours by a margin.
