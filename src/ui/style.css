@@ -2844,6 +2844,9 @@ body.ended .bark, body.clear-view .bark { display: none; }
   .cc-line { font-size: 12px; line-height: 1.25; }
   .cc-plate { font-size: 10px; }
   .stamp { font-size: 17px; border-width: 2px; }
+  /* Two lines of the feed, as on a phone held upright: a third reached the
+     dock at the bottom of the right-hand column. */
+  .feed-line:nth-last-child(n+3) { display: none; }
   .tut-gen { width: min(620px, calc(100vw - 2 * var(--pad-l) - 220px)); }
   .tut-gen-face { width: 110px; }
   #status { max-width: 24vw; }
