@@ -108,6 +108,7 @@ export class UnitCard {
     this.battle = battle;
     this.onSell = opts.onSell || (() => {});
     this.onFocus = opts.onFocus || (() => {});
+    this.onLay = opts.onLay || (() => {});
     this.unit = null;
     const el = document.createElement('div');
     el.id = 'unit-card';
@@ -123,6 +124,7 @@ export class UnitCard {
         <div><span>Crew</span><b id="uc2-rank"></b></div>
       </div>
       <div class="uc2-buttons">
+        <button id="uc2-lay" class="uc2-lay">LAY</button>
         <button id="uc2-focus">FOCUS</button>
         <button id="uc2-sell">SELL</button>
         <button id="uc2-close">CLOSE</button>
@@ -134,6 +136,7 @@ export class UnitCard {
     this.q = (id) => el.querySelector(`#${id}`);
     this.q('uc2-close').addEventListener('click', () => this.hide());
     this.q('uc2-focus').addEventListener('click', () => { if (this.unit) this.onFocus(this.unit); });
+    this.q('uc2-lay').addEventListener('click', () => { if (this.unit) this.onLay(this.unit); });
     this.q('uc2-sell').addEventListener('click', () => {
       if (!this.unit) return;
       this.onSell(this.unit);
@@ -148,6 +151,8 @@ export class UnitCard {
     // The crew chief, by name and chevrons (see crews.js).
     const t = this.el.querySelector('.uc2-title');
     if (t) t.textContent = unit.crew ? crewName(unit) : 'YOUR UNIT';
+    // Only a gun with a barrel to lay offers it (battle.canLay).
+    this.q('uc2-lay').hidden = !this.battle?.canLay?.(unit);
     this._w = {};
     this._sell = null;
     this.update();

@@ -1,5 +1,8 @@
 import { newCrew } from './crews.js';
 import * as THREE from 'three';
+
+// Points on a hand-laid shell's drawn flight: 0.04 s each, twelve seconds.
+const LAY_PTS = 300;
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
@@ -91,6 +94,10 @@ export class Battle {
     // `delay` fuzes the shell to burst a couple of metres inside the stone it
     // hits, for depth rather than a crater on the surface.
     this.fireMode = 'point';
+    // The player on a gun (see `startLay`): none until they take one.
+    this.lay = null;
+    this.handShots = 0;
+    this.layLine = null;
     this.smokeCooldown = 0;
     this.smokes = null;        // a SmokeScreens, if the level has one
     this.fires = null;         // Fires, likewise
@@ -232,6 +239,181 @@ export class Battle {
   }
 
   /** Cycle the battery's fire mode. */
+  // ──────────────────────────────────────────────────────── hand laying ──
+
+  /**
+   * The player on the gun.
+   *
+   * Everything else the player does is an order: place, designate, call.
+   * This is the one thing they do with their own hands. LAY on a gun's card
+   * takes it off its crew; the camera stands behind the breech; a drag
+   * turns and elevates it, with the shell's flight drawn out to where it
+   * lands and a ring on the spot; FIRE sends one round, exactly along that
+   * line, no dispersion — the skill is the laying. The gun is the player's
+   * until DONE, and reloads at its own rate meanwhile. A hand-laid round
+   * that does damage pays a bonus and its own stamp (see `_onImpact`).
+   *
+   * Guns with a barrel to lay: not the machine-gun teams, not the ripple
+   * launchers, not the top-attack missile.
+   */
+  canLay(u) {
+    const p = u?.def?.projectile;
+    return !!(u && u.alive && !u.def.mg && !u.def.salvo && p && p.kind !== 'topattack');
+  }
+
+  startLay(unit) {
+    if (!this.canLay(unit)) return false;
+    if (this.lay) this.endLay();
+    const p = unit.def.projectile;
+    const from = this._layMuzzle(unit);
+    // Laid where the crew had it, so the first picture is a gun on its target.
+    let yaw = unit.yaw, elev = 0.3;
+    const aim = this.aimFor(unit) || this.target;
+    if (aim) {
+      yaw = Math.atan2(aim.x - from.x, aim.z - from.z);
+      const low = solveArc(from, aim, p.speed, p.gravity, false);
+      if (low) elev = Math.atan2(low.y, Math.hypot(low.x, low.z));
+    }
+    this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [] };
+    unit.handHeld = true;
+    this._layBuild();
+    this.layTurn(0, 0);
+    // The crew's solution was to a man in a window; the drawn line should
+    // end on the wall he is standing in, not go through the window and off
+    // the map, and not on the skirting under it, where a flat round only
+    // skips. Elevate until the line meets stone that counts.
+    const counts = () => this.lay.masonry && this.lay.impact.y > this.originGround + 4.5;
+    // Into the house next door: the crew would have lofted over it, so start
+    // from their solution rather than a wall.
+    if (aim && this.lay.blocked) {
+      const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0, (vv) => this._trajectoryClear(from, vv, p.gravity));
+      if (lofted) this.layTurn(0, Math.atan2(lofted.vel.y, Math.hypot(lofted.vel.x, lofted.vel.z)) - this.lay.elev);
+    }
+    for (let k = 0; k < 40 && !counts(); k++) this.layTurn(0, 0.015);
+    this.layLine.visible = true;
+    this.layRing.visible = true;
+    return true;
+  }
+
+  endLay() {
+    if (!this.lay) return;
+    this.lay.unit.handHeld = false;
+    this.lay = null;
+    if (this.layLine) { this.layLine.visible = false; this.layRing.visible = false; }
+  }
+
+  /** Turn and elevate, in radians; the arc is redrawn. */
+  layTurn(dyaw, delev) {
+    const L = this.lay;
+    if (!L) return;
+    const p = L.unit.def.projectile;
+    // A direct-fire gun has a mount, not a howitzer's elevation.
+    const top = p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
+    L.yaw += dyaw;
+    L.elev = THREE.MathUtils.clamp(L.elev + delev, -0.08, top);
+    L.unit.yaw = L.yaw;
+    L.unit.group.rotation.y = L.yaw;
+    this._layArc();
+  }
+
+  _layMuzzle(unit) {
+    return unit.pos.clone().setY(unit.pos.y + (unit.def.model === 'infantry' ? 1.3 : 2.2));
+  }
+
+  _layVel(L) {
+    const s = L.unit.def.projectile.speed, c = Math.cos(L.elev);
+    return new THREE.Vector3(Math.sin(L.yaw) * c * s, Math.sin(L.elev) * s, Math.cos(L.yaw) * c * s);
+  }
+
+  /**
+   * The shell's flight from this lay, stepped until it meets something: the
+   * same ray through the physics world the round itself will cast, segment
+   * by segment (the town's boxes, the monument's stones, the turret), with
+   * the terrain as the backstop. A line that only knew the ground and the
+   * masonry drew straight through the house next door, and the shell did
+   * not. What it met says what the ring means: the monument's stone, or
+   * something else — the street, a roof, the town — which is a wasted round.
+   */
+  _layArc() {
+    const L = this.lay;
+    const g = L.unit.def.projectile.gravity;
+    L.from = this._layMuzzle(L.unit);
+    const v = this._layVel(L);
+    const prev = L.from.clone(), pos = L.from.clone(), dir = new THREE.Vector3();
+    const pts = [prev.clone()];
+    const edge = (this.terrain?.span || 900) * 1.6;
+    L.hit = false; L.masonry = false; L.blocked = false;
+    for (let i = 1, t = 0; i < LAY_PTS; i++) {
+      t += 0.04;
+      pos.set(L.from.x + v.x * t, L.from.y + v.y * t - 0.5 * g * t * t, L.from.z + v.z * t);
+      dir.subVectors(pos, prev);
+      const len = dir.length();
+      let hit = null;
+      if (len > 1e-4) {
+        dir.multiplyScalar(1 / len);
+        const res = this.physics.castRay({ x: prev.x, y: prev.y, z: prev.z }, { x: dir.x, y: dir.y, z: dir.z }, len);
+        if (res && !(res.owner && res.owner === L.unit)) hit = prev.clone().addScaledVector(dir, Math.max(0, res.toi - 0.05));
+      }
+      if (!hit && pos.y <= this.terrain.heightAt(pos.x, pos.z)) { hit = pos.clone(); hit.y = this.terrain.heightAt(pos.x, pos.z); }
+      if (hit) {
+        pts.push(hit);
+        L.hit = true;
+        L.masonry = this._inMasonry(hit) || this._inMasonry(hit.clone().addScaledVector(dir, 0.6));
+        break;
+      }
+      pts.push(pos.clone());
+      prev.copy(pos);
+      if (Math.abs(pos.x) > edge || Math.abs(pos.z) > edge) break;
+    }
+    L.pts = pts;
+    L.impact.copy(pts[pts.length - 1]);
+    L.range = Math.hypot(L.impact.x - L.from.x, L.impact.z - L.from.z);
+    // Met the town inside forty metres: the barrel is pointing at a wall.
+    L.blocked = L.hit && !L.masonry && L.range < 40;
+    const arr = this.layLine.geometry.attributes.position.array;
+    for (let i = 0; i < LAY_PTS; i++) {
+      const q = pts[Math.min(i, pts.length - 1)];
+      arr[i * 3] = q.x; arr[i * 3 + 1] = q.y + 0.15; arr[i * 3 + 2] = q.z;
+    }
+    this.layLine.geometry.attributes.position.needsUpdate = true;
+    this.layRing.position.copy(L.impact);
+    this.layRing.position.y += 0.3;
+    const col = L.masonry ? 0xffb020 : L.blocked ? 0xe8604c : L.hit ? 0x9fd2ff : 0x8a98a6;
+    this.layRing.material.color.setHex(col);
+    this.layLine.material.color.setHex(col);
+  }
+
+  _layBuild() {
+    if (this.layLine) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(LAY_PTS * 3), 3));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.9, depthTest: false }));
+    line.renderOrder = 30; line.frustumCulled = false; line.visible = false;
+    this.scene.add(line);
+    this.layLine = line;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 3.0, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.renderOrder = 31; ring.frustumCulled = false; ring.visible = false;
+    this.scene.add(ring);
+    this.layRing = ring;
+  }
+
+  /** One round down the drawn line. False if the gun is not ready. */
+  handFire() {
+    const L = this.lay;
+    if (!L || this.state !== 'playing') return false;
+    const u = L.unit;
+    if (!u.alive || u.state !== 'ready' || u.cooldown > 0) return false;
+    this._layArc();
+    const ok = this._fireOne(u, L.impact.clone(), { vel: this._layVel(L), hand: true });
+    if (ok) {
+      u.cooldown = u.def.reload * this.reloadFactor;
+      this.handShots++;
+      this.onEvent('handshot', { unit: u, point: L.impact.clone() });
+    }
+    return ok;
+  }
+
   setFireMode(mode) {
     if (!['point', 'area', 'delay'].includes(mode)) return;
     this.fireMode = mode;
@@ -1131,6 +1313,16 @@ export class Battle {
         }
       }
     }
+    // The plots are axis-aligned and the town's colliders are not: a block
+    // on the skew, or one whose box runs on under the slope it stands on,
+    // can hold a gun's muzzle without holding its plot — and a round fired
+    // from inside a collider dies at the muzzle, every round, the crew's
+    // included. The physics world is the one that knows, so it is asked:
+    // a ray that starts inside a solid comes back at zero.
+    if (!onRoof && this.physics?.cityBody) {
+      const inside = this.physics.castRay({ x: point.x, y: point.y + 2.2, z: point.z }, { x: 0, y: 1, z: 0 }, 0.05);
+      if (inside && inside.toi <= 1e-3 && !inside.owner) return { ok: false, reason: 'inside a building' };
+    }
     return { ok: true };
   }
 
@@ -1635,7 +1827,7 @@ export class Battle {
 
   // ──────────────────────────────────────────────────────────────── firing ──
 
-  _fireOne(unit, aimPoint) {
+  _fireOne(unit, aimPoint, opts = {}) {
     const def = unit.def;
     const muzzleHeight = def.model === 'infantry' ? 1.3 : 2.2;
     const from = unit.pos.clone().setY(unit.pos.y + muzzleHeight);
@@ -1645,6 +1837,8 @@ export class Battle {
     // shoots tighter: veterancy is a smaller sheaf.
     const spread = def.dispersion * this.dispersionScale * (1 - 0.14 * (unit.rank || 0));
     const aim = aimPoint.clone();
+    // A hand-laid round goes where it was laid: no sheaf, no area walk.
+    if (!opts.vel) {
     const toward = new THREE.Vector3().subVectors(aim, from).setY(0).normalize();
     const across = new THREE.Vector3(-toward.z, 0, toward.x);
     aim.addScaledVector(toward, gauss() * spread * 1.6);
@@ -1660,10 +1854,13 @@ export class Battle {
       aim.z += Math.sin(a) * d;
       aim.y += (Math.random() - 0.5) * r * 0.5;
     }
+    }
 
     let vel;
     const p = def.projectile;
-    if (p.flat || p.kind === 'arc') {
+    if (opts.vel) {
+      vel = opts.vel.clone();
+    } else if (p.flat || p.kind === 'arc') {
       // Every gun shoots flat first, and lofts only when it has to.
       //
       // Artillery used to go straight to the minimum-energy lob, which is how
@@ -1751,7 +1948,7 @@ export class Battle {
 
     this.projectiles.fire({
       pos: from, vel, gravity: p.gravity, kind: p.kind, speed: p.speed,
-      warhead: def.warhead, owner: unit, target: aim, trail: p.trail,
+      warhead: def.warhead, owner: unit, target: aim, trail: p.trail, hand: !!opts.hand,
     });
 
     const dir = vel.clone().normalize();
@@ -1869,6 +2066,9 @@ export class Battle {
         if (u.setupLeft <= 0) { u.state = 'ready'; u.cooldown = 0; }
         continue;
       }
+
+      // The player's hand on it: the crew holds, the breech reloads.
+      if (u.handHeld) { u.cooldown = Math.max(0, u.cooldown - dt); continue; }
 
       // A machine-gun team fires bursts of its own, not shells.
       if (u.def.mg) { this._updateMG(u, dt); continue; }
@@ -2418,6 +2618,12 @@ export class Battle {
       u.hits += 1;
       const rank = Math.min(3, Math.floor((u.hits + u.kills * 3) / 10));
       if (rank > u.rank) { u.rank = rank; this.onEvent('rank', u); }
+      // The player's own round, on the money.
+      if (proj.hand) {
+        const bonus = destroyed > 0 ? 500 : 250;
+        this.money += bonus;
+        this.onEvent('handhit', { point: at, destroyed, killed, bonus });
+      }
     }
     // A heavy hit on masonry leaves a fire burning in the hole.
     if (this.fires && hit.structureHit && destroyed > 8) {
@@ -2566,6 +2772,7 @@ export class Battle {
   }
 
   update(dt) {
+    if (this.lay && (!this.lay.unit.alive || this.state !== 'playing')) this.endLay();
     if (this.state !== 'playing') {
       // The fight is over; the sky is not. Transports still in the air fly
       // on and their loads come down, rounds in flight land, the fires burn

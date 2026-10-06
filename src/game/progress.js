@@ -169,6 +169,7 @@ export const CAREER = [
 export const RIBBONS = {
   firstblood: { name: 'FIRST BLOOD', xp: 50 },
   hit: { name: 'DIRECT HIT', xp: 150 },
+  marksman: { name: 'HAND LAID', xp: 200 },
   collateral: { name: 'COLLATERAL', xp: 200 },
   multikill: { name: 'MULTI-KILL', xp: 100 },
   massacre: { name: 'MASSACRE', xp: 250 },

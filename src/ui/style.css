@@ -481,6 +481,43 @@ html, body {
 }
 .uc2-buttons button:hover { border-color: var(--edge-bright); color: var(--text); }
 #uc2-sell:hover { border-color: var(--warn); color: var(--warn); }
+/* LAY on its own row, full width: four across a phone card was 24 px each. */
+.uc2-buttons { flex-wrap: wrap; }
+.uc2-buttons .uc2-lay { flex: 1 1 100%; min-height: 34px; color: #ffd25a !important; border-color: rgba(255, 210, 90, 0.55) !important; font-weight: 700; }
+.uc2-lay[hidden] { display: none; }
+
+/* ── Laying a gun by hand (battle.startLay, main.js) ───────────────────
+   The readout in the talk band, the trigger under the right thumb above
+   the dock, DONE under the left; the dock itself steps back. */
+#lay { position: absolute; inset: 0; pointer-events: none; z-index: 17; }
+#lay[hidden] { display: none; }
+#lay-read {
+  position: absolute; left: 50%; top: var(--talk-top); transform: translateX(-50%);
+  max-width: calc(100vw - var(--pad-l) - var(--pad-r)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: var(--panel); border: 1px solid var(--edge-bright); padding: 7px 14px;
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text);
+  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+}
+#lay-hint {
+  position: absolute; left: 50%; bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 34px); transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 0.16em; color: var(--dim); text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+#lay-fire {
+  position: absolute; right: var(--pad-r); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 18px);
+  width: 76px; height: 76px; border-radius: 50%; pointer-events: auto; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none;
+  display: grid; place-items: center; font: 700 14px/1 var(--f-ui); letter-spacing: 0.16em; color: #fff3e8;
+  background: radial-gradient(circle at 50% 40%, #6b2a22, #3f1611 70%); border: 2px solid rgba(255, 214, 190, 0.35);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5); transition: background 0.2s, border-color 0.2s, transform 0.1s;
+}
+#lay-fire.ready { background: radial-gradient(circle at 50% 40%, #e2553a, #9a2c1b 70%); border-color: rgba(255, 214, 190, 0.7); }
+#lay-fire:active { transform: scale(0.94); }
+#lay-done {
+  position: absolute; left: var(--pad-l); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 24px);
+  min-width: 72px; min-height: 44px; pointer-events: auto; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--edge-bright); color: var(--text);
+  font: 600 11px/1 var(--f-ui); letter-spacing: 0.18em;
+}
+body.laying #dock, body.laying #survey-btn, body.laying #survey-key, body.laying #targetcard, body.laying #status { opacity: 0.3; pointer-events: none; }
 
 /* ── Popups and badges ───────────────────────────────────────────────── */
 #popups { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }
@@ -2362,6 +2399,7 @@ body.clear-view #tgp, body.ended #tgp { display: none !important; }
 .stamp.kill { color: #ff6a4a; }
 .stamp.city { color: #ffb050; }
 .stamp.loss { color: #c8ccd2; text-shadow: 0 0 18px rgba(255, 60, 40, 0.75); }
+.stamp.hand { color: #9fd2ff; }
 .stamp.go { animation: stamp-slam 1.6s cubic-bezier(.2,.9,.3,1) forwards; }
 @keyframes stamp-slam {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--tilt)) scale(2.4); }

@@ -289,6 +289,8 @@ export class Projectile {
     // A round whose sound is carried by something else (the A-10's rounds:
     // the gun recording has the impacts in it) makes no noise of its own.
     this.quiet = !!opts.quiet;
+    // Laid by the player's own hand (battle.handFire): the impact pays for it.
+    this.hand = !!opts.hand;
     this.age = 0;
     this.alive = true;
     this._trailAcc = 0;

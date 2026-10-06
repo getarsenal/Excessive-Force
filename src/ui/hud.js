@@ -540,8 +540,10 @@ export class HUD {
     if (sc.behind) return;
     // One at a time: a second inside two seconds of the first is the same
     // moment, and three tilted words over each other read as none.
+    // The player's own round always gets its stamp, under whatever else
+    // the same impact earned.
     const now = performance.now();
-    if (now - (this._stampAt || 0) < 2000) return;
+    if (kind !== 'hand' && now - (this._stampAt || 0) < 2000) return;
     this._stampAt = now;
     if (!this._stamps) {
       this._stamps = [];

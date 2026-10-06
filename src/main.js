@@ -958,6 +958,7 @@ async function boot() {
   const unitCard = new UnitCard(battle, {
     onSell: (u) => battle.sellUnit(u),
     onFocus: (u) => rig.focus(u.pos.clone().setY(u.pos.y + 4), 110),
+    onLay: (u) => enterLay(u),
   });
 
   // What the General thinks of it, by the stars it earned.
@@ -1480,6 +1481,14 @@ async function boot() {
         feedback.emit('deny'); hud.deny();
         hud.showPrompt(data.reason, 'warn');
         break;
+      case 'handhit':
+        // The player's own round, on the money: a stamp of its own, the
+        // ribbon, and the bonus where it landed.
+        hud.stamp('HAND LAID', data.point, 'hand', 58);
+        ribbon('marksman');
+        hud.popup(`+$${data.bonus.toLocaleString()}`, data.point, 'kill');
+        feedback.emit('rank');
+        break;
       case 'unitlost':
         feedback.emit('lost');
         hud.feed(data.fell ? `${data.def.name} DOWN WITH THE BUILDING` : `${data.def.name} LOST`, 'bad');
@@ -1827,6 +1836,81 @@ async function boot() {
    */
   let aiming = null;
   const armedDef = () => (battle.selectedUnitId ? UNITS_BY_ID[battle.selectedUnitId] : null);
+
+  // ── The player on a gun (battle.startLay). The camera is parked behind
+  // the breech and the rig's own gestures are off; one finger lays the gun,
+  // FIRE sends the round, DONE gives it back to its crew. The readout sits
+  // in the talk band; the trigger is under the right thumb, above the dock.
+  const layEl = document.createElement('div');
+  layEl.id = 'lay';
+  layEl.hidden = true;
+  layEl.innerHTML = `<div id="lay-read"></div><div id="lay-hint">DRAG TO LAY THE GUN</div>
+    <button id="lay-done" type="button">DONE</button>
+    <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
+  document.getElementById('ui').appendChild(layEl);
+  const layRead = layEl.querySelector('#lay-read'), layFire = layEl.querySelector('#lay-fire');
+  let layDrag = null, layWas = null, layReady = null;
+  const enterLay = (u) => {
+    if (!battle.startLay(u)) return;
+    unitCard.hide();
+    hud.closeDrawer?.();
+    battle.selectedUnitId = null;
+    hud.hidePrompt?.();
+    layWas = { yaw: rig.desiredYaw, pitch: rig.desiredPitch, dist: rig.desiredDistance, target: rig.desiredTarget.clone() };
+    rig.enabled = false;
+    layEl.hidden = false;
+    layReady = null;
+    document.body.classList.add('laying');
+    feedback.emit('open');
+  };
+  const exitLay = () => {
+    if (layEl.hidden && !battle.lay) return;
+    battle.endLay();
+    rig.enabled = true;
+    if (layWas) { rig.desiredDistance = layWas.dist; rig.desiredPitch = layWas.pitch; layWas = null; }
+    layEl.hidden = true;
+    layDrag = null;
+    document.body.classList.remove('laying');
+  };
+  const fireHand = () => {
+    if (!battle.lay) return;
+    if (battle.handFire()) { feedback.emit('confirm'); layFire.classList.remove('ready'); layReady = false; }
+    else feedback.emit('deny');
+  };
+  layEl.querySelector('#lay-done').addEventListener('click', () => { exitLay(); feedback.emit('tick'); });
+  layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fireHand(); });
+  layFire.addEventListener('contextmenu', (e) => e.preventDefault());
+  window.addEventListener('keydown', (e) => {
+    if (!battle.lay || e.repeat) return;
+    if (e.code === 'Space') { e.preventDefault(); fireHand(); }
+    if (e.code === 'Escape') exitLay();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!layDrag || e.pointerId !== layDrag.id || !battle.lay) return;
+    const dx = e.clientX - layDrag.x, dy = e.clientY - layDrag.y;
+    layDrag.x = e.clientX; layDrag.y = e.clientY;
+    // A hundred points of drag is a quarter turn; up is up.
+    battle.layTurn(-dx * 0.0045, -dy * 0.0032);
+  });
+  /** Each frame while laying: the camera behind the breech, the readout. */
+  const layFrame = () => {
+    const L = battle.lay;
+    if (!L) { if (!layEl.hidden) exitLay(); return; }
+    const u = L.unit;
+    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
+    // High over the breech, looking down the line: a camera at the gun's
+    // own height in a street is a camera inside the house next door.
+    rig.desiredTarget.set(u.pos.x + fx * 22, u.pos.y + 6, u.pos.z + fz * 22);
+    rig.desiredYaw = L.yaw + Math.PI;
+    rig.desiredPitch = 0.62;
+    rig.desiredDistance = 40;
+    const ready = u.state === 'ready' && u.cooldown <= 0;
+    if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
+    const deg = Math.round(L.elev * 180 / Math.PI);
+    const t = `${u.def.name} · ${Math.round(L.range)} m · ${deg}°${L.masonry ? ' · ON THE STONE' : L.blocked ? ' · BLOCKED' : ''} · ${ready ? 'LOADED' : `RELOADING ${Math.max(0, u.cooldown).toFixed(1)} s`}`;
+    if (layRead.textContent !== t) layRead.textContent = t;
+  };
+  window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand };   // for the harness
   const endAiming = () => {
     aiming = null;
     battle.hideLine();
@@ -1842,6 +1926,8 @@ async function boot() {
     // it through would plant a gun under the panel the player was closing.
     if (hud.openDrawer) { hud.closeDrawer(); aiming = { swallow: true }; return; }
     if (battle.state !== 'playing') return;
+    // On a gun: the finger is the gun's. The rig is off, so nothing else moves.
+    if (battle.lay) { if (!layDrag) layDrag = { id: e.pointerId, x: e.clientX, y: e.clientY }; aiming = { swallow: true }; return; }
     const def = armedDef();
     if (!def || livePointers.size > 1) return;
     const hit = pick(e.clientX, e.clientY, !!def.strike);
@@ -1862,6 +1948,7 @@ async function boot() {
   });
 
   canvas.addEventListener('pointerup', (e) => {
+    if (layDrag && e.pointerId === layDrag.id) layDrag = null;
     if (!livePointers.delete(e.pointerId)) return;
     // The armed gestures resolve themselves and end the tap here: a line of
     // guns goes down, or the strike goes in at whatever the sight was on.
@@ -2531,6 +2618,7 @@ async function boot() {
     // locked after one of them is a camera that has stopped working.
     rig.dragLocked = !!battle.selectedUnitId && battle.state === 'playing';
     unitCard.update();
+    layFrame();
     testMenu.update(rawDt);
     cinematicTick();
     ambience.tick();

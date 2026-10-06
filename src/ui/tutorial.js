@@ -174,6 +174,15 @@ export class Tutorial {
         enter: () => { if (h.openDrawer !== 'orders') h.setDrawer?.('orders'); },
         done: () => b.smokeCooldown > 0,
         say: 'Smoke. The poor man\'s invisibility cloak. Works better than the expensive kind.' },
+      { ch: 2, el: '#uc2-lay', fallback: '#dock-units', title: 'LAY IT YOURSELF',
+        text: 'Tap a gun, then LAY: the gun is yours. Drag to aim it — the line is the shell\'s flight, the ring where it lands — and press FIRE. A hand-laid hit pays a bonus. DONE hands it back to the crew.',
+        enter: () => {
+          b.selectedUnitId = null; h.closeDrawer?.();
+          const u = b.units.find((x) => x.alive && b.canLay(x));
+          if (u) { this.unitCard?.show?.(u); this._fly(u.pos, 110); }
+        },
+        done: () => b.handShots > 0,
+        say: 'Lay it yourself. If you want a thing hit properly, you put your own thumb on it.' },
 
       // ── 4. High-value targets.
       { ch: 3, world: () => siteLive(), title: 'GOLD DIAMONDS', ok: true, skip: () => !site(),

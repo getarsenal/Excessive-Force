@@ -114,6 +114,15 @@ for (let guard = 0; guard < 140; guard++) {
     case 'ORDERS': await page.click('#dock-orders', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
     case 'FIRE MODE': await page.click('#orders-modes [data-mode="area"]', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
     case 'SMOKE': await page.click('#orders-smoke', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
+    case 'LAY IT YOURSELF': {
+      // The step's enter() put a gun's card up; LAY takes it, FIRE when loaded.
+      if (!(await page.evaluate(() => !!window.battle.lay))) await page.click('#uc2-lay', { timeout: 4000 }).catch(() => log.push('  click missed'));
+      await page.evaluate(() => { const B = window.battle; for (let k = 0; k < 40 && B.lay && B.lay.unit.cooldown > 0; k++) window.__fastForward(0.5, 1 / 30); });
+      await page.evaluate(() => window.__lay?.fire());
+      await ff(2);
+      await page.evaluate(() => window.__lay?.exit());
+      break;
+    }
     case 'TAKE IT OUT': {
       // Tap the launcher's ring (the guns lay on it), then let them work.
       if (s.ring) await page.mouse.click(s.ring.x, s.ring.y);

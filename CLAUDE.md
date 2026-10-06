@@ -212,7 +212,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   masonry · `src/structure/builder.js` the block vocabulary ·
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift
-  package · `src/game/aircraft.js` air strikes and the airlift (the C-130,
+  package, and the player's own hand on a gun (`startLay`/`layTurn`/
+  `handFire`: LAY on a gun's card, the camera behind the breech, a drag
+  lays it with the shell's flight drawn by the shell's own physics ray,
+  FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
+  the HAND LAID stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
+  drives it on a phone) · `src/game/aircraft.js` air strikes and the airlift (the C-130,
   the parachutes, what the flak does to both) · `src/game/reinforce.js` the enemy's airborne at the halfway mark (each nation's
   transport, the drop, the men digging in round the building) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
