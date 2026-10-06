@@ -109,6 +109,13 @@ prints one line each.
 `node tools/perfprobe.mjs <level> [units] [seconds] [warm-up]` puts an army
 on the ground, runs the fight and prints milliseconds per simulated second
 for each system and the draw calls with and without the units.
+`node tools/stressprobe.mjs <level> [units] [tier]` is the phone's question:
+units in batches of six with the fight stepped between, and after each
+batch the JS heap, the renderer's geometries and textures, render and
+update time apart, physics bodies and context loss. Geometries must hold
+level as units die and sorties land: `scene.remove` gives nothing back,
+`releaseTree` (`src/core/release.js`) does, and every path a unit, a
+sortie, a sling or a chute leaves the scene by calls it.
 
 ## The real world
 

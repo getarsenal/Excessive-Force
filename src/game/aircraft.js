@@ -1,5 +1,6 @@
 import { decorate } from './noseart.js';
 import * as THREE from 'three';
+import { releaseTree } from '../core/release.js';
 import { flyby, crack } from '../core/synth.js';
 
 /**
@@ -1147,10 +1148,7 @@ export class AirWing {
       } else if (s.life > 14 || m.position.y > s.alt + 1600) s.done = true;
     }
     for (const s of this.sorties) {
-      if (s.done) {
-        this.scene.remove(s.model);
-        if (s.heli) this.scene.remove(s.heli.sling);
-      }
+      if (s.done) this._dropSortie(s);
     }
     this.sorties = this.sorties.filter((s) => !s.done);
   }
@@ -1582,7 +1580,7 @@ AirWing.prototype._collapse = function _collapse(L, dt) {
       cn.position.y *= (1 - Math.min(1, dt * 4.0));
       if (cn.userData.dome) cn.userData.dome.material.opacity = 1 - k * 0.6;
     }
-    if (k >= 1) { this.scene.remove(c.g); c.gone = true; }
+    if (k >= 1) { this.scene.remove(c.g); releaseTree(c.g, this.scene); c.gone = true; }
   }
   L.chutes = L.chutes.filter((c) => !c.gone);
 };
@@ -1671,12 +1669,22 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
 AirWing.prototype.abortLifts = function abortLifts() {
   for (const s of this.sorties) {
     if (!s.lift && !s.heli) continue;
-    if (s.lift) for (const L of s.lift.loads) for (const c of L.chutes) this.scene.remove(c.g);
-    if (s.heli) this.scene.remove(s.heli.sling);
-    this.scene.remove(s.model);
+    if (s.lift) for (const L of s.lift.loads) for (const c of L.chutes) { this.scene.remove(c.g); releaseTree(c.g, this.scene); }
+    this._dropSortie(s);
     s.done = true;
   }
   this.sorties = this.sorties.filter((s) => !s.done);
+};
+
+/**
+ * A sortie out of the scene and off the GPU: every airframe is built fresh
+ * for its flight, skin, nose art and all, and the sling under a Chinook with
+ * it. Nothing of theirs is shared with anything that stays.
+ */
+AirWing.prototype._dropSortie = function _dropSortie(s) {
+  this.scene.remove(s.model);
+  releaseTree(s.model, this.scene);
+  if (s.heli && s.heli.sling) { this.scene.remove(s.heli.sling); releaseTree(s.heli.sling, this.scene); }
 };
 
 // ─────────────────────────────────────────────────────────── the Chinook ──

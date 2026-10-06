@@ -6,6 +6,7 @@ const LAY_PTS = 300;
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
+import { releaseTree } from '../core/release.js';
 
 /** How long a lift package stays open after the first unit is placed. */
 const LIFT_WINDOW = 8;
@@ -476,7 +477,7 @@ export class Battle {
     this.money += refund;
     this.spent -= refund;
     unit.alive = false;
-    this.scene.remove(unit.group);
+    this._dropUnit(unit);
     this.onEvent('sold', { unit, refund });
     return true;
   }
@@ -1627,10 +1628,16 @@ export class Battle {
 
   removeUnit(unit) {
     unit.alive = false;
+    this._dropUnit(unit);
+  }
+
+  /**
+   * A unit out of the scene and off the GPU. The cached model wrappers are
+   * pinned: every gun of a type is a clone sharing their buffers.
+   */
+  _dropUnit(unit) {
     this.scene.remove(unit.group);
-    unit.group.traverse((o) => {
-      if (o.isMesh && o.geometry && o.userData.own !== false) { /* shared geo, leave it */ }
-    });
+    releaseTree(unit.group, this.scene, this.models?.cache?.values());
   }
 
   /**
@@ -2047,7 +2054,7 @@ export class Battle {
       if (u.health <= 0) {
         u.alive = false;
         this.unitsLost++;
-        this.scene.remove(u.group);
+        this._dropUnit(u);
         this.fx.detonate(u.pos.clone().setY(u.pos.y + 1), 0.55, {
           ground: true, groundY: u.pos.y,
         });

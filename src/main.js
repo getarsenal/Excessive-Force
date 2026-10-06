@@ -2732,6 +2732,7 @@ async function boot() {
   // throws still reaches the draw — which cannot be asserted from
   // `fastForward`, because that is the path with no draw in it.
   window.__frame = frame;
+  window.__engine = engine;   // for the harness: the renderer's own counters
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
     recordResult(level.id, true, sum);

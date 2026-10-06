@@ -260,6 +260,7 @@ export function artTexture(art, wins = 0, bosses = 0) {
   for (let i = 0; i < k; i++, x += 18) skull(ctx, x + 8, 298);
   for (let i = 0; i < n; i++, x += 18) tallyBomb(ctx, x + 8, 298);
   const tex = new THREE.CanvasTexture(c);
+  tex.userData.keep = true;   // cached per piece; a sortie's end must not take it
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   if (painted) drawPainted(ctx, painted, tex, () => { drawn(); tex.needsUpdate = true; });
