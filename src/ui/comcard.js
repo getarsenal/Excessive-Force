@@ -194,6 +194,7 @@ export class ComCard {
    */
   say(side, text, sub = null) {
     if (!this.el) this._build();
+    this._lastAt = performance.now();
     const who = side === 'us' ? CAST.us : this.enemy;
     const el = this.el;
     clearTimeout(this._t);
@@ -236,7 +237,10 @@ export class ComCard {
     setTimeout(() => { if (!this.el.classList.contains('in')) this.el.hidden = true; }, 260);
   }
 
-  _quiet() { return performance.now() < (this._quietUntil || 0); }
+  // A general has the floor at most once in twenty-five seconds, his answer
+  // apart: the fight's own feed says what happened, and they are the colour
+  // on it, not a second commentary.
+  _quiet() { const now = performance.now(); return now < (this._quietUntil || 0) || now - (this._lastAt || -1e9) < 25000; }
 
   /**
    * The enemy at a moment, and, `p` of the time, Buck after him: misreading
@@ -277,13 +281,14 @@ export class ComCard {
   win() { this.say('us', this._deal('win', BUCK_WIN)); }
   /** A SAM compound wrecked; the last of them, the sky. */
   samSite(last = false) {
+    if (!last && this._quiet()) return;
     this.say('us', last ? this._deal('supremacy', BUCK_SUPREMACY) : this._deal('samsite', BUCK_SAMSITE));
     this._quietUntil = performance.now() + 7000;
   }
   /** The other high-value targets: a line from Buck for each. */
   hvt(what) {
     const lines = BUCK_HVT[what];
-    if (!lines) return;
+    if (!lines || this._quiet()) return;
     this.say('us', this._deal(`hvt-${what}`, lines));
     this._quietUntil = performance.now() + 7000;
   }

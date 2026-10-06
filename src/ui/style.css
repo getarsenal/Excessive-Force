@@ -2716,11 +2716,15 @@ body.ended #bossbar, body.clear-view #bossbar { display: none; }
 /* ── Crew chatter ───────────────────────────────────────────────────────── */
 /* Small text floating over the gun, no box: there if you are looking at
    them, missed if you are not. The name is smaller still. */
-.bark { position: absolute; left: 0; top: calc(var(--talk-top) + 76px); max-width: min(220px, 60vw); pointer-events: none; z-index: 6;
-  color: #f4f0e4; text-align: center; font: italic 500 11.5px/1.25 var(--f-ui);
+/* A crew's line rides over its own gun: small, a fixed size on the screen
+   however far out the camera is, and gone when the gun is off the screen.
+   Placed by barks.js; nothing here says where. */
+.bark { position: absolute; left: 0; top: 0; max-width: 168px; pointer-events: none; z-index: 6;
+  color: #f4f0e4; text-align: center; font: italic 500 10.5px/1.25 var(--f-ui);
   text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.7), 0 0 1px #000; will-change: transform, opacity;
   transition: opacity 0.3s; }
-.bark b { display: block; font: 700 9px/1 var(--f-ui); letter-spacing: 0.14em; color: #c9d7a8; margin-bottom: 2px; opacity: 0.85; }
+.bark b { display: block; font: 700 10px/1 var(--f-ui); letter-spacing: 0.12em; color: #c9d7a8; margin-bottom: 2px; opacity: 0.85; font-style: normal; }
+.bark::after { content: ''; display: block; width: 1px; height: 10px; margin: 3px auto 0; background: rgba(244, 240, 228, 0.55); }
 .bark.in { animation: bark-in 0.25s ease-out; }
 @keyframes bark-in { from { opacity: 0; margin-top: 6px; } to { opacity: 1; margin-top: 0; } }
 body.ended .bark, body.clear-view .bark { display: none; }
@@ -2815,6 +2819,17 @@ body.ended .bark, body.clear-view .bark { display: none; }
      under SURVEY. Still the upper half of the screen, still out of the
      fingers' way. */
   :root { --talk-top: max(calc(var(--hud-top) + 2 * var(--rail-step) + 8px), calc(var(--right-bottom, 0px) + 10px)); }
+  /* And a third of the height it was: a small face, one size of type, the
+     line in two rows at most. At 369 by 92 it was the biggest thing on the
+     screen that was not the building. */
+  #comcard { width: min(300px, calc(100vw - var(--pad-l) - var(--pad-r))); gap: 8px; padding: 5px 9px 6px 5px; }
+  #comcard.enemy { padding: 5px 5px 6px 9px; }
+  .cc-fig { width: 34px; height: 40px; }
+  .cc-body { gap: 1px; }
+  .cc-plate { font-size: 10px; letter-spacing: 0.12em; }
+  .cc-line { font-size: 12px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .cc-sub { font-size: 10.5px; }
+  .stamp { font-size: 17px; border-width: 2px; }
 }
 /* A phone on its side. The bar is one row and the screen is under four
    hundred points tall, so everything that stacked under the bar has to
@@ -2824,10 +2839,11 @@ body.ended .bark, body.clear-view .bark { display: none; }
    three columns so it fits without scrolling. */
 @media (orientation: landscape) and (max-height: 500px) {
   :root { --talk-top: calc(var(--hud-top) + 6px); }
-  #comcard { width: min(360px, calc(100vw - 2 * 300px)); }
-  .cc-fig { width: 52px; height: 60px; }
-  .cc-line { font-size: 14px; }
-  .bark { top: calc(var(--talk-top) + 100px); }
+  #comcard { width: min(320px, calc(100vw - 2 * 300px)); gap: 8px; padding: 5px 9px 6px 5px; }
+  .cc-fig { width: 34px; height: 40px; }
+  .cc-line { font-size: 12px; line-height: 1.25; }
+  .cc-plate { font-size: 10px; }
+  .stamp { font-size: 17px; border-width: 2px; }
   .tut-gen { width: min(620px, calc(100vw - 2 * var(--pad-l) - 220px)); }
   .tut-gen-face { width: 110px; }
   #status { max-width: 24vw; }

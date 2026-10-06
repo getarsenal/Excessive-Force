@@ -1048,6 +1048,7 @@ async function boot() {
   // called, and whether an aircraft was lost doing it.
   const used = new Set();
   let lostAircraft = false;
+  let samSaid = false;
   let chain = 0, chainAt = 0;
   // What the fight earned besides the result: ribbons, as often as they
   // happen, and the counts the career and the daily orders are made of.
@@ -1056,8 +1057,9 @@ async function boot() {
   const ribbon = (id, n = 1) => {
     ribbons[id] = (ribbons[id] || 0) + n;
     const rb = RIBBONS[id];
-    // Said once a battle per ribbon; the rest bank quietly for the report.
-    if (rb && !suiteHold && ribbons[id] === n) hud.feed(`+${(rb.xp * n).toLocaleString()} XP · ${rb.name}`, 'xp');
+    // Banked quietly for the report: the stamp or the line that earned it
+    // has already said so, and an XP line under it was the same news twice.
+    void rb;
   };
   let paid = false;
   const payOut = (won, sum, extra = {}) => {
@@ -1258,7 +1260,8 @@ async function boot() {
         hud.feed(`FLAK OVER TARGET · ${data.guns} GUN${data.guns > 1 ? 'S' : ''}`, 'warn');
         break;
       case 'underfire':
-        hud.feed(`${data.def.name} TAKING FIRE${data.loiter ? '' : ' ON THE RUN'}`, 'bad');
+        // The flak line at the call already said the run would be shot at;
+        // the tracers say it now.
         break;
       case 'aborted':
         hud.feed(`${data.def.name} DRIVEN OFF — NO DROP`, 'bad');
@@ -1270,20 +1273,22 @@ async function boot() {
         hud.feed(`${data.def.name} OFF STATION — ${data.stones} STONES · ${data.kills} KILLED`, 'big');
         break;
       case 'samactive':
-        hud.feed('SAM SITES ACTIVE — THEY FIRE ON EVERY AIRCRAFT UNTIL DESTROYED', 'warn');
+        hud.feed('SAM SITES ACTIVE', 'warn');
         break;
       case 'samlaunch':
         // Every launch, marked at the launcher, so the player can find it; the
-        // feed says so once per aeroplane rather than every few seconds.
+        // feed says so once a battle. Once per aeroplane was a line for each
+        // Chinook in a lift, and the missiles in the sky say the rest.
         feedback.emit('impact', 0.4);
-        if (data.first) hud.feed(`SAM LAUNCH — ${data.label || data.def.name} ENGAGED`, 'bad');
+        if (data.first && !samSaid) { samSaid = true; hud.feed(`SAM LAUNCH — ${data.label || data.def.name} ENGAGED`, 'bad'); }
         if (data.point) battle.pulse(data.point.clone(), 0xff5030, 26, true);
         break;
       case 'samkill':
         feedback.emit('impact', 1.4);
         // A transport's loss is said by the air wing, with what it carried.
         if (!data.transport) hud.feed(`${data.label || data.def.name} SHOT DOWN BY SAM`, 'big');
-        battle.onEvent('stamp', { text: 'AIRCRAFT LOST', point: data.point, kind: 'loss' });
+        // No stamp as well: the feed has it and the generals may say it, and
+        // a loss said three ways at once was the loudest thing in the fight.
         if (comcard) comcard.samKill();
         break;
       case 'liftdown':
@@ -1294,7 +1299,7 @@ async function boot() {
         if (data.lost.length) hud.status('the SAM sites are hitting the airlift · knock them out before you buy heavy', 6);
         break;
       case 'sammiss':
-        hud.feed(`SAM MISSED — ${data.label || data.def.name} STILL FLYING`, 'warn');
+        // A miss is the aircraft still flying, which is what was seen.
         break;
       case 'samdown':
         feedback.emit('impact', 1.0);
@@ -1430,10 +1435,9 @@ async function boot() {
         hud.feed(`${data.def.name} SHOT DOWN`, 'bad');
         break;
       case 'transporthit':
-        hud.feed('TRANSPORT HIT — STICKS DUMPED SHORT', 'bad');
-        break;
       case 'canopy':
-        hud.feed(data.troops ? `CANOPY SHOT OUT — ${data.def.name}` : `LOAD STREAMING — ${data.def.name}`, 'bad');
+        // Said by what it costs, when it costs it: LOST ON THE DROP or DOWN
+        // HARD, a line later.
         break;
       case 'droplost':
         hud.feed(`${data.def.name} LOST ON THE DROP`, 'bad');
@@ -1462,7 +1466,6 @@ async function boot() {
         else if (/^MULTI-KILL/.test(data.text)) ribbon('multikill');
         break;
       case 'collateral':
-        hud.feed(`${data.n} CITY BLOCKS LEVELLED`, 'big');
         ribbon('collateral');
         setTimeout(() => hud.stamp(`COLLATERAL ×${data.n}`, data.point, 'city', 58), 380);
         break;
@@ -1484,7 +1487,11 @@ async function boot() {
         break;
       case 'crushed':
         if (data > 2) feedback.emit('impact', 1.3);
-        if (data > 2) { hud.feed(`${data} DEFENDERS CRUSHED`, 'big'); ribbon('crushed'); }
+        // A run of them inside a few seconds counts up on the one line.
+        if (data > 2) {
+          hud.feed(`${data} DEFENDERS CRUSHED`, 'big', { key: 'crushed', merge: (old) => `${(parseInt(old, 10) || 0) + data} DEFENDERS CRUSHED` });
+          ribbon('crushed');
+        }
         break;
       case 'secondary': {
         // One line for a chain, not one per dump: a run of them inside a

@@ -4,9 +4,12 @@ import { crewName } from '../game/crews.js';
 /**
  * The crews talk.
  *
- * Small, and out of the way: a line of little text floating over the gun
- * whose crew said it, the kind of thing you catch if you are looking at
- * them and miss if you are not. No box, no bubble. One at a time, for long
+ * Small, and out of the way: a line of little text standing over the gun
+ * whose crew said it, held there on the screen as the camera moves, the
+ * kind of thing you catch if you are looking at them and miss if you are
+ * not. A fixed size in pixels, so it neither grows nor shrinks with the
+ * zoom: pulled out, it is still a small line over a small gun. No box, no
+ * bubble; a hairline down to the crew. One at a time, for long
  * enough to read, and a few seconds' quiet after it. The lines answer what
  * the battle actually did — a gun hit, a gun lost, a big piece down, the
  * airborne coming in — and between those, now and then, they complain,
@@ -173,16 +176,19 @@ export class Barks {
     if (this.el.hidden) return;
     const u = this.unit;
     if (this.t > this.until || !u || !u.alive) { this.el.hidden = true; return; }
-    // In the talk band under the top bar, over the gun's column: never in
-    // the lower middle of the screen, where the fingers are. Off screen,
-    // not shown at all.
+    // Over the crew, every frame: the hairline's foot a little above the gun
+    // so the line stands on it. Off the screen, or so high it would sit on
+    // the top bar, it is not shown at all rather than pinned somewhere the
+    // gun is not.
     const p = this._v.copy(u.pos);
-    p.y += 4.5;
+    p.y += 3;
     p.project(this.camera);
     if (p.z > 1 || Math.abs(p.x) > 1.0 || Math.abs(p.y) > 1.0) { this.el.style.opacity = '0'; return; }
+    const x = (p.x + 1) / 2 * innerWidth, y = (1 - p.y) / 2 * innerHeight;
+    const h = this.el.offsetHeight || 40, w2 = (this.el.offsetWidth || 160) / 2;
+    if (y - h < 64) { this.el.style.opacity = '0'; return; }
     this.el.style.opacity = '';
-    const x = (p.x + 1) / 2 * innerWidth;
-    const cx = Math.max(120, Math.min(innerWidth - 120, x));
-    this.el.style.transform = `translate(${Math.round(cx)}px, 0) translate(-50%, 0)`;
+    const cx = Math.max(w2 + 6, Math.min(innerWidth - w2 - 6, x));
+    this.el.style.transform = `translate(${Math.round(cx)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
   }
 }

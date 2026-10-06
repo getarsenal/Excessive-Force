@@ -538,6 +538,11 @@ export class HUD {
     if (!this.picker || !worldPoint) return;
     const sc = this.picker.toScreen(worldPoint);
     if (sc.behind) return;
+    // One at a time: a second inside two seconds of the first is the same
+    // moment, and three tilted words over each other read as none.
+    const now = performance.now();
+    if (now - (this._stampAt || 0) < 2000) return;
+    this._stampAt = now;
     if (!this._stamps) {
       this._stamps = [];
       for (let i = 0; i < 3; i++) {
@@ -830,7 +835,23 @@ export class HUD {
     this._promptTimer = 0;
   }
 
-  feed(text, kind = '') {
+  /**
+   * A line in the feed. The same line again inside a few seconds is the
+   * line still standing, not a second one; `key` names lines that are the
+   * same news in different words, and `merge` rewrites the standing line
+   * with the new one folded in (three unlocks, a run of crushed defenders).
+   */
+  feed(text, kind = '', { key = null, merge = null } = {}) {
+    const now = performance.now();
+    const live = this._feedLive || (this._feedLive = new Map());
+    const k = key || text;
+    const prev = live.get(k);
+    if (prev && prev.el.isConnected && now - prev.at < 4000) {
+      if (merge) prev.el.textContent = merge(prev.el.textContent);
+      prev.at = now;
+      this._feedLife(prev);
+      return;
+    }
     // On a phone the feed is off, and UNIT LOST, ON TARGET, SOLD and the
     // weapon releases were all feed-only: the lines that matter go to the
     // status row there instead.
@@ -842,9 +863,18 @@ export class HUD {
     line.textContent = text;
     this.el.feed.appendChild(line);
     while (this.el.feed.children.length > 6) this.el.feed.firstChild.remove();
-    setTimeout(() => {
-      line.classList.add('fade');
-      setTimeout(() => line.remove(), 520);
+    const rec = { el: line, at: now, t: 0 };
+    live.set(k, rec);
+    for (const [kk, r] of live) if (!r.el.isConnected) live.delete(kk);
+    this._feedLife(rec);
+  }
+
+  _feedLife(rec) {
+    clearTimeout(rec.t);
+    rec.el.classList.remove('fade');
+    rec.t = setTimeout(() => {
+      rec.el.classList.add('fade');
+      rec.t = setTimeout(() => rec.el.remove(), 520);
     }, 3600);
   }
 
@@ -985,6 +1015,7 @@ export class HUD {
     }
 
     // Build bar state.
+    const fresh = [];
     for (const u of UNITS) {
       const card = this.cards.get(u.id);
       const unlocked = b.isUnlocked(u);
@@ -1025,9 +1056,20 @@ export class HUD {
       } else if (!this._lastUnlocked.has(u.id)) {
         card.classList.remove('sealed');
         this._lastUnlocked.add(u.id);
-        // What was open at the start is not news.
-        if (this._seeded) this.feed(`${u.full} AVAILABLE`, 'big');
+        // What was open at the start is not news; what opens together is
+        // one line.
+        if (this._seeded) fresh.push(u.name);
       }
+    }
+    if (fresh.length) {
+      // Two names and a count: the dock's own badges say which the rest are.
+      const now = performance.now();
+      if (now - (this._unlockAt || 0) > 4000) this._unlockNames = [];
+      this._unlockAt = now;
+      this._unlockNames.push(...fresh);
+      const ns = this._unlockNames;
+      const text = `NEW IN THE ARSENAL · ${ns.slice(0, 2).join(' · ')}${ns.length > 2 ? ` +${ns.length - 2} MORE` : ''}`;
+      this.feed(text, 'big', { key: 'unlock', merge: () => text });
     }
     this._seeded = true;
 

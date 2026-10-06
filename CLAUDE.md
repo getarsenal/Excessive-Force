@@ -31,7 +31,13 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   dock sized by `--dock-h` so five fit a 360-wide phone. Everything that
   talks in a fight sits in the talk band (`--talk-top`), never in the lower
   middle where the fingers go; on a portrait phone the band hangs under the
-  right-hand column (`--right-bottom`, published by the HUD). A phone on
+  right-hand column (`--right-bottom`, published by the HUD). The one
+  exception is the crews' barks (`src/ui/barks.js`): a small line at a fixed
+  pixel size standing over its own gun, following it on the screen. Say a
+  thing once: one event is one line (the feed merges repeats by `key`), a
+  stamp at most every two seconds, a general at most every twenty-five, and
+  `node tools/chatterprobe.mjs <level>` counts what a five-minute fight says
+  per channel. A phone on
   its side (`orientation: landscape` and `max-height: 500px`) is the
   two-thumb layout: dock split to the two bottom corners, drawers as a
   side panel up the left edge. After any HUD change run
