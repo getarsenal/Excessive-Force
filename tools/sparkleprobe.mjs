@@ -66,7 +66,7 @@ const setup = await page.evaluate(() => {
     return false;
   };
   const got = [place('m777'), place('m119')];
-  for (const u of B.units) { u.age = 40; u.dugIn = true; }   // sandbag rings too
+  for (const u of B.units) { u.age = 40; u.dugIn = true; u.handHeld = true; }   // sandbag rings too; held, so no firing and no smoke in the lens
   window.__fastForward(1, 1 / 30);
   const u = B.units.find((x) => x.alive && x.model) || B.units.find((x) => x.alive);
   if (!u) return { units: [], got };
@@ -74,7 +74,8 @@ const setup = await page.evaluate(() => {
   for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm) mats.set(mm, { type: mm.type, metal: mm.metalness, rough: mm.roughness, env: mm.envMapIntensity, map: !!mm.map, flat: mm.flatShading }); });
   // The camera: twenty metres off the first gun, looking at it, the sun behind the camera.
   const R = window.rig; R.enabled = false;
-  R.target.copy(u.pos).setY(u.pos.y + 1.5); R.desiredTarget.copy(R.target); R.distance = R.desiredDistance = 22; R.pitch = R.desiredPitch = 0.35; R.yaw = R.desiredYaw = 0.8;
+  const D = +(new URLSearchParams(location.search).get('dist') || 120), P = +(new URLSearchParams(location.search).get('pitch') || 0.6);
+  R.target.copy(u.pos).setY(u.pos.y + 1.5); R.desiredTarget.copy(R.target); R.distance = R.desiredDistance = D; R.pitch = R.desiredPitch = P; R.yaw = R.desiredYaw = 0.8;
   for (let k = 0; k < 10; k++) R.update(0.1);
   document.body.classList.add('clear-view');
   return { got, units: B.units.map((q) => q.def.id), materials: [...mats.values()], env: !!window.__engine.scene.environment, exposure: window.__engine.renderer.toneMappingExposure, tone: window.__engine.renderer.toneMapping };
@@ -83,47 +84,42 @@ const shot = async (name) => {
   await page.evaluate(() => { for (let k = 0; k < 3; k++) window.__frame(); });
   await page.waitForTimeout(300);
   const path = `/tmp/out/sparkle-${name}.png`;
-  await page.screenshot({ path, timeout: 180000 });
+  await page.screenshot({ path, timeout: 420000 });
   const png = readPng(readFileSync(path));
   // Near-white pixels in the middle of the frame (where the gun is), isolated: brighter than all four neighbours by a margin.
-  let white = 0, sparks = 0;
+  let white = 0, sparks = 0, dots = 0;
   const { width: W, height: H, data } = png;
   const lum = (i) => 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
   for (let y = Math.floor(H * 0.3); y < H * 0.8; y++) for (let x = Math.floor(W * 0.15); x < W * 0.85; x++) {
     const i = (y * W + x) * 4; const l = lum(i);
-    if (l > 235) { white++; const n = [lum(i - 4), lum(i + 4), lum(i - W * 4), lum(i + W * 4)]; if (n.every((v) => l - v > 60)) sparks++; }
+    if (l > 170) { const n = [lum(i - 4), lum(i + 4), lum(i - W * 4), lum(i + W * 4)]; if (n.every((v) => l - v > 40)) dots++; if (l > 235) { white++; if (n.every((v) => l - v > 60)) sparks++; } }
   }
-  return { name, white, sparks };
+  const r = { name, white, sparks, dots };
+  console.error(JSON.stringify(r));
+  return r;
 };
 const out = { setup, shots: [] };
-out.shots.push(await shot('asis'));
-await page.evaluate(() => { const E = window.__engine; E.__env = E.scene.environment; E.scene.environment = null; });
-out.shots.push(await shot('noenv'));
-await page.evaluate(() => { const E = window.__engine; E.scene.environment = E.__env; const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm) { mm.__m = mm.metalness; mm.__r = mm.roughness; mm.metalness = 0; mm.roughness = 1; } }); });
-out.shots.push(await shot('matte'));
-await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm && mm.__m != null) { mm.metalness = mm.__m; mm.roughness = mm.__r; } }); });
-await page.evaluate(() => { const E = window.__engine; E.renderer.toneMappingExposure = 0.8; });
-out.shots.push(await shot('dimmer'));
-await page.evaluate(() => { const E = window.__engine; E.renderer.toneMappingExposure = 1.26; });
 out.shadows = await page.evaluate(() => { const E = window.__engine; return { enabled: E.renderer.shadowMap.enabled, type: E.renderer.shadowMap.type, size: E.sun?.shadow?.mapSize?.x, bias: E.sun?.shadow?.bias, normalBias: E.sun?.shadow?.normalBias, radius: E.sun?.shadow?.radius }; });
+out.bloom = await page.evaluate(() => { const E = window.__engine; return E.bloom ? { enabled: E.bloom.enabled, threshold: E.bloom.threshold, strength: E.bloom.strength, radius: E.bloom.radius } : null; });
+out.shots.push(await shot('asis'));
 if (out.shadows.enabled) {
-  await page.evaluate(() => { const E = window.__engine; E.__nb = E.sun.shadow.normalBias; E.sun.shadow.normalBias = 0.15; });
-  out.shots.push(await shot('normalbias015'));
-  await page.evaluate(() => { const E = window.__engine; E.sun.shadow.normalBias = E.__nb; E.__type = E.renderer.shadowMap.type; E.renderer.shadowMap.type = 1; /* PCF: three warns on PCFSoft and falls back to it */ E.renderer.shadowMap.needsUpdate = true; E.scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.needsUpdate = true; } }); });
-  out.shots.push(await shot('pcf'));
-  await page.evaluate(() => { const E = window.__engine; E.renderer.shadowMap.type = E.__type; E.renderer.shadowMap.needsUpdate = true; E.scene.traverse((o) => { if (o.material) { const ms = Array.isArray(o.material) ? o.material : [o.material]; for (const m of ms) m.needsUpdate = true; } }); const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) m.receiveShadow = false; }); });
-  out.shots.push(await shot('noreceive'));
-  await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) m.receiveShadow = true; }); const E = window.__engine; E.setShadows(false); });
+  await page.evaluate(() => { const E = window.__engine; E.setShadows(false); });
   out.shots.push(await shot('noshadow'));
   await page.evaluate(() => { const E = window.__engine; E.setShadows(true); });
 }
-out.bloom = await page.evaluate(() => { const E = window.__engine; return E.bloom ? { enabled: E.bloom.enabled, threshold: E.bloom.threshold, strength: E.bloom.strength, radius: E.bloom.radius } : null; });
 if (out.bloom?.enabled) {
   await page.evaluate(() => { const E = window.__engine; E.bloom.enabled = false; });
   out.shots.push(await shot('nobloom'));
-  await page.evaluate(() => { const E = window.__engine; E.bloom.enabled = true; E.bloom.threshold = 2.0; });
-  out.shots.push(await shot('bloomthr2'));
-  await page.evaluate(() => { const E = window.__engine; E.bloom.threshold = 1.3; });
+  await page.evaluate(() => { const E = window.__engine; E.bloom.enabled = true; });
 }
+if (out.shadows.enabled) {
+  await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) m.receiveShadow = false; }); });
+  out.shots.push(await shot('noreceive'));
+  await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) m.receiveShadow = true; }); const E = window.__engine; E.__nb = E.sun.shadow.normalBias; E.sun.shadow.normalBias = 0.15; });
+  out.shots.push(await shot('normalbias015'));
+  await page.evaluate(() => { const E = window.__engine; E.sun.shadow.normalBias = E.__nb; });
+}
+await page.evaluate(() => { const B = window.battle; for (const q of B.units) q.group.traverse((m) => { if (m.isMesh) for (const mm of Array.isArray(m.material) ? m.material : [m.material]) if (mm) { mm.__m = mm.metalness; mm.__r = mm.roughness; mm.metalness = 0; mm.roughness = 1; } }); });
+out.shots.push(await shot('matte'));
 console.log(JSON.stringify(out, null, 1));
 await b.close();
