@@ -148,6 +148,37 @@ export function applyWaterLook(water, look, fog) {
 
 // ── The shading ──────────────────────────────────────────────────────────
 
+// ── A floor under three's multi-scatter compensation ─────────────────
+// r186 compensates the sun's specular for the energy a single-scatter GGX
+// lobe loses, by 1 + F0 (1/Ess − 1), with Ess read from a small lookup
+// texture by roughness and the cosine to the eye. Along the silhouette of a
+// smooth-shaded model the interpolated normal leans away from the eye, the
+// cosine is nought, the lookup lands on its last texel, and Ess comes back
+// near nothing: one over nothing, and the pixel is pure white. Every gun,
+// soldier and sandbag wore a row of white dots along its edges on a phone,
+// bloomed into sparkles. The true Ess of a rough lobe at grazing is a
+// third or more, so the floor changes nothing the eye can see elsewhere.
+// Patched in the chunk, so every standard and physical material has it,
+// stylized or not, from the first program compiled.
+{
+  const FROM = 'float EssMs = material.dfg.x + material.dfg.y;';
+  const TO = 'float EssMs = max( material.dfg.x + material.dfg.y, 0.3 );';
+  const chunk = THREE.ShaderChunk.lights_fragment_begin;
+  if (chunk.includes(FROM)) THREE.ShaderChunk.lights_fragment_begin = chunk.replace(FROM, TO);
+  else if (!chunk.includes(TO)) console.warn('[look] three changed its multi-scatter compensation; the silhouette guard did not apply');
+  // The sky's reflection at the same silhouette: Fresnel goes to one as the
+  // surface turns edge-on, so the last few degrees of every smooth form
+  // reflect the whole sky and draw a white line round the model, which at a
+  // bird's-eye distance is a row of white dots. Faded out over the last ten
+  // degrees to the edge; a window or a river seen at any usable angle is
+  // untouched.
+  const RFROM = 'radiance += iblRadiance;';
+  const RTO = 'radiance += iblRadiance * smoothstep( 0.0, 0.18, saturate( dot( geometryNormal, geometryViewDir ) ) );';
+  const maps = THREE.ShaderChunk.lights_fragment_maps;
+  if (maps.includes(RFROM)) THREE.ShaderChunk.lights_fragment_maps = maps.replace(RFROM, RTO);
+  else if (!maps.includes(RTO)) console.warn('[look] three changed its environment lighting; the silhouette fade did not apply');
+}
+
 const STYLE_UNIFORMS = {
   uWrap: { value: 0.32 },        // how far the sun reaches round a form
   uFaceTop: { value: 1.0 },      // value structure: tops…
