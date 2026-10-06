@@ -611,7 +611,11 @@ body.laying #dock, body.laying #survey-btn, body.laying #survey-key, body.laying
   font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--dim); background: rgba(10, 13, 17, 0.45); padding: 3px 10px;
   pointer-events: none; opacity: 0; transition: opacity 0.3s ease; z-index: 15;
-  max-width: 56vw; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  /* Bounded by what the feed across from it may take (`#feed`, 46vw or
+     280px): fifty-six and forty-six made a hundred and two, and a boss
+     level's long status ran under the feed on a portrait phone. */
+  max-width: calc(100vw - var(--pad-l) - var(--pad-r) - min(46vw, 280px) - 8px);
+  text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #status.on { opacity: 1; }
 
