@@ -900,9 +900,25 @@ LEVELS = {
         "lon": -21.92667,
         "span": 900.0,
         "zoom": 15,
-        "ceiling": "auto",
+        # The elevation tiles over Reykjavík are not a survey of Reykjavík:
+        # the church comes back at 107 m and the open sea 800 m north of it
+        # at 98, in thirty-eight flat steps across the whole tile. Baked from
+        # that, the city stood on a 93 m table with the harbour dredged into
+        # a pit beside it. So the ground is built instead: a plane at the
+        # tide line and Skólavörðuholt as the broad 45 m dome it is, the
+        # church on the top, falling to the harbour over the whole map.
+        "dem": {"flat": 2.5},
+        "ceiling": None,
         "parks": [],
         "flatten": [[0, 0, [70, 70], 30]],
+        "peak": {
+            "height": 45.0,
+            "top": 50.0,
+            "slope": 0.075,
+            "floor": 2.5,
+            "wobble": [[0.12, 2, 0.9], [0.06, 3, 2.1], [0.03, 7, 0.4]],
+            "fade": 120.0,
+        },
     },
     "trakai": {
         "name": "Trakai Island Castle, Trakai",
@@ -1641,6 +1657,14 @@ def bake(level_id: str, natural_water: bool = False):
 
     elev, mpp = build_mosaic(cfg["lat"], cfg["lon"], cfg["span"], cfg["zoom"])
     print(f"  raw DEM {elev.shape}, {elev.min():.1f}..{elev.max():.1f} m")
+
+    # A level whose tiles are wrong says so and states its own ground: a
+    # plane at the given height, for `peak` and the pads to build on. The
+    # mosaic is still cut, for the scale.
+    dem = cfg.get("dem")
+    if dem and "flat" in dem:
+        elev = np.full_like(elev, float(dem["flat"]))
+        print(f"  DEM discarded: a flat plane at {float(dem['flat']):.1f} m instead")
 
     # Throw out the corrupt pixels before anything is measured off them.
     #

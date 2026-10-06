@@ -336,6 +336,19 @@ that way.)
   ground near Bennelong Point is about forty; the game then builds its own
   city on that and half the roofs are level with the hillside they stand in.
   `ceiling` compresses everything above a height rather than clipping it.
+- **The DEM can be wrong, not just a surface model, and then it is replaced,
+  not corrected.** Reykjavík's tiles put Hallgrímskirkja at 107 m and the
+  open sea 800 m north of it at 98, in thirty-eight flat steps across the
+  tile; baked, the city stood on a 93 m table with the harbour dredged into
+  a pit beside it. The test is the raw tile against what you know of the
+  place (`python3 tools/survey.py <id>` says "a table, not a hilltop" when
+  the level top is wider than the subject). The cure is `"dem": {"flat": h}`
+  in the level's `bake_terrain.py` entry — the tiles are discarded for a
+  plane at the tide line — with `peak` building the real landform on it
+  (Skólavörðuholt: 45 m, `top` 50, `slope` 0.075, `floor` at the plane) and
+  `ceiling: None`, since the auto ceiling would flatten the built hill. The
+  Overture coastline still cuts the sea, and the water surface then comes
+  out at the plane.
 - **z15 where the subject is small.** Bennelong Point is a hundred metres
   across, which at z14 is twelve DEM pixels, most of which the smoothing
   hands to the harbour — the point is simply not there. Corcovado at z14 is
