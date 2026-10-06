@@ -196,7 +196,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/airframes/` the aircraft, one module each (`geo.js` is the
   loft/surface vocabulary they are built from); the A-10 is still in
-  `aircraft.js`. Each keeps its real dimensions, nose along +Z, and the
+  `aircraft.js`. A builder says what an aircraft is made of a part at a
+  time and ends in `bakeAirframe(g)`, which merges every static part that
+  shares a material into one mesh and leaves what the sorties move alone
+  (anything named, and whatever a part's `userData` points at): a Chinook
+  is 16 meshes in flight, not 79, an Apache 25, not 218. Painted skins and
+  tail codes go through `cachedSkin`, one texture per kind for the
+  session, marked keep. `node tools/heliprobe.mjs <level> [n] [tier]
+  [kind] [seconds]` flies a lift of n towed guns under n Chinooks (or any
+  other kind under the C-130) and prints, every five seconds, the heap,
+  geometries, textures, the sorties alive and down, the garrison's hits on
+  them, and the worst single step of each simulation system. Each keeps its real dimensions, nose along +Z, and the
   named parts the sorties drive (`bomb`, `prop`, `rotorA`/`rotorB`,
   `tailrotor`, the Apache's chin turret `userData.gun`, which the sortie
   slews with `_layGun`; `node tools/apacheprobe.mjs` follows it in a
