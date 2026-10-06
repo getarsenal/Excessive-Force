@@ -17,6 +17,11 @@
  *     onChange(g)  after each reveal, with what came out, so the caller can
  *                  take its badges and notices down when the last one goes
  *
+ * With two or more waiting, OPEN ALL opens the lot: one crate goes through
+ * the sequence in the colour of the best thing in the pile, its card says
+ * how many and the best of them, and the haul is tallied under the stage,
+ * rarest first, like for like counted together.
+ *
  * Returns { destroy }.
  */
 import { feedback } from './feedback.js';
@@ -57,11 +62,15 @@ export function crateStage(host, { count, open, onChange } = {}) {
         <div class="cx-cfront"><span></span><b></b><i></i></div>
       </div></div>
     </div>
+    <div class="cx-haul" hidden></div>
     <div class="cx-ctl">
       <button class="cx-btn" type="button"></button>
+      <button class="cx-btn cx-all" type="button" hidden></button>
     </div>`;
   const stage = host.querySelector('.cx-stage');
   const btn = host.querySelector('.cx-btn');
+  const allBtn = host.querySelector('.cx-all');
+  const haul = host.querySelector('.cx-haul');
   const sparks = host.querySelector('.cx-sparks');
   const front = host.querySelector('.cx-cfront');
   const timers = [];
@@ -71,6 +80,9 @@ export function crateStage(host, { count, open, onChange } = {}) {
     const n = count();
     btn.disabled = busy || n <= 0;
     btn.textContent = n > 0 ? (stage.dataset.state === 'done' ? `OPEN ANOTHER · ${n} LEFT` : `OPEN · ${n} LEFT`) : 'ALL OPENED';
+    allBtn.hidden = n < 2;
+    allBtn.disabled = busy;
+    allBtn.textContent = `OPEN ALL · ${n}`;
     stage.classList.toggle('empty', n <= 0 && stage.dataset.state !== 'done');
   };
   const at = (ms, f) => timers.push(setTimeout(f, ms));
@@ -91,17 +103,39 @@ export function crateStage(host, { count, open, onChange } = {}) {
     }
   };
 
-  const go = () => {
-    if (busy || count() <= 0) return;
-    const got = open();
-    if (!got) { label(); return; }
+  const ORDER = ['LEGENDARY', 'RARE', 'UNCOMMON', 'COMMON'];
+
+  /**
+   * The sequence, for one crate's worth of loot or a pile of it: `got` is
+   * what the card shows, `pile` (when there is one) is tallied underneath.
+   */
+  const play = (got, pile = null) => {
     busy = true;
     const R = RARITY[got.rarity] || RARITY.COMMON;
     stage.style.setProperty('--rc', R.c);
     stage.className = `cx-stage r-${got.rarity.toLowerCase()}`;
-    front.querySelector('span').textContent = got.rarity;
-    front.querySelector('b').innerHTML = esc(got.line.toUpperCase());
-    front.querySelector('i').textContent = got.perk ? 'READY FOR YOUR NEXT BATTLE' : 'PAID NOW';
+    haul.hidden = true;
+    if (pile) {
+      front.querySelector('span').textContent = `${pile.length} CRATES`;
+      front.querySelector('b').innerHTML = esc(got.line.toUpperCase());
+      front.querySelector('i').textContent = 'THE BEST OF THEM';
+      const rows = new Map();
+      for (const g of pile) {
+        const k = g.id || g.line;
+        const r = rows.get(k) || { g, n: 0 };
+        r.n++;
+        rows.set(k, r);
+      }
+      const list = [...rows.values()].sort((a, b) => ORDER.indexOf(a.g.rarity) - ORDER.indexOf(b.g.rarity) || b.n - a.n);
+      haul.innerHTML = list.map(({ g, n }) => {
+        const c = (RARITY[g.rarity] || RARITY.COMMON).c;
+        return `<div class="cx-row" style="--rc:${c}"><span>${g.rarity}</span><b>${esc(g.line.toUpperCase())}</b><u>×${n}</u></div>`;
+      }).join('');
+    } else {
+      front.querySelector('span').textContent = got.rarity;
+      front.querySelector('b').innerHTML = esc(got.line.toUpperCase());
+      front.querySelector('i').textContent = got.perk ? 'READY FOR YOUR NEXT BATTLE' : 'PAID NOW';
+    }
     label();
     const reveal = () => {
       set('reveal');
@@ -115,7 +149,7 @@ export function crateStage(host, { count, open, onChange } = {}) {
         at(900, () => { flash.remove(); document.body.classList.remove('cx-quake'); });
       }
     };
-    const finish = () => { set('done'); busy = false; label(); if (onChange) onChange(got); };
+    const finish = () => { set('done'); busy = false; if (pile) haul.hidden = false; label(); if (onChange) onChange(got); };
     if (calm()) {
       set('open'); reveal(); at(200, finish);
       return;
@@ -129,7 +163,30 @@ export function crateStage(host, { count, open, onChange } = {}) {
     at(2900, finish);
   };
 
+  const go = () => {
+    if (busy || count() <= 0) return;
+    const got = open();
+    if (!got) { label(); return; }
+    play(got);
+  };
+
+  // Every crate there is, a crate's XP crossing a grade included (that pays
+  // crates of its own), to a sane limit.
+  const goAll = () => {
+    if (busy || count() <= 0) return;
+    const pile = [];
+    for (let k = 0; k < 500 && count() > 0; k++) {
+      const g = open();
+      if (!g) break;
+      pile.push(g);
+    }
+    if (!pile.length) { label(); return; }
+    const best = pile.reduce((a, b) => (ORDER.indexOf(b.rarity) < ORDER.indexOf(a.rarity) ? b : a));
+    play(best, pile.length > 1 ? pile : null);
+  };
+
   btn.addEventListener('click', go);
+  allBtn.addEventListener('click', goAll);
   stage.addEventListener('click', () => { if (stage.dataset.state === 'idle' || stage.dataset.state === 'done') go(); });
   set('idle');
   label();

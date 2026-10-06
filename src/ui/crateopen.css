@@ -127,7 +127,7 @@
   box-shadow: 0 0 34px color-mix(in srgb, var(--rc) 70%, transparent), inset 0 0 22px color-mix(in srgb, var(--rc) 22%, transparent); }
 .cx-cfront span { font: 700 10px/1 var(--f-data, monospace); letter-spacing: 0.42em; color: var(--rc); }
 .cx-cfront b { font: 700 16px/1.25 var(--f-data, monospace); letter-spacing: 0.06em; color: #fff; }
-.cx-cfront i { font: 600 9px/1 var(--f-data, monospace); letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.5); font-style: normal; }
+.cx-cfront i { font: 600 10px/1 var(--f-data, monospace); letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.5); font-style: normal; }
 .cx-stage.r-legendary:is([data-state="reveal"], [data-state="done"]) .cx-cfront { animation: cx-gold 1.6s ease-in-out infinite; }
 @keyframes cx-gold { 50% { box-shadow: 0 0 60px var(--rc), inset 0 0 30px color-mix(in srgb, var(--rc) 40%, transparent); } }
 
@@ -135,6 +135,23 @@
 .cx-btn { min-width: 210px; padding: 12px 20px; font: 700 12px/1 var(--f-data, monospace); letter-spacing: 0.2em; cursor: pointer;
   color: #f3cf6a; background: rgba(224, 163, 60, 0.1); border: 1px solid rgba(224, 163, 60, 0.6); }
 .cx-btn:disabled { opacity: 0.45; cursor: default; }
+.cx-ctl { gap: 8px; flex-wrap: wrap; }
+.cx-ctl .cx-btn { min-width: 0; flex: 1 1 140px; max-width: 220px; min-height: 44px; }
+.cx-all { color: #10130b; background: #f3cf6a; border-color: #f3cf6a; }
+.cx-btn[hidden] { display: none; }
+
+/* OPEN ALL's tally: rarest first, like for like counted together. */
+.cx-haul { display: flex; flex-direction: column; gap: 4px; max-width: 420px; margin: 2px auto 4px; padding: 0 4px; }
+.cx-haul[hidden] { display: none; }
+.cx-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 10px; background: rgba(10, 12, 9, 0.7);
+  border-left: 3px solid var(--rc); animation: cx-row-in 0.3s ease-out both; }
+.cx-row:nth-child(2) { animation-delay: 0.08s; } .cx-row:nth-child(3) { animation-delay: 0.16s; }
+.cx-row:nth-child(4) { animation-delay: 0.24s; } .cx-row:nth-child(n+5) { animation-delay: 0.32s; }
+.cx-row span { flex: 0 0 84px; font: 700 10px/1 var(--f-data, monospace); letter-spacing: 0.2em; color: var(--rc); }
+.cx-row b { flex: 1 1 auto; font: 700 11.5px/1.3 var(--f-data, monospace); letter-spacing: 0.04em; color: #fff; }
+.cx-row u { flex: 0 0 auto; font: 700 13px/1 var(--f-data, monospace); color: var(--rc); text-decoration: none; }
+@keyframes cx-row-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cx-row { animation: none; } }
 
 /* A legendary: the screen whites out and the whole page jumps. */
 .cx-whiteout { position: fixed; inset: 0; z-index: 100000; pointer-events: none; background: #fff8e0;
