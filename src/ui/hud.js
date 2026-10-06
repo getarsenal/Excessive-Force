@@ -725,11 +725,13 @@ export class HUD {
     // than at a guessed offset through it.
     const right = document.getElementById('hud-right');
     const publish = () => {
-      const h = Math.round(bar.getBoundingClientRect().height);
+      // Rounded up: a bar 121.6 tall published as 122 is fine, one 122.4
+      // tall published as 122 has the rails starting on its last pixel.
+      const h = Math.ceil(bar.getBoundingClientRect().height);
       if (h > 0) document.documentElement.style.setProperty('--hud-top', `${h}px`);
       if (right) {
         const r = right.getBoundingClientRect();
-        document.documentElement.style.setProperty('--right-bottom', `${Math.round(r.bottom)}px`);
+        document.documentElement.style.setProperty('--right-bottom', `${Math.ceil(r.bottom)}px`);
       }
     };
     publish();

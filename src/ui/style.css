@@ -2685,16 +2685,19 @@ body.clear-view #lensdirt { display: none; }
 #ec-next.boss { background: #d4313f; color: #fff; }
 #ec-next.boss::before { content: '\2620\00a0'; }
 
-#bossbar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 92px);
-  width: min(420px, calc(100vw - 32px)); display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center;
-  padding: 6px 10px; background: rgba(40, 6, 8, 0.78); border: 1px solid rgba(232, 96, 76, 0.55); border-radius: 6px; pointer-events: none; z-index: 5; }
+/* A row of the top bar, not a plate pinned under it at a guessed height:
+   pinned, it ran under the status line, the target card and SURVEY on a
+   phone. In the bar, the bar is taller by it and every rail follows. */
+#bossbar { grid-column: 1 / -1; justify-self: center; width: min(420px, 100%); margin-top: 2px;
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: center;
+  padding: 5px 10px; background: rgba(40, 6, 8, 0.78); border: 1px solid rgba(232, 96, 76, 0.55); border-radius: 6px; pointer-events: none; }
+#bossbar[hidden] { display: none; }
 #bossbar .bb-tag { font: 700 10px/1 var(--f-ui); letter-spacing: 0.2em; color: #ff8a8a; }
 #bossbar .bb-name { font: 600 12px/1 var(--f-ui); letter-spacing: 0.12em; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #bossbar .bb-track { grid-column: 1 / -1; height: 7px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
 #bossbar .bb-track > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #d4313f, #ff7a4d); transition: width 0.3s; }
 #bossbar.dead { opacity: 0.5; }
 body.ended #bossbar, body.clear-view #bossbar { display: none; }
-@media (max-width: 620px) { #bossbar { top: calc(max(8px, env(safe-area-inset-top)) + 118px); } }
 
 /* ── The campaign screen: operations, stars, bosses ─────────────────────── */
 .ef-star { color: #ffc53d; }

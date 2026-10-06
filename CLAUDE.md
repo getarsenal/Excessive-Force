@@ -42,6 +42,8 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   two-thumb layout: dock split to the two bottom corners, drawers as a
   side panel up the left edge. After any HUD change run
   `node tools/mobaudit_run.mjs iphone15pro-portrait iphone15pro-landscape`
+  and the same with `TT_LEVEL=moscow`, a boss battle, whose warlord bar is a
+  row of the top bar that Westminster never shows
   (sets the real insets through CDP, screenshots every state into
   `/tmp/out/mobaudit/`, prints small targets / overlaps / clipping /
   safe-area hits per screen) and read the numbers before the pictures;
