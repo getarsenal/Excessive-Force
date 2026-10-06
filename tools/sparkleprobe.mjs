@@ -101,6 +101,19 @@ const shot = async (name) => {
 const out = { setup, shots: [] };
 out.shadows = await page.evaluate(() => { const E = window.__engine; return { enabled: E.renderer.shadowMap.enabled, type: E.renderer.shadowMap.type, size: E.sun?.shadow?.mapSize?.x, bias: E.sun?.shadow?.bias, normalBias: E.sun?.shadow?.normalBias, radius: E.sun?.shadow?.radius }; });
 out.bloom = await page.evaluate(() => { const E = window.__engine; return E.bloom ? { enabled: E.bloom.enabled, threshold: E.bloom.threshold, strength: E.bloom.strength, radius: E.bloom.radius } : null; });
+// If the game already carries the guards (src/world/look.js), take them out
+// first, so 'asis' is always the unguarded frame and 'guard' the guarded one.
+out.unguarded = await page.evaluate(() => {
+  const T = window.THREE; if (!T) return 'no window.THREE';
+  const FROM = 'float EssMs = material.dfg.x + material.dfg.y;', TO = 'float EssMs = max( material.dfg.x + material.dfg.y, 0.3 );';
+  const RFROM = 'radiance += iblRadiance;', RTO = 'radiance += iblRadiance * smoothstep( 0.0, 0.18, saturate( dot( geometryNormal, geometryViewDir ) ) );';
+  const had = T.ShaderChunk.lights_fragment_begin.includes(TO) || T.ShaderChunk.lights_fragment_maps.includes(RTO);
+  if (!had) return { hadGuards: false };
+  T.ShaderChunk.lights_fragment_begin = T.ShaderChunk.lights_fragment_begin.replace(TO, FROM);
+  T.ShaderChunk.lights_fragment_maps = T.ShaderChunk.lights_fragment_maps.replace(RTO, RFROM);
+  let n = 0; window.__engine.scene.traverse((o) => { if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m && m.isMeshStandardMaterial) { m.needsUpdate = true; n++; } });
+  return { hadGuards: true, materials: n };
+});
 out.shots.push(await shot('asis'));
 // The same frame twice: as it is, then with the two shader guards patched
 // into three's chunks at run time and every program rebuilt. Same scene,
