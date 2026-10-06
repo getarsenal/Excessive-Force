@@ -183,6 +183,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `docs/snapshots/pre-beauty-v1.txt`. `node tools/renderprobe.mjs <level>`
   is the render-only A/B (median frame, calls, triangles, programs) and
   `node tools/unitshot.mjs <level>` photographs a battery from close.
+  `look.js` also patches two guards into three's own shader chunks at load:
+  a floor under r186's multi-scatter compensation (one over a near-zero
+  lookup at a smooth model's silhouette was a pure white pixel, bloomed to
+  a sparkle on every gun, soldier and sandbag) and a fade on the sky's
+  reflection over the last ten degrees to the edge; `TAG=x DIST=22
+  PITCH=0.35 node tools/sparkleprobe.mjs` shoots a battery close up,
+  patches the guards out and in on the same frame and counts the white rim
+  pixels either way. Specular fireflies are a shader question before they
+  are a lighting one: look at the dots at one-to-one first.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/airframes/` the aircraft, one module each (`geo.js` is the
