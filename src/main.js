@@ -1849,7 +1849,7 @@ async function boot() {
     <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
   document.getElementById('ui').appendChild(layEl);
   const layRead = layEl.querySelector('#lay-read'), layFire = layEl.querySelector('#lay-fire');
-  let layDrag = null, layWas = null, layReady = null;
+  let layDrag = null, layWas = null, layReady = null, layFov = null;
   const enterLay = (u) => {
     if (!battle.startLay(u)) return;
     unitCard.hide();
@@ -1861,12 +1861,20 @@ async function boot() {
     layEl.hidden = false;
     layReady = null;
     document.body.classList.add('laying');
+    // A wider lens for the lay: fifty-two degrees could not hold a gun
+    // and a tower in one portrait frame from anywhere over the roofs.
+    layFov = engine.camera.fov;
+    engine.camera.fov = 66; engine.camera.updateProjectionMatrix();
+    // A cut to the breech, not a glide: the pose is set and then held.
+    layFrame();
+    rig.yaw = rig.desiredYaw; rig.pitch = rig.desiredPitch; rig.distance = rig.desiredDistance; rig.target.copy(rig.desiredTarget);
     feedback.emit('open');
   };
   const exitLay = () => {
     if (layEl.hidden && !battle.lay) return;
     battle.endLay();
     rig.enabled = true;
+    if (layFov != null) { engine.camera.fov = layFov; engine.camera.updateProjectionMatrix(); layFov = null; }
     if (layWas) { rig.desiredDistance = layWas.dist; rig.desiredPitch = layWas.pitch; layWas = null; }
     layEl.hidden = true;
     layDrag = null;
@@ -1900,12 +1908,18 @@ async function boot() {
     const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
     // High over the breech, looking down the line: a camera at the gun's
     // own height in a street is a camera inside the house next door.
-    // Pitched to keep a tower three hundred metres off inside a portrait
-    // screen as well as the gun: steeper and the player aims at a line.
-    rig.desiredTarget.set(u.pos.x + fx * 30, u.pos.y + 9, u.pos.z + fz * 30);
+    // From the gun's own geometry: sixty metres behind the breech and
+    // forty up, over the roofs of the town, looking seventy down the lane.
+    // Through the wider lens the lay opens (sixty-six degrees), that puts
+    // the gun seventeen degrees under the centre, just clear of the
+    // trigger, and a hit a hundred metres up a tower three hundred metres
+    // off inside the top, so the gun, the line and what it ends on share
+    // the one picture, in portrait too.
+    const F = 70, BK = 60, H = 40, LY = 2;
+    rig.desiredTarget.set(u.pos.x + fx * F, u.pos.y + LY, u.pos.z + fz * F);
     rig.desiredYaw = L.yaw + Math.PI;
-    rig.desiredPitch = 0.46;
-    rig.desiredDistance = 44;
+    rig.desiredPitch = Math.atan2(H - LY, F + BK);
+    rig.desiredDistance = Math.hypot(F + BK, H - LY);
     const ready = u.state === 'ready' && u.cooldown <= 0;
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
     const deg = Math.round(L.elev * 180 / Math.PI);

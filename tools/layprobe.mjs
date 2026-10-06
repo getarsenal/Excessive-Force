@@ -54,7 +54,7 @@ const cardLay = await box('#uc2-lay');
 await page.screenshot({ path: '/tmp/out/lay-card.png' });
 await page.click('#uc2-lay');
 await page.waitForTimeout(2500);
-const laid0 = await page.evaluate(() => { const L = window.battle.lay; return L && { yaw: +L.yaw.toFixed(3), elev: +L.elev.toFixed(3), range: Math.round(L.range), masonry: L.masonry, hit: L.hit, held: L.unit.handHeld, rigOff: !window.rig.enabled, laying: document.body.classList.contains('laying'), read: document.getElementById('lay-read').textContent }; });
+const laid0 = await page.evaluate(() => { const L = window.battle.lay; const R = window.rig; const proj = (v) => { const q = v.clone().project(R.camera); return [Math.round((q.x + 1) / 2 * innerWidth), Math.round((1 - q.y) / 2 * innerHeight)]; }; return L && { rigYaw: +R.yaw.toFixed(2), wantYaw: +((L.yaw + Math.PI) % (2 * Math.PI)).toFixed(2), dist: Math.round(R.distance), gunPx: proj(L.unit.pos), impactPx: proj(L.impact), yaw: +L.yaw.toFixed(3), elev: +L.elev.toFixed(3), range: Math.round(L.range), masonry: L.masonry, hit: L.hit, held: L.unit.handHeld, rigOff: !window.rig.enabled, laying: document.body.classList.contains('laying'), read: document.getElementById('lay-read').textContent }; });
 // A drag on the canvas: left 60 px, up 30 px.
 const cv = await (await page.$('canvas')).boundingBox();
 const cx = cv.x + cv.width * 0.5, cy = cv.y + cv.height * 0.45;
