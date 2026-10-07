@@ -106,7 +106,7 @@ export const UNITS = [
     crew: 3, health: 120,
     // Indirect and slow: a high arc that comes down on a roof or a terrace the
     // guns cannot see, with a fifth of a howitzer's punch.
-    projectile: { kind: 'arc', speed: 150, gravity: 9.81, trail: 0.6 },
+    projectile: { kind: 'arc', speed: 150, gravity: 9.81, trail: 0.6, mortar: true },
     warhead: { lethal: 1.2, radius: 5.5, power: 3600, fx: 1.4, kinetic: 0.5 },
     dispersion: 7.0,
     blurb: '120 mm on a baseplate. Drops in from above onto whatever the guns cannot see.',
@@ -122,6 +122,7 @@ export const UNITS = [
     // one. (Measured: the M119 and M777 bounding boxes are 3.4:1 and 2.3:1
     // along X; the M109, M270 and M142 are long along Z.)
     modelYaw: -Math.PI / 2,
+    muzzle: { f: 3.0, h: 1.6 },   // where the round leaves: forward of the plot, and up
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
     // Direct-fire howitzer: a high muzzle velocity on the *low* arc, so the
@@ -140,6 +141,7 @@ export const UNITS = [
     id: 'm777', name: 'M777', full: 'M777A2 155 mm Howitzer', tier: 'GUN',
     cost: 1300, unlockFrac: 0.085,
     tint: ARTILLERY_GREEN, model: 'M777', modelLength: 10.7,
+    muzzle: { f: 5.4, h: 2.6 },   // where the round leaves: forward of the plot, and up
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,
     // The opposite quarter turn to the M119, because the two towed guns are
@@ -159,6 +161,7 @@ export const UNITS = [
     id: 'm109', name: 'PALADIN', full: 'M109A7 Paladin SPH', tier: 'SPH',
     cost: 2200, unlockFrac: 0.15,
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
+    muzzle: { f: 5.2, h: 2.9 },   // where the round leaves: forward of the plot, and up
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
     projectile: { kind: 'arc', speed: 420, gravity: 9.81, trail: 1.0 },
@@ -632,65 +635,83 @@ export function makeInfantryMesh(colour = 0x4a5340, opts = {}) {
  * on its right with the next round held up over the muzzle, and the open
  * ammunition crate at his feet. True size: a 1.76 m barrel, a 0.7 m plate.
  */
-export function makeMortarTeam() {
+/** The mortar's tube as the crew lays it, and its length. */
+export const MORTAR = { e0: 62 * Math.PI / 180, breech: { y: 0.12, z: 0.05 }, len: 1.76 };
+
+export function makeMortarTeam({ live = false } = {}) {
   const g = new THREE.Group();
   const gun = new THREE.MeshStandardMaterial({ color: 0x2e332b, roughness: 0.6, metalness: 0.35 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x1c1e1a, roughness: 0.55, metalness: 0.4 });
   const olive = new THREE.MeshStandardMaterial({ color: 0x55603f, roughness: 0.7 });
   const band = new THREE.MeshStandardMaterial({ color: 0xc9a92a, roughness: 0.6 });
   const wood = new THREE.MeshStandardMaterial({ color: 0x4d4a33, roughness: 0.85 });
-  const add = (m) => { m.castShadow = true; g.add(m); return m; };
+  const add = (m, to = g) => { m.castShadow = true; to.add(m); return m; };
 
-  const e = 62 * Math.PI / 180;
+  const e = MORTAR.e0;
   const dir = new THREE.Vector3(0, Math.sin(e), Math.cos(e));
-  const breech = new THREE.Vector3(0, 0.12, 0.05);
-  const at = (t) => breech.clone().addScaledVector(dir, t);
+  const breech = new THREE.Vector3(0, MORTAR.breech.y, MORTAR.breech.z);
+  // The tube and everything that elevates with it hang off a pivot at the
+  // breech, so a lay can tilt the tube (`tube.rotation.x = e0 - elevation`)
+  // and the round the loader holds goes with it. Positions under the pivot
+  // are measured from the breech.
+  const tube = new THREE.Group();
+  tube.name = 'tube';
+  tube.position.copy(breech);
+  g.add(tube);
+  const at = (t) => dir.clone().multiplyScalar(t);
 
   // Baseplate and the ball socket the breech sits in.
   add(new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.38, 0.06, 18), gun)).position.set(0, 0.04, 0.05);
   add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), dark)).position.copy(breech);
   // The tube, with the thicker breech end and a ring at the muzzle.
-  add(rod(at(0), at(1.76), 0.075, gun));
-  add(rod(at(0), at(0.35), 0.09, gun));
-  add(rod(at(1.7), at(1.77), 0.088, dark));
+  add(rod(at(0), at(MORTAR.len), 0.075, gun), tube);
+  add(rod(at(0), at(0.35), 0.09, gun), tube);
+  add(rod(at(1.7), at(1.77), 0.088, dark), tube);
   // The bipod: a collar a metre up the tube, two legs splayed forward to the
   // ground, a spreader between them, the elevating screw up the middle.
   const collar = at(1.05);
-  add(rod(collar.clone().setX(-0.2), collar.clone().setX(0.2), 0.05, dark));
-  const feet = [new THREE.Vector3(-0.42, 0.02, 1.02), new THREE.Vector3(0.42, 0.02, 1.02)];
+  add(rod(collar.clone().setX(-0.2), collar.clone().setX(0.2), 0.05, dark), tube);
+  const feet = [new THREE.Vector3(-0.42, 0.02, 1.02).sub(breech), new THREE.Vector3(0.42, 0.02, 1.02).sub(breech)];
   for (const f of feet) {
-    add(rod(collar, f, 0.028, gun));
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.1), dark)).position.copy(f);
+    add(rod(collar, f, 0.028, gun), tube);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.04, 0.1), dark), tube).position.copy(f);
   }
   const spread = (k) => collar.clone().lerp(feet[k], 0.6);
-  add(rod(spread(0), spread(1), 0.015, dark));
-  add(rod(collar, spread(0).clone().lerp(spread(1), 0.5), 0.025, dark));
+  add(rod(spread(0), spread(1), 0.015, dark), tube);
+  add(rod(collar, spread(0).clone().lerp(spread(1), 0.5), 0.025, dark), tube);
   // The sight on the left of the collar, where the gunner's eye is.
-  const sight = add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.1), dark));
+  const sight = add(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.1), dark), tube);
   sight.position.set(-0.24, collar.y + 0.1, collar.z);
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8), dark)).position.set(-0.24, collar.y + 0.22, collar.z);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8), dark), tube).position.set(-0.24, collar.y + 0.22, collar.z);
 
   // The gunner, kneeling on the left, facing the sight.
   const gunner = makeInfantryMesh(0x4a5340, { weapon: 'm120', role: 'gunner' });
-  gunner.position.set(-0.66, 0, collar.z - 0.02);
+  gunner.name = 'gunner';
+  gunner.position.set(-0.66, 0, breech.z + collar.z - 0.02);
   gunner.rotation.y = Math.PI / 2;
   g.add(gunner);
   // The loader, standing on the right, the round up over the muzzle.
   const loader = makeInfantryMesh(0x3f4738, { weapon: 'm120', role: 'loader' });
+  loader.name = 'loader';
   loader.position.set(0.56, 0, 1.02);
   loader.rotation.y = -Math.PI / 2;
   g.add(loader);
-  // A hand's width clear of the muzzle and into his hands, so it reads as a
-  // round being held rather than as more tube.
+  // The round in his hands: a hand's width clear of the muzzle and into his
+  // hands, so it reads as a round being held rather than as more tube. Its
+  // own group under the tube, so a lay can lift it out of the crate and
+  // drop it in.
+  const round = new THREE.Group();
+  round.name = 'round';
+  tube.add(round);
   const held = new THREE.Vector3(0.07, 0, 0);
   const r0 = at(1.95).add(held), r1 = at(2.47).add(held);
-  add(rod(r0, r1, 0.06, olive));
-  add(rod(r0.clone().lerp(r1, 0.62), r0.clone().lerp(r1, 0.7), 0.062, band));
-  const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 8), olive));
+  add(rod(r0, r1, 0.06, olive), round);
+  add(rod(r0.clone().lerp(r1, 0.62), r0.clone().lerp(r1, 0.7), 0.062, band), round);
+  const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 8), olive), round);
   nose.position.copy(r0).addScaledVector(dir, -0.08);
   nose.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().negate());
   // Fins at the top, which is the tail: the round goes in nose first.
-  add(rod(r1, r1.clone().addScaledVector(dir, 0.1), 0.075, dark));
+  add(rod(r1, r1.clone().addScaledVector(dir, 0.1), 0.075, dark), round);
 
   // The ready rounds: an open crate by the loader's feet, three in it.
   add(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.2, 0.34), wood)).position.set(0.95, 0.1, 0.35);
@@ -699,5 +720,11 @@ export function makeMortarTeam() {
     add(rod(a, b, 0.05, olive));
   }
   g.userData.weapon = 'm120';
+  if (live) {
+    // Where the round sits in the crate, measured from where it is held, in
+    // the tube's frame: the loader's reach, for the lay to play back.
+    g.userData.parts = { tube, round, gunner, loader };
+    g.userData.crateOffset = new THREE.Vector3(0.95, 0.3, 0.35).sub(breech).sub(r0);
+  }
   return g;
 }

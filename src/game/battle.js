@@ -5,7 +5,7 @@ import * as THREE from 'three';
 const LAY_PTS = 300;
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
-import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel } from './units.js';
+import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
 import { releaseTree } from '../core/release.js';
 
 /** How long a lift package stays open after the first unit is placed. */
@@ -268,17 +268,21 @@ export class Battle {
     const p = unit.def.projectile;
     const from = this._layMuzzle(unit);
     // Laid where the crew had it, so the first picture is a gun on its target.
-    let yaw = unit.yaw, elev = 0.3;
+    let yaw = unit.yaw, elev = p.mortar ? 1.05 : 0.3;
     const aim = this.aimFor(unit) || this.target;
     if (aim) {
       yaw = Math.atan2(aim.x - from.x, aim.z - from.z);
-      const low = solveArc(from, aim, p.speed, p.gravity, false);
-      if (low) elev = Math.atan2(low.y, Math.hypot(low.x, low.z));
+      // The crew's own solution: a gun's low shot, a mortar's high one.
+      const sol = p.mortar ? solveBallistic(from, aim, p.speed, p.gravity, 12.0, null)?.vel
+        : solveArc(from, aim, p.speed, p.gravity, false);
+      if (sol) elev = Math.atan2(sol.y, Math.hypot(sol.x, sol.z));
     }
     this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
       reloadTotal: unit.def.reload * this.reloadFactor, kick: 0 };
     unit.handHeld = true;
+    // A mortar's crew is seen working while the player has it (see _mortarLive).
+    if (p.mortar) this._mortarLive(unit, true);
     this._layBuild();
     this.layTurn(0, 0);
     // The crew's solution was to a man in a window; the drawn line should
@@ -292,7 +296,9 @@ export class Battle {
       const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0, (vv) => this._trajectoryClear(from, vv, p.gravity));
       if (lofted) this.layTurn(0, Math.atan2(lofted.vel.y, Math.hypot(lofted.vel.x, lofted.vel.z)) - this.lay.elev);
     }
-    for (let k = 0; k < 40 && !counts(); k++) this.layTurn(0, 0.015);
+    // A mortar's high solution already lands on the point; elevating it
+    // further only shortens the shot.
+    if (!p.mortar) for (let k = 0; k < 40 && !counts(); k++) this.layTurn(0, 0.015);
     this.layLine.visible = true;
     this.layRing.visible = true;
     return true;
@@ -301,8 +307,63 @@ export class Battle {
   endLay() {
     if (!this.lay) return;
     this.lay.unit.handHeld = false;
+    this._mortarLive(this.lay.unit, false);
     this.lay = null;
     if (this.layLine) { this.layLine.visible = false; this.layRing.visible = false; }
+  }
+
+  /**
+   * The mortar's crew, live, while the player has the tube: the baked team
+   * is hidden and an articulated one stands in, its tube pivoting to the
+   * lay's elevation, the loader reaching a round out of the crate and up to
+   * the muzzle over the reload, the gunner leaning into the traverse. The
+   * baked team comes back when the crew get it back.
+   */
+  _mortarLive(unit, on) {
+    if (on) {
+      if (unit.live) return;
+      const g = makeMortarTeam({ live: true });
+      const hidden = [...unit.group.children];
+      for (const c of hidden) c.visible = false;
+      unit.group.add(g);
+      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, hidden, lean: 0, fired: false, t: 0 };
+      return;
+    }
+    if (!unit.live) return;
+    unit.group.remove(unit.live.g);
+    releaseTree(unit.live.g, this.scene);
+    for (const c of unit.live.hidden) c.visible = true;
+    unit.live = null;
+  }
+
+  _animateMortar(u, dt) {
+    const A = u.live, L = this.lay && this.lay.unit === u ? this.lay : null;
+    A.t += dt;
+    // The tube follows the lay.
+    const elev = L ? L.elev : MORTAR.e0;
+    A.tube.rotation.x += ((MORTAR.e0 - elev) - A.tube.rotation.x) * Math.min(1, dt * 9);
+    // The loader: a round out of the crate and up to the muzzle over the
+    // reload, held there until it is fired; then he reaches for the next.
+    const total = Math.max(0.01, L?.reloadTotal || u.def.reload * this.reloadFactor);
+    const k = 1 - Math.max(0, u.cooldown) / total;   // 0 just fired, 1 loaded
+    if (A.fired) { A.fired = false; A.round.visible = false; }
+    if (k < 0.3) {
+      A.round.visible = false;
+      const s = Math.sin((k / 0.3) * Math.PI);
+      A.loader.position.y = -0.22 * s;
+      A.loader.rotation.x = 0.35 * s;
+    } else {
+      const r = THREE.MathUtils.clamp((k - 0.3) / 0.55, 0, 1);
+      const e = 1 - (1 - r) * (1 - r);
+      A.round.visible = true;
+      A.round.position.copy(A.crate).multiplyScalar(1 - e);
+      A.loader.position.y = 0;
+      A.loader.rotation.x = 0.12 * (1 - e);
+    }
+    // The gunner leans into a traverse and settles back on the sight.
+    A.lean *= Math.max(0, 1 - dt * 4);
+    A.gunner.rotation.z = A.lean * 0.5;
+    A.gunner.position.y = Math.sin(A.t * 2.2) * 0.006;
   }
 
   /** Turn and elevate, in radians; the arc is redrawn. */
@@ -310,17 +371,41 @@ export class Battle {
     const L = this.lay;
     if (!L) return;
     const p = L.unit.def.projectile;
-    // A direct-fire gun has a mount, not a howitzer's elevation.
-    const top = p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
+    // A direct-fire gun has a mount, not a howitzer's elevation; a mortar
+    // has nothing under forty-five degrees in it.
+    const top = p.mortar ? 1.48 : p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
+    const bottom = p.mortar ? 0.785 : -0.08;
     L.yaw += dyaw;
-    L.elev = THREE.MathUtils.clamp(L.elev + delev, -0.08, top);
+    L.elev = THREE.MathUtils.clamp(L.elev + delev, bottom, top);
+    if (L.unit.live) L.unit.live.lean = THREE.MathUtils.clamp(L.unit.live.lean + dyaw * 6, -0.35, 0.35);
     L.unit.yaw = L.yaw;
     L.unit.group.rotation.y = L.yaw;
     this._layArc();
   }
 
   _layMuzzle(unit) {
-    return unit.pos.clone().setY(unit.pos.y + (unit.def.model === 'infantry' ? 1.3 : 2.2));
+    return this._muzzle(unit, this.lay && this.lay.unit === unit ? this.lay.elev : null);
+  }
+
+  /**
+   * Where a unit's round leaves it. A gun's barrel ends well forward of the
+   * plot its crew stands on and above it (`def.muzzle`: forward along the
+   * facing, and up); a man's rocket leaves his shoulder; the mortar's round
+   * leaves the top of a tube laid at an elevation, which the lay sets and
+   * the crew keeps at sixty-two degrees. Every round used to start two
+   * metres over the middle of the plot, which for a howitzer was inside the
+   * breech and for a mortar the ground beside it.
+   */
+  _muzzle(unit, elev = null) {
+    const def = unit.def, p = unit.pos, yaw = unit.yaw;
+    const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    if (def.projectile?.mortar) {
+      const e = elev ?? MORTAR.e0;
+      const f = MORTAR.breech.z + Math.cos(e) * MORTAR.len, h = MORTAR.breech.y + Math.sin(e) * MORTAR.len;
+      return new THREE.Vector3(p.x + fx * f, p.y + h, p.z + fz * f);
+    }
+    const m = def.muzzle || (def.model === 'infantry' ? { f: 0.7, h: 1.3 } : { f: 0, h: 2.2 });
+    return new THREE.Vector3(p.x + fx * m.f, p.y + m.h, p.z + fz * m.f);
   }
 
   /**
@@ -431,11 +516,12 @@ export class Battle {
     const u = L.unit;
     if (!u.alive || u.state !== 'ready' || u.cooldown > 0) return false;
     this._layArc();
-    const ok = this._fireOne(u, L.impact.clone(), { vel: this._layVel(L), hand: true });
+    const ok = this._fireOne(u, L.impact.clone(), { vel: this._layVel(L), hand: true, from: L.from });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
       L.reloadTotal = u.cooldown;
       L.kick = 1;
+      if (u.live) u.live.fired = true;
       this.handShots++;
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }
@@ -1689,6 +1775,7 @@ export class Battle {
    * pinned: every gun of a type is a clone sharing their buffers.
    */
   _dropUnit(unit) {
+    if (unit.live) this._mortarLive(unit, false);
     this.scene.remove(unit.group);
     releaseTree(unit.group, this.scene, this.models?.cache?.values());
   }
@@ -1889,8 +1976,7 @@ export class Battle {
 
   _fireOne(unit, aimPoint, opts = {}) {
     const def = unit.def;
-    const muzzleHeight = def.model === 'infantry' ? 1.3 : 2.2;
-    const from = unit.pos.clone().setY(unit.pos.y + muzzleHeight);
+    const from = opts.from ? opts.from.clone() : this._muzzle(unit);
 
     // Dispersion is applied to the aim point, so error grows along the line of
     // fire the way real gun dispersion does. A crew that has landed rounds
@@ -1920,6 +2006,14 @@ export class Battle {
     const p = def.projectile;
     if (opts.vel) {
       vel = opts.vel.clone();
+    } else if (p.mortar) {
+      // A mortar has no flat shot in it: the round goes up the tube and comes
+      // down on the point, on the charge that makes the arc. The low
+      // solution a gun takes when the way is clear was a mortar shooting
+      // horizontally at something fifty feet away.
+      const sol = solveBallistic(from, aim, p.speed, p.gravity, 12.0, null);
+      if (!sol) { unit.hold = 'out of range'; return false; }
+      vel = sol.vel;
     } else if (p.flat || p.kind === 'arc') {
       // Every gun shoots flat first, and lofts only when it has to.
       //
@@ -2128,7 +2222,7 @@ export class Battle {
       }
 
       // The player's hand on it: the crew holds, the breech reloads.
-      if (u.handHeld) { u.cooldown = Math.max(0, u.cooldown - dt); continue; }
+      if (u.handHeld) { u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue; }
 
       // A machine-gun team fires bursts of its own, not shells.
       if (u.def.mg) { this._updateMG(u, dt); continue; }
