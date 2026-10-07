@@ -499,8 +499,16 @@ export class Battle {
     const pts = [prev.clone()];
     const edge = (this.terrain?.span || 900) * 1.6;
     L.hit = false; L.masonry = false; L.blocked = false;
+    // Enough of the flight to land: three hundred steps of a twenty-fifth of
+    // a second is twelve seconds, and a mortar's lob on reduced charge is in
+    // the air for seventeen. The line ended in mid-air and said the round
+    // would land there; the round carried on. The step is sized to the
+    // flight, down to the ground the muzzle stands on and a good way below.
+    const drop = Math.max(30, L.from.y - this.terrain.heightAt(L.from.x, L.from.z) + 120);
+    const tFlight = (v.y + Math.sqrt(v.y * v.y + 2 * g * drop)) / g;
+    const step = THREE.MathUtils.clamp((tFlight * 1.1) / (LAY_PTS - 2), 0.04, 0.25);
     for (let i = 1, t = 0; i < LAY_PTS; i++) {
-      t += 0.04;
+      t += step;
       pos.set(L.from.x + v.x * t, L.from.y + v.y * t - 0.5 * g * t * t, L.from.z + v.z * t);
       dir.subVectors(pos, prev);
       const len = dir.length();
