@@ -302,7 +302,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   tools/layviews.mjs` lays every weapon, measures how much of the view
   is the weapon itself, zooms, and pulls the trigger (tracers, missile,
   round counted), `node tools/mortarprobe.mjs` the mortar's lay,
-  load and shot, `node tools/samprobe.mjs` a rocket team against a SAM
+  load and shot (FIRE lets the round go: it slides down the tube and the
+  shell leaves at the pin, `MORTAR_DROP` later, `_mortarLaunch`; the loader
+  ducks, turns low to the crate, and comes up once with the next round;
+  `node tools/loaderstrip.mjs` films one shot and reload as a contact
+  sheet), `node tools/samprobe.mjs` a rocket team against a SAM
   compound, which is solid now: launchers, radars and revetments carry
   colliders and a round into one is a direct hit; the gunner's seat
   (`startSeat`/`seatMove`/`seatFire`): while a gunship is in its orbit or

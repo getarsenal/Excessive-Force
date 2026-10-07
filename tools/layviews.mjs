@@ -81,8 +81,10 @@ for (const kind of list) {
       const centred = Math.hypot(q.x, q.y) < 0.03;
       const tr0 = B.tracerFX?.fired || 0, pr0 = B.projectiles?.list?.length ?? B.projectiles?.active?.length ?? -1;
       const fired = B.handFire();
-      // The burst goes out over its own interval.
-      for (let k = 0; k < 20; k++) { window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 10)); }
+      // A machine gun fires while the trigger is held: a second and a half of it.
+      if (u.def.mg) B.trigger = true;
+      for (let k = 0; k < 20; k++) { if (k === 15) B.trigger = false; window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 10)); }
+      B.trigger = false;
       return { mag: window.__lay.mag(), fov: +cam.fov.toFixed(1), centred, fired, tracers: (B.tracerFX?.fired || 0) - tr0, shots: B.shotsFired, hand: B.handShots, sight: u.def.sight?.kind, fire: document.getElementById('lay-fire')?.textContent, hidden: document.getElementById('lay-zoom')?.hidden };
     });
     await page.waitForTimeout(300);

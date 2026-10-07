@@ -54,7 +54,10 @@ const r = await page.evaluate(async () => {
     for (let i = 0; i < n; i++) {
       u.cooldown = 0; u.burstLeft = 0;
       if (B.handFire()) res.fired++;
-      for (let k = 0; k < 30; k++) { window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 5)); }
+      // A machine gun is held on for a second; anything else is one round.
+      if (u.def.mg) B.trigger = true;
+      for (let k = 0; k < 30; k++) { if (k === 10) B.trigger = false; window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 5)); }
+      B.trigger = false;
     }
     window.__lay.exit();
     return res;

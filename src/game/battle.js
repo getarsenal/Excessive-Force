@@ -3,6 +3,8 @@ import * as THREE from 'three';
 
 // Points on a hand-laid shell's drawn flight: 0.04 s each, twelve seconds.
 const LAY_PTS = 300;
+// Seconds from a mortar round let go at the muzzle to the shell leaving the tube.
+const MORTAR_DROP = 0.32;
 /**
  * A held gun's barrel. Held, an automatic weapon fires round after round
  * at its own rate (no bursts) for as long as the trigger is down; every
@@ -368,13 +370,15 @@ export class Battle {
    * baked team comes back when the crew get it back.
    */
   _mortarLive(unit, on) {
+    // A round already let go is fired whatever happens to the crew next.
+    if (!on && unit.live?.pending) this._mortarLaunch(unit);
     if (on) {
       if (unit.live) return;
       const g = makeMortarTeam({ live: true });
       const hidden = [...unit.group.children];
       for (const c of hidden) c.visible = false;
       unit.group.add(g);
-      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, tubeDir: g.userData.tubeDir, heldAt: g.userData.heldAt, hands: g.userData.hands, hidden, lean: 0, fired: false, drop: null, t: 0 };
+      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, tubeDir: g.userData.tubeDir, heldAt: g.userData.heldAt, hands: g.userData.hands, hidden, lean: 0, pending: null, drop: null, t: 0 };
       return;
     }
     if (!unit.live) return;
@@ -382,6 +386,18 @@ export class Battle {
     releaseTree(unit.live.g, this.scene);
     for (const c of unit.live.hidden) c.visible = true;
     unit.live = null;
+  }
+
+  /** The round has struck the pin: the shell leaves the tube on the lay it was let go on. */
+  _mortarLaunch(u) {
+    const A = u.live, P = A?.pending;
+    if (!P) return;
+    A.pending = null;
+    const ok = this._fireOne(u, P.impact, { vel: P.vel, hand: true, from: P.from });
+    if (!ok) return;
+    if (this.lay && this.lay.unit === u) this.lay.kick = 1;
+    this.handShots++;
+    this.onEvent('handshot', { unit: u, point: P.impact.clone() });
   }
 
   _animateMortar(u, dt) {
@@ -394,45 +410,49 @@ export class Battle {
     // reload, held there until it is fired; then he reaches for the next.
     const total = Math.max(0.01, L?.reloadTotal || u.def.reload * this.reloadFactor);
     const k = 1 - Math.max(0, u.cooldown) / total;   // 0 just fired, 1 loaded
-    // The shot: the round goes down the tube, a hand's length in a tenth of
-    // a second, and is gone; the loader has let go and is already ducking.
-    if (A.fired) { A.fired = false; A.drop = 0; }
+    // The shot: let go, the round slides down the tube, slowly and then
+    // fast, and the shell leaves when it strikes the pin at the bottom
+    // (`MORTAR_DROP` seconds). The loader lets go and ducks at once.
     if (A.drop != null) {
       A.drop += dt;
-      const d = Math.min(1, A.drop / 0.12);
+      const d = Math.min(1, A.drop / MORTAR_DROP);
       A.round.visible = d < 1;
-      A.round.position.copy(A.tubeDir).multiplyScalar(-0.6 * d * d);
-      if (d >= 1) A.drop = null;
+      A.round.position.copy(A.tubeDir).multiplyScalar(-1.5 * d * d);
+      if (d >= 1) { A.drop = null; this._mortarLaunch(u); }
     }
     const ease = (x) => { x = THREE.MathUtils.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
     const FACE = -Math.PI / 2;   // the loader faces the tube
-    if (k < 0.36) {
-      // Crouched away from the muzzle blast, head down and turned from the
-      // tube, for the first part of the reload.
+    // One motion through the reload, never upright at the tube with empty
+    // hands: down and turned from the blast, round to the crate still low,
+    // the round taken out of it, then up and back round to the muzzle with
+    // it, and held there over the mouth until it is let go.
+    const DUCK = { y: -0.48, rx: 0.55, ry: FACE + 0.7 };
+    const CRATE = { y: -0.5, rx: 0.45, ry: FACE + Math.PI };
+    if (k < 0.22) {
       if (A.drop == null) A.round.visible = false;
-      const e = k < 0.2 ? 1 : 1 - ease((k - 0.2) / 0.16);
-      A.loader.position.y = -0.48 * e;
-      A.loader.rotation.x = 0.55 * e;
-      A.loader.rotation.y = FACE + 0.7 * e;
-    } else if (k < 0.56) {
-      // He turns about to the crate behind him and bends to it; the next
-      // round is in his hands as he comes up with it.
-      const t = ease((k - 0.36) / 0.2);
-      A.loader.rotation.y = FACE + Math.PI * t;
-      A.loader.position.y = -0.5 * t;
-      A.loader.rotation.x = 0.45 * t;
-      A.round.visible = t > 0.75;
+      const e = ease(k / 0.08);
+      A.loader.position.y = DUCK.y * e;
+      A.loader.rotation.x = DUCK.rx * e;
+      A.loader.rotation.y = FACE + (DUCK.ry - FACE) * e;
+    } else if (k < 0.5) {
+      // Still crouched, he turns on round to the crate behind him and
+      // reaches into it; the round is in his hands as he takes hold.
+      const t = ease((k - 0.22) / 0.28);
+      A.loader.position.y = DUCK.y + (CRATE.y - DUCK.y) * t;
+      A.loader.rotation.x = DUCK.rx + (CRATE.rx - DUCK.rx) * t;
+      A.loader.rotation.y = DUCK.ry + (CRATE.ry - DUCK.ry) * t;
+      A.round.visible = t > 0.85;
       if (A.round.visible) this._roundInHands(A);
     } else if (k < 0.9) {
       // Back round to the tube, straightening, the round coming up with his hands.
-      const t = ease((k - 0.56) / 0.34);
-      A.loader.rotation.y = FACE + Math.PI * (1 - t);
-      A.loader.position.y = -0.5 * (1 - t);
-      A.loader.rotation.x = 0.45 * (1 - t);
+      const t = ease((k - 0.5) / 0.4);
+      A.loader.rotation.y = CRATE.ry + (FACE - CRATE.ry) * t;
+      A.loader.position.y = CRATE.y * (1 - t);
+      A.loader.rotation.x = CRATE.rx * (1 - t);
       A.round.visible = true;
       this._roundInHands(A);
     } else {
-      // Over the muzzle, the fins in the tube's mouth, held until it is fired.
+      // Over the muzzle, the fins in the tube's mouth, held until it is let go.
       const t = ease((k - 0.9) / 0.1);
       A.loader.rotation.y = FACE; A.loader.position.y = 0; A.loader.rotation.x = 0;
       A.round.visible = true;
@@ -895,12 +915,22 @@ export class Battle {
       this._mortarSolve(L2);
       if (L2.vel) vel = L2.vel;
     }
+    // A mortar with its crew live is fired by letting the round go: it
+    // slides down the tube and the shell leaves when it strikes the pin
+    // (`_animateMortar`), a third of a second after the press.
+    if (u.live && u.def.projectile.mortar) {
+      if (u.live.pending) return false;
+      u.live.pending = { impact: L.impact.clone(), vel, from: L.from.clone() };
+      u.live.drop = 0;
+      u.cooldown = u.def.reload * this.reloadFactor;
+      L.reloadTotal = u.cooldown;
+      return true;
+    }
     const ok = this._fireOne(u, L.impact.clone(), { vel, hand: true, from: L.from });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
       L.reloadTotal = u.cooldown;
       L.kick = 1;
-      if (u.live) u.live.fired = true;
       this.handShots++;
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }
