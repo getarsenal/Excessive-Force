@@ -454,6 +454,10 @@ export class Battle {
       // Remembered once the model is there to measure; a vehicle laid while
       // its model is still loading gets a guess this once.
       if (!(u._layTop > 0.5)) {
+        // The world matrices first: a unit laid the tick it was placed has
+        // its model still at the origin, and measured there the top of a
+        // five-metre vehicle came out a metre over the plot.
+        u.group.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(u.model || u.group);
         const top = box.max.y - u.pos.y;
         if (Number.isFinite(top) && top > 0.5) u._layTop = top;
