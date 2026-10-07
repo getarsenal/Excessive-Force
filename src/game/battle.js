@@ -355,7 +355,7 @@ export class Battle {
       const hidden = [...unit.group.children];
       for (const c of hidden) c.visible = false;
       unit.group.add(g);
-      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, tubeDir: g.userData.tubeDir, hidden, lean: 0, fired: false, drop: null, t: 0 };
+      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, tubeDir: g.userData.tubeDir, heldAt: g.userData.heldAt, hands: g.userData.hands, hidden, lean: 0, fired: false, drop: null, t: 0 };
       return;
     }
     if (!unit.live) return;
@@ -385,30 +385,59 @@ export class Battle {
       A.round.position.copy(A.tubeDir).multiplyScalar(-0.6 * d * d);
       if (d >= 1) A.drop = null;
     }
+    const ease = (x) => { x = THREE.MathUtils.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    const FACE = -Math.PI / 2;   // the loader faces the tube
     if (k < 0.36) {
       // Crouched away from the muzzle blast, head down and turned from the
-      // tube, for the first part of the reload; then up for the next round.
+      // tube, for the first part of the reload.
       if (A.drop == null) A.round.visible = false;
-      const c = k < 0.2 ? 1 : 1 - (k - 0.2) / 0.16;
-      const e = c * c * (3 - 2 * c);
+      const e = k < 0.2 ? 1 : 1 - ease((k - 0.2) / 0.16);
       A.loader.position.y = -0.48 * e;
       A.loader.rotation.x = 0.55 * e;
-      A.loader.rotation.y = -Math.PI / 2 + 0.7 * e;
-    } else {
-      // The next round out of the crate and up to the muzzle, held there
-      // until it is fired.
-      const r = THREE.MathUtils.clamp((k - 0.36) / 0.5, 0, 1);
-      const e = 1 - (1 - r) * (1 - r);
+      A.loader.rotation.y = FACE + 0.7 * e;
+    } else if (k < 0.56) {
+      // He turns about to the crate behind him and bends to it; the next
+      // round is in his hands as he comes up with it.
+      const t = ease((k - 0.36) / 0.2);
+      A.loader.rotation.y = FACE + Math.PI * t;
+      A.loader.position.y = -0.5 * t;
+      A.loader.rotation.x = 0.45 * t;
+      A.round.visible = t > 0.75;
+      if (A.round.visible) this._roundInHands(A);
+    } else if (k < 0.9) {
+      // Back round to the tube, straightening, the round coming up with his hands.
+      const t = ease((k - 0.56) / 0.34);
+      A.loader.rotation.y = FACE + Math.PI * (1 - t);
+      A.loader.position.y = -0.5 * (1 - t);
+      A.loader.rotation.x = 0.45 * (1 - t);
       A.round.visible = true;
-      A.round.position.copy(A.crate).multiplyScalar(1 - e);
-      A.loader.position.y = -0.1 * (1 - e);
-      A.loader.rotation.x = 0.18 * (1 - e);
-      A.loader.rotation.y = -Math.PI / 2;
+      this._roundInHands(A);
+    } else {
+      // Over the muzzle, the fins in the tube's mouth, held until it is fired.
+      const t = ease((k - 0.9) / 0.1);
+      A.loader.rotation.y = FACE; A.loader.position.y = 0; A.loader.rotation.x = 0;
+      A.round.visible = true;
+      if (t < 1) { this._roundInHands(A); A.round.position.multiplyScalar(1 - t); } else A.round.position.set(0, 0, 0);
     }
     // The gunner leans into a traverse and settles back on the sight.
     A.lean *= Math.max(0, 1 - dt * 4);
     A.gunner.rotation.z = A.lean * 0.5;
     A.gunner.position.y = Math.sin(A.t * 2.2) * 0.006;
+  }
+
+  /**
+   * The round where the loader's hands are: his hands in his own frame,
+   * through his pose and the team's frame, into the tube's, less where the
+   * round's tail sits when it is over the muzzle (`round` lives under the
+   * tube so that it elevates with it).
+   */
+  _roundInHands(A) {
+    if (!A.hands || !A.heldAt) return;
+    const v = this._handsV || (this._handsV = new THREE.Vector3());
+    v.copy(A.hands).applyEuler(A.loader.rotation).add(A.loader.position);
+    A.g.localToWorld(v);
+    A.tube.worldToLocal(v);
+    A.round.position.copy(v).sub(A.heldAt);
   }
 
   /** Turn and elevate, in radians; the arc is redrawn. */

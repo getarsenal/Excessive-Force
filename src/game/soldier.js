@@ -303,8 +303,10 @@ function mortarGunner(k) {
 function mortarLoader(k) {
   standingLegs(k);
   const sh = upperBody(k, 0.92, 0.18);
+  // His hands are up at the muzzle, round the round the team itself carries
+  // (units.js makeMortarTeam `round`), which the lay moves between the
+  // crate and the tube; the pose draws no round of its own.
   const r = v(0.02, 2.02, 0.44);
-  k.rod(v(r.x, r.y - 0.25, r.z), v(r.x, r.y + 0.25, r.z), 0.06, 'steel', 8);
   k.arm(sh.right, v(0.26, sh.right.y + 0.12, sh.right.z + 0.2), v(0.07, r.y - 0.06, r.z));
   k.arm(sh.left, v(-0.26, sh.left.y + 0.12, sh.left.z + 0.2), v(-0.05, r.y - 0.16, r.z));
 }

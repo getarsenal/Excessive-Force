@@ -784,6 +784,8 @@ export function makeMortarTeam({ live = false } = {}) {
     g.userData.parts = { tube, round, gunner, loader };
     g.userData.crateOffset = new THREE.Vector3(0.95, 0.3, 0.35).sub(breech).sub(r0);
     g.userData.tubeDir = dir.clone();   // the tube's axis in its own frame: the round drops down it
+    g.userData.heldAt = r0.clone();     // the round's tail, in the tube's frame, when it sits over the muzzle
+    g.userData.hands = new THREE.Vector3(0.02, 2.02, 0.44);   // the loader's hands, in his own frame (soldier.js mortarLoader)
   }
   return g;
 }

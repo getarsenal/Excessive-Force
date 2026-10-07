@@ -56,6 +56,11 @@ const loading = await page.evaluate(() => {
   return { elevDeg: Math.round(L.elev * 180 / Math.PI), seen };
 });
 await page.screenshot({ path: '/tmp/out/mortar-loaded.png' });
+// Mid-carry: the loader coming back round from the crate with the round in his hands.
+const carry = await page.evaluate(() => { const B = window.battle, L = B.lay, u = L.unit; u.cooldown = L.reloadTotal * 0.3; window.__fastForward(0.05, 1 / 30); window.__frame(); const A = u.live; const h = new window.THREE.Vector3(); A.round.getWorldPosition(h); return { k: +(1 - u.cooldown / L.reloadTotal).toFixed(2), roundVisible: A.round.visible, loaderTurn: +(A.loader.rotation.y + Math.PI / 2).toFixed(2), loaderY: +A.loader.position.y.toFixed(2), roundOff: A.round.position.toArray().map((v) => +v.toFixed(2)) }; });
+await page.waitForTimeout(300);
+await page.screenshot({ path: '/tmp/out/mortar-carry.png' });
+await page.evaluate(() => { const B = window.battle, L = B.lay, u = L.unit; u.cooldown = 0; for (let i = 0; i < 10; i++) window.__fastForward(0.1, 1 / 30); });
 const fired = await page.evaluate(() => {
   const B = window.battle, L = B.lay, u = L.unit;
   B._layArc(); const pred = L.impact.clone(); const from = L.from.clone();
@@ -83,5 +88,5 @@ const landed = await page.evaluate(() => {
   return { impacts };
 });
 const done = await page.evaluate(() => { const B = window.battle, u = (B.lay && B.lay.unit) || B.units[B.units.length - 1]; const alive = u ? u.alive : null, n = B.units.length; window.__lay.exit(); if (!u) return { noUnit: true, units: n }; return { units: n, alive, lay: !!B.lay, live: !!u.live, bakedVisible: u.group.children.every((c) => c.visible), children: u.group.children.length }; });
-console.log(JSON.stringify({ laid, flat, loading, fired, landed, done, errors }, null, 1));
+console.log(JSON.stringify({ laid, flat, loading, carry, fired, landed, done, errors }, null, 1));
 await b.close();
