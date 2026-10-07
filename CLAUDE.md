@@ -252,9 +252,20 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   forty-five degrees, with its crew live and loading while the player has
   it, and each weapon says where its gunner's eye is (`def.eye`: a
   vehicle's commander in the hatch over the model's measured top, the
-  mortar's gunner on the sight looking at the tube); `node
-  tools/layviews.mjs` lays every weapon and measures how much of the view
-  is the weapon itself, `node tools/mortarprobe.mjs` the mortar's lay,
+  mortar's gunner on the sight looking at the tube, a fire team's gunner
+  in his own head with the tube on his shoulder, `h` his eye's height);
+  every weapon also says what sight it has (`def.sight`: the kind of
+  reticle, drawn in `src/ui/sights.js`, and its magnifications, which
+  ZOOM steps through); the reticle's centre is the point of impact, so a
+  straight shooter (rockets, the machine gun, the Javelin) looks through
+  it at every magnification and a gun does when zoomed, the mark
+  bracketing the fall of shot otherwise; the machine gun is laid too,
+  FIRE held being burst after burst at the point under the cross
+  (`_handBurst`), and the Javelin's cross designates; the survey stays
+  live in the lay; `node
+  tools/layviews.mjs` lays every weapon, measures how much of the view
+  is the weapon itself, zooms, and pulls the trigger (tracers, missile,
+  round counted), `node tools/mortarprobe.mjs` the mortar's lay,
   load and shot, `node tools/samprobe.mjs` a rocket team against a SAM
   compound, which is solid now: launchers, radars and revetments carry
   colliders and a round into one is a direct hit) · `src/game/aircraft.js` air strikes and the airlift (the C-130,

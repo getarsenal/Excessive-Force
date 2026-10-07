@@ -3,7 +3,10 @@
 // the picture is the weapon's own model (rays from the camera over the
 // central part of the view against the unit's meshes, within ten metres),
 // plus whether the muzzle and the drawn impact are on the screen.
-//   node tools/layviews.mjs [level=westminster] [kinds=all]  -> /tmp/out/layview-<kind>.png
+//   node tools/layviews.mjs [level=westminster] [kinds=all]  -> /tmp/out/layview-<kind>.png, -zoom.png
+// Each kind is also zoomed through its sight (`def.sight.zoom`) and shot
+// again, and the trigger pulled: a gun's round, the machine gun's burst
+// (tracers fired), the Javelin's missile, each counted.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 mkdirSync('/tmp/out', { recursive: true });
@@ -23,7 +26,7 @@ const kinds = await page.evaluate((arg) => {
   const all = window.UNITS ? window.UNITS : null;
   return arg === 'all' ? null : arg.split(',');
 }, kindsArg);
-const list = kinds || ['at4', 'gustaf', 'rpg32', 'm120', 'm119', 'm777', 'm109', 'stryker'];   // everything canLay allows
+const list = kinds || ['m240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm120', 'm119', 'm777', 'm109', 'stryker'];   // everything canLay allows
 const out = [];
 for (const kind of list) {
   const r = await page.evaluate(async (kind) => {
@@ -41,9 +44,11 @@ for (const kind of list) {
     for (let k = 0; k < 80 && (u.state !== 'ready' || !measurable()); k++) { window.__fastForward(0.5, 1 / 30); await new Promise((r) => setTimeout(r, 50)); }
     window.__lay.enter(u);
     // A working lay, not a search for stone that ran out of elevation: a gun
-    // over open sights at four degrees, a mortar as the solve left it.
+    // over open sights at four degrees, a mortar as the solve left it. The
+    // lay's own solution is kept for the zoomed shot.
     const L = B.lay;
-    if (!u.def.projectile.mortar) B.layTurn(0, 0.07 - L.elev);
+    window.__layElev0 = L.elev;
+    if (!u.def.projectile.mortar && !u.def.mg && u.def.projectile.kind !== 'topattack') B.layTurn(0, 0.07 - L.elev);
     window.__frame();
     const cam = window.rig.camera;
     // Rays over the central three fifths of the view, against the unit's own meshes.
@@ -61,7 +66,29 @@ for (const kind of list) {
     return res;
   }, kind);
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `/tmp/out/layview-${kind}.png`, timeout: 120000 });
+  await page.screenshot({ path: `/tmp/out/layview-${kind}.png`, timeout: 240000 }).catch((e) => { r.shotErr = String(e).slice(0, 80); });
+  if (!r.noUnit) {
+    // Through the sight, and the trigger pulled.
+    const z = await page.evaluate(async () => {
+      const B = window.battle, L = B.lay, u = L.unit;
+      if (!u.def.projectile.mortar) B.layTurn(0, window.__layElev0 - L.elev);
+      // A machine gun taken mid-burst finishes the crew's burst first.
+      for (let k = 0; k < 40 && (u.burstLeft > 0 || u.cooldown > 0); k++) { window.__fastForward(0.2, 1 / 30); await new Promise((r) => setTimeout(r, 10)); }
+      window.__lay.zoom(1);
+      window.__frame();
+      const cam = window.rig.camera;
+      const q = L.impact.clone().project(cam);
+      const centred = Math.hypot(q.x, q.y) < 0.03;
+      const tr0 = B.tracerFX?.fired || 0, pr0 = B.projectiles?.list?.length ?? B.projectiles?.active?.length ?? -1;
+      const fired = B.handFire();
+      // The burst goes out over its own interval.
+      for (let k = 0; k < 20; k++) { window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 10)); }
+      return { mag: window.__lay.mag(), fov: +cam.fov.toFixed(1), centred, fired, tracers: (B.tracerFX?.fired || 0) - tr0, shots: B.shotsFired, hand: B.handShots, sight: u.def.sight?.kind, fire: document.getElementById('lay-fire')?.textContent, hidden: document.getElementById('lay-zoom')?.hidden };
+    });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `/tmp/out/layview-${kind}-zoom.png`, timeout: 240000 }).catch((e) => { z.shotErr = String(e).slice(0, 80); });
+    r.zoom = z;
+  }
   await page.evaluate(() => { const B = window.battle; const u = B.lay?.unit; window.__lay.exit(); if (u) B.removeUnit(u); });
   out.push(r);
   console.log(JSON.stringify(r));

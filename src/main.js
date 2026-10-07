@@ -1871,8 +1871,8 @@ async function boot() {
   /** The sight a weapon looks through, with a plain optic for one that says nothing. */
   const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
   const layMag = () => { const L = battle.lay; if (!L) return 1; const z = laySightOf(L.unit).zoom; return z[Math.min(layZoom, z.length - 1)] || 1; };
-  /** A straight shooter looks through its sight at the point of impact at every magnification; a gun does when zoomed. */
-  const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack'; };
+  /** A straight shooter (and a tank gun) looks through its sight at the point of impact at every magnification; a howitzer does when zoomed. */
+  const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack' || laySightOf(L.unit).kind === 'tank'; };
   const applyZoom = () => {
     const L = battle.lay;
     if (!L) return;

@@ -45,9 +45,12 @@ export const UNITS = [
     model: 'infantry',
     range: 340, reload: 1.5, setup: 1.4,
     crew: 2, health: 150,
-    muzzle: { f: 0.9, h: 0.55 },   // the gun on its bipod, a man's length forward of the plot
-    // Prone behind the gun, cheek on the stock: the eye is the gun's own height (battle.layEye).
-    eye: { back: 0.55, side: 0.18, up: 0.72, pitch: 0 },
+    // The gun's muzzle and the gunner's eye, measured off the prone pair
+    // (soldier.js proneGunner, the gunner 0.65 to the right of the plot):
+    // the barrel ends two metres forward at knee height, the eye is just
+    // over his helmet, looking along the receiver (battle.layEye).
+    muzzle: { f: 2.0, h: 0.5, s: 0.53 },
+    eye: { back: -0.35, side: 0.61, h: 0.8, pitch: 0 },
     sight: { kind: 'iron', zoom: [1, 2] },   // the sight the lay looks through (main.js, SIGHTS)
     mg: {
       burst: 9, interval: 0.085, damage: 6,
@@ -64,8 +67,10 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 255, reload: 3.8, setup: 1.0,
     crew: 2, health: 165,
-    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
-    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The gunner's own eye, in his head, the tube on his right shoulder under
+    // it and in the bottom of the picture (soldier.js shoulderTube; the gunner
+    // stands 0.65 to the right of the plot); the sight he looks through in the lay.
+    eye: { back: -0.05, side: 0.52, h: 1.76, pitch: 0 }, muzzle: { f: 0.6, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 220, gravity: 3.2, trail: 0.35 },
     warhead: { lethal: 0.9, radius: 2.8, power: 1100, fx: 0.5, kinetic: 0.2 },
     dispersion: 2.4,
@@ -77,8 +82,10 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 300, reload: 4.4, setup: 1.2,
     crew: 2, health: 185,
-    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
-    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The gunner's own eye, in his head, the tube on his right shoulder under
+    // it and in the bottom of the picture (soldier.js shoulderTube; the gunner
+    // stands 0.65 to the right of the plot); the sight he looks through in the lay.
+    eye: { back: -0.05, side: 0.52, h: 1.76, pitch: 0 }, muzzle: { f: 0.6, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 255, gravity: 3.6, trail: 0.4 },
     warhead: { lethal: 1.2, radius: 3.6, power: 1900, fx: 0.7, kinetic: 0.3 },
     dispersion: 2.0,
@@ -90,8 +97,10 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Cannon_Crew_Member',
     range: 290, reload: 5.2, setup: 1.2,
     crew: 2, health: 185,
-    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
-    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The gunner's own eye, in his head, the tube on his right shoulder under
+    // it and in the bottom of the picture (soldier.js shoulderTube; the gunner
+    // stands 0.65 to the right of the plot); the sight he looks through in the lay.
+    eye: { back: -0.05, side: 0.52, h: 1.76, pitch: 0 }, muzzle: { f: 0.6, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 195, gravity: 4.0, trail: 0.6 },
     warhead: { lethal: 1.5, radius: 5.2, power: 2600, fx: 1.0, kinetic: 0.08 },
     dispersion: 3.2,
@@ -105,7 +114,7 @@ export const UNITS = [
     crew: 2, health: 175,
     // The CLU on his shoulder: the lay looks through its day sight, wide field then narrow,
     // and the crosshair is where the missile comes down.
-    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'clu', zoom: [4, 9] },
+    eye: { back: -0.05, side: 0.52, h: 1.76, pitch: 0 }, muzzle: { f: 0.7, h: 1.56, s: 0.48 }, sight: { kind: 'clu', zoom: [4, 9] },
     projectile: { kind: 'topattack', speed: 145, gravity: 0, trail: 0.5 },
     warhead: { lethal: 1.4, radius: 4.2, power: 3400, fx: 0.9, kinetic: 0.45 },
     dispersion: 0.5,

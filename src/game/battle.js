@@ -390,7 +390,8 @@ export class Battle {
     // A direct-fire gun has a mount, not a howitzer's elevation; a mortar
     // has nothing under forty-five degrees in it.
     const straight = p.kind === 'direct' || p.kind === 'topattack';
-    const top = straight ? 0.6 : 1.25;
+    // A tank gun's mount stops under twenty degrees; a howitzer goes to seventy.
+    const top = L.unit.def.sight?.kind === 'tank' ? 0.33 : straight ? 0.6 : 1.25;
     // Down the hill: a rocket or a burst goes where the man can look.
     const lo = straight ? -0.7 : -0.08;
     L.yaw += dyaw;
@@ -430,7 +431,9 @@ export class Battle {
       return new THREE.Vector3(p.x + fx * f, p.y + h, p.z + fz * f);
     }
     const m = def.muzzle || (def.model === 'infantry' ? { f: 0.7, h: 1.3 } : { f: 0, h: 2.2 });
-    return new THREE.Vector3(p.x + fx * m.f, p.y + m.h, p.z + fz * m.f);
+    // And to the right (`s`): a fire team's gunner stands beside the plot, not on it.
+    const sd = m.s || 0;
+    return new THREE.Vector3(p.x + fx * m.f - Math.cos(yaw) * sd, p.y + m.h, p.z + fz * m.f + Math.sin(yaw) * sd);
   }
 
   /**
@@ -477,7 +480,10 @@ export class Battle {
     }
     out.set(u.pos.x - fx * back + rx * side, 0, u.pos.z - fz * back + rz * side);
     const g = this.terrain.heightAt(out.x, out.z);
-    out.y = Math.max(g + Math.min(1.2, up), u.pos.y - 0.6 + up);
+    // `h` is the eye's own height over the plot, a man's eye in his head
+    // (standing, kneeling or prone); `up` the older reckoning from the
+    // gun's top, floored at a standing eye.
+    out.y = E && E.h > 0 ? Math.max(g + E.h * 0.9, u.pos.y + E.h) : Math.max(g + Math.min(1.2, up), u.pos.y - 0.6 + up);
     return out;
   }
 

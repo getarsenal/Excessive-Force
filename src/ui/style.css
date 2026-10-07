@@ -543,8 +543,13 @@ body.laying #dock, body.laying #targetcard, body.laying #status, body.laying #hu
 #lay-sight svg { width: var(--ss); height: var(--ss); overflow: visible; stroke: var(--ret); fill: none; stroke-linecap: square; opacity: 0.92; }
 #lay-sight svg text { fill: var(--ret); stroke: none; font-family: var(--f-data); font-weight: 600; }
 #lay-sight svg .fill { fill: var(--ret); stroke: none; }
-#lay-sight.sight-pano, #lay-sight.sight-glass, #lay-sight.sight-iron { --ret: #0e1114; }
-#lay-sight.sight-pano svg, #lay-sight.sight-glass svg, #lay-sight.sight-iron svg { filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55)); }
+/* Etched glass reads against the stone and the sky alike: pale lines with a
+   dark edge for the telescope and the binoculars, the gun's own black metal
+   for the irons. */
+#lay-sight.sight-pano, #lay-sight.sight-glass { --ret: #f1e8d6; }
+#lay-sight.sight-pano svg, #lay-sight.sight-glass svg { filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9)); }
+#lay-sight.sight-iron { --ret: #14171b; }
+#lay-sight.sight-iron svg { filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6)); }
 #lay-sight.sight-clu { --ret: #8df0a0; }
 #lay-sight.sight-tank { --ret: #ff7a4a; }
 #lay[data-zoom="in"] #lay-sight::before {
