@@ -76,6 +76,7 @@ import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
 import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
+import { makeWeaponView } from './game/units.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -1867,6 +1868,10 @@ async function boot() {
   const laySight = layEl.querySelector('#lay-sight'), layMark = layEl.querySelector('#lay-mark'), layZoomBtn = layEl.querySelector('#lay-zoom'), layHint = layEl.querySelector('#lay-hint');
   let layDrag = null, layWas = null, layReady = null, layFov = null, layNear = null, layPct = -1;
   let layZoom = 0, layHold = false, laySightKind = '';
+  // The weapon in the firer's hands (a fire team's lay): the team's figures
+  // are hidden, since from inside the gunner's own head they are a helmet
+  // and a pack, and the launcher or the gun alone is drawn under the eye.
+  let layView = null, layViewUnit = null;
   const LAY_FOV = 66;
   /** The sight a weapon looks through, with a plain optic for one that says nothing. */
   const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
@@ -1904,6 +1909,15 @@ async function boot() {
     engine.camera.near = u.def.eye?.near ?? 0.4;
     layZoom = 0;
     applyZoom();
+    if (u.def.view !== undefined || (u.def.model === 'infantry' && !u.def.projectile.mortar)) {
+      layViewUnit = u;
+      u.group.visible = false;
+      if (u.def.view !== null) {
+        layView = makeWeaponView(u.def.id);
+        layView.traverse((m) => { if (m.isMesh) { m.castShadow = false; m.frustumCulled = false; } });
+        engine.scene.add(layView);
+      }
+    }
     layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG UP FOR RANGE' : 'DRAG TO LAY THE GUN';
     layPct = -1;
     // A cut to the gun, not a glide: the pose is set and then held.
@@ -1924,6 +1938,8 @@ async function boot() {
     layDrag = null;
     layHold = false;
     layMark.hidden = true;
+    if (layViewUnit) { layViewUnit.group.visible = true; layViewUnit = null; }
+    if (layView) { engine.scene.remove(layView); releaseTree(layView); layView = null; }
     document.body.classList.remove('laying');
   };
   const fireHand = (quiet) => {
@@ -2003,6 +2019,7 @@ async function boot() {
    * here and not a cut across the map.
    */
   const _eye = new THREE.Vector3(), _look = new THREE.Vector3(), _proj = new THREE.Vector3();
+  const _vr = new THREE.Vector3(), _vu = new THREE.Vector3(), _vf = new THREE.Vector3();
   const layCamera = (dt) => {
     const L = battle.lay;
     if (!L) return;
@@ -2033,6 +2050,17 @@ async function boot() {
     engine.camera.position.copy(_eye);
     engine.camera.lookAt(_look);
     engine.camera.updateMatrixWorld();
+    if (layView) {
+      // Under the eye and a touch to the right, along the line of sight,
+      // kicked back into the shoulder by the shot.
+      const V = u.def.view || { down: 0.12, right: 0.05 };
+      layView.quaternion.copy(engine.camera.quaternion);
+      layView.rotateY(Math.PI);
+      _vr.set(1, 0, 0).applyQuaternion(engine.camera.quaternion);
+      _vu.set(0, 1, 0).applyQuaternion(engine.camera.quaternion);
+      _vf.set(0, 0, -1).applyQuaternion(engine.camera.quaternion);
+      layView.position.copy(_eye).addScaledVector(_vu, -V.down).addScaledVector(_vr, V.right).addScaledVector(_vf, -L.kick * 0.07);
+    }
     // The mark on the fall of shot, when the eye is not already on it.
     if (aimed) { if (!layMark.hidden) layMark.hidden = true; }
     else {

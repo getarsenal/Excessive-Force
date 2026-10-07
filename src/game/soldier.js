@@ -160,6 +160,13 @@ function aimingRifle(k, hipY, opts = {}) {
 function shoulderTube(k, hipY, weapon) {
   const sh = upperBody(k, hipY, 0.08);
   const y = sh.right.y + 0.06, x = 0.17, z = sh.right.z;
+  launcher(k, x, y, z, weapon);
+  k.arm(sh.right, v(0.32, y - 0.32, z + 0.02), v(x, y - 0.14, z + 0.14));
+  k.arm(sh.left, v(-0.12, y - 0.3, z + 0.22), v(x - 0.03, y - 0.09, z + 0.42));
+}
+
+/** The launcher alone, its axis through (x, y, z) along +Z: on a shoulder, or in the firer's own view. */
+function launcher(k, x, y, z, weapon) {
   if (weapon === 'javelin') {
     k.box(0.26, 0.26, 1.15, x, y + 0.04, z + 0.12, 'steel');
     k.box(0.22, 0.22, 0.3, x - 0.08, y - 0.14, z + 0.18, 'gear');
@@ -182,8 +189,6 @@ function shoulderTube(k, hipY, weapon) {
     k.rod(v(x, y, z - 0.45), v(x, y, z + 0.55), 0.068, 'steel', 8);
     k.box(0.04, 0.1, 0.05, x - 0.08, y + 0.1, z + 0.12, 'steel');
   }
-  k.arm(sh.right, v(0.32, y - 0.32, z + 0.02), v(x, y - 0.14, z + 0.14));
-  k.arm(sh.left, v(-0.12, y - 0.3, z + 0.22), v(x - 0.03, y - 0.09, z + 0.42));
 }
 
 /** The second man with binoculars up at his eyes. */
@@ -359,8 +364,25 @@ export function soldierGeometry(pose = 'aim', weapon = null, opts = {}) {
  * the player's teams.
  */
 export function soldierFigure(colour, pose = 'aim', weapon = null, opts = {}) {
+  return partsToGroup(build(pose, weapon, opts), colour, opts);
+}
+
+/**
+ * The weapon alone, as the firer sees it from behind: the launcher's or the
+ * machine gun's axis along +Z through the origin, the muzzle forward. The
+ * lay stands this under the gunner's eye (main.js `layView`) in place of
+ * the whole team, which from inside its own head is a helmet and a pack.
+ */
+export function weaponView(weapon, colour = 0x4a5340, opts = {}) {
+  const k = new Kit();
+  if (weapon === 'm240') machineGun(k, v(0, -0.04, -0.6));
+  else launcher(k, 0, 0, 0, weapon);
+  return partsToGroup(k.parts, colour, opts);
+}
+
+function partsToGroup(parts, colour, opts = {}) {
   const byTone = new Map();
-  for (const { geo, tone } of build(pose, weapon, opts)) {
+  for (const { geo, tone } of parts) {
     if (!byTone.has(tone)) byTone.set(tone, []);
     byTone.get(tone).push(tidy(geo));
   }

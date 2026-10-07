@@ -1,6 +1,6 @@
 import { stylizeTree } from '../world/look.js';
 import * as THREE from 'three';
-import { soldierFigure } from './soldier.js';
+import { weaponView, soldierFigure } from './soldier.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -47,11 +47,13 @@ export const UNITS = [
     crew: 2, health: 150,
     // The gun's muzzle and the gunner's eye, measured off the prone pair
     // (soldier.js proneGunner, the gunner 0.65 to the right of the plot):
-    // the barrel ends two metres forward at knee height, the eye is over the
-    // rear of the receiver, looking down the gun (battle.layEye; `near` is
-    // the lens's near plane, close enough to keep the gun in the picture).
+    // the barrel ends two metres forward at knee height, the eye is the
+    // gunner's own, cheek on the stock (battle.layEye; `near` is the lens's
+    // near plane, close enough to keep the gun in the picture; in the lay
+    // the team is hidden and the gun alone drawn under the eye, `view`).
     muzzle: { f: 2.0, h: 0.5, s: 0.53 },
-    eye: { back: -0.5, side: 0.53, h: 0.72, near: 0.2, pitch: 0 },
+    eye: { back: -0.6, side: 0.61, h: 0.55, near: 0.2, pitch: 0 },
+    view: { down: 0.1, right: 0.0 },   // where the gun sits under the eye in the first-person view
     sight: { kind: 'iron', zoom: [1, 2] },   // the sight the lay looks through (main.js, SIGHTS)
     mg: {
       burst: 9, interval: 0.085, damage: 6,
@@ -68,11 +70,11 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 255, reload: 3.8, setup: 1.0,
     crew: 2, health: 165,
-    // The firer's own view: the eye on the sight over the tube, the tube
-    // running out under it to the muzzle (soldier.js shoulderTube; the
-    // gunner stands 0.65 to the right of the plot); the sight he looks
-    // through in the lay, and the lens's near plane close enough to show it.
-    eye: { back: 0.2, side: 0.48, h: 1.71, near: 0.2, pitch: 0 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The firer's own view: his eye in his head (the gunner stands 0.65 to
+    // the right of the plot, soldier.js shoulderTube), the team hidden and
+    // the tube alone drawn under the eye (`view`), running out to the muzzle;
+    // the sight he looks through, and a lens near enough to show the tube.
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.12, right: 0.05 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 220, gravity: 3.2, trail: 0.35 },
     warhead: { lethal: 0.9, radius: 2.8, power: 1100, fx: 0.5, kinetic: 0.2 },
     dispersion: 2.4,
@@ -84,11 +86,11 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 300, reload: 4.4, setup: 1.2,
     crew: 2, health: 185,
-    // The firer's own view: the eye on the sight over the tube, the tube
-    // running out under it to the muzzle (soldier.js shoulderTube; the
-    // gunner stands 0.65 to the right of the plot); the sight he looks
-    // through in the lay, and the lens's near plane close enough to show it.
-    eye: { back: 0.2, side: 0.48, h: 1.71, near: 0.2, pitch: 0 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The firer's own view: his eye in his head (the gunner stands 0.65 to
+    // the right of the plot, soldier.js shoulderTube), the team hidden and
+    // the tube alone drawn under the eye (`view`), running out to the muzzle;
+    // the sight he looks through, and a lens near enough to show the tube.
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.12, right: 0.05 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 255, gravity: 3.6, trail: 0.4 },
     warhead: { lethal: 1.2, radius: 3.6, power: 1900, fx: 0.7, kinetic: 0.3 },
     dispersion: 2.0,
@@ -100,11 +102,11 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Cannon_Crew_Member',
     range: 290, reload: 5.2, setup: 1.2,
     crew: 2, health: 185,
-    // The firer's own view: the eye on the sight over the tube, the tube
-    // running out under it to the muzzle (soldier.js shoulderTube; the
-    // gunner stands 0.65 to the right of the plot); the sight he looks
-    // through in the lay, and the lens's near plane close enough to show it.
-    eye: { back: 0.2, side: 0.48, h: 1.79, near: 0.2, pitch: 0 }, muzzle: { f: 0.84, h: 1.54, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    // The firer's own view: his eye in his head (the gunner stands 0.65 to
+    // the right of the plot, soldier.js shoulderTube), the team hidden and
+    // the tube alone drawn under the eye (`view`), running out to the muzzle;
+    // the sight he looks through, and a lens near enough to show the tube.
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.2, right: 0.05 }, muzzle: { f: 0.84, h: 1.54, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 195, gravity: 4.0, trail: 0.6 },
     warhead: { lethal: 1.5, radius: 5.2, power: 2600, fx: 1.0, kinetic: 0.08 },
     dispersion: 3.2,
@@ -118,7 +120,8 @@ export const UNITS = [
     crew: 2, health: 175,
     // The CLU on his shoulder: the lay looks through its day sight, wide field then narrow,
     // and the crosshair is where the missile comes down.
-    eye: { back: 0.3, side: 0.48, h: 1.78, near: 0.2, pitch: 0 }, muzzle: { f: 0.7, h: 1.56, s: 0.48 }, sight: { kind: 'clu', zoom: [4, 9] },
+    // Shot off the knee: the eye at a kneeling man's head, the CLU's view the picture.
+    eye: { back: -0.03, side: 0.62, h: 1.26, near: 0.2, pitch: 0 }, view: null, muzzle: { f: 0.7, h: 1.16, s: 0.48 }, sight: { kind: 'clu', zoom: [4, 9] },
     projectile: { kind: 'topattack', speed: 145, gravity: 0, trail: 0.5 },
     warhead: { lethal: 1.4, radius: 4.2, power: 3400, fx: 0.9, kinetic: 0.45 },
     dispersion: 0.5,
@@ -639,13 +642,19 @@ function rod(a, b, r, mat) {
   return m;
 }
 
+// The launcher's own colour, because shape stops carrying at forty metres
+// and a tone does not: the AT4's olive fibreglass, the Gustaf's grey alloy,
+// the RPG's brown composite, the Javelin's pale green case.
+const TUBE = { at4: 0x3b4230, gustaf: 0x6a6f63, rpg32: 0x4a3a2a, javelin: 0x8b9382 };
+
+/** The weapon in the firer's own hands, for the lay's first-person view (soldier.js weaponView). */
+export function makeWeaponView(weapon) {
+  return weaponView(weapon, 0x4a5340, TUBE[weapon] ? { tones: { steel: TUBE[weapon] } } : {});
+}
+
 export function makeInfantryMesh(colour = 0x4a5340, opts = {}) {
   const weapon = typeof opts === 'string' ? opts : (opts.weapon || null);
   const role = (typeof opts === 'object' && opts.role) || 'gunner';
-  // The launcher's own colour, because shape stops carrying at forty metres
-  // and a tone does not: the AT4's olive fibreglass, the Gustaf's grey alloy,
-  // the RPG's brown composite, the Javelin's pale green case.
-  const TUBE = { at4: 0x3b4230, gustaf: 0x6a6f63, rpg32: 0x4a3a2a, javelin: 0x8b9382 };
   const gunner = role === 'gunner';
   let pose;
   if (weapon === 'm120') pose = gunner ? 'mortar-gunner' : 'mortar-loader';
