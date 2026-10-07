@@ -1878,6 +1878,11 @@ async function boot() {
   // are hidden, since from inside the gunner's own head they are a helmet
   // and a pack, and the launcher or the gun alone is drawn under the eye.
   let layView = null, layViewUnit = null;
+  // The neighbours within arm's reach of the eye: a battery is laid two and
+  // a half metres apart, so the next team's man can be standing a metre
+  // from the gunner's face, a black wall over half the picture. They are
+  // hidden while the player has the weapon and back on DONE.
+  let layHidden = [];
   const LAY_FOV = 66;
   /** The sight a weapon looks through, with a plain optic for one that says nothing. */
   const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
@@ -1929,6 +1934,11 @@ async function boot() {
     // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
     layCamera(0);
+    layHidden = [];
+    for (const o of battle.units) {
+      if (o === u || !o.alive || !o.group.visible) continue;
+      if (o.pos.distanceTo(_eye) < 3.2) { o.group.visible = false; layHidden.push(o); }
+    }
     feedback.emit('open');
   };
   const exitLay = () => {
@@ -1945,6 +1955,8 @@ async function boot() {
     layHold = false;
     layMark.hidden = true;
     if (layViewUnit) { layViewUnit.group.visible = true; layViewUnit = null; }
+    for (const o of layHidden) o.group.visible = true;
+    layHidden = [];
     if (layView) { engine.scene.remove(layView); releaseTree(layView, engine.scene); layView = null; }
     document.body.classList.remove('laying');
   };
