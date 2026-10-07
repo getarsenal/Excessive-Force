@@ -2297,8 +2297,10 @@ AirWing.prototype._gunshipShell = function _gunshipShell(s, at = null, hand = fa
  */
 AirWing.prototype.seatEye = function seatEye(s, out = new THREE.Vector3()) {
   const m = s.model, a = s.def.aircraft;
+  // The TADS turret is on the very nose, ahead of the chin gun (which sits
+  // at 5.35 and filled the picture from behind it).
   return a.orbit ? out.set(3.9, -1.6, 1.0).applyEuler(m.rotation).add(m.position)
-    : out.set(0, -1.1, 5.2).applyEuler(m.rotation).add(m.position);
+    : out.set(0, -0.3, 7.6).applyEuler(m.rotation).add(m.position);
 };
 AirWing.prototype.seatMuzzle = function seatMuzzle(s, kind, out = new THREE.Vector3()) {
   const m = s.model, a = s.def.aircraft;
