@@ -1124,6 +1124,7 @@ export class TestMenu {
       }],
 
       ['defenders stand on real masonry', () => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         const g = b.garrison;
         assert(g.defenders.length > 0, 'the garrison is empty');
         // Living men, on masonry that is still masonry.
@@ -1163,6 +1164,7 @@ export class TestMenu {
       }],
 
       ['there are windows to shoot from', () => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         const g = b.garrison;
         const traits = c.level.traits || {};
         const inWindows = g.defenders.filter((d) => d.cover === 'window').length;
@@ -1198,6 +1200,7 @@ export class TestMenu {
       }],
 
       ['mortars put shells in the air', () => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         const before = b.garrison.mortarsFired;
         const inv = b.invulnerable;
         b.invulnerable = true;   // the point is the bombs, not the casualties
@@ -1836,6 +1839,7 @@ export class TestMenu {
       }],
 
       ['defenders fall when their footing goes', () => this._calm(() => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         // A sandbagged position on the plinth is anchored to whichever stone
         // happened to be nearest when it was posted — up to eight metres away,
         // and the field-of-fire nudge can then move the man several more. So
@@ -2111,6 +2115,7 @@ export class TestMenu {
       }],
 
       ['the map is a place, not a plan', () => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         // The complaint this answers: the landmark stood in an apron of bare
         // paving, every open block was flat and blank, and past the last street
         // the map was a wash of colour running to the fog. All three are the
@@ -2803,6 +2808,7 @@ export class TestMenu {
       }],
 
       ['a severed section cannot hang in the air', () => this._calm(() => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         // Cut a building clean through and everything above the cut must come
         // down. It used to stay up: the "is this section resting on anything"
         // test counted reachable stone anywhere in the three bands below, so a
