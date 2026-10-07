@@ -485,6 +485,11 @@ html, body {
 .uc2-buttons { flex-wrap: wrap; }
 .uc2-buttons .uc2-lay { flex: 1 1 100%; min-height: 34px; color: #ffd25a !important; border-color: rgba(255, 210, 90, 0.55) !important; font-weight: 700; }
 .uc2-lay[hidden] { display: none; }
+/* Under a thumb every one of them is forty-four a side. */
+@media (pointer: coarse) {
+  .uc2-buttons button { min-height: 44px; min-width: 44px; }
+  .uc2-buttons .uc2-lay { min-height: 44px; }
+}
 
 /* ── Laying a gun by hand (battle.startLay, main.js) ───────────────────
    The readout in the talk band, the trigger under the right thumb above
