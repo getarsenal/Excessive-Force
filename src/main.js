@@ -1950,7 +1950,10 @@ async function boot() {
     battle.layEye(_eye);
     L.kick = Math.max(0, L.kick - dt * 2.5);
     const pitch = (u.def.eye?.pitch ?? Math.min(0.72, 0.05 + L.elev * 0.55)) + L.kick * L.kick * 0.06;
-    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw), cp = Math.cos(pitch);
+    // Along the line of fire, or, for a crew-served weapon whose gunner
+    // stands off to one side of it (the mortar), at the muzzle itself.
+    const lookYaw = u.def.eye?.atMuzzle ? Math.atan2(L.from.x - _eye.x, L.from.z - _eye.z) : L.yaw;
+    const fx = Math.sin(lookYaw), fz = Math.cos(lookYaw), cp = Math.cos(pitch);
     _look.set(_eye.x + fx * cp, _eye.y + Math.sin(pitch), _eye.z + fz * cp);
     engine.camera.position.copy(_eye);
     engine.camera.lookAt(_look);

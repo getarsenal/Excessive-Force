@@ -102,7 +102,7 @@ export const UNITS = [
     id: 'm120', name: 'M120 MORTAR', full: 'M120 120 mm Mortar Team', tier: 'INF',
     cost: 240, unlockFrac: 0.0,
     tint: 0x5a6a52, model: 'infantry',
-    eye: { back: 2.6, side: -1.5, up: 1.55, pitch: 0.12 },   // the gunner's eye in the lay (battle.layEye)
+    eye: { back: 2.8, side: -1.2, up: 1.55, pitch: 0.1, atMuzzle: true },   // the gunner's eye in the lay (battle.layEye)
     range: 620, reload: 7.0, setup: 3.0,
     crew: 3, health: 120,
     // Indirect and slow: a high arc that comes down on a roof or a terrace the

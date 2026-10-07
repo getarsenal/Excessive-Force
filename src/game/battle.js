@@ -451,11 +451,14 @@ export class Battle {
       // In the hatch: a head and shoulders over the top of the vehicle as
       // the model actually stands, measured once, rather than a height
       // guessed from the real thing and found inside the turret.
-      if (!u._layTop) {
+      // Remembered once the model is there to measure; a vehicle laid while
+      // its model is still loading gets a guess this once.
+      if (!(u._layTop > 0.5)) {
         const box = new THREE.Box3().setFromObject(u.model || u.group);
-        u._layTop = Number.isFinite(box.max.y) ? box.max.y - u.pos.y : 3;
+        const top = box.max.y - u.pos.y;
+        if (Number.isFinite(top) && top > 0.5) u._layTop = top;
       }
-      up = u._layTop + 0.75;
+      up = (u._layTop > 0.5 ? u._layTop : 3) + 0.75;
     }
     out.set(u.pos.x - fx * back + rx * side, 0, u.pos.z - fz * back + rz * side);
     const g = this.terrain.heightAt(out.x, out.z);
