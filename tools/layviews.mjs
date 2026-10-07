@@ -54,7 +54,8 @@ for (const kind of list) {
       n++; if (ray.intersectObjects(meshes, false).length) own++;
     }
     const proj = (v) => { const q = v.clone().project(cam); return { x: Math.round((q.x + 1) / 2 * innerWidth), y: Math.round((1 - q.y) / 2 * innerHeight), on: Math.abs(q.x) < 1 && Math.abs(q.y) < 1 && q.z < 1 }; };
-    const res = { kind, model: u.def.model, len: u.def.modelLength, eye: { offGun: +cam.position.distanceTo(u.pos).toFixed(1), up: +(cam.position.y - u.pos.y).toFixed(2) }, ownFrac: +(own / n).toFixed(2), muzzle: proj(L.from), impact: proj(L.impact), elevDeg: Math.round(L.elev * 180 / Math.PI), range: Math.round(L.range), masonry: L.masonry };
+    const box = new T.Box3().setFromObject(u.model || u.group); const inside = box.containsPoint(cam.position);
+    const res = { kind, model: u.def.model, len: u.def.modelLength, eye: { offGun: +cam.position.distanceTo(u.pos).toFixed(1), up: +(cam.position.y - u.pos.y).toFixed(2), inside, modelTop: +(box.max.y - u.pos.y).toFixed(2) }, ownFrac: +(own / n).toFixed(2), muzzle: proj(L.from), impact: proj(L.impact), elevDeg: Math.round(L.elev * 180 / Math.PI), range: Math.round(L.range), masonry: L.masonry };
     return res;
   }, kind);
   await page.waitForTimeout(600);

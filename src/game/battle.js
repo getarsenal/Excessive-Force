@@ -445,7 +445,18 @@ export class Battle {
     let back = want;
     const res = this.physics.castRay({ x: u.pos.x, y: u.pos.y + 1.6, z: u.pos.z }, { x: -fx, y: 0, z: -fz }, want + 0.8);
     if (res && !(res.owner && res.owner === u)) back = Math.max(E ? 0.8 : 1.6, res.toi - 0.8);
-    const side = E ? E.side : 1.5, up = E ? E.up : 1.75;
+    const side = E ? E.side : 1.5;
+    let up = E ? E.up : 1.75;
+    if (E && E.hatch) {
+      // In the hatch: a head and shoulders over the top of the vehicle as
+      // the model actually stands, measured once, rather than a height
+      // guessed from the real thing and found inside the turret.
+      if (!u._layTop) {
+        const box = new THREE.Box3().setFromObject(u.model || u.group);
+        u._layTop = Number.isFinite(box.max.y) ? box.max.y - u.pos.y : 3;
+      }
+      up = u._layTop + 0.75;
+    }
     out.set(u.pos.x - fx * back + rx * side, 0, u.pos.z - fz * back + rz * side);
     const g = this.terrain.heightAt(out.x, out.z);
     out.y = Math.max(g + 1.2, u.pos.y - 0.6 + up);
