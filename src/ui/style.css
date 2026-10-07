@@ -2297,7 +2297,10 @@ body.a11y-lefty #dock { justify-content: flex-start; }
 }
 /* Small boxes get small brackets. */
 #status, .feed-line, .lo-row, #survey-btn, .ec-mark, .ec-medal { --plate-arm: 5px; }
-.menu-inner, #clip-view .cv-inner, #ba-view .cv-inner { padding: 22px 20px 20px; }
+/* The bottom padding carries the safe-area inset: a menu taller than a
+   phone on its side scrolls, and its last row has to come to rest above
+   the home indicator, not under it. */
+.menu-inner, #clip-view .cv-inner, #ba-view .cv-inner { padding: 22px 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
 #clip-view .cv-inner, #ba-view .cv-inner { width: min(600px, 100%); }
 /* What a box means, in its brackets. */
 .feed-line { border-left: 3px solid var(--plate-edge); }
