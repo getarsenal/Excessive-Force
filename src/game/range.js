@@ -355,10 +355,12 @@ export class Range {
       const dx = t.x - point.x, dy = t.y - point.y, dz = t.z - point.z;
       const d = Math.hypot(dx, dy, dz);
       if (d > R) continue;
-      const v = THREE.MathUtils.clamp(power / 220 * (1 - d / R) + 3, 3, 26);
-      const mass = Math.max(0.05, b.body.mass());
+      const v = THREE.MathUtils.clamp(power / 240 * (1 - d / R) + 3, 3, 19);
+      // The block's own mass, from its density and volume: a fixed body
+      // reports none until it is dynamic, and the throw is sized before.
+      const mass = 2.2 * 8 * BLOCK.hx * BLOCK.hy * BLOCK.hz;
       const k = v * mass / (d || 1);
-      this.physics.promote(b.body, { x: dx * k, y: Math.abs(dy) * k * 0.5 + 0.35 * v * mass, z: dz * k }, true);
+      this.physics.promote(b.body, { x: dx * k, y: Math.abs(dy) * k * 0.5 + 0.3 * v * mass, z: dz * k }, true);
       b.moved = true;
       thrown++;
     }
@@ -546,7 +548,8 @@ export class Range {
     const t = owner.t;
     switch (owner.range) {
       case 'shack':
-        this._shackBlast(point || this.shack.centre, w || { power: 400, radius: 2 });
+        // The blast that follows the round (`blast`) throws the blocks;
+        // counting the round as well threw them twice as hard.
         return;
       case 'paper':
         if (t.down > 0) return;

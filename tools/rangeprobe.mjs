@@ -64,6 +64,8 @@ const r = await page.evaluate(async () => {
   out.popper = await fireAt(st.u, tgt('popper', 0), 2);
   out.gong = await fireAt(st.u, tgt('gong', 0), 2);
   out.shack = await fireAt(gun.u, R.shack.centre, 2);
+  // Did the blocks actually fly? The furthest from home, right after the shots.
+  out.shackFlung = +Math.max(0, ...R.shack.blocks.map((b) => { if (!b.body || b.body.__removed) return 0; const t = b.body.translation(); return Math.hypot(t.x - b.home.x, t.y - b.home.y, t.z - b.home.z); })).toFixed(1);
   // The MG left to itself for ten seconds: does it engage the drones?
   const k0 = R.score.hits;
   for (let k = 0; k < 100; k++) { window.__fastForward(0.1, 1 / 30); await new Promise((r) => setTimeout(r, 5)); }
