@@ -15,7 +15,7 @@ await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low')
 await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.hud, null, { timeout: 400000 });
 await page.waitForTimeout(1200);
-const r = await page.evaluate(async (kind) => {
+const rP = page.evaluate(async (kind) => {
   const B = window.battle, T = window.THREE, o = B.primary.origin;
   B.freeBuild = true; B.unlockAll = true; B.invulnerable = true;
   if (B.garrison) B.garrison.fireEnabled = false;
@@ -46,6 +46,8 @@ const r = await page.evaluate(async (kind) => {
   const tw = new T.Vector3(s.model.position.x - a0.x, 0, s.model.position.z - a0.z).normalize();
   B.seatMove(tw.x * 40, tw.z * 40);
   out.moved = +S.aim.distanceTo(a0).toFixed(1);
+  window.__seatState = () => ({ seat: !!B.seat, done: s.done, phase: s.loiter.phase, state: B.state, hp: s.hp, hits: s.hits, laying: document.body.classList.contains('laying') });
+  await new Promise((r) => window.__seatShot = r);
   // Weapon one, twice, each round's fall against the cross at firing.
   const falls = []; const oi = B._onImpact.bind(B);
   B._onImpact = (hit) => { if (hit.proj.hand) falls.push(+hit.point.distanceTo(S.look).toFixed(1)); return oi(hit); };
@@ -71,9 +73,14 @@ const r = await page.evaluate(async (kind) => {
   window.__seat.switch();
   return out;
 }, kind);
-console.log(JSON.stringify(r));
-await page.waitForTimeout(500);
+await page.waitForFunction(() => !!window.__seatShot, null, { timeout: 300000 });
+await page.waitForTimeout(400);
+console.log(JSON.stringify({ atShot: await page.evaluate(() => window.__seatState()) }));
 await page.screenshot({ path: `/tmp/out/seat-${kind}.png`, timeout: 240000 }).catch((e) => console.log('shot: ' + String(e).slice(0, 80)));
+await page.evaluate(() => { const f = window.__seatShot; window.__seatShot = null; f(); });
+const r = await rP;
+console.log(JSON.stringify(r));
+console.log(JSON.stringify({ atEnd: await page.evaluate(() => window.__seatState()) }));
 const after = await page.evaluate(() => { const B = window.battle; window.__seat.exit(); window.__frame(); return { seat: !!B.seat, laying: document.body.classList.contains('laying'), thermal: document.body.classList.contains('optics-thermal'), rig: window.rig.enabled }; });
 console.log(JSON.stringify({ after, errors }));
 await b.close();

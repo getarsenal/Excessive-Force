@@ -294,7 +294,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   round counted), `node tools/mortarprobe.mjs` the mortar's lay,
   load and shot, `node tools/samprobe.mjs` a rocket team against a SAM
   compound, which is solid now: launchers, radars and revetments carry
-  colliders and a round into one is a direct hit) · `src/game/aircraft.js` air strikes and the airlift (the C-130,
+  colliders and a round into one is a direct hit; the gunner's seat
+  (`startSeat`/`seatMove`/`seatFire`): while a gunship is in its orbit or
+  an Apache at its hover, GUNNER (`#seat-btn`) puts the player at its
+  sensor, the camera the ball under the aircraft (`air.seatEye`) on a
+  cross the finger drags over the ground, the cross sitting where the
+  sensor's line first meets the world (`_seatLook`) and the round going
+  there dead on; FIRE the 105 or the rocket pair, the weapon button the
+  30 mm held; the sortie's own fire stops (`loiter.hand`) and the Apache's
+  turret follows the cross; the thermal grade is `body.optics-thermal`;
+  `node tools/seatprobe.mjs <level> ac130|ah64` calls one, takes the seat,
+  drags, fires both weapons and measures the fall against the cross) · `src/game/aircraft.js` air strikes and the airlift (the C-130,
   the parachutes, what the flak does to both) · `src/game/reinforce.js` the enemy's airborne at the halfway mark (each nation's
   transport, the drop, the men digging in round the building) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
