@@ -69,6 +69,6 @@ const fired = await page.evaluate(() => {
   B._onImpact = oi;
   return { ok, leftFrom, roundAfter, impacts, shots: B.handShots };
 });
-const done = await page.evaluate(() => { const B = window.battle, u = B.units.find((x) => x.alive); window.__lay.exit(); return { lay: !!B.lay, live: !!u.live, bakedVisible: u.group.children.every((c) => c.visible), children: u.group.children.length }; });
+const done = await page.evaluate(() => { const B = window.battle, u = (B.lay && B.lay.unit) || B.units[B.units.length - 1]; const alive = u ? u.alive : null, n = B.units.length; window.__lay.exit(); if (!u) return { noUnit: true, units: n }; return { units: n, alive, lay: !!B.lay, live: !!u.live, bakedVisible: u.group.children.every((c) => c.visible), children: u.group.children.length }; });
 console.log(JSON.stringify({ laid, flat, loading, fired, done, errors }, null, 1));
 await b.close();
