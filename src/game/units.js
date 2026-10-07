@@ -748,14 +748,28 @@ export function makeMortarTeam({ live = false } = {}) {
   round.name = 'round';
   tube.add(round);
   const held = new THREE.Vector3(0.07, 0, 0);
-  const r0 = at(1.95).add(held), r1 = at(2.47).add(held);
-  add(rod(r0, r1, 0.06, olive), round);
-  add(rod(r0.clone().lerp(r1, 0.62), r0.clone().lerp(r1, 0.7), 0.062, band), round);
-  const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.16, 8), olive), round);
-  nose.position.copy(r0).addScaledVector(dir, -0.08);
-  nose.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().negate());
-  // Fins at the top, which is the tail: the round goes in nose first.
-  add(rod(r1, r1.clone().addScaledVector(dir, 0.1), 0.075, dark), round);
+  const r0 = at(1.92).add(held);
+  // The round itself, tail down: it goes into the tube fins first, and the
+  // loader holds it by the body with the fuze up. Built along its own axis
+  // (`y`, tail at nought) and stood on the tube's line: a thin tail boom
+  // with four fins, the fat ogive body with a white band, the fuze on top.
+  const shell = new THREE.Group();
+  shell.position.copy(r0);
+  shell.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  round.add(shell);
+  const steel = new THREE.MeshStandardMaterial({ color: 0x8a8f93, roughness: 0.45, metalness: 0.5 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.6 });
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.24, 8), dark), shell).position.y = 0.12;
+  for (let k = 0; k < 4; k++) {
+    const fin = add(new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.11, 0.055), dark), shell);
+    fin.position.set(Math.sin(k * Math.PI / 2) * 0.04, 0.055, Math.cos(k * Math.PI / 2) * 0.04);
+    fin.rotation.y = k * Math.PI / 2;
+  }
+  const profile = [[0.018, 0.22], [0.05, 0.27], [0.061, 0.33], [0.061, 0.43], [0.052, 0.5], [0.036, 0.56], [0.0, 0.565]].map(([r, y]) => new THREE.Vector2(r, y));
+  add(new THREE.Mesh(new THREE.LatheGeometry(profile, 14), olive), shell);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.0625, 0.0625, 0.02, 14), white), shell).position.y = 0.38;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.028, 0.05, 10), steel), shell).position.y = 0.585;
+  add(new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.035, 10), steel), shell).position.y = 0.63;
 
   // The ready rounds: an open crate by the loader's feet, three in it.
   add(new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.2, 0.34), wood)).position.set(0.95, 0.1, 0.35);
@@ -769,6 +783,7 @@ export function makeMortarTeam({ live = false } = {}) {
     // the tube's frame: the loader's reach, for the lay to play back.
     g.userData.parts = { tube, round, gunner, loader };
     g.userData.crateOffset = new THREE.Vector3(0.95, 0.3, 0.35).sub(breech).sub(r0);
+    g.userData.tubeDir = dir.clone();   // the tube's axis in its own frame: the round drops down it
   }
   return g;
 }

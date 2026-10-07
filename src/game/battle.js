@@ -350,7 +350,7 @@ export class Battle {
       const hidden = [...unit.group.children];
       for (const c of hidden) c.visible = false;
       unit.group.add(g);
-      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, hidden, lean: 0, fired: false, t: 0 };
+      unit.live = { g, ...g.userData.parts, crate: g.userData.crateOffset, tubeDir: g.userData.tubeDir, hidden, lean: 0, fired: false, drop: null, t: 0 };
       return;
     }
     if (!unit.live) return;
@@ -370,19 +370,35 @@ export class Battle {
     // reload, held there until it is fired; then he reaches for the next.
     const total = Math.max(0.01, L?.reloadTotal || u.def.reload * this.reloadFactor);
     const k = 1 - Math.max(0, u.cooldown) / total;   // 0 just fired, 1 loaded
-    if (A.fired) { A.fired = false; A.round.visible = false; }
-    if (k < 0.3) {
-      A.round.visible = false;
-      const s = Math.sin((k / 0.3) * Math.PI);
-      A.loader.position.y = -0.22 * s;
-      A.loader.rotation.x = 0.35 * s;
+    // The shot: the round goes down the tube, a hand's length in a tenth of
+    // a second, and is gone; the loader has let go and is already ducking.
+    if (A.fired) { A.fired = false; A.drop = 0; }
+    if (A.drop != null) {
+      A.drop += dt;
+      const d = Math.min(1, A.drop / 0.12);
+      A.round.visible = d < 1;
+      A.round.position.copy(A.tubeDir).multiplyScalar(-0.6 * d * d);
+      if (d >= 1) A.drop = null;
+    }
+    if (k < 0.36) {
+      // Crouched away from the muzzle blast, head down and turned from the
+      // tube, for the first part of the reload; then up for the next round.
+      if (A.drop == null) A.round.visible = false;
+      const c = k < 0.2 ? 1 : 1 - (k - 0.2) / 0.16;
+      const e = c * c * (3 - 2 * c);
+      A.loader.position.y = -0.48 * e;
+      A.loader.rotation.x = 0.55 * e;
+      A.loader.rotation.y = -Math.PI / 2 + 0.7 * e;
     } else {
-      const r = THREE.MathUtils.clamp((k - 0.3) / 0.55, 0, 1);
+      // The next round out of the crate and up to the muzzle, held there
+      // until it is fired.
+      const r = THREE.MathUtils.clamp((k - 0.36) / 0.5, 0, 1);
       const e = 1 - (1 - r) * (1 - r);
       A.round.visible = true;
       A.round.position.copy(A.crate).multiplyScalar(1 - e);
-      A.loader.position.y = 0;
-      A.loader.rotation.x = 0.12 * (1 - e);
+      A.loader.position.y = -0.1 * (1 - e);
+      A.loader.rotation.x = 0.18 * (1 - e);
+      A.loader.rotation.y = -Math.PI / 2;
     }
     // The gunner leans into a traverse and settles back on the sight.
     A.lean *= Math.max(0, 1 - dt * 4);
