@@ -489,7 +489,11 @@ export class Battle {
     if (this.seat) this.endSeat();
     const aim = s.target.clone();
     aim.y = this.terrain.heightAt(aim.x, aim.z) + 0.3;
-    this.seat = { sortie: s, aim, weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0 };
+    // `aim` is the point on the ground the finger drags; `look` is where the
+    // sensor's line to it first meets something (a roof, the tower), which
+    // is where the cross sits and where the round goes.
+    this.seat = { sortie: s, aim, look: aim.clone(), weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0 };
+    this._seatLook();
     s.loiter.hand = true;
     s.loiter.gunAim = aim;
     this.onEvent('seat', { def: s.def, on: true });
@@ -533,7 +537,8 @@ export class Battle {
     if (S.cooldown > 0) return false;
     const s = S.sortie, a = s.def.aircraft;
     const w = this.seatWeapons(s)[S.weapon];
-    const aim = S.aim.clone();
+    this._seatLook();
+    const aim = S.look.clone();
     if (w.kind === 'shell') {
       this.air._gunshipShell(s, aim, true);
       this.engine.addShake(0.08);
@@ -568,7 +573,23 @@ export class Battle {
     if (s.done || !L || L.phase === 'egress' || L.phase === 'down' || this.state !== 'playing') { this.endSeat(); return; }
     S.cooldown = Math.max(0, S.cooldown - dt);
     S.kick = Math.max(0, S.kick - dt * 2.5);
-    if (!L.orbit) L.gunAim = S.aim;
+    this._seatLook();
+    if (!L.orbit) L.gunAim = S.look;
+  }
+
+  /** Where the sensor's line to the aim first meets the world: the cross, and the round's mark. */
+  _seatLook() {
+    const S = this.seat;
+    if (!S) return;
+    const eye = this.air.seatEye(S.sortie, this._seatEyeV || (this._seatEyeV = new THREE.Vector3()));
+    const dir = this._seatDirV || (this._seatDirV = new THREE.Vector3());
+    dir.subVectors(S.aim, eye);
+    const dist = dir.length();
+    if (dist < 1) { S.look.copy(S.aim); return; }
+    dir.multiplyScalar(1 / dist);
+    const res = this.physics.castRay({ x: eye.x, y: eye.y, z: eye.z }, { x: dir.x, y: dir.y, z: dir.z }, dist - 0.5);
+    if (res) S.look.copy(eye).addScaledVector(dir, Math.max(0, res.toi - 0.3));
+    else S.look.copy(S.aim);
   }
 
   /** Turn and elevate, in radians; the arc is redrawn. */

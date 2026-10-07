@@ -2123,7 +2123,7 @@ async function boot() {
     if (layFire.textContent !== label) layFire.textContent = label;
     const left = Math.max(0, Math.round(s.def.aircraft.station - (s.loiter.time || 0)));
     const ammo = w.kind === 'rocket' ? ` · ${s.loiter.rockets} LEFT` : '';
-    const t = `${s.def.name} · ${w.name}${ammo} · ${Math.round(S.aim.distanceTo(s.model.position))} m · ${left} s ON STATION`;
+    const t = `${s.def.name} · ${w.name}${ammo} · ${Math.round((S.look || S.aim).distanceTo(s.model.position))} m · ${left} s ON STATION`;
     if (layRead.textContent !== t) layRead.textContent = t;
   };
   /** Each frame while laying: the readout, and the reload clock on the trigger. */
@@ -2169,7 +2169,7 @@ async function boot() {
     const S = battle.seat;
     if (!S) return;
     battle.air.seatEye(S.sortie, _eye);
-    _look.copy(S.aim);
+    _look.copy(S.look || S.aim);
     const dist = Math.max(1, _eye.distanceTo(_look));
     const jolt = S.kick * S.kick * 0.004 * dist / SEAT_ZOOM[seatZoom];
     _look.x += Math.sin(S.kick * 41) * jolt; _look.y += Math.cos(S.kick * 37) * jolt;
