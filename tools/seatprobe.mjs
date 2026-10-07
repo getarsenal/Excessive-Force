@@ -76,6 +76,17 @@ const rP = page.evaluate(async (kind) => {
 await page.waitForFunction(() => !!window.__seatShot, null, { timeout: 300000 });
 await page.waitForTimeout(400);
 console.log(JSON.stringify({ atShot: await page.evaluate(() => window.__seatState()) }));
+// The finger: a drag across the middle of the screen, then a tap off to one side; the cross must follow both.
+const aimAt = () => page.evaluate(() => window.battle.seat.aim.toArray().map((v) => +v.toFixed(1)));
+const a0 = await aimAt();
+await page.mouse.move(196, 420); await page.mouse.down(); for (let i = 1; i <= 8; i++) { await page.mouse.move(196 + i * 10, 420 - i * 6); await page.waitForTimeout(16); } await page.mouse.up();
+await page.waitForTimeout(100);
+const a1 = await aimAt();
+await page.mouse.click(120, 520);
+await page.waitForTimeout(100);
+const a2 = await aimAt();
+const d = (p, q) => +Math.hypot(p[0] - q[0], p[2] - q[2]).toFixed(1);
+console.log(JSON.stringify({ finger: { drag: d(a0, a1), tap: d(a1, a2) } }));
 await page.screenshot({ path: `/tmp/out/seat-${kind}.png`, timeout: 240000 }).catch((e) => console.log('shot: ' + String(e).slice(0, 80)));
 await page.evaluate(() => { const f = window.__seatShot; window.__seatShot = null; f(); });
 const r = await rP;
