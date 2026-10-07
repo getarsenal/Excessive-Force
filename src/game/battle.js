@@ -3,6 +3,13 @@ import * as THREE from 'three';
 
 // Points on a hand-laid shell's drawn flight: 0.04 s each, twelve seconds.
 const LAY_PTS = 300;
+/**
+ * A held gun's barrel: how much a burst heats it, how fast it cools, how
+ * long a gun run hot is locked, and the heat it is back at when the lock
+ * lifts. About seven bursts of the machine gun in a row, or eight of the
+ * 30 mm, then four seconds of nothing.
+ */
+const HEAT = { mgBurst: 0.15, seatBurst: 0.13, cool: 0.2, lock: 4.0, reset: 0.45 };
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
@@ -293,8 +300,9 @@ export class Battle {
       else if (p.gravity <= 0) elev = Math.atan2(aim.y - from.y, Math.hypot(aim.x - from.x, aim.z - from.z));
     }
     this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
-      // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
-      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0 };
+      // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye;
+      // the barrel's heat and its lock, for the machine gun.
+      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0 };
     unit.handHeld = true;
     // The gun is handed over loaded: the crew's own reload and the burst
     // they were in the middle of are theirs, not the player's. The trigger
@@ -492,7 +500,7 @@ export class Battle {
     // `aim` is the point on the ground the finger drags; `look` is where the
     // sensor's line to it first meets something (a roof, the tower), which
     // is where the cross sits and where the round goes.
-    this.seat = { sortie: s, aim, look: aim.clone(), weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0 };
+    this.seat = { sortie: s, aim, look: aim.clone(), weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0, heat: 0, over: 0 };
     this._seatLook();
     s.loiter.hand = true;
     s.loiter.gunAim = aim;
@@ -537,6 +545,11 @@ export class Battle {
     if (S.cooldown > 0) return false;
     const s = S.sortie, a = s.def.aircraft;
     const w = this.seatWeapons(s)[S.weapon];
+    if (w.hold) {
+      if (S.over > 0) return false;
+      S.heat = Math.min(1, (S.heat || 0) + HEAT.seatBurst);
+      if (S.heat >= 1) { S.over = HEAT.lock; this.onEvent('overheat', { def: s.def }); return false; }
+    }
     this._seatLook();
     const aim = S.look.clone();
     if (w.kind === 'shell') {
@@ -573,8 +586,16 @@ export class Battle {
     if (s.done || !L || L.phase === 'egress' || L.phase === 'down' || this.state !== 'playing') { this.endSeat(); return; }
     S.cooldown = Math.max(0, S.cooldown - dt);
     S.kick = Math.max(0, S.kick - dt * 2.5);
+    this._cool(S, dt);
     this._seatLook();
     if (!L.orbit) L.gunAim = S.look;
+  }
+
+  /** A barrel's heat, cooling; a locked gun opens again once it is down to the reset line. */
+  _cool(H, dt) {
+    if (!H) return;
+    H.heat = Math.max(0, (H.heat || 0) - dt * HEAT.cool);
+    if (H.over > 0) { H.over = Math.max(0, H.over - dt); if (H.over <= 0 && H.heat > HEAT.reset) H.heat = HEAT.reset; }
   }
 
   /** Where the sensor's line to the aim first meets the world: the cross, and the round's mark. */
@@ -858,6 +879,11 @@ export class Battle {
    */
   _handBurst(u, L) {
     if (u.burstLeft > 0) return false;
+    // The barrel: every burst heats it, it cools between them, and a gun
+    // run hot locks until it has cooled a good way (`HEAT`).
+    if (L.over > 0) return false;
+    L.heat = Math.min(1, (L.heat || 0) + HEAT.mgBurst);
+    if (L.heat >= 1) { L.over = HEAT.lock; this.onEvent('overheat', { unit: u }); return false; }
     const mg = u.def.mg;
     u.mgTarget = { hand: true, pos: L.impact.clone() };
     u.burstLeft = mg.burst;
@@ -2566,7 +2592,7 @@ export class Battle {
 
       // The player's hand on it: the crew holds, the breech reloads.
       if (u.handHeld) {
-        if (u.def.mg) { this._updateMG(u, dt); continue; }
+        if (u.def.mg) { this._updateMG(u, dt); this._cool(this.lay && this.lay.unit === u ? this.lay : null, dt); continue; }
         u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue;
       }
 

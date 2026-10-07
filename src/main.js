@@ -1468,6 +1468,10 @@ async function boot() {
         feedback.emit('kill');
         hud.feed('DRONE DOWN', 'good');
         break;
+      case 'overheat':
+        feedback.emit('deny');
+        hud.feed(`${(data.unit?.def || data.def).name} BARREL HOT — LET IT COOL`, 'bad');
+        break;
       case 'transporthit':
       case 'canopy':
         // Said by what it costs, when it costs it: LOST ON THE DROP or DOWN
@@ -2109,14 +2113,41 @@ async function boot() {
     const k = 1 / layMag();
     battle.layTurn(-dx * 0.0045 * k, -dy * 0.0032 * k);
   });
+  /**
+   * A held gun's trigger: the ring round FIRE is the barrel's heat, going
+   * from amber to red, and a gun run hot wears the lock's seconds until it
+   * has cooled. The readout says HOT and OVERHEATED.
+   */
+  const heatRing = (H, name = null, extra = '') => {
+    const pct = Math.round(100 * (H.heat || 0));
+    if (pct !== layPct) { layPct = pct; layFire.style.setProperty('--p', `${pct}%`); }
+    layFire.classList.add('heat');
+    layFire.classList.toggle('hot', (H.heat || 0) > 0.7);
+    layFire.classList.toggle('overheat', H.over > 0);
+    const label = H.over > 0 ? H.over.toFixed(1) : 'FIRE';
+    if (layFire.textContent !== label) layFire.textContent = label;
+    if (name) {
+      const state = H.over > 0 ? 'OVERHEATED' : (H.heat || 0) > 0.7 ? 'HOT' : 'READY';
+      const t = `${name}${extra} · ${state}`;
+      if (layRead.textContent !== t) layRead.textContent = t;
+    } else {
+      const L = H, u = L.unit;
+      const state = L.over > 0 ? 'OVERHEATED' : L.heat > 0.7 ? 'HOT' : u.burstLeft > 0 ? 'FIRING' : 'READY';
+      const t = `${u.def.name} · ${Math.round(L.range)} m${L.masonry ? ' · ON THE STONE' : ''} · ${state}`;
+      if (layRead.textContent !== t) layRead.textContent = t;
+    }
+  };
   /** Each frame in the seat: the readout, the reload ring, the held 30 mm, and the seat given up when the aircraft goes. */
   const seatFrame = () => {
     const S = battle.seat;
     if (!S) { if (!layEl.hidden && document.body.classList.contains('seated')) exitSeat(); return; }
     const s = S.sortie, w = battle.seatWeapons(s)[S.weapon];
-    const ready = S.cooldown <= 0;
+    const ready = S.cooldown <= 0 && !(w.hold && S.over > 0);
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
     if (layHold && ready && w.hold) fireHand(true);
+    const left0 = Math.max(0, Math.round(s.def.aircraft.station - (s.loiter.time || 0)));
+    if (w.hold) { heatRing(S, `${s.def.name} · ${w.name}`, ` · ${Math.round((S.look || S.aim).distanceTo(s.model.position))} m · ${left0} s ON STATION`); return; }
+    layFire.classList.remove('heat', 'hot', 'overheat');
     const total = Math.max(S.reloadTotal || 0.01, 0.01);
     const pct = ready ? 100 : Math.round(100 * (1 - S.cooldown / total));
     if (pct !== layPct) { layPct = pct; layFire.style.setProperty('--p', `${pct}%`); }
@@ -2133,13 +2164,16 @@ async function boot() {
     const L = battle.lay;
     if (!L) { if (!layEl.hidden) exitLay(); return; }
     const u = L.unit;
-    const ready = u.state === 'ready' && u.cooldown <= 0 && !(u.def.mg && u.burstLeft > 0);
+    const over = u.def.mg && L.over > 0;
+    const ready = u.state === 'ready' && u.cooldown <= 0 && !(u.def.mg && u.burstLeft > 0) && !over;
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
     // The trigger held on the machine gun: the next burst as soon as the gun will give it.
     if (layHold && ready && u.def.mg) fireHand(true);
+    if (u.def.mg) { heatRing(L); return; }
     // The ring round FIRE fills as the breech is loaded, and the button
     // itself counts the seconds down: how long a reload is, and how far
     // through it the crew are, without reading a word.
+    layFire.classList.remove('heat', 'hot', 'overheat');
     const left = Math.max(0, u.cooldown);
     const total = Math.max(L.reloadTotal || 0, left, 0.01);
     const pct = ready ? 100 : Math.round(100 * (1 - left / total));
