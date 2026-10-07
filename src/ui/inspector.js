@@ -147,6 +147,7 @@ export class UnitCard {
   show(unit) {
     this.unit = unit;
     this.el.hidden = false;
+    document.body.classList.add('card-open');
     this.q('uc2-name').textContent = unit.def.full;
     // The crew chief, by name and chevrons (see crews.js).
     const t = this.el.querySelector('.uc2-title');
@@ -158,7 +159,7 @@ export class UnitCard {
     this.update();
   }
 
-  hide() { this.unit = null; this.el.hidden = true; }
+  hide() { this.unit = null; this.el.hidden = true; document.body.classList.remove('card-open'); }
 
   update() {
     const u = this.unit;

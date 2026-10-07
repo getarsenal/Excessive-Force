@@ -3022,8 +3022,12 @@ body.ended .bark, body.clear-view .bark { display: none; }
   .dr-row button { flex: 1 1 40%; }
   body.drawer-open #status, body.drawer-open #survey-btn, body.drawer-open #survey-key,
   body.drawer-open #unit-card { display: none; }
-  /* The unit card sits over the left dock group's column, clear of its buttons. */
+  /* The unit card sits over the left dock group's column, clear of its buttons;
+     with a laid weapon's card up it reaches the status line and SURVEY, which
+     step over to the right of it until it shuts. */
   #unit-card { bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 16px); width: 200px; }
+  body.card-open #status, body.card-open #survey-btn { left: calc(var(--pad-l) + 208px); }
+  body.card-open #survey-key { left: calc(var(--pad-l) + 308px); }
   /* The clip button has no dock under the middle any more: it sits on the bottom edge. */
   #clip-btn { bottom: max(8px, env(safe-area-inset-bottom)); }
 }
