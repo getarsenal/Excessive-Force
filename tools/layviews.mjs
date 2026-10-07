@@ -36,7 +36,9 @@ for (const kind of list) {
       B.deploy(kind, p); u = B.units[B.units.length - 1];
     }
     if (!u) return { kind, noUnit: true };
-    for (let k = 0; k < 80 && (u.state !== 'ready' || !(u.model || u.group.children.length)); k++) window.__fastForward(0.5, 1 / 30);
+    // Ready, and with a model that can be measured (a vehicle's loads).
+    const measurable = () => { const bx = new T.Box3().setFromObject(u.model || u.group); return Number.isFinite(bx.max.y) && bx.max.y - u.pos.y > 0.5; };
+    for (let k = 0; k < 80 && (u.state !== 'ready' || !measurable()); k++) { window.__fastForward(0.5, 1 / 30); await new Promise((r) => setTimeout(r, 50)); }
     window.__lay.enter(u);
     // A working lay, not a search for stone that ran out of elevation: a gun
     // over open sights at four degrees, a mortar as the solve left it.
