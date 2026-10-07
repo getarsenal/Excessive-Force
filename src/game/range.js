@@ -159,6 +159,11 @@ export class Range {
     const W = HALL.x * 2, L = HALL.zFront - HALL.zBack;
     const tex = textTexture(1024, 2048, (ctx, w, h) => {
       ctx.fillStyle = '#5b5e63'; ctx.fillRect(0, 0, w, h);
+      // The apron behind the line, where the guns stand, is a pale pour: a
+      // dark gun on a dark floor could not be seen where it was put down.
+      const X0 = (x) => (x + HALL.x) / W * w, Y0 = (z) => (z - HALL.zBack) / L * h;
+      ctx.fillStyle = '#a9aaa6'; ctx.fillRect(0, Y0(1.5), w, Y0(HALL.zFront) - Y0(1.5));
+      void X0;
       // Slabs: a faint grid of pours.
       ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
       for (let i = 0; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(i * w / 10, 0); ctx.lineTo(i * w / 10, h); ctx.stroke(); }

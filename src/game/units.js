@@ -132,7 +132,10 @@ export const UNITS = [
     cost: 240, unlockFrac: 0.0,
     tint: 0x5a6a52, model: 'infantry',
     eye: { back: 2.8, side: -1.2, up: 1.55, pitch: 0.1, atMuzzle: true },   // the gunner's eye in the lay (battle.layEye)
-    sight: { kind: 'glass', zoom: [1, 6] },   // the tube at one; the observer's glasses on the fall of shot at six
+    // Indirect fire is laid from above: the plot (tube and fall of shot in one
+    // picture, the drag walking the ring over the ground), the plot closer in,
+    // and the gunner's own eye at the tube for the crew (main.js layCamera).
+    sight: { kind: 'plot', zoom: [1, 2, 3], labels: ['PLOT', 'CLOSE', 'EYE'] },
     range: 620, reload: 7.0, setup: 3.0,
     crew: 3, health: 120,
     // Indirect and slow: a high arc that comes down on a roof or a terrace the

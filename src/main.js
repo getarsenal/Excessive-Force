@@ -1906,13 +1906,15 @@ async function boot() {
   const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
   const layMag = () => { const L = battle.lay; if (!L) return 1; const z = laySightOf(L.unit).zoom; return z[Math.min(layZoom, z.length - 1)] || 1; };
   /** A straight shooter (and a tank gun) looks through its sight at the point of impact at every magnification; a howitzer does when zoomed. */
-  const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack' || laySightOf(L.unit).kind === 'tank'; };
+  const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; if (laySightOf(L.unit).kind === 'plot') return false; return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack' || laySightOf(L.unit).kind === 'tank'; };
+  /** The mortar's overhead plot: its sight kind, below the eye's step. */
+  const layPlot = () => { const L = battle.lay; return !!L && laySightOf(L.unit).kind === 'plot' && layMag() < 3; };
   const applyZoom = () => {
     const L = battle.lay;
     if (!L) return;
     const S = laySightOf(L.unit), mag = layMag();
-    engine.camera.fov = LAY_FOV / mag; engine.camera.updateProjectionMatrix();
-    layZoomBtn.textContent = `×${mag}`;
+    engine.camera.fov = S.kind === 'plot' ? LAY_FOV : LAY_FOV / mag; engine.camera.updateProjectionMatrix();
+    layZoomBtn.textContent = S.labels ? S.labels[Math.min(layZoom, S.labels.length - 1)] : `×${mag}`;
     layZoomBtn.hidden = S.zoom.length < 2;
     layEl.dataset.zoom = mag > 1 ? 'in' : 'out';
     layEl.dataset.aimed = layAimed() ? '1' : '0';
@@ -1947,7 +1949,7 @@ async function boot() {
         engine.scene.add(layView);
       }
     }
-    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG UP FOR RANGE' : 'DRAG TO LAY THE GUN';
+    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO LAY THE GUN';
     layPct = -1;
     // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
@@ -2018,7 +2020,14 @@ async function boot() {
     layDrag.x = e.clientX; layDrag.y = e.clientY;
     // A hundred points of drag is a quarter turn; up is up. Through a
     // zoomed sight the same drag moves the lay by the same amount of the
-    // picture, which is that much finer a lay.
+    // picture, which is that much finer a lay. From the plot, the finger
+    // moves the fall of shot over the ground by what it moves on the screen.
+    if (layPlot()) {
+      const L = battle.lay;
+      const mpp = 2 * layPlotHeight() * Math.tan(THREE.MathUtils.degToRad(LAY_FOV) / 2) / Math.max(1, innerHeight);
+      battle.layTurn(-dx * mpp / Math.max(30, L.range), -dy * mpp / 420);
+      return;
+    }
     const k = 1 / layMag();
     battle.layTurn(-dx * 0.0045 * k, -dy * 0.0032 * k);
   });
@@ -2055,6 +2064,8 @@ async function boot() {
    * here and not a cut across the map.
    */
   const _eye = new THREE.Vector3(), _look = new THREE.Vector3(), _proj = new THREE.Vector3();
+  /** How high the plot's camera stands: the whole flight in the frame at one, half that closer in. */
+  const layPlotHeight = () => { const L = battle.lay; return THREE.MathUtils.clamp(L.range * 0.95 + 40, 70, 700) / layMag(); };
   const _vr = new THREE.Vector3(), _vu = new THREE.Vector3(), _vf = new THREE.Vector3();
   const layCamera = (dt) => {
     const L = battle.lay;
@@ -2064,6 +2075,32 @@ async function boot() {
     L.kick = Math.max(0, L.kick - dt * 2.5);
     const mag = layMag();
     const aimed = layAimed();
+    if (layPlot()) {
+      // The plot: straight down on the midpoint between the tube and the
+      // fall of shot, the line of fire up the screen, the ring where the
+      // round lands and the arc drawn over the ground.
+      const h = layPlotHeight();
+      const mx = (L.from.x + L.impact.x) / 2, mz = (L.from.z + L.impact.z) / 2;
+      _eye.set(mx - Math.sin(L.yaw) * h * 0.08, Math.max(L.from.y, L.impact.y) + h, mz - Math.cos(L.yaw) * h * 0.08);
+      _look.set(mx, (L.from.y + L.impact.y) / 2, mz);
+      engine.camera.up.set(Math.sin(L.yaw), 0, Math.cos(L.yaw));
+      engine.camera.position.copy(_eye);
+      engine.camera.lookAt(_look);
+      engine.camera.up.set(0, 1, 0);
+      engine.camera.updateMatrixWorld();
+      _proj.copy(L.impact).project(engine.camera);
+      const on = _proj.z < 1 && Math.abs(_proj.x) < 0.98 && Math.abs(_proj.y) < 0.98;
+      if (layMark.hidden === on) layMark.hidden = !on;
+      if (on) {
+        layMark.style.left = `${((_proj.x + 1) / 2 * 100).toFixed(2)}%`;
+        layMark.style.top = `${((1 - _proj.y) / 2 * 100).toFixed(2)}%`;
+        const col = L.masonry ? 'stone' : L.blocked ? 'blocked' : L.hit ? 'ground' : 'sky';
+        if (layMark.dataset.on !== col) layMark.dataset.on = col;
+      }
+      rig.target.copy(u.pos).setY(u.pos.y + 2); rig.desiredTarget.copy(rig.target);
+      rig.yaw = rig.desiredYaw = L.yaw + Math.PI;
+      return;
+    }
     if (aimed) {
       // Through the sight: the reticle's centre is the point of impact, so
       // the eye looks straight at it and the drop is already in the lay.

@@ -233,7 +233,9 @@ export class Battle {
   _updateEmplacements() {
     let w = 0;
     for (const u of this.units) {
-      if (!u.alive || !u.dugIn || w >= 64) continue;
+      // Not round the gun the player is on: from the gunner's eye the
+      // sandbag ring was a wall across the bottom of the picture.
+      if (!u.alive || !u.dugIn || u.handHeld || w >= 64) continue;
       const r = u.def.model === 'infantry' ? 2.6 : 4.4;
       this._emV.set(u.pos.x, u.pos.y + 0.45, u.pos.z);
       this._emS.set(r, 0.9, r);
@@ -2285,8 +2287,8 @@ export class Battle {
     });
 
     const dir = vel.clone().normalize();
-    this.fx.muzzleFlash(from, dir, def.warhead.fx);
-    if (p.kind !== 'rocket' && this.fx.flourish) {
+    this.fx.muzzleFlash(from, dir, def.warhead.fx * (opts.hand ? 0.3 : 1));
+    if (p.kind !== 'rocket' && this.fx.flourish && !opts.hand) {
       // The blast flattens the ground in front of a heavy gun, and now and
       // then a big one blows a smoke ring.
       if (def.warhead.fx >= 0.7) this.fx.flourish.muzzleDust(from, dir, this.terrain.heightAt(from.x, from.z), def.warhead.fx);
