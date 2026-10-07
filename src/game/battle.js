@@ -2736,6 +2736,10 @@ export class Battle {
     const t = u.mgTarget;
     if (!t) return;
     const from = this._muzzle(u);
+    // Seen from the gunner's own eye, a foot behind the muzzle, the flash
+    // the camera sees from fifty metres is a wall of light: the hand's
+    // rounds carry a small, dim one (`hand`, tracers.js).
+    const look = this.lay && this.lay.unit === u ? { look: 'm240', hand: true } : { look: 'm240' };
     if (t.hand) {
       // Laid by hand on a point: the sheaf walks round it as it does round
       // a man, and whoever is standing in it is hit. The round's end is
@@ -2775,14 +2779,14 @@ export class Battle {
         if (dd < 0.9 * 0.9 && dd < bestX) { bestX = dd; extra = x; }
       }
       if (extra && (!victim || bestX < best)) {
-        this.tracerFX.fire(from, extra.pos, { look: 'm240' }, true);
+        this.tracerFX.fire(from, extra.pos, look, true);
         extra.hit(mg.damage, u);
         if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(1, this.lay.kick + 0.18);
         return;
       }
       const cover = victim ? (victim.cover === 'trench' ? 0.5 : victim.cover === 'window' || victim.cover === 'arcade' ? 0.6 : victim.sandbags ? 0.7 : 1) : 0;
       const hit = !!victim && Math.random() < 0.8 * cover;
-      this.tracerFX.fire(from, hit ? victim.muzzle : to, { look: 'm240' }, hit);
+      this.tracerFX.fire(from, hit ? victim.muzzle : to, look, hit);
       if (hit) {
         victim.health -= mg.damage;
         if (victim.health <= 0) {
@@ -2811,7 +2815,7 @@ export class Battle {
       const aim = t.air.pos.clone();
       const sp = dist * (hit ? 0.006 : 0.03);
       aim.x += gauss() * sp; aim.y += gauss() * sp; aim.z += gauss() * sp;
-      this.tracerFX.fire(from, aim, { look: 'm240' }, hit);
+      this.tracerFX.fire(from, aim, look, hit);
       if (hit) t.air.hit(mg.airDamage * (t.air.armour ?? 1), u);
     } else {
       const d = t.d;
@@ -2838,7 +2842,7 @@ export class Battle {
         : d.cover === 'window' || d.cover === 'arcade' ? 0.5
           : d.sandbags ? 0.65 : d.cover === 'roof' ? 0.75 : 1;
       const hit = Math.random() < 0.45 * (1 - 0.5 * dist / u.def.range) * cover;
-      this.tracerFX.fire(from, to, { look: 'm240' }, hit);
+      this.tracerFX.fire(from, to, look, hit);
       if (hit) {
         d.health -= mg.damage;
         if (d.health <= 0) {

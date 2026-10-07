@@ -197,7 +197,7 @@ export class TracerFX {
     if (look.every) {
       this._belt = (this._belt || 0) + 1;
       if (this._belt % look.every) {
-        this._flash(from, dir, look);
+        this._flash(from, dir, look, def?.hand);
         return;
       }
     }
@@ -220,7 +220,7 @@ export class TracerFX {
       this.tracers.push(rec);
     }
 
-    this._flash(from, dir, look);
+    this._flash(from, dir, look, def?.hand);
   }
 
   /** A tracer off the ground at a new angle, dimmer, slower and short-lived. */
@@ -238,8 +238,15 @@ export class TracerFX {
     });
   }
 
-  /** The muzzle flash: every round has one, tracer or not. */
-  _flash(from, dir, look) {
+  /**
+   * The muzzle flash: every round has one, tracer or not. A round fired by
+   * the player's own hand (`hand`) is seen from the gunner's eye a foot
+   * behind the muzzle, where the flash that reads from fifty metres fills
+   * the screen: his is a sixteenth the size (a hand's breadth at the
+   * muzzle), a third the light, briefer, and never widened to a minimum
+   * on the screen.
+   */
+  _flash(from, dir, look, hand = false) {
     if (this.flashes.length >= MAX_FLASHES && look.player) {
       const k = this.flashes.findIndex((f) => !f.player);
       if (k >= 0) this.flashes.splice(k, 1);
@@ -247,9 +254,10 @@ export class TracerFX {
     if (this.flashes.length < MAX_FLASHES) {
       this.flashes.push({
         pos: from.clone(), dir: dir.clone(), t: 0,
-        life: 0.055 + look.flash * 0.012,
-        size: 0.9 * look.flash, color: look.core, player: !!look.player,
-        minPx: look.player ? 3 : 0,
+        life: hand ? 0.03 : 0.055 + look.flash * 0.012,
+        size: 0.9 * look.flash * (hand ? 0.06 : 1), color: look.core, player: !!look.player,
+        minPx: look.player && !hand ? 3 : 0,
+        gain: hand ? 0.3 : 1,
         roll: Math.random() * Math.PI,
       });
     }
@@ -364,7 +372,7 @@ export class TracerFX {
       this._s.set(s, s, s);
       this._m4.compose(this._v, this._q, this._s);
       this.flashMesh.setMatrixAt(w, this._m4);
-      this._c.setHex(f.color).multiplyScalar(k * k * 2.4);
+      this._c.setHex(f.color).multiplyScalar(k * k * 2.4 * (f.gain || 1));
       this.flashMesh.instanceColor.setXYZ(w, this._c.r, this._c.g, this._c.b);
       w++;
     }
