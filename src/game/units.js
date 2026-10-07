@@ -176,6 +176,7 @@ export const UNITS = [
     cost: 1800, unlockFrac: 0.06,
     tint: ARTILLERY_GREEN, model: 'M1128', modelLength: 8.6,
     eye: { hatch: true, back: 1.4, side: 0, pitch: -0.06 },   // the gunner's eye in the lay (battle.layEye)
+    muzzle: { f: 4.4, h: 2.6 },   // where the round leaves: the end of the 105
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
     // A tank gun, not a howitzer: nine hundred metres a second on the lowest
