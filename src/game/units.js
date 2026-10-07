@@ -47,11 +47,11 @@ export const UNITS = [
     crew: 2, health: 150,
     // The gun's muzzle and the gunner's eye, measured off the prone pair
     // (soldier.js proneGunner, the gunner 0.65 to the right of the plot):
-    // the barrel ends two metres forward at knee height, the eye is the
-    // gunner's own, cheek on the stock (battle.layEye; `near` is the lens's
+    // the muzzle is where the drawn gun's is, the eye the gunner's own,
+    // cheek on the stock (battle.layEye; `near` is the lens's
     // near plane, close enough to keep the gun in the picture; in the lay
     // the team is hidden and the gun alone drawn under the eye, `view`).
-    muzzle: { f: 2.0, h: 0.5, s: 0.53 },
+    muzzle: { f: 1.2, h: 0.45, s: 0.61 },
     eye: { back: -0.6, side: 0.61, h: 0.55, near: 0.2, pitch: 0 },
     view: { down: 0.1, right: 0.0 },   // where the gun sits under the eye in the first-person view
     sight: { kind: 'iron', zoom: [1, 2] },   // the sight the lay looks through (main.js, SIGHTS)
@@ -74,7 +74,7 @@ export const UNITS = [
     // the right of the plot, soldier.js shoulderTube), the team hidden and
     // the tube alone drawn under the eye (`view`), running out to the muzzle;
     // the sight he looks through, and a lens near enough to show the tube.
-    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.12, right: 0.05 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.16, right: 0.06 }, muzzle: { f: 0.52, h: 1.5, s: 0.68 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 220, gravity: 3.2, trail: 0.35 },
     warhead: { lethal: 0.9, radius: 2.8, power: 1100, fx: 0.5, kinetic: 0.2 },
     dispersion: 2.4,
@@ -90,7 +90,7 @@ export const UNITS = [
     // the right of the plot, soldier.js shoulderTube), the team hidden and
     // the tube alone drawn under the eye (`view`), running out to the muzzle;
     // the sight he looks through, and a lens near enough to show the tube.
-    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.12, right: 0.05 }, muzzle: { f: 0.55, h: 1.52, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.16, right: 0.06 }, muzzle: { f: 0.52, h: 1.5, s: 0.68 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 255, gravity: 3.6, trail: 0.4 },
     warhead: { lethal: 1.2, radius: 3.6, power: 1900, fx: 0.7, kinetic: 0.3 },
     dispersion: 2.0,
@@ -106,7 +106,7 @@ export const UNITS = [
     // the right of the plot, soldier.js shoulderTube), the team hidden and
     // the tube alone drawn under the eye (`view`), running out to the muzzle;
     // the sight he looks through, and a lens near enough to show the tube.
-    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.2, right: 0.05 }, muzzle: { f: 0.84, h: 1.54, s: 0.48 }, sight: { kind: 'optic', zoom: [1, 3] },
+    eye: { back: -0.03, side: 0.62, h: 1.66, near: 0.2, pitch: 0 }, view: { down: 0.28, right: 0.07 }, muzzle: { f: 0.81, h: 1.38, s: 0.69 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 195, gravity: 4.0, trail: 0.6 },
     warhead: { lethal: 1.5, radius: 5.2, power: 2600, fx: 1.0, kinetic: 0.08 },
     dispersion: 3.2,
