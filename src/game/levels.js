@@ -46,6 +46,8 @@ import { buildMachupicchu, populateMachupicchu, buildTorreon, populateTorreon, b
   from '../structure/landmarks/machupicchu.js';
 import { buildGreatwall, populateGreatwall } from '../structure/landmarks/greatwall.js';
 import { ATLAS_LEVELS, ATLAS_ORDER, ATLAS_BLURB, TUTORIAL_LEVEL } from './atlas.js';
+import { buildKit } from '../structure/landmarks/kit.js';
+import { MATERIALS } from '../structure/builder.js';
 
 /**
  * Par.
@@ -2362,6 +2364,56 @@ export const LEVELS = {
 Object.assign(LEVELS, ATLAS_LEVELS);
 // Boot Camp: playable by id, never in the running order.
 LEVELS.tutorial = TUTORIAL_LEVEL;
+
+/**
+ * The Range: an indoor live-fire range on Boot Camp's ground at Fort Irwin
+ * (src/game/range.js builds the hall and the targets; this record is the
+ * pipeline's view of it). A sandbox: no garrison, no SAMs, no airborne, no
+ * win or loss, every weapon unlocked and free. The one Structure is the
+ * bullet trap, an earth berm at the end of the lanes, so the pipeline has
+ * a monument to found the level on; its readout is hidden.
+ */
+LEVELS.range = {
+  id: 'range',
+  terrain: 'tutorial',
+  sandbox: true,
+  range: true,
+  sams: false,
+  intros: false,
+  name: 'The Range, Fort Irwin',
+  place: 'Range Control, Fort Irwin',
+  target: 'BULLET TRAP',
+  subtitle: 'Indoor Range · Fort Irwin',
+  victory: 'Cease Fire',
+  cityExcludeRadius: 2000,
+  contextExclude: 2000,
+  // The hall's floor: one flat disc over the lanes, cut before anything is
+  // founded on it; no pad of the berm's own on top of that.
+  flatten: (terrain) => terrain.levelPad(0, -270, 440, 80),
+  padRadius: 0,
+  // From behind the firing line, looking down the lanes.
+  camera: { yaw: 0, pitch: 0.1, distance: 150, height: 26 },
+  structures: (quality) => [
+    { key: 'trap', primary: true, required: false, label: 'BULLET TRAP', offset: { x: 0, z: -560 },
+      blocks: buildKit({ S: 1, yaw: 0, mat: MATERIALS.TURF, parts: [
+        { t: 'steps', tag: 'berm', x: 0, z: 0, w: 300, d: 18, h: 13, n: 1, batter: 0.55, mat: MATERIALS.TURF, posts: false, coarse: 3.0 },
+      ] }, quality) },
+  ],
+  garrison: () => {},
+  scoreTags: null,
+  precinct: { boundary: 'none', ground: 'none', ornament: 'none' },
+  palette: {
+    urban: new THREE.Color(0x3a3d41), urbanAlt: new THREE.Color(0x34373b), park: new THREE.Color(0x3a3d41), parkAlt: new THREE.Color(0x3a3d41),
+    road: new THREE.Color(0x3a3d41), bank: new THREE.Color(0x3a3d41), bed: new THREE.Color(0x2a2d31), dry: new THREE.Color(0x3a3d41),
+  },
+  setting: { clime: 'range', haze: { colour: 0x050607, density: 0.0004 }, hinterland: 'none' },
+  traits: { windows: false, river: false, topples: false, remote: true, opaque: false, sheds: false },
+  unlockScale: 1,
+  par: { rounds: 999, spend: 1e9, minutes: 999, leverage: 1 },
+  brief: 'Every weapon, live. Paper at fifty, poppers at a hundred, gongs to five hundred, the block shack at a hundred and eighty, and two drones on the racetrack for the machine guns.',
+  startMoney: 999999,
+  unlockAll: true,
+};
 
 export const DEFAULT_LEVEL = 'westminster';
 

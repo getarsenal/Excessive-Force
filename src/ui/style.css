@@ -3022,3 +3022,16 @@ body.ended .bark, body.clear-view .bark { display: none; }
   /* The clip button has no dock under the middle any more: it sits on the bottom edge. */
   #clip-btn { bottom: max(8px, env(safe-area-inset-bottom)); }
 }
+
+/* ── The Range (level `range`, src/game/range.js) ─────────────────────
+   A sandbox: no monument to read out and no garrison to count. The top
+   bar's centre carries the range's own board instead. */
+body.range .integrity-wrap, body.range .tb-meta, body.range #hud-target { display: none; }
+body.range .tb-block:has(#hud-defenders) { display: none; }
+#range-board {
+  font-family: var(--f-data); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 6px 0 2px;
+}
+#range-board::before { content: 'THE RANGE · '; color: var(--dim); }
+@media (max-width: 480px) { #range-board { font-size: 10px; letter-spacing: 0.06em; } #range-board::before { content: ''; } }

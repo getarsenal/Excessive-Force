@@ -130,6 +130,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
     { act: 'medals', name: 'MEDALS' },
     { act: 'hangar', name: 'HANGAR' },
+    { act: 'range', name: 'THE RANGE' },
     { act: 'boot', name: 'BOOT CAMP' },
     { act: 'commanders', name: 'COMMANDERS' },
     { act: 'records', name: 'SETTINGS' },
@@ -153,6 +154,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     map: IC('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>'),
     armoury: IC('<path d="M3 16h12l3-3h3v-3h-6l-2-2H5v3H3z"/><path d="M8 16v3h3v-3"/>'),
     hangar: IC('<path d="M3 20v-9l9-6 9 6v9"/><path d="M7 20v-6h10v6"/><path d="M3 20h18"/>'),
+    range: IC('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>'),
     orders: IC('<rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V2.5h6V4M8.5 10l2 2 4-4M8.5 16h7"/>'),
     crates: IC('<path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/>'),
     medals: IC('<path d="M8 2l4 7 4-7"/><circle cx="12" cy="15" r="6"/><path d="M12 12l1 2h2l-1.6 1.3.6 2-2-1.2-2 1.2.6-2L9 14h2z"/>'),
@@ -316,6 +318,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'map': done({ world: 'map' }); break;
         case 'records': done({ world: 'records' }); break;
         case 'boot': go('tutorial'); break;
+        case 'range': go('range'); break;
         case 'daily':
           if (!daily) break;
           openSheet('DAILY STRIKE', dailySheet(daily, dLv, dT, dstate, dDone), 'daily');
@@ -341,6 +344,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
             { act: 'hangar', name: 'HANGAR', sub: `THE FLEET \u00b7 ${unlockedArt(prog).length} OF ${ART.length} NOSE ART` },
             { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
+            { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
             { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
           ]), 'list');

@@ -145,6 +145,11 @@ export class Battle {
     // What the enemy has in the air — transports on their run, men under
     // canopies — for the player's machine guns. Each is { pos, alive, hit(dmg) }.
     this.enemyAir = [];
+    // The Range (src/game/range.js) when this is the range: its targets
+    // and the drones it flies. `extraTargets` is anything else a hand-laid
+    // burst may hit: {pos, r, alive, hit(dmg, unit)}.
+    this.range = null;
+    this.extraTargets = [];
     this.air = new AirWing({
       scene: this.scene, quality: this.quality, terrain: this.terrain,
       projectiles: this.projectiles, fx: this.fx, audio: this.audio, camera: this.camera,
@@ -2522,19 +2527,36 @@ export class Battle {
       to.x += w.x + gauss() * spread * 0.3; to.z += w.z + gauss() * spread * 0.3; to.y += w.y + gauss() * spread * 0.15;
       const g = this.garrison;
       let victim = null, best = 0.9 * 0.9;
+      const seg = this._mgSeg || (this._mgSeg = new THREE.Vector3()), ab = this._mgAB || (this._mgAB = new THREE.Vector3());
+      ab.subVectors(to, from);
+      const ab2 = Math.max(1e-6, ab.lengthSq());
+      // How far a point stands off the round's path, over its last stretch.
+      const offPath = (pt) => {
+        const tt = THREE.MathUtils.clamp(seg.subVectors(pt, from).dot(ab) / ab2, 0, 1);
+        if (tt < 0.6) return Infinity;
+        return seg.copy(from).addScaledVector(ab, tt).distanceToSquared(pt);
+      };
       if (g) {
-        const seg = this._mgSeg || (this._mgSeg = new THREE.Vector3()), ab = this._mgAB || (this._mgAB = new THREE.Vector3());
-        ab.subVectors(to, from);
-        const ab2 = Math.max(1e-6, ab.lengthSq());
         for (const d of g.defenders) {
           if (!d.alive) continue;
           if (d.pos.distanceToSquared(from) > (dist + 6) * (dist + 6)) continue;
-          // The man's distance from the round's path, over its last stretch.
-          const tt = THREE.MathUtils.clamp(seg.subVectors(d.muzzle, from).dot(ab) / ab2, 0, 1);
-          if (tt < 0.6) continue;
-          const dd = seg.copy(from).addScaledVector(ab, tt).distanceToSquared(d.muzzle);
+          const dd = offPath(d.muzzle);
           if (dd < best) { best = dd; victim = d; }
         }
+      }
+      // The range's plates and drones, and anything else that asks to be hit.
+      let extra = null, bestX = Infinity;
+      for (const x of this.extraTargets) {
+        if (!x.alive) continue;
+        if (x.pos.distanceToSquared(from) > (dist + 12) * (dist + 12)) continue;
+        const dd = offPath(x.pos) - x.r * x.r;
+        if (dd < 0.9 * 0.9 && dd < bestX) { bestX = dd; extra = x; }
+      }
+      if (extra && (!victim || bestX < best)) {
+        this.tracerFX.fire(from, extra.pos, { look: 'm240' }, true);
+        extra.hit(mg.damage, u);
+        if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(1, this.lay.kick + 0.18);
+        return;
       }
       const cover = victim ? (victim.cover === 'trench' ? 0.5 : victim.cover === 'window' || victim.cover === 'arcade' ? 0.6 : victim.sandbags ? 0.7 : 1) : 0;
       const hit = !!victim && Math.random() < 0.8 * cover;
@@ -2905,6 +2927,11 @@ export class Battle {
       const r = this.turret.hit(hit, proj, this);
       if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
     }
+    // The range's targets: a round into one, and the blast near any of them.
+    if (this.range) {
+      if (hit.owner && hit.owner.range) this.range.hit(hit.owner, point, w, proj.owner || null);
+      this.range.blast(point, w);
+    }
     // A round into a launcher or a radar itself (their colliders carry the
     // record as owner): the hit is the hit, over and above the blast that
     // follows. A revetment wall takes the round and gives nothing.
@@ -3149,6 +3176,7 @@ export class Battle {
       this.enemyAir.length = 0;
       this.airborne.update(dt);
       this.assault.update(dt);
+      if (this.range) this.range.update(dt);
       this._refreshSkyFloor();
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
@@ -3189,6 +3217,7 @@ export class Battle {
     this.enemyAir.length = 0;
     this.airborne.update(dt);
     this.assault.update(dt);
+    if (this.range) this.range.update(dt);
     this._refreshSkyFloor();
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
     if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
@@ -3406,6 +3435,8 @@ export class Battle {
   get flattened() { return !!this._flattened; }
 
   _checkEnd() {
+    // A sandbox (the range) is never won or lost.
+    if (this.level?.sandbox) return;
     if (this._winAcknowledged) {
       // The win is banked and play went on. When there is nothing left of
       // any objective, say so once: a player who has taken the last ten per

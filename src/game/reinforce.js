@@ -548,7 +548,7 @@ export class EnemyAirborne {
     const level = battle.level;
     this.code = level ? DEFENDER_OF[level.id] : null;
     // The tutorial is a range, not a war, and has no general to send for help.
-    this.enabled = !!(level && level.id !== 'tutorial' && battle.garrison);
+    this.enabled = !!(level && level.id !== 'tutorial' && !level.sandbox && battle.garrison);
     // Whether the bar sets it off by itself. The harness turns this off and
     // calls `launch` when a test wants it.
     this.auto = true;

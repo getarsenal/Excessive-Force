@@ -29,6 +29,14 @@ const C = (h) => new THREE.Color(h);
  * the water. Everything downstream reads one of these.
  */
 export const LOOKS = {
+  // The indoor range: no sky, black air, the lamps' cool-white key from
+  // above and a little warm bounce off the concrete.
+  range: {
+    zenith: 0x050607, mid: 0x08090b, horizon: 0x0c0d10, ground: 0x111214,
+    fog: 0x050607, sun: 0xfff0d8, hemiSky: 0x6a6862, hemiGround: 0x2b2a28, ambient: 0x454644,
+    shallow: 0x1a2426, deep: 0x0d1416,
+    sunIntensity: 1.7, hemiIntensity: 0.5, ambientIntensity: 0.34, exposure: 1.0,
+  },
   temperate: {
     zenith: 0x2559c2, mid: 0x6fa7e4, horizon: 0xd6e4f3, ground: 0x9aa4ac,
     fog: 0xb9cce4, sun: 0xffd9a3, hemiSky: 0x8fb4ff, hemiGround: 0x6e5f8a, ambient: 0x6f7298,
@@ -108,13 +116,14 @@ export function applyLook(engine, level, sky) {
   engine.sun.color.setHex(L.sun);
   engine.hemi.color.setHex(L.hemiSky);
   engine.hemi.groundColor.setHex(L.hemiGround);
-  engine.hemi.intensity = 0.60;
+  engine.hemi.intensity = L.hemiIntensity ?? 0.60;
   engine.ambient.color.setHex(L.ambient);
-  engine.ambient.intensity = 0.22;
+  engine.ambient.intensity = L.ambientIntensity ?? 0.22;
   // The sun carries the contrast: less fill and exposure, so the lit side
-  // is bright and the shadow side is colour rather than grey.
-  engine.sun.intensity = 3.9;
-  engine.renderer.toneMappingExposure = 1.12;
+  // is bright and the shadow side is colour rather than grey. A look may
+  // say otherwise (the range, lit by lamps).
+  engine.sun.intensity = L.sunIntensity ?? 3.9;
+  engine.renderer.toneMappingExposure = L.exposure ?? 1.12;
   // The level's own haze keeps its density; the colour is the sky's, cooled,
   // so a far hill fades into the sky behind it and not into a beige wall.
   engine.scene.fog.color.setHex(L.fog);

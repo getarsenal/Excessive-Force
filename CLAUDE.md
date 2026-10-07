@@ -231,6 +231,28 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   ground removed by `python3 tools/noseart_cut.py SRC OUT --check SHEET`);
   the gallery shows the whole painting (`<id>.jpg`). A new piece needs both.
   The contact sheet's `-nose.png` view is the close-up to judge it by.
+- `src/game/range.js` THE RANGE (level `range`, off the title beside
+  HANGAR): an indoor live-fire range on Boot Camp's ground, on the normal
+  battle pipeline, so every weapon is deployed and laid as in a fight. A
+  dark hall with a girder ceiling, pendant lamps, baffles and the cable
+  runs; four lanes down -z from the firing line (the level origin): paper
+  silhouettes on carriers at 50/100/150 that flip and rise, steel poppers
+  at 100/200/300 on hinges, gongs on chains at 300/400/500 that swing and
+  ring, the block shack at 180 (three hundred blocks, each its own body,
+  thrown by a blast and flying back to their courses when they have
+  settled), a tank plate at 460, and two target drones towing sleeves on
+  a racetrack over the far third for the machine guns (published to
+  `battle.enemyAir`; a hand-laid burst finds them and the plates through
+  `battle.extraTargets`). Every collider's owner carries `range`;
+  `battle._onImpact` routes a round into one to `range.hit` and every
+  impact to `range.blast`. The level is a sandbox (`level.sandbox`: no
+  win or loss, garrison, SAMs, airborne, generals, perks or XP; free and
+  unlocked; no airlift) with the bullet-trap berm as its one Structure
+  and its readouts hidden (`body.range`), the tally on the top bar
+  (`#range-board`). `node tools/rangeprobe.mjs [light|fire]` loads it,
+  lays an M240, a Stryker and an M777 on the paper, a popper, a gong and
+  the shack, lets the MG at the drones, waits for the rebuild and reads
+  the board.
 - `src/game/operations.js` the campaign's operations, stars, gating,
   bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·

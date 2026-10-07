@@ -76,6 +76,7 @@ import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
 import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
+import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
 
 const statusEl = document.getElementById('load-status');
@@ -236,6 +237,8 @@ async function boot() {
   // London greens and brick dust make the plateau read as the Home Counties
   // with a pyramid on it.
   if (level.palette) terrain.palette = level.palette;
+  // A level may cut its own ground before anything is founded on it (the range's floor).
+  if (level.flatten) level.flatten(terrain);
   // The landmarks' footprints, measured before the ground is committed to.
   //
   // This has to happen before the mesh and the heightfield collider are built,
@@ -610,6 +613,12 @@ async function boot() {
   });
   // So a shell landing can scatter whatever was sitting on the roofs.
   battle.life = life;
+  // The range: everything free and unlocked, the monument's readouts off,
+  // and the hall with its targets round the firing line.
+  // Deployed where the finger lands: no C-130 through the ceiling.
+  if (level.sandbox) { battle.freeBuild = true; battle.unlockAll = true; battle.airlift = false; document.body.classList.add('range'); }
+  const range = level.range ? new Range({ scene: engine.scene, physics, terrain, battle, fx, audio, origin, groundY, quality }) : null;
+  window.__range = range;
   // A level can set its own terms: Boot Camp opens the whole arsenal and
   // charges nothing for it. The guns still come in by air — that is one of
   // the things it teaches.
@@ -620,7 +629,7 @@ async function boot() {
   // battle. Not in Boot Camp, and never under the harness.
   // Not on a resume: the save's money replaces whatever the perks would add,
   // and spending them here threw a fresh crate's cheque away.
-  const perks = (!underHarness() && level.id !== 'tutorial' && !resumeSnap) ? battlePerks() : null;
+  const perks = (!underHarness() && level.id !== 'tutorial' && !level.sandbox && !resumeSnap) ? battlePerks() : null;
   if (perks) {
     battle.money = Math.round(battle.money * (1 + perks.fundsPct)) + perks.funds;
     // Income is computed from the battle's progress; the perk scales it.
@@ -630,7 +639,7 @@ async function boot() {
   // The campaign's sawtooth (see operations.js): this battle's place in its
   // operation sets how hard the garrison bites. Not in Boot Camp, and not
   // under the harness, whose numbers are calibrated on the bare garrison.
-  const threat = (!underHarness() && level.id !== 'tutorial')
+  const threat = (!underHarness() && level.id !== 'tutorial' && !level.sandbox)
     ? threatOf(level.id, operationsState(loadProgress()).bossesDown) : 1;
   garrison.damageScale *= threat;
   garrison.threatRof = Math.sqrt(threat);
@@ -647,7 +656,7 @@ async function boot() {
   }
   // The doctrine the stars bought (see doctrine.js). Not in Boot Camp, not
   // under the harness.
-  if (!underHarness() && level.id !== 'tutorial') applyDoctrine(battle, garrison);
+  if (!underHarness() && level.id !== 'tutorial' && !level.sandbox) applyDoctrine(battle, garrison);
   if (dailyMod) {
     if (dailyMod.id === 'chest') battle.money *= 2;
     if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
@@ -1049,7 +1058,7 @@ async function boot() {
   };
   // The generals' corner card, the win orbit and the milestones: see the
   // frame loop. Boot Camp has its own General and gets no heckling.
-  const comcard = level.id === 'tutorial' ? null : new ComCard({ level, audio });
+  const comcard = (level.id === 'tutorial' || level.sandbox) ? null : new ComCard({ level, audio });
   window.__comcard = comcard;      // for the harness
   window.__hunt = huntMarkers;
   window.__hvt = hvtMarkers;
@@ -1075,6 +1084,7 @@ async function boot() {
   const payOut = (won, sum, extra = {}) => {
     if (paid) return null;
     paid = true;
+    if (level.sandbox) return null;
     if (level.id === 'tutorial') return won ? bootCampXp() : null;
     return award({
       won, sum, level: level.id, ribbons, marks: extra.marks || [], feats: extra.feats || [],
@@ -1449,6 +1459,10 @@ async function boot() {
         break;
       case 'shotdown':
         hud.feed(`${data.def.name} SHOT DOWN`, 'bad');
+        break;
+      case 'rangedrone':
+        feedback.emit('kill');
+        hud.feed('DRONE DOWN', 'good');
         break;
       case 'transporthit':
       case 'canopy':
@@ -2416,6 +2430,12 @@ async function boot() {
   const firstPrompt = () => {
     if (level.id === 'tutorial') {
       tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio, unitCard });
+      return;
+    }
+    if (level.sandbox) {
+      // The range: the line is hot, and the one thing to know.
+      hud.status('range is hot \u00b7 deploy on the line, LAY a weapon, ZOOM through its sight', 7);
+      hud.feed('THE RANGE \u00b7 PAPER AT 50 \u00b7 POPPERS AT 100 \u00b7 GONGS TO 500 \u00b7 DRONES OVERHEAD', 'big');
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
