@@ -9,14 +9,14 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
 const page = await b.newPage({ viewport: { width: 900, height: 600 } });
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
-await page.addInitScript(() => { try {
-  localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.autostart', '1');
+await page.addInitScript((tier) => { try {
+  localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
-  localStorage.setItem('tt.tutorial', 'done'); } catch {} });
+  localStorage.setItem('tt.tutorial', 'done'); } catch {} }, process.env.TIER || 'low');
 await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 await page.waitForTimeout(2000);
-const r = await page.evaluate(([n, secs, warm]) => {
+const r = await page.evaluate(([n, secs, warm, gapMode]) => {
   const T = {}, C = {};
   const wrap = (obj, name, key) => {
     const f = obj[name]; if (!f) return;
@@ -41,6 +41,10 @@ const r = await page.evaluate(([n, secs, warm]) => {
   if (g.city) wrap(g.city, 'blocks', 'city.blocks');
   wrap(window.physics, 'step', 'physics.step');
   for (const k of ['reclaim', 'demote', '_findSupport', '_overSomething', 'recycleSettled', 'auditFrozen']) wrap(window.physics, k, 'physics.' + k);
+  // The frame loop asks the solver for the tier's minimum gap (and the
+  // solver's own budget rides on it); fastForward asks for none. Measured
+  // the phone's way unless GAP=0.
+  if (gapMode !== '0') for (const s of window.structures) { const orig = s.solveStability.bind(s); s.solveStability = (force = false, gap = 0) => orig(force, gap || window.quality.solveGap || 0); }
   for (const s of window.structures) { wrap(s, 'solveStability', 'solve'); wrap(s, 'maintainIslands', 'islands'); wrap(s, 'syncTransforms', 'sync'); wrap(s, 'fragmentIsland', 'fragment'); }
   if (bt.projectiles) wrap(bt.projectiles, 'update', 'projectiles');
   for (const k of Object.getOwnPropertyNames(Object.getPrototypeOf(bt))) {
@@ -76,6 +80,6 @@ const r = await page.evaluate(([n, secs, warm]) => {
     shells: bt.projectiles?.list?.length ?? bt.projectiles?.active?.length, awake: window.physics.awakeCount, sim: window.physics.dynamicSet.size,
     destroyed: window.structures.reduce((a, s) => a + s.destroyedCount, 0),
     render, wallMsPerSimSec: (wall / secs).toFixed(1), losPerSec: ((g.losChecks - l0) / secs).toFixed(0), per };
-}, [+nUnits, +secs, +warm]);
+}, [+nUnits, +secs, +warm, process.env.GAP ?? '1']);
 console.log(JSON.stringify(r, null, 1));
 await b.close();

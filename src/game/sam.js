@@ -69,6 +69,10 @@ export const SAM = {
   powerPerHp: 60,
   /** What the earth ring keeps off a launcher from a round landing outside it. */
   berm: 0.3,
+  /** A round into the launcher or the radar itself, rather than the ground
+   *  beside it: its power counts this many times over. An AT4 square on a
+   *  launcher is two rockets; a Javelin or an RPG is one. */
+  direct: 4,
 };
 
 /** What the feed calls an aircraft: a transport by its type, a strike by its name. */
@@ -269,6 +273,12 @@ export class SamSites {
     this.audio = o.audio;
     this.air = o.air;
     this.camera = o.camera;
+    // The physics world, for the colliders: a launcher, a radar and the
+    // revetment walls are things a round can hit, not pictures it flies
+    // through. Without them a direct-fire rocket on flat ground went past a
+    // launcher and landed behind it, outside its own blast radius.
+    this.physics = o.physics || null;
+    this.bodies = [];
     this.onEvent = o.onEvent || (() => {});
     this.low = o.quality?.name === 'low';
     // Boot Camp's practice compound: there to be shot at, not to shoot, and
@@ -314,7 +324,9 @@ export class SamSites {
     L.group.rotation.y = p.yaw;
     this.group.add(L.group);
     const l = { ...L, x: p.x, z: p.z, y: p.y, yaw: p.yaw, rounds: SAM.rounds, cool: 2 + (i % 3) * 2.5,
-      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0, hp: SAM.hp * (this.training ? 0.5 : 1), site, _hitAt: -9 };
+      alive: true, until: from + SAM.window, reload: 0, dropped: from > 0, hp: SAM.hp * (this.training ? 0.5 : 1), site, _hitAt: -9, sam: 'launcher' };
+    // The chassis, and the erected canisters over the back of it.
+    this._solid(l, p, [[0, 1.75, 0, 1.45, 1.75, 6.3], [0, 6.4, -5.0, 1.6, 3.9, 0.9]]);
     this.launchers.push(l);
     if (site) site.launchers.push(l);
     else if (!this.radar?.alive) {
@@ -330,7 +342,41 @@ export class SamSites {
     R.group.position.set(x, this.terrain.heightAt(x, z), z);
     R.group.rotation.y = yaw;
     this.group.add(R.group);
-    return { ...R, x, z, alive: true, hp: SAM.radarHp, _hitAt: -9 };
+    const Rd = { ...R, x, z, alive: true, hp: SAM.radarHp, _hitAt: -9, sam: 'radar' };
+    // The chassis, the mast and the array on it.
+    this._solid(Rd, { x, y: R.group.position.y, z, yaw }, [[0, 1.6, 0, 1.3, 1.6, 4.7], [0, 6.3, -0.6, 0.3, 2.8, 0.3], [0, 9.2, -0.6, 1.7, 2.3, 0.6]]);
+    return Rd;
+  }
+
+  /**
+   * Fixed colliders for a thing at `p` (x, y, z, yaw), each box given in the
+   * thing's own frame as centre and half-extents, owned by its record so a
+   * round that stops against one knows what it hit (battle._onImpact).
+   */
+  _solid(owner, p, boxes) {
+    if (!this.physics) return;
+    const q = this._q.setFromAxisAngle(this._up, p.yaw);
+    const c = Math.cos(p.yaw), sn = Math.sin(p.yaw);
+    for (const [x, y, z, hx, hy, hz] of boxes) {
+      const wx = p.x + x * c + z * sn, wz = p.z - x * sn + z * c;
+      const body = this.physics.createFixedBox({ x: wx, y: p.y + y, z: wz }, { x: hx, y: hy, z: hz }, q, owner);
+      this.bodies.push(body);
+    }
+  }
+
+  /**
+   * A round into a launcher or a radar itself. Its power counts SAM.direct
+   * times over what the same round landing beside it would, and what it
+   * wrecks pays as a blast would.
+   */
+  directHit(owner, power) {
+    if (!owner || !owner.alive) return 0;
+    let pay = 0;
+    const dmg = (power / SAM.powerPerHp) * SAM.direct;
+    if (owner.sam === 'launcher') pay += this._hurtLauncher(owner, dmg);
+    else if (owner.sam === 'radar') pay += this._hurtRadar(owner, dmg);
+    pay += this._settleSites();
+    return pay;
   }
 
   /**
@@ -394,6 +440,7 @@ export class SamSites {
         wall.rotation.y = p.yaw;
         wall.castShadow = true; wall.receiveShadow = true;
         this.group.add(wall);
+        this._solid({ sam: 'wall', site, alive: true }, { x: wall.position.x, y: ly, z: wall.position.z, yaw: p.yaw }, [[0, 1.2, 0, 0.9, 1.2, 7]]);
       }
     });
     // The radar at the back of the ring, on the side away from the gap.
@@ -478,51 +525,70 @@ export class SamSites {
     for (const l of this.launchers) {
       if (!l.alive) continue;
       const dmg = dmgAt(l.x, l.z, l.y, l.site);
-      if (dmg <= 0) continue;
-      l.hp -= dmg;
-      if (l.hp > 0) {
-        if (now - l._hitAt > 1.5) {
-          l._hitAt = now;
-          this.onEvent('samhit', { point: new THREE.Vector3(l.x, l.y, l.z), frac: l.hp / SAM.hp, what: 'launcher' });
-        }
-        continue;
-      }
-      l.alive = false;
-      pay += SAM.bounty;
-      this._wreck(l.group);
-      // What was left in the tubes goes off: the rest of the pack lifts out
-      // of the wreck in every direction and climbs away to nowhere.
-      for (const m of l.mouths) {
-        if (l.rounds <= 0) break;
-        l.rounds--;
-        if (Math.random() < 0.6) this._launch(l, m, null, false, true);
-      }
-      if (this.fx) this.fx.detonate(this._v.set(l.x, l.y + 3, l.z), 3.2, { ground: true, groundY: l.y });
-      this.onEvent('samdown', { point: new THREE.Vector3(l.x, l.y, l.z), left: this.alive });
+      if (dmg > 0) pay += this._hurtLauncher(l, dmg);
     }
     for (const Rd of [this.radar, ...this.sites.map((s) => s.radar)]) {
       if (!Rd?.alive) continue;
       const gy = this.terrain.heightAt(Rd.x, Rd.z);
       const site = this.sites.find((s) => s.radar === Rd) || null;
       const dmg = dmgAt(Rd.x, Rd.z, gy, site);
-      if (dmg <= 0) continue;
-      Rd.hp -= dmg;
-      if (Rd.hp > 0) {
-        if (now - Rd._hitAt > 1.5) {
-          Rd._hitAt = now;
-          this.onEvent('samhit', { point: new THREE.Vector3(Rd.x, gy, Rd.z), frac: Rd.hp / SAM.radarHp, what: 'radar' });
-        }
-        continue;
-      }
-      Rd.alive = false;
-      pay += SAM.radarBounty;
-      const first = !!site && site.launchers.length > 0 && site.launchers.every((l) => l.alive);
-      if (first) pay += SAM.radarFirst;
-      this._wreck(Rd.group);
-      if (this.fx) this.fx.detonate(this._v.set(Rd.x, gy + 3, Rd.z), 2.2, { ground: true });
-      this.onEvent('samradar', { point: new THREE.Vector3(Rd.x, gy, Rd.z), first });
+      if (dmg > 0) pay += this._hurtRadar(Rd, dmg);
     }
-    // A compound with nothing left in it.
+    pay += this._settleSites();
+    return pay;
+  }
+
+  /** Damage to a launcher: the feed told at most every second and a half; wrecked at nought, with what was left in the tubes going off. */
+  _hurtLauncher(l, dmg) {
+    const now = this._time;
+    l.hp -= dmg;
+    if (l.hp > 0) {
+      if (now - l._hitAt > 1.5) {
+        l._hitAt = now;
+        this.onEvent('samhit', { point: new THREE.Vector3(l.x, l.y, l.z), frac: l.hp / SAM.hp, what: 'launcher' });
+      }
+      return 0;
+    }
+    l.alive = false;
+    this._wreck(l.group);
+    // What was left in the tubes goes off: the rest of the pack lifts out
+    // of the wreck in every direction and climbs away to nowhere.
+    for (const m of l.mouths) {
+      if (l.rounds <= 0) break;
+      l.rounds--;
+      if (Math.random() < 0.6) this._launch(l, m, null, false, true);
+    }
+    if (this.fx) this.fx.detonate(this._v.set(l.x, l.y + 3, l.z), 3.2, { ground: true, groundY: l.y });
+    this.onEvent('samdown', { point: new THREE.Vector3(l.x, l.y, l.z), left: this.alive });
+    return SAM.bounty;
+  }
+
+  /** Damage to a radar; wrecked at nought, with the bonus for blinding a compound whose launchers both stand. */
+  _hurtRadar(Rd, dmg) {
+    const now = this._time;
+    const gy = this.terrain.heightAt(Rd.x, Rd.z);
+    const site = this.sites.find((s) => s.radar === Rd) || null;
+    Rd.hp -= dmg;
+    if (Rd.hp > 0) {
+      if (now - Rd._hitAt > 1.5) {
+        Rd._hitAt = now;
+        this.onEvent('samhit', { point: new THREE.Vector3(Rd.x, gy, Rd.z), frac: Rd.hp / SAM.radarHp, what: 'radar' });
+      }
+      return 0;
+    }
+    Rd.alive = false;
+    let pay = SAM.radarBounty;
+    const first = !!site && site.launchers.length > 0 && site.launchers.every((l) => l.alive);
+    if (first) pay += SAM.radarFirst;
+    this._wreck(Rd.group);
+    if (this.fx) this.fx.detonate(this._v.set(Rd.x, gy + 3, Rd.z), 2.2, { ground: true });
+    this.onEvent('samradar', { point: new THREE.Vector3(Rd.x, gy, Rd.z), first });
+    return pay;
+  }
+
+  /** A compound with nothing left in it pays its bonus, once. */
+  _settleSites() {
+    let pay = 0;
     for (const site of this.sites) {
       if (site.down || site.radar?.alive || site.launchers.some((l) => l.alive)) continue;
       site.down = true;
@@ -759,6 +825,8 @@ export class SamSites {
   dispose() {
     this.scene.remove(this.group);
     this.scene.remove(this.smoke.mesh);
+    if (this.physics) for (const b of this.bodies) { try { this.physics.remove(b); } catch { /* already gone */ } }
+    this.bodies.length = 0;
   }
 }
 

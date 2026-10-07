@@ -700,7 +700,7 @@ async function boot() {
     // Sand where the ground is sand, olive drab everywhere else.
     const u = level.palette?.urban;
     const desert = !!(u && u.r > 0.5 && u.r > u.b * 1.25);
-    const makeSams = (sites) => new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air,
+    const makeSams = (sites) => new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air, physics,
       camera: engine.camera, quality, sites, desert,
       onEvent: (kind, data) => handleEvent(kind, data) });
     // Two or three launchers round the map, by the level.
@@ -780,7 +780,7 @@ async function boot() {
       plots: contextGroup?.userData?.plots || [], net: contextGroup?.userData?.network || null, landmarks };
     const ps = siteSams(terrain, { ...opts, count: 1, seed: 0x71, r0: 200, rMax: 460, sizes: [36, 28, 20] });
     if (ps.length) {
-      battle.sams = new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air, camera: engine.camera,
+      battle.sams = new SamSites({ scene: engine.scene, terrain, fx, audio, air: battle.air, camera: engine.camera, physics,
         quality, sites: ps, desert, training: true, onEvent: (kind, data) => handleEvent(kind, data) });
     }
     const hs = siteSams(terrain, { ...opts, count: 1, seed: 0x72, r0: 150, rMax: 420, sizes: [20, 16, 13],

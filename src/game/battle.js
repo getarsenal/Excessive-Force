@@ -2611,6 +2611,16 @@ export class Battle {
       const r = this.turret.hit(hit, proj, this);
       if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
     }
+    // A round into a launcher or a radar itself (their colliders carry the
+    // record as owner): the hit is the hit, over and above the blast that
+    // follows. A revetment wall takes the round and gives nothing.
+    if (this.sams && hit.owner && hit.owner.sam) {
+      const pay = this.sams.directHit(hit.owner, w.power * this.powerScale);
+      if (pay > 0) {
+        this.money += pay;
+        this.onEvent('bounty', { point, amount: Math.round(pay), kind: 'kill' });
+      }
+    }
     // A round that stopped against the town.
     //
     // `structureHit` means the ray found *a* collider, not that it found the

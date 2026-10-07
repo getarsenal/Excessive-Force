@@ -1,58 +1,74 @@
-// The SAM sites, counted over a long fight: how many launchers each level
-// gets and where, and then strikes flown one after another from minute five
-// on, to see that the battery is still firing, firing more than once at an
-// aeroplane it can reach, reloading, and bringing down about one in three.
-//
-//   node tools/samprobe.mjs [runs=12] level...
+// An infantry rocket team against a SAM compound on flat ground: the team is
+// put down with a clear line to a launcher, the battery's target is laid on
+// the launcher, and the fight is stepped until the launcher is wrecked or
+// the clock runs out. Prints what the rounds hit, how many it took, and the
+// same for the radar.
+//   node tools/samprobe.mjs [level=westminster] [kind=at4]
 import { chromium } from 'playwright';
-const args = process.argv.slice(2);
-const runs = /^\d+$/.test(args[0] || '') ? Number(args.shift()) : 12;
-const levels = args.length ? args : ['westminster'];
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
-for (const level of levels) {
-  const page = await b.newPage({ viewport: { width: 800, height: 500 } });
-  const errors = [];
-  page.on('pageerror', (e) => errors.push(e.message.slice(0, 200)));
-  await page.addInitScript(() => { try {
-    localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.autostart', '1');
-    localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
-    localStorage.setItem('tt.tutorial', 'done'); localStorage.removeItem('tt.suite'); } catch {} });
-  await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
-  await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
-  const r = await page.evaluate((runs) => {
-    const B = window.battle, S = B.sams, ff = window.__fastForward;
-    if (!S) return { sams: 0 };
-    B.unlockAll = true; B.freeBuild = true; B.airborne.auto = false; B.assault.auto = false;
-    B.garrison.fireEnabled = false; B.invulnerable = true;
-    const o = B.primary.origin;
-    const out = {
-      sams: S.launchers.length, radar: !!S.radar,
-      at: S.launchers.map((l) => [Math.round(l.x), Math.round(l.z), Math.round(Math.hypot(l.x - o.x, l.z - o.z))]),
-      bearings: S.launchers.map((l) => Math.round((Math.atan2(l.x - o.x, l.z - o.z) * 180) / Math.PI)),
-    };
-    const ev = { samlaunch: 0, samkill: 0, sammiss: 0 };
-    const prev = S.onEvent;
-    S.onEvent = (k, d) => { if (k in ev) ev[k]++; prev(k, d); };
-    // Five minutes in: past where the battery used to go quiet.
-    ff(300, 1 / 10);
-    let reloads = 0, perPlane = [];
-    const wasEmpty = new Set();
-    for (let i = 0; i < runs; i++) {
-      const aim = o.clone(); aim.y = B.primary.groundY + 10;
-      const before = ev.samlaunch;
-      const s = B.callStrike(i % 3 === 2 ? 'b1' : 'f15', aim);
-      for (let k = 0; k < 40 * 15; k++) {
-        ff(1 / 15, 1 / 15);
-        S.launchers.forEach((l, j) => { if (l.rounds <= 0) wasEmpty.add(j); else if (wasEmpty.has(j)) { wasEmpty.delete(j); reloads++; } });
-        if (s && (s.done || s.downed) && !S.missiles.length) break;
-      }
-      perPlane.push(ev.samlaunch - before);
-      ff(6, 1 / 10);
+const [level = 'westminster', kind = 'at4'] = process.argv.slice(2);
+const port = process.env.TT_PORT || 5177;
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
+const page = await b.newPage({ viewport: { width: 900, height: 600 } });
+const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
+await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} });
+await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
+await page.waitForTimeout(1500);
+const out = await page.evaluate(async (kind) => {
+  const B = window.battle, T = window.THREE, terrain = window.terrain;
+  B.freeBuild = true; B.unlockAll = true; B.invulnerable = true; B.airlift = false;
+  const S = B.sams;
+  if (!S || !S.launchers.length) return { noSams: true };
+  const res = { kind, launchers: S.launchers.length, bodies: S.bodies.length, sites: S.sites.length, tries: [] };
+  // The hits on the way: what each round met.
+  const hits = []; const oi = B._onImpact.bind(B);
+  B._onImpact = (h) => { if (!h.proj.hostile) hits.push({ owner: h.owner ? (h.owner.sam || h.owner.def?.id || 'stone/other') : null, structureHit: h.structureHit, d: +Math.hypot(h.point.x - res.lx, h.point.z - res.lz).toFixed(1) }); return oi(h); };
+  for (const l of S.launchers) {
+    if (!l.alive) continue;
+    res.lx = l.x; res.lz = l.z;
+    // A spot a hundred metres out, level with the launcher, that the placement rules allow.
+    let u = null, spot = null;
+    for (let a = 0; a < 360 && !u; a += 15) for (const r of [90, 110, 130]) {
+      const x = l.x + Math.cos(a * Math.PI / 180) * r, z = l.z + Math.sin(a * Math.PI / 180) * r;
+      const p = new T.Vector3(x, terrain.heightAt(x, z), z);
+      if (Math.abs(p.y - l.y) > 3) continue;
+      if (!B.validPlacement(p, null).ok) continue;
+      if (B.city && B.city.blocks(new T.Vector3(x, p.y + 1.3, z), new T.Vector3(l.x, l.y + 2, l.z))) continue;
+      B.deploy(kind, p); u = B.units[B.units.length - 1]; spot = p; break;
     }
-    return { ...out, runs, ...ev, reloads, perPlane: perPlane.join(','), quiet: S.quiet, elapsed: Math.round(B.elapsed) };
-  }, runs);
-  console.log(JSON.stringify({ level, ...r, errors }));
-  await page.close();
-}
+    if (!u) { res.tries.push({ launcher: [l.x, l.z].map(Math.round), noSpot: true }); continue; }
+    for (let k = 0; k < 90 && u.state !== 'ready'; k++) window.__fastForward(0.5, 1 / 30);
+    B.setTarget(new T.Vector3(l.x, l.y + 2.4, l.z), 'tower');
+    const hp0 = l.hp, n0 = hits.length;
+    let shots = 0; const fired = B._fireOne.bind(B); B._fireOne = (unit, aim, o) => { const ok = fired(unit, aim, o); if (ok && unit === u) shots++; return ok; };
+    for (let k = 0; k < 120 && l.alive; k++) window.__fastForward(0.5, 1 / 30);
+    B._fireOne = fired;
+    const aim = B.aimFor(u); res.tries.push({ launcher: [l.x, l.z].map(Math.round), range: Math.round(spot.distanceTo(new T.Vector3(l.x, l.y, l.z))), hp0, hp: Math.round(l.hp), dead: !l.alive, shots, state: u.state, hold: u.hold, cooldown: +u.cooldown.toFixed(1), aim: aim ? [aim.x, aim.y, aim.z].map(Math.round) : null, autoEngage: B.autoEngage, defRange: u.def.range, minRange: u.def.minRange, hits: hits.slice(n0).slice(0, 12) });
+    B.removeUnit(u);
+    if (res.tries.length >= 2) break;
+  }
+  // And the radar of the first compound, from the gap side.
+  const site = S.sites[0]; const Rd = site?.radar;
+  if (Rd?.alive) {
+    res.lx = Rd.x; res.lz = Rd.z;
+    let u = null, spot = null; const gy = terrain.heightAt(Rd.x, Rd.z);
+    for (let a = 0; a < 360 && !u; a += 15) for (const r of [100, 130]) {
+      const x = Rd.x + Math.cos(a * Math.PI / 180) * r, z = Rd.z + Math.sin(a * Math.PI / 180) * r;
+      const p = new T.Vector3(x, terrain.heightAt(x, z), z);
+      if (Math.abs(p.y - gy) > 3 || !B.validPlacement(p, null).ok) continue;
+      B.deploy(kind, p); u = B.units[B.units.length - 1]; spot = p; break;
+    }
+    if (u) {
+      for (let k = 0; k < 90 && u.state !== 'ready'; k++) window.__fastForward(0.5, 1 / 30);
+      B.setTarget(new T.Vector3(Rd.x, gy + 6, Rd.z), 'tower');
+      const n0 = hits.length; let shots = 0; const fired = B._fireOne.bind(B); B._fireOne = (unit, aim, o) => { const ok = fired(unit, aim, o); if (ok && unit === u) shots++; return ok; };
+      for (let k = 0; k < 120 && Rd.alive; k++) window.__fastForward(0.5, 1 / 30);
+      B._fireOne = fired;
+      res.radar = { dead: !Rd.alive, hp: Math.round(Rd.hp), shots, hits: hits.slice(n0).slice(0, 10) };
+    }
+  }
+  B._onImpact = oi;
+  return res;
+}, kind);
+console.log(JSON.stringify({ level, out, errors: errors.slice(0, 5) }, null, 1));
 await b.close();
