@@ -282,7 +282,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   ZOOM steps through); the reticle's centre is the point of impact, so a
   straight shooter (rockets, the machine gun, the Javelin) looks through
   it at every magnification and a gun does when zoomed, the mark
-  bracketing the fall of shot otherwise; the mortar is laid from the plot
+  bracketing the fall of shot otherwise; a held gun has a barrel (`HEAT`
+  in battle.js: the machine gun on FIRE and the seat's hold weapons heat a
+  step a burst, do not cool while firing, lock four seconds run hot and
+  reopen at the reset line; the trigger ring is the heat, amber then red,
+  dark and counting while locked; `node tools/heatprobe.mjs` holds both
+  and prints the trace); the mortar is laid from the plot
   (`sight.kind === 'plot'`): straight down on the tube and the fall of
   shot together, the drag walking the ring over the ground, CLOSE the
   same at half the height, EYE the gunner's own at the tube; the machine gun is laid too,
