@@ -58,7 +58,7 @@ for (const kind of list) {
     return res;
   }, kind);
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `/tmp/out/layview-${kind}.png` });
+  await page.screenshot({ path: `/tmp/out/layview-${kind}.png`, timeout: 120000 });
   await page.evaluate(() => { const B = window.battle; const u = B.lay?.unit; window.__lay.exit(); if (u) B.removeUnit(u); });
   out.push(r);
   console.log(JSON.stringify(r));
