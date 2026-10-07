@@ -246,7 +246,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   lays it with the shell's flight drawn by the shell's own physics ray,
   FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
   the HAND LAID stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
-  drives it on a phone) · `src/game/aircraft.js` air strikes and the airlift (the C-130,
+  drives it on a phone; every round leaves its weapon's own muzzle
+  (`def.muzzle`, forward and up; a mortar's the top of its tube), a mortar
+  is laid by range on the charge that makes the arc and never under
+  forty-five degrees, with its crew live and loading while the player has
+  it, and each weapon says where its gunner's eye is (`def.eye`: a
+  vehicle's commander in the hatch over the model's measured top, the
+  mortar's gunner on the sight looking at the tube); `node
+  tools/layviews.mjs` lays every weapon and measures how much of the view
+  is the weapon itself, `node tools/mortarprobe.mjs` the mortar's lay,
+  load and shot, `node tools/samprobe.mjs` a rocket team against a SAM
+  compound, which is solid now: launchers, radars and revetments carry
+  colliders and a round into one is a direct hit) · `src/game/aircraft.js` air strikes and the airlift (the C-130,
   the parachutes, what the flak does to both) · `src/game/reinforce.js` the enemy's airborne at the halfway mark (each nation's
   transport, the drop, the men digging in round the building) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
