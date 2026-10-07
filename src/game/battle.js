@@ -1488,6 +1488,32 @@ export class Battle {
    * standing height where the line passes near its footprint, the town's
    * roofs where it passes over them. The aircraft fly above it.
    */
+  /**
+   * The top of the tallest thing standing on the map, plus a margin, for the
+   * projectiles (`skyFloor`): above it a shell's physics ray is skipped. The
+   * monument's standing height, the town's roofs and the ground itself all
+   * count; a hill is sampled rather than assumed. Every two seconds, since
+   * buildings only get shorter.
+   */
+  _refreshSkyFloor() {
+    if (this._skyAt !== undefined && this.elapsed - this._skyAt < 2) return;
+    this._skyAt = this.elapsed;
+    let top = -Infinity;
+    for (const st of this.structures) top = Math.max(top, st.standingHeight());
+    const cf = this.cityFire;
+    if (cf && cf.plots) for (const p of cf.plots) top = Math.max(top, p.top ?? (p.base + p.h));
+    if (this.terrain?.heightAt) {
+      if (this._terrainTop === undefined) {
+        const span = this.terrain.span || 900;
+        let g = -Infinity;
+        for (let i = 0; i <= 24; i++) for (let j = 0; j <= 24; j++) g = Math.max(g, this.terrain.heightAt(-span + (2 * span * i) / 24, -span + (2 * span * j) / 24));
+        this._terrainTop = g;
+      }
+      top = Math.max(top, this._terrainTop);
+    }
+    this.projectiles.skyFloor = Number.isFinite(top) ? top + 40 : Infinity;
+  }
+
   ceilingAlong(ax, az, bx, bz) {
     let top = -Infinity;
     const dx = bx - ax, dz = bz - az;
@@ -2819,7 +2845,8 @@ export class Battle {
       this.enemyAir.length = 0;
       this.airborne.update(dt);
       this.assault.update(dt);
-      this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
+      this._refreshSkyFloor();
+    this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
       if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
       if (this.smokes) this.smokes.update(dt);
       if (this.fires) this.fires.update(dt);
@@ -2858,6 +2885,7 @@ export class Battle {
     this.enemyAir.length = 0;
     this.airborne.update(dt);
     this.assault.update(dt);
+    this._refreshSkyFloor();
     this.projectiles.update(dt, this.fx, this.terrain, (h) => this._onImpact(h));
     if (this.stores) this.stores.update(dt, (st, spec) => this._storeBoom(st, spec));
 

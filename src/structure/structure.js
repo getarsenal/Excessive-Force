@@ -5,6 +5,10 @@ import { PhysicsWorld } from '../core/physics.js';
 import { surveyRamp } from '../core/access.js';
 import { stylize } from '../world/look.js';
 
+// The solver may take about a fifth of the frame: a solve that cost N ms is
+// not run again for N × SOLVE_BUDGET ms (see solveStability).
+const SOLVE_BUDGET = 4;
+
 /**
  * A destructible masonry structure.
  *
@@ -2385,7 +2389,36 @@ export class Structure {
    * so the next tick re-runs and the failure propagates. That loop is the
    * progressive collapse.
    */
+  /**
+   * The solve, under a budget of its own.
+   *
+   * The frame loop asks for a fixed minimum gap by tier, and that was sized
+   * for a tower: a solve of Westminster is a few milliseconds, and twenty a
+   * second is nothing. The Great Pyramid is the largest structure in the
+   * game, and under four hundred guns it is marked dirty on every step; at
+   * the tier's gap the solver alone cost 1.7 seconds of CPU per simulated
+   * second on a desktop, and a phone stopped answering. So the gap grows
+   * with the solve's own measured cost: a solve that took a hundred and
+   * fifty milliseconds is not asked for again for six hundred, which keeps
+   * the solver to about a fifth of the frame time however hard the building
+   * is being hit. A stone that has lost its footing is noticed later in a
+   * hail of fire, which is also when nobody is watching one stone. The
+   * suite and the tools ask for no gap, and get the solve to the step.
+   */
   solveStability(force = false, minGap = 0) {
+    let gap = minGap;
+    if (minGap > 0 && this._solveMs > 0) gap = Math.max(minGap, this._solveMs * SOLVE_BUDGET / 1000);
+    const before = this._lastSolve;
+    const t0 = performance.now();
+    const r = this._solveStabilityNow(force, gap);
+    if (this._lastSolve !== before) {
+      const ms = performance.now() - t0;
+      this._solveMs = this._solveMs > 0 ? this._solveMs * 0.6 + ms * 0.4 : ms;
+    }
+    return r;
+  }
+
+  _solveStabilityNow(force = false, minGap = 0) {
     // A periodic re-check, on top of the event-driven one.
     //
     // The solver runs when something marks it dirty, which is the right design

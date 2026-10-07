@@ -92,6 +92,12 @@ export class TestMenu {
     this.body = panel.querySelector('.tm-body');
   }
 
+  /** Show or hide the TEST button on the HUD (the pause menu's switch). */
+  setDev(on) {
+    this.btn.hidden = !on;
+    if (!on && this.open) this.toggle(false);
+  }
+
   toggle(force) {
     this.open = force === undefined ? !this.open : force;
     this.panel.hidden = !this.open;

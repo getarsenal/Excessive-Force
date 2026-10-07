@@ -466,6 +466,22 @@ export class HUD {
       label();
       opening.addEventListener('click', () => { setOpeningEnabled(!openingEnabled()); label(); });
     }
+    // The TEST panel (ui/testmenu.js) opens by the backquote key or ?test=1,
+    // neither of which a phone has. This switch is the phone's way: on, the
+    // TEST button sits under the readouts and the panel opens from it, and
+    // `tt.dev` remembers the choice across loads.
+    const test = menu.querySelector('#menu-test');
+    if (test) {
+      const devOn = () => { try { return localStorage.getItem('tt.dev') === '1'; } catch { return false; } };
+      const label = () => { test.textContent = devOn() ? 'TEST PANEL: ON' : 'TEST PANEL: OFF'; };
+      label();
+      test.addEventListener('click', () => {
+        const on = !devOn();
+        try { if (on) localStorage.setItem('tt.dev', '1'); else localStorage.removeItem('tt.dev'); } catch { /* private mode */ }
+        label();
+        this.onDev?.(on);
+      });
+    }
     const intros = menu.querySelector('#menu-intros');
     if (intros) {
       const label = () => { intros.textContent = introsEnabled() ? 'INTROS: ON' : 'INTROS: OFF'; };

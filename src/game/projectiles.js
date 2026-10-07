@@ -457,6 +457,13 @@ export class ProjectileManager {
     this.scene = scene;
     this.physics = physics;
     this.list = [];
+    // Above this there is nothing a shell can hit but the ground, and the
+    // ground is tested apart (below): the battle keeps it at the top of the
+    // tallest standing thing on the map plus a margin, and the physics ray
+    // is skipped for the part of the arc above it. A hundred and sixty
+    // shells in the air were nine thousand rays a second, most of them
+    // through empty sky.
+    this.skyFloor = Infinity;
 
     const geo = new THREE.SphereGeometry(0.42, 8, 6);
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
@@ -500,7 +507,7 @@ export class ProjectileManager {
       let structureHit = false;
       let owner = null;
 
-      if (dist > 0.0001) {
+      if (dist > 0.0001 && !(a.y > this.skyFloor && b.y > this.skyFloor)) {
         const dir = delta.clone().multiplyScalar(1 / dist);
         const res = this.physics.castRay(
           { x: a.x, y: a.y, z: a.z },

@@ -2497,6 +2497,8 @@ async function boot() {
     stats: () => ({ fps, physMs: +physMs.toFixed(2) }),
     shaderErrors: () => shaderLog,
   });
+  // The pause menu's TEST PANEL switch (see HUD): the button appears or goes.
+  hud.onDev = (on) => testMenu.setDev(on);
 
   /**
    * A regression run starts from a board nothing has happened on yet.
