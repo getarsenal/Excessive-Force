@@ -19,6 +19,7 @@ await page.waitForTimeout(1500);
 const laid = await page.evaluate((kind) => {
   const B = window.battle, T = window.THREE, terrain = window.terrain;
   B.freeBuild = true; B.unlockAll = true; B.invulnerable = true; B.airlift = false;
+  if (B.garrison) B.garrison.fireEnabled = false;   // the probe is about the mortar, not the garrison's mortars
   const o = B.primary.origin;
   B.setTarget(new T.Vector3(o.x, B.originGround + 20, o.z), 'tower');
   let u = null;
@@ -32,7 +33,7 @@ const laid = await page.evaluate((kind) => {
   for (let k = 0; k < 60 && u.state !== 'ready'; k++) window.__fastForward(0.5, 1 / 30);
   // The crew's own first shot: where it leaves from, and how steep.
   let crewFrom = null, crewElev = null; const fire = B.projectiles.fire.bind(B.projectiles);
-  B.projectiles.fire = (o2) => { crewFrom = [o2.pos.x, o2.pos.y, o2.pos.z].map((v) => +v.toFixed(2)); crewElev = +Math.atan2(o2.vel.y, Math.hypot(o2.vel.x, o2.vel.z)).toFixed(3); return fire(o2); };
+  B.projectiles.fire = (o2) => { if (o2.owner === u && !crewFrom) { crewFrom = [o2.pos.x, o2.pos.y, o2.pos.z].map((v) => +v.toFixed(2)); crewElev = +Math.atan2(o2.vel.y, Math.hypot(o2.vel.x, o2.vel.z)).toFixed(3); } return fire(o2); };
   for (let k = 0; k < 40 && !crewFrom; k++) window.__fastForward(0.5, 1 / 30);
   B.projectiles.fire = fire;
   const crewMuzzleRel = crewFrom ? [crewFrom[0] - u.pos.x, crewFrom[1] - u.pos.y, crewFrom[2] - u.pos.z].map((v) => +v.toFixed(2)) : null;

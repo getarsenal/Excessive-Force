@@ -281,8 +281,16 @@ export class Battle {
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
       reloadTotal: unit.def.reload * this.reloadFactor, kick: 0 };
     unit.handHeld = true;
-    // A mortar's crew is seen working while the player has it (see _mortarLive).
-    if (p.mortar) this._mortarLive(unit, true);
+    if (p.mortar) {
+      // A mortar is laid by range, not by elevation: the crew pick the charge
+      // that makes the arc, and the tube's angle follows (see _mortarSolve).
+      // At full charge even eighty-five degrees carries four hundred metres,
+      // which is no use against a wall a hundred and fifty metres off.
+      this.lay.rangeWant = aim ? Math.hypot(aim.x - from.x, aim.z - from.z) : 220;
+      this._mortarSolve(this.lay);
+      // Its crew is seen working while the player has it (see _mortarLive).
+      this._mortarLive(unit, true);
+    }
     this._layBuild();
     this.layTurn(0, 0);
     // The crew's solution was to a man in a window; the drawn line should
@@ -373,10 +381,16 @@ export class Battle {
     const p = L.unit.def.projectile;
     // A direct-fire gun has a mount, not a howitzer's elevation; a mortar
     // has nothing under forty-five degrees in it.
-    const top = p.mortar ? 1.48 : p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
-    const bottom = p.mortar ? 0.785 : -0.08;
+    const top = p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
     L.yaw += dyaw;
-    L.elev = THREE.MathUtils.clamp(L.elev + delev, bottom, top);
+    if (p.mortar) {
+      // Up is further: the drag walks the range and the solve sets the tube.
+      const maxR = 0.92 * p.speed * p.speed / p.gravity;
+      L.rangeWant = THREE.MathUtils.clamp(L.rangeWant + delev * 420, 45, maxR);
+      this._mortarSolve(L);
+    } else {
+      L.elev = THREE.MathUtils.clamp(L.elev + delev, -0.08, top);
+    }
     if (L.unit.live) L.unit.live.lean = THREE.MathUtils.clamp(L.unit.live.lean + dyaw * 6, -0.35, 0.35);
     L.unit.yaw = L.yaw;
     L.unit.group.rotation.y = L.yaw;
@@ -432,8 +446,39 @@ export class Battle {
   }
 
   _layVel(L) {
+    if (L.vel) return L.vel.clone();
     const s = L.unit.def.projectile.speed, c = Math.cos(L.elev);
     return new THREE.Vector3(Math.sin(L.yaw) * c * s, Math.sin(L.elev) * s, Math.cos(L.yaw) * c * s);
+  }
+
+  /**
+   * The mortar's solution for the range the player has walked to: the
+   * high arc on the charge that makes it, to the ground at that range along
+   * the line of fire. The tube's elevation comes out of it, between
+   * forty-five and eighty-five degrees, and the muzzle moves with the tube.
+   */
+  _mortarSolve(L) {
+    const p = L.unit.def.projectile;
+    const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
+    const from = this._muzzle(L.unit, L.elev);
+    const tx = from.x + fx * L.rangeWant, tz = from.z + fz * L.rangeWant;
+    const to = new THREE.Vector3(tx, this.terrain.heightAt(tx, tz), tz);
+    let sol = solveBallistic(from, to, p.speed, p.gravity, 30, null);
+    if (!sol) sol = { vel: solveArc(from, to, p.speed, p.gravity, true) };
+    if (!sol.vel) { const c = Math.cos(L.elev); sol.vel = new THREE.Vector3(fx * c * p.speed, Math.sin(L.elev) * p.speed, fz * c * p.speed); }
+    const v = sol.vel;
+    let elev = Math.atan2(v.y, Math.hypot(v.x, v.z));
+    // The tube has nothing under forty-five degrees in it: a solution that
+    // wants less is re-solved on the high arc at the same charge.
+    if (elev < 0.785) {
+      const speed = Math.hypot(v.x, v.y, v.z);
+      const hi = solveArc(from, to, speed, p.gravity, true);
+      if (hi) { v.copy(hi); elev = Math.atan2(v.y, Math.hypot(v.x, v.z)); }
+    }
+    L.elev = THREE.MathUtils.clamp(elev, 0.785, 1.48);
+    // Along the lay's yaw exactly, at the solved speed and the clamped angle.
+    const speed = Math.hypot(v.x, v.y, v.z), c = Math.cos(L.elev);
+    L.vel = new THREE.Vector3(fx * c * speed, Math.sin(L.elev) * speed, fz * c * speed);
   }
 
   /**
