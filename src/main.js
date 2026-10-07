@@ -1299,7 +1299,13 @@ async function boot() {
         if (!data.transport) hud.feed(`${data.label || data.def.name} SHOT DOWN BY SAM`, 'big');
         // No stamp as well: the feed has it and the generals may say it, and
         // a loss said three ways at once was the loudest thing in the fight.
-        if (comcard) comcard.samKill();
+        // The generals, once a kind of aircraft a battle: what it was decides the lines.
+        if (comcard) {
+          const ak = data.def?.aircraft?.kind;
+          const kind = data.transport ? (data.label === 'CHINOOK' ? 'heli' : 'transport')
+            : ak === 'apache' ? 'heli' : ak === 'ghostrider' ? 'gunship' : ak === 'tomahawk' ? 'missile' : 'strike';
+          comcard.samKill(kind);
+        }
         break;
       case 'liftdown':
         lostAircraft = true;

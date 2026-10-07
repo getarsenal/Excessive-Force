@@ -87,6 +87,29 @@ const BUCK_REPLY = {
   ],
 };
 
+/** Buck on a loss, by what was lost: said once a kind a battle, whatever language the boast was in. */
+const BUCK_KILL = {
+  transport: [
+    "That was a Hercules with my guns on its pallets. Nobody buys heavy till those launchers are rubble.",
+    "Lost a transport and everything aboard. Find the SAM sites before the next drop goes in.",
+  ],
+  heli: [
+    "Chopper down. Rotors and missiles don't mix. Shell the SAM sites, then we fly again.",
+    "That was a helicopter and its crew. The launchers are the target now, people.",
+  ],
+  strike: [
+    "Lost a fast mover. Pilot's got a long walk. Put a battery on those SAMs.",
+    "That's a strike jet gone. Nobody calls air until those launchers are in pieces.",
+  ],
+  gunship: [
+    "They got the gunship. Four engines and a 105 don't come cheap. Kill those launchers.",
+    "Ghostrider's down. That orbit was too slow for a missile. SAMs first, then the building.",
+  ],
+  missile: [
+    "They swatted the Tomahawk. Fine. Walls don't dodge. Shell the radars and send another.",
+  ],
+};
+
 const BUCK_WARN = [
   "Intel says he's staging a whole brigade for the drop. Spread the guns, get the MGs up, and hit him before his SAMs are on the ground.",
   "Signals picked up a brigade on the move. Heavy drop at three quarters. Dig in, spread out, and keep some money back.",
@@ -270,8 +293,28 @@ export class ComCard {
   assaultWarn() { this.say('us', this._deal('warn', BUCK_WARN)); this._quietUntil = performance.now() + 9000; }
   /** The counter-attack: his last throw, then Buck. */
   assault() { this._exchange('assault', 1, 20000); }
-  /** One of the player's aeroplanes brought down by his SAMs. */
-  samKill() { if (!this._quiet()) this._exchange('samkill', 0.6, 9000); }
+  /**
+   * One of the player's aircraft brought down by his SAMs: his boast and
+   * Buck's answer, once a kind a battle (a transport, a helicopter, a
+   * strike jet, the gunship, a cruise missile). The second and every later
+   * loss of a kind is the feed's line alone.
+   */
+  samKill(kind = 'strike') {
+    this._killSaid = this._killSaid || new Set();
+    if (this._killSaid.has(kind)) return;
+    if (performance.now() < (this._quietUntil || 0)) return;
+    this._killSaid.add(kind);
+    const s = this.voice.sayKill(kind);
+    if (!s) return;
+    this.say('enemy', s.line, s.sub);
+    this._quietUntil = performance.now() + 9000;
+    clearTimeout(this._reply);
+    const pool = BUCK_KILL[kind] || BUCK_KILL.strike;
+    const wait = 3200 + Math.max(s.line.length, s.sub ? s.sub.length : 0) * 70 + (s.sub ? 1200 : 0);
+    this._reply = setTimeout(() => {
+      if (!document.body.classList.contains('ended')) this.say('us', this._deal(`buck-kill-${kind}`, pool));
+    }, Math.min(9000, wait));
+  }
   /** The battery's first loss. */
   firstLoss() {
     if (this._lostOnce || this._quiet()) return;

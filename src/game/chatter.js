@@ -57,6 +57,21 @@ const MEAN = {
 };
 const ORDER = ['quarter', 'half', 'airborne', 'assault', 'last', 'samkill'];
 
+/**
+ * His SAMs' kills, by what they brought down: one line each for the men who
+ * speak English. A native speaker says his translated SAM line instead (the
+ * two above, in his own language). Said once a kind a battle (comcard.js
+ * `samKill`), not once an aeroplane: the fourth Hercules down is the feed's
+ * business, not the generals'.
+ */
+const KILL_EN = {
+  transport: 'Your big fat aeroplane fell out of my sky. With your guns inside it. Delicious.',
+  heli: 'A helicopter! Very loud, very slow, and now very quiet.',
+  strike: 'Your jet was very fast. My missile was faster. Your pilot is walking home.',
+  gunship: 'The flying cannon! It circled, I shot it, it stopped circling.',
+  missile: 'Your cruise missile met my missile. Mine won.',
+};
+
 /** More for the ones who speak English anyway: no translation to carry. */
 const EN_EXTRA = {
   quarter: [
@@ -1037,6 +1052,11 @@ export function voiceFor(levelId) {
       }
       const all = [...mean, ...(EN_EXTRA[moment] || [])];
       return { line: all[draw(moment, all.length)], sub: null };
+    },
+    /** One of the player's aircraft down, by kind: his own words in English, his SAM line otherwise. */
+    sayKill(kind) {
+      if (!table && KILL_EN[kind]) return { line: KILL_EN[kind], sub: null };
+      return this.say('samkill');
     },
   };
 }
