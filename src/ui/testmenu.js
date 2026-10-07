@@ -1186,6 +1186,7 @@ export class TestMenu {
       }],
 
       ['defenders can see out of their positions', () => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         // The counterpart to the blocking test. It is easy to make line of
         // sight so strict that the garrison never fires at all, and a silent
         // defender looks exactly like one with no target — so assert that the
@@ -1214,6 +1215,7 @@ export class TestMenu {
       }],
 
       ['the garrison shoots at what is in the air', () => this._holdFire(() => {
+        if (c.level.sandbox) return 'a sandbox (the range): no garrison, no town, nothing to sever';
         // The claim: an aircraft over a defended objective is flown through
         // real tracer from real crews, and killing those crews stops it.
         //
