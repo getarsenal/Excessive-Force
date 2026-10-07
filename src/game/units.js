@@ -102,6 +102,7 @@ export const UNITS = [
     id: 'm120', name: 'M120 MORTAR', full: 'M120 120 mm Mortar Team', tier: 'INF',
     cost: 240, unlockFrac: 0.0,
     tint: 0x5a6a52, model: 'infantry',
+    eye: { back: 3.4, side: 1.7, up: 1.65, pitch: 0.14 },   // the gunner's eye in the lay (battle.layEye)
     range: 620, reload: 7.0, setup: 3.0,
     crew: 3, health: 120,
     // Indirect and slow: a high arc that comes down on a roof or a terrace the
@@ -162,6 +163,7 @@ export const UNITS = [
     cost: 2200, unlockFrac: 0.15,
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
     muzzle: { f: 5.2, h: 2.9 },   // where the round leaves: forward of the plot, and up
+    eye: { back: 1.8, side: 0, up: 4.1, pitch: 0.1 },   // the gunner's eye in the lay (battle.layEye)
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
     projectile: { kind: 'arc', speed: 420, gravity: 9.81, trail: 1.0 },
@@ -173,6 +175,7 @@ export const UNITS = [
     id: 'stryker', name: 'STRYKER MGS', full: 'M1128 Stryker Mobile Gun System', tier: 'AFV',
     cost: 1800, unlockFrac: 0.06,
     tint: ARTILLERY_GREEN, model: 'M1128', modelLength: 8.6,
+    eye: { back: 1.6, side: 0, up: 3.6, pitch: 0.1 },   // the gunner's eye in the lay (battle.layEye)
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
     // A tank gun, not a howitzer: nine hundred metres a second on the lowest

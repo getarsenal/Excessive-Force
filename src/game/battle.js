@@ -435,13 +435,20 @@ export class Battle {
     const fx = Math.sin(L.yaw), fz = Math.cos(L.yaw);
     // Forward is (sin yaw, cos yaw); forward crossed with up is the right hand.
     const rx = -Math.cos(L.yaw), rz = Math.sin(L.yaw);
-    const want = (u.def.modelLength || 6) * 0.5 + 2.2;
+    // A weapon can say where its gunner's eye is (`def.eye`: the step back,
+    // the step to the right, the height, and how far up to look): a vehicle's
+    // commander stands in his hatch over the turret, where a man behind the
+    // hull would see nothing but hull and slat armour; a mortar's gunner
+    // looks at the tube and the loader, not up the arc into the sky.
+    const E = u.def.eye || null;
+    const want = E ? E.back : (u.def.modelLength || 6) * 0.5 + 2.2;
     let back = want;
     const res = this.physics.castRay({ x: u.pos.x, y: u.pos.y + 1.6, z: u.pos.z }, { x: -fx, y: 0, z: -fz }, want + 0.8);
-    if (res && !(res.owner && res.owner === u)) back = Math.max(1.6, res.toi - 0.8);
-    out.set(u.pos.x - fx * back + rx * 1.5, 0, u.pos.z - fz * back + rz * 1.5);
+    if (res && !(res.owner && res.owner === u)) back = Math.max(E ? 0.8 : 1.6, res.toi - 0.8);
+    const side = E ? E.side : 1.5, up = E ? E.up : 1.75;
+    out.set(u.pos.x - fx * back + rx * side, 0, u.pos.z - fz * back + rz * side);
     const g = this.terrain.heightAt(out.x, out.z);
-    out.y = Math.max(g, u.pos.y - 0.6) + 1.75;
+    out.y = Math.max(g + 1.2, u.pos.y - 0.6 + up);
     return out;
   }
 

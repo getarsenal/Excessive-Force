@@ -38,8 +38,12 @@ for (const kind of list) {
     if (!u) return { kind, noUnit: true };
     for (let k = 0; k < 80 && (u.state !== 'ready' || !(u.model || u.group.children.length)); k++) window.__fastForward(0.5, 1 / 30);
     window.__lay.enter(u);
+    // A working lay, not a search for stone that ran out of elevation: a gun
+    // over open sights at four degrees, a mortar as the solve left it.
+    const L = B.lay;
+    if (!u.def.projectile.mortar) B.layTurn(0, 0.07 - L.elev);
     window.__frame();
-    const L = B.lay, cam = window.rig.camera;
+    const cam = window.rig.camera;
     // Rays over the central three fifths of the view, against the unit's own meshes.
     const meshes = []; u.group.traverse((m) => { if (m.isMesh && m.visible) meshes.push(m); });
     const ray = new T.Raycaster(); ray.far = 12;
