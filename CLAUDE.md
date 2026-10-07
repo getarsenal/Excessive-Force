@@ -232,11 +232,14 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the gallery shows the whole painting (`<id>.jpg`). A new piece needs both.
   The contact sheet's `-nose.png` view is the close-up to judge it by.
 - `src/game/range.js` THE RANGE (level `range`, off the title beside
-  HANGAR): an indoor live-fire range on Boot Camp's ground, on the normal
-  battle pipeline, so every weapon is deployed and laid as in a fight. A
-  dark hall with a girder ceiling, pendant lamps, baffles and the cable
-  runs; four lanes down -z from the firing line (the level origin): paper
-  silhouettes on carriers at 50/100/150 that flip and rise, steel poppers
+  HANGAR): a live-fire range out on Boot Camp's Mojave desert at Fort
+  Irwin, on the normal battle pipeline, so every weapon is deployed and
+  laid as in a fight. Open sky (a hall's ceiling cut off the mortar's arc
+  and the aircraft): a graded floor painted with lanes and distances and
+  fading into the sand, earth berms down both sides, distance boards on
+  posts, range control and the red flag behind the line, creosote and rock
+  beyond; four lanes seventy metres apart down -z from the firing line
+  (the level origin): paper silhouettes on gantries at 50/100/150 that flip and rise, steel poppers
   at 100/200/300 on hinges, gongs on chains at 300/400/500 that swing and
   ring, the block shack at 180 (three hundred blocks, each its own body,
   thrown by a blast and flying back to their courses when they have

@@ -399,10 +399,11 @@ async function boot() {
   const contextGroup = buildContext(terrain, quality, {
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
-    clearings: level.turret
+    // And any ground the level keeps bare of its own (the range's floor).
+    clearings: (level.turret
       ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
         r: 5.2 * (level.turret.scale ?? 1.4) * 4.2 }]
-      : [],
+      : []).concat((level.clearings || []).map((c) => ({ x: origin.x + c.x, z: origin.z + c.z, r: c.r }))),
     city, cityExclude: level.cityExcludeRadius, road: level.road,
     // What is beyond the town. A level says where it is; the generator does
     // not guess it from the terrain, because fields and forest look much the
@@ -616,8 +617,8 @@ async function boot() {
   // So a shell landing can scatter whatever was sitting on the roofs.
   battle.life = life;
   // The range: everything free and unlocked, the monument's readouts off,
-  // and the hall with its targets round the firing line.
-  // Deployed where the finger lands: no C-130 through the ceiling.
+  // and the range with its targets round the firing line.
+  // Deployed where the finger lands: no airlift onto a practice range.
   if (level.sandbox) { battle.freeBuild = true; battle.unlockAll = true; battle.airlift = false; document.body.classList.add('range'); }
   // The camera stays on the firing line: it turns and zooms, it does not wander off down the lanes.
   if (level.sandbox) rig.panLocked = true;

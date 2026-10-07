@@ -2366,8 +2366,8 @@ Object.assign(LEVELS, ATLAS_LEVELS);
 LEVELS.tutorial = TUTORIAL_LEVEL;
 
 /**
- * The Range: an indoor live-fire range on Boot Camp's ground at Fort Irwin
- * (src/game/range.js builds the hall and the targets; this record is the
+ * The Range: a live-fire range out on Boot Camp's desert at Fort Irwin
+ * (src/game/range.js builds the grounds and the targets; this record is the
  * pipeline's view of it). A sandbox: no garrison, no SAMs, no airborne, no
  * win or loss, every weapon unlocked and free. The one Structure is the
  * bullet trap, an earth berm at the end of the lanes, so the pipeline has
@@ -2383,30 +2383,34 @@ LEVELS.range = {
   name: 'The Range, Fort Irwin',
   place: 'Range Control, Fort Irwin',
   target: 'BULLET TRAP',
-  subtitle: 'Indoor Range · Fort Irwin',
+  subtitle: 'Live-Fire Range · Fort Irwin',
   victory: 'Cease Fire',
   cityExcludeRadius: 2000,
   contextExclude: 2000,
-  // The hall's floor: one flat disc over the lanes, cut before anything is
-  // founded on it; no pad of the berm's own on top of that.
-  flatten: (terrain) => terrain.levelPad(0, -270, 440, 80),
+  // The range's floor: one flat disc over the lanes, the berms and the
+  // tower, cut before anything is founded on it; no pad of the berm's own.
+  flatten: (terrain) => terrain.levelPad(0, -260, 540, 120),
   padRadius: 0,
+  // No trees on the floor, the berms or the apron: a chain of clearings
+  // down the range, each wide enough to take the berms at its waist.
+  clearings: [30, -110, -250, -390, -530].map((z) => ({ x: 0, z, r: 215 })),
   // From behind the firing line, looking down the lanes.
   camera: { yaw: 0, pitch: 0.1, distance: 150, height: 26 },
   structures: (quality) => [
     { key: 'trap', primary: true, required: false, label: 'BULLET TRAP', offset: { x: 0, z: -560 },
-      blocks: buildKit({ S: 1, yaw: 0, mat: MATERIALS.TURF, parts: [
-        { t: 'steps', tag: 'berm', x: 0, z: 0, w: 300, d: 18, h: 13, n: 1, batter: 0.55, mat: MATERIALS.TURF, posts: false, coarse: 3.0 },
+      blocks: buildKit({ S: 1, yaw: 0, mat: MATERIALS.RUBBLE, parts: [
+        { t: 'steps', tag: 'berm', x: 0, z: 0, w: 300, d: 18, h: 13, n: 1, batter: 0.55, mat: MATERIALS.RUBBLE, posts: false, coarse: 3.0 },
       ] }, quality) },
   ],
   garrison: () => {},
   scoreTags: null,
   precinct: { boundary: 'none', ground: 'none', ornament: 'none' },
+  // Mojave hardpan: no lawns anywhere, the 'park' tones are sand too.
   palette: {
-    urban: new THREE.Color(0x3a3d41), urbanAlt: new THREE.Color(0x34373b), park: new THREE.Color(0x3a3d41), parkAlt: new THREE.Color(0x3a3d41),
-    road: new THREE.Color(0x3a3d41), bank: new THREE.Color(0x3a3d41), bed: new THREE.Color(0x2a2d31), dry: new THREE.Color(0x3a3d41),
+    urban: new THREE.Color(0xd6c9ad), urbanAlt: new THREE.Color(0xc8b896), park: new THREE.Color(0xcbb68e), parkAlt: new THREE.Color(0xc2ab84),
+    road: new THREE.Color(0x9a8a70), bank: new THREE.Color(0xdccaa2), bed: new THREE.Color(0x3c6b73), dry: new THREE.Color(0xe3d5b2),
   },
-  setting: { clime: 'range', haze: { colour: 0x050607, density: 0.0004 }, hinterland: 'none' },
+  setting: { clime: 'desert', haze: { colour: 0xe3d6bb, density: 0.00022 }, hinterland: 'none' },
   traits: { windows: false, river: false, topples: false, remote: true, opaque: false, sheds: false },
   unlockScale: 1,
   par: { rounds: 999, spend: 1e9, minutes: 999, leverage: 1 },

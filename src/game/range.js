@@ -1,18 +1,21 @@
 /**
- * The Range: an indoor live-fire range for every weapon in the game, on the
- * normal battle pipeline (level `range`, src/game/levels.js), so a gun laid
- * here is laid the way it is laid in a fight.
+ * The Range: a live-fire range for every weapon in the game, out on the
+ * Mojave hardpan at Fort Irwin, on the normal battle pipeline (level
+ * `range`, src/game/levels.js), so a gun laid here is laid the way it is
+ * laid in a fight.
  *
- * A dark hall, three hundred and forty metres wide and eight hundred long,
- * with a girder ceiling ninety-five metres up, pendant lamps on their drops
- * every forty metres, baffles over the lanes and the overhead cable runs
- * the paper targets ride on. The firing line is the level's origin; the
- * lanes run down -z to the bullet trap, an earth berm five hundred and
- * sixty metres out (the level's one Structure, so the pipeline has a
- * monument to hang its readouts on, hidden here).
+ * Open sky over it, so a mortar's arc and an aircraft overhead are seen
+ * whole (an indoor hall's ceiling cut both off). A graded floor three
+ * hundred metres wide painted with the lanes, the distances and the firing
+ * line, fading into the sand at its edges; low earth berms down both
+ * sides; distance boards on posts; the range control tower and the red
+ * flag behind the line; creosote and rock beyond. The firing line is the
+ * level's origin; the lanes run down -z to the bullet trap, an earth berm
+ * five hundred and sixty metres out (the level's one Structure, so the
+ * pipeline has a monument to hang its readouts on, hidden here).
  *
  * Four lanes, by what they are for:
- *   A  paper silhouettes on overhead carriers at 50, 100 and 150: hit, they
+ *   A  paper silhouettes on target gantries at 50, 100 and 150: hit, they
  *      flip flat and rise again a few seconds later
  *   B  knock-down steel poppers at 100, 200 and 300: a hinge at the base,
  *      down with a clang, back up after five seconds
@@ -22,7 +25,7 @@
  *      its own body; a blast near it throws them (the engine's own debris
  *      budget takes them from there), and when they have settled it
  *      rebuilds itself, the blocks flying back to their courses
- * and over the far third of the hall two target drones on a racetrack,
+ * and over the far third of the range two target drones on a racetrack,
  * for the machine guns (they are published to `battle.enemyAir`, so a team
  * engages them on its own, and the hand-laid burst finds them through
  * `battle.extraTargets`); a shell that passes within a few metres of one
@@ -37,10 +40,9 @@
 import * as THREE from 'three';
 import { PhysicsWorld } from '../core/physics.js';
 
-// Narrow enough that a phone held upright sees the walls and the ceiling
-// from the firing line, not a floor in a void.
-const LANE = { A: -66, B: -22, C: 22, D: 66 };
-const HALL = { x: 90, zFront: 110, zBack: -640, h: 170 };
+// Four lanes seventy metres apart, and the graded floor they are painted on.
+const LANE = { A: -105, B: -35, C: 35, D: 105 };
+const FIELD = { x: 150, zFront: 60, zBack: -600 };
 const BLOCK = { hx: 1.0, hy: 0.5, hz: 0.5 };   // a block of the shack, half extents: big, as everything on this map is
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -77,7 +79,7 @@ export class Range {
     this.time = 0;
     this._board = null;
     this._boardText = '';
-    this._buildHall();
+    this._buildGrounds();
     this._buildFloor();
     this._buildLanes();
     this._buildShack();
@@ -91,121 +93,154 @@ export class Range {
     return out.set(this.origin.x + x, this.groundY + y, this.origin.z + z);
   }
 
-  // ── The hall ────────────────────────────────────────────────────────
+  // ── The grounds ─────────────────────────────────────────────────
 
-  _buildHall() {
+  _buildGrounds() {
     const g = this.group;
-    const W = HALL.x * 2, L = HALL.zFront - HALL.zBack, H = HALL.h, zc = (HALL.zFront + HALL.zBack) / 2;
-    // The shell: five planes facing in (a box seen from inside through a
-    // back-face material did not survive the renderer's depth pass).
-    const wallMat = mat(0x565b63, 0.95, 0.0), ceilMat = mat(0x3d4147, 0.95, 0.0);
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat); side.position.set(-HALL.x, H / 2, zc); side.rotation.y = Math.PI / 2; g.add(side);
-    const side2 = new THREE.Mesh(new THREE.PlaneGeometry(L, H), wallMat); side2.position.set(HALL.x, H / 2, zc); side2.rotation.y = -Math.PI / 2; g.add(side2);
-    const far = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat); far.position.set(0, H / 2, HALL.zBack); g.add(far);
-    const near = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat); near.position.set(0, H / 2, HALL.zFront); near.rotation.y = Math.PI; g.add(near);
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, L), ceilMat); ceil.position.set(0, H, zc); ceil.rotation.x = Math.PI / 2; g.add(ceil);
-    for (const m of [side, side2, far, near, ceil]) m.receiveShadow = true;
-    // Columns up the side walls and the girders across the ceiling, every forty metres.
-    const steel = mat(0x6b727a, 0.6, 0.35), dark = mat(0x2a2d31, 0.9, 0.1);
-    const colGeo = new THREE.BoxGeometry(1.6, H, 1.6);
-    const girderGeo = new THREE.BoxGeometry(W, 2.2, 0.9);
-    const flangeGeo = new THREE.BoxGeometry(W, 0.3, 2.4);
-    for (let z = HALL.zFront - 20; z > HALL.zBack; z -= 40) {
-      for (const sx of [-1, 1]) { const c = new THREE.Mesh(colGeo, steel); c.position.set(sx * (HALL.x - 0.8), H / 2, z); g.add(c); }
-      const gd = new THREE.Mesh(girderGeo, steel); gd.position.set(0, H - 1.6, z); g.add(gd);
-      const fl = new THREE.Mesh(flangeGeo, steel); fl.position.set(0, H - 2.8, z); g.add(fl);
+    const sand = mat(0xc9b28a, 1, 0), post = mat(0x5d5a52, 0.8, 0.2), white = mat(0xf2ead6, 0.9, 0);
+    // Low earth berms down both sides of the floor, sloped, to frame the
+    // lanes without hiding a single round in the sky.
+    const shape = new THREE.Shape();
+    shape.moveTo(-9, 0); shape.lineTo(-2.5, 4.2); shape.lineTo(2.5, 4.2); shape.lineTo(9, 0); shape.closePath();
+    const L = FIELD.zFront - FIELD.zBack - 30;
+    const bermGeo = new THREE.ExtrudeGeometry(shape, { depth: L, bevelEnabled: false });
+    for (const sx of [-1, 1]) {
+      const b = new THREE.Mesh(bermGeo, sand);
+      b.position.set(sx * (FIELD.x + 12), 0, FIELD.zFront - 10 - L);
+      b.receiveShadow = true; b.castShadow = true;
+      g.add(b);
     }
-    // Purlins the long way, and the cable runs over the lanes.
-    const purlinGeo = new THREE.BoxGeometry(0.6, 0.6, L);
-    for (const x of [-72, -24, 24, 72]) { const p = new THREE.Mesh(purlinGeo, steel); p.position.set(x, H - 3.3, zc); g.add(p); }
-    // Baffles: angled plates over the first two hundred metres, the way an
-    // indoor range keeps a high round in the building.
-    const baffleGeo = new THREE.BoxGeometry(W - 20, 0.4, 14);
-    for (let z = -30; z > -230; z -= 50) {
-      const b = new THREE.Mesh(baffleGeo, dark); b.position.set(0, 70 + (z + 30) * -0.08, z); b.rotation.x = 0.55; g.add(b);
-    }
-    // The lamps: pendants on their drops, three rows, an emissive disc under a shade.
-    const LAMP = 56;   // the pendants hang to here, on drops from the roof
-    const dropGeo = new THREE.CylinderGeometry(0.08, 0.08, H - 3.3 - LAMP, 5);
-    const shadeGeo = new THREE.ConeGeometry(3.2, 2.6, 12, 1, true);
-    const bulbGeo = new THREE.CylinderGeometry(2.4, 2.4, 0.3, 12);
-    const shadeMat = mat(0x202326, 0.7, 0.3, { side: THREE.DoubleSide });
-    const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2d6, emissive: 0xffe9c4, emissiveIntensity: 2.6, roughness: 1 });
-    for (const x of [-52, 0, 52]) {
-      for (let z = HALL.zFront - 40; z > HALL.zBack + 20; z -= 40) {
-        const drop = new THREE.Mesh(dropGeo, dark); drop.position.set(x, (H - 3.3 + LAMP) / 2, z); g.add(drop);
-        const shade = new THREE.Mesh(shadeGeo, shadeMat); shade.position.set(x, LAMP + 1.3, z); g.add(shade);
-        const bulb = new THREE.Mesh(bulbGeo, bulbMat); bulb.position.set(x, LAMP, z); g.add(bulb);
-      }
-    }
-    // Nothing on the line itself: a bench there stood between a prone gun
-    // and its target. A red lamp over the line, lit while the range is hot (always).
-    const hot = new THREE.Mesh(new THREE.SphereGeometry(1.4, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff2a1a, emissive: 0xff2a1a, emissiveIntensity: 3 }));
-    hot.position.set(0, 30, 2); g.add(hot);
-    // The boards on the left wall at every distance.
+    // The distance boards on their posts, both sides, facing the line.
     for (const d of [50, 100, 150, 200, 300, 400, 500]) {
       const tex = textTexture(256, 128, (ctx, w, h) => {
         ctx.fillStyle = '#f2ead6'; ctx.fillRect(0, 0, w, h);
         ctx.fillStyle = '#14161a'; ctx.font = 'bold 92px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(d), w / 2, h / 2 + 4);
       });
-      const board = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
-      board.position.set(-HALL.x + 2.2, 9, -d); board.rotation.y = Math.PI / 2; g.add(board);
-      const board2 = board.clone(); board2.position.x = HALL.x - 2.2; board2.rotation.y = -Math.PI / 2; g.add(board2);
+      const boardMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+      for (const sx of [-1, 1]) {
+        const x = sx * (FIELD.x - 4);
+        const board = new THREE.Mesh(new THREE.PlaneGeometry(10, 5), boardMat); board.position.set(x, 7, -d); g.add(board);
+        for (const px of [-3.6, 3.6]) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 7, 0.3), post); p.position.set(x + px, 3.5, -d - 0.2); g.add(p); }
+      }
     }
+    // Range control behind the line on the left: a cab on legs, its
+    // windows all round, and the red flag beside it (a range is hot while
+    // the flag flies, and this one always is).
+    const tx = -FIELD.x + 28, tz = 44;
+    for (const [px, pz] of [[-3.6, -2.6], [3.6, -2.6], [-3.6, 2.6], [3.6, 2.6]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8, 0.5), post); leg.position.set(tx + px, 4, tz + pz); g.add(leg);
+    }
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(9, 4.6, 7), mat(0xd9cfb8, 0.9, 0)); cab.position.set(tx, 10.3, tz); cab.castShadow = true; g.add(cab);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(9.1, 1.8, 7.1), mat(0x23303a, 0.25, 0.6)); glass.position.set(tx, 11, tz); g.add(glass);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(11, 0.5, 9), mat(0x6b5a48, 0.8, 0.1)); roof.position.set(tx, 12.85, tz); roof.castShadow = true; g.add(roof);
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(11, 0.4, 9), post); deck.position.set(tx, 7.9, tz); g.add(deck);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 18, 8), mat(0xd6d6d0, 0.5, 0.6)); pole.position.set(tx + 12, 9, tz - 2); g.add(pole);
+    const flagGeo = new THREE.PlaneGeometry(5, 3.2, 8, 1); flagGeo.translate(2.5, 0, 0);
+    this.flag = new THREE.Mesh(flagGeo, new THREE.MeshStandardMaterial({ color: 0xd8261a, roughness: 0.9, side: THREE.DoubleSide }));
+    this.flag.position.set(tx + 12, 16.2, tz - 2); g.add(this.flag);
+    this._flagBase = Float32Array.from(flagGeo.attributes.position.array);
+    // Lane numbers on posts at the line, either side of each lane.
+    for (const [k, x] of Object.entries(LANE)) {
+      const tex = textTexture(128, 128, (ctx, w, h) => {
+        ctx.fillStyle = '#d9b43a'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#14161a'; ctx.font = 'bold 96px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(k, w / 2, h / 2 + 4);
+      });
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 }));
+      sign.position.set(x - 20, 3.6, -2); g.add(sign);
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.25, 3.6, 0.25), post); p.position.set(x - 20, 1.8, -2.2); g.add(p);
+    }
+    void white;
+    this._buildScrub();
+  }
+
+  /** Creosote and rock on the open desert round the graded floor, never on it. */
+  _buildScrub() {
+    const rnd = (() => { let a = 1234567; return () => ((a = (a * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+    const bush = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), mat(0x6f7552, 1, 0), 320);
+    const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), mat(0x9a8a72, 0.95, 0), 120);
+    let nb = 0, nr = 0;
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    for (let i = 0; i < 2000 && (nb < 320 || nr < 120); i++) {
+      const x = (rnd() - 0.5) * 1500, z = 160 - rnd() * 1000;
+      // Off the floor and its berms, and off the apron behind the line.
+      if (Math.abs(x) < FIELD.x + 26 && z < FIELD.zFront + 40 && z > FIELD.zBack - 30) continue;
+      const w = this.world(x, 0, z);
+      const y = (this.terrain?.heightAt ? this.terrain.heightAt(w.x, w.z) : this.groundY) - this.groundY;
+      const isRock = rnd() < 0.27;
+      if (isRock && nr < 120) {
+        const r = 0.5 + rnd() * 1.6;
+        e.set(rnd() * 3, rnd() * 3, rnd() * 3); q.setFromEuler(e); sc.set(r * (1 + rnd()), r * 0.6, r);
+        m.compose(p.set(x, y + r * 0.2, z), q, sc); rock.setMatrixAt(nr++, m);
+      } else if (!isRock && nb < 320) {
+        const r = 0.6 + rnd() * 1.1;
+        q.setFromAxisAngle(UP, rnd() * 6.28); sc.set(r * 1.3, r * 0.8, r * 1.3);
+        m.compose(p.set(x, y + r * 0.45, z), q, sc); bush.setMatrixAt(nb++, m);
+      }
+    }
+    bush.count = nb; rock.count = nr;
+    for (const im of [bush, rock]) { im.instanceMatrix.needsUpdate = true; im.castShadow = true; im.frustumCulled = false; this.group.add(im); }
   }
 
   _buildFloor() {
-    const W = HALL.x * 2, L = HALL.zFront - HALL.zBack;
+    const W = FIELD.x * 2, L = FIELD.zFront - FIELD.zBack;
     const tex = textTexture(1024, 2048, (ctx, w, h) => {
-      ctx.fillStyle = '#5b5e63'; ctx.fillRect(0, 0, w, h);
-      // The apron behind the line, where the guns stand, is a pale pour: a
-      // dark gun on a dark floor could not be seen where it was put down.
-      const X0 = (x) => (x + HALL.x) / W * w, Y0 = (z) => (z - HALL.zBack) / L * h;
-      ctx.fillStyle = '#a9aaa6'; ctx.fillRect(0, Y0(1.5), w, Y0(HALL.zFront) - Y0(1.5));
-      void X0;
-      // Slabs: a faint grid of pours.
-      ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2;
-      for (let i = 0; i <= 10; i++) { ctx.beginPath(); ctx.moveTo(i * w / 10, 0); ctx.lineTo(i * w / 10, h); ctx.stroke(); }
-      for (let j = 0; j <= 40; j++) { ctx.beginPath(); ctx.moveTo(0, j * h / 40); ctx.lineTo(w, j * h / 40); ctx.stroke(); }
       // The plane lies with its top edge down-range: canvas row nought is the far end.
-      const X = (x) => (x + HALL.x) / W * w, Y = (z) => (z - HALL.zBack) / L * h;
-      // Lane dividers, yellow, the length of the range.
-      ctx.strokeStyle = '#d9b43a'; ctx.lineWidth = 6;
-      for (const x of [-44, 0, 44]) { ctx.beginPath(); ctx.moveTo(X(x), Y(-10)); ctx.lineTo(X(x), Y(-540)); ctx.stroke(); }
+      const X = (x) => (x + FIELD.x) / W * w, Y = (z) => (z - FIELD.zBack) / L * h;
+      ctx.fillStyle = '#cdb994'; ctx.fillRect(0, 0, w, h);
+      // Grader passes and speckle, so it reads as ground and not as paint.
+      const rnd = (() => { let a = 99991; return () => ((a = (a * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
+      for (let i = 0; i < 9000; i++) { ctx.fillStyle = rnd() < 0.5 ? 'rgba(120,100,70,0.10)' : 'rgba(255,245,220,0.10)'; ctx.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 5, 2 + rnd() * 5); }
+      ctx.strokeStyle = 'rgba(110,92,64,0.16)'; ctx.lineWidth = 10;
+      for (const x of Object.values(LANE)) for (const dx of [-6, 6]) { ctx.beginPath(); ctx.moveTo(X(x + dx), Y(0)); ctx.lineTo(X(x + dx), Y(-560)); ctx.stroke(); }
+      // The apron behind the line, where the guns stand: a pale pad, so a
+      // dark gun can be seen where it was put down.
+      ctx.fillStyle = '#e4dccb'; ctx.fillRect(X(-FIELD.x + 10), Y(FIELD.zFront - 6), X(FIELD.x - 10) - X(-FIELD.x + 10), Y(1.5) - Y(FIELD.zFront - 6));
+      // Lane dividers, white lime, the length of the range.
+      ctx.strokeStyle = 'rgba(248,244,232,0.9)'; ctx.lineWidth = 6;
+      for (const x of [-70, 0, 70]) { ctx.beginPath(); ctx.moveTo(X(x), Y(-6)); ctx.lineTo(X(x), Y(-560)); ctx.stroke(); }
       // The firing line, red, and its legend.
       ctx.fillStyle = '#c8321e'; ctx.fillRect(0, Y(1.5), w, Y(-1.5) - Y(1.5));
-      ctx.fillStyle = '#e8e2d0'; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('FIRING LINE', w / 2, Y(8));
+      ctx.fillStyle = '#7a1c12'; ctx.font = 'bold 40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('FIRING LINE', w / 2, Y(7));
       // Distance stripes and their figures, read from the line.
       for (const d of [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]) {
-        ctx.fillStyle = 'rgba(232,226,208,0.7)'; ctx.fillRect(0, Y(-d + 0.6), w, Y(-d - 0.6) - Y(-d + 0.6));
-        ctx.fillStyle = '#e8e2d0'; ctx.font = 'bold 56px sans-serif';
+        ctx.fillStyle = 'rgba(248,244,232,0.55)'; ctx.fillRect(0, Y(-d + 0.6), w, Y(-d - 0.6) - Y(-d + 0.6));
+        ctx.fillStyle = 'rgba(248,244,232,0.85)'; ctx.font = 'bold 52px sans-serif';
         for (const x of Object.values(LANE)) ctx.fillText(String(d), X(x), Y(-d + 7));
       }
-      // The lanes' names at the line.
-      ctx.font = 'bold 40px sans-serif'; ctx.fillStyle = '#d9b43a';
+      ctx.font = 'bold 40px sans-serif'; ctx.fillStyle = '#9a7a1c';
       for (const [k, x] of Object.entries(LANE)) ctx.fillText(k, X(x), Y(-4));
+      // Into the sand at the edges: the floor is graded ground, not a slab.
+      ctx.globalCompositeOperation = 'destination-in';
+      const fx = ctx.createLinearGradient(0, 0, w, 0);
+      fx.addColorStop(0, 'rgba(0,0,0,0)'); fx.addColorStop(0.06, 'rgba(0,0,0,1)'); fx.addColorStop(0.94, 'rgba(0,0,0,1)'); fx.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = fx; ctx.fillRect(0, 0, w, h);
+      const fz = ctx.createLinearGradient(0, 0, 0, h);
+      fz.addColorStop(0, 'rgba(0,0,0,0)'); fz.addColorStop(0.05, 'rgba(0,0,0,1)'); fz.addColorStop(0.97, 'rgba(0,0,0,1)'); fz.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = fz; ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
     });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({
+      map: tex, roughness: 0.97, transparent: true, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    }));
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0.08, (HALL.zFront + HALL.zBack) / 2);
+    floor.position.set(0, 0.08, (FIELD.zFront + FIELD.zBack) / 2);
     floor.receiveShadow = true;
+    floor.renderOrder = 1;
     this.group.add(floor);
   }
 
   // ── The targets ───────────────────────────────────────────────────
 
   _buildLanes() {
-    // Lane A: the overhead cable and the paper silhouettes riding it.
-    const cable = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(LANE.A - 12, 11.5, 0), new THREE.Vector3(LANE.A + 12, 11.5, -170)]),
-      new THREE.LineBasicMaterial({ color: 0x8a8f94 }));
-    this.group.add(cable);
-    for (const [z, dx] of [[-50, -12], [-100, 0], [-150, 12]]) this._paper(LANE.A + dx, z);
+    // Lane A: paper silhouettes on their gantries.
+    for (const [z, dx] of [[-50, -14], [-100, 0], [-150, 14]]) this._paper(LANE.A + dx, z);
     // Lane B: the poppers.
-    for (const [z, dx] of [[-100, -14], [-200, 0], [-300, 14]]) this._popper(LANE.B + dx, z);
+    for (const [z, dx] of [[-100, -18], [-200, 0], [-300, 18]]) this._popper(LANE.B + dx, z);
     // Lane C: the gongs on their frames.
-    for (const [z, size, dx] of [[-300, 3.4, -16], [-400, 4.2, 0], [-500, 5.2, 16]]) this._gong(LANE.C + dx, z, size);
+    for (const [z, size, dx] of [[-300, 3.4, -20], [-400, 4.2, 0], [-500, 5.2, 20]]) this._gong(LANE.C + dx, z, size);
     // The tank plate at the end of lane D, past the shack.
     this._gong(LANE.D, -460, 7.0, true);
   }
@@ -221,7 +256,10 @@ export class Range {
   _paper(x, z) {
     const g = new THREE.Group();
     g.position.set(x, 11.5, z);
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.2, 0.2), mat(0x6a6f74, 0.6, 0.4)); g.add(bar);
+    const gantry = mat(0x6a6f74, 0.6, 0.4);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(6.4, 0.3, 0.3), gantry); g.add(bar);
+    // The gantry's legs, down to the ground either side of the target.
+    for (const sx of [-3.1, 3.1]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 11.5, 0.3), gantry); leg.position.set(sx, -11.5 / 2, 0); g.add(leg); }
     const pivot = new THREE.Group(); pivot.position.y = -0.2; g.add(pivot);
     const tex = textTexture(128, 192, (ctx, w, h) => {
       ctx.fillStyle = '#d8c9a5'; ctx.fillRect(0, 0, w, h);
@@ -461,13 +499,13 @@ export class Range {
       this._dronePlace(d, 0);
       return d;
     };
-    this.drones.push(make(0, 30, 1), make(Math.PI, 42, -1));
+    this.drones.push(make(0, 45, 1), make(Math.PI, 62, -1));
   }
 
-  /** The racetrack over the far third of the hall: two straights across the lanes and two turns. */
+  /** The racetrack over the far third of the range: two straights across the lanes and two turns. */
   _dronePlace(d, dt) {
-    // Lower than the ceiling by a good margin, and inside the walls.
-    const speed = 38, R = 34, straight = 70;
+    // Across all four lanes, inside the berms.
+    const speed = 40, R = 40, straight = 140;
     const per = (2 * straight + 2 * Math.PI * R) / speed;
     d.phase = (d.phase + d.dir * dt / per * Math.PI * 2 + Math.PI * 2) % (Math.PI * 2);
     // Position on a stadium: parametrised by angle for simplicity, scaled.
@@ -604,6 +642,12 @@ export class Range {
   // ── The frame ─────────────────────────────────────────────────────
 
   update(dt) {
+    // The red flag in the desert wind.
+    if (this.flag) {
+      const a = this.flag.geometry.attributes.position, b = this._flagBase, t = this.time;
+      for (let k = 0; k < a.count; k++) { const x = b[k * 3]; a.setZ(k, Math.sin(t * 5.5 - x * 1.3) * 0.32 * (x / 5)); }
+      a.needsUpdate = true;
+    }
     this.time += dt;
     for (const t of this.targets) {
       if (t.kind === 'gong') {

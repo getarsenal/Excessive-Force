@@ -31,12 +31,6 @@ const C = (h) => new THREE.Color(h);
 export const LOOKS = {
   // The indoor range: no sky, black air, the lamps' cool-white key from
   // above and a little warm bounce off the concrete.
-  range: {
-    zenith: 0x050607, mid: 0x08090b, horizon: 0x0c0d10, ground: 0x111214,
-    fog: 0x050607, sun: 0xfff0d8, hemiSky: 0x6a6862, hemiGround: 0x2b2a28, ambient: 0x454644,
-    shallow: 0x1a2426, deep: 0x0d1416,
-    sunIntensity: 1.7, hemiIntensity: 0.5, ambientIntensity: 0.34, exposure: 1.0,
-  },
   temperate: {
     zenith: 0x2559c2, mid: 0x6fa7e4, horizon: 0xd6e4f3, ground: 0x9aa4ac,
     fog: 0xb9cce4, sun: 0xffd9a3, hemiSky: 0x8fb4ff, hemiGround: 0x6e5f8a, ambient: 0x6f7298,
