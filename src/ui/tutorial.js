@@ -194,7 +194,7 @@ export class Tutorial {
         enter: () => { this._fly(siteLive(), 170); },
         done: () => !!site()?.down },
       { ch: 3, el: '#strikebar .unit-card.free', fallback: '#dock-strikes', title: 'FREE STRIKE', skip: () => !site(),
-        text: 'A compound down pays $15,000 and a free air strike, any up to the F-15: the cards say FREE. Open STRIKES and call one. The A-10 strafes a line you drag; the rest make one pass at what you tap; LOITER cards stay on station.',
+        text: 'A compound down pays $15,000 and a free air strike, any up to the F-15: the cards say FREE. Open STRIKES and call one. The A-10 strafes a line you drag; the rest make one pass at what you tap; LOITER cards stay on station, and with a gunship or an Apache up, GUNNER puts you at its guns.',
         enter: () => { this.credits0 = b.strikeCredits; },
         done: () => b.strikeCredits < (this.credits0 ?? 0) || this._striking(),
         say: 'A free one. Nothing in the Army is free. Somebody shot down a missile site for that.' },

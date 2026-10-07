@@ -150,6 +150,8 @@ export class Battle {
     // burst may hit: {pos, r, alive, hit(dmg, unit)}.
     this.range = null;
     this.extraTargets = [];
+    // The gunner's seat on an aircraft on station (see `startSeat`).
+    this.seat = null;
     this.air = new AirWing({
       scene: this.scene, quality: this.quality, terrain: this.terrain,
       projectiles: this.projectiles, fx: this.fx, audio: this.audio, camera: this.camera,
@@ -450,6 +452,123 @@ export class Battle {
   laySpread(L = this.lay) {
     if (!L || !L.unit.def.projectile.mortar) return 0;
     return Math.max(4, L.range * 0.035);
+  }
+
+  // ── The gunner's seat ────────────────────────────────────────────────
+  //
+  // An aircraft on station (the AC-130 in its orbit, the Apache at its
+  // hover) flies itself; the player takes its guns. The seat holds the
+  // sensor's aim point on the ground, which the finger drags, and the
+  // weapon in hand: the gunship's 105 and its 30 mm, the Apache's rocket
+  // pairs and its chin gun. While the seat is held the sortie's own fire
+  // stops (`loiter.hand`), and the Apache's turret follows the aim.
+
+  /** The sorties a gunner could sit in now, most time left first. */
+  seatable() {
+    const out = [];
+    for (const s of this.air.sorties) {
+      const L = s.loiter;
+      if (!L || s.done || L.phase === 'egress' || L.phase === 'down') continue;
+      out.push(s);
+    }
+    out.sort((a, b) => (a.loiter.time || 0) - (b.loiter.time || 0));
+    return out;
+  }
+
+  /** What a seat's aircraft can fire by hand. */
+  seatWeapons(s) {
+    const a = s.def.aircraft;
+    return a.orbit
+      ? [{ kind: 'shell', name: '105 MM', reload: a.every, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.9, hold: true }]
+      : [{ kind: 'rocket', name: 'ROCKETS', reload: 1.4, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.9, hold: true }];
+  }
+
+  startSeat(s) {
+    if (!s || !s.loiter || s.done) return false;
+    if (this.lay) this.endLay();
+    if (this.seat) this.endSeat();
+    const aim = s.target.clone();
+    aim.y = this.terrain.heightAt(aim.x, aim.z) + 0.3;
+    this.seat = { sortie: s, aim, weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0 };
+    s.loiter.hand = true;
+    s.loiter.gunAim = aim;
+    this.onEvent('seat', { def: s.def, on: true });
+    return true;
+  }
+
+  endSeat() {
+    const S = this.seat;
+    if (!S) return;
+    const L = S.sortie.loiter;
+    if (L) { L.hand = false; L.gunAim = null; L.gunAimFor = undefined; }
+    this.seat = null;
+    this.onEvent('seat', { def: S.sortie.def, on: false });
+  }
+
+  /** Move the aim over the ground by a world offset, kept within the aircraft's reach. */
+  seatMove(dx, dz) {
+    const S = this.seat;
+    if (!S) return;
+    const s = S.sortie, a = s.def.aircraft, L = s.loiter;
+    S.aim.x += dx; S.aim.z += dz;
+    // Inside the orbit and a little beyond it, or within the Apache's reach of its station.
+    const cx = L.orbit ? L.centre.x : (L.station?.x ?? s.target.x), cz = L.orbit ? L.centre.z : (L.station?.z ?? s.target.z);
+    const reach = L.orbit ? a.radius * 1.5 : 420;
+    const ox = S.aim.x - cx, oz = S.aim.z - cz, d = Math.hypot(ox, oz);
+    if (d > reach) { S.aim.x = cx + ox / d * reach; S.aim.z = cz + oz / d * reach; }
+    S.aim.y = this.terrain.heightAt(S.aim.x, S.aim.z) + 0.3;
+  }
+
+  seatSwitch() {
+    const S = this.seat;
+    if (!S) return;
+    S.weapon = (S.weapon + 1) % this.seatWeapons(S.sortie).length;
+    S.cooldown = Math.min(S.cooldown, 0.5);
+  }
+
+  /** One round (or one burst) of the weapon in hand at the aim. False while reloading. */
+  seatFire() {
+    const S = this.seat;
+    if (!S || this.state !== 'playing') return false;
+    if (S.cooldown > 0) return false;
+    const s = S.sortie, a = s.def.aircraft;
+    const w = this.seatWeapons(s)[S.weapon];
+    const aim = S.aim.clone();
+    if (w.kind === 'shell') {
+      this.air._gunshipShell(s, aim, true);
+      this.engine.addShake(0.08);
+    } else if (w.kind === 'rocket') {
+      if (s.loiter.rockets <= 0) { S.cooldown = 0.3; return false; }
+      for (let k = 0; k < Math.min(a.pair || 2, s.loiter.rockets); k++) { this._seatRocketLater(s, aim, k * 0.12); s.loiter.rockets--; }
+      if (this.audio) this.audio.play('rocket', s.model.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
+    } else {
+      // The 30 mm: a burst on the point, the men round it, the range's plates and drones.
+      const from = this.air.seatMuzzle(s, 'gun');
+      const killed = this.air.gunner.fire(from, aim, a.gun) || 0;
+      s.kills += killed;
+      const r2 = (a.gun.radius + 1.5) ** 2;
+      for (const x of this.extraTargets) if (x.alive && x.pos.distanceToSquared(aim) < r2 + x.r * x.r) x.hit(a.gun.power / 200, null);
+      if (this.range) this.range.blast(aim, { power: a.gun.power * 0.25, radius: a.gun.radius });
+    }
+    S.cooldown = w.reload; S.reloadTotal = w.reload; S.kick = 1; S.fired++;
+    this.shotsFired++; this.handShots++;
+    return true;
+  }
+
+  _seatRocketLater(s, aim, delay) {
+    if (delay <= 0) { this.air._loiterRocket(s, 0, aim, true); return; }
+    setTimeout(() => { if (this.seat && this.seat.sortie === s && !s.done) this.air._loiterRocket(s, 0, aim, true); }, delay * 1000);
+  }
+
+  /** Each frame: the clock, the Apache's turret on the aim, and the seat given up when the aircraft goes. */
+  _updateSeat(dt) {
+    const S = this.seat;
+    if (!S) return;
+    const s = S.sortie, L = s.loiter;
+    if (s.done || !L || L.phase === 'egress' || L.phase === 'down' || this.state !== 'playing') { this.endSeat(); return; }
+    S.cooldown = Math.max(0, S.cooldown - dt);
+    S.kick = Math.max(0, S.kick - dt * 2.5);
+    if (!L.orbit) L.gunAim = S.aim;
   }
 
   /** Turn and elevate, in radians; the arc is redrawn. */
@@ -3217,6 +3336,7 @@ export class Battle {
 
   update(dt) {
     if (this.lay && (!this.lay.unit.alive || this.state !== 'playing')) this.endLay();
+    this._updateSeat(dt);
     if (this.state !== 'playing') {
       // The fight is over; the sky is not. Transports still in the air fly
       // on and their loads come down, rounds in flight land, the fires burn

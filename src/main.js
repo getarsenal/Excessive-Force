@@ -1885,6 +1885,7 @@ async function boot() {
   // the fall of shot when the eye is not looking straight at it.
   layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-read"></div><div id="lay-hint">DRAG TO LAY THE GUN</div>
     <button id="lay-done" type="button">DONE</button>
+    <button id="lay-wpn" type="button" hidden>105 MM</button>
     <button id="lay-zoom" type="button" aria-label="Zoom">×1</button>
     <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
   document.getElementById('ui').appendChild(layEl);
@@ -1892,6 +1893,14 @@ async function boot() {
   const laySight = layEl.querySelector('#lay-sight'), layMark = layEl.querySelector('#lay-mark'), layZoomBtn = layEl.querySelector('#lay-zoom'), layHint = layEl.querySelector('#lay-hint');
   let layDrag = null, layWas = null, layReady = null, layFov = null, layNear = null, layPct = -1;
   let layZoom = 0, layHold = false, laySightKind = '';
+  // The gunner's seat on an aircraft on station (battle.startSeat): the
+  // same HUD, the camera the sensor ball's, the aircraft flying itself.
+  const layWpn = layEl.querySelector('#lay-wpn');
+  let seatZoom = 0;
+  const SEAT_ZOOM = [1, 2, 4];
+  const seatBtn = document.createElement('button');
+  seatBtn.id = 'seat-btn'; seatBtn.type = 'button'; seatBtn.hidden = true;
+  document.getElementById('ui').appendChild(seatBtn);
   // The weapon in the firer's hands (a fire team's lay): the team's figures
   // are hidden, since from inside the gunner's own head they are a helmet
   // and a pack, and the launcher or the gun alone is drawn under the eye.
@@ -1962,7 +1971,53 @@ async function boot() {
     }
     feedback.emit('open');
   };
+  const applySeatZoom = () => {
+    const S = battle.seat;
+    if (!S) return;
+    const mag = SEAT_ZOOM[seatZoom];
+    engine.camera.fov = 40 / mag; engine.camera.updateProjectionMatrix();
+    layZoomBtn.textContent = `×${mag}`; layZoomBtn.hidden = false;
+    layEl.dataset.zoom = 'out'; layEl.dataset.aimed = '1';
+    const kind = S.sortie.def.aircraft.orbit ? 'gunship' : 'tads';
+    if (laySightKind !== kind) { laySightKind = kind; laySight.innerHTML = sightSVG(kind); laySight.className = `sight-${kind}`; }
+    laySight.style.removeProperty('--ss');
+  };
+  const seatWeaponLabel = () => { const S = battle.seat; if (!S) return; layWpn.textContent = battle.seatWeapons(S.sortie)[S.weapon].name; layWpn.hidden = false; };
+  const enterSeat = (s) => {
+    if (!battle.startSeat(s)) return;
+    unitCard.hide();
+    hud.closeDrawer?.();
+    battle.selectedUnitId = null;
+    hud.hidePrompt?.();
+    layWas = { yaw: rig.desiredYaw, pitch: rig.desiredPitch, dist: rig.desiredDistance, target: rig.desiredTarget.clone() };
+    rig.enabled = false;
+    layEl.hidden = false;
+    layReady = null; layHold = false; layPct = -1;
+    document.body.classList.add('laying', 'seated', 'optics-thermal');
+    layFov = engine.camera.fov; layNear = engine.camera.near;
+    engine.camera.near = 1;
+    seatZoom = 0;
+    applySeatZoom();
+    seatWeaponLabel();
+    layMark.hidden = true;
+    layHint.textContent = 'DRAG THE CROSS ONTO THE TARGET';
+    seatFrame();
+    seatCamera(0);
+    feedback.emit('open');
+  };
+  const exitSeat = () => {
+    if (layEl.hidden && !battle.seat) return;
+    battle.endSeat();
+    rig.enabled = true;
+    if (layFov != null) { engine.camera.fov = layFov; engine.camera.near = layNear; engine.camera.updateProjectionMatrix(); layFov = null; layNear = null; }
+    if (layWas) { rig.desiredTarget.copy(layWas.target); rig.target.copy(layWas.target); rig.desiredYaw = layWas.yaw; rig.desiredPitch = layWas.pitch; rig.desiredDistance = layWas.dist; layWas = null; }
+    layEl.hidden = true;
+    layDrag = null; layHold = false;
+    layWpn.hidden = true;
+    document.body.classList.remove('laying', 'seated', 'optics-thermal');
+  };
   const exitLay = () => {
+    if (battle.seat) { exitSeat(); return; }
     if (layEl.hidden && !battle.lay) return;
     battle.endLay();
     rig.enabled = true;
@@ -1982,12 +2037,18 @@ async function boot() {
     document.body.classList.remove('laying');
   };
   const fireHand = (quiet) => {
+    if (battle.seat) {
+      if (battle.seatFire()) { feedback.emit('confirm'); layFire.classList.remove('ready'); layReady = false; }
+      else if (!quiet) feedback.emit('deny');
+      return;
+    }
     if (!battle.lay) return;
     if (battle.handFire()) { feedback.emit('confirm'); layFire.classList.remove('ready'); layReady = false; }
     else if (!quiet) feedback.emit('deny');
   };
   /** The next magnification round: the button, Z, or the wheel. */
   const zoomLay = (step = 1) => {
+    if (battle.seat) { seatZoom = (seatZoom + step + SEAT_ZOOM.length) % SEAT_ZOOM.length; applySeatZoom(); feedback.emit('tick'); return; }
     const L = battle.lay;
     if (!L) return;
     const n = laySightOf(L.unit).zoom.length;
@@ -1998,6 +2059,8 @@ async function boot() {
   };
   layEl.querySelector('#lay-done').addEventListener('click', () => { exitLay(); feedback.emit('tick'); });
   layZoomBtn.addEventListener('click', () => zoomLay(1));
+  layWpn.addEventListener('click', () => { battle.seatSwitch(); seatWeaponLabel(); feedback.emit('tick'); });
+  seatBtn.addEventListener('click', () => { const list = battle.seatable(); if (list.length) enterSeat(list[0]); });
   // FIRE held is a machine gun's trigger held: burst after burst until it is let go.
   layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); layHold = true; fireHand(); });
   window.addEventListener('pointerup', () => { layHold = false; });
@@ -2015,10 +2078,23 @@ async function boot() {
     e.preventDefault();
     zoomLay(e.deltaY < 0 ? 1 : -1);
   }, { passive: false });
+  const _sgA = new THREE.Vector3(), _sgB = new THREE.Vector3();
   canvas.addEventListener('pointermove', (e) => {
-    if (!layDrag || e.pointerId !== layDrag.id || !battle.lay) return;
+    if (!layDrag || e.pointerId !== layDrag.id || !(battle.lay || battle.seat)) return;
     const dx = e.clientX - layDrag.x, dy = e.clientY - layDrag.y;
     layDrag.x = e.clientX; layDrag.y = e.clientY;
+    if (battle.seat) {
+      // The cross goes where the finger goes: the ground under the finger
+      // before and after, and the aim moved by the difference.
+      const from = rig._screenToGround(e.clientX - dx, e.clientY - dy, _sgA);
+      const to = from ? rig._screenToGround(e.clientX, e.clientY, _sgB) : null;
+      if (from && to) {
+        const mx = to.x - from.x, mz = to.z - from.z, m = Math.hypot(mx, mz);
+        const cap = Math.min(m, 40);
+        if (m > 1e-4) battle.seatMove(mx / m * cap, mz / m * cap);
+      }
+      return;
+    }
     // A hundred points of drag is a quarter turn; up is up. Through a
     // zoomed sight the same drag moves the lay by the same amount of the
     // picture, which is that much finer a lay. From the plot, the finger
@@ -2032,8 +2108,27 @@ async function boot() {
     const k = 1 / layMag();
     battle.layTurn(-dx * 0.0045 * k, -dy * 0.0032 * k);
   });
+  /** Each frame in the seat: the readout, the reload ring, the held 30 mm, and the seat given up when the aircraft goes. */
+  const seatFrame = () => {
+    const S = battle.seat;
+    if (!S) { if (!layEl.hidden && document.body.classList.contains('seated')) exitSeat(); return; }
+    const s = S.sortie, w = battle.seatWeapons(s)[S.weapon];
+    const ready = S.cooldown <= 0;
+    if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
+    if (layHold && ready && w.hold) fireHand(true);
+    const total = Math.max(S.reloadTotal || 0.01, 0.01);
+    const pct = ready ? 100 : Math.round(100 * (1 - S.cooldown / total));
+    if (pct !== layPct) { layPct = pct; layFire.style.setProperty('--p', `${pct}%`); }
+    const label = ready ? 'FIRE' : S.cooldown.toFixed(1);
+    if (layFire.textContent !== label) layFire.textContent = label;
+    const left = Math.max(0, Math.round(s.def.aircraft.station - (s.loiter.time || 0)));
+    const ammo = w.kind === 'rocket' ? ` · ${s.loiter.rockets} LEFT` : '';
+    const t = `${s.def.name} · ${w.name}${ammo} · ${Math.round(S.aim.distanceTo(s.model.position))} m · ${left} s ON STATION`;
+    if (layRead.textContent !== t) layRead.textContent = t;
+  };
   /** Each frame while laying: the readout, and the reload clock on the trigger. */
   const layFrame = () => {
+    if (battle.seat || document.body.classList.contains('seated')) { seatFrame(); return; }
     const L = battle.lay;
     if (!L) { if (!layEl.hidden) exitLay(); return; }
     const u = L.unit;
@@ -2069,7 +2164,24 @@ async function boot() {
   /** How high the plot's camera stands: the whole flight in the frame at one, half that closer in. */
   const layPlotHeight = () => { const L = battle.lay; return THREE.MathUtils.clamp(L.range * 0.7 + 50, 70, 600) / layMag(); };
   const _vr = new THREE.Vector3(), _vu = new THREE.Vector3(), _vf = new THREE.Vector3();
+  /** The sensor ball's view: from under the aircraft, straight at the aim, stabilised, jolted by the shot. */
+  const seatCamera = (dt) => {
+    const S = battle.seat;
+    if (!S) return;
+    battle.air.seatEye(S.sortie, _eye);
+    _look.copy(S.aim);
+    const dist = Math.max(1, _eye.distanceTo(_look));
+    const jolt = S.kick * S.kick * 0.004 * dist / SEAT_ZOOM[seatZoom];
+    _look.x += Math.sin(S.kick * 41) * jolt; _look.y += Math.cos(S.kick * 37) * jolt;
+    engine.camera.up.set(0, 1, 0);
+    engine.camera.position.copy(_eye);
+    engine.camera.lookAt(_look);
+    engine.camera.updateMatrixWorld();
+    // The rig's ground plane, for the finger's drag, is the aim's.
+    rig.target.copy(S.aim); rig.desiredTarget.copy(S.aim);
+  };
   const layCamera = (dt) => {
+    if (battle.seat) { seatCamera(dt); return; }
     const L = battle.lay;
     if (!L) return;
     const u = L.unit;
@@ -2150,6 +2262,14 @@ async function boot() {
     rig.yaw = rig.desiredYaw = L.yaw + Math.PI;
   };
   window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand, zoom: zoomLay, mag: layMag, hold: (on) => { layHold = !!on; } };   // for the harness
+  window.__seat = { enter: enterSeat, exit: exitSeat, fire: fireHand, zoom: zoomLay, hold: (on) => { layHold = !!on; }, switch: () => { battle.seatSwitch(); seatWeaponLabel(); } };
+  /** The GUNNER button: up while an aircraft is on station and nobody is at a gun. */
+  const seatButton = () => {
+    const list = (!battle.lay && !battle.seat && battle.state === 'playing') ? battle.seatable() : [];
+    const show = list.length > 0;
+    if (seatBtn.hidden === show) seatBtn.hidden = !show;
+    if (show) { const t = `GUNNER · ${list[0].def.name}`; if (seatBtn.textContent !== t) seatBtn.textContent = t; }
+  };
   const endAiming = () => {
     aiming = null;
     battle.hideLine();
@@ -2914,6 +3034,7 @@ async function boot() {
     rig.dragLocked = !!battle.selectedUnitId && battle.state === 'playing';
     unitCard.update();
     layFrame();
+    seatButton();
     testMenu.update(rawDt);
     cinematicTick();
     ambience.tick();

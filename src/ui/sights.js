@@ -17,7 +17,7 @@
  *          thermal-green glass
  *   glass  the mortar observer's binoculars: a mil cross in twin circles
  */
-export const SIGHT_KINDS = ['tank', 'pano', 'optic', 'iron', 'clu', 'glass', 'plot'];
+export const SIGHT_KINDS = ['tank', 'pano', 'optic', 'iron', 'clu', 'glass', 'plot', 'gunship', 'tads'];
 
 const line = (x1, y1, x2, y2, w = 1) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${w}"/>`;
 const text = (x, y, t, size = 6, anchor = 'middle') => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${anchor}">${t}</text>`;
@@ -131,7 +131,29 @@ function plot() {
   return s;
 }
 
-const DRAW = { tank, pano, optic, iron, clu, glass, plot };
+/** The gunship's sensor: the TV operator's cross, open at the centre, in a boxed field with the data corners. */
+function gunship() {
+  let s = '';
+  s += line(-60, 0, -8, 0, 1.4) + line(8, 0, 60, 0, 1.4) + line(0, -60, 0, -8, 1.4) + line(0, 8, 0, 60, 1.4);
+  s += `<circle cx="0" cy="0" r="1.4" class="fill"/>`;
+  for (const t of [-40, -20, 20, 40]) s += line(t, -3, t, 3, 1) + line(-3, t, 3, t, 1);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) s += line(sx * 96, sy * 96, sx * 96, sy * 82, 1.6) + line(sx * 96, sy * 96, sx * 82, sy * 96, 1.6);
+  s += text(-92, -84, 'TV', 6, 'start') + text(92, -84, '105 / 30', 6, 'end') + text(-92, 92, 'SENSOR', 6, 'start') + text(92, 92, 'GUN', 6, 'end');
+  return s;
+}
+/** The Apache's TADS: a box round the mark with a cross in it, the gun's bars either side. */
+function tads() {
+  let s = '';
+  s += `<rect x="-24" y="-24" width="48" height="48" fill="none" stroke-width="1.6"/>`;
+  s += line(-12, 0, 12, 0, 1.2) + line(0, -12, 0, 12, 1.2);
+  s += line(-80, 0, -40, 0, 2.2) + line(40, 0, 80, 0, 2.2);
+  s += line(0, 40, 0, 80, 1.2);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) s += line(sx * 96, sy * 96, sx * 96, sy * 84, 1.4) + line(sx * 96, sy * 96, sx * 84, sy * 96, 1.4);
+  s += text(-92, -84, 'TADS', 6, 'start') + text(92, -84, 'FLIR', 6, 'end');
+  return s;
+}
+
+const DRAW = { tank, pano, optic, iron, clu, glass, plot, gunship, tads };
 
 /** The reticle's SVG for a kind of sight, as markup to drop into the overlay. */
 export function sightSVG(kind) {

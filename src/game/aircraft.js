@@ -2112,7 +2112,7 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
     face(s.target.x, s.target.z, 2.5);
 
     L.nextRocket -= dt;
-    if (L.rockets > 0 && L.nextRocket <= 0) {
+    if (!L.hand && L.rockets > 0 && L.nextRocket <= 0) {
       L.nextRocket = a.every;
       for (let k = 0; k < a.pair && L.rockets > 0; k++, L.rockets--) this._loiterRocket(s, k);
       if (this.audio) this.audio.play('rocket', m.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
@@ -2123,7 +2123,7 @@ AirWing.prototype._updateLoiter = function _updateLoiter(s, dt) {
     // laid on, from wherever the muzzle is.
     const gun = m.userData.gun;
     if (gun) this._layGun(m, gun, L.gunAim || s.target, dt);
-    if (L.nextGun <= 0 && this.gunner) {
+    if (!L.hand && L.nextGun <= 0 && this.gunner) {
       L.nextGun = a.gun.every;
       const to = this.gunner.pick(s.target, a.gun.reach);
       if (to) {
@@ -2206,9 +2206,10 @@ AirWing.prototype._updateOrbit = function _updateOrbit(s, dt) {
     m.rotation.y = Math.atan2(Math.sin(L.theta), -Math.cos(L.theta));
     m.rotation.x = 0;
     m.rotation.z = bank;
-    // The 105: out of the port side, a straight line down to the mark.
+    // The 105: out of the port side, a straight line down to the mark. Not
+    // while the player has the gunner's seat: the shells are theirs then.
     L.nextShell -= dt;
-    if (L.shells > 0 && L.nextShell <= 0) {
+    if (!L.hand && L.shells > 0 && L.nextShell <= 0) {
       L.nextShell = a.every;
       L.shells--;
       this._gunshipShell(s);
@@ -2217,7 +2218,7 @@ AirWing.prototype._updateOrbit = function _updateOrbit(s, dt) {
     // nearest the mark, so the men round the building have the whole orbit
     // to keep their heads down in.
     L.nextGun -= dt;
-    if (a.gun && L.nextGun <= 0 && this.gunner) {
+    if (!L.hand && a.gun && L.nextGun <= 0 && this.gunner) {
       L.nextGun = a.gun.every * (0.85 + Math.random() * 0.3);
       const to = this.gunner.pick(s.target, a.gun.reach);
       if (to) {
@@ -2272,28 +2273,46 @@ AirWing.prototype._fallLoiter = function _fallLoiter(s, dt, spin, forward = 0) {
 };
 
 /** One 70 mm rocket from the pod on alternating sides, on a fast line to the mark. */
-AirWing.prototype._loiterRocket = function _loiterRocket(s) {
+AirWing.prototype._loiterRocket = function _loiterRocket(s, k = 0, at = null, hand = false) {
   const m = s.model, a = s.def.aircraft, L = s.loiter;
   const podX = (L.pod++ % 2 === 0 ? 1 : -1) * 2.45;
   const from = new THREE.Vector3(podX, -0.52, 2.2).applyEuler(m.rotation).add(m.position);
-  this._shoot(s, from, a.spread, a.muzzle);
-  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(s.target).sub(from).normalize(), 0.8);
+  this._shoot(s, from, hand ? 0 : a.spread, a.muzzle, at, hand);
+  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(at || s.target).sub(from).normalize(), hand ? 0.4 : 0.8);
 };
 
-/** One 105 mm round from the gunship's howitzer, down to the mark. */
-AirWing.prototype._gunshipShell = function _gunshipShell(s) {
+/** One 105 mm round from the gunship's howitzer, down to the mark (or to a gunner's own point). */
+AirWing.prototype._gunshipShell = function _gunshipShell(s, at = null, hand = false) {
   const m = s.model, a = s.def.aircraft;
   const from = new THREE.Vector3(4.7, -0.45, -5.6).applyEuler(m.rotation).add(m.position);
-  this._shoot(s, from, a.spread, a.muzzle);
-  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(s.target).sub(from).normalize(), 1.6);
+  this._shoot(s, from, hand ? 0 : a.spread, a.muzzle, at, hand);
+  if (this.fx && this.fx.muzzleFlash) this.fx.muzzleFlash(from, this._v.copy(at || s.target).sub(from).normalize(), hand ? 0.6 : 1.6);
   if (this.audio) this.audio.play('gun', m.position, { rate: 0.8, gain: 0.7, rolloff: 1600 });
 };
 
-/** A round on a ballistic line that lands on the mark, give or take `spread`. */
-AirWing.prototype._shoot = function _shoot(s, from, spread, muzzle) {
+/**
+ * The gunner's seat (battle.startSeat): where the sensor looks from, and
+ * where each weapon's rounds leave. The gunship's ball is under the port
+ * side, forward of the 105; the Apache's TADS is under the nose.
+ */
+AirWing.prototype.seatEye = function seatEye(s, out = new THREE.Vector3()) {
+  const m = s.model, a = s.def.aircraft;
+  return a.orbit ? out.set(3.9, -1.6, 1.0).applyEuler(m.rotation).add(m.position)
+    : out.set(0, -1.1, 5.2).applyEuler(m.rotation).add(m.position);
+};
+AirWing.prototype.seatMuzzle = function seatMuzzle(s, kind, out = new THREE.Vector3()) {
+  const m = s.model, a = s.def.aircraft;
+  if (a.orbit) return (kind === 'gun' ? out.set(3.77, -0.55, 6.2) : out.set(4.7, -0.45, -5.6)).applyEuler(m.rotation).add(m.position);
+  const gun = m.userData.gun;
+  if (kind === 'gun' && gun) return gun.userData.muzzle.getWorldPosition(out);
+  return out.set(0, -0.52, 2.2).applyEuler(m.rotation).add(m.position);
+};
+
+/** A round on a ballistic line that lands on the mark, give or take `spread`; a gunner's round on his own point, dead on. */
+AirWing.prototype._shoot = function _shoot(s, from, spread, muzzle, at = null, hand = false) {
   const p = s.def.projectile;
   const r = spread * Math.sqrt(Math.random()), t = Math.random() * Math.PI * 2;
-  const to = s.target.clone();
+  const to = (at || s.target).clone();
   to.x += Math.cos(t) * r; to.y += (Math.random() - 0.5) * spread; to.z += Math.sin(t) * r;
   const d = to.clone().sub(from);
   const T = d.length() / muzzle;
@@ -2302,7 +2321,7 @@ AirWing.prototype._shoot = function _shoot(s, from, spread, muzzle) {
   this.projectiles.fire({
     pos: from, vel, gravity: p.gravity, kind: 'bomb', drag: 0, speed: muzzle,
     warhead: s.def.warhead, owner: null, target: to, trail: p.trail,
-    strikeDef: s.def, sortie: s,
+    strikeDef: s.def, sortie: s, hand,
   });
 };
 

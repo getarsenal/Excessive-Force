@@ -579,6 +579,26 @@ body.laying #dock, body.laying #targetcard, body.laying #status, body.laying #hu
   font: 700 13px/1 var(--f-ui); letter-spacing: 0.08em; font-variant-numeric: tabular-nums;
 }
 #lay-zoom[hidden] { display: none; }
+/* The gunner's seat: the weapon in hand, over ZOOM; and the GUNNER button
+   that opens it, where FIRE sits once it is open. */
+#lay-wpn {
+  position: absolute; right: var(--pad-r); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 18px + 76px + 18px + 44px + 10px);
+  min-width: 56px; min-height: 44px; pointer-events: auto; cursor: pointer;
+  background: var(--panel); border: 1px solid rgba(255, 210, 90, 0.55); color: #ffd25a;
+  font: 700 11px/1 var(--f-ui); letter-spacing: 0.1em; padding: 0 10px;
+}
+#lay-wpn[hidden] { display: none; }
+#seat-btn {
+  position: absolute; right: var(--pad-r); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 18px); z-index: 18;
+  min-height: 44px; padding: 0 14px; pointer-events: auto; cursor: pointer;
+  background: var(--panel); border: 1px solid rgba(255, 210, 90, 0.7); color: #ffd25a;
+  font: 700 11px/1 var(--f-ui); letter-spacing: 0.14em; text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 14px rgba(255, 210, 90, 0.25);
+}
+#seat-btn[hidden], body.laying #seat-btn, body.drawer-open #seat-btn { display: none; }
+#lay-sight.sight-gunship { --ret: #e6eef8; }
+#lay-sight.sight-gunship svg, #lay-sight.sight-tads svg { filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9)); }
+#lay-sight.sight-tads { --ret: #d8f3dc; }
 
 /* ── Popups and badges ───────────────────────────────────────────────── */
 #popups { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }
