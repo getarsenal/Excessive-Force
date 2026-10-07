@@ -442,6 +442,16 @@ export class Battle {
     A.round.position.copy(v).sub(A.heldAt);
   }
 
+  /**
+   * How far a hand-laid round may land from the ring: nothing for a gun
+   * laid over its own sights, and for a mortar a share of the range, the
+   * way a dropped round's dispersion grows with the charge behind it.
+   */
+  laySpread(L = this.lay) {
+    if (!L || !L.unit.def.projectile.mortar) return 0;
+    return Math.max(4, L.range * 0.035);
+  }
+
   /** Turn and elevate, in radians; the arc is redrawn. */
   layTurn(dyaw, delev) {
     const L = this.lay;
@@ -645,6 +655,9 @@ export class Battle {
     this.layLine.geometry.attributes.position.needsUpdate = true;
     this.layRing.position.copy(L.impact);
     this.layRing.position.y += 0.3;
+    // The ring is the round's dispersion on the ground where there is any.
+    const sp = this.laySpread(L);
+    this.layRing.scale.setScalar(sp > 0 ? sp / 2.6 : 1);
     const col = L.masonry ? 0xffb020 : L.blocked ? 0xe8604c : L.hit ? 0x9fd2ff : 0x8a98a6;
     this.layRing.material.color.setHex(col);
     this.layLine.material.color.setHex(col);
@@ -675,7 +688,16 @@ export class Battle {
     if (u.def.mg) return this._handBurst(u, L);
     // The Javelin flies its own path to the mark; everything else goes down the drawn line.
     const top = u.def.projectile.kind === 'topattack';
-    const ok = this._fireOne(u, L.impact.clone(), { vel: top ? null : this._layVel(L), hand: true, from: L.from });
+    let vel = top ? null : this._layVel(L);
+    const sp = this.laySpread(L);
+    if (sp > 0 && !top) {
+      // A mortar round lands somewhere in its ring: the same lay, solved
+      // again a little off in line and in range.
+      const L2 = { unit: u, yaw: L.yaw + gauss() * (sp / 2) / Math.max(30, L.range), rangeWant: L.rangeWant + gauss() * (sp / 2), elev: L.elev };
+      this._mortarSolve(L2);
+      if (L2.vel) vel = L2.vel;
+    }
+    const ok = this._fireOne(u, L.impact.clone(), { vel, hand: true, from: L.from });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
       L.reloadTotal = u.cooldown;

@@ -17,7 +17,7 @@
  *          thermal-green glass
  *   glass  the mortar observer's binoculars: a mil cross in twin circles
  */
-export const SIGHT_KINDS = ['tank', 'pano', 'optic', 'iron', 'clu', 'glass'];
+export const SIGHT_KINDS = ['tank', 'pano', 'optic', 'iron', 'clu', 'glass', 'plot'];
 
 const line = (x1, y1, x2, y2, w = 1) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width="${w}"/>`;
 const text = (x, y, t, size = 6, anchor = 'middle') => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${anchor}">${t}</text>`;
@@ -116,7 +116,22 @@ function glass() {
   return s;
 }
 
-const DRAW = { tank, pano, optic, iron, clu, glass };
+/**
+ * The mortar's plot: a bullseye on the fall of shot, seen from above. Its
+ * outer ring is the round's dispersion at this range (main.js sizes the
+ * overlay to it each frame), so the circle grows as the shot gets longer.
+ */
+function plot() {
+  let s = '';
+  s += `<circle cx="0" cy="0" r="70" fill="none" stroke-width="2.2"/>`;
+  s += `<circle cx="0" cy="0" r="44" fill="none" stroke-width="1.2"/>`;
+  s += `<circle cx="0" cy="0" r="18" fill="none" stroke-width="1.2"/>`;
+  s += `<circle cx="0" cy="0" r="2.2" class="fill"/>`;
+  for (const [x1, y1, x2, y2] of [[-96, 0, -74, 0], [74, 0, 96, 0], [0, -96, 0, -74], [0, 74, 0, 96]]) s += line(x1, y1, x2, y2, 1.6);
+  return s;
+}
+
+const DRAW = { tank, pano, optic, iron, clu, glass, plot };
 
 /** The reticle's SVG for a kind of sight, as markup to drop into the overlay. */
 export function sightSVG(kind) {
