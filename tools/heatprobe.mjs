@@ -26,9 +26,7 @@ const r = await page.evaluate(async (part) => {
   const btn = () => document.getElementById('lay-fire');
   const hold = async (H, label) => {
     const trace = []; let bursts = 0, lockedAt = -1, freedAt = -1, lockClasses = '', lockLabel = '';
-    const ob = B._handBurst.bind(B), os = B.seatFire.bind(B);
-    B._handBurst = (u, L) => { const ok = ob(u, L); if (ok) bursts++; return ok; };
-    B.seatFire = () => { const ok = os(); if (ok) bursts++; return ok; };
+    const r0 = H.rounds ?? H.fired ?? 0;
     window.__lay.hold(true);
     for (let t = 0; t < 16; t += 0.5) {
       tick(0.5); await new Promise((r) => setTimeout(r, 2));
@@ -37,8 +35,8 @@ const r = await page.evaluate(async (part) => {
       if (lockedAt >= 0 && H.over <= 0 && freedAt < 0) freedAt = t;
     }
     window.__lay.hold(false);
-    B._handBurst = ob; B.seatFire = os;
-    return { label, bursts, lockedAt, freedAt, lockClasses, lockLabel, heatAfterLock: freedAt >= 0 ? +H.heat.toFixed(2) : null, trace };
+    bursts = (H.rounds ?? H.fired ?? 0) - r0;
+    return { label, rounds: bursts, lockedAt, freedAt, lockClasses, lockLabel, heatAfterLock: freedAt >= 0 ? +H.heat.toFixed(2) : null, trace };
   };
   // The machine gun.
   let mg = null, u = null;

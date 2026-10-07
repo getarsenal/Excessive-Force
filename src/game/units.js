@@ -52,8 +52,8 @@ export const UNITS = [
     // near plane, close enough to keep the gun in the picture; in the lay
     // the team is hidden and the gun alone drawn under the eye, `view`).
     muzzle: { f: 1.2, h: 0.45, s: 0.61 },
-    eye: { back: -0.6, side: 0.61, h: 0.55, near: 0.2, pitch: 0 },
-    view: { down: 0.1, right: 0.0 },   // where the gun sits under the eye in the first-person view
+    eye: { back: -0.6, side: 0.61, h: 0.55, near: 0.12, pitch: 0 },
+    view: { down: 0.27, right: 0.0 },   // where the gun sits under the eye in the first-person view
     sight: { kind: 'iron', zoom: [1, 2] },   // the sight the lay looks through (main.js, SIGHTS)
     mg: {
       burst: 9, interval: 0.085, damage: 6,
@@ -652,7 +652,10 @@ const TUBE = { at4: 0x3b4230, gustaf: 0x6a6f63, rpg32: 0x4a3a2a, javelin: 0x8b93
 
 /** The weapon in the firer's own hands, for the lay's first-person view (soldier.js weaponView). */
 export function makeWeaponView(weapon) {
-  return weaponView(weapon, 0x4a5340, TUBE[weapon] ? { tones: { steel: TUBE[weapon] } } : {});
+  // The machine gun's steel a shade up from the figures': a foot from the
+  // eye, with the sky behind it, near-black reads as a hole in the picture.
+  const tones = TUBE[weapon] ? { steel: TUBE[weapon] } : weapon === 'm240' ? { steel: 0x4c514a } : null;
+  return weaponView(weapon, 0x4a5340, tones ? { tones } : {});
 }
 
 export function makeInfantryMesh(colour = 0x4a5340, opts = {}) {

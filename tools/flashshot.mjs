@@ -39,11 +39,12 @@ await page.evaluate(async () => {
 await hot('quiet');
 await page.evaluate(() => {
   const B = window.battle;
-  window.__lay.fire();
-  // Two rounds in, the flash of the last fresh.
-  window.__fastForward(0.09, 1 / 60);
+  // The trigger held a third of a second: four rounds out, the last flash fresh.
+  B.trigger = true;
+  window.__fastForward(0.3, 1 / 60);
+  B.trigger = false;
   window.__frame();
-  console.log('[flash] flashes ' + B.tracerFX.flashes.length + ' sizes ' + B.tracerFX.flashes.map((f) => f.size.toFixed(2) + '/' + f.gain + '/' + f.minPx).join(' '));
+  console.log('[flash] rounds ' + B.lay.rounds + ' heat ' + B.lay.heat.toFixed(2) + ' flashes ' + B.tracerFX.flashes.length + ' sizes ' + B.tracerFX.flashes.map((f) => f.size.toFixed(2) + '/' + f.gain + '/' + f.minPx).join(' '));
 });
 await hot('hand');
 await page.evaluate(() => {

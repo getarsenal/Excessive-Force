@@ -4,13 +4,16 @@ import * as THREE from 'three';
 // Points on a hand-laid shell's drawn flight: 0.04 s each, twelve seconds.
 const LAY_PTS = 300;
 /**
- * A held gun's barrel: how much a burst heats it, how fast it cools (and
- * it does not cool while it is firing), how long a gun run hot is locked,
- * and the heat it is back at when the lock lifts. About seven bursts of
- * the machine gun held on, six seconds, or seven of the 30 mm; then four
- * seconds of nothing and the rest of the cooling after.
+ * A held gun's barrel. Held, an automatic weapon fires round after round
+ * at its own rate (no bursts) for as long as the trigger is down; every
+ * round heats the barrel, it does not cool while firing, and run to the
+ * top it locks. `mgRound` is about fifty-five rounds of the M240, under
+ * five seconds held; the seat's cannon heats by `seatSecs` seconds of
+ * fire whatever its rate. Then four seconds of nothing, and the gun opens
+ * again at the reset line, so held on it gets a couple more seconds
+ * before it locks again; let go, it cools a tenth a second.
  */
-const HEAT = { mgBurst: 0.16, seatBurst: 0.15, cool: 0.1, lock: 4.0, reset: 0.45 };
+const HEAT = { mgRound: 0.018, seatSecs: 5, cool: 0.1, lock: 4.0, reset: 0.45 };
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
@@ -197,14 +200,15 @@ export class Battle {
         return best ? best.pos : null;
       },
       fire: (from, to, g) => {
-        for (let k = 0; k < 3; k++) this.tracerFX.fire(from, to, { look: 'chaingun' }, k === 0);
+        // A burst is three tracers on the point; one round of a held gun, one.
+        for (let k = 0; k < (g.one ? 1 : 3); k++) this.tracerFX.fire(from, to, { look: 'chaingun' }, k === 0);
         const killed = this.garrison.splash(to, g.radius, g.power);
         if (killed) {
           this.defendersKilled += killed;
           this.money += killed * MONEY_PER_DEFENDER;
           this.onEvent('bounty', { point: to, amount: killed * MONEY_PER_DEFENDER, kind: 'kill' });
         }
-        if (this.audio) this.audio.play('mg', from, { gain: 0.34, rolloff: 500, rate: 0.62, cooldown: 0.2 });
+        if (this.audio) this.audio.play('mg', from, { gain: 0.34, rolloff: 500, rate: 0.62, cooldown: g.one ? 0.09 : 0.2 });
         return killed;
       },
     };
@@ -272,7 +276,7 @@ export class Battle {
    * that does damage pays a bonus and its own stamp (see `_onImpact`).
    *
    * Anything with a sight to look through: the guns, the mortar, the rocket
-   * teams, the machine gun (FIRE held is bursts, see `_handBurst`) and the
+   * teams, the machine gun (FIRE held is a stream, see `_handMG`) and the
    * Javelin (the CLU's crosshair designates, the missile flies its own
    * path). Not the ripple launchers: six rockets on a timer is a battery
    * order, not a hand on a gun.
@@ -303,7 +307,8 @@ export class Battle {
     this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye;
       // the barrel's heat and its lock, for the machine gun.
-      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0 };
+      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0, rounds: 0, streaming: false };
+    this.trigger = false;
     unit.handHeld = true;
     // The gun is handed over loaded: the crew's own reload and the burst
     // they were in the middle of are theirs, not the player's. The trigger
@@ -347,6 +352,7 @@ export class Battle {
   }
 
   endLay() {
+    this.trigger = false;
     if (!this.lay) return;
     this.lay.unit.handHeld = false;
     this._mortarLive(this.lay.unit, false);
@@ -488,8 +494,11 @@ export class Battle {
   seatWeapons(s) {
     const a = s.def.aircraft;
     return a.orbit
-      ? [{ kind: 'shell', name: '105 MM', reload: a.every, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.9, hold: true }]
-      : [{ kind: 'rocket', name: 'ROCKETS', reload: 1.4, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.9, hold: true }];
+      // The cannon's `reload` is the interval between rounds held on: the
+      // gunship's GAU-23 at two hundred a minute, the Apache's M230 at six
+      // hundred and twenty-five.
+      ? [{ kind: 'shell', name: '105 MM', reload: a.every, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.3, hold: true, power: 0.6 }]
+      : [{ kind: 'rocket', name: 'ROCKETS', reload: 1.4, hold: false }, { kind: 'gun', name: '30 MM', reload: 0.096, hold: true, power: 0.3 }];
   }
 
   startSeat(s) {
@@ -501,7 +510,8 @@ export class Battle {
     // `aim` is the point on the ground the finger drags; `look` is where the
     // sensor's line to it first meets something (a roof, the tower), which
     // is where the cross sits and where the round goes.
-    this.seat = { sortie: s, aim, look: aim.clone(), weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0, heat: 0, over: 0 };
+    this.seat = { sortie: s, aim, look: aim.clone(), weapon: 0, cooldown: 0.4, reloadTotal: 0.4, kick: 0, fired: 0, heat: 0, over: 0, gunTimer: 0, streaming: false };
+    this.trigger = false;
     this._seatLook();
     s.loiter.hand = true;
     s.loiter.gunAim = aim;
@@ -510,6 +520,7 @@ export class Battle {
   }
 
   endSeat() {
+    this.trigger = false;
     const S = this.seat;
     if (!S) return;
     const L = S.sortie.loiter;
@@ -546,11 +557,8 @@ export class Battle {
     if (S.cooldown > 0) return false;
     const s = S.sortie, a = s.def.aircraft;
     const w = this.seatWeapons(s)[S.weapon];
-    if (w.hold) {
-      if (S.over > 0) return false;
-      S.heat = Math.min(1, (S.heat || 0) + HEAT.seatBurst);
-      if (S.heat >= 1) { S.over = HEAT.lock; this.onEvent('overheat', { def: s.def }); return false; }
-    }
+    // The cannon is held, not pulled: `_updateSeat` fires it while `trigger` is down.
+    if (w.hold) return S.over <= 0;
     this._seatLook();
     const aim = S.look.clone();
     if (w.kind === 'shell') {
@@ -560,18 +568,31 @@ export class Battle {
       if (s.loiter.rockets <= 0) { S.cooldown = 0.3; return false; }
       for (let k = 0; k < Math.min(a.pair || 2, s.loiter.rockets); k++) { this._seatRocketLater(s, aim, k * 0.12); s.loiter.rockets--; }
       if (this.audio) this.audio.play('rocket', s.model.position, { rate: 1.35, gain: 0.5, rolloff: 900 });
-    } else {
-      // The 30 mm: a burst on the point, the men round it, the range's plates and drones.
-      const from = this.air.seatMuzzle(s, 'gun');
-      const killed = this.air.gunner.fire(from, aim, a.gun) || 0;
-      s.kills += killed;
-      const r2 = (a.gun.radius + 1.5) ** 2;
-      for (const x of this.extraTargets) if (x.alive && x.pos.distanceToSquared(aim) < r2 + x.r * x.r) x.hit(a.gun.power / 200, null);
-      if (this.range) this.range.blast(aim, { power: a.gun.power * 0.25, radius: a.gun.radius });
     }
     S.cooldown = w.reload; S.reloadTotal = w.reload; S.kick = 1; S.fired++;
     this.shotsFired++; this.handShots++;
     return true;
+  }
+
+  /**
+   * One round of the seat's cannon on the cross, a little off it (a 30 mm
+   * from a turning aircraft walks a metre or so round its point), with a
+   * share of a burst's weight, `w.power`.
+   */
+  _seatRound(s, w) {
+    const S = this.seat, a = s.def.aircraft;
+    this._seatLook();
+    const aim = S.look.clone();
+    aim.x += gauss() * 0.9; aim.z += gauss() * 0.9;
+    const g = { ...a.gun, power: a.gun.power * w.power, one: true };
+    const from = this.air.seatMuzzle(s, 'gun');
+    const killed = this.air.gunner.fire(from, aim, g) || 0;
+    s.kills += killed;
+    const r2 = (a.gun.radius + 1.5) ** 2;
+    for (const x of this.extraTargets) if (x.alive && x.pos.distanceToSquared(aim) < r2 + x.r * x.r) x.hit(g.power / 200, null);
+    if (this.range) this.range.blast(aim, { power: g.power * 0.25, radius: a.gun.radius });
+    S.kick = Math.min(1, S.kick + 0.35); S.fired++;
+    if (this.engine) this.engine.addShake(0.015);
   }
 
   _seatRocketLater(s, aim, delay) {
@@ -587,7 +608,21 @@ export class Battle {
     if (s.done || !L || L.phase === 'egress' || L.phase === 'down' || this.state !== 'playing') { this.endSeat(); return; }
     S.cooldown = Math.max(0, S.cooldown - dt);
     S.kick = Math.max(0, S.kick - dt * 2.5);
-    this._cool(S, dt, S.cooldown > 0 && !!this.seatWeapons(s)[S.weapon].hold);
+    // The cannon held: a round every `reload`, each heating the barrel by its
+    // share of `HEAT.seatSecs`, until the trigger is let go or the gun locks.
+    const w = this.seatWeapons(s)[S.weapon];
+    const on = !!w.hold && this.trigger && S.over <= 0;
+    if (on) {
+      if (!S.streaming) { S.streaming = true; S.gunTimer = 0; this.shotsFired++; this.handShots++; }
+      S.gunTimer -= dt;
+      while (S.gunTimer <= 0) {
+        S.gunTimer += w.reload;
+        this._seatRound(s, w);
+        S.heat = Math.min(1, (S.heat || 0) + w.reload / HEAT.seatSecs);
+        if (S.heat >= 1) { S.over = HEAT.lock; S.streaming = false; this.onEvent('overheat', { def: s.def }); break; }
+      }
+    } else S.streaming = false;
+    this._cool(S, dt, on);
     this._seatLook();
     if (!L.orbit) L.gunAim = S.look;
   }
@@ -847,7 +882,8 @@ export class Battle {
     const u = L.unit;
     if (!u.alive || u.state !== 'ready' || u.cooldown > 0) return false;
     this._layArc();
-    if (u.def.mg) return this._handBurst(u, L);
+    // A machine gun's trigger is held, not pulled: the stream is `_handMG`'s.
+    if (u.def.mg) return L.over <= 0;
     // The Javelin flies its own path to the mark; everything else goes down the drawn line.
     const top = u.def.projectile.kind === 'topattack';
     let vel = top ? null : this._layVel(L);
@@ -872,33 +908,45 @@ export class Battle {
   }
 
   /**
-   * The machine gun under the player's thumb: one burst at the point the
-   * sight is on, the rounds walking round it as a bipod gun's do
-   * (`_mgRound`, `t.hand`), the men near where it lands pinned, and a man
-   * standing in it hit. FIRE held is burst after burst, each on the gun's
-   * own reload. False while the last burst is still going out.
+   * The laid machine gun while the player holds it: round after round at
+   * the gun's own rate for as long as `trigger` is down (main.js sets it
+   * from FIRE), each on the point under the cross, each heating the barrel
+   * (`HEAT`). Run hot, it locks until it has cooled; let go, it cools. The
+   * sheaf walks round the point as the gun is held on it (`_mgRound`).
    */
-  _handBurst(u, L) {
-    if (u.burstLeft > 0) return false;
-    // The barrel: every burst heats it, it cools between them, and a gun
-    // run hot locks until it has cooled a good way (`HEAT`).
-    if (L.over > 0) return false;
-    L.heat = Math.min(1, (L.heat || 0) + HEAT.mgBurst);
-    if (L.heat >= 1) { L.over = HEAT.lock; this.onEvent('overheat', { unit: u }); return false; }
+  _handMG(u, L, dt) {
     const mg = u.def.mg;
-    u.mgTarget = { hand: true, pos: L.impact.clone() };
-    u.burstLeft = mg.burst;
-    u.burstTimer = 0;
-    u.idle = false;
-    this.shotsFired++;
-    this.handShots++;
-    L.kick = 0.5;
-    // Held, the gun gives burst after burst with only the regrip between:
-    // the barrel's heat is what stops it, not the crew's pace.
-    u.cooldown = 0.15;
-    L.reloadTotal = u.cooldown + mg.burst * mg.interval;
-    return true;
+    const on = this.trigger && L.over <= 0 && u.state === 'ready' && this.state === 'playing';
+    if (!on) {
+      if (L.streaming) { L.streaming = false; u.burstLeft = 0; }
+      u.burstTimer = 0;
+      this._cool(L, dt, false);
+      return;
+    }
+    if (!L.streaming) {
+      // A press is a shot, for the tally and the save, however long it is held.
+      L.streaming = true;
+      this.shotsFired++; this.handShots++;
+      u.mgTarget = { hand: true, fresh: true, pos: L.impact.clone() };
+      u.idle = false;
+    }
+    u.mgTarget.pos.copy(L.impact);
+    u.burstTimer -= dt;
+    while (u.burstTimer <= 0) {
+      u.burstTimer += mg.interval;
+      L.rounds = (L.rounds || 0) + 1;
+      // Every third round speaks and kicks dust, as in a crew's burst.
+      u.burstLeft = 3 - (L.rounds % 3);
+      this._mgRound(u);
+      L.heat = Math.min(1, L.heat + HEAT.mgRound);
+      if (L.heat >= 1) {
+        L.over = HEAT.lock; L.streaming = false; u.burstLeft = 0; u.burstTimer = 0;
+        this.onEvent('overheat', { unit: u });
+        break;
+      }
+    }
   }
+
 
   setFireMode(mode) {
     if (!['point', 'area', 'delay'].includes(mode)) return;
@@ -2595,7 +2643,10 @@ export class Battle {
 
       // The player's hand on it: the crew holds, the breech reloads.
       if (u.handHeld) {
-        if (u.def.mg) { this._updateMG(u, dt); this._cool(this.lay && this.lay.unit === u ? this.lay : null, dt, u.burstLeft > 0); continue; }
+        if (u.def.mg) {
+          if (this.lay && this.lay.unit === u) this._handMG(u, this.lay, dt); else this._updateMG(u, dt);
+          continue;
+        }
         u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue;
       }
 
@@ -2748,8 +2799,12 @@ export class Battle {
       const dist = Math.max(1, to.distanceTo(from));
       const spread = u.def.dispersion * (0.4 + dist / u.def.range) * 0.8;
       const w = u.walk || (u.walk = { x: 0, y: 0, z: 0, n: 0 });
-      if (u.burstLeft === mg.burst - 1) { w.x = gauss() * spread * 0.4; w.z = gauss() * spread * 0.4; w.y = 0; w.n = 0; }
+      if (t.fresh || u.burstLeft === mg.burst - 1) { t.fresh = false; w.x = gauss() * spread * 0.4; w.z = gauss() * spread * 0.4; w.y = 0; w.n = 0; }
       w.x += gauss() * spread * 0.2; w.z += gauss() * spread * 0.2; w.y += spread * 0.05;
+      // Held on for a hundred rounds the wander stays round the point: the
+      // gunner is leaning on it, not letting it climb away.
+      const wl = spread * 0.8;
+      w.x = THREE.MathUtils.clamp(w.x, -wl, wl); w.z = THREE.MathUtils.clamp(w.z, -wl, wl); w.y = Math.min(w.y, spread * 0.5);
       to.x += w.x + gauss() * spread * 0.3; to.z += w.z + gauss() * spread * 0.3; to.y += w.y + gauss() * spread * 0.15;
       const g = this.garrison;
       let victim = null, best = 0.9 * 0.9;
@@ -2781,7 +2836,7 @@ export class Battle {
       if (extra && (!victim || bestX < best)) {
         this.tracerFX.fire(from, extra.pos, look, true);
         extra.hit(mg.damage, u);
-        if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(1, this.lay.kick + 0.18);
+        if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(0.6, this.lay.kick + 0.1);
         return;
       }
       const cover = victim ? (victim.cover === 'trench' ? 0.5 : victim.cover === 'window' || victim.cover === 'arcade' ? 0.6 : victim.sandbags ? 0.7 : 1) : 0;
@@ -2806,7 +2861,7 @@ export class Battle {
           if (o.pos.distanceToSquared(to) < pr2 && (o.pinned || 0) < until) o.pinned = until;
         }
       }
-      if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(1, this.lay.kick + 0.18);
+      if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(0.6, this.lay.kick + 0.1);
     } else if (t.air) {
       if (!t.air.alive) { u.burstLeft = 0; return; }
       const dist = t.air.pos.distanceTo(from);

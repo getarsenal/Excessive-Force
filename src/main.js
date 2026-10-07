@@ -2016,7 +2016,7 @@ async function boot() {
     if (layFov != null) { engine.camera.fov = layFov; engine.camera.near = layNear; engine.camera.updateProjectionMatrix(); layFov = null; layNear = null; }
     if (layWas) { rig.desiredTarget.copy(layWas.target); rig.target.copy(layWas.target); rig.desiredYaw = layWas.yaw; rig.desiredPitch = layWas.pitch; rig.desiredDistance = layWas.dist; layWas = null; }
     layEl.hidden = true;
-    layDrag = null; layHold = false;
+    layDrag = null; layHold = false; battle.trigger = false;
     layWpn.hidden = true;
     document.body.classList.remove('laying', 'seated', 'optics-thermal');
   };
@@ -2065,7 +2065,7 @@ async function boot() {
   layZoomBtn.addEventListener('click', () => zoomLay(1));
   layWpn.addEventListener('click', () => { battle.seatSwitch(); seatWeaponLabel(); feedback.emit('tick'); });
   seatBtn.addEventListener('click', () => { const list = battle.seatable(); if (list.length) enterSeat(list[0]); });
-  // FIRE held is a machine gun's trigger held: burst after burst until it is let go.
+  // FIRE held is an automatic weapon's trigger held: it fires until it is let go or runs hot.
   layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); layHold = true; fireHand(); });
   window.addEventListener('pointerup', () => { layHold = false; });
   window.addEventListener('pointercancel', () => { layHold = false; });
@@ -2132,7 +2132,7 @@ async function boot() {
       if (layRead.textContent !== t) layRead.textContent = t;
     } else {
       const L = H, u = L.unit;
-      const state = L.over > 0 ? 'OVERHEATED' : L.heat > 0.7 ? 'HOT' : u.burstLeft > 0 ? 'FIRING' : 'READY';
+      const state = L.over > 0 ? 'OVERHEATED' : L.heat > 0.7 ? 'HOT' : L.streaming ? 'FIRING' : 'READY';
       const t = `${u.def.name} · ${Math.round(L.range)} m${L.masonry ? ' · ON THE STONE' : ''} · ${state}`;
       if (layRead.textContent !== t) layRead.textContent = t;
     }
@@ -2142,9 +2142,10 @@ async function boot() {
     const S = battle.seat;
     if (!S) { if (!layEl.hidden && document.body.classList.contains('seated')) exitSeat(); return; }
     const s = S.sortie, w = battle.seatWeapons(s)[S.weapon];
-    const ready = S.cooldown <= 0 && !(w.hold && S.over > 0);
+    const ready = w.hold ? !(S.over > 0) : S.cooldown <= 0;
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
-    if (layHold && ready && w.hold) fireHand(true);
+    // The cannon fires while the thumb is down (battle._updateSeat).
+    battle.trigger = layHold && !!w.hold;
     const left0 = Math.max(0, Math.round(s.def.aircraft.station - (s.loiter.time || 0)));
     if (w.hold) { heatRing(S, `${s.def.name} · ${w.name}`, ` · ${Math.round((S.look || S.aim).distanceTo(s.model.position))} m · ${left0} s ON STATION`); return; }
     layFire.classList.remove('heat', 'hot', 'overheat');
@@ -2165,10 +2166,10 @@ async function boot() {
     if (!L) { if (!layEl.hidden) exitLay(); return; }
     const u = L.unit;
     const over = u.def.mg && L.over > 0;
-    const ready = u.state === 'ready' && u.cooldown <= 0 && !(u.def.mg && u.burstLeft > 0) && !over;
+    const ready = u.state === 'ready' && (u.def.mg ? !over : u.cooldown <= 0);
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
-    // The trigger held on the machine gun: the next burst as soon as the gun will give it.
-    if (layHold && ready && u.def.mg) fireHand(true);
+    // The machine gun fires while the thumb is down, round after round (battle._handMG).
+    battle.trigger = layHold && !!u.def.mg;
     if (u.def.mg) { heatRing(L); return; }
     // The ring round FIRE fills as the breech is loaded, and the button
     // itself counts the seconds down: how long a reload is, and how far
@@ -2182,7 +2183,7 @@ async function boot() {
     if (layFire.textContent !== label) layFire.textContent = label;
     const deg = Math.round(L.elev * 180 / Math.PI);
     const mg = !!u.def.mg, top = u.def.projectile.kind === 'topattack';
-    const state = mg ? (u.burstLeft > 0 ? 'FIRING' : ready ? 'READY' : 'RELOADING') : top ? (ready ? 'SEEKER READY' : 'COOLING') : ready ? 'LOADED' : 'RELOADING';
+    const state = mg ? (L.streaming ? 'FIRING' : ready ? 'READY' : 'RELOADING') : top ? (ready ? 'SEEKER READY' : 'COOLING') : ready ? 'LOADED' : 'RELOADING';
     const sp = battle.laySpread(L);
     const t = `${u.def.name} · ${Math.round(L.range)} m${sp > 0 ? ` ±${Math.round(sp)}` : ''}${mg || top ? '' : ` · ${deg}°`}${L.masonry ? ' · ON THE STONE' : L.blocked && !mg ? ' · BLOCKED' : ''} · ${state}`;
     if (layRead.textContent !== t) layRead.textContent = t;
@@ -2279,6 +2280,10 @@ async function boot() {
       _vu.set(0, 1, 0).applyQuaternion(engine.camera.quaternion);
       _vf.set(0, 0, -1).applyQuaternion(engine.camera.quaternion);
       layView.position.copy(_eye).addScaledVector(_vu, -V.down).addScaledVector(_vr, V.right).addScaledVector(_vf, -L.kick * 0.07);
+      // The belt walks into the feed tray at the gun's own rate while it fires.
+      const belt = layView.userData.belt;
+      // The belt walks into the feed tray a link for every round fired.
+      if (belt) { const n = (L.rounds || 0) - (layView.userData.rounds || 0); if (n > 0) belt.userData.advance(n); layView.userData.rounds = L.rounds || 0; }
     }
     // The mark on the fall of shot, when the eye is not already on it.
     if (aimed) { if (!layMark.hidden) layMark.hidden = true; }

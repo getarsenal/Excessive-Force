@@ -35,6 +35,7 @@ export const TONE_MULT = {
   boots: [0.32, 0.3, 0.28],
   skin: [1.6, 1.2, 1.0],
   steel: [0.34, 0.34, 0.34],
+  brass: [1.5, 1.15, 0.5],
 };
 
 /** Tones as plain colours, for the player's teams. */
@@ -44,6 +45,7 @@ export const TONE_COLOUR = {
   boots: 0x211f1b,
   skin: 0x8d6a4f,
   steel: 0x23251f,
+  brass: 0xb5893a,
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -259,15 +261,82 @@ function proneGunner(k, withGun = true) {
   if (withGun) machineGun(k, v(0.12, 0.44, 0.8));
 }
 
-/** An M240-class gun from its butt at `b`: stock, receiver, belt box, barrel, bipod. */
-function machineGun(k, b) {
+/**
+ * An M240-class gun from its butt at `b`: stock, receiver with its feed
+ * tray cover, pistol grip, the belt bag on its left, barrel with the gas
+ * tube under it, front sight post and flash hider, and the bipod at the
+ * gas block with its feet on `ground` (the figure's ground, or, drawn
+ * under the gunner's own eye, the ground as far below the gun as a prone
+ * gun's is; `null`, folded out of the way, as the gunner's own eye has
+ * it). Returns the mouth of the feed tray, for the belt.
+ */
+function machineGun(k, b, ground = 0.02) {
+  const y = b.y + 0.04;   // the bore
   k.box(0.07, 0.12, 0.26, b.x, b.y, b.z, 'steel');
+  // Receiver, the feed cover standing a little proud of it, the grip and guard.
   k.box(0.1, 0.14, 0.38, b.x, b.y + 0.02, b.z + 0.32, 'steel');
-  k.box(0.14, 0.12, 0.14, b.x - 0.12, b.y - 0.02, b.z + 0.3, 'gear');
-  k.rod(v(b.x, b.y + 0.04, b.z + 0.5), v(b.x, b.y + 0.04, b.z + 1.2), 0.026, 'steel', 6);
-  for (const sx of [-1, 1]) {
-    k.rod(v(b.x, b.y + 0.02, b.z + 0.95), v(b.x + sx * 0.18, 0.02, b.z + 1.05), 0.014, 'steel', 4);
+  k.box(0.12, 0.03, 0.26, b.x, b.y + 0.105, b.z + 0.36, 'steel');
+  k.box(0.03, 0.1, 0.05, b.x, b.y - 0.1, b.z + 0.22, 'steel', 0.3);
+  k.box(0.012, 0.012, 0.09, b.x, b.y - 0.07, b.z + 0.3, 'steel');
+  // The hundred-round bag hung under the left of the feed tray (a figure
+  // facing +Z has its left at +X; the M240 feeds from the left).
+  k.box(0.08, 0.13, 0.16, b.x + 0.11, b.y - 0.07, b.z + 0.34, 'gear');
+  // Barrel and gas tube, the front sight post behind the flash hider.
+  k.rod(v(b.x, y, b.z + 0.5), v(b.x, y, b.z + 1.16), 0.024, 'steel', 8);
+  k.rod(v(b.x, y - 0.04, b.z + 0.5), v(b.x, y - 0.04, b.z + 0.98), 0.012, 'steel', 6);
+  k.box(0.05, 0.03, 0.06, b.x, y - 0.025, b.z + 0.98, 'steel');
+  k.box(0.01, 0.055, 0.01, b.x, y + 0.048, b.z + 1.04, 'steel');
+  k.box(0.034, 0.012, 0.012, b.x, y + 0.075, b.z + 1.04, 'steel');
+  const hider = new THREE.CylinderGeometry(0.03, 0.02, 0.1, 8);
+  hider.rotateX(Math.PI / 2); hider.translate(b.x, y, b.z + 1.2);
+  k.add(hider, 'steel');
+  // The bipod, legs splayed from the gas block down to the ground.
+  if (ground !== null) for (const sx of [-1, 1]) {
+    k.rod(v(b.x, y - 0.03, b.z + 0.98), v(b.x + sx * 0.17, ground, b.z + 1.04), 0.011, 'steel', 5);
   }
+  return v(b.x + 0.06, b.y + 0.075, b.z + 0.36);
+}
+
+/**
+ * A belt of linked 7.62, hanging from the mouth of the bag up into the
+ * feed tray: a run of brass rounds on a dark spine of links. Its
+ * `userData.advance(rounds)` walks the rounds along the belt by that many
+ * link pitches, which is what the gunner sees as the gun eats it.
+ */
+export function ammoBelt(from, to, colour) {
+  const g = new THREE.Group();
+  g.name = 'belt';
+  // A sag between the two: out of the bag, bellied outward, up into the tray.
+  const mid = from.clone().lerp(to, 0.5); mid.x += Math.sign(from.x - to.x || 1) * 0.05; mid.y -= 0.01;
+  const curve = new THREE.QuadraticBezierCurve3(from.clone(), mid, to.clone());
+  const len = curve.getLength();
+  const pitch = 0.016, n = Math.max(2, Math.floor(len / pitch));
+  const spine = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.0035, 5, false),
+    new THREE.MeshStandardMaterial({ color: 0x2a2c27, roughness: 0.7, metalness: 0.3, emissive: 0x2a2c27, emissiveIntensity: 0.55 }));
+  g.add(spine);
+  const brass = colour ?? TONE_COLOUR.brass;
+  // A touch over true size (7.62 by 51): at half a metre a true round is a hair.
+  const round = new THREE.CylinderGeometry(0.0055, 0.0055, 0.062, 6);
+  const rounds = new THREE.InstancedMesh(round, new THREE.MeshStandardMaterial({ color: brass, roughness: 0.45, metalness: 0.25, emissive: brass, emissiveIntensity: 0.45 }), n);
+  g.add(rounds);
+  const p = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3(), m = new THREE.Matrix4(), q = new THREE.Quaternion();
+  let phase = 0;
+  const lay = () => {
+    for (let i = 0; i < n; i++) {
+      const u = ((i * pitch + phase) % len) / len;
+      curve.getPointAt(u, p); curve.getTangentAt(u, t);
+      // A round lies across the belt, on the inside of the curve.
+      side.crossVectors(t, UP).normalize();
+      if (side.lengthSq() < 0.5) side.set(1, 0, 0);
+      q.setFromUnitVectors(UP, side);
+      m.compose(p, q, rounds.scale);
+      rounds.setMatrixAt(i, m);
+    }
+    rounds.instanceMatrix.needsUpdate = true;
+  };
+  lay();
+  g.userData.advance = (k) => { if (!k) return; phase = (phase + k * pitch) % len; lay(); };
+  return g;
 }
 
 /** The assistant gunner, prone beside the gun and feeding the belt. */
@@ -376,9 +445,23 @@ export function soldierFigure(colour, pose = 'aim', weapon = null, opts = {}) {
  * the whole team, which from inside its own head is a helmet and a pack.
  */
 export function weaponView(weapon, colour = 0x4a5340, opts = {}) {
+  opts = { ...opts, selfLit: true };
   const k = new Kit();
-  if (weapon === 'm240') machineGun(k, v(0, -0.04, -0.6));
-  else launcher(k, 0, 0, 0, weapon);
+  if (weapon === 'm240') {
+    // Seen from the gunner's cheek on the stock: the receiver and its feed
+    // cover low at the bottom of the frame, the barrel running away from it
+    // up to the front sight post just under the cross, the belt coming up
+    // into the tray on the left. The bipod is under the barrel, out of his
+    // sight, so it is not drawn.
+    const b = v(0, -0.04, 0.26);
+    const tray = machineGun(k, b, null);
+    const g = partsToGroup(k.parts, colour, opts);
+    const belt = ammoBelt(v(b.x + 0.15, b.y + 0.0, b.z + 0.36), tray, opts.tones?.brass);
+    g.add(belt);
+    g.userData.belt = belt;
+    return g;
+  }
+  launcher(k, 0, 0, 0, weapon);
   return partsToGroup(k.parts, colour, opts);
 }
 
@@ -394,6 +477,10 @@ function partsToGroup(parts, colour, opts = {}) {
     const mat = new THREE.MeshStandardMaterial({
       color: c, roughness: tone === 'steel' ? 0.6 : 0.9, metalness: tone === 'steel' ? 0.2 : 0.02,
     });
+    // A weapon under the player's own eye carries a little of its own light:
+    // a foot from the lens it is otherwise a black cut-out against the sky,
+    // and in a dark hall nothing at all.
+    if (opts.selfLit) { mat.emissive = new THREE.Color(c); mat.emissiveIntensity = 0.55; }
     const m = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(geos, false), mat);
     m.castShadow = true;
     m.userData.tone = tone;
