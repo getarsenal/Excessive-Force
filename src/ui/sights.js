@@ -76,12 +76,14 @@ function optic() {
 
 function iron() {
   let s = '';
-  // The hood and the post in it, rising to just under the centre.
-  s += `<path d="M -22 -2 A 22 22 0 0 1 22 -2" fill="none" stroke-width="2.4"/>`;
-  s += `<rect x="-2.2" y="0" width="4.4" height="34" class="fill"/>`;
-  s += line(-22, -2, -22, 34, 2.4) + line(22, -2, 22, 34, 2.4);
-  // The rear aperture, a wide ring the eye looks through.
-  s += `<circle cx="0" cy="0" r="88" fill="none" stroke-width="7"/>`;
+  // Small, as irons are at arm's length: the hood and the post in it,
+  // rising to just under the centre, and the rear aperture round them,
+  // a ring the width of a man at a hundred metres rather than the whole
+  // of the picture.
+  s += `<path d="M -8 -1 A 8 8 0 0 1 8 -1" fill="none" stroke-width="1.4"/>`;
+  s += `<rect x="-0.9" y="0" width="1.8" height="13" class="fill"/>`;
+  s += line(-8, -1, -8, 13, 1.4) + line(8, -1, 8, 13, 1.4);
+  s += `<circle cx="0" cy="0" r="30" fill="none" stroke-width="3"/>`;
   return s;
 }
 
