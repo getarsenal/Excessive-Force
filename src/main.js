@@ -1939,7 +1939,7 @@ async function boot() {
     layHold = false;
     layMark.hidden = true;
     if (layViewUnit) { layViewUnit.group.visible = true; layViewUnit = null; }
-    if (layView) { engine.scene.remove(layView); releaseTree(layView); layView = null; }
+    if (layView) { engine.scene.remove(layView); releaseTree(layView, engine.scene); layView = null; }
     document.body.classList.remove('laying');
   };
   const fireHand = (quiet) => {
