@@ -75,6 +75,7 @@ import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
 import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today } from './game/career.js';
+import { sightSVG } from './ui/sights.js';
 
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
@@ -1853,12 +1854,36 @@ async function boot() {
   const layEl = document.createElement('div');
   layEl.id = 'lay';
   layEl.hidden = true;
-  layEl.innerHTML = `<div id="lay-read"></div><div id="lay-hint">DRAG TO LAY THE GUN</div>
+  // The sight (`#lay-sight`, src/ui/sights.js) is the weapon's own reticle,
+  // centred where the round goes; ZOOM steps through the sight's
+  // magnifications (`def.sight.zoom`), and the mark (`#lay-mark`) brackets
+  // the fall of shot when the eye is not looking straight at it.
+  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-read"></div><div id="lay-hint">DRAG TO LAY THE GUN</div>
     <button id="lay-done" type="button">DONE</button>
+    <button id="lay-zoom" type="button" aria-label="Zoom">×1</button>
     <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
   document.getElementById('ui').appendChild(layEl);
   const layRead = layEl.querySelector('#lay-read'), layFire = layEl.querySelector('#lay-fire');
+  const laySight = layEl.querySelector('#lay-sight'), layMark = layEl.querySelector('#lay-mark'), layZoomBtn = layEl.querySelector('#lay-zoom'), layHint = layEl.querySelector('#lay-hint');
   let layDrag = null, layWas = null, layReady = null, layFov = null, layNear = null, layPct = -1;
+  let layZoom = 0, layHold = false, laySightKind = '';
+  const LAY_FOV = 66;
+  /** The sight a weapon looks through, with a plain optic for one that says nothing. */
+  const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
+  const layMag = () => { const L = battle.lay; if (!L) return 1; const z = laySightOf(L.unit).zoom; return z[Math.min(layZoom, z.length - 1)] || 1; };
+  /** A straight shooter looks through its sight at the point of impact at every magnification; a gun does when zoomed. */
+  const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack'; };
+  const applyZoom = () => {
+    const L = battle.lay;
+    if (!L) return;
+    const S = laySightOf(L.unit), mag = layMag();
+    engine.camera.fov = LAY_FOV / mag; engine.camera.updateProjectionMatrix();
+    layZoomBtn.textContent = `×${mag}`;
+    layZoomBtn.hidden = S.zoom.length < 2;
+    layEl.dataset.zoom = mag > 1 ? 'in' : 'out';
+    layEl.dataset.aimed = layAimed() ? '1' : '0';
+    if (laySightKind !== S.kind) { laySightKind = S.kind; laySight.innerHTML = sightSVG(S.kind); laySight.className = `sight-${S.kind}`; }
+  };
   const enterLay = (u) => {
     if (!battle.startLay(u)) return;
     unitCard.hide();
@@ -1869,12 +1894,16 @@ async function boot() {
     rig.enabled = false;
     layEl.hidden = false;
     layReady = null;
+    layHold = false;
     document.body.classList.add('laying');
     // A wider lens for the lay, and a near plane that lets the breech a
     // pace away stay in the picture: the game's own three and a half
     // metres would cut the gun off at the trunnions.
     layFov = engine.camera.fov; layNear = engine.camera.near;
-    engine.camera.fov = 66; engine.camera.near = 0.4; engine.camera.updateProjectionMatrix();
+    engine.camera.near = 0.4;
+    layZoom = 0;
+    applyZoom();
+    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG UP FOR RANGE' : 'DRAG TO LAY THE GUN';
     layPct = -1;
     // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
@@ -1892,35 +1921,63 @@ async function boot() {
     if (layWas) { rig.desiredDistance = layWas.dist; rig.desiredPitch = layWas.pitch; layWas = null; }
     layEl.hidden = true;
     layDrag = null;
+    layHold = false;
+    layMark.hidden = true;
     document.body.classList.remove('laying');
   };
-  const fireHand = () => {
+  const fireHand = (quiet) => {
     if (!battle.lay) return;
     if (battle.handFire()) { feedback.emit('confirm'); layFire.classList.remove('ready'); layReady = false; }
-    else feedback.emit('deny');
+    else if (!quiet) feedback.emit('deny');
+  };
+  /** The next magnification round: the button, Z, or the wheel. */
+  const zoomLay = (step = 1) => {
+    const L = battle.lay;
+    if (!L) return;
+    const n = laySightOf(L.unit).zoom.length;
+    if (n < 2) return;
+    layZoom = (layZoom + step + n) % n;
+    applyZoom();
+    feedback.emit('tick');
   };
   layEl.querySelector('#lay-done').addEventListener('click', () => { exitLay(); feedback.emit('tick'); });
-  layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fireHand(); });
+  layZoomBtn.addEventListener('click', () => zoomLay(1));
+  // FIRE held is a machine gun's trigger held: burst after burst until it is let go.
+  layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); layHold = true; fireHand(); });
+  window.addEventListener('pointerup', () => { layHold = false; });
+  window.addEventListener('pointercancel', () => { layHold = false; });
   layFire.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('keydown', (e) => {
     if (!battle.lay || e.repeat) return;
-    if (e.code === 'Space') { e.preventDefault(); fireHand(); }
+    if (e.code === 'Space') { e.preventDefault(); layHold = true; fireHand(); }
     if (e.code === 'Escape') exitLay();
+    if (e.code === 'KeyZ') zoomLay(e.shiftKey ? -1 : 1);
   });
+  window.addEventListener('keyup', (e) => { if (e.code === 'Space') layHold = false; });
+  canvas.addEventListener('wheel', (e) => {
+    if (!battle.lay) return;
+    e.preventDefault();
+    zoomLay(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
   canvas.addEventListener('pointermove', (e) => {
     if (!layDrag || e.pointerId !== layDrag.id || !battle.lay) return;
     const dx = e.clientX - layDrag.x, dy = e.clientY - layDrag.y;
     layDrag.x = e.clientX; layDrag.y = e.clientY;
-    // A hundred points of drag is a quarter turn; up is up.
-    battle.layTurn(-dx * 0.0045, -dy * 0.0032);
+    // A hundred points of drag is a quarter turn; up is up. Through a
+    // zoomed sight the same drag moves the lay by the same amount of the
+    // picture, which is that much finer a lay.
+    const k = 1 / layMag();
+    battle.layTurn(-dx * 0.0045 * k, -dy * 0.0032 * k);
   });
   /** Each frame while laying: the readout, and the reload clock on the trigger. */
   const layFrame = () => {
     const L = battle.lay;
     if (!L) { if (!layEl.hidden) exitLay(); return; }
     const u = L.unit;
-    const ready = u.state === 'ready' && u.cooldown <= 0;
+    const ready = u.state === 'ready' && u.cooldown <= 0 && !(u.def.mg && u.burstLeft > 0);
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
+    // The trigger held on the machine gun: the next burst as soon as the gun will give it.
+    if (layHold && ready && u.def.mg) fireHand(true);
     // The ring round FIRE fills as the breech is loaded, and the button
     // itself counts the seconds down: how long a reload is, and how far
     // through it the crew are, without reading a word.
@@ -1931,7 +1988,9 @@ async function boot() {
     const label = ready ? 'FIRE' : left.toFixed(1);
     if (layFire.textContent !== label) layFire.textContent = label;
     const deg = Math.round(L.elev * 180 / Math.PI);
-    const t = `${u.def.name} · ${Math.round(L.range)} m · ${deg}°${L.masonry ? ' · ON THE STONE' : L.blocked ? ' · BLOCKED' : ''} · ${ready ? 'LOADED' : 'RELOADING'}`;
+    const mg = !!u.def.mg, top = u.def.projectile.kind === 'topattack';
+    const state = mg ? (u.burstLeft > 0 ? 'FIRING' : ready ? 'READY' : 'RELOADING') : top ? (ready ? 'SEEKER READY' : 'COOLING') : ready ? 'LOADED' : 'RELOADING';
+    const t = `${u.def.name} · ${Math.round(L.range)} m${mg || top ? '' : ` · ${deg}°`}${L.masonry ? ' · ON THE STONE' : L.blocked && !mg ? ' · BLOCKED' : ''} · ${state}`;
     if (layRead.textContent !== t) layRead.textContent = t;
   };
   /**
@@ -1942,25 +2001,54 @@ async function boot() {
    * The rig's own focus is kept on the gun, so DONE is a step back from
    * here and not a cut across the map.
    */
-  const _eye = new THREE.Vector3(), _look = new THREE.Vector3();
+  const _eye = new THREE.Vector3(), _look = new THREE.Vector3(), _proj = new THREE.Vector3();
   const layCamera = (dt) => {
     const L = battle.lay;
     if (!L) return;
     const u = L.unit;
     battle.layEye(_eye);
     L.kick = Math.max(0, L.kick - dt * 2.5);
-    const pitch = (u.def.eye?.pitch ?? Math.min(0.72, 0.05 + L.elev * 0.55)) + L.kick * L.kick * 0.06;
-    // Along the line of fire, or, for a crew-served weapon whose gunner
-    // stands off to one side of it (the mortar), at the muzzle itself.
-    const lookYaw = u.def.eye?.atMuzzle ? Math.atan2(L.from.x - _eye.x, L.from.z - _eye.z) : L.yaw;
-    const fx = Math.sin(lookYaw), fz = Math.cos(lookYaw), cp = Math.cos(pitch);
-    _look.set(_eye.x + fx * cp, _eye.y + Math.sin(pitch), _eye.z + fz * cp);
+    const mag = layMag();
+    const aimed = layAimed();
+    if (aimed) {
+      // Through the sight: the reticle's centre is the point of impact, so
+      // the eye looks straight at it and the drop is already in the lay.
+      // The kick is a jolt of the picture, smaller the more of it there is.
+      const kick = L.kick * L.kick * 0.05 / mag;
+      _look.copy(L.impact);
+      const dx = _look.x - _eye.x, dz = _look.z - _eye.z, dist = Math.max(0.5, Math.hypot(dx, dz));
+      const jolt = L.kick > 0 ? Math.sin(L.kick * 37) * 0.012 * L.kick / mag * dist : 0;
+      _look.y += kick * dist;
+      _look.x += Math.sin(L.yaw + Math.PI / 2) * jolt;
+      _look.z += Math.cos(L.yaw + Math.PI / 2) * jolt;
+    } else {
+      const pitch = (u.def.eye?.pitch ?? Math.min(0.72, 0.05 + L.elev * 0.55)) + L.kick * L.kick * 0.06;
+      // Along the line of fire, or, for a crew-served weapon whose gunner
+      // stands off to one side of it (the mortar), at the muzzle itself.
+      const lookYaw = u.def.eye?.atMuzzle ? Math.atan2(L.from.x - _eye.x, L.from.z - _eye.z) : L.yaw;
+      const fx = Math.sin(lookYaw), fz = Math.cos(lookYaw), cp = Math.cos(pitch);
+      _look.set(_eye.x + fx * cp, _eye.y + Math.sin(pitch), _eye.z + fz * cp);
+    }
     engine.camera.position.copy(_eye);
     engine.camera.lookAt(_look);
+    engine.camera.updateMatrixWorld();
+    // The mark on the fall of shot, when the eye is not already on it.
+    if (aimed) { if (!layMark.hidden) layMark.hidden = true; }
+    else {
+      _proj.copy(L.impact).project(engine.camera);
+      const on = _proj.z < 1 && Math.abs(_proj.x) < 0.98 && Math.abs(_proj.y) < 0.98;
+      if (layMark.hidden === on) layMark.hidden = !on;
+      if (on) {
+        layMark.style.left = `${((_proj.x + 1) / 2 * 100).toFixed(2)}%`;
+        layMark.style.top = `${((1 - _proj.y) / 2 * 100).toFixed(2)}%`;
+        const col = L.masonry ? 'stone' : L.blocked ? 'blocked' : L.hit ? 'ground' : 'sky';
+        if (layMark.dataset.on !== col) layMark.dataset.on = col;
+      }
+    }
     rig.target.copy(u.pos).setY(u.pos.y + 2); rig.desiredTarget.copy(rig.target);
     rig.yaw = rig.desiredYaw = L.yaw + Math.PI;
   };
-  window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand };   // for the harness
+  window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand, zoom: zoomLay, mag: layMag, hold: (on) => { layHold = !!on; } };   // for the harness
   const endAiming = () => {
     aiming = null;
     battle.hideLine();

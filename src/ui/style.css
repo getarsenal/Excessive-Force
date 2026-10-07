@@ -530,7 +530,45 @@ html, body {
   background: var(--panel); border: 1px solid var(--edge-bright); color: var(--text);
   font: 600 11px/1 var(--f-ui); letter-spacing: 0.18em;
 }
-body.laying #dock, body.laying #survey-btn, body.laying #survey-key, body.laying #targetcard, body.laying #status, body.laying #hud-right, body.laying #bossbar { opacity: 0.3; pointer-events: none; }
+/* The survey stays live in the lay: red stone through a gunsight is the
+   whole point of a gunsight. */
+body.laying #dock, body.laying #targetcard, body.laying #status, body.laying #hud-right, body.laying #bossbar { opacity: 0.3; pointer-events: none; }
+/* The sight (src/ui/sights.js): the weapon's own reticle over the middle of
+   the picture, sized to the shorter side so the ladder's figures stay
+   readable on a phone; zoomed in, the glass closes round it. A straight
+   shooter looks through it at every magnification (`data-aimed`), a gun
+   only when zoomed, and otherwise the mark brackets the fall of shot. */
+#lay-sight { position: absolute; inset: 0; display: grid; place-items: center; --ss: min(92vmin, 560px); --ret: #ffb020; pointer-events: none; }
+#lay[data-aimed="0"] #lay-sight { display: none; }
+#lay-sight svg { width: var(--ss); height: var(--ss); overflow: visible; stroke: var(--ret); fill: none; stroke-linecap: square; opacity: 0.92; }
+#lay-sight svg text { fill: var(--ret); stroke: none; font-family: var(--f-data); font-weight: 600; }
+#lay-sight svg .fill { fill: var(--ret); stroke: none; }
+#lay-sight.sight-pano, #lay-sight.sight-glass, #lay-sight.sight-iron { --ret: #0e1114; }
+#lay-sight.sight-pano svg, #lay-sight.sight-glass svg, #lay-sight.sight-iron svg { filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55)); }
+#lay-sight.sight-clu { --ret: #8df0a0; }
+#lay-sight.sight-tank { --ret: #ff7a4a; }
+#lay[data-zoom="in"] #lay-sight::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: var(--ss); height: var(--ss); transform: translate(-50%, -50%);
+  border-radius: 50%; box-shadow: 0 0 0 200vmax rgba(4, 6, 8, 0.97), inset 0 0 28px rgba(0, 0, 0, 0.7);
+}
+#lay[data-zoom="in"] #lay-sight.sight-tank::before, #lay[data-zoom="in"] #lay-sight.sight-clu::before { border-radius: 8px; }
+#lay[data-zoom="in"] #lay-sight.sight-clu::before { background: rgba(40, 90, 50, 0.12); }
+#lay-mark {
+  position: absolute; width: 30px; height: 30px; transform: translate(-50%, -50%); pointer-events: none;
+  border: 1.5px solid var(--mk, #8a98a6); border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+#lay-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; transform: translate(-50%, -50%); background: var(--mk, #8a98a6); border-radius: 50%; }
+#lay-mark[hidden] { display: none; }
+#lay-mark[data-on="stone"] { --mk: #ffb020; }
+#lay-mark[data-on="blocked"] { --mk: #e8604c; }
+#lay-mark[data-on="ground"] { --mk: #9fd2ff; }
+#lay-zoom {
+  position: absolute; right: var(--pad-r); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 18px + 76px + 18px);
+  min-width: 56px; min-height: 44px; pointer-events: auto; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--edge-bright); color: var(--text);
+  font: 700 13px/1 var(--f-ui); letter-spacing: 0.08em; font-variant-numeric: tabular-nums;
+}
+#lay-zoom[hidden] { display: none; }
 
 /* ── Popups and badges ───────────────────────────────────────────────── */
 #popups { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 9; }

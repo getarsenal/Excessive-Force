@@ -254,12 +254,15 @@ export class Battle {
    * until DONE, and reloads at its own rate meanwhile. A hand-laid round
    * that does damage pays a bonus and its own stamp (see `_onImpact`).
    *
-   * Guns with a barrel to lay: not the machine-gun teams, not the ripple
-   * launchers, not the top-attack missile.
+   * Anything with a sight to look through: the guns, the mortar, the rocket
+   * teams, the machine gun (FIRE held is bursts, see `_handBurst`) and the
+   * Javelin (the CLU's crosshair designates, the missile flies its own
+   * path). Not the ripple launchers: six rockets on a timer is a battery
+   * order, not a hand on a gun.
    */
   canLay(u) {
     const p = u?.def?.projectile;
-    return !!(u && u.alive && !u.def.mg && !u.def.salvo && p && p.kind !== 'topattack');
+    return !!(u && u.alive && !u.def.salvo && p);
   }
 
   startLay(unit) {
@@ -268,14 +271,17 @@ export class Battle {
     const p = unit.def.projectile;
     const from = this._layMuzzle(unit);
     // Laid where the crew had it, so the first picture is a gun on its target.
-    let yaw = unit.yaw, elev = p.mortar ? 1.05 : 0.3;
-    const aim = this.aimFor(unit) || this.target;
+    let yaw = unit.yaw, elev = p.mortar ? 1.05 : p.kind === 'direct' || p.kind === 'topattack' ? 0 : 0.3;
+    // The machine gun's own man first, then whatever the battery is laid on.
+    const aim = (unit.def.mg && this._mgTarget(unit)?.pos) || this.aimFor(unit) || this.target;
     if (aim) {
       yaw = Math.atan2(aim.x - from.x, aim.z - from.z);
-      // The crew's own solution: a gun's low shot, a mortar's high one.
+      // The crew's own solution: a gun's low shot, a mortar's high one, a
+      // straight shooter's line of sight.
       const sol = p.mortar ? solveBallistic(from, aim, p.speed, p.gravity, 12.0, null)?.vel
-        : solveArc(from, aim, p.speed, p.gravity, false);
+        : p.gravity > 0 ? solveArc(from, aim, p.speed, p.gravity, false) : null;
       if (sol) elev = Math.atan2(sol.y, Math.hypot(sol.x, sol.z));
+      else if (p.gravity <= 0) elev = Math.atan2(aim.y - from.y, Math.hypot(aim.x - from.x, aim.z - from.z));
     }
     this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
@@ -300,13 +306,15 @@ export class Battle {
     const counts = () => this.lay.masonry && this.lay.impact.y > this.originGround + 4.5;
     // Into the house next door: the crew would have lofted over it, so start
     // from their solution rather than a wall.
-    if (aim && this.lay.blocked) {
+    if (aim && this.lay.blocked && p.gravity > 0) {
       const lofted = solveBallistic(from, aim, p.speed, p.gravity, 9.0, (vv) => this._trajectoryClear(from, vv, p.gravity));
       if (lofted) this.layTurn(0, Math.atan2(lofted.vel.y, Math.hypot(lofted.vel.x, lofted.vel.z)) - this.lay.elev);
     }
     // A mortar's high solution already lands on the point; elevating it
     // further only shortens the shot.
-    if (!p.mortar) for (let k = 0; k < 40 && !counts(); k++) this.layTurn(0, 0.015);
+    // A straight shooter is on what it is pointed at: the machine gun on a
+    // man, the Javelin on a mark.
+    if (!p.mortar && !unit.def.mg && p.kind !== 'topattack') for (let k = 0; k < 40 && !counts(); k++) this.layTurn(0, 0.015);
     this.layLine.visible = true;
     this.layRing.visible = true;
     return true;
@@ -381,7 +389,10 @@ export class Battle {
     const p = L.unit.def.projectile;
     // A direct-fire gun has a mount, not a howitzer's elevation; a mortar
     // has nothing under forty-five degrees in it.
-    const top = p.flat && p.kind !== 'arc' ? 0.55 : 1.25;
+    const straight = p.kind === 'direct' || p.kind === 'topattack';
+    const top = straight ? 0.6 : 1.25;
+    // Down the hill: a rocket or a burst goes where the man can look.
+    const lo = straight ? -0.7 : -0.08;
     L.yaw += dyaw;
     if (p.mortar) {
       // Up is further: the drag walks the range and the solve sets the tube.
@@ -389,7 +400,7 @@ export class Battle {
       L.rangeWant = THREE.MathUtils.clamp(L.rangeWant + delev * 420, 45, maxR);
       this._mortarSolve(L);
     } else {
-      L.elev = THREE.MathUtils.clamp(L.elev + delev, -0.08, top);
+      L.elev = THREE.MathUtils.clamp(L.elev + delev, lo, top);
     }
     if (L.unit.live) L.unit.live.lean = THREE.MathUtils.clamp(L.unit.live.lean + dyaw * 6, -0.35, 0.35);
     L.unit.yaw = L.yaw;
@@ -466,7 +477,7 @@ export class Battle {
     }
     out.set(u.pos.x - fx * back + rx * side, 0, u.pos.z - fz * back + rz * side);
     const g = this.terrain.heightAt(out.x, out.z);
-    out.y = Math.max(g + 1.2, u.pos.y - 0.6 + up);
+    out.y = Math.max(g + Math.min(1.2, up), u.pos.y - 0.6 + up);
     return out;
   }
 
@@ -530,7 +541,8 @@ export class Battle {
     // would land there; the round carried on. The step is sized to the
     // flight, down to the ground the muzzle stands on and a good way below.
     const drop = Math.max(30, L.from.y - this.terrain.heightAt(L.from.x, L.from.z) + 120);
-    const tFlight = (v.y + Math.sqrt(v.y * v.y + 2 * g * drop)) / g;
+    const speed = Math.max(1, Math.hypot(v.x, v.y, v.z));
+    const tFlight = g > 0 ? (v.y + Math.sqrt(v.y * v.y + 2 * g * drop)) / g : edge * 2 / speed;
     const step = THREE.MathUtils.clamp((tFlight * 1.1) / (LAY_PTS - 2), 0.04, 0.25);
     for (let i = 1, t = 0; i < LAY_PTS; i++) {
       t += step;
@@ -594,7 +606,10 @@ export class Battle {
     const u = L.unit;
     if (!u.alive || u.state !== 'ready' || u.cooldown > 0) return false;
     this._layArc();
-    const ok = this._fireOne(u, L.impact.clone(), { vel: this._layVel(L), hand: true, from: L.from });
+    if (u.def.mg) return this._handBurst(u, L);
+    // The Javelin flies its own path to the mark; everything else goes down the drawn line.
+    const top = u.def.projectile.kind === 'topattack';
+    const ok = this._fireOne(u, L.impact.clone(), { vel: top ? null : this._layVel(L), hand: true, from: L.from });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
       L.reloadTotal = u.cooldown;
@@ -604,6 +619,28 @@ export class Battle {
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }
     return ok;
+  }
+
+  /**
+   * The machine gun under the player's thumb: one burst at the point the
+   * sight is on, the rounds walking round it as a bipod gun's do
+   * (`_mgRound`, `t.hand`), the men near where it lands pinned, and a man
+   * standing in it hit. FIRE held is burst after burst, each on the gun's
+   * own reload. False while the last burst is still going out.
+   */
+  _handBurst(u, L) {
+    if (u.burstLeft > 0) return false;
+    const mg = u.def.mg;
+    u.mgTarget = { hand: true, pos: L.impact.clone() };
+    u.burstLeft = mg.burst;
+    u.burstTimer = 0;
+    u.idle = false;
+    this.shotsFired++;
+    this.handShots++;
+    L.kick = 0.5;
+    u.cooldown = u.def.reload * this.reloadFactor;
+    L.reloadTotal = u.cooldown + mg.burst * mg.interval;
+    return true;
   }
 
   setFireMode(mode) {
@@ -2062,7 +2099,7 @@ export class Battle {
     const spread = def.dispersion * this.dispersionScale * (1 - 0.14 * (unit.rank || 0));
     const aim = aimPoint.clone();
     // A hand-laid round goes where it was laid: no sheaf, no area walk.
-    if (!opts.vel) {
+    if (!opts.vel && !opts.hand) {
     const toward = new THREE.Vector3().subVectors(aim, from).setY(0).normalize();
     const across = new THREE.Vector3(-toward.z, 0, toward.x);
     aim.addScaledVector(toward, gauss() * spread * 1.6);
@@ -2300,7 +2337,10 @@ export class Battle {
       }
 
       // The player's hand on it: the crew holds, the breech reloads.
-      if (u.handHeld) { u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue; }
+      if (u.handHeld) {
+        if (u.def.mg) { this._updateMG(u, dt); continue; }
+        u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue;
+      }
 
       // A machine-gun team fires bursts of its own, not shells.
       if (u.def.mg) { this._updateMG(u, dt); continue; }
@@ -2362,11 +2402,13 @@ export class Battle {
       u.burstTimer = mg.interval;
       u.burstLeft--;
       this._mgRound(u);
-      if (u.burstLeft === 0) u.cooldown = u.def.reload * this.reloadFactor * (0.85 + Math.random() * 0.3);
-      return;
+      if (u.burstLeft === 0 && !u.handHeld) u.cooldown = u.def.reload * this.reloadFactor * (0.85 + Math.random() * 0.3);
+      if (!u.handHeld) return;
     }
     u.cooldown -= dt;
     if (u.cooldown > 0) return;
+    // The player's gun waits for the player's thumb.
+    if (u.handHeld) { u.cooldown = 0; return; }
     const t = this._mgTarget(u);
     if (!t) { u.idle = true; u.cooldown = 0.5; u.mgTarget = null; return; }
     u.idle = false;
@@ -2436,8 +2478,58 @@ export class Battle {
     const mg = u.def.mg;
     const t = u.mgTarget;
     if (!t) return;
-    const from = new THREE.Vector3(u.pos.x, u.pos.y + 0.55, u.pos.z);
-    if (t.air) {
+    const from = this._muzzle(u);
+    if (t.hand) {
+      // Laid by hand on a point: the sheaf walks round it as it does round
+      // a man, and whoever is standing in it is hit. The round's end is
+      // tested against the men near the point, not the point against a man.
+      const to = t.pos.clone();
+      const dist = Math.max(1, to.distanceTo(from));
+      const spread = u.def.dispersion * (0.4 + dist / u.def.range) * 0.8;
+      const w = u.walk || (u.walk = { x: 0, y: 0, z: 0, n: 0 });
+      if (u.burstLeft === mg.burst - 1) { w.x = gauss() * spread * 0.4; w.z = gauss() * spread * 0.4; w.y = 0; w.n = 0; }
+      w.x += gauss() * spread * 0.2; w.z += gauss() * spread * 0.2; w.y += spread * 0.05;
+      to.x += w.x + gauss() * spread * 0.3; to.z += w.z + gauss() * spread * 0.3; to.y += w.y + gauss() * spread * 0.15;
+      const g = this.garrison;
+      let victim = null, best = 0.9 * 0.9;
+      if (g) {
+        const seg = this._mgSeg || (this._mgSeg = new THREE.Vector3()), ab = this._mgAB || (this._mgAB = new THREE.Vector3());
+        ab.subVectors(to, from);
+        const ab2 = Math.max(1e-6, ab.lengthSq());
+        for (const d of g.defenders) {
+          if (!d.alive) continue;
+          if (d.pos.distanceToSquared(from) > (dist + 6) * (dist + 6)) continue;
+          // The man's distance from the round's path, over its last stretch.
+          const tt = THREE.MathUtils.clamp(seg.subVectors(d.muzzle, from).dot(ab) / ab2, 0, 1);
+          if (tt < 0.6) continue;
+          const dd = seg.copy(from).addScaledVector(ab, tt).distanceToSquared(d.muzzle);
+          if (dd < best) { best = dd; victim = d; }
+        }
+      }
+      const cover = victim ? (victim.cover === 'trench' ? 0.5 : victim.cover === 'window' || victim.cover === 'arcade' ? 0.6 : victim.sandbags ? 0.7 : 1) : 0;
+      const hit = !!victim && Math.random() < 0.8 * cover;
+      this.tracerFX.fire(from, hit ? victim.muzzle : to, { look: 'm240' }, hit);
+      if (hit) {
+        victim.health -= mg.damage;
+        if (victim.health <= 0) {
+          victim.alive = false;
+          u.kills = (u.kills || 0) + 1;
+          this._creditKills(1, victim.pos);
+          this.onEvent('handshot', { unit: u, point: victim.pos.clone(), kill: true });
+        }
+      } else if (this.fx?.impactDust && u.burstLeft % 3 === 0) {
+        this.fx.impactDust(to.x, to.y, to.z, 0.35);
+      }
+      if (g) {
+        const until = g.time + mg.pin;
+        const pr2 = mg.pinRadius * mg.pinRadius;
+        for (const o of g.defenders) {
+          if (!o.alive) continue;
+          if (o.pos.distanceToSquared(to) < pr2 && (o.pinned || 0) < until) o.pinned = until;
+        }
+      }
+      if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(1, this.lay.kick + 0.18);
+    } else if (t.air) {
       if (!t.air.alive) { u.burstLeft = 0; return; }
       const dist = t.air.pos.distanceTo(from);
       const hit = Math.random() < 0.5 * (1 - 0.6 * dist / mg.air) * (t.air.exposure ?? 1);

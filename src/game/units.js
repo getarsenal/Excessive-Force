@@ -45,6 +45,10 @@ export const UNITS = [
     model: 'infantry',
     range: 340, reload: 1.5, setup: 1.4,
     crew: 2, health: 150,
+    muzzle: { f: 0.9, h: 0.55 },   // the gun on its bipod, a man's length forward of the plot
+    // Prone behind the gun, cheek on the stock: the eye is the gun's own height (battle.layEye).
+    eye: { back: 0.55, side: 0.18, up: 0.72, pitch: 0 },
+    sight: { kind: 'iron', zoom: [1, 2] },   // the sight the lay looks through (main.js, SIGHTS)
     mg: {
       burst: 9, interval: 0.085, damage: 6,
       pin: 6.0, pinRadius: 10, air: 420, airDamage: 5,
@@ -60,6 +64,8 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 255, reload: 3.8, setup: 1.0,
     crew: 2, health: 165,
+    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
+    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 220, gravity: 3.2, trail: 0.35 },
     warhead: { lethal: 0.9, radius: 2.8, power: 1100, fx: 0.5, kinetic: 0.2 },
     dispersion: 2.4,
@@ -71,6 +77,8 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Friendly_Machine_Gunner',
     range: 300, reload: 4.4, setup: 1.2,
     crew: 2, health: 185,
+    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
+    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 255, gravity: 3.6, trail: 0.4 },
     warhead: { lethal: 1.2, radius: 3.6, power: 1900, fx: 0.7, kinetic: 0.3 },
     dispersion: 2.0,
@@ -82,6 +90,8 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Cannon_Crew_Member',
     range: 290, reload: 5.2, setup: 1.2,
     crew: 2, health: 185,
+    // The gunner's eye at the tube on his shoulder; the sight he looks through in the lay.
+    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'optic', zoom: [1, 3] },
     projectile: { kind: 'direct', speed: 195, gravity: 4.0, trail: 0.6 },
     warhead: { lethal: 1.5, radius: 5.2, power: 2600, fx: 1.0, kinetic: 0.08 },
     dispersion: 3.2,
@@ -93,6 +103,9 @@ export const UNITS = [
     model: 'infantry', modelFile: 'Cannon_Crew_Member',
     range: 420, reload: 8.5, setup: 2.0,
     crew: 2, health: 175,
+    // The CLU on his shoulder: the lay looks through its day sight, wide field then narrow,
+    // and the crosshair is where the missile comes down.
+    eye: { back: 0.45, side: 0.3, up: 1.5, pitch: 0 }, sight: { kind: 'clu', zoom: [4, 9] },
     projectile: { kind: 'topattack', speed: 145, gravity: 0, trail: 0.5 },
     warhead: { lethal: 1.4, radius: 4.2, power: 3400, fx: 0.9, kinetic: 0.45 },
     dispersion: 0.5,
@@ -103,6 +116,7 @@ export const UNITS = [
     cost: 240, unlockFrac: 0.0,
     tint: 0x5a6a52, model: 'infantry',
     eye: { back: 2.8, side: -1.2, up: 1.55, pitch: 0.1, atMuzzle: true },   // the gunner's eye in the lay (battle.layEye)
+    sight: { kind: 'glass', zoom: [1, 6] },   // the tube at one; the observer's glasses on the fall of shot at six
     range: 620, reload: 7.0, setup: 3.0,
     crew: 3, health: 120,
     // Indirect and slow: a high arc that comes down on a roof or a terrace the
@@ -124,6 +138,7 @@ export const UNITS = [
     // along X; the M109, M270 and M142 are long along Z.)
     modelYaw: -Math.PI / 2,
     muzzle: { f: 3.0, h: 1.6 },   // where the round leaves: forward of the plot, and up
+    sight: { kind: 'pano', zoom: [1, 4] },   // over open sights at one; the panoramic telescope at four
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
     // Direct-fire howitzer: a high muzzle velocity on the *low* arc, so the
@@ -143,6 +158,7 @@ export const UNITS = [
     cost: 1300, unlockFrac: 0.085,
     tint: ARTILLERY_GREEN, model: 'M777', modelLength: 10.7,
     muzzle: { f: 5.4, h: 2.6 },   // where the round leaves: forward of the plot, and up
+    sight: { kind: 'pano', zoom: [1, 4] },
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,
     // The opposite quarter turn to the M119, because the two towed guns are
@@ -164,6 +180,7 @@ export const UNITS = [
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
     muzzle: { f: 5.2, h: 2.9 },   // where the round leaves: forward of the plot, and up
     eye: { hatch: true, back: 1.8, side: 0, pitch: -0.04 },   // the gunner's eye in the lay (battle.layEye)
+    sight: { kind: 'pano', zoom: [1, 4] },
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
     projectile: { kind: 'arc', speed: 420, gravity: 9.81, trail: 1.0 },
@@ -177,6 +194,7 @@ export const UNITS = [
     tint: ARTILLERY_GREEN, model: 'M1128', modelLength: 8.6,
     eye: { hatch: true, back: 1.4, side: 0, pitch: -0.06 },   // the gunner's eye in the lay (battle.layEye)
     muzzle: { f: 4.4, h: 2.6 },   // where the round leaves: the end of the 105
+    sight: { kind: 'tank', zoom: [1, 3, 10] },   // the gunner's primary sight: unity, three, ten
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
     // A tank gun, not a howitzer: nine hundred metres a second on the lowest
