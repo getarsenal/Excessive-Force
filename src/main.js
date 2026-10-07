@@ -2083,6 +2083,7 @@ async function boot() {
     if (!layDrag || e.pointerId !== layDrag.id || !(battle.lay || battle.seat)) return;
     const dx = e.clientX - layDrag.x, dy = e.clientY - layDrag.y;
     layDrag.x = e.clientX; layDrag.y = e.clientY;
+    layDrag.moved = (layDrag.moved || 0) + Math.abs(dx) + Math.abs(dy);
     if (battle.seat) {
       // The cross goes where the finger goes: the ground under the finger
       // before and after, and the aim moved by the difference.
@@ -2285,8 +2286,8 @@ async function boot() {
     // it through would plant a gun under the panel the player was closing.
     if (hud.openDrawer) { hud.closeDrawer(); aiming = { swallow: true }; return; }
     if (battle.state !== 'playing') return;
-    // On a gun: the finger is the gun's. The rig is off, so nothing else moves.
-    if (battle.lay) { if (!layDrag) layDrag = { id: e.pointerId, x: e.clientX, y: e.clientY }; aiming = { swallow: true }; return; }
+    // On a gun, or in a gunner's seat: the finger is the gun's. The rig is off, so nothing else moves.
+    if (battle.lay || battle.seat) { if (!layDrag) layDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: 0 }; aiming = { swallow: true }; return; }
     const def = armedDef();
     if (!def || livePointers.size > 1) return;
     const hit = pick(e.clientX, e.clientY, !!def.strike);
@@ -2307,7 +2308,19 @@ async function boot() {
   });
 
   canvas.addEventListener('pointerup', (e) => {
-    if (layDrag && e.pointerId === layDrag.id) layDrag = null;
+    if (layDrag && e.pointerId === layDrag.id) {
+      // In the seat a tap, not a drag, puts the cross where the finger touched.
+      if (battle.seat && (layDrag.moved || 0) < 9) {
+        const S = battle.seat;
+        const g = rig._screenToGround(e.clientX, e.clientY, _sgA);
+        if (g) {
+          const mx = g.x - S.aim.x, mz = g.z - S.aim.z, m = Math.hypot(mx, mz), cap = Math.min(m, 400);
+          if (m > 0.5) battle.seatMove(mx / m * cap, mz / m * cap);
+          feedback.emit('tick');
+        }
+      }
+      layDrag = null;
+    }
     if (!livePointers.delete(e.pointerId)) return;
     // The armed gestures resolve themselves and end the tap here: a line of
     // guns goes down, or the strike goes in at whatever the sight was on.
