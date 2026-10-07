@@ -3,7 +3,7 @@
 // checked to be the top of the tube at that elevation, the live crew's parts
 // present and the round rising over the reload, FIRE, the impact against
 // the drawn point, DONE, the baked team back.
-//   node tools/mortarprobe.mjs [level=westminster] [kind=m120]  -> /tmp/out/mortar-{laid,loaded}.png
+//   node tools/mortarprobe.mjs [level=westminster] [kind=m120]  -> /tmp/out/mortar-{laid,loaded,fired}.png
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 mkdirSync('/tmp/out', { recursive: true });
@@ -65,11 +65,23 @@ const fired = await page.evaluate(() => {
   B.projectiles.fire = (o) => { leftFrom = +new window.THREE.Vector3(o.pos.x, o.pos.y, o.pos.z).distanceTo(from).toFixed(2); return fire(o); };
   const ok = window.__lay.fire();
   B.projectiles.fire = fire;
-  const roundAfter = u.live ? u.live.round.visible : null;
+  // The round goes down the tube and the loader ducks: a frame into the
+  // drop, and half a second on, when he should be crouched and it gone.
+  const A = u.live;
+  const snap = () => A ? { round: [A.round.visible, ...A.round.position.toArray().map((v) => +v.toFixed(2))], loaderY: +A.loader.position.y.toFixed(2), loaderTurn: +(A.loader.rotation.y + Math.PI / 2).toFixed(2), loaderBow: +A.loader.rotation.x.toFixed(2) } : null;
+  window.__fastForward(0.05, 1 / 30); const dropping = snap();
+  window.__fastForward(0.45, 1 / 30); const crouched = snap();
+  window.__pendingImpacts = { impacts, oi, pred };
+  return { ok, leftFrom, dropping, crouched, shots: B.handShots };
+});
+await page.waitForTimeout(400);
+await page.screenshot({ path: '/tmp/out/mortar-fired.png' });
+const landed = await page.evaluate(() => {
+  const B = window.battle, { impacts, oi } = window.__pendingImpacts;
   for (let k = 0; k < 20 && !impacts.length; k++) window.__fastForward(1, 1 / 30);
   B._onImpact = oi;
-  return { ok, leftFrom, roundAfter, impacts, shots: B.handShots };
+  return { impacts };
 });
 const done = await page.evaluate(() => { const B = window.battle, u = (B.lay && B.lay.unit) || B.units[B.units.length - 1]; const alive = u ? u.alive : null, n = B.units.length; window.__lay.exit(); if (!u) return { noUnit: true, units: n }; return { units: n, alive, lay: !!B.lay, live: !!u.live, bakedVisible: u.group.children.every((c) => c.visible), children: u.group.children.length }; });
-console.log(JSON.stringify({ laid, flat, loading, fired, done, errors }, null, 1));
+console.log(JSON.stringify({ laid, flat, loading, fired, landed, done, errors }, null, 1));
 await b.close();
