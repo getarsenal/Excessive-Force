@@ -608,6 +608,7 @@ export class CameraRig {
     this._keys = new Set();
     this.keysLocked = false;             // a cutscene owns the camera
     this.dragLocked = false;             // an armed weapon owns one-finger drags
+    this.panLocked = false;              // the focus stays put: turn and zoom only
     window.addEventListener('keydown', (e) => this._keys.add(e.code));
     window.addEventListener('keyup', (e) => this._keys.delete(e.code));
 
@@ -754,6 +755,8 @@ export class CameraRig {
    * ground plane.
    */
   _pan(dx, dy, sx, sy) {
+    // A level may pin the camera's focus (the range: the firing line).
+    if (this.panLocked) return;
     if (sx !== undefined && sy !== undefined) {
       const a = this._panA || (this._panA = new THREE.Vector3());
       const b = this._panB || (this._panB = new THREE.Vector3());

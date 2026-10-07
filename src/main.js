@@ -455,6 +455,7 @@ async function boot() {
     exclude: level.contextExclude || level.cityExcludeRadius || 70,
   });
   engine.scene.add(fieldWorks.group);
+  if (level.sandbox) fieldWorks.group.visible = false;
 
   // The things that move. A still city is uncanny however detailed it is: the
   // eye reads motion as life long before it reads a bollard.
@@ -582,7 +583,8 @@ async function boot() {
     // A level can man only part of the belt: Boot Camp is a lesson, not a siege.
     const share = level.fieldWorksShare ?? 1;
     const every = Math.max(1, Math.round(1 / Math.max(share, 0.01)));
-    const posts = fieldWorks.posts.filter((_, i) => i % every === 0);
+    // A practice range has nobody in its trenches: the targets do not shoot back.
+    const posts = level.sandbox ? [] : fieldWorks.posts.filter((_, i) => i % every === 0);
     const manned = garrison.populateFieldWorks(posts);
     console.log(`[tumble] field works: ${fieldWorks.counts.trenchBays} bays, `
       + `${fieldWorks.counts.gunPits} gun pits, `
@@ -617,6 +619,8 @@ async function boot() {
   // and the hall with its targets round the firing line.
   // Deployed where the finger lands: no C-130 through the ceiling.
   if (level.sandbox) { battle.freeBuild = true; battle.unlockAll = true; battle.airlift = false; document.body.classList.add('range'); }
+  // The camera stays on the firing line: it turns and zooms, it does not wander off down the lanes.
+  if (level.sandbox) rig.panLocked = true;
   const range = level.range ? new Range({ scene: engine.scene, physics, terrain, battle, fx, audio, origin, groundY, quality }) : null;
   window.__range = range;
   // A level can set its own terms: Boot Camp opens the whole arsenal and

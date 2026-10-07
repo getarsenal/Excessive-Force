@@ -40,7 +40,7 @@ import { PhysicsWorld } from '../core/physics.js';
 // Narrow enough that a phone held upright sees the walls and the ceiling
 // from the firing line, not a floor in a void.
 const LANE = { A: -66, B: -22, C: 22, D: 66 };
-const HALL = { x: 90, zFront: 110, zBack: -640, h: 68 };
+const HALL = { x: 90, zFront: 110, zBack: -640, h: 170 };
 const BLOCK = { hx: 1.0, hy: 0.5, hz: 0.5 };   // a block of the shack, half extents: big, as everything on this map is
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -122,27 +122,26 @@ export class Range {
     // indoor range keeps a high round in the building.
     const baffleGeo = new THREE.BoxGeometry(W - 20, 0.4, 14);
     for (let z = -30; z > -230; z -= 50) {
-      const b = new THREE.Mesh(baffleGeo, dark); b.position.set(0, 30 + (z + 30) * -0.05, z); b.rotation.x = 0.55; g.add(b);
+      const b = new THREE.Mesh(baffleGeo, dark); b.position.set(0, 70 + (z + 30) * -0.08, z); b.rotation.x = 0.55; g.add(b);
     }
     // The lamps: pendants on their drops, three rows, an emissive disc under a shade.
-    const dropGeo = new THREE.CylinderGeometry(0.06, 0.06, 14, 5);
+    const LAMP = 56;   // the pendants hang to here, on drops from the roof
+    const dropGeo = new THREE.CylinderGeometry(0.08, 0.08, H - 3.3 - LAMP, 5);
     const shadeGeo = new THREE.ConeGeometry(3.2, 2.6, 12, 1, true);
     const bulbGeo = new THREE.CylinderGeometry(2.4, 2.4, 0.3, 12);
     const shadeMat = mat(0x202326, 0.7, 0.3, { side: THREE.DoubleSide });
     const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2d6, emissive: 0xffe9c4, emissiveIntensity: 2.6, roughness: 1 });
     for (const x of [-52, 0, 52]) {
       for (let z = HALL.zFront - 40; z > HALL.zBack + 20; z -= 40) {
-        const drop = new THREE.Mesh(dropGeo, dark); drop.position.set(x, H - 7 - 3.3, z); g.add(drop);
-        const shade = new THREE.Mesh(shadeGeo, shadeMat); shade.position.set(x, H - 14.6, z); g.add(shade);
-        const bulb = new THREE.Mesh(bulbGeo, bulbMat); bulb.position.set(x, H - 15.6, z); g.add(bulb);
+        const drop = new THREE.Mesh(dropGeo, dark); drop.position.set(x, (H - 3.3 + LAMP) / 2, z); g.add(drop);
+        const shade = new THREE.Mesh(shadeGeo, shadeMat); shade.position.set(x, LAMP + 1.3, z); g.add(shade);
+        const bulb = new THREE.Mesh(bulbGeo, bulbMat); bulb.position.set(x, LAMP, z); g.add(bulb);
       }
     }
-    // The firing line's shooting bays: a low concrete bench the width of the hall behind the line.
-    const bench = new THREE.Mesh(new THREE.BoxGeometry(W - 30, 1.1, 1.4), mat(0x5b5e62, 0.9));
-    bench.position.set(0, 0.55, 4); g.add(bench);
-    // A red lamp over the line, lit while the range is hot (always).
+    // Nothing on the line itself: a bench there stood between a prone gun
+    // and its target. A red lamp over the line, lit while the range is hot (always).
     const hot = new THREE.Mesh(new THREE.SphereGeometry(1.4, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff2a1a, emissive: 0xff2a1a, emissiveIntensity: 3 }));
-    hot.position.set(0, 22, 2); g.add(hot);
+    hot.position.set(0, 30, 2); g.add(hot);
     // The boards on the left wall at every distance.
     for (const d of [50, 100, 150, 200, 300, 400, 500]) {
       const tex = textTexture(256, 128, (ctx, w, h) => {
