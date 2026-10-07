@@ -386,12 +386,21 @@ export const SPECS = {
     ],
   },
   belem: {
-    S: 3.0, yaw: 0.5, mat: M.MARBLE,
+    // Manueline, on the Tagus: the four-storey keep at the land end, its
+    // terrace ringed with bartizans and the small upper storey standing on
+    // it; the bastion in front, a square against the keep and a hexagon
+    // pointed out into the river, its terrace a battery with a bartizan on
+    // every corner; the loggia across the keep's river face over the
+    // bastion's terrace. Every turret stands on stone, not off an edge.
+    S: 2.2, yaw: 0.5, mat: M.MARBLE,
     parts: [
-      { t: 'hall', tag: 'bastion', x: 0, z: 6, w: 28, d: 18, h: 10, roof: 'flat', roofH: 1, mat: M.MARBLE, storey: 5 },
-      { t: 'tower', tag: 'tower', x: 0, z: -9.3, w: 12, h: 30, cap: 'flat', capH: 1, mat: M.MARBLE, floors: 3 },
-      ...[[-1, 1], [1, 1]].map(([sx, sz]) => ({ t: 'tower', tag: 'turrets', x: sx * 15.5, z: 6 + sz * 10.5, w: 3, h: 13, round: true, cap: 'dome', capH: 2.2, capMat: M.MARBLE, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
-      ...[[-1, -1], [1, -1]].map(([sx]) => ({ t: 'tower', tag: 'turrets', x: sx * 7.9, z: -15, y0: 30, w: 2.6, h: 5, round: true, cap: 'dome', capH: 2, capMat: M.MARBLE, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      { t: 'hall', tag: 'bastion', x: 0, z: 2, w: 26, d: 16, h: 9, roof: 'flat', roofH: 1, mat: M.MARBLE, storey: 4.5, floors: 1, windows: false },
+      { t: 'tower', tag: 'bastion', x: 0, z: 14, w: 30, h: 9, sides: 6, cap: 'flat', capH: 1, mat: M.MARBLE, floors: 1, windows: false, roofPosts: false },
+      ...[[-11.3, 20.5], [11.3, 20.5], [0, 27], [-11.5, -4.5], [11.5, -4.5]].map(([x, z]) => ({ t: 'tower', tag: 'turrets', x, z, y0: 10, w: 3, h: 4.5, round: true, cap: 'dome', capH: 2.2, capMat: M.MARBLE, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      { t: 'tower', tag: 'tower', x: 0, z: -11, w: 12, h: 24, cap: 'flat', capH: 1, mat: M.MARBLE, floors: 3, storey: 6 },
+      { t: 'tower', tag: 'tower', x: 0, z: -11, y0: 25, w: 7, h: 7, cap: 'flat', capH: 1, mat: M.MARBLE, ground: false, floors: 1, storey: 6 },
+      ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => ({ t: 'tower', tag: 'turrets', x: sx * 4.9, z: -11 + sz * 4.9, y0: 25, w: 2.2, h: 4.5, round: true, cap: 'dome', capH: 1.8, capMat: M.MARBLE, mat: M.MARBLE, ground: false, windows: false, floors: 0, roofPosts: false })),
+      { t: 'colonnade', tag: 'loggia', x: 0, z: -3.6, w: 10, d: 2.6, y0: 10, podH: 0.5, colH: 4.5, colW: 0.6, bay: 1.5, rows: 'front', roof: 'flat', mat: M.MARBLE },
     ],
   },
   salisbury: {
