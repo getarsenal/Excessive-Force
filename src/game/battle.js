@@ -287,6 +287,14 @@ export class Battle {
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye.
       reloadTotal: unit.def.reload * this.reloadFactor, kick: 0 };
     unit.handHeld = true;
+    // The gun is handed over loaded: the crew's own reload and the burst
+    // they were in the middle of are theirs, not the player's. The trigger
+    // is the player's from the first moment, after a half-second handover
+    // that lets the ring be seen filling.
+    unit.cooldown = Math.min(unit.cooldown || 0, 0.5);
+    unit.burstLeft = 0;
+    unit.burstTimer = 0;
+    unit.hold = null;
     if (p.mortar) {
       // A mortar is laid by range, not by elevation: the crew pick the charge
       // that makes the arc, and the tube's angle follows (see _mortarSolve).

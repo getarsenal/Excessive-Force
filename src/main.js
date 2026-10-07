@@ -1900,7 +1900,8 @@ async function boot() {
     // pace away stay in the picture: the game's own three and a half
     // metres would cut the gun off at the trunnions.
     layFov = engine.camera.fov; layNear = engine.camera.near;
-    engine.camera.near = 0.4;
+    // A man's weapon on his shoulder wants the lens nearer still (`def.eye.near`).
+    engine.camera.near = u.def.eye?.near ?? 0.4;
     layZoom = 0;
     applyZoom();
     layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG UP FOR RANGE' : 'DRAG TO LAY THE GUN';
