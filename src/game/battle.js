@@ -4,12 +4,13 @@ import * as THREE from 'three';
 // Points on a hand-laid shell's drawn flight: 0.04 s each, twelve seconds.
 const LAY_PTS = 300;
 /**
- * A held gun's barrel: how much a burst heats it, how fast it cools, how
- * long a gun run hot is locked, and the heat it is back at when the lock
- * lifts. About seven bursts of the machine gun in a row, or eight of the
- * 30 mm, then four seconds of nothing.
+ * A held gun's barrel: how much a burst heats it, how fast it cools (and
+ * it does not cool while it is firing), how long a gun run hot is locked,
+ * and the heat it is back at when the lock lifts. About seven bursts of
+ * the machine gun held on, six seconds, or seven of the 30 mm; then four
+ * seconds of nothing and the rest of the cooling after.
  */
-const HEAT = { mgBurst: 0.15, seatBurst: 0.13, cool: 0.2, lock: 4.0, reset: 0.45 };
+const HEAT = { mgBurst: 0.16, seatBurst: 0.15, cool: 0.1, lock: 4.0, reset: 0.45 };
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
@@ -586,15 +587,15 @@ export class Battle {
     if (s.done || !L || L.phase === 'egress' || L.phase === 'down' || this.state !== 'playing') { this.endSeat(); return; }
     S.cooldown = Math.max(0, S.cooldown - dt);
     S.kick = Math.max(0, S.kick - dt * 2.5);
-    this._cool(S, dt);
+    this._cool(S, dt, S.cooldown > 0 && !!this.seatWeapons(s)[S.weapon].hold);
     this._seatLook();
     if (!L.orbit) L.gunAim = S.look;
   }
 
-  /** A barrel's heat, cooling; a locked gun opens again once it is down to the reset line. */
-  _cool(H, dt) {
+  /** A barrel's heat, cooling when it is not firing; a locked gun opens again once it is down to the reset line. */
+  _cool(H, dt, firing = false) {
     if (!H) return;
-    H.heat = Math.max(0, (H.heat || 0) - dt * HEAT.cool);
+    if (!firing) H.heat = Math.max(0, (H.heat || 0) - dt * HEAT.cool);
     if (H.over > 0) { H.over = Math.max(0, H.over - dt); if (H.over <= 0 && H.heat > HEAT.reset) H.heat = HEAT.reset; }
   }
 
@@ -892,7 +893,9 @@ export class Battle {
     this.shotsFired++;
     this.handShots++;
     L.kick = 0.5;
-    u.cooldown = u.def.reload * this.reloadFactor;
+    // Held, the gun gives burst after burst with only the regrip between:
+    // the barrel's heat is what stops it, not the crew's pace.
+    u.cooldown = 0.15;
     L.reloadTotal = u.cooldown + mg.burst * mg.interval;
     return true;
   }
@@ -2592,7 +2595,7 @@ export class Battle {
 
       // The player's hand on it: the crew holds, the breech reloads.
       if (u.handHeld) {
-        if (u.def.mg) { this._updateMG(u, dt); this._cool(this.lay && this.lay.unit === u ? this.lay : null, dt); continue; }
+        if (u.def.mg) { this._updateMG(u, dt); this._cool(this.lay && this.lay.unit === u ? this.lay : null, dt, u.burstLeft > 0); continue; }
         u.cooldown = Math.max(0, u.cooldown - dt); if (u.live) this._animateMortar(u, dt); continue;
       }
 
