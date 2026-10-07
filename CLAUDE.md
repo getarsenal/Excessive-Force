@@ -282,7 +282,10 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   ZOOM steps through); the reticle's centre is the point of impact, so a
   straight shooter (rockets, the machine gun, the Javelin) looks through
   it at every magnification and a gun does when zoomed, the mark
-  bracketing the fall of shot otherwise; the machine gun is laid too,
+  bracketing the fall of shot otherwise; the mortar is laid from the plot
+  (`sight.kind === 'plot'`): straight down on the tube and the fall of
+  shot together, the drag walking the ring over the ground, CLOSE the
+  same at half the height, EYE the gunner's own at the tube; the machine gun is laid too,
   FIRE held being burst after burst at the point under the cross
   (`_handBurst`), and the Javelin's cross designates; the survey stays
   live in the lay; `node
