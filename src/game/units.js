@@ -183,7 +183,11 @@ export const UNITS = [
     cost: 1300, unlockFrac: 0.085,
     tint: ARTILLERY_GREEN, model: 'M777', modelLength: 10.7,
     muzzle: { f: 5.4, h: 2.6 },   // where the round leaves (until the model is in: then the barrel's own end)
-    barrel: { len: 6.6, r: 0.7, rb: 0.8, brake: 1.0, down: 0.32, back: 0.3, recoil: 0.9, min: -0.05, max: 1.25, elev: 16 },
+    // The M777's trunnions are at the back, where the cradle's hydraulic
+    // tubes come down to the carriage, nearly ten metres behind the muzzle:
+    // the whole of the tube, the cradle and those tubes elevate together.
+    barrel: { r: 0.7, recoil: 0.9, min: -0.05, max: 1.25, elev: 16,
+      region: { pivotT: 9.8, pivotU: -1.1, top: 0.6, side: 0.95, lo: [[4.0, -0.85], [9.6, -1.38]] } },
     sight: { kind: 'pano', zoom: [1, 4] },
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,

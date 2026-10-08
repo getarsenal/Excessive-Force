@@ -277,7 +277,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   with `def.barrel` has its barrel cut out of its model at load,
   `src/game/barrel.js`: the tip found in the geometry, the axis by the
   elevation along which the most surface lies, the tube's triangles hung
-  on a pivot at the trunnions, so the barrel is laid to every shot and to
+  on a pivot at the trunnions (or, `region`, a band whose floor falls
+  toward the rear, for the M777, whose tube, cradle and hydraulic tubes
+  swing together about trunnions at the base plate nearly ten metres
+  behind the muzzle; `node tools/barrelmap.mjs <kind>` maps a model's
+  metal round its barrel line to place them), so the barrel is laid to every shot and to
   the lay, recoils along its own line, and `_muzzle` is that barrel's end
   at that elevation; a lob past the barrel's `max` falls back to the low
   line; `node tools/barrelshot.mjs` photographs each gun at rest, level,

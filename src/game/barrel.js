@@ -85,7 +85,7 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
     }
   }
   let slope = 0, best = -1;
-  const rq = (spec.r * 1.25) ** 2, tMax = Math.max(1.2, spec.len * 0.85);
+  const rq = (spec.r * 1.25) ** 2, tMax = Math.max(1.2, (spec.len ?? spec.region?.pivotT ?? 4) * 0.85);
   const lo = spec.elev != null ? spec.elev : -10, hi = spec.elev != null ? spec.elev : 75;
   for (let deg = lo; deg <= hi; deg += 1) {
     const e = deg * Math.PI / 180, ay = Math.sin(e), az = Math.cos(e);
@@ -99,7 +99,13 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
     if (c > best) { best = c; slope = Math.tan(e); }
   }
   const axisU = new THREE.Vector3(0, slope, 1).normalize();
-  const pivotU = tip.clone().addScaledVector(axisU, -spec.len);
+  // The trunnions: `len` back along the line, or, for a gun that says where
+  // its parts meet the carriage (`region`), that far back and that far under.
+  const upU = new THREE.Vector3(0, axisU.z, -axisU.y);
+  const R = spec.region;
+  const pivotU = R
+    ? tip.clone().addScaledVector(axisU, -R.pivotT).addScaledVector(upU, R.pivotU)
+    : tip.clone().addScaledVector(axisU, -spec.len);
   // Into the wrapper's frame.
   const pivot = pivotU.clone().applyMatrix4(toWrap);
   const axis = axisU.clone().applyMatrix4(toWrap).normalize();
@@ -107,20 +113,34 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
   const right = new THREE.Vector3().crossVectors(axis, new THREE.Vector3(0, 1, 0)).normalize();
   // The tube's triangles.
   const r2 = spec.r * spec.r, rb2 = (spec.rb ?? spec.r) * (spec.rb ?? spec.r);
-  const brakeFrom = spec.len - (spec.brake ?? 0.7);
+  const brakeFrom = (spec.len ?? 0) - (spec.brake ?? 0.7);
   const d = new THREE.Vector3();
   // The cut's centre line can sit `down` below the barrel's own axis, square
   // to it: a gun whose cradle and recoil cylinders hang under the tube (the
   // M777) elevates them together.
   const up = new THREE.Vector3().crossVectors(right, axis).normalize();
   const c0 = pivot.clone().addScaledVector(up, -(spec.down ?? 0));
-  const inTube = (x, y, z) => {
+  const upW = upU.clone().applyMatrix4(toWrap).normalize();
+  // A band round the line instead of a tube (`region`): from the muzzle back
+  // to the trunnions, no higher than `top` over the line and no lower than a
+  // floor that falls from `lo[0]` to `lo[1]` (metres back, metres under),
+  // and no wider than `side` either way; for a cradle whose tubes run down
+  // and back to the carriage, as the M777's do.
+  const inRegion = R && ((x, y, z) => {
+    d.set(x - tipW.x, y - tipW.y, z - tipW.z);
+    const t = -d.dot(axis), u = d.dot(upW), sd = Math.abs(d.dot(right));
+    if (t < -0.4 || t > R.pivotT + 0.15 || sd > R.side || u > R.top) return false;
+    const [[t0, u0], [t1, u1]] = R.lo;
+    const k = THREE.MathUtils.clamp((t - t0) / (t1 - t0), 0, 1);
+    return u > u0 + (u1 - u0) * k;
+  });
+  const inTube = inRegion || ((x, y, z) => {
     d.set(x - c0.x, y - c0.y, z - c0.z);
     const t = d.dot(axis);
     if (t < -(spec.back ?? 0.5) || t > spec.len + 0.4) return false;
     const rr = d.lengthSq() - t * t;
     return rr < (t > brakeFrom ? rb2 : r2);
-  };
+  });
   const barrel = new THREE.Group();
   barrel.name = 'barrel';
   barrel.position.copy(pivot);
