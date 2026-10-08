@@ -16,6 +16,7 @@ const MORTAR_DROP = 0.32;
  * before it locks again; let go, it cools a tenth a second.
  */
 const HEAT = { mgRound: 0.018, seatSecs: 5, cool: 0.1, lock: 4.0, reset: 0.45 };
+import { barrelTip, poseBarrel } from './barrel.js';
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
 import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
@@ -388,6 +389,22 @@ export class Battle {
     unit.live = null;
   }
 
+  /**
+   * A gun's barrel: laid where the player has it (the lay's elevation, at
+   * once), else slewed to the last shot's at fifty degrees a second, and
+   * run back on its recoil, home again over seven tenths of a second.
+   */
+  _updateBarrel(u, dt) {
+    const B = u.barrelB;
+    if (this.lay && this.lay.unit === u) u.barrelElev = u.barrelWant = this.lay.elev;
+    else {
+      const d = (u.barrelWant ?? u.barrelElev) - u.barrelElev, step = 0.9 * dt;
+      u.barrelElev += Math.abs(d) <= step ? d : Math.sign(d) * step;
+    }
+    u.recoilT = Math.max(0, (u.recoilT || 0) - dt * 1.4);
+    poseBarrel(u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+  }
+
   /** The round has struck the pin: the shell leaves the tube on the lay it was let go on. */
   _mortarLaunch(u) {
     const A = u.live, P = A?.pending;
@@ -678,9 +695,11 @@ export class Battle {
     // has nothing under forty-five degrees in it.
     const straight = p.kind === 'direct' || p.kind === 'topattack';
     // A tank gun's mount stops under twenty degrees; a howitzer goes to seventy.
-    const top = L.unit.def.sight?.kind === 'tank' ? 0.33 : straight ? 0.6 : 1.25;
+    // A gun with its own barrel (barrel.js) stops where that barrel does.
+    const BB = L.unit.barrelB;
+    const top = BB ? BB.max : L.unit.def.sight?.kind === 'tank' ? 0.33 : straight ? 0.6 : 1.25;
     // Down the hill: a rocket or a burst goes where the man can look.
-    const lo = straight ? -0.7 : -0.08;
+    const lo = BB ? BB.min : straight ? -0.7 : -0.08;
     L.yaw += dyaw;
     if (p.mortar) {
       // Up is further: the drag walks the range and the solve sets the tube.
@@ -712,6 +731,15 @@ export class Battle {
   _muzzle(unit, elev = null) {
     const def = unit.def, p = unit.pos, yaw = unit.yaw;
     const fx = Math.sin(yaw), fz = Math.cos(yaw);
+    // A gun with its barrel cut out of its model: the end of that barrel, at
+    // this elevation (or where it is laid now), through the model's own turn
+    // in the unit and the unit's on the ground.
+    if (unit.barrelB && unit.model) {
+      const t = barrelTip(unit.barrelB, elev ?? unit.barrelElev, this._tipV || (this._tipV = new THREE.Vector3()));
+      const my = unit.model.rotation.y, c = Math.cos(my), s = Math.sin(my);
+      const lx = t.x * c + t.z * s, lz = -t.x * s + t.z * c;
+      return new THREE.Vector3(p.x + lx * fz + lz * fx, p.y + unit.model.position.y + t.y, p.z - lx * fx + lz * fz);
+    }
     if (def.projectile?.mortar) {
       const e = elev ?? MORTAR.e0;
       const f = MORTAR.breech.z + Math.cos(e) * MORTAR.len, h = MORTAR.breech.y + Math.sin(e) * MORTAR.len;
@@ -2206,12 +2234,20 @@ export class Battle {
     }
     const wrapper = def.build
       ? this.models.wrap(def.build(), def.id)
-      : await this.models.load(def.modelFile || def.model, def.modelLength, { tint: def.tint });
+      : await this.models.load(def.modelFile || def.model, def.modelLength, { tint: def.tint, barrel: def.barrel, modelYaw: def.modelYaw });
     if (!unit.alive) return;
     const inst = this.models.instance(wrapper);
     inst.rotation.y = def.modelYaw ?? 0;
     unit.group.add(inst);
     unit.model = inst;
+    // A gun whose barrel was cut out of its model: laid to each shot, the
+    // round leaving its end, and recoiling (barrel.js, `_updateBarrel`).
+    if (inst.userData.barrel) {
+      unit.barrel = inst.getObjectByName('barrel');
+      unit.barrelB = inst.userData.barrel;
+      unit.barrelElev = unit.barrelWant = unit.barrelB.rest;
+      unit.recoilT = 0;
+    }
     if (unit.drop) unit.drop.model = inst;
   }
 
@@ -2495,6 +2531,14 @@ export class Battle {
           (v) => this._trajectoryClear(from, v, p.gravity));
         if (!lofted && !low) { unit.hold = 'no clear arc'; return false; }
         vel = lofted ? lofted.vel : low;
+        // A gun whose barrel cannot be laid that high (the Stryker's 105
+        // stops at twenty degrees) cannot lob: it fires the low line, into
+        // whatever is in the way, as a direct-fire gun does.
+        const top = unit.barrelB?.max;
+        if (top != null && lofted && Math.atan2(vel.y, Math.hypot(vel.x, vel.z)) > top + 0.01) {
+          if (!low) { unit.hold = 'out of elevation'; return false; }
+          vel = low;
+        }
       }
     } else if (p.kind === 'rocket') {
       // The motor is part of the solve, not something that happens to the
@@ -2549,6 +2593,15 @@ export class Battle {
       }
     }
     unit.hold = null;
+
+    // A gun with its own barrel is laid to this shot, the round leaves the
+    // barrel's end, and the barrel runs back on its recoil.
+    if (unit.barrelB && p.kind !== 'rocket') {
+      const e = Math.atan2(vel.y, Math.hypot(vel.x, vel.z));
+      unit.barrelElev = unit.barrelWant = e;
+      if (!opts.from) from.copy(this._muzzle(unit, e));
+      unit.recoilT = 1;
+    }
 
     this.projectiles.fire({
       pos: from, vel, gravity: p.gravity, kind: p.kind, speed: p.speed,
@@ -2660,6 +2713,7 @@ export class Battle {
       }
 
       if (this.invulnerable) u.health = u.maxHealth;
+      if (u.barrel) this._updateBarrel(u, dt);
 
       // Time in place. After half a minute the crew has dug in.
       u.age += dt;

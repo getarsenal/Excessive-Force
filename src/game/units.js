@@ -1,3 +1,4 @@
+import { splitBarrel } from './barrel.js';
 import { stylizeTree } from '../world/look.js';
 import * as THREE from 'three';
 import { weaponView, soldierFigure } from './soldier.js';
@@ -156,7 +157,12 @@ export const UNITS = [
     // one. (Measured: the M119 and M777 bounding boxes are 3.4:1 and 2.3:1
     // along X; the M109, M270 and M142 are long along Z.)
     modelYaw: -Math.PI / 2,
-    muzzle: { f: 3.0, h: 1.6 },   // where the round leaves: forward of the plot, and up
+    muzzle: { f: 3.0, h: 1.6 },   // where the round leaves (until the model is in: then the barrel's own end)
+    // The barrel, cut out of the model so it is laid and recoils (barrel.js):
+    // how far back the trunnions are from the tip, the tube's radius and the
+    // muzzle brake's, how far the breech runs behind the trunnions, the
+    // recoil, and the elevation limits.
+    barrel: { len: 3.0, r: 0.24, rb: 0.26, back: 1.0, recoil: 0.55, min: -0.09, max: 1.22 },
     sight: { kind: 'pano', zoom: [1, 4] },   // over open sights at one; the panoramic telescope at four
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
@@ -176,7 +182,8 @@ export const UNITS = [
     id: 'm777', name: 'M777', full: 'M777A2 155 mm Howitzer', tier: 'GUN',
     cost: 1300, unlockFrac: 0.085,
     tint: ARTILLERY_GREEN, model: 'M777', modelLength: 10.7,
-    muzzle: { f: 5.4, h: 2.6 },   // where the round leaves: forward of the plot, and up
+    muzzle: { f: 5.4, h: 2.6 },   // where the round leaves (until the model is in: then the barrel's own end)
+    barrel: { len: 6.6, r: 0.7, rb: 0.8, brake: 1.0, down: 0.32, back: 0.3, recoil: 0.9, min: -0.05, max: 1.25, elev: 16 },
     sight: { kind: 'pano', zoom: [1, 4] },
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,
@@ -197,7 +204,8 @@ export const UNITS = [
     id: 'm109', name: 'PALADIN', full: 'M109A7 Paladin SPH', tier: 'SPH',
     cost: 2200, unlockFrac: 0.15,
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
-    muzzle: { f: 5.2, h: 2.9 },   // where the round leaves: forward of the plot, and up
+    muzzle: { f: 5.2, h: 2.9 },   // where the round leaves (until the model is in: then the barrel's own end)
+    barrel: { len: 4.6, r: 0.27, rb: 0.38, brake: 0.9, back: 0.4, recoil: 0.6, min: -0.05, max: 1.3, elev: 0 },
     eye: { hatch: true, back: 1.8, side: 0, pitch: -0.04 },   // the gunner's eye in the lay (battle.layEye)
     sight: { kind: 'pano', zoom: [1, 4] },
     range: 1600, reload: 6.5, setup: 3.0,
@@ -212,7 +220,8 @@ export const UNITS = [
     cost: 1800, unlockFrac: 0.06,
     tint: ARTILLERY_GREEN, model: 'M1128', modelLength: 8.6,
     eye: { hatch: true, back: 1.4, side: 0, pitch: -0.06 },   // the gunner's eye in the lay (battle.layEye)
-    muzzle: { f: 4.4, h: 2.6 },   // where the round leaves: the end of the 105
+    muzzle: { f: 4.4, h: 2.6 },   // where the round leaves (until the model is in: then the 105's own end)
+    barrel: { len: 4.5, r: 0.17, rb: 0.22, back: 0.3, recoil: 0.45, min: -0.17, max: 0.35, tipY: 2.88, tipTol: 0.2, elev: 0 },
     sight: { kind: 'tank', zoom: [1, 3, 10] },   // the gunner's primary sight: unity, three, ten
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
@@ -496,7 +505,7 @@ export class ModelLibrary {
   }
 
   async load(file, targetLength, opts = {}) {
-    const key = `${file}:${targetLength}:${opts.tint ?? ''}`;
+    const key = `${file}:${targetLength}:${opts.tint ?? ''}${opts.barrel ? ':barrel' : ''}`;
     if (this.cache.has(key)) return this.cache.get(key);
 
     const gltf = await this.loader.loadAsync(`assets/${file}.glb`);
@@ -577,6 +586,8 @@ export class ModelLibrary {
     // Wrap so callers can rotate the wrapper without fighting the normalisation.
     const wrapper = new THREE.Group();
     wrapper.add(flattenModel(root));
+    // A gun's barrel on its own pivot, so it can be laid and recoil (barrel.js).
+    if (opts.barrel) splitBarrel(wrapper, opts.barrel, opts.modelYaw || 0);
     // The same shading as the world they stand in (see world/look.js).
     stylizeTree(wrapper);
     this.cache.set(key, wrapper);
