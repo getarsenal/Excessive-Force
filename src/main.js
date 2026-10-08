@@ -1522,7 +1522,7 @@ async function boot() {
       case 'handhit':
         // The player's own round, on the money: a stamp of its own, the
         // ribbon, and the bonus where it landed.
-        hud.stamp('HAND LAID', data.point, 'hand', 58);
+        hud.stamp("GUNNER'S SHOT", data.point, 'hand', 58);
         ribbon('marksman');
         hud.popup(`+$${data.bonus.toLocaleString()}`, data.point, 'kill');
         feedback.emit('rank');
@@ -1888,7 +1888,7 @@ async function boot() {
   // centred where the round goes; ZOOM steps through the sight's
   // magnifications (`def.sight.zoom`), and the mark (`#lay-mark`) brackets
   // the fall of shot when the eye is not looking straight at it.
-  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-read"></div><div id="lay-hint">DRAG TO LAY THE GUN</div>
+  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-read"></div><div id="lay-hint">DRAG TO AIM</div>
     <button id="lay-done" type="button">DONE</button>
     <button id="lay-wpn" type="button" hidden>105 MM</button>
     <button id="lay-zoom" type="button" aria-label="Zoom">×1</button>
@@ -1967,7 +1967,7 @@ async function boot() {
         engine.scene.add(layView);
       }
     }
-    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO LAY THE GUN';
+    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO AIM';
     layPct = -1;
     // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
@@ -2682,7 +2682,7 @@ async function boot() {
     }
     if (level.sandbox) {
       // The range: the line is hot, and the one thing to know.
-      hud.status('range is hot \u00b7 deploy on the line, LAY a weapon, ZOOM through its sight', 7);
+      hud.status('range is hot \u00b7 deploy on the line, GUNNER on any weapon, ZOOM through its sight', 7);
       hud.feed('THE RANGE \u00b7 PAPER AT 50 \u00b7 POPPERS AT 100 \u00b7 GONGS TO 500 \u00b7 DRONES OVERHEAD', 'big');
       return;
     }

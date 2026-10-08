@@ -174,15 +174,15 @@ export class Tutorial {
         enter: () => { if (h.openDrawer !== 'orders') h.setDrawer?.('orders'); },
         done: () => b.smokeCooldown > 0,
         say: 'Smoke. The poor man\'s invisibility cloak. Works better than the expensive kind.' },
-      { ch: 2, el: '#uc2-lay', fallback: '#dock-units', title: 'LAY IT YOURSELF',
-        text: 'Tap a gun, then LAY: you are standing at the breech. Drag to aim it — the line is the shell\'s flight, the mark where it lands — and ZOOM looks through the gun\'s own sight, its cross on the point of impact. Press FIRE; the ring round it fills as the crew reload. A machine gun held on FIRE heats, and run hot it locks till it cools. SURVEY still works here. A hand-laid hit pays a bonus. DONE hands it back.',
+      { ch: 2, el: '#uc2-lay', fallback: '#dock-units', title: 'BE THE GUNNER',
+        text: 'Tap a gun, then GUNNER: you are standing at the breech. Drag to aim it — the line is the shell\'s flight, the mark where it lands — and ZOOM looks through the gun\'s own sight, its cross on the point of impact. Press FIRE; the ring round it fills as the crew reload. A machine gun held on FIRE heats, and run hot it locks till it cools. SURVEY still works here. A gunner's hit pays a bonus. DONE hands it back.',
         enter: () => {
           b.selectedUnitId = null; h.closeDrawer?.();
           const u = b.units.find((x) => x.alive && b.canLay(x));
           if (u) { this.unitCard?.show?.(u); this._fly(u.pos, 110); }
         },
         done: () => b.handShots > 0,
-        say: 'Lay it yourself. If you want a thing hit properly, you put your own thumb on it.' },
+        say: 'Be the gunner. If you want a thing hit properly, you put your own thumb on it.' },
 
       // ── 4. High-value targets.
       { ch: 3, world: () => siteLive(), title: 'GOLD DIAMONDS', ok: true, skip: () => !site(),

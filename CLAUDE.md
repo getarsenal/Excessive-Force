@@ -267,11 +267,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/structure/structure.js` support solver, collapse, damage ·
   `src/game/battle.js` units, targeting, impacts, win rules, the lift
   package, and the player's own hand on a gun (`startLay`/`layTurn`/
-  `handFire`: LAY on a gun's card, the camera the gunner's own eye behind
+  `handFire`: GUNNER on a gun's card (the code still calls it the lay), the camera the gunner's own eye behind
   the trail (`layEye`; the reload is a ring filling round FIRE), a drag
   lays it with the shell's flight drawn by the shell's own physics ray,
   FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
-  the HAND LAID stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
+  the GUNNER'S SHOT stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
   drives it on a phone; every round leaves its weapon's own muzzle
   (`def.muzzle`, forward and up; a mortar's the top of its tube; a gun
   with `def.barrel` has its barrel cut out of its model at load,

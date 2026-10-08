@@ -114,7 +114,7 @@ for (let guard = 0; guard < 140; guard++) {
     case 'ORDERS': await page.click('#dock-orders', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
     case 'FIRE MODE': await page.click('#orders-modes [data-mode="area"]', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
     case 'SMOKE': await page.click('#orders-smoke', { timeout: 4000 }).catch(() => log.push('  click missed')); break;
-    case 'LAY IT YOURSELF': {
+    case 'BE THE GUNNER': {
       // The step's enter() put a gun's card up; LAY takes it, FIRE when loaded.
       if (!(await page.evaluate(() => !!window.battle.lay))) await page.click('#uc2-lay', { timeout: 4000 }).catch(() => log.push('  click missed'));
       await page.evaluate(() => { const B = window.battle; for (let k = 0; k < 40 && B.lay && B.lay.unit.cooldown > 0; k++) window.__fastForward(0.5, 1 / 30); });

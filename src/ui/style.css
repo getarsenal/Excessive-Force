@@ -481,7 +481,7 @@ html, body {
 }
 .uc2-buttons button:hover { border-color: var(--edge-bright); color: var(--text); }
 #uc2-sell:hover { border-color: var(--warn); color: var(--warn); }
-/* LAY on its own row, full width: four across a phone card was 24 px each. */
+/* GUNNER on its own row, full width: four across a phone card was 24 px each. */
 .uc2-buttons { flex-wrap: wrap; }
 .uc2-buttons .uc2-lay { flex: 1 1 100%; min-height: 34px; color: #ffd25a !important; border-color: rgba(255, 210, 90, 0.55) !important; font-weight: 700; }
 .uc2-lay[hidden] { display: none; }

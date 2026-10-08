@@ -124,7 +124,7 @@ export class UnitCard {
         <div><span>Crew</span><b id="uc2-rank"></b></div>
       </div>
       <div class="uc2-buttons">
-        <button id="uc2-lay" class="uc2-lay">LAY</button>
+        <button id="uc2-lay" class="uc2-lay">GUNNER</button>
         <button id="uc2-focus">FOCUS</button>
         <button id="uc2-sell">SELL</button>
         <button id="uc2-close">CLOSE</button>
