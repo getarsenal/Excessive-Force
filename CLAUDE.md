@@ -273,7 +273,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
   the HAND LAID stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
   drives it on a phone; every round leaves its weapon's own muzzle
-  (`def.muzzle`, forward and up; a mortar's the top of its tube), a mortar
+  (`def.muzzle`, forward and up; a mortar's the top of its tube; a gun
+  with `def.barrel` has its barrel cut out of its model at load,
+  `src/game/barrel.js`: the tip found in the geometry, the axis by the
+  elevation along which the most surface lies, the tube's triangles hung
+  on a pivot at the trunnions, so the barrel is laid to every shot and to
+  the lay, recoils along its own line, and `_muzzle` is that barrel's end
+  at that elevation; a lob past the barrel's `max` falls back to the low
+  line; `node tools/barrelshot.mjs` photographs each gun at rest, level,
+  elevated and in recoil with the cut tinted red, `tools/muzzlecheck.mjs`
+  measures round start against barrel tip and `tools/gunfire.mjs` fires
+  each gun and prints the shell's start and line against the barrel's), a mortar
   is laid by range on the charge that makes the arc and never under
   forty-five degrees, with its crew live and loading while the player has
   it, and each weapon says where its gunner's eye is (`def.eye`: a
