@@ -295,7 +295,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   holds both and prints the trace); the M240's first-person gun
   (`weaponView`, soldier.js) is the receiver low in the frame, the barrel
   and front sight post, and the belt (`ammoBelt`) walking into the feed
-  tray a link a round; `node tools/flashshot.mjs` photographs it mid-burst; the mortar is laid from the plot
+  tray a link a round, its belly on a damped spring that each round yanks
+  and rattles; the gun carries its own flash at its flash hider (the
+  world's is skipped for a hand round) and kicks back and up a little a
+  round (`layRecoil` in main.js); `node tools/flashshot.mjs` photographs
+  it mid-burst; a mortar's shell leaving the tube jolts the plot and
+  thumps the phone; the mortar is laid from the plot
   (`sight.kind === 'plot'`): straight down on the tube and the fall of
   shot together, the drag walking the ring over the ground, CLOSE the
   same at half the height, EYE the gunner's own at the tube; the machine gun is laid too,

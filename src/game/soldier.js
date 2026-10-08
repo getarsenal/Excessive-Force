@@ -298,44 +298,82 @@ function machineGun(k, b, ground = 0.02) {
 }
 
 /**
- * A belt of linked 7.62, hanging from the mouth of the bag up into the
- * feed tray: a run of brass rounds on a dark spine of links. Its
- * `userData.advance(rounds)` walks the rounds along the belt by that many
- * link pitches, which is what the gunner sees as the gun eats it.
+ * A belt of linked 7.62, hanging out of the bag in a sag and up into the
+ * feed tray: brass rounds on a dark run of links, laid along a curve whose
+ * belly is on a damped spring. At rest it hangs and settles; fired through,
+ * every round pulled into the tray snaps it toward the gun and shakes it,
+ * so a long burst is a belt jumping and rattling under the receiver.
+ *
+ *   userData.advance(n)  n rounds pulled in: the rounds walk a link each
+ *                        and the belt is yanked
+ *   userData.update(dt)  the spring, and the belt laid again on it
  */
 export function ammoBelt(from, to, colour) {
   const g = new THREE.Group();
   g.name = 'belt';
-  // A sag between the two: out of the bag, bellied outward, up into the tray.
-  const mid = from.clone().lerp(to, 0.5); mid.x += Math.sign(from.x - to.x || 1) * 0.05; mid.y -= 0.01;
-  const curve = new THREE.QuadraticBezierCurve3(from.clone(), mid, to.clone());
-  const len = curve.getLength();
-  const pitch = 0.016, n = Math.max(2, Math.floor(len / pitch));
-  const spine = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.0035, 5, false),
-    new THREE.MeshStandardMaterial({ color: 0x2a2c27, roughness: 0.7, metalness: 0.3, emissive: 0x2a2c27, emissiveIntensity: 0.55 }));
-  g.add(spine);
+  const out = Math.sign(from.x - to.x || 1);
+  // Rest shape: out of the bag outward and down, a belly, up into the tray.
+  const c1r = from.clone().add(new THREE.Vector3(out * 0.04, -0.07, 0));
+  const c2r = to.clone().add(new THREE.Vector3(out * 0.07, -0.08, 0));
+  const curve = new THREE.CubicBezierCurve3(from.clone(), c1r.clone(), c2r.clone(), to.clone());
+  const len0 = curve.getLength();
+  const pitch = 0.016, n = Math.max(2, Math.floor(len0 / pitch) + 2);
   const brass = colour ?? TONE_COLOUR.brass;
-  // A touch over true size (7.62 by 51): at half a metre a true round is a hair.
-  const round = new THREE.CylinderGeometry(0.0055, 0.0055, 0.062, 6);
-  const rounds = new THREE.InstancedMesh(round, new THREE.MeshStandardMaterial({ color: brass, roughness: 0.45, metalness: 0.25, emissive: brass, emissiveIntensity: 0.45 }), n);
-  g.add(rounds);
-  const p = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3(), m = new THREE.Matrix4(), q = new THREE.Quaternion();
-  let phase = 0;
+  const rounds = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.0055, 0.0055, 0.062, 6),
+    new THREE.MeshStandardMaterial({ color: brass, roughness: 0.45, metalness: 0.25, emissive: brass, emissiveIntensity: 0.45 }), n);
+  const links = new THREE.InstancedMesh(new THREE.BoxGeometry(0.012, 0.008, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x2a2c27, roughness: 0.7, metalness: 0.3, emissive: 0x2a2c27, emissiveIntensity: 0.55 }), n);
+  for (const im of [rounds, links]) { im.frustumCulled = false; g.add(im); }
+  const p = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3(), m = new THREE.Matrix4(),
+    q = new THREE.Quaternion(), qL = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1), Z = new THREE.Vector3(0, 0, 1);
+  // The belly's spring: an offset from rest and its velocity, in the belt's plane and across it.
+  const off = new THREE.Vector3(), vel = new THREE.Vector3();
+  let phase = 0, rattle = 0;
   const lay = () => {
+    curve.v1.copy(c1r).addScaledVector(off, 0.6);
+    curve.v2.copy(c2r).add(off);
+    curve.updateArcLengths();
+    const len = curve.getLength();
     for (let i = 0; i < n; i++) {
-      const u = ((i * pitch + phase) % len) / len;
+      const s = (i * pitch + phase) % len;
+      const u = s / len;
       curve.getPointAt(u, p); curve.getTangentAt(u, t);
-      // A round lies across the belt, on the inside of the curve.
-      side.crossVectors(t, UP).normalize();
-      if (side.lengthSq() < 0.5) side.set(1, 0, 0);
-      q.setFromUnitVectors(UP, side);
-      m.compose(p, q, rounds.scale);
-      rounds.setMatrixAt(i, m);
+      // A round lies along the bore (the belt runs across it), a link square on the belt.
+      side.crossVectors(t, Z);
+      if (side.lengthSq() < 1e-6) side.set(1, 0, 0);
+      q.setFromUnitVectors(UP, Z);
+      m.compose(p, q, one); rounds.setMatrixAt(i, m);
+      qL.setFromUnitVectors(new THREE.Vector3(1, 0, 0), t);
+      p.addScaledVector(side.normalize(), 0.004);
+      m.compose(p, qL, one); links.setMatrixAt(i, m);
     }
     rounds.instanceMatrix.needsUpdate = true;
+    links.instanceMatrix.needsUpdate = true;
   };
   lay();
-  g.userData.advance = (k) => { if (!k) return; phase = (phase + k * pitch) % len; lay(); };
+  g.userData.advance = (k) => {
+    if (!k) return;
+    phase = (phase + k * pitch) % len0;
+    // Pulled in: the belly snaps toward the tray and up, and jumps about.
+    vel.x += -out * 0.18 * k + (Math.random() - 0.5) * 0.25;
+    vel.y += 0.22 * k + (Math.random() - 0.5) * 0.2;
+    vel.z += (Math.random() - 0.5) * 0.16;
+    rattle = Math.min(1, rattle + 0.35 * k);
+  };
+  g.userData.update = (dt) => {
+    if (dt <= 0) return;
+    // Stiff enough to swing back within a quarter second, loose enough to
+    // overshoot; gravity's sag is the rest shape, so the spring pulls to nought.
+    const K = 260, C = 9;
+    const st = Math.min(dt, 1 / 30);
+    vel.addScaledVector(off, -K * st).multiplyScalar(Math.max(0, 1 - C * st));
+    // The rattle: small fast shakes while it is being fired through, dying away.
+    if (rattle > 0.01) { vel.x += (Math.random() - 0.5) * 3 * rattle * st * 60 * 0.02; vel.y += (Math.random() - 0.5) * 3 * rattle * st * 60 * 0.02; }
+    rattle *= Math.exp(-dt * 6);
+    off.addScaledVector(vel, st);
+    off.clampLength(0, 0.05);
+    lay();
+  };
   return g;
 }
 
@@ -459,10 +497,49 @@ export function weaponView(weapon, colour = 0x4a5340, opts = {}) {
     const belt = ammoBelt(v(b.x + 0.15, b.y + 0.0, b.z + 0.36), tray, opts.tones?.brass);
     g.add(belt);
     g.userData.belt = belt;
+    // The muzzle flash at the flash hider, the gun's own (the world's flash
+    // is at the team's real muzzle, not where this gun is drawn): star
+    // petals along the bore and a disc across it, lit for a frame a round.
+    const flash = muzzleStar(0.48, 0.13);
+    flash.position.set(b.x, b.y + 0.04, b.z + 1.27);
+    flash.visible = false;
+    g.add(flash);
+    g.userData.flash = flash;
     return g;
   }
   launcher(k, 0, 0, 0, weapon);
   return partsToGroup(k.parts, colour, opts);
+}
+
+/** A soft star of light for a muzzle: two crossed petals along +Z, `len` long, and a disc of `r` across the bore. */
+let _starTex = null;
+function muzzleStar(len, r) {
+  if (!_starTex && typeof document !== 'undefined') {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,240,1)'); gr.addColorStop(0.25, 'rgba(255,214,140,0.9)');
+    gr.addColorStop(0.6, 'rgba(255,140,40,0.35)'); gr.addColorStop(1, 'rgba(255,90,10,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+    _starTex = new THREE.CanvasTexture(c);
+    _starTex.colorSpace = THREE.SRGBColorSpace;
+    _starTex.userData = { keep: true };
+  }
+  // Past the tone mapper, so a flash in desert noon still reads as light.
+  const mat = new THREE.MeshBasicMaterial({ map: _starTex, color: 0xfff0cc, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false, toneMapped: false });
+  const g = new THREE.Group();
+  g.name = 'flash';
+  for (const rz of [0, Math.PI / 2]) {
+    const petal = new THREE.Mesh(new THREE.PlaneGeometry(r * 1.4, len), mat);
+    petal.rotation.x = Math.PI / 2; petal.rotation.y = rz; petal.position.z = len / 2;
+    g.add(petal);
+  }
+  const disc = new THREE.Mesh(new THREE.PlaneGeometry(r * 2.6, r * 2.6), mat);
+  disc.position.z = 0.02;
+  g.add(disc);
+  g.traverse((o) => { o.renderOrder = 5; o.frustumCulled = false; });
+  return g;
 }
 
 function partsToGroup(parts, colour, opts = {}) {

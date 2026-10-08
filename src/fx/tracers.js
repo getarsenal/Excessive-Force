@@ -239,14 +239,14 @@ export class TracerFX {
   }
 
   /**
-   * The muzzle flash: every round has one, tracer or not. A round fired by
-   * the player's own hand (`hand`) is seen from the gunner's eye a foot
-   * behind the muzzle, where the flash that reads from fifty metres fills
-   * the screen: his is a sixteenth the size (a hand's breadth at the
-   * muzzle), a third the light, briefer, and never widened to a minimum
-   * on the screen.
+   * The muzzle flash: every round has one, tracer or not; a round fired by
+   * the player's own hand (`hand`) has the first-person gun's instead.
    */
   _flash(from, dir, look, hand = false) {
+    // The gun under the player's own eye carries its own flash at its own
+    // muzzle (soldier.js `weaponView`); the world's would be a second one
+    // at the team's real muzzle, a foot from the lens.
+    if (hand) return;
     if (this.flashes.length >= MAX_FLASHES && look.player) {
       const k = this.flashes.findIndex((f) => !f.player);
       if (k >= 0) this.flashes.splice(k, 1);

@@ -46,7 +46,11 @@ await page.evaluate(() => {
   window.__frame();
   console.log('[flash] rounds ' + B.lay.rounds + ' heat ' + B.lay.heat.toFixed(2) + ' flashes ' + B.tracerFX.flashes.length + ' sizes ' + B.tracerFX.flashes.map((f) => f.size.toFixed(2) + '/' + f.gain + '/' + f.minPx).join(' '));
 });
+// The flash lives forty-five milliseconds and the capture is several frames
+// late: held on for the picture, with the kick at its height.
+await page.evaluate(() => { const R = window.__lay.recoil; R.flash = 30; R.z = 0.04; R.p = 0.025; });
 await hot('hand');
+await page.evaluate(() => { const R = window.__lay.recoil; R.flash = 0; });
 await page.evaluate(() => {
   const B = window.battle;
   for (const f of B.tracerFX.flashes) { f.size *= 5; f.gain = 1; f.minPx = 3; f.t = 0.01; f.life = 0.072; }

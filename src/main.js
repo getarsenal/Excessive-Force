@@ -1910,6 +1910,9 @@ async function boot() {
   // are hidden, since from inside the gunner's own head they are a helmet
   // and a pack, and the launcher or the gun alone is drawn under the eye.
   let layView = null, layViewUnit = null;
+  // The first-person gun's kick (back, muzzle up, a twitch aside), its
+  // flash's remaining life, and the plot's jolt when a mortar's shell leaves.
+  const layRecoil = { rounds: 0, z: 0, p: 0, y: 0, flash: 0, shake: 0, plotKick: 0 };
   // The neighbours within arm's reach of the eye: a battery is laid two and
   // a half metres apart, so the next team's man can be standing a metre
   // from the gunner's face, a black wall over half the picture. They are
@@ -2224,6 +2227,20 @@ async function boot() {
     const u = L.unit;
     battle.layEye(_eye);
     L.kick = Math.max(0, L.kick - dt * 2.5);
+    // A machine gun's rounds since the last frame: each kicks the gun back
+    // and up into the shoulder and lights its flash for a frame.
+    // The last frame's kick settles first, so a round fired in a long frame still shows.
+    const rk = Math.exp(-dt * 20);
+    layRecoil.z *= rk; layRecoil.p *= rk; layRecoil.y *= rk;
+    layRecoil.flash -= dt;
+    const fresh = Math.max(0, (L.rounds || 0) - layRecoil.rounds);
+    layRecoil.rounds = L.rounds || 0;
+    if (fresh) {
+      layRecoil.z = Math.min(0.045, layRecoil.z + 0.016 * fresh);
+      layRecoil.p = Math.min(0.03, layRecoil.p + 0.007 * fresh * (0.7 + Math.random() * 0.6));
+      layRecoil.y += (Math.random() - 0.5) * 0.006 * fresh;
+      layRecoil.flash = 0.045;
+    }
     const mag = layMag();
     const aimed = layAimed();
     if (layPlot()) {
@@ -2235,6 +2252,17 @@ async function boot() {
       const h = layPlotHeight();
       _eye.set(L.impact.x - Math.sin(L.yaw) * h * 0.04, L.impact.y + h, L.impact.z - Math.cos(L.yaw) * h * 0.04);
       _look.copy(L.impact);
+      // The shot: the shell leaving the tube (`_mortarLaunch` kicks the lay)
+      // jolts the whole picture, hard and then settling, and the phone
+      // thumps once.
+      if (L.kick > layRecoil.plotKick + 0.5) { layRecoil.shake = 1; feedback.emit('impact'); }
+      layRecoil.plotKick = L.kick;
+      if (layRecoil.shake > 0.01) {
+        const a = layRecoil.shake * layRecoil.shake * h * 0.022;
+        _eye.x += (Math.random() - 0.5) * a; _eye.z += (Math.random() - 0.5) * a; _eye.y += (Math.random() - 0.5) * a * 0.5;
+        _look.x += (Math.random() - 0.5) * a * 0.6; _look.z += (Math.random() - 0.5) * a * 0.6;
+        layRecoil.shake *= Math.exp(-dt * 5);
+      }
       engine.camera.up.set(Math.sin(L.yaw), 0, Math.cos(L.yaw));
       engine.camera.position.copy(_eye);
       engine.camera.lookAt(_look);
@@ -2257,9 +2285,9 @@ async function boot() {
       _look.copy(L.impact);
       const dx = _look.x - _eye.x, dz = _look.z - _eye.z, dist = Math.max(0.5, Math.hypot(dx, dz));
       const jolt = L.kick > 0 ? Math.sin(L.kick * 37) * 0.012 * L.kick / mag * dist : 0;
-      _look.y += kick * dist;
-      _look.x += Math.sin(L.yaw + Math.PI / 2) * jolt;
-      _look.z += Math.cos(L.yaw + Math.PI / 2) * jolt;
+      _look.y += kick * dist + layRecoil.p * 0.35 * dist / mag;
+      _look.x += Math.sin(L.yaw + Math.PI / 2) * (jolt + layRecoil.y * dist / mag);
+      _look.z += Math.cos(L.yaw + Math.PI / 2) * (jolt + layRecoil.y * dist / mag);
     } else {
       const pitch = (u.def.eye?.pitch ?? Math.min(0.72, 0.05 + L.elev * 0.55)) + L.kick * L.kick * 0.06;
       // Along the line of fire, or, for a crew-served weapon whose gunner
@@ -2280,11 +2308,18 @@ async function boot() {
       _vr.set(1, 0, 0).applyQuaternion(engine.camera.quaternion);
       _vu.set(0, 1, 0).applyQuaternion(engine.camera.quaternion);
       _vf.set(0, 0, -1).applyQuaternion(engine.camera.quaternion);
-      layView.position.copy(_eye).addScaledVector(_vu, -V.down).addScaledVector(_vr, V.right).addScaledVector(_vf, -L.kick * 0.07);
-      // The belt walks into the feed tray at the gun's own rate while it fires.
+      layView.position.copy(_eye).addScaledVector(_vu, -V.down).addScaledVector(_vr, V.right).addScaledVector(_vf, -L.kick * 0.07 - layRecoil.z);
+      // The muzzle climbs a little with each round and settles.
+      if (layRecoil.p > 1e-4) layView.rotateX(-layRecoil.p);
+      // The belt walks into the feed tray a link for every round fired, and swings and rattles on its spring.
       const belt = layView.userData.belt;
-      // The belt walks into the feed tray a link for every round fired.
-      if (belt) { const n = (L.rounds || 0) - (layView.userData.rounds || 0); if (n > 0) belt.userData.advance(n); layView.userData.rounds = L.rounds || 0; }
+      if (belt) { const n = (L.rounds || 0) - (layView.userData.rounds || 0); if (n > 0) belt.userData.advance(n); layView.userData.rounds = L.rounds || 0; belt.userData.update(dt); }
+      const flash = layView.userData.flash;
+      if (flash) {
+        const on = layRecoil.flash > 0;
+        if (on && !flash.visible) { flash.rotation.z = Math.random() * Math.PI; flash.scale.setScalar(0.75 + Math.random() * 0.5); }
+        flash.visible = on;
+      }
     }
     // The mark on the fall of shot, when the eye is not already on it.
     if (aimed) { if (!layMark.hidden) layMark.hidden = true; }
@@ -2302,7 +2337,7 @@ async function boot() {
     rig.target.copy(u.pos).setY(u.pos.y + 2); rig.desiredTarget.copy(rig.target);
     rig.yaw = rig.desiredYaw = L.yaw + Math.PI;
   };
-  window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand, zoom: zoomLay, mag: layMag, hold: (on) => { layHold = !!on; } };   // for the harness
+  window.__lay = { enter: enterLay, exit: exitLay, fire: fireHand, zoom: zoomLay, mag: layMag, hold: (on) => { layHold = !!on; }, recoil: layRecoil };   // for the harness
   window.__seat = { enter: enterSeat, exit: exitSeat, fire: fireHand, zoom: zoomLay, hold: (on) => { layHold = !!on; }, switch: () => { battle.seatSwitch(); seatWeaponLabel(); } };
   /** The GUNNER button: up while an aircraft is on station and nobody is at a gun. */
   const seatButton = () => {
