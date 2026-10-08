@@ -253,7 +253,9 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   unlocked; no airlift; the field works unmanned and hidden; the camera's
   focus pinned to the line, `rig.panLocked`) with the bullet-trap berm as its one Structure
   and its readouts hidden (`body.range`), the tally on the top bar
-  (`#range-board`). `node tools/rangeprobe.mjs [light|fire]` loads it,
+  (`#range-board`: the rounds fired down the range and the share that
+  found a target, `range.open`/`close` round each impact and each MG
+  round, then the tally). `node tools/rangeprobe.mjs [light|fire]` loads it,
   lays an M240, a Stryker and an M777 on the paper, a popper, a gong and
   the shack, lets the MG at the drones, waits for the rebuild and reads
   the board.
@@ -271,7 +273,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the trail (`layEye`; the reload is a ring filling round FIRE), a drag
   lays it with the shell's flight drawn by the shell's own physics ray,
   FIRE sends one round with no dispersion; a hand-laid hit pays a bonus,
-  the GUNNER'S SHOT stamp and the `marksman` ribbon; `node tools/layprobe.mjs`
+  the GUNNER'S SHOT stamp and the `marksman` ribbon; the hand's round is
+  watched (`_armSpot`, `battle.handRound`): over the readout `#lay-spot`
+  counts the drawn line's time of flight down to SPLASH, then the
+  spotter's call (`_spotFall`: OVER/SHORT and LEFT/RIGHT in metres off
+  the line from the gun to the designated point or the crew's own aim,
+  ON TARGET, DEFLECTED, LOST), and a red cross (`fallMark`) stands where
+  the gun's last round fell (`u.lastFall`); NEXT GUN (`#lay-next`, over
+  DONE) takes the next layable gun; `node tools/spotprobe.mjs` fires one
+  short and reads the calls; `node tools/layprobe.mjs`
   drives it on a phone; every round leaves its weapon's own muzzle
   (`def.muzzle`, forward and up; a mortar's the top of its tube; a gun
   with `def.barrel` has its barrel cut out of its model at load,
@@ -287,7 +297,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   barrel sheet frames the trunnions), so the barrel is laid to every shot and to
   the lay, recoils along its own line, and `_muzzle` is that barrel's end
   at that elevation; a lob past the barrel's `max` falls back to the low
-  line; `node tools/barrelshot.mjs` photographs each gun at rest, level,
+  line; a gun swings onto a new bearing at its own `def.traverse`
+  (radians a second, `_traverse`) and fires only when on it, the barrel
+  rising toward the shot's elevation as it swings (`_leadBarrel`) and
+  settling to `barrel.ready` after eight idle seconds; the M270 and M142
+  boxes are cut the same way and their rockets leave the cells in turn
+  (`barrel.cells`); after a shot the muzzle smokes for four and a half
+  seconds (`_muzzleSmoke`, `fx.wisp`), and the laid M240 run hot smokes
+  off its jacket (`node tools/smokeshot.mjs`); `node tools/traverseprobe.mjs`
+  times a swing; `node tools/barrelshot.mjs` photographs each gun at rest, level,
   elevated and in recoil with the cut tinted red, `tools/muzzlecheck.mjs`
   measures round start against barrel tip and `tools/gunfire.mjs` fires
   each gun and prints the shell's start and line against the barrel's), a mortar

@@ -812,6 +812,24 @@ export class ExplosionFX {
     }
   }
 
+  /**
+   * A wisp of smoke off hot metal: a gun's muzzle in the seconds after the
+   * shot, a machine gun's barrel run hot. Thin, slow, rising, drifting;
+   * `size` scales it from a rifle-calibre barrel (0.15) to a howitzer's (1).
+   */
+  wisp(pos, size = 1, alpha = 0.24, drift = null) {
+    const j = 0.08 * size;
+    this.smoke.spawn({
+      x: pos.x + (Math.random() - 0.5) * j, y: pos.y + (Math.random() - 0.5) * j, z: pos.z + (Math.random() - 0.5) * j,
+      vx: (drift ? drift.x : 0) + (Math.random() - 0.5) * 0.4 * size, vy: (0.25 + Math.random() * 0.35) * Math.max(0.4, size),
+      vz: (drift ? drift.z : 0) + (Math.random() - 0.5) * 0.4 * size,
+      life: 1.6 + Math.random() * 1.4,
+      size0: 0.18 * size, size1: (1.1 + Math.random() * 0.8) * size,
+      color0: this._c.smokeLight, color1: this._c.smokeLight,
+      drag: 0.9, grav: 0.25 * Math.max(0.3, size), turb: 0.7 * size, alpha,
+    });
+  }
+
   /** Thin smoke trail behind a shell in flight. */
   trail(pos, scale = 1) {
     this.smoke.spawn({

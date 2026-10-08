@@ -1519,6 +1519,14 @@ async function boot() {
         feedback.emit('deny'); hud.deny();
         hud.showPrompt(data.reason, 'warn');
         break;
+      case 'spot':
+        // The spotter's call on the gunner's round (battle._spotFall).
+        if (battle.lay && battle.lay.unit === data.unit) {
+          laySpot.text = data.text;
+          laySpot.cls = data.on || data.text === 'ON THE MARK' ? 'on' : 'miss';
+          laySpot.until = performance.now() / 1000 + 6;
+        }
+        break;
       case 'handhit':
         // The player's own round, on the money: a stamp of its own, the
         // ribbon, and the bonus where it landed.
@@ -1888,8 +1896,12 @@ async function boot() {
   // centred where the round goes; ZOOM steps through the sight's
   // magnifications (`def.sight.zoom`), and the mark (`#lay-mark`) brackets
   // the fall of shot when the eye is not looking straight at it.
-  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-read"></div><div id="lay-hint">DRAG TO AIM</div>
+  // Over the readout, the spotter: the round's time of flight counting
+  // down to SPLASH, then where it fell (battle._spotFall). NEXT GUN takes
+  // the next gun in the battery without stepping back out to the map.
+  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-talk"><div id="lay-spot" hidden></div><div id="lay-read"></div></div><div id="lay-hint">DRAG TO AIM</div>
     <button id="lay-done" type="button">DONE</button>
+    <button id="lay-next" type="button" hidden>NEXT GUN</button>
     <button id="lay-wpn" type="button" hidden>105 MM</button>
     <button id="lay-zoom" type="button" aria-label="Zoom">×1</button>
     <button id="lay-fire" type="button" aria-label="Fire">FIRE</button>`;
@@ -1901,6 +1913,12 @@ async function boot() {
   // The gunner's seat on an aircraft on station (battle.startSeat): the
   // same HUD, the camera the sensor ball's, the aircraft flying itself.
   const layWpn = layEl.querySelector('#lay-wpn');
+  const laySpotEl = layEl.querySelector('#lay-spot'), layNext = layEl.querySelector('#lay-next');
+  // The spotter's last call, and until when it stands on the screen.
+  const laySpot = { text: '', cls: '', until: 0 };
+  let laySpotShown = null;
+  /** The battery's guns a player can take, in the order they were deployed. */
+  const layable = () => battle.units.filter((o) => battle.canLay(o));
   let seatZoom = 0;
   const SEAT_ZOOM = [1, 2, 4];
   const seatBtn = document.createElement('button');
@@ -1912,7 +1930,8 @@ async function boot() {
   let layView = null, layViewUnit = null;
   // The first-person gun's kick (back, muzzle up, a twitch aside), its
   // flash's remaining life, and the plot's jolt when a mortar's shell leaves.
-  const layRecoil = { rounds: 0, z: 0, p: 0, y: 0, flash: 0, shake: 0, plotKick: 0 };
+  const layRecoil = { rounds: 0, z: 0, p: 0, y: 0, flash: 0, shake: 0, plotKick: 0, smoke: 0 };
+  const _smk = new THREE.Vector3();
   // The neighbours within arm's reach of the eye: a battery is laid two and
   // a half metres apart, so the next team's man can be standing a metre
   // from the gunner's face, a black wall over half the picture. They are
@@ -1969,6 +1988,8 @@ async function boot() {
     }
     layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO AIM';
     layPct = -1;
+    laySpot.until = 0; laySpotShown = null;
+    layNext.hidden = layable().length < 2;
     // A cut to the gun, not a glide: the pose is set and then held.
     layFrame();
     layCamera(0);
@@ -2008,6 +2029,7 @@ async function boot() {
     applySeatZoom();
     seatWeaponLabel();
     layMark.hidden = true;
+    layNext.hidden = true; laySpotEl.hidden = true;
     layHint.textContent = 'DRAG THE CROSS ONTO THE TARGET';
     seatFrame();
     seatCamera(0);
@@ -2066,6 +2088,16 @@ async function boot() {
     feedback.emit('tick');
   };
   layEl.querySelector('#lay-done').addEventListener('click', () => { exitLay(); feedback.emit('tick'); });
+  layNext.addEventListener('click', () => {
+    const L = battle.lay;
+    if (!L) return;
+    const list = layable();
+    if (list.length < 2) { layNext.hidden = true; return; }
+    const next = list[(list.indexOf(L.unit) + 1) % list.length];
+    exitLay();
+    enterLay(next);
+    feedback.emit('tick');
+  });
   layZoomBtn.addEventListener('click', () => zoomLay(1));
   layWpn.addEventListener('click', () => { battle.seatSwitch(); seatWeaponLabel(); feedback.emit('tick'); });
   seatBtn.addEventListener('click', () => { const list = battle.seatable(); if (list.length) enterSeat(list[0]); });
@@ -2191,6 +2223,21 @@ async function boot() {
     const sp = battle.laySpread(L);
     const t = `${u.def.name} · ${Math.round(L.range)} m${sp > 0 ? ` ±${Math.round(sp)}` : ''}${mg || top ? '' : ` · ${deg}°`}${L.masonry ? ' · ON THE STONE' : L.blocked && !mg ? ' · BLOCKED' : ''} · ${state}`;
     if (layRead.textContent !== t) layRead.textContent = t;
+    // The round in the air, counting down; then the spotter's call.
+    const H = battle.handRound;
+    let st = '', cls = '';
+    if (H && H.unit === u) {
+      const left = H.eta - H.t;
+      st = left > 0.05 ? `SHOT OUT · SPLASH ${left.toFixed(1)}` : 'SPLASH';
+      cls = 'flight';
+    } else if (laySpot.until > performance.now() / 1000) { st = laySpot.text; cls = laySpot.cls; }
+    const key = st + cls;
+    if (key !== laySpotShown) {
+      laySpotShown = key;
+      laySpotEl.hidden = !st;
+      laySpotEl.textContent = st;
+      laySpotEl.className = cls;
+    }
   };
   /**
    * The gunner's eye, after the rig has placed the camera for the frame:
@@ -2319,6 +2366,18 @@ async function boot() {
         const on = layRecoil.flash > 0;
         if (on && !flash.visible) { flash.rotation.z = Math.random() * Math.PI; flash.scale.setScalar(0.75 + Math.random() * 0.5); }
         flash.visible = on;
+      }
+      // A barrel run hot smokes, off the flash hider and back along the
+      // jacket, thicker the hotter it is, and on after the trigger is let go.
+      if (u.def.mg && flash && battle.fx?.wisp) {
+        const h = L.over > 0 ? 1 : (L.heat || 0);
+        if (h > 0.35) {
+          layRecoil.smoke += dt * (h - 0.35) * 34;
+          for (; layRecoil.smoke >= 1; layRecoil.smoke -= 1) {
+            flash.getWorldPosition(_smk).addScaledVector(_vf, -0.05 - Math.random() * 0.55);
+            battle.fx.wisp(_smk, 0.16, 0.16 + 0.22 * h);
+          }
+        } else layRecoil.smoke = 0;
       }
     }
     // The mark on the fall of shot, when the eye is not already on it.

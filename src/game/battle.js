@@ -310,7 +310,9 @@ export class Battle {
       if (sol) elev = Math.atan2(sol.y, Math.hypot(sol.x, sol.z));
       else if (p.gravity <= 0) elev = Math.atan2(aim.y - from.y, Math.hypot(aim.x - from.x, aim.z - from.z));
     }
-    this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [],
+    this.lay = { unit, yaw, elev, from, impact: new THREE.Vector3(), masonry: false, hit: false, range: 0, pts: [], tof: 0,
+      // What the crew had it laid on: the spotter's reference when nothing is designated.
+      ref: aim ? aim.clone() : null,
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye;
       // the barrel's heat and its lock, for the machine gun.
       reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0, rounds: 0, streaming: false };
@@ -409,6 +411,23 @@ export class Battle {
     poseBarrel(u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
   }
 
+  /**
+   * A gun's muzzle after the shot: a thread of smoke out of the bore,
+   * thick at first and thinning over four and a half seconds, drifting
+   * out along the barrel's line. Not drawn for a gun too far off to see it.
+   */
+  _muzzleSmoke(u, dt) {
+    u.smokeT -= dt;
+    if (!this.fx?.wisp || !u.group.visible || this.camera.position.distanceToSquared(u.pos) > 360 * 360) return;
+    const k = Math.max(0, u.smokeT / 4.5);
+    u.smokeAcc = (u.smokeAcc || 0) + dt * (2 + 12 * k * k) * (this.fx.quality?.name === 'low' ? 0.5 : 1);
+    if (u.smokeAcc < 1) return;
+    u.smokeAcc -= 1;
+    const tip = this._muzzle(u);
+    const size = u.def.projectile?.mortar ? 0.35 : 0.55;
+    this.fx.wisp(tip, size + 0.6 * size * k, 0.16 + 0.24 * k, { x: Math.sin(u.yaw) * 0.6 * k, z: Math.cos(u.yaw) * 0.6 * k });
+  }
+
   /** A crew turning its gun to `wantYaw` at its own rate (`def.traverse`, radians a second). */
   _traverse(u, dt) {
     const d = angleDiff(u.wantYaw, u.yaw);
@@ -438,6 +457,7 @@ export class Battle {
     if (!P) return;
     A.pending = null;
     const ok = this._fireOne(u, P.impact, { vel: P.vel, hand: true, from: P.from });
+    if (ok) this._armSpot(u, P.tof, P.ref);
     if (!ok) return;
     if (this.lay && this.lay.unit === u) this.lay.kick = 1;
     this.handShots++;
@@ -892,7 +912,8 @@ export class Battle {
     const speed = Math.max(1, Math.hypot(v.x, v.y, v.z));
     const tFlight = g > 0 ? (v.y + Math.sqrt(v.y * v.y + 2 * g * drop)) / g : edge * 2 / speed;
     const step = THREE.MathUtils.clamp((tFlight * 1.1) / (LAY_PTS - 2), 0.04, 0.25);
-    for (let i = 1, t = 0; i < LAY_PTS; i++) {
+    let t = 0;
+    for (let i = 1; i < LAY_PTS; i++) {
       t += step;
       pos.set(L.from.x + v.x * t, L.from.y + v.y * t - 0.5 * g * t * t, L.from.z + v.z * t);
       dir.subVectors(pos, prev);
@@ -915,6 +936,7 @@ export class Battle {
       if (Math.abs(pos.x) > edge || Math.abs(pos.z) > edge) break;
     }
     L.pts = pts;
+    L.tof = t;
     L.impact.copy(pts[pts.length - 1]);
     L.range = Math.hypot(L.impact.x - L.from.x, L.impact.z - L.from.z);
     // Met the town inside forty metres: the barrel is pointing at a wall.
@@ -948,6 +970,23 @@ export class Battle {
     ring.rotation.x = -Math.PI / 2; ring.renderOrder = 31; ring.frustumCulled = false; ring.visible = false;
     this.scene.add(ring);
     this.layRing = ring;
+    // Where the last round fell: a red cross and a ring on the ground, so
+    // the next one is laid off the last and not off the drawn line alone.
+    const mark = new THREE.Group();
+    const red = new THREE.MeshBasicMaterial({ color: 0xff3b2a, transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide });
+    const bar = new THREE.PlaneGeometry(4.2, 0.45);
+    for (const a of [Math.PI / 4, -Math.PI / 4]) {
+      const m = new THREE.Mesh(bar, red);
+      m.rotation.set(-Math.PI / 2, 0, a);
+      m.renderOrder = 31; m.frustumCulled = false;
+      mark.add(m);
+    }
+    const o = new THREE.Mesh(new THREE.RingGeometry(1.6, 1.95, 28), red);
+    o.rotation.x = -Math.PI / 2; o.renderOrder = 31; o.frustumCulled = false;
+    mark.add(o);
+    mark.visible = false;
+    this.scene.add(mark);
+    this.fallMark = mark;
   }
 
   /** One round down the drawn line. False if the gun is not ready. */
@@ -975,7 +1014,7 @@ export class Battle {
     // (`_animateMortar`), a third of a second after the press.
     if (u.live && u.def.projectile.mortar) {
       if (u.live.pending) return false;
-      u.live.pending = { impact: L.impact.clone(), vel, from: L.from.clone() };
+      u.live.pending = { impact: L.impact.clone(), vel, from: L.from.clone(), tof: L.tof, ref: L.ref };
       u.live.drop = 0;
       u.cooldown = u.def.reload * this.reloadFactor;
       L.reloadTotal = u.cooldown;
@@ -987,9 +1026,71 @@ export class Battle {
       L.reloadTotal = u.cooldown;
       L.kick = 1;
       this.handShots++;
+      this._armSpot(u, L.tof, L.ref);
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }
     return ok;
+  }
+
+  /**
+   * The round just fired by the gunner's hand is watched: it carries the
+   * spotter's note (`proj.spot`), and `handRound` is the clock the gunner
+   * reads it by, the drawn line's time of flight counting down to SPLASH.
+   */
+  _armSpot(u, tof, ref) {
+    const p = this._lastProj;
+    if (!p) return;
+    p.spot = { unit: u, from: u.pos.clone(), ref: ref ? ref.clone() : null };
+    this.handRound = { unit: u, proj: p, eta: tof || 0, t: 0 };
+  }
+
+  /**
+   * Where the gunner's round fell, called the way an observer calls it:
+   * OVER or SHORT along the line from the gun to the target and LEFT or
+   * RIGHT of it, in metres, or ON TARGET. The target is the designated
+   * point, or what the crew had the gun laid on. The fall is kept on the
+   * gun (`u.lastFall`) and marked on the ground while it is laid.
+   */
+  _spotFall(spot, point, on) {
+    const u = spot.unit;
+    u.lastFall = point.clone();
+    if (this.handRound && this.handRound.unit === u) this.handRound = null;
+    let text = 'ON TARGET', along = 0, across = 0;
+    if (on === 'deflect') text = 'DEFLECTED';
+    else if (!on) {
+      const ref = this.target || spot.ref;
+      const dx = point.x - spot.from.x, dz = point.z - spot.from.z;
+      if (!ref) text = `SPLASH · ${Math.round(Math.hypot(dx, dz))} M`;
+      else {
+        const fx = ref.x - spot.from.x, fz = ref.z - spot.from.z, R = Math.max(1, Math.hypot(fx, fz));
+        along = (dx * fx + dz * fz) / R - R;
+        across = (dz * fx - dx * fz) / R;
+        const parts = [];
+        if (Math.abs(along) >= 4) parts.push(`${along > 0 ? 'OVER' : 'SHORT'} ${Math.round(Math.abs(along))}`);
+        if (Math.abs(across) >= 4) parts.push(`${across > 0 ? 'RIGHT' : 'LEFT'} ${Math.round(Math.abs(across))}`);
+        text = parts.length ? parts.join(' · ') : 'ON THE MARK';
+      }
+    }
+    this.onEvent('spot', { unit: u, text, on: on === true, along, across, point: point.clone() });
+  }
+
+  /** The gunner's watched round and the mark of the last one's fall, each frame. */
+  _spotUpdate(dt) {
+    const H = this.handRound;
+    // A round that left the map, or a deflection's second flight, is let go;
+    // one that never came down anywhere is called lost.
+    if (H && ((H.t += dt) > H.eta + 6 || !H.proj.alive)) {
+      this.handRound = null;
+      if (H.proj.spot) { H.proj.spot = null; this.onEvent('spot', { unit: H.unit, text: 'LOST', on: false, along: 0, across: 0, point: null }); }
+    }
+    const M = this.fallMark;
+    if (!M) return;
+    const f = this.lay?.unit.lastFall;
+    M.visible = !!f;
+    if (f) {
+      M.position.set(f.x, f.y + 0.35, f.z);
+      M.scale.setScalar(THREE.MathUtils.clamp(this.lay.range / 120, 1, 4));
+    }
   }
 
   /**
@@ -2647,11 +2748,13 @@ export class Battle {
       }
     }
 
-    this.projectiles.fire({
+    this._lastProj = this.projectiles.fire({
       pos: from, vel, gravity: p.gravity, kind: p.kind, speed: p.speed,
       warhead: def.warhead, owner: unit, target: aim, trail: p.trail, hand: !!opts.hand,
     });
 
+    // A gun's barrel, or a mortar's tube, goes on smoking for a few seconds after the shot.
+    if ((unit.barrelB || p.mortar) && p.kind !== 'rocket') unit.smokeT = 4.5;
     const dir = vel.clone().normalize();
     this.fx.muzzleFlash(from, dir, def.warhead.fx * (opts.hand ? 0.3 : 1));
     if (p.kind !== 'rocket' && this.fx.flourish && !opts.hand) {
@@ -2755,6 +2858,7 @@ export class Battle {
 
       if (this.invulnerable) u.health = u.maxHealth;
       if (u.barrel) this._updateBarrel(u, dt);
+      if (u.smokeT > 0) this._muzzleSmoke(u, dt);
       if (u.wantYaw != null && !u.handHeld) this._traverse(u, dt);
 
       // Time in place. After half a minute the crew has dug in.
@@ -2923,6 +3027,14 @@ export class Battle {
 
   /** One round of a burst: the tracer, the hit, and the pinning. */
   _mgRound(u) {
+    // On the range every round is counted, and the board says how many found something.
+    if (!this.range) { this._mgRound1(u); return; }
+    this.range.open();
+    this._mgRound1(u);
+    this.range.close();
+  }
+
+  _mgRound1(u) {
     const mg = u.def.mg;
     const t = u.mgTarget;
     if (!t) return;
@@ -3315,7 +3427,10 @@ export class Battle {
   _onImpact(hit) {
     const { point, proj } = hit;
     const w = proj.warhead;
-    if (this._splash(hit, w) && !(proj.kind === 'bomb' && proj.strikeDef)) return;
+    // The gunner's own round: the spotter calls where it fell (`_spotFall`).
+    const spot = proj.spot;
+    if (spot) proj.spot = null;
+    if (this._splash(hit, w) && !(proj.kind === 'bomb' && proj.strikeDef)) { if (spot) this._spotFall(spot, point, false); return; }
     if (proj.kind === 'bomb' && proj.strikeDef) { this._strikeImpact(hit); return; }
 
     // Defensive mortar fire lands on the player's guns. It chips whatever it
@@ -3346,12 +3461,14 @@ export class Battle {
     // arrived anywhere yet.
     if (this.turret && hit.owner === this.turret) {
       const r = this.turret.hit(hit, proj, this);
-      if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); return; }
+      if (r === 'deflect' || r === 'bite') { this._lastImpact = point.clone(); if (spot) this._spotFall(spot, point, 'deflect'); return; }
     }
     // The range's targets: a round into one, and the blast near any of them.
     if (this.range) {
+      if (proj.owner && !proj.hostile) this.range.open();
       if (hit.owner && hit.owner.range) this.range.hit(hit.owner, point, w, proj.owner || null);
       this.range.blast(point, w);
+      this.range.close();
     }
     // A round into a launcher or a radar itself (their colliders carry the
     // record as owner): the hit is the hit, over and above the blast that
@@ -3415,6 +3532,7 @@ export class Battle {
     if (this.stores) this.stores.blast(at, splashR);
     this._samBlast(at, splashR, blastPower);
     const killed = this.garrison.splash(at, splashR, power);
+    if (spot) this._spotFall(spot, at, destroyed > 0 || killed > 0 || !!(hit.owner && (hit.owner.range || hit.owner.sam)));
     if (killed) {
       this.defendersKilled += killed;
       const bounty = Math.round(killed * MONEY_PER_DEFENDER * (this.bountyScale || 1));
@@ -3585,6 +3703,7 @@ export class Battle {
 
   update(dt) {
     if (this.lay && (!this.lay.unit.alive || this.state !== 'playing')) this.endLay();
+    this._spotUpdate(dt);
     this._updateSeat(dt);
     if (this.state !== 'playing') {
       // The fight is over; the sky is not. Transports still in the air fly

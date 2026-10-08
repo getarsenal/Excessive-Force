@@ -496,12 +496,25 @@ html, body {
    the dock, DONE under the left; the dock itself steps back. */
 #lay { position: absolute; inset: 0; pointer-events: none; z-index: 17; }
 #lay[hidden] { display: none; }
-#lay-read {
+#lay-talk {
   /* Down with the controls, between DONE and FIRE: the talk band lands in
      the middle of the picture on a portrait phone with a tall right-hand
-     column, which is exactly where the gunner is looking. */
+     column, which is exactly where the gunner is looking. The spotter's
+     line stands on the readout. */
   position: absolute; left: 50%; bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 54px); transform: translateX(-50%);
-  width: max-content; max-width: calc(100vw - var(--pad-l) - var(--pad-r) - 184px); text-align: center; white-space: normal; line-height: 1.5;
+  width: max-content; max-width: calc(100vw - var(--pad-l) - var(--pad-r) - 184px);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+#lay-spot {
+  padding: 5px 12px; font: 700 12px/1.3 var(--f-ui); letter-spacing: 0.14em; font-variant-numeric: tabular-nums; text-align: center;
+  background: rgba(10, 12, 14, 0.82); border: 1px solid var(--edge-bright); color: #f1e8d6;
+}
+#lay-spot[hidden] { display: none; }
+#lay-spot.flight { color: #ffd25a; border-color: rgba(255, 210, 90, 0.55); }
+#lay-spot.miss { color: #ff8a6a; border-color: rgba(255, 90, 60, 0.6); }
+#lay-spot.on { color: #9df0a8; border-color: rgba(120, 230, 140, 0.6); }
+#lay-read {
+  text-align: center; white-space: normal; line-height: 1.5;
   background: var(--panel); border: 1px solid var(--edge-bright); padding: 7px 14px;
   font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text);
   backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
@@ -541,6 +554,14 @@ html, body {
   background: var(--panel); border: 1px solid var(--edge-bright); color: var(--text);
   font: 600 11px/1 var(--f-ui); letter-spacing: 0.18em;
 }
+/* The next gun in the battery, over DONE. */
+#lay-next {
+  position: absolute; left: var(--pad-l); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 24px + 44px + 10px);
+  min-width: 72px; min-height: 44px; pointer-events: auto; cursor: pointer; padding: 0 10px;
+  background: var(--panel); border: 1px solid rgba(255, 210, 90, 0.55); color: #ffd25a;
+  font: 700 11px/1 var(--f-ui); letter-spacing: 0.14em;
+}
+#lay-next[hidden] { display: none; }
 /* The survey stays live in the lay: red stone through a gunsight is the
    whole point of a gunsight. */
 body.laying #dock, body.laying #targetcard, body.laying #status, body.laying #hud-right, body.laying #bossbar { opacity: 0.3; pointer-events: none; }

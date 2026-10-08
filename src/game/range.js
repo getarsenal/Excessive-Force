@@ -76,6 +76,10 @@ export class Range {
     this.targets = [];      // paper, poppers, gongs
     this.drones = [];
     this.score = { hits: 0, paper: 0, poppers: 0, gongs: 0, drones: 0, shacks: 0 };
+    // Rounds fired down the range, and how many of them found something:
+    // battle opens a round (`open`) before it lands or strikes, and the
+    // first target it scores closes it on target (`_scored`).
+    this.rounds = 0; this.onTarget = 0; this._open = false;
     this.time = 0;
     this._board = null;
     this._boardText = '';
@@ -406,7 +410,7 @@ export class Range {
       b.moved = true;
       thrown++;
     }
-    if (thrown) { S.lastBlast = this.time; S.built = false; S.hits++; this.score.hits++; }
+    if (thrown) { S.lastBlast = this.time; S.built = false; S.hits++; this._scored(); }
   }
 
   _shackUpdate(dt) {
@@ -527,7 +531,7 @@ export class Range {
   _droneHit(d, dmg, u) {
     if (!d.alive) return;
     d.health -= dmg;
-    this.score.hits++;
+    this._scored();
     this.fx?.impactDust?.(d.pos.x, d.pos.y, d.pos.z, 0.3);
     if (d.health <= 0) {
       d.alive = false; d.dead = true; d.spin = 0; d.respawn = 7;
@@ -596,13 +600,13 @@ export class Range {
       case 'paper':
         if (t.down > 0) return;
         t.down = 4.0; t.body.setEnabled(false);
-        this.score.hits++; this.score.paper++;
+        this._scored(); this.score.paper++;
         this._clang(t, 0.5, 1.6);
         return;
       case 'popper':
         if (t.down > 0) return;
         t.down = 5.0; t.body.setEnabled(false);
-        this.score.hits++; this.score.poppers++;
+        this._scored(); this.score.poppers++;
         this._clang(t, 0.8, 0.9);
         return;
       case 'gong': {
@@ -611,12 +615,20 @@ export class Range {
         // Hit on a side, it swings away from the shooter: the line is +z toward the firing line.
         t.swingV -= kick;
         t.ring = 1;
-        this.score.hits++; this.score.gongs++;
+        this._scored(); this.score.gongs++;
         this._clang(t, 1.0, t.tank ? 0.55 : 1.1 - t.size * 0.12);
         return;
       }
       default:
     }
+  }
+
+  /** A round down the range, landing or striking now. */
+  open() { this.rounds++; this._open = true; }
+  close() { this._open = false; }
+  _scored() {
+    this.score.hits++;
+    if (this._open) { this._open = false; this.onTarget++; }
   }
 
   _clang(t, gain, rate) {
@@ -699,7 +711,8 @@ export class Range {
       this._board = el;
     }
     const s = this.score;
-    const txt = `HITS ${s.hits} · PAPER ${s.paper} · POPPERS ${s.poppers} · GONGS ${s.gongs} · DRONES ${s.drones} · SHACK ${s.shacks}`;
+    const acc = this.rounds ? Math.round(100 * this.onTarget / this.rounds) : 0;
+    const txt = `ROUNDS ${this.rounds} · ${acc}% ON TARGET · PAPER ${s.paper} · POPPERS ${s.poppers} · GONGS ${s.gongs} · DRONES ${s.drones} · SHACK ${s.shacks}`;
     if (txt !== this._boardText) { this._boardText = txt; this._board.textContent = txt; }
   }
 }
