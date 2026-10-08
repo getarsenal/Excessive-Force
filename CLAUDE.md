@@ -281,7 +281,10 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   toward the rear, for the M777, whose tube, cradle and hydraulic tubes
   swing together about trunnions at the base plate nearly ten metres
   behind the muzzle; `node tools/barrelmap.mjs <kind>` maps a model's
-  metal round its barrel line to place them), so the barrel is laid to every shot and to
+  metal round its barrel line to place them; the Paladin's band takes the
+  square mantlet its barrel goes into, which pivots with it, and only the
+  `tube` before `recoilTo` runs back on the recoil; `CLOSE=1` on the
+  barrel sheet frames the trunnions), so the barrel is laid to every shot and to
   the lay, recoils along its own line, and `_muzzle` is that barrel's end
   at that elevation; a lob past the barrel's `max` falls back to the low
   line; `node tools/barrelshot.mjs` photographs each gun at rest, level,

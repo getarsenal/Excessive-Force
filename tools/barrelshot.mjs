@@ -17,6 +17,7 @@ await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low')
 await page.goto(`http://localhost:${port}/?level=range`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.hud, null, { timeout: 400000 });
 await page.waitForTimeout(1200);
+await page.evaluate((c) => { globalThis.__CLOSE = c; }, !!process.env.CLOSE);
 const url = await page.evaluate(async (kinds) => {
   const B = window.battle, T = window.THREE, terrain = window.terrain, E = window.__engine;
   B.freeBuild = true; B.unlockAll = true;
@@ -41,8 +42,14 @@ const url = await page.evaluate(async (kinds) => {
       if (red) u.barrel.traverse((m) => { if (m.isMesh) { mats.push([m, m.material]); m.material = new T.MeshBasicMaterial({ color: 0xff2020 }); } });
       u.group.updateMatrixWorld(true);
       // From the gun's left, square on, a little above.
-      cam.position.set(u.pos.x - len * 2.3, u.pos.y + len * 0.3, u.pos.z - len * 0.12);
-      cam.lookAt(u.pos.x, u.pos.y + len * 0.2, u.pos.z - len * 0.12);
+      // CLOSE=1: the front half, three-quarter on from the left, for the joint at the trunnions.
+      if (globalThis.__CLOSE) {
+        cam.position.set(u.pos.x - len * 0.75, u.pos.y + len * 0.42, u.pos.z - len * 0.55);
+        cam.lookAt(u.pos.x, u.pos.y + len * 0.22, u.pos.z - len * 0.12);
+      } else {
+        cam.position.set(u.pos.x - len * 2.3, u.pos.y + len * 0.3, u.pos.z - len * 0.12);
+        cam.lookAt(u.pos.x, u.pos.y + len * 0.2, u.pos.z - len * 0.12);
+      }
       E.renderer.setRenderTarget(null);
       E.renderer.render(E.scene, cam);
       // The round's start, drawn as a dot on the frame.

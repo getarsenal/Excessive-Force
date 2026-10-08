@@ -129,7 +129,7 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
   const inRegion = R && ((x, y, z) => {
     d.set(x - tipW.x, y - tipW.y, z - tipW.z);
     const t = -d.dot(axis), u = d.dot(upW), sd = Math.abs(d.dot(right));
-    if (t < -0.4 || t > R.pivotT + 0.15 || sd > R.side || u > R.top) return false;
+    if (t < -0.4 || t > (R.tMax ?? R.pivotT + 0.15) || sd > R.side || u > R.top) return false;
     const [[t0, u0], [t1, u1]] = R.lo;
     const k = THREE.MathUtils.clamp((t - t0) / (t1 - t0), 0, 1);
     return u > u0 + (u1 - u0) * k;
@@ -146,27 +146,36 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
   barrel.position.copy(pivot);
   const hull = new THREE.Group();
   hull.name = 'hull';
+  // The tube alone runs back on the recoil when the gun has a mantlet that
+  // does not (`region.recoilTo`: metres back from the muzzle where the tube
+  // goes into it): those triangles hang on a child of the barrel, `tube`.
+  const recoilTo = R?.recoilTo;
+  const tube = recoilTo != null ? new THREE.Group() : null;
+  if (tube) { tube.name = 'tube'; barrel.add(tube); }
+  const tOf = (x, y, z) => -((x - tipW.x) * axis.x + (y - tipW.y) * axis.y + (z - tipW.z) * axis.z);
   let cut = 0;
   for (const { src, g } of meshes) {
     const pos = g.attributes.position;
     const tri = pos.count / 3;
+    // 0 the hull, 1 the barrel, 2 the tube that recoils within it.
     const keepB = new Uint8Array(tri);
     let nb = 0;
     for (let t = 0; t < tri; t++) {
-      let all = true;
-      for (let k = 0; k < 3 && all; k++) { const i = t * 3 + k; all = inTube(pos.getX(i), pos.getY(i), pos.getZ(i)); }
-      if (all) { keepB[t] = 1; nb++; }
+      let all = true, back = -Infinity;
+      for (let k = 0; k < 3 && all; k++) { const i = t * 3 + k; all = inTube(pos.getX(i), pos.getY(i), pos.getZ(i)); back = Math.max(back, tOf(pos.getX(i), pos.getY(i), pos.getZ(i))); }
+      if (all) { keepB[t] = tube && back < recoilTo ? 2 : 1; nb++; }
     }
     cut += nb;
     const part = (want, shift) => {
-      const count = (want ? nb : tri - nb) * 3;
+      let count = 0;
+      for (let t = 0; t < tri; t++) if (keepB[t] === want) count += 3;
       if (!count) return null;
       const out = new THREE.BufferGeometry();
       for (const [name, attr] of Object.entries(g.attributes)) {
         const s = attr.itemSize, arr = new attr.array.constructor(count * s);
         let w = 0;
         for (let t = 0; t < tri; t++) {
-          if (!!keepB[t] !== want) continue;
+          if (keepB[t] !== want) continue;
           for (let k = 0; k < 3; k++) { const i = t * 3 + k; for (let c = 0; c < s; c++) arr[w++] = attr.array[i * s + c]; }
         }
         out.setAttribute(name, new THREE.BufferAttribute(arr, s, attr.normalized));
@@ -177,8 +186,9 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
       m.castShadow = src.castShadow; m.receiveShadow = src.receiveShadow;
       return m;
     };
-    const h = part(false, false); if (h) hull.add(h);
-    const bm = part(true, true); if (bm) barrel.add(bm);
+    const h = part(0, false); if (h) hull.add(h);
+    const bm = part(1, true); if (bm) barrel.add(bm);
+    const tm = tube && part(2, true); if (tm) tube.add(tm);
   }
   if (!cut) return null;
   // The model is rebuilt as the hull and the barrel on its pivot.
@@ -197,12 +207,18 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
 
 const _q = new THREE.Quaternion(), _a = new THREE.Vector3(), _t = new THREE.Vector3(), _ax = new THREE.Vector3();
 
-/** Lay a barrel group at `elev` (radians) and `recoil` metres back along its own axis. */
+/**
+ * Lay a barrel group at `elev` (radians) and `recoil` metres back along its
+ * own axis: the whole of it, or only its `tube` when it has a mantlet that
+ * stays put.
+ */
 export function poseBarrel(barrel, B, elev, recoil = 0) {
   _a.fromArray(B.right);
   const dE = THREE.MathUtils.clamp(elev, B.min, B.max) - B.rest;
   barrel.quaternion.setFromAxisAngle(_a, dE);
   barrel.position.fromArray(B.pivot);
+  const tube = barrel.userData.tube || (barrel.userData.tube = barrel.getObjectByName('tube') || null);
+  if (tube) { tube.position.fromArray(B.axis).multiplyScalar(-recoil); return; }
   if (recoil) { _ax.fromArray(B.axis).applyQuaternion(barrel.quaternion); barrel.position.addScaledVector(_ax, -recoil); }
 }
 

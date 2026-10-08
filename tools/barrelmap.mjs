@@ -11,6 +11,7 @@ const page = await b.newPage({ viewport: { width: 393, height: 852 } });
 await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} });
 await page.goto(`http://localhost:${port}/?level=range`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
+await page.evaluate(([v, b2]) => { globalThis.__SMAX = v; globalThis.__BIN = b2; }, [process.env.SMAX || 2, process.env.BIN || 2]);
 const rows = await page.evaluate(async ([kind, elevArg]) => {
   const B = window.battle, T = window.THREE;
   B.freeBuild = true; B.unlockAll = true;
@@ -31,8 +32,8 @@ const rows = await page.evaluate(async ([kind, elevArg]) => {
   for (let i = 0; i < pts.length; i += 3) {
     const dx = pts[i] - tipW.x, dy = pts[i + 1] - tipW.y, dz = pts[i + 2] - tipW.z;
     const t = -(dy * ax.y + dz * ax.z), uu = dy * up.y + dz * up.z, s = dx;
-    if (t < -0.3 || t > 11 || Math.abs(uu) > 2 || Math.abs(s) > 2) continue;
-    const k = Math.floor(t * 2) / 2;
+    if (t < -0.3 || t > 11 || Math.abs(uu) > 2 || Math.abs(s) > +(globalThis.__SMAX ?? 2)) continue;
+    const k = Math.floor(t * (+(globalThis.__BIN ?? 2))) / (+(globalThis.__BIN ?? 2));
     const bn = bins[k] || (bins[k] = { n: 0, u: [9, -9], s: [9, -9], hist: {} });
     bn.n++; bn.u[0] = Math.min(bn.u[0], uu); bn.u[1] = Math.max(bn.u[1], uu); bn.s[0] = Math.min(bn.s[0], s); bn.s[1] = Math.max(bn.s[1], s);
     const h = (Math.round(uu * 5) / 5).toFixed(1); bn.hist[h] = (bn.hist[h] || 0) + 1;

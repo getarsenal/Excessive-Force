@@ -209,7 +209,11 @@ export const UNITS = [
     cost: 2200, unlockFrac: 0.15,
     tint: ARTILLERY_GREEN, model: 'M109', modelLength: 9.7,
     muzzle: { f: 5.2, h: 2.9 },   // where the round leaves (until the model is in: then the barrel's own end)
-    barrel: { len: 4.6, r: 0.27, rb: 0.38, brake: 0.9, back: 0.4, recoil: 0.6, min: -0.05, max: 1.3, elev: 0 },
+    // The Paladin's barrel goes into the square mantlet on the turret's face,
+    // five to six metres back from the muzzle, and the two elevate together
+    // about trunnions at its rear; only the tube runs back on the recoil.
+    barrel: { r: 0.27, recoil: 0.6, min: -0.05, max: 1.3, elev: 0,
+      region: { pivotT: 6.0, pivotU: 0, tMax: 6.1, top: 0.47, side: 0.47, lo: [[4.8, -0.36], [5.0, -0.68]], recoilTo: 5.0 } },
     eye: { hatch: true, back: 1.8, side: 0, pitch: -0.04 },   // the gunner's eye in the lay (battle.layEye)
     sight: { kind: 'pano', zoom: [1, 4] },
     range: 1600, reload: 6.5, setup: 3.0,
