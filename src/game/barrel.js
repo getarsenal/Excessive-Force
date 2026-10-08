@@ -61,13 +61,16 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
   const okY = spec.tipY != null
     ? (y) => Math.abs(y - minY - spec.tipY) < (spec.tipTol ?? 0.45)
     : (y) => y > minY + (maxY - minY) * 0.25;
-  let fz = -Infinity;
-  for (let i = 0; i < pts.length; i += 3) if (okY(pts[i + 1])) fz = Math.max(fz, pts[i + 2]);
-  let n = 0;
   const tip = new THREE.Vector3();
-  for (let i = 0; i < pts.length; i += 3) if (pts[i + 2] > fz - 0.2 && okY(pts[i + 1])) { tip.x += pts[i]; tip.y += pts[i + 1]; tip.z += pts[i + 2]; n++; }
-  if (!n) return null;
-  tip.multiplyScalar(1 / n);
+  if (spec.tip) tip.fromArray(spec.tip);   // a launcher's face, measured, where no rule finds it
+  else {
+    let fz = -Infinity;
+    for (let i = 0; i < pts.length; i += 3) if (okY(pts[i + 1])) fz = Math.max(fz, pts[i + 2]);
+    let n = 0;
+    for (let i = 0; i < pts.length; i += 3) if (pts[i + 2] > fz - 0.2 && okY(pts[i + 1])) { tip.x += pts[i]; tip.y += pts[i + 1]; tip.z += pts[i + 2]; n++; }
+    if (!n) return null;
+    tip.multiplyScalar(1 / n);
+  }
   // The axis: of every elevation from ten below to seventy-five above, the
   // line back from the tip that the most of the model's surface lies along,
   // within the tube's radius, from half a metre to most of the barrel's
@@ -201,6 +204,8 @@ export function splitBarrel(wrapper, spec, modelYaw = 0) {
     pivot: pivot.toArray(), axis: axis.toArray(), right: right.toArray(),
     tip: tipW.clone().sub(pivot).toArray(), rest, cut,
     recoil: spec.recoil ?? 0.6, min: spec.min ?? -0.05, max: spec.max ?? 1.2,
+    // Where it settles with nothing to shoot at, and a launcher's cells.
+    ready: spec.ready ?? THREE.MathUtils.clamp(0.12, spec.min ?? -0.05, spec.max ?? 1.2), cells: spec.cells || null,
   };
   return wrapper.userData.barrel;
 }

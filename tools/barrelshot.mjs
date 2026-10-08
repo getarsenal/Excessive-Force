@@ -32,12 +32,12 @@ const url = await page.evaluate(async (kinds) => {
     B.deploy(kind, p); const u = B.units[B.units.length - 1];
     for (let k = 0; k < 120 && !(u.model && u.state === 'ready'); k++) { window.__fastForward(0.5, 1 / 30); await new Promise((r) => setTimeout(r, 10)); }
     u.yaw = Math.PI; u.group.rotation.y = u.yaw;
-    const BB = u.barrelB;
-    if (!BB) { console.log('[bs] ' + kind + ' NO BARREL'); continue; }
+    const BB = u.barrelB || { rest: 0, max: 0, cut: 0, pivot: [0, 0, 0], none: true };
+
     const len = u.def.modelLength;
     const shoot = (label, elev, recoil, red) => {
       u.barrelElev = u.barrelWant = elev; u.recoilT = recoil;
-      B._updateBarrel(u, 0);
+      if (u.barrelB) B._updateBarrel(u, 0);
       const mats = [];
       if (red) u.barrel.traverse((m) => { if (m.isMesh) { mats.push([m, m.material]); m.material = new T.MeshBasicMaterial({ color: 0xff2020 }); } });
       u.group.updateMatrixWorld(true);
@@ -64,6 +64,7 @@ const url = await page.evaluate(async (kinds) => {
       for (const [mm, mat] of mats) mm.material = mat;
       frames.push(cv);
     };
+    if (BB.none) { u.cooldown = 1e9; shoot('side (no barrel)', 0, 0, false); console.log('[bs] ' + kind + ' no barrel'); continue; }
     shoot(`rest ${(BB.rest * 57.3).toFixed(0)}°`, BB.rest, 0, true);
     shoot('level', 0, 0, false);
     const top = Math.min(BB.max, 0.7);

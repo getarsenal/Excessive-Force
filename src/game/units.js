@@ -163,6 +163,7 @@ export const UNITS = [
     // muzzle brake's, how far the breech runs behind the trunnions, the
     // recoil, and the elevation limits.
     barrel: { len: 3.0, r: 0.24, rb: 0.26, back: 1.0, recoil: 0.55, min: -0.09, max: 1.22 },
+    traverse: 0.6,   // radians a second the crew turns the gun to a new bearing
     sight: { kind: 'pano', zoom: [1, 4] },   // over open sights at one; the panoramic telescope at four
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
@@ -186,6 +187,7 @@ export const UNITS = [
     // The M777's trunnions are at the back, where the cradle's hydraulic
     // tubes come down to the carriage, nearly ten metres behind the muzzle:
     // the whole of the tube, the cradle and those tubes elevate together.
+    traverse: 0.5,
     barrel: { r: 0.7, recoil: 0.9, min: -0.05, max: 1.25, elev: 16,
       region: { pivotT: 9.8, pivotU: -1.1, top: 0.6, side: 0.95, lo: [[4.0, -0.85], [9.6, -1.38]] } },
     sight: { kind: 'pano', zoom: [1, 4] },
@@ -212,6 +214,7 @@ export const UNITS = [
     // The Paladin's barrel goes into the square mantlet on the turret's face,
     // five to six metres back from the muzzle, and the two elevate together
     // about trunnions at its rear; only the tube runs back on the recoil.
+    traverse: 0.9,   // the turret
     barrel: { r: 0.27, recoil: 0.6, min: -0.05, max: 1.3, elev: 0,
       region: { pivotT: 6.0, pivotU: 0, tMax: 6.1, top: 0.47, side: 0.47, lo: [[4.8, -0.36], [5.0, -0.68]], recoilTo: 5.0 } },
     eye: { hatch: true, back: 1.8, side: 0, pitch: -0.04 },   // the gunner's eye in the lay (battle.layEye)
@@ -230,6 +233,7 @@ export const UNITS = [
     eye: { hatch: true, back: 1.4, side: 0, pitch: -0.06 },   // the gunner's eye in the lay (battle.layEye)
     muzzle: { f: 4.4, h: 2.6 },   // where the round leaves (until the model is in: then the 105's own end)
     barrel: { len: 4.5, r: 0.17, rb: 0.22, back: 0.3, recoil: 0.45, min: -0.17, max: 0.35, tipY: 2.88, tipTol: 0.2, elev: 0 },
+    traverse: 1.1,
     sight: { kind: 'tank', zoom: [1, 3, 10] },   // the gunner's primary sight: unity, three, ten
     range: 1200, reload: 3.2, setup: 2.0,
     crew: 0, health: 520,
@@ -250,6 +254,13 @@ export const UNITS = [
     // of a side view): at a half turn the cab and the open end of the
     // launcher pointed away from what it was shooting at.
     modelYaw: 0,
+    // The launcher box behind the cab, cut out and pivoted at its rear foot
+    // (barrel.js): it elevates to the salvo, and each rocket leaves its own
+    // cell across the box's face, two pods of six.
+    barrel: { tip: [0, 2.05, 0.51], elev: 0, r: 0.4, recoil: 0, min: 0, max: 1.05, ready: 0,
+      region: { pivotT: 3.99, pivotU: -0.62, tMax: 4.1, top: 0.66, side: 1.56, lo: [[0, -0.66], [4, -0.66]] },
+      cells: { cols: 6, rows: 2, dx: 0.33, dy: 0.28 } },
+    traverse: 0.7,
     noBarrel: true,
     minRange: 200, range: 2000, reload: 15.0, setup: 4.0,
     crew: 0, health: 480,
@@ -269,6 +280,12 @@ export const UNITS = [
     // No barrel for the facing test to find, so that test is told not to
     // look; the probe is the check.
     modelYaw: Math.PI,
+    // The pod on the bed, built raised at twenty-five degrees: cut out,
+    // pivoted at its rear foot, elevated to the shot; one pod of six.
+    barrel: { tip: [0, 3.25, 0.2], elev: 25, r: 0.4, recoil: 0, min: 0.1, max: 1.05, ready: 0.44,
+      region: { pivotT: 4.0, pivotU: -0.55, tMax: 4.4, top: 0.75, side: 1.25, lo: [[0, -0.7], [4, -0.7]] },
+      cells: { cols: 3, rows: 2, dx: 0.4, dy: 0.35 } },
+    traverse: 0.8,
     noBarrel: true,
     minRange: 200, range: 2600, reload: 18.0, setup: 3.5,
     crew: 0, health: 420,

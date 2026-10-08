@@ -12,6 +12,7 @@ const page = await b.newPage({ viewport: { width: 393, height: 852 } });
 await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} });
 await page.goto(`http://localhost:${port}/?level=range`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
+await page.evaluate(([a, b2]) => { globalThis.__ZF = a; globalThis.__ZHI = b2; }, [process.env.ZLO ?? 3.6, process.env.ZHI ?? 1e9]);
 const r = await page.evaluate(async (kind) => {
   const B = window.battle, T = window.THREE;
   const def = window.UNITS ? null : null;
@@ -32,7 +33,8 @@ const r = await page.evaluate(async (kind) => {
   const rows = Object.keys(slices).map(Number).sort((a, b) => b - a).map((k) => `z ${k.toFixed(1)}: y ${slices[k].lo.toFixed(2)}..${slices[k].hi.toFixed(2)} x ${slices[k].xs[0].toFixed(2)}..${slices[k].xs[1].toFixed(2)} n ${slices[k].n}`);
   const zf = +(globalThis.__ZF ?? 3.6);
   const hist = {};
-  for (const q of pts) if (q[2] > zf) { const k = (Math.round(q[1] * 10) / 10).toFixed(1); const h = hist[k] || (hist[k] = { n: 0, z: -1e9, x: [1e9, -1e9] }); h.n++; h.z = Math.max(h.z, q[2]); h.x[0] = Math.min(h.x[0], q[0]); h.x[1] = Math.max(h.x[1], q[0]); }
+  const zhi = +(globalThis.__ZHI ?? 1e9);
+  for (const q of pts) if (q[2] > zf && q[2] < zhi) { const k = (Math.round(q[1] * 10) / 10).toFixed(1); const h = hist[k] || (hist[k] = { n: 0, z: -1e9, x: [1e9, -1e9] }); h.n++; h.z = Math.max(h.z, q[2]); h.x[0] = Math.min(h.x[0], q[0]); h.x[1] = Math.max(h.x[1], q[0]); }
   rowsH = Object.keys(hist).sort((a, b) => b - a).map((k) => `y ${k}: n ${hist[k].n} zmax ${hist[k].z.toFixed(2)} x ${hist[k].x[0].toFixed(2)}..${hist[k].x[1].toFixed(2)}`);
   return { rowsH, top: top.map((q) => +q.toFixed(2)), front: front.map((q) => +q.toFixed(2)), barrel: u.barrelB ? { rest: +(u.barrelB.rest * 57.3).toFixed(1), pivot: u.barrelB.pivot.map((q) => +q.toFixed(2)), tip: u.barrelB.tip.map((q) => +q.toFixed(2)) } : null, rows };
 }, kind);

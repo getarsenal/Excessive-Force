@@ -52,6 +52,9 @@ const FREE_STRIKE_CAP = 100000;
 // The job, in tonnes, that the rubble rate is quoted for (see payScale).
 const JOB_REF_TONNES = 600000;
 
+/** The signed shortest turn from `b` to `a`, radians. */
+function angleDiff(a, b) { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
+
 export class Battle {
   constructor(ctx) {
     this.scene = ctx.scene;
@@ -358,6 +361,7 @@ export class Battle {
     this.trigger = false;
     if (!this.lay) return;
     this.lay.unit.handHeld = false;
+    this.lay.unit.wantYaw = this.lay.unit.yaw;
     this._mortarLive(this.lay.unit, false);
     this.lay = null;
     if (this.layLine) { this.layLine.visible = false; this.layRing.visible = false; }
@@ -403,6 +407,29 @@ export class Battle {
     }
     u.recoilT = Math.max(0, (u.recoilT || 0) - dt * 1.4);
     poseBarrel(u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+  }
+
+  /** A crew turning its gun to `wantYaw` at its own rate (`def.traverse`, radians a second). */
+  _traverse(u, dt) {
+    const d = angleDiff(u.wantYaw, u.yaw);
+    if (Math.abs(d) < 1e-4) return;
+    const step = (u.def.traverse ?? (u.def.model === 'infantry' ? 4 : 2)) * dt;
+    u.yaw += Math.abs(d) <= step ? d : Math.sign(d) * step;
+    u.group.rotation.y = u.yaw;
+  }
+
+  /**
+   * While the gun traverses, its barrel comes up toward the shot: the low
+   * arc to the aim over flat ground, near enough for the eye; the shot sets
+   * it exactly when it goes.
+   */
+  _leadBarrel(u, aim) {
+    if (!u.barrelB) return;
+    const p = u.def.projectile, d = Math.hypot(aim.x - u.pos.x, aim.z - u.pos.z);
+    const v2 = p.speed * p.speed, g = p.gravity || 9.81;
+    const low = 0.5 * Math.asin(THREE.MathUtils.clamp(g * d / v2, 0, 1));
+    const lift = Math.atan2(aim.y - (u.pos.y + 2), Math.max(1, d));
+    u.barrelWant = THREE.MathUtils.clamp(low + lift, u.barrelB.min, u.barrelB.max);
   }
 
   /** The round has struck the pin: the shell leaves the tube on the lay it was let go on. */
@@ -2174,7 +2201,7 @@ export class Battle {
 
     // Face the primary target immediately so it reads as deliberate.
     const aim = this.target || new THREE.Vector3(this.primary.origin.x, y, this.primary.origin.z);
-    unit.yaw = Math.atan2(aim.x - pos.x, aim.z - pos.z);
+    unit.yaw = unit.wantYaw = Math.atan2(aim.x - pos.x, aim.z - pos.z);
     unit.group.rotation.y = unit.yaw;
 
     // Model loads asynchronously; the unit is playable in the meantime. A
@@ -2462,6 +2489,13 @@ export class Battle {
 
   _fireOne(unit, aimPoint, opts = {}) {
     const def = unit.def;
+    // A crew's shot: the gun is on the bearing already (it traversed to it,
+    // `_traverse`) bar the last degree or two, taken up here before the
+    // muzzle is read, so the round leaves the barrel where it now points.
+    if (!opts.from) {
+      unit.yaw = unit.wantYaw = Math.atan2(aimPoint.x - unit.pos.x, aimPoint.z - unit.pos.z);
+      unit.group.rotation.y = unit.yaw;
+    }
     const from = opts.from ? opts.from.clone() : this._muzzle(unit);
 
     // Dispersion is applied to the aim point, so error grows along the line of
@@ -2596,11 +2630,21 @@ export class Battle {
 
     // A gun with its own barrel is laid to this shot, the round leaves the
     // barrel's end, and the barrel runs back on its recoil.
-    if (unit.barrelB && p.kind !== 'rocket') {
+    if (unit.barrelB) {
       const e = Math.atan2(vel.y, Math.hypot(vel.x, vel.z));
       unit.barrelElev = unit.barrelWant = e;
       if (!opts.from) from.copy(this._muzzle(unit, e));
-      unit.recoilT = 1;
+      unit.recoilT = p.kind === 'rocket' ? 0 : 1;
+      // A launcher's rockets leave its cells in turn, across the face.
+      const C = unit.barrelB.cells;
+      if (C && !opts.from) {
+        const k = unit.cell = ((unit.cell ?? -1) + 1) % (C.cols * C.rows);
+        const col = k % C.cols - (C.cols - 1) / 2, row = Math.floor(k / C.cols) - (C.rows - 1) / 2;
+        const fx = Math.sin(unit.yaw), fz = Math.cos(unit.yaw), ce = Math.cos(e), se = Math.sin(e);
+        from.x += -fz * col * C.dx + (-se * fx) * row * C.dy;
+        from.y += ce * row * C.dy;
+        from.z += fx * col * C.dx + (-se * fz) * row * C.dy;
+      }
     }
 
     this.projectiles.fire({
@@ -2636,9 +2680,6 @@ export class Battle {
     }
     this.engine.addShake(Math.min(0.13, def.warhead.fx * 0.035));
     this.shotsFired++;
-
-    unit.yaw = Math.atan2(aim.x - unit.pos.x, aim.z - unit.pos.z);
-    unit.group.rotation.y = unit.yaw;
     return true;
   }
 
@@ -2714,6 +2755,7 @@ export class Battle {
 
       if (this.invulnerable) u.health = u.maxHealth;
       if (u.barrel) this._updateBarrel(u, dt);
+      if (u.wantYaw != null && !u.handHeld) this._traverse(u, dt);
 
       // Time in place. After half a minute the crew has dug in.
       u.age += dt;
@@ -2757,8 +2799,22 @@ export class Battle {
       if (u.cooldown > 0) continue;
 
       const aim = this.aimFor(u);
-      if (!aim) { u.idle = true; u.cooldown = 0.5; continue; }
-      u.idle = false;
+      if (!aim) {
+        u.idle = true; u.cooldown = 0.5;
+        // Nothing to shoot at for a while: the barrel comes down to ready.
+        u.idleT = (u.idleT || 0) + 0.5;
+        if (u.barrelB && u.idleT > 8) u.barrelWant = u.barrelB.ready;
+        continue;
+      }
+      u.idle = false; u.idleT = 0;
+      // On the bearing first: the crew traverses (`_traverse`) and the barrel
+      // comes up toward the shot while it does; it fires when it is laid.
+      u.wantYaw = Math.atan2(aim.x - u.pos.x, aim.z - u.pos.z);
+      if (Math.abs(angleDiff(u.wantYaw, u.yaw)) > 0.035) {
+        this._leadBarrel(u, aim);
+        u.cooldown = 0.2;
+        continue;
+      }
 
       if (u.def.salvo) {
         // A ripple stays on the aim point it was laid for; re-solving between
