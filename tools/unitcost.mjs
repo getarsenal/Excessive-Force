@@ -34,8 +34,8 @@ const out = await page.evaluate(() => {
   const res = {};
   for (const u of window.battle.units) {
     let tris = 0, meshes = 0, inst = 0;
-    u.group.traverse((m) => {
-      if (!m.isMesh || !m.visible) return;
+    u.group.traverseVisible((m) => {
+      if (!m.isMesh) return;
       const g = m.geometry; const n = (g.index ? g.index.count : g.attributes.position.count) / 3;
       tris += n * (m.isInstancedMesh ? m.count : 1); meshes++; if (m.isInstancedMesh) inst++;
     });
