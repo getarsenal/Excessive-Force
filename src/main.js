@@ -1037,7 +1037,17 @@ async function boot() {
       opOut = { name: o.name, total: st.total, line,
         pips: o.battles.map((b) => ({ won: b.won, boss: b.boss, here: b.id === level.id, stars: b.stars.filter(Boolean).length })) };
     }
-    const nx = st.next?.battle || null;
+    // The battle after this one in its own operation, while it is open and
+    // not yet won: winning the second battle of an operation offers the
+    // third, not the first one anywhere on the line still unbeaten (a
+    // battle the player has left behind was offered after every win).
+    let nx = null;
+    if (op) {
+      const o = st.ops.find((x) => x.id === op.id);
+      const k = o.battles.findIndex((b) => b.id === level.id);
+      nx = o.battles.slice(k + 1).find((b) => b.open && !b.won) || null;
+    }
+    nx = nx || st.next?.battle || null;
     campaignNextId = nx?.id || null;
     hud.nextTargetLabel = nx ? (LEVELS[nx.id]?.target || nx.id) : nextTarget(level.id).target;
     hud.nextIsBoss = !!nx?.boss;
