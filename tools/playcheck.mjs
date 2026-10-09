@@ -44,9 +44,9 @@ const dep = await page.evaluate(async () => {
     const x = o.x + Math.cos(a * Math.PI / 180) * rad, z = o.z + Math.sin(a * Math.PI / 180) * rad;
     const p = new T.Vector3(x, terrain.heightAt(x, z), z);
     if (!B.validPlacement(p, null).ok) continue;
-    const n0 = B.units.length + B.pending.length + (B.lift?.drops?.length || 0);
-    B.deploy(kinds[i], p);
-    i++;
+    // A vehicle wants more room than a man: a spot refused for it is tried
+    // for it again further round, not given up.
+    if (await B.deploy(kinds[i], p)) i++;
   }
   // Until everything ordered is on the ground and ready.
   let t = 0;
