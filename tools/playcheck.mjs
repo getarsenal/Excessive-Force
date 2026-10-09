@@ -52,6 +52,7 @@ const dep = await page.evaluate(async () => {
     window.__fastForward(1, 1 / 30); window.__frame();
     await new Promise((r) => setTimeout(r, 2));
     const ready = B.units.filter((u) => u.alive && u.state === 'ready').length;
+    if (t % 10 === 0) console.log(`[check] t=${t} units=${B.units.length} ready=${ready} pending=${B.pending.length} sorties=${B.air.sorties.length} heap=${performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : '?'}MB`);
     if (ready >= kinds.length && !B.pending.length) break;
   }
   return { ordered: i, t, units: B.units.map((u) => `${u.def.id}:${u.state}${u.airDropped || u.drop ? '(air)' : ''}`).join(' '), pending: B.pending.length, airlift: !!B.airlift };
