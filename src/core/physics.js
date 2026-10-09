@@ -697,6 +697,9 @@ export class PhysicsWorld {
   }
 
   remove(body) {
+    // Twice is a trap too: removing a freed body reaches into wasm like any
+    // other call on it.
+    if (!body || body.__removed === true) return;
     this.dynamicSet.delete(body);
     this.owners.delete(body.handle);
     body.__frozen = false;
@@ -996,6 +999,15 @@ export class PhysicsWorld {
       const owner = this.owners.get(b.handle);
       if (owner && owner.structure && owner.chunk !== undefined) {
         owner.structure.destroyChunk(owner.chunk);
+      } else if (owner && owner.structure && owner.island !== undefined) {
+        // A welded section gone off the map: its stones go through the
+        // structure, which takes the body out with its last one. Removed here
+        // behind the structure's back, the section's books kept the freed
+        // body, and the next thing to ask it anything trapped in wasm (the
+        // aqueduct, forty per cent of the way down).
+        const isl = owner.structure.islands?.get(owner.island);
+        if (isl) for (const i of Array.from(isl.members)) owner.structure.destroyChunk(i);
+        this.remove(b);
       } else {
         this.remove(b);
       }
