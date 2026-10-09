@@ -1337,6 +1337,13 @@ async function boot() {
           comcard.samKill(kind);
         }
         break;
+      case 'missiled':
+        // The run was lost before it dropped: said with what came back
+        // (battle.js refunds half), after the SAM line that says how.
+        if (data.lost) hud.feed(data.refund
+          ? `${data.def.name} LOST BEFORE THE DROP · $${data.refund.toLocaleString()} BACK · KILL THE SAMS FIRST`
+          : `${data.def.name} LOST BEFORE THE DROP · KILL THE SAMS FIRST`, 'bad');
+        break;
       case 'liftdown':
         lostAircraft = true;
         hud.feed(data.lost.length

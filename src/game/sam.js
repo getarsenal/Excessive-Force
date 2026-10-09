@@ -609,15 +609,14 @@ export class SamSites {
   }
 
   /**
-   * Whether this missile brings its aeroplane down. Asked per missile now
-   * that an aeroplane in reach is fired at more than once: about one in
-   * eight, so an aeroplane that stays in reach for three of them comes down
-   * about one time in three; never two in a row, and never a long run of
-   * luck — the ninth since the last is the one that does not miss.
+   * Whether this aeroplane is brought down, asked once, at the first
+   * missile fired at it (`_engage`): about one in five, never two in a row,
+   * and never a long run of luck — the sixth since the last does not get
+   * through.
    */
   _decide(l) {
     this.since++;
-    const p = this.since >= 9 ? 1 : this.since <= 1 ? 0.06 : 0.12;
+    const p = this.since >= 6 ? 1 : this.since <= 1 ? 0.08 : 0.2;
     const hit = Math.random() < (this._radarUp(l) ? p : p * 0.5);
     if (hit) this.since = 0;
     return hit;
@@ -681,7 +680,14 @@ export class SamSites {
       s._samNext = now + SAM.again;
       if (!this.announced) { this.announced = true; this.onEvent('samactive', {}); }
       if (Math.random() > SAM.engage) continue;
-      const kill = this._decide(best);
+      // One roll per aeroplane, at its first missile, not one per missile:
+      // a slow run that stayed in reach for six of them came down almost
+      // every time, which is not one in four or five but most strikes lost
+      // and the player reading it as a strike that never went off. Every
+      // missile is still fired; only the one the roll chose connects.
+      if (s._samDoom === undefined) s._samDoom = this._decide(best);
+      const kill = s._samDoom && !s._samKillSent;
+      if (kill) s._samKillSent = true;
       const mouth = best.mouths[SAM.rounds - best.rounds] || best.mouths[0];
       best.rounds--;
       best.cool = SAM.cooldown;

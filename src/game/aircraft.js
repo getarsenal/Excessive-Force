@@ -882,6 +882,7 @@ export class AirWing {
       this.hitAir({ kind: 'aircraft', sortie: s }, 1e6);
       return true;
     }
+    const lost = !s.released && !s.strafe?.fired;
     if (!s.released) {
       s.released = true;
       s.aborted = true;
@@ -896,7 +897,7 @@ export class AirWing {
       dive: 0.35 + Math.random() * 0.5, t: 0, fire: 0,
     };
     s.smoking = true;
-    if (this.onAirEvent) this.onAirEvent('missiled', { def: s.def, point: m.position.clone() });
+    if (this.onAirEvent) this.onAirEvent('missiled', { def: s.def, point: m.position.clone(), lost });
     return true;
   }
 

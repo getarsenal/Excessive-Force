@@ -178,6 +178,14 @@ export class Battle {
     // a pilot has turned for home or a canopy has come apart.
     this.air.onAirEvent = (kind, data) => {
       if (kind === 'wreck') this._wreckDown(data.point);
+      // Brought down before it let go: the bomb went in with the wreck, out
+      // where it fell, and the player has nothing for the price. Half of it
+      // comes back, so a strike lost to the SAMs is a setback and not a
+      // card that silently ate the money.
+      if (kind === 'missiled' && data.lost && data.def && !this.freeBuild) {
+        data.refund = Math.round(this.costOf(data.def) * 0.5);
+        this.money += data.refund;
+      }
       this.onEvent(kind, data);
     };
     // What the town stands to along a line, for a helicopter picking a
