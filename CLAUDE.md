@@ -192,6 +192,16 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `node tools/shadowprobe.mjs <level>` counts shadow redraws quiet, under
   a deploying battery and in a pan, saver on and off, photographs both
   and counts the frosted elements left on the page.
+  `PORTS=5178:before,5177:after RUNS=3 FRAMES=30 node tools/powerbench.mjs`
+  measures two builds the same way (an old checkout served on 5178):
+  four scenes driven frame by frame through `window.__frame` at the
+  iPhone tier, each draw timed to `gl.finish`, triangles, calls and shadow
+  redraws counted; `python3 tools/powerstats.py <dir> --json out.json`
+  gives medians, bootstrap intervals and fight mixes, and
+  `python3 tools/powerreport.py out.json out.html` the page. The first
+  measured pass is `docs/perf/power-2026-10-09.*`: a typical fight 30%
+  fewer triangles a frame, shadow redraws 100% to 31% of frames, draw
+  time 22% less.
 - `src/world/look.js` the art direction: the climate's sky, fog, water
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against

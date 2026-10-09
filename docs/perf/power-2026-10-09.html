@@ -1,0 +1,267 @@
+<title>Phone Power Benchmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, figures first, then the tables that back them, then the method. */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --ink: #14181d; --ink-2: #4a5360; --muted: #6b7482;
+  --rule: #d9dee4; --grid: #e6e9ed; --accent: #1f5fa8; --good: #1d7a46;
+  --before: #eb6834; --after: #2a78d6;
+  --f-display: 'Oswald', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+  --f-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-data: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111418; --surface: #191d22; --ink: #eef1f4; --ink-2: #b7c0cb; --muted: #8a94a1;
+  --rule: #2c333b; --grid: #262c33; --accent: #7fb2ec; --good: #5cc28a;
+  --before: #d95926; --after: #3987e5; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #111418; --surface: #191d22; --ink: #eef1f4; --ink-2: #b7c0cb; --muted: #8a94a1;
+  --rule: #2c333b; --grid: #262c33; --accent: #7fb2ec; --good: #5cc28a;
+  --before: #d95926; --after: #3987e5; color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--f-body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 64px; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px/1 var(--f-data); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+h1 { font: 600 clamp(30px, 6vw, 44px)/1.05 var(--f-display); letter-spacing: .01em; margin: 0; text-transform: uppercase; text-wrap: balance; }
+h2 { font: 600 22px/1.2 var(--f-display); letter-spacing: .02em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h3 { font: 600 15px/1.3 var(--f-body); margin: 0; }
+p { margin: 0; max-width: 68ch; color: var(--ink-2); }
+p strong { color: var(--ink); font-weight: 600; }
+.lede { font-size: 17px; color: var(--ink); }
+.conds { display: flex; flex-wrap: wrap; gap: 6px; }
+.conds span { font: 12px/1 var(--f-data); padding: 6px 8px; border: 1px solid var(--rule); border-radius: 4px; color: var(--ink-2); background: var(--surface); }
+section { display: grid; gap: 14px; min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; display: grid; gap: 4px; }
+.big { font: 600 34px/1.05 var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cap { font: 500 12px/1.3 var(--f-data); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-2); }
+.sub { font-size: 13px; color: var(--muted); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font: 13px/1 var(--f-data); color: var(--ink-2); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.chart { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; }
+.band { display: grid; grid-template-columns: 9.5em 1fr; gap: 12px; align-items: center; }
+.bl { font-size: 13px; color: var(--ink-2); }
+.bars { display: grid; gap: 2px; min-width: 0; background: linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 25% 100%; }
+.row { display: flex; align-items: center; gap: 8px; height: 20px; cursor: default; }
+.bar { display: block; height: 16px; border-radius: 0 4px 4px 0; flex: none; }
+.b-before { background: var(--before); }
+.b-after { background: var(--after); }
+.val { font: 12px/1 var(--f-data); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row:hover .bar, .row:focus .bar { filter: brightness(1.12); }
+.tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px/1.4 var(--f-data); padding: 6px 8px; border-radius: 4px; max-width: 280px; z-index: 5; }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; white-space: nowrap; }
+thead th { font: 500 11px/1.3 var(--f-data); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+tbody th { font-weight: 600; color: var(--ink); }
+td { font-family: var(--f-data); color: var(--ink-2); }
+td.chg { color: var(--ink); font-weight: 500; }
+td.note { font-family: var(--f-body); white-space: normal; min-width: 260px; }
+tr:last-child th, tr:last-child td { border-bottom: 0; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+ol, ul { margin: 0; padding-left: 1.2em; color: var(--ink-2); max-width: 68ch; display: grid; gap: 6px; }
+code { font: 13px var(--f-data); background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 1px 5px; overflow-wrap: anywhere; }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; }
+footer { font: 12px/1.6 var(--f-data); color: var(--muted); }
+@media (max-width: 520px) { .band { grid-template-columns: 1fr; gap: 4px; } .wrap { padding-inline: 16px; } }
+</style>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Excessive Force · battery pass · measured 2026-10-09</div>
+  <h1>Phone Power Benchmark</h1>
+  <p class="lede">The same four scenes on Westminster, played through the old build (<code>a35961d</code>) and the battery pass (<code>26a493d</code>), 3 times each, alternating between the builds.</p>
+  <div class="conds"><span>Westminster</span><span>medium tier (iPhone)</span><span>589×1278 px</span><span>shadow map 1024²</span><span>30 fps battery saver</span><span>iPhone agent</span><span>software renderer</span></div>
+</header>
+
+<section aria-labelledby="h-sum">
+  <h2 id="h-sum">The result</h2>
+  <div class="tiles"><div class="tile"><div class="big">-30%</div><div class="cap">triangles a frame</div><div class="sub">5.04 M → 3.54 M in a typical fight</div></div><div class="tile"><div class="big">100% → 31%</div><div class="cap">frames redrawing shadows</div><div class="sub">the shadow pass is skipped on the rest</div></div><div class="tile"><div class="big">-22%</div><div class="cap">draw time a frame</div><div class="sub">software-rendered, median, typical-fight mix</div></div></div>
+  <p>A typical fight is weighted as 30% quiet, 20% panning, 40% with the guns firing and 10% with stone falling. The other weightings below move the result by a few points, not its direction.</p>
+</section>
+
+<section aria-labelledby="h-tri">
+  <h2 id="h-tri">Triangles drawn per frame</h2>
+  <p>Every triangle in the view, plus the shadow pass when it runs, counted by the renderer across all passes of the frame. These counts are exact, so they need no statistics: the drop is the shadow pass being skipped.</p>
+  <div class="legend"><span><i style="background:var(--before)"></i>before (a35961d)</span><span><i style="background:var(--after)"></i>after (26a493d)</span></div>
+  <div class="chart" role="img" aria-label="Triangles drawn per frame, before and after, by scene">
+<div class="band"><div class="bl">Quiet</div><div class="bars">
+<div class="row" data-tip="Quiet · before: 4.47 M"><span class="bar b-before" style="width:69.77%"></span><span class="val">4.47 M</span></div>
+<div class="row" data-tip="Quiet · after: 2.60 M"><span class="bar b-after" style="width:40.57%"></span><span class="val">2.60 M</span></div>
+</div></div>
+<div class="band"><div class="bl">Camera pan</div><div class="bars">
+<div class="row" data-tip="Camera pan · before: 4.47 M"><span class="bar b-before" style="width:69.76%"></span><span class="val">4.47 M</span></div>
+<div class="row" data-tip="Camera pan · after: 2.67 M"><span class="bar b-after" style="width:41.65%"></span><span class="val">2.67 M</span></div>
+</div></div>
+<div class="band"><div class="bl">Battery firing</div><div class="bars">
+<div class="row" data-tip="Battery firing · before: 5.59 M"><span class="bar b-before" style="width:87.35%"></span><span class="val">5.59 M</span></div>
+<div class="row" data-tip="Battery firing · after: 4.43 M"><span class="bar b-after" style="width:69.14%"></span><span class="val">4.43 M</span></div>
+</div></div>
+<div class="band"><div class="bl">Tower collapsing</div><div class="bars">
+<div class="row" data-tip="Tower collapsing · before: 5.72 M"><span class="bar b-before" style="width:89.29%"></span><span class="val">5.72 M</span></div>
+<div class="row" data-tip="Tower collapsing · after: 4.55 M"><span class="bar b-after" style="width:71.07%"></span><span class="val">4.55 M</span></div>
+</div></div>
+</div>
+</section>
+
+<section aria-labelledby="h-sh">
+  <h2 id="h-sh">Frames that redrew the shadow map</h2>
+  <p>Before, every frame redrew it. After, it is redrawn every other frame while something that casts a shadow is moving, three times a second otherwise, and once when the camera crosses into a new 30-metre square.</p>
+  <div class="chart" role="img" aria-label="Share of frames that redrew the shadow map, by scene">
+<div class="band"><div class="bl">Quiet</div><div class="bars">
+<div class="row" data-tip="Quiet · before: 100%"><span class="bar b-before" style="width:89.29%"></span><span class="val">100%</span></div>
+<div class="row" data-tip="Quiet · after: 10%"><span class="bar b-after" style="width:8.93%"></span><span class="val">10%</span></div>
+</div></div>
+<div class="band"><div class="bl">Camera pan</div><div class="bars">
+<div class="row" data-tip="Camera pan · before: 100%"><span class="bar b-before" style="width:89.29%"></span><span class="val">100%</span></div>
+<div class="row" data-tip="Camera pan · after: 13%"><span class="bar b-after" style="width:11.90%"></span><span class="val">13%</span></div>
+</div></div>
+<div class="band"><div class="bl">Battery firing</div><div class="bars">
+<div class="row" data-tip="Battery firing · before: 100%"><span class="bar b-before" style="width:89.29%"></span><span class="val">100%</span></div>
+<div class="row" data-tip="Battery firing · after: 50%"><span class="bar b-after" style="width:44.64%"></span><span class="val">50%</span></div>
+</div></div>
+<div class="band"><div class="bl">Tower collapsing</div><div class="bars">
+<div class="row" data-tip="Tower collapsing · before: 100%"><span class="bar b-before" style="width:89.29%"></span><span class="val">100%</span></div>
+<div class="row" data-tip="Tower collapsing · after: 50%"><span class="bar b-after" style="width:44.64%"></span><span class="val">50%</span></div>
+</div></div>
+</div>
+</section>
+
+<section aria-labelledby="h-ms">
+  <h2 id="h-ms">Draw time per frame</h2>
+  <p>The draw timed to the finish of the GPU work. In the software renderer this is the vertex and fragment work done on the CPU, so it is a proxy for the GPU's work, not a phone's milliseconds. Hover a bar for the middle half of the frames.</p>
+  <div class="chart" role="img" aria-label="Median draw time per frame in the software renderer, by scene">
+<div class="band"><div class="bl">Quiet</div><div class="bars">
+<div class="row" data-tip="Quiet · before: 3,197 ms (middle half 3108–3261 ms)"><span class="bar b-before" style="width:88.49%"></span><span class="val">3,197 ms</span></div>
+<div class="row" data-tip="Quiet · after: 2,261 ms (middle half 2222–2321 ms)"><span class="bar b-after" style="width:62.59%"></span><span class="val">2,261 ms</span></div>
+</div></div>
+<div class="band"><div class="bl">Camera pan</div><div class="bars">
+<div class="row" data-tip="Camera pan · before: 3,194 ms (middle half 3081–3345 ms)"><span class="bar b-before" style="width:88.42%"></span><span class="val">3,194 ms</span></div>
+<div class="row" data-tip="Camera pan · after: 2,269 ms (middle half 2140–2418 ms)"><span class="bar b-after" style="width:62.81%"></span><span class="val">2,269 ms</span></div>
+</div></div>
+<div class="band"><div class="bl">Battery firing</div><div class="bars">
+<div class="row" data-tip="Battery firing · before: 3,050 ms (middle half 2969–3137 ms)"><span class="bar b-before" style="width:84.43%"></span><span class="val">3,050 ms</span></div>
+<div class="row" data-tip="Battery firing · after: 2,636 ms (middle half 2054–3058 ms)"><span class="bar b-after" style="width:72.96%"></span><span class="val">2,636 ms</span></div>
+</div></div>
+<div class="band"><div class="bl">Tower collapsing</div><div class="bars">
+<div class="row" data-tip="Tower collapsing · before: 3,101 ms (middle half 3030–3180 ms)"><span class="bar b-before" style="width:85.83%"></span><span class="val">3,101 ms</span></div>
+<div class="row" data-tip="Tower collapsing · after: 2,497 ms (middle half 2069–3115 ms)"><span class="bar b-after" style="width:69.12%"></span><span class="val">2,497 ms</span></div>
+</div></div>
+</div>
+</section>
+
+<section aria-labelledby="h-tab">
+  <h2 id="h-tab">Every scene, with the statistics</h2>
+  <p>The 95% interval is for the change in median draw time, from a two-level bootstrap: whole runs resampled, then frames within each run, because frames from one page load are not independent. The p value is a Mann-Whitney test on the frames.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Scene</th><th>Frames (before/after)</th><th>Median draw ms</th><th>Change</th><th>95% interval</th><th>p</th><th>Triangles a frame</th><th>Change</th><th>Shadow redraws</th><th>Draw calls</th></tr></thead>
+    <tbody><tr><th scope="row">Quiet</th>
+<td>90 / 90</td>
+<td>3,197 → 2,261</td>
+<td class="chg">-29.3%</td>
+<td>-30.3% to -28.2%</td>
+<td>&lt; 0.001</td>
+<td>4.47 → 2.60 M</td>
+<td class="chg">-41.9%</td>
+<td>100% → 10%</td>
+<td>543 → 140</td></tr><tr><th scope="row">Camera pan</th>
+<td>90 / 90</td>
+<td>3,194 → 2,269</td>
+<td class="chg">-29.0%</td>
+<td>-31.2% to -26.3%</td>
+<td>&lt; 0.001</td>
+<td>4.47 → 2.67 M</td>
+<td class="chg">-40.3%</td>
+<td>100% → 13%</td>
+<td>540 → 154</td></tr><tr><th scope="row">Battery firing</th>
+<td>90 / 90</td>
+<td>3,050 → 2,636</td>
+<td class="chg">-13.6%</td>
+<td>-30.7% to -4.2%</td>
+<td>&lt; 0.001</td>
+<td>5.59 → 4.43 M</td>
+<td class="chg">-20.9%</td>
+<td>100% → 50%</td>
+<td>724 → 467</td></tr><tr><th scope="row">Tower collapsing</th>
+<td>90 / 90</td>
+<td>3,101 → 2,497</td>
+<td class="chg">-19.5%</td>
+<td>-32.3% to -3.1%</td>
+<td>&lt; 0.001</td>
+<td>5.72 → 4.55 M</td>
+<td class="chg">-20.4%</td>
+<td>100% → 50%</td>
+<td>725 → 468</td></tr></tbody></table></div>
+  <div class="cols"><p><strong>Quiet.</strong> Level loaded, nothing deployed, camera still.</p><p><strong>Camera pan.</strong> Camera sliding across the city at 4 m a frame.</p><p><strong>Battery firing.</strong> Four M777s set up on the tower and firing.</p><p><strong>Tower collapsing.</strong> Charges on the tower walls: about 80 stones out and 70 to 90 bodies falling.</p></div>
+</section>
+
+<section aria-labelledby="h-mix">
+  <h2 id="h-mix">How much the fight's mix matters</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Mix</th><th>Share of play time</th><th>Triangles a second at 30 fps</th><th>Triangles</th><th>Draw time</th><th>Shadow redraws</th></tr></thead>
+    <tbody><tr><th scope="row">typical</th><td>quiet 30% · camera 20% · battery 40% · tower 10%</td>
+<td>151 M → 106 M</td><td class="chg">-29.8%</td><td class="chg">-22.1%</td>
+<td>100% → 31%</td></tr><tr><th scope="row">calm</th><td>quiet 50% · camera 20% · battery 25% · tower 5%</td>
+<td>144 M → 95 M</td><td class="chg">-34.2%</td><td class="chg">-24.9%</td>
+<td>100% → 23%</td></tr><tr><th scope="row">heavy</th><td>quiet 10% · camera 15% · battery 55% · tower 20%</td>
+<td>160 M → 120 M</td><td class="chg">-25.0%</td><td class="chg">-18.8%</td>
+<td>100% → 40%</td></tr></tbody></table></div>
+</section>
+
+<section aria-labelledby="h-page">
+  <h2 id="h-page">The rest of the page</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Check</th><th>before</th><th>after</th><th>Note</th></tr></thead>
+    <tbody><tr><th scope="row">Frosted-glass panels visible in battle</th><td>1</td><td>0</td><td class="note">Measured on the idle battle screen. More appear with drawers and cards open; all are gone on a phone now.</td></tr><tr><th scope="row">Audio engine with the page hidden</th><td>running</td><td>suspended</td><td class="note">Before, the mixer kept running behind another app. After, it suspends and resumes on return.</td></tr><tr><th scope="row">Animations running forever on the battle screen</th><td>0</td><td>0</td><td class="note">Zero at the start of a battle in both. The news ticker only exists after a win, and it is now stopped once it is hidden again.</td></tr><tr><th scope="row">Hangar frame rate on a 120 Hz phone</th><td>120</td><td>30</td><td class="note">Set by the code (pacing to 30 on the saver), not measured here.</td></tr><tr><th scope="row">Page errors in all runs</th><td>0</td><td>0</td><td class="note"></td></tr></tbody></table></div>
+</section>
+
+<section aria-labelledby="h-exp">
+  <h2 id="h-exp">What to expect on a phone</h2>
+  <p>A phone's battery drain during play is the screen, the CPU and the GPU together. This pass only reduces the GPU's share, by somewhere between the triangle cut (30%) and the draw-time cut (22%) in a typical fight. How much of the phone's power the GPU takes in this game cannot be measured from here, so the projection is given for three plausible shares:</p>
+  <div class="scroll"><table>
+    <thead><tr><th>If the GPU is</th><th>Expected play time per charge</th><th>Power drawn</th></tr></thead>
+    <tbody><tr><th scope="row">35% of the phone's power</th><td>8% to 12% longer play per charge</td><td>8% to 10% less power drawn</td></tr><tr><th scope="row">45% of the phone's power</th><td>11% to 16% longer play per charge</td><td>10% to 13% less power drawn</td></tr><tr><th scope="row">55% of the phone's power</th><td>14% to 20% longer play per charge</td><td>12% to 16% less power drawn</td></tr></tbody></table></div>
+  <p class="callout">Heat follows the same power. A phone throttles when it runs hot, so less sustained GPU work should also mean the game takes longer to get warm and holds 30 frames for longer before it drops. Moments with the most going on (a big collapse, aircraft overhead) save least, because that is when the shadows are being redrawn.</p>
+</section>
+
+<section aria-labelledby="h-track">
+  <h2 id="h-track">How to track it from here</h2>
+  <div class="cols">
+    <div style="display:grid;gap:10px;min-width:0"><h3>On the bench</h3>
+      <ol>
+        <li>Run the old build on port 5178 and the new one on port 5177.</li>
+        <li><code>PORTS=5178:before,5177:after RUNS=3 FRAMES=30 node tools/powerbench.mjs</code></li>
+        <li><code>python3 tools/powerstats.py /tmp/out/powerbench --json stats.json</code></li>
+        <li><code>python3 tools/powerreport.py stats.json report.html</code></li>
+      </ol>
+      <p>Each change to rendering is then measured the same way as this one, and the reports compare like for like.</p></div>
+    <div style="display:grid;gap:10px;min-width:0"><h3>On a phone</h3>
+      <ol>
+        <li>Charge to 100%, brightness at half, Low Power Mode off, other apps closed.</li>
+        <li>Play Westminster for 20 minutes with the battery saver on.</li>
+        <li>Note the battery percentage at the end, and the minute the phone first feels warm.</li>
+        <li>Repeat on another day and average the two. A single session varies too much to trust on its own.</li>
+      </ol></div>
+  </div>
+</section>
+
+<footer>Generated by tools/powerreport.py from tools/powerstats.py output · 3+3 page loads · 720 frames measured</footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+<script>
+(() => {
+  const tip = document.getElementById('tip');
+  const show = (el, x, y) => { tip.textContent = el.dataset.tip; tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 12)) + 'px';
+    tip.style.top = Math.max(8, y - h - 10) + 'px'; };
+  document.querySelectorAll('.row[data-tip]').forEach((el) => {
+    el.tabIndex = 0;
+    el.addEventListener('pointermove', (ev) => show(el, ev.clientX, ev.clientY));
+    el.addEventListener('pointerleave', () => { tip.hidden = true; });
+    el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); show(el, r.left, r.top); });
+    el.addEventListener('blur', () => { tip.hidden = true; });
+  });
+})();
+</script>
