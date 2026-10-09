@@ -116,6 +116,15 @@ update time apart, physics bodies and context loss. Geometries must hold
 level as units die and sorties land: `scene.remove` gives nothing back,
 `releaseTree` (`src/core/release.js`) does, and every path a unit, a
 sortie, a sling or a chute leaves the scene by calls it.
+A gun past `LOD_DIST` (67 m, `src/game/units.js`) is drawn with its far
+model: the finished wrapper (barrel already cut) cloned and every mesh
+simplified by meshoptimizer to five centimetres of error in a worker
+(`src/game/lodworker.js`), colour-aware for the vertex-painted ones, so
+the far copy has the same pivot and barrel and `battle._lod` swaps the
+two by the camera's distance and poses whichever is shown. An M777 is
+182,675 triangles near and 11,844 far. `node tools/lodshot.mjs` renders
+each gun near and far side by side; `node tools/unitcost.mjs <level>`
+counts what the deployed units cost a frame.
 
 ## The real world
 

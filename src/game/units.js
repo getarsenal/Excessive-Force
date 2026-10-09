@@ -7,6 +7,87 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
+ * The far model.
+ *
+ * The guns came as their makers built them: an M777 is 183,000 triangles, a
+ * Paladin and a Stryker 47,000 each, and from where the camera plays a gun
+ * is a few dozen pixels across. A phone fielding a few hundred of them drew
+ * five and a half million triangles a frame and fell to fifteen frames a
+ * second. So each loaded gun gets a light copy, made once: the finished
+ * model, barrel already cut and hung on its pivot, cloned and every piece
+ * simplified in place (meshoptimizer, in a worker: lodworker.js) until the next collapse would move
+ * its outline by more than `LOD_ERR` metres. Same hierarchy, same pivot,
+ * same barrel record, so the barrel is laid and recoils on both alike.
+ * A unit draws it beyond `LOD_DIST` metres, where that error is under a
+ * pixel on a phone's screen (battle.js `_lod`).
+ */
+const LOD_ERR = 0.05;
+export const LOD_DIST = Math.round(LOD_ERR * 1300 / (2 * Math.tan(THREE.MathUtils.degToRad(26))));
+
+/** One worker for every model's simplification (lodworker.js), made on first use. */
+let lodWorker = null, lodSeq = 0;
+const lodWaiting = new Map();
+function simplifyOff(pos, cols, index, err) {
+  if (!lodWorker) {
+    lodWorker = new Worker(new URL('./lodworker.js', import.meta.url), { type: 'module' });
+    lodWorker.onmessage = (e) => {
+      const w = lodWaiting.get(e.data.id);
+      lodWaiting.delete(e.data.id);
+      if (!w) return;
+      if (e.data.error) w.reject(new Error(e.data.error)); else w.resolve(e.data);
+    };
+    lodWorker.onerror = (e) => { for (const w of lodWaiting.values()) w.reject(e); lodWaiting.clear(); };
+  }
+  const id = ++lodSeq;
+  return new Promise((resolve, reject) => {
+    lodWaiting.set(id, { resolve, reject });
+    lodWorker.postMessage({ id, pos, cols, index, err });
+  });
+}
+
+async function lightModel(wrapper) {
+  const low = wrapper.clone(true);
+  low.updateMatrixWorld(true);
+  let before = 0, after = 0;
+  const sc = new THREE.Vector3();
+  const jobs = [];
+  low.traverse((o) => {
+    if (!o.isMesh || Array.isArray(o.material) || o.material?.map) return;
+    // Painted by vertex (the M777, HIMARS): the colour rides along and has
+    // a say in what may collapse, so a seam between two paints survives.
+    const col = o.material?.vertexColors ? o.geometry.attributes.color : null;
+    if (o.material?.vertexColors && !col) return;
+    const geo = o.geometry;
+    before += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
+    o.getWorldScale(sc);
+    const err = LOD_ERR / Math.max(1e-6, (Math.abs(sc.x) + Math.abs(sc.y) + Math.abs(sc.z)) / 3);
+    const pa = geo.attributes.position;
+    const pos = new Float32Array(pa.count * 3);
+    for (let i = 0; i < pa.count; i++) { pos[i * 3] = pa.getX(i); pos[i * 3 + 1] = pa.getY(i); pos[i * 3 + 2] = pa.getZ(i); }
+    let cols = null;
+    if (col) {
+      cols = new Float32Array(col.count * 3);
+      for (let i = 0; i < col.count; i++) { cols[i * 3] = col.getX(i); cols[i * 3 + 1] = col.getY(i); cols[i * 3 + 2] = col.getZ(i); }
+    }
+    const index = geo.index ? new Uint32Array(geo.index.array) : null;
+    jobs.push(simplifyOff(pos, cols, index, err).then((r) => {
+      if (r.idx.length < 3) { o.visible = false; return; }
+      const ng = new THREE.BufferGeometry();
+      ng.setAttribute('position', new THREE.BufferAttribute(r.pos, 3));
+      if (r.cols) ng.setAttribute('color', new THREE.BufferAttribute(r.cols, 3));
+      ng.setIndex(new THREE.BufferAttribute(r.idx, 1));
+      // Faceted: at that distance a crisp face reads, a smoothed blob does not.
+      const flat = ng.toNonIndexed();
+      flat.computeVertexNormals();
+      o.geometry = flat;
+      after += r.idx.length / 3;
+    }));
+  });
+  await Promise.all(jobs);
+  return { low, before: Math.round(before), after: Math.round(after) };
+}
+
+/**
  * The arsenal.
  *
  * Progression runs light anti-armour -> heavy anti-armour -> towed guns ->
@@ -527,11 +608,25 @@ export class ModelLibrary {
     this.loader = new GLTFLoader();
     this.loader.setDRACOLoader(draco);
     this.cache = new Map();
+    this.lods = new Map();
   }
 
-  async load(file, targetLength, opts = {}) {
+  /**
+   * A gun's model, loaded, normalised, repainted, its barrel cut and its far
+   * copy made, once a key: a second ask while the first is still under way
+   * (the warm-up and the first deploy, together) waits on the same work.
+   */
+  load(file, targetLength, opts = {}) {
     const key = `${file}:${targetLength}:${opts.tint ?? ''}${opts.barrel ? ':barrel' : ''}`;
-    if (this.cache.has(key)) return this.cache.get(key);
+    if (this.cache.has(key)) return Promise.resolve(this.cache.get(key));
+    if (!this.pending) this.pending = new Map();
+    if (!this.pending.has(key)) {
+      this.pending.set(key, this._load(key, file, targetLength, opts).finally(() => this.pending.delete(key)));
+    }
+    return this.pending.get(key);
+  }
+
+  async _load(key, file, targetLength, opts) {
 
     const gltf = await this.loader.loadAsync(`assets/${file}.glb`);
     const root = gltf.scene;
@@ -615,9 +710,21 @@ export class ModelLibrary {
     if (opts.barrel) splitBarrel(wrapper, opts.barrel, opts.modelYaw || 0);
     // The same shading as the world they stand in (see world/look.js).
     stylizeTree(wrapper);
+    // A gun's light copy for the distance, where it saves enough to matter.
+    if (tint) {
+      try {
+        const t0 = performance.now();
+        const L = await lightModel(wrapper);
+        if (L.after < L.before * 0.6) this.lods.set(wrapper, L);
+        console.log(`[tumble] ${file}: ${L.before} triangles, ${L.after} beyond ${LOD_DIST} m (${Math.round(performance.now() - t0)} ms)`);
+      } catch (e) { console.warn('[tumble] no far model for', file, e); }
+    }
     this.cache.set(key, wrapper);
     return wrapper;
   }
+
+  /** The light copy made for a loaded gun (`lightModel`), or null. */
+  lodOf(wrapper) { return this.lods.get(wrapper) || null; }
 
   /**
    * A model built in code rather than loaded: already at true scale, so it

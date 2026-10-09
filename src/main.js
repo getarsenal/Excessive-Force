@@ -686,7 +686,9 @@ async function boot() {
       // the guns and vehicles have a file to warm.
       if (u.model === 'infantry' || u.model === 'aircraft' || u.strike) continue;
       try {
-        await battle.models.load(u.model, u.modelLength, { tint: u.tint });
+        // The same key the deploy asks for (battle._attachModel), barrel and
+        // all, so the gun is cut and its far model made once, here.
+        await battle.models.load(u.modelFile || u.model, u.modelLength, { tint: u.tint, barrel: u.barrel, modelYaw: u.modelYaw });
       } catch (e) { console.warn(`[tumble] ${u.model} unavailable:`, e.message); }
     }
   })();

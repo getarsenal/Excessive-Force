@@ -19,7 +19,7 @@ const HEAT = { mgRound: 0.018, seatSecs: 5, cool: 0.1, lock: 4.0, reset: 0.45 };
 import { barrelTip, poseBarrel } from './barrel.js';
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
-import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR } from './units.js';
+import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR, LOD_DIST } from './units.js';
 import { releaseTree } from '../core/release.js';
 
 /** How long a lift package stays open after the first unit is placed. */
@@ -408,7 +408,22 @@ export class Battle {
       u.barrelElev += Math.abs(d) <= step ? d : Math.sign(d) * step;
     }
     u.recoilT = Math.max(0, (u.recoilT || 0) - dt * 1.4);
-    poseBarrel(u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+    poseBarrel(u.lodFar && u.barrelLo ? u.barrelLo : u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+  }
+
+  /**
+   * Near or far: the gun's full model inside LOD_DIST of the camera, its
+   * light copy beyond. The barrel of whichever is shown is posed at once,
+   * so a swap never shows the other's stale elevation.
+   */
+  _lod(u) {
+    const far = this.camera.position.distanceToSquared(u.pos) > LOD_DIST * LOD_DIST;
+    if (far === u.lodFar) return;
+    u.lodFar = far;
+    u.model.visible = !far;
+    u.modelLo.visible = far;
+    const B = u.barrelB;
+    if (B) poseBarrel(far && u.barrelLo ? u.barrelLo : u.barrel, B, u.barrelElev, B.recoil * (u.recoilT || 0) ** 2);
   }
 
   /**
@@ -2144,7 +2159,8 @@ export class Battle {
     if (def.model !== 'infantry') {
       // The vehicle or gun is loaded now, so it is on the platform when the
       // ramp opens rather than appearing on the ground.
-      drop.loading = this._attachModel({ def, group: drop.group, alive: true, drop }).catch((e) => console.warn('model load failed', e));
+      drop.stub = { def, group: drop.group, alive: true, drop };
+      drop.loading = this._attachModel(drop.stub).catch((e) => console.warn('model load failed', e));
     }
     drop.marker = this._dropMarker(pos);
     this.pending.push(drop);
@@ -2328,12 +2344,12 @@ export class Battle {
     // Model loads asynchronously; the unit is playable in the meantime. A
     // unit that came down the lift brought its model with it.
     if (drop && drop.model) {
-      unit.model = drop.model;
+      this._adoptModel(unit, drop);
       unit.model.rotation.y = def.modelYaw ?? 0;
     } else if (drop && drop.loading) {
       // Still on its way from the cache: it lands in this group when it
       // arrives, and starting a second load would put two in it.
-      drop.loading.then(() => { if (unit.alive && drop.model && !unit.model) unit.model = drop.model; });
+      drop.loading.then(() => { if (unit.alive && drop.model && !unit.model) this._adoptModel(unit, drop); });
     } else {
       this._attachModel(unit).catch((e) => console.warn('model load failed', e));
     }
@@ -2396,7 +2412,33 @@ export class Battle {
       unit.barrelElev = unit.barrelWant = unit.barrelB.rest;
       unit.recoilT = 0;
     }
+    // The far model (units.js `lightModel`): drawn instead beyond LOD_DIST,
+    // its barrel the same pivot laid by the same record.
+    const lod = this.models.lodOf?.(wrapper);
+    if (lod) {
+      const lo = this.models.instance(lod.low);
+      lo.rotation.y = inst.rotation.y;
+      lo.visible = false;
+      unit.group.add(lo);
+      unit.modelLo = lo;
+      unit.barrelLo = lo.getObjectByName('barrel') || null;
+      unit.lodFar = false;
+    }
     if (unit.drop) unit.drop.model = inst;
+  }
+
+  /**
+   * A gun that came down the lift was given its model in the sling, on a
+   * stand-in for the unit (`drop.stub`): the model, its cut barrel and its
+   * far copy are taken over from there. Only the model used to be, so an
+   * airlifted gun never laid its barrel and never had a far model.
+   */
+  _adoptModel(unit, drop) {
+    const s = drop.stub || {};
+    unit.model = drop.model;
+    for (const k of ['barrel', 'barrelB', 'barrelElev', 'barrelWant', 'recoilT', 'modelLo', 'barrelLo', 'lodFar']) {
+      if (s[k] !== undefined) unit[k] = s[k];
+    }
   }
 
   removeUnit(unit) {
@@ -2877,6 +2919,7 @@ export class Battle {
       }
 
       if (this.invulnerable) u.health = u.maxHealth;
+      if (u.modelLo) this._lod(u);
       if (u.barrel) this._updateBarrel(u, dt);
       if (u.smokeT > 0) this._muzzleSmoke(u, dt);
       if (u.wantYaw != null && !u.handHeld) this._traverse(u, dt);
