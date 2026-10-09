@@ -50,6 +50,8 @@ for (let n = 0; n < 100 && !crashed; n++) {
       for (let k = 0; k < s.count; k++) {
         const i = (start + k) % s.count;
         if (!(s.flags[i] & 1) || (mask && !mask[i])) continue;
+        // Not the footings under the ground: a shell cannot reach them.
+        if (s.py[i] < window.terrain.heightAt(s.px[i], s.pz[i]) + 0.4) continue;
         if (s.py[i] < by - 0.5) { by = s.py[i]; best = i; if (k > s.count * 0.05) break; }
       }
       if (best < 0) return { done: true };

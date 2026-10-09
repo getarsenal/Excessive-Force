@@ -12,6 +12,7 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', a
 const page = await b.newPage({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
 let step = 'load';
 const errors = [];
+page.on('crash', () => { console.log(`PAGE CRASHED during ${step}`); });
 page.on('pageerror', (e) => errors.push(`[${step}] ${String(e.stack || e).slice(0, 400)}`));
 page.on('console', (m) => {
   const t = m.text();
