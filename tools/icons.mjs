@@ -86,5 +86,7 @@ const out = await page.evaluate(async (ids) => {
   return res;
 }, ids);
 for (const [id, url] of Object.entries(out)) writeFileSync(`public/assets/icons/${id}.png`, Buffer.from(url.split(',')[1], 'base64'));
+// And the cards' own size (tools/iconcards.py).
+(await import('node:child_process')).execSync('python3 tools/iconcards.py', { stdio: 'inherit' });
 console.log('wrote', Object.keys(out).join(' '));
 await b.close();

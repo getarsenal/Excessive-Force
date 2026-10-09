@@ -301,7 +301,11 @@ export const IMAGE_ICONS = new Set([
 /** Inline markup for a unit id, or null if it has no icon. */
 export function unitIcon(id) {
   if (IMAGE_ICONS.has(id)) {
-    return `<img class="uc-img" src="assets/icons/${id}.png" alt="" width="512" height="320" draggable="false">`;
+    // The card's own size (tools/iconcards.py), not the 512x320 render: a
+    // phone in a big battle gives decoded images back and redrew the big
+    // ones half-done or not at all. A load that fails is tried again, then
+    // the full-size file, then the drawn pictogram, never a blank card.
+    return `<img class="uc-img" src="assets/icons/card/${id}.webp" alt="" width="256" height="160" draggable="false" decoding="async" data-id="${id}" onerror="window.__iconRetry?.(this)">`;
   }
   const body = BODY[id];
   if (!body) return null;
@@ -316,3 +320,15 @@ for (const [id, from] of [['m120', 'at4'], ['stryker', 'm109'], ['ah64', 'f15'],
 }
 
 export const ICON_IDS = Object.keys(BODY);
+
+/** A card icon that did not load: once more, then the big file, then the pictogram. */
+if (typeof window !== 'undefined') {
+  window.__iconRetry = (img) => {
+    const id = img.dataset.id, n = +(img.dataset.retry || 0);
+    img.dataset.retry = n + 1;
+    if (n === 0) setTimeout(() => { img.src = `assets/icons/card/${id}.webp?r=${Date.now() % 1e6}`; }, 900);
+    else if (n === 1) img.src = `assets/icons/${id}.png`;
+    else if (BODY[id]) img.outerHTML = `<svg class="uc-svg" viewBox="0 0 64 40" width="64" height="40" aria-hidden="true" focusable="false">${BODY[id]}</svg>`;
+    else img.style.visibility = 'hidden';
+  };
+}

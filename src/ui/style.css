@@ -376,7 +376,10 @@ html, body {
 .unit-card:hover:not(.locked) { border-color: var(--edge-bright); transform: translateY(-2px); }
 .unit-card.selected { border-color: var(--accent); background: rgba(35, 62, 96, 0.78); }
 .unit-card.locked { opacity: 0.62; cursor: not-allowed; }
-.unit-card.locked .uc-icon { filter: grayscale(1) brightness(0.7); }
+/* One filter on the picture itself, not a filter on its box round another on
+   the picture inside a faded card: Safari drew that stack displaced or blank. */
+.unit-card.locked .uc-icon .uc-img { filter: grayscale(1) brightness(0.7); }
+.unit-card.locked .uc-icon .uc-svg { filter: grayscale(1) brightness(0.7); }
 .unit-card.unaffordable .uc-cost { color: var(--danger); }
 
 .uc-icon {
@@ -2178,6 +2181,11 @@ body.cine #cine i { height: 9vh; }
 @keyframes feed-in { from { transform: translateX(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
 /* 8. A drawer's cards rise into place one after another. */
 .drawer:not([hidden]) .unit-card { animation: card-rise 0.3s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(var(--i, 0) * 28ms); }
+/* Not on a phone: the rise is a layer per card for a third of a second each
+   time the drawer opens, over a battle already using all the GPU has. */
+body.lean .drawer:not([hidden]) .unit-card { animation: none; }
+body.lean .uc-icon .uc-img { filter: none; }
+body.lean .unit-card.locked .uc-icon .uc-img { filter: grayscale(1) brightness(0.7); }
 @keyframes card-rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
 /* 9. The report comes up line by line. */
 #endcard:not([hidden]) .ec-inner > * { animation: ec-in 0.4s ease-out both; }
