@@ -245,6 +245,20 @@ export class TestMenu {
     this._stat(diag, 'Water quads', () => c.water.userData.quads ?? 0);
     this._stat(diag, 'Quality tier', () => c.quality.id);
 
+    // ── Performance ────────────────────────────────────────────────────────
+    // The on-device run (ui/perftest.js): a scripted fight through the real
+    // frame loop, every frame measured, the results kept and compared.
+    const perf = this._section('PERFORMANCE', true);
+    this._buttons(perf, null, [
+      ['RUN QUICK · 2½ MIN', () => this.ctx.perf?.start('quick')],
+      ['RUN LONG · 10 MIN', () => this.ctx.perf?.start('long')],
+      ['LAST RESULTS', () => this.ctx.perf?.showCard()],
+    ]);
+    this._note(perf, 'Plays quiet, a camera circle, a battery firing, an air strike, the '
+      + 'landmark collapsing and quiet again, and measures every frame: frame rate, hitches, '
+      + 'CPU and GPU time, triangles, shadow redraws, heat slowdown and battery. Hands off '
+      + 'while it runs; it wrecks the battle, so restart after. LONG unplugged for battery.');
+
     // ── Self tests ─────────────────────────────────────────────────────────
     const tests = this._section('SELF TESTS', true);
     this._buttons(tests, null, [

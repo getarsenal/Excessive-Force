@@ -41,6 +41,7 @@ import { HUD } from './ui/hud.js';
 import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
+import { PerfTest } from './ui/perftest.js';
 import { Ambience } from './core/ambient.js';
 import { access } from './core/access.js';
 import { Stores } from './game/stores.js';
@@ -2965,6 +2966,14 @@ async function boot() {
   });
   // The pause menu's TEST PANEL switch (see HUD): the button appears or goes.
   hud.onDev = (on) => testMenu.setDev(on);
+  // The on-device performance test, run from the panel's PERFORMANCE section.
+  const perfTest = new PerfTest({
+    battle, engine, physics, rig, quality, level, governor, power,
+    onOpen: (open) => testMenu.toggle(open),
+    restart: () => hud.onRestart(),
+  });
+  testMenu.ctx.perf = perfTest;
+  window.__perf = perfTest;   // for the harness
 
   /**
    * A regression run starts from a board nothing has happened on yet.
@@ -3251,8 +3260,14 @@ async function boot() {
     rig.update(rawDt, shake);
     layCamera(rawDt);
     placeSun();
+    // The performance test (src/ui/perftest.js) measures the frame from here:
+    // the work before the draw, the draw handed over, the GPU's own clock.
+    const perfOn = perfTest.running;
+    if (perfOn) perfTest.beforeRender();
+    const drawT0 = performance.now();
     engine.render();
     pod.render(dt);
+    if (perfOn) perfTest.afterRender(dtMs, drawT0 - now, performance.now() - drawT0);
     clip.frame();
 
     frames++; fpsAcc += dtMs;

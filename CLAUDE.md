@@ -202,6 +202,23 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   measured pass is `docs/perf/power-2026-10-09.*`: a typical fight 30%
   fewer triangles a frame, shadow redraws 100% to 31% of frames, draw
   time 22% less.
+  On the phone itself: the test panel's PERFORMANCE section
+  (`src/ui/perftest.js`) runs QUICK (two and a half minutes: quiet, the
+  camera circling, a battery firing, an F-15 and the gunship, quiet again
+  with the guns gone and the view restored, the landmark's foot blown out)
+  or LONG (ten: the same, then seven minutes of fight and quiet at the
+  end) through the real frame loop (`perfTest.beforeRender`/`afterRender`
+  round the draw in main.js), with the battle held from ending
+  (`battle.holdEnd`), and measures every drawn frame: interval, CPU work,
+  the GPU's own time where `EXT_disjoint_timer_query_webgl2` exists
+  (Android Chrome, not Safari), triangles, calls, shadow redraws, heat
+  (first quiet against the second, or LONG's first minute against its
+  last), the battery through `navigator.getBattery` (not Safari: the card
+  takes the phone's percentages typed in), heap and the governor's stage.
+  The card compares with the last run on the same level and tier, keeps
+  thirty (`tt.perfruns`), and COPY RESULTS puts the record on the
+  clipboard to send. `SCALE=0.15 node tools/perftestprobe.mjs` runs it
+  headless through the panel and prints the record.
 - `src/world/look.js` the art direction: the climate's sky, fog, water
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against

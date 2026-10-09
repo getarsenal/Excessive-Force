@@ -3996,8 +3996,9 @@ export class Battle {
   get flattened() { return !!this._flattened; }
 
   _checkEnd() {
-    // A sandbox (the range) is never won or lost.
-    if (this.level?.sandbox) return;
+    // A sandbox (the range) is never won or lost, and nor is a battle the
+    // performance test is running in (src/ui/perftest.js).
+    if (this.level?.sandbox || this.holdEnd) return;
     if (this._winAcknowledged) {
       // The win is banked and play went on. When there is nothing left of
       // any objective, say so once: a player who has taken the last ten per
