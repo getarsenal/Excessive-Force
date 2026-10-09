@@ -51,11 +51,13 @@ const dep = await page.evaluate(async () => {
   // Until everything ordered is on the ground and ready.
   let t = 0;
   for (; t < 240; t += 1) {
-    window.__fastForward(1, 1 / 30); window.__frame();
+    // Drawn only now and then: a software rasteriser takes seconds a frame
+    // over a town, and the deploy is a simulation question.
+    window.__fastForward(1, 1 / 30); if (t % 10 === 0) window.__frame();
     await new Promise((r) => setTimeout(r, 2));
     const ready = B.units.filter((u) => u.alive && u.state === 'ready').length;
     if (t % 10 === 0) console.log(`[check] t=${t} units=${B.units.length} ready=${ready} pending=${B.pending.length} sorties=${B.air.sorties.length} heap=${performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : '?'}MB`);
-    if (ready >= kinds.length && !B.pending.length) break;
+    if (t > 20 && !B.pending.length && !B.package && B.units.length && ready >= B.units.filter((u) => u.alive).length) break;
   }
   return { ordered: i, t, units: B.units.map((u) => `${u.def.id}:${u.state}${u.airDropped || u.drop ? '(air)' : ''}`).join(' '), pending: B.pending.length, airlift: !!B.airlift };
 });
@@ -71,7 +73,7 @@ const lay = await page.evaluate(async () => {
     if (!u.barrel || !B.canLay(u)) { r.canLay = B.canLay?.(u); out.push(r); continue; }
     window.__lay.enter(u);
     B.layTurn(0.4, 0.5);
-    for (let k = 0; k < 10; k++) { window.__fastForward(1 / 30, 1 / 30); window.__frame(); }
+    for (let k = 0; k < 10; k++) { window.__fastForward(1 / 30, 1 / 30); if (k % 5 === 4) window.__frame(); }
     const shown = u.lodFar && u.barrelLo ? u.barrelLo : u.barrel;
     const ang = 2 * Math.acos(Math.min(1, Math.abs(shown.quaternion.w)));
     r.elev = +(B.lay.elev * 57.3).toFixed(1);
@@ -104,7 +106,7 @@ const strikes = await page.evaluate(async () => {
     const s = B.callStrike(id, target);
     let t = 0, lost = null;
     for (; t < 60; t += 0.5) {
-      window.__fastForward(0.5, 1 / 30); if ((t * 2) % 4 === 0) window.__frame();
+      window.__fastForward(0.5, 1 / 30); if (t % 10 === 0) window.__frame();
       await new Promise((r) => setTimeout(r, 2));
       if (s && !B.air.sorties.includes(s)) break;
     }
