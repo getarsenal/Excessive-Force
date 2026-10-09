@@ -206,6 +206,8 @@ const FIRING_ARC = Math.cos(THREE.MathUtils.degToRad(72));
  * as good as ever.
  */
 const NEAR = 7.5;
+/** Seconds a man shot down lies where he fell before he is taken off. */
+const FALLEN = 5;
 
 /** Does the segment p→q pass through stone i of s? Exact, in the stone's own frame. */
 function segHitsStone(s, i, px, py, pz, qx, qy, qz) {
@@ -1867,13 +1869,17 @@ export class Garrison {
   reconcileStructure(groundY = -Infinity) {
     let lost = 0;
     for (const d of this.defenders) {
-      if (!d.alive) continue;
+      if (!d.alive) {
+        // Lying where he fell (`sync`) until the stone under him goes.
+        if (!d.gone && d.structure) { const f = d.structure.flags[d.chunk]; if (!(f & 1) || (f & 10)) d.gone = true; }
+        continue;
+      }
       const s = d.structure;
       if (!s) continue;                      // in a pit, on the ground
       const f = s.flags[d.chunk];
       const dead = !(f & 1);
       const falling = (f & 2) || (f & 8);
-      if (dead || falling) { d.alive = false; lost++; continue; }
+      if (dead || falling) { d.alive = false; d.gone = true; lost++; continue; }
 
       // And check there is still a floor under him.
       //
@@ -1891,7 +1897,7 @@ export class Garrison {
       const solid = s.occupancy
         && (s.occupancy.solidAt(d.pos.x, d.pos.y - 1.0, d.pos.z)
           || s.occupancy.solidAt(d.pos.x, d.pos.y - 2.2, d.pos.z));
-      if (s.occupancy && !solid) { d.alive = false; lost++; }
+      if (s.occupancy && !solid) { d.alive = false; d.gone = true; lost++; }
     }
     return lost;
   }
@@ -2326,7 +2332,36 @@ export class Garrison {
     return n;
   }
 
-  /** Rebuild the instance buffers. Only live defenders are drawn. */
+  /**
+   * A dead man's figure, `age` seconds after he was hit: in the open he
+   * goes over backwards in half a second, at a window or in a trench he
+   * slumps down behind it (falling flat there would put him through the
+   * wall); then he lies there, and for the last second sinks out of sight.
+   */
+  _fallen(d, age, w) {
+    const k = Math.min(1, age / 0.45);
+    const fall = k * k;
+    const sink = Math.max(0, age - (FALLEN - 1));
+    const behind = d.cover === 'window' || d.cover === 'arcade' || d.cover === 'trench';
+    const v = this._v.copy(d.pos);
+    v.y -= sink * 0.9;
+    this._q.setFromAxisAngle(this._axis, d.facing);
+    const sc = this._sFall || (this._sFall = new THREE.Vector3());
+    if (behind) {
+      sc.set(1, 1 - 0.7 * fall, 1);
+    } else {
+      sc.set(1, 1, 1);
+      const tilt = this._qFall || (this._qFall = new THREE.Quaternion());
+      tilt.setFromAxisAngle(this._xAxis || (this._xAxis = new THREE.Vector3(1, 0, 0)), -fall * Math.PI * 0.48);
+      this._q.multiply(tilt);
+    }
+    this._m4.compose(v, this._q, sc);
+    this.mesh.setMatrixAt(w, this._m4);
+    this._col.setHex(d.def.colour).multiplyScalar(0.55);
+    this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
+  }
+
+  /** Rebuild the instance buffers: the living, and the dead for a few seconds. */
   sync() {
     let w = 0, mw = 0, bw = 0, gw = 0, fw = 0;
     // Which defender each drawn figure is, so a tap on one can be traced back.
@@ -2335,7 +2370,20 @@ export class Garrison {
     const order = this._drawOrder || (this._drawOrder = []);
     order.length = 0;
     for (const d of this.defenders) {
-      if (!d.alive) continue;
+      if (!d.alive) {
+        // A man shot down falls, and lies there a few seconds before he is
+        // taken off: one who simply stopped being drawn was a kill nobody
+        // saw. A man lost with his masonry (`gone`) went with the stone.
+        if (d.gone || d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' || d.def.key === 'howitzer'
+          || w >= this.mesh.instanceMatrix.count) continue;
+        if (d.diedAt == null) d.diedAt = this.time;
+        const age = this.time - d.diedAt;
+        if (age > FALLEN) { d.gone = true; continue; }
+        this._fallen(d, age, w);
+        order[w] = d;
+        w++;
+        continue;
+      }
       this._q.setFromAxisAngle(this._axis, d.facing);
 
       if (d.def.indirect && d.def.key !== 'howitzer') {

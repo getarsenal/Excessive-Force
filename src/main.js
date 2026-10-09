@@ -1904,7 +1904,7 @@ async function boot() {
   // Over the readout, the spotter: the round's time of flight counting
   // down to SPLASH, then where it fell (battle._spotFall). NEXT GUN takes
   // the next gun in the battery without stepping back out to the map.
-  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-talk"><div id="lay-spot" hidden></div><div id="lay-read"></div></div><div id="lay-hint">DRAG TO AIM</div>
+  layEl.innerHTML = `<div id="lay-sight"></div><div id="lay-mark"></div><div id="lay-hit"><svg viewBox="-22 -22 44 44"><path d="M-14 -14L-6 -6M14 -14L6 -6M-14 14L-6 6M14 14L6 6"/></svg></div><div id="lay-talk"><div id="lay-spot" hidden></div><div id="lay-read"></div></div><div id="lay-hint">DRAG TO AIM</div>
     <button id="lay-done" type="button">DONE</button>
     <button id="lay-next" type="button" hidden>NEXT GUN</button>
     <button id="lay-wpn" type="button" hidden>105 MM</button>
@@ -2178,6 +2178,36 @@ async function boot() {
       if (layRead.textContent !== t) layRead.textContent = t;
     }
   };
+  // The machine gun's hits, said where the eye is: the cross over the
+  // point of impact flashes white for a round that found a man (red, and
+  // held longer, when he went down) with a click in the ear, and over the
+  // readout the stream's tally — hits, men down, men pinned at the point.
+  // battle._mgHit counts them; a new lay (NEXT GUN) starts from nothing.
+  const layHit = layEl.querySelector('#lay-hit');
+  const hitSeen = { L: null, hit: 0, kill: 0 };
+  const mgTally = (L) => {
+    if (hitSeen.L !== L) { hitSeen.L = L; hitSeen.hit = L.hitN || 0; hitSeen.kill = L.killN || 0; }
+    const hit = L.hitN || 0, kill = L.killN || 0;
+    if (hit > hitSeen.hit) {
+      const down = kill > hitSeen.kill;
+      hitSeen.hit = hit; hitSeen.kill = kill;
+      layHit.classList.remove('on', 'kill');
+      void layHit.offsetWidth;
+      layHit.classList.add('on');
+      if (down) layHit.classList.add('kill');
+      audio.tick(down);
+    }
+    const pinned = L.rounds ? battle.pinnedNear(L.impact, L.unit.def.mg) : 0;
+    const st = L.rounds ? `HITS ${hit} · DOWN ${kill} · PINNED ${pinned}` : '';
+    const cls = hit ? 'on' : '';
+    const key = st + cls;
+    if (key !== laySpotShown) {
+      laySpotShown = key;
+      laySpotEl.hidden = !st;
+      laySpotEl.textContent = st;
+      laySpotEl.className = cls;
+    }
+  };
   /** Each frame in the seat: the readout, the reload ring, the held 30 mm, and the seat given up when the aircraft goes. */
   const seatFrame = () => {
     const S = battle.seat;
@@ -2211,7 +2241,7 @@ async function boot() {
     if (ready !== layReady) { layReady = ready; layFire.classList.toggle('ready', ready); }
     // The machine gun fires while the thumb is down, round after round (battle._handMG).
     battle.trigger = layHold && !!u.def.mg;
-    if (u.def.mg) { heatRing(L); return; }
+    if (u.def.mg) { heatRing(L); mgTally(L); return; }
     // The ring round FIRE fills as the breech is loaded, and the button
     // itself counts the seconds down: how long a reload is, and how far
     // through it the crew are, without reading a word.

@@ -3101,6 +3101,7 @@ export class Battle {
     const mg = u.def.mg;
     const t = u.mgTarget;
     if (!t) return;
+    u.mgRounds = (u.mgRounds || 0) + 1;
     const from = this._muzzle(u);
     // Seen from the gunner's own eye, a foot behind the muzzle, the flash
     // the camera sees from fifty metres is a wall of light: the hand's
@@ -3151,6 +3152,7 @@ export class Battle {
       if (extra && (!victim || bestX < best)) {
         this.tracerFX.fire(from, extra.pos, look, true);
         extra.hit(mg.damage, u);
+        this._mgHit(u, extra.pos, false);
         if (this.lay && this.lay.unit === u) this.lay.kick = Math.min(0.6, this.lay.kick + 0.1);
         return;
       }
@@ -3159,12 +3161,14 @@ export class Battle {
       this.tracerFX.fire(from, hit ? victim.muzzle : to, look, hit);
       if (hit) {
         victim.health -= mg.damage;
-        if (victim.health <= 0) {
+        const kill = victim.health <= 0;
+        if (kill) {
           victim.alive = false;
           u.kills = (u.kills || 0) + 1;
           this._creditKills(1, victim.pos);
           this.onEvent('handshot', { unit: u, point: victim.pos.clone(), kill: true });
         }
+        this._mgHit(u, victim.muzzle, kill);
       } else if (this.fx?.impactDust && u.burstLeft % 3 === 0) {
         this.fx.impactDust(to.x, to.y, to.z, 0.35);
       }
@@ -3186,7 +3190,7 @@ export class Battle {
       const sp = dist * (hit ? 0.006 : 0.03);
       aim.x += gauss() * sp; aim.y += gauss() * sp; aim.z += gauss() * sp;
       this.tracerFX.fire(from, aim, look, hit);
-      if (hit) t.air.hit(mg.airDamage * (t.air.armour ?? 1), u);
+      if (hit) { t.air.hit(mg.airDamage * (t.air.armour ?? 1), u); this._mgHit(u, t.air.pos, false); }
     } else {
       const d = t.d;
       if (!d.alive) { u.burstLeft = 0; return; }
@@ -3215,11 +3219,13 @@ export class Battle {
       this.tracerFX.fire(from, to, look, hit);
       if (hit) {
         d.health -= mg.damage;
-        if (d.health <= 0) {
+        const kill = d.health <= 0;
+        if (kill) {
           d.alive = false;
           u.kills = (u.kills || 0) + 1;
           this._creditKills(1, d.pos);
         }
+        this._mgHit(u, d.muzzle, kill);
       }
       // Pinned: every man near where the burst is landing, hit or not.
       const g = this.garrison;
@@ -3233,6 +3239,37 @@ export class Battle {
     if (this.audio && u.burstLeft % 3 === 0) {
       this.audio.play('mg', from, { gain: 0.3, rolloff: 380, rate: 1.05, cooldown: 0.05 });
     }
+  }
+
+  /**
+   * A machine-gun round that found something. Only one round in several is
+   * a tracer, and a tracer's own spark is the only thing that said a round
+   * had landed: most hits showed nothing at all, and a man hit and not
+   * killed never showed anything. So every hit is said on the man, a burst
+   * of sparks big enough to see from the map (red-hot and with dust when he
+   * goes down, and he falls: `defenders.sync`), counted on the gun for its
+   * card, and, for the gun in the player's hands, on the sight (main.js:
+   * the hit marker and the tally over the readout).
+   */
+  _mgHit(u, at, kill) {
+    u.mgHits = (u.mgHits || 0) + 1;
+    this.tracerFX.impact(at, kill ? 0xff5a2a : 0xfff0d0, kill ? 10 : 5, kill ? 1.4 : 0.9, true);
+    if (kill && this.fx?.impactDust) this.fx.impactDust(at.x, at.y - 1.2, at.z, 0.4);
+    const L = this.lay;
+    if (L && L.unit === u) {
+      L.hitN = (L.hitN || 0) + 1;
+      if (kill) L.killN = (L.killN || 0) + 1;
+    }
+  }
+
+  /** Men pinned now within a machine gun's beaten zone of a point. */
+  pinnedNear(p, mg) {
+    const g = this.garrison;
+    if (!g || !p) return 0;
+    const r2 = (mg.pinRadius + 2) ** 2;
+    let n = 0;
+    for (const o of g.defenders) if (o.alive && o.pinned > g.time && o.pos.distanceToSquared(p) < r2) n++;
+    return n;
   }
 
   /** The garrison men killed: the tally, the pay and the bounty text. */

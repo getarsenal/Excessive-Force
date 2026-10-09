@@ -249,6 +249,31 @@ export class Audio {
    *
    * @param {number} severity 0..1, how far past saving the structure is
    */
+  /**
+   * The hit marker's click, in the ear rather than in the world: a dry
+   * tick for a round that found a man, a lower double one for a man down.
+   * Synthesised, two oscillators at most; a held gun hitting every round
+   * clicks at most every sixty milliseconds.
+   */
+  tick(kill = false) {
+    if (!this.ready || !this.enabled || this._failed || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    if (now - (this._tickAt ?? -1) < 0.06) return;
+    this._tickAt = now;
+    for (let i = 0; i < (kill ? 2 : 1); i++) {
+      const t = now + i * 0.07;
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(kill ? 1300 : 2300, t);
+      o.frequency.exponentialRampToValueAtTime(kill ? 650 : 1500, t + 0.04);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.09, t + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      o.connect(g).connect(this.master);
+      o.start(t); o.stop(t + 0.06);
+    }
+  }
+
   groan(severity, pos) {
     if (!this.ready || !this.enabled || this._failed || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;

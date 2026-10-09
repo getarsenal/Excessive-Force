@@ -227,7 +227,7 @@ export function restoreBattle(snap, { battle, structures }) {
   // The garrison.
   const g = battle.garrison;
   if (g && snap.nDefenders === g.defenders.length) {
-    unpackBits(snap.defenders, g.defenders.length, (i) => { g.defenders[i].alive = false; });
+    unpackBits(snap.defenders, g.defenders.length, (i) => { g.defenders[i].alive = false; g.defenders[i].gone = true; });
   }
   // The airborne, if they have been: dug in where they were, and not coming
   // a second time.

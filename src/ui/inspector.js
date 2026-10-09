@@ -178,7 +178,12 @@ export class UnitCard {
     put('uc2-hp', frac > 0.6 ? '' : frac > 0.28 ? 'hurt' : 'critical', 'className');
     put('uc2-cond', u.dugIn ? 'DUG IN' : u.state === 'setup' ? 'SETTING UP' : 'READY');
     put('uc2-kills', String(u.kills || 0));
-    put('uc2-hits', String(u.hits || 0));
+    // A machine gun's rounds are counted one by one (battle._mgHit): the
+    // men they found, of the rounds fired, which is how the player knows a
+    // gun is hitting anything at all.
+    put('uc2-hits', u.def.mg
+      ? `${u.mgHits || 0} / ${u.mgRounds || 0}${u.mgRounds ? ` · ${Math.round(100 * (u.mgHits || 0) / u.mgRounds)}%` : ''}`
+      : String(u.hits || 0));
     const rank = u.rank || 0;
     put('uc2-rank', rank >= 3 ? 'ELITE ★★★' : rank === 2 ? 'VETERAN ★★' : rank === 1 ? 'SEASONED ★' : 'GREEN');
     const sell = this.battle?.freeBuild ? 'SELL' : `SELL $${Math.round(u.def.cost * 0.5).toLocaleString()}`;
