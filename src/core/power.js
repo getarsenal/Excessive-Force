@@ -32,16 +32,24 @@ const suite = () => { try { return localStorage.getItem('tt.suite') === '1'; } c
 
 export const power = {
   /** Thirty frames in battle. On by default on a phone, off on a desktop. */
+  // Asked every frame, so read from storage once and kept.
+  _saver: null,
   get saver() {
-    if (suite()) return false;
-    try {
-      const v = localStorage.getItem(SAVER);
-      if (v) return v === 'on';
-    } catch { /* private mode */ }
-    return isMobile();
+    if (this._saver !== null) return this._saver;
+    let v = null;
+    if (suite()) v = false;
+    else {
+      try { const s = localStorage.getItem(SAVER); if (s) v = s === 'on'; } catch { /* private mode */ }
+      if (v === null) v = isMobile();
+    }
+    return (this._saver = v);
   },
+  /** The free savings (see `applySaver`): a phone, or the saver on. */
+  get lean() { return this.saver || isMobile(); },
   set saver(on) {
+    this._saver = !!on;
     try { localStorage.setItem(SAVER, on ? 'on' : 'off'); } catch { /* private mode */ }
+    applySaver();
   },
 
   /**
@@ -88,4 +96,14 @@ export function armBoot(levelId) {
   set();
   document.addEventListener('visibilitychange', () => { if (document.hidden) clear(); else set(); });
   window.addEventListener('pagehide', clear);
+}
+
+/**
+ * The savings that cost nothing to look at — the shadow map drawn only when
+ * something has moved (main.js `placeSun`), no frosted glass over the moving
+ * picture (style.css `body.lean`) — are taken on any phone, and on a desktop
+ * with the saver on. The page wears them as `body.lean`.
+ */
+export function applySaver() {
+  if (typeof document !== 'undefined' && document.body) document.body.classList.toggle('lean', power.lean);
 }

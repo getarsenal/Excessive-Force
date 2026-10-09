@@ -176,6 +176,22 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
+- `src/core/power.js` how hard the game works a phone: the battery saver
+  (thirty frames in battle, on by default on a phone), a few frames behind
+  a menu, and `power.lean` (any phone, or the saver), which takes the
+  savings that cost nothing to look at: the shadow map drawn on demand
+  (`placeSun` in main.js: every other frame while `battle.shadowBusy` or
+  the physics has bodies awake, three times a second otherwise, at once
+  when the focus crosses a thirty-metre square; `window.__shadows()`
+  counts frames and redraws) and no frosted glass (`body.lean`). The
+  audio context is suspended and the menu track paused with the page
+  hidden, the hangar is paced to thirty, and nothing on the page animates
+  forever off screen (the news ticker sat at -104% running all battle).
+  `TIER=medium node tools/triprobe.mjs <level>` counts a frame's
+  triangles by group and what of them casts shadows;
+  `node tools/shadowprobe.mjs <level>` counts shadow redraws quiet, under
+  a deploying battery and in a pan, saver on and off, photographs both
+  and counts the frosted elements left on the page.
 - `src/world/look.js` the art direction: the climate's sky, fog, water
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { detectQuality, setQuality, AdaptiveGovernor } from './core/quality.js';
-import { power, recoverFromCrash, armBoot } from './core/power.js';
+import { power, recoverFromCrash, armBoot, applySaver } from './core/power.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
 import { Audio } from './core/audio.js';
@@ -122,6 +122,7 @@ function progress(pct, msg) {
 
 async function boot() {
   installTapFeedback();
+  applySaver();
   // A regression run is reproducible, so its randomness is too.
   //
   // Everything else about the suite is now identical from one run to the next
@@ -3076,6 +3077,54 @@ async function boot() {
     } catch { /* no audio */ }
   };
 
+  /**
+   * The sun, and on a phone the shadow map drawn on demand.
+   *
+   * The shadow pass draws every stone, wall and gun that casts a shadow a
+   * second time, and the variance map blurs the result twice: on Westminster
+   * at the phone's tier that is a million and a half triangles and two
+   * full-map blurs, every frame, to redraw shadows that had not moved. So on
+   * a phone (and on the saver) it is redrawn when something has: every other frame while
+   * anything that casts one is falling, flying, swinging or recoiling
+   * (`battle.shadowBusy`, the physics' awake bodies), three times a second
+   * otherwise for the crews' small movements, and at once when the camera's
+   * focus crosses into a new square, the sun's frustum riding with it.
+   * The frustum moves in thirty-metre steps then, so a pan does not
+   * redraw it every frame and the edges do not crawl as it does.
+   */
+  const SHADOW_STEP = 30;
+  let shadowKey = '', shadowAge = 0, shadowDemand = null;
+  const placeSun = () => {
+    const onDemand = power.lean && engine.renderer.shadowMap.enabled && engine.sun.castShadow;
+    if (onDemand !== shadowDemand) {
+      shadowDemand = onDemand;
+      engine.renderer.shadowMap.autoUpdate = !onDemand;
+      engine.renderer.shadowMap.needsUpdate = true;
+      shadowKey = '';
+    }
+    let x = rig.target.x, y = rig.target.y, z = rig.target.z;
+    if (onDemand) {
+      x = Math.round(x / SHADOW_STEP) * SHADOW_STEP; z = Math.round(z / SHADOW_STEP) * SHADOW_STEP;
+      y = Math.round(y / 10) * 10;
+    }
+    engine.sun.target.position.set(x, y, z);
+    engine.sun.position.set(x + SUN_OFFSET.x, y + SUN_OFFSET.y, z + SUN_OFFSET.z);
+    shadowFrames++;
+    if (!onDemand) return;
+    const key = `${x},${y},${z}`;
+    shadowAge++;
+    const busy = physics.awakeCount > 0 || battle.shadowBusy();
+    if (key !== shadowKey || shadowAge >= (busy ? 2 : 10)) {
+      shadowKey = key;
+      shadowAge = 0;
+      engine.renderer.shadowMap.needsUpdate = true;
+      shadowDraws++;
+    }
+  };
+  let shadowDraws = 0, shadowFrames = 0;
+  // For the harness: frames drawn, and of them how many redrew the shadow map.
+  window.__shadows = () => ({ frames: shadowFrames, draws: shadowDraws, onDemand: shadowDemand });
+
   function frame() {
     if (released) return;
     requestAnimationFrame(frame);
@@ -3201,9 +3250,7 @@ async function boot() {
     const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
     layCamera(rawDt);
-    engine.sun.target.position.set(rig.target.x, rig.target.y, rig.target.z);
-    engine.sun.position.set(
-      rig.target.x + SUN_OFFSET.x, rig.target.y + SUN_OFFSET.y, rig.target.z + SUN_OFFSET.z);
+    placeSun();
     engine.render();
     pod.render(dt);
     clip.frame();

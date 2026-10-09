@@ -4,6 +4,7 @@ import { ART, unlockedArt, warStats, paintNoseArt, artChoice, setArtChoice } fro
 import { feedback } from './feedback.js';
 import { TracerFX } from '../fx/tracers.js';
 import { menuMusic } from './music.js';
+import { power } from '../core/power.js';
 
 /**
  * The hangar.
@@ -633,6 +634,11 @@ export function hangarStage(host, { prog } = {}) {
   let raf = 0, last = performance.now();
   const frame = (now) => {
     raf = requestAnimationFrame(frame);
+    // Thirty frames on the battery saver, as in a battle: a turning
+    // aircraft and its tracers need no more, and a 120 Hz phone was drawing
+    // the whole fleet four times as often as that.
+    if (power.saver && now - last < 1000 / 30 - 3) return;
+    if (document.hidden) { last = now; return; }
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (!cam.spin && !drag && !pointers.size && now > idleAt && !live.firing) { cam.spin = true; live.range = false; }
     if (cam.spin) cam.yaw += dt * 0.22;

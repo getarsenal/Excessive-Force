@@ -118,6 +118,15 @@ class MenuMusic {
 }
 
 export const menuMusic = new MenuMusic();
+// Left in the background, the menu's track stops, and comes back with the page.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    const a = menuMusic.el;
+    if (!a) return;
+    if (document.hidden) { if (!a.paused) { menuMusic._hiddenPause = true; a.pause(); } }
+    else if (menuMusic._hiddenPause) { menuMusic._hiddenPause = false; if (menuMusic.want && menuMusic.enabled) a.play().catch(() => { /* waits for a touch */ }); }
+  });
+}
 
 /**
  * The eagle. One screech as the player commits to a battle — the nod to the

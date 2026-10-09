@@ -109,8 +109,12 @@ export class Audio {
     if (this._watching) return;
     this._watching = true;
     const wake = () => this.resume();
+    // Put away with the page: a phone keeps a running context, and the CPU
+    // behind it, awake in the background for as long as the app is left
+    // there, mixing a battle that is no longer being drawn.
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) wake();
+      else if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => { /* gone already */ });
     });
     window.addEventListener('pageshow', wake);
     window.addEventListener('focus', wake);

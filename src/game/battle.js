@@ -1033,6 +1033,26 @@ export class Battle {
   }
 
   /**
+   * Whether anything that throws a shadow is moving: an aircraft, a
+   * parachute, a gun swinging, laying, recoiling or being set up. On a
+   * phone the shadow map is drawn only when something has moved (main.js,
+   * `power.shadows`), and often only while this says so.
+   */
+  shadowBusy() {
+    if (this.air?.sorties?.length || this.airborne?.planes?.length || this.airborne?.men?.length) return true;
+    // A building in the town gutted since the last look: its shell is a new shadow.
+    const burnt = this.cityFire?.burnt || 0;
+    if (burnt !== this._shadowBurnt) { this._shadowBurnt = burnt; return true; }
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      if (u.state === 'setup' || u.recoilT > 0.01) return true;
+      if (u.wantYaw != null && Math.abs(angleDiff(u.wantYaw, u.yaw)) > 0.004) return true;
+      if (u.barrelB && Math.abs((u.barrelWant ?? 0) - (u.barrelElev ?? 0)) > 0.003) return true;
+    }
+    return false;
+  }
+
+  /**
    * The round just fired by the gunner's hand is watched: it carries the
    * spotter's note (`proj.spot`), and `handRound` is the clock the gunner
    * reads it by, the drawn line's time of flight counting down to SPLASH.

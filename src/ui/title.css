@@ -716,3 +716,7 @@
 .hg-piece.locked { opacity: 0.5; cursor: default; background: rgba(255,255,255,0.04); }
 .hg-dice, .hg-lock { display: grid; place-items: center; width: 100%; height: 66px; font: 700 26px/1 var(--f-display, sans-serif); color: var(--mute); }
 .tt-tohangar { display: block; width: 100%; margin: 0 0 12px; min-height: 44px; }
+
+/* A phone drops the frosted glass (style.css, body.lean): the title's
+   lighter panels take up the difference in their own tint. */
+body.lean #title { --panel: rgba(9, 13, 19, 0.84); }

@@ -2557,6 +2557,10 @@ body.clear-view .stamp { display: none; }
   color: #fff; background: #c8141c; padding: 3px 6px; }
 #newsflash .nf-live::before { content: '● '; animation: tgp-blink 1s steps(2) infinite; }
 body.clear-view #newsflash { display: none; }
+/* Off the screen it is still on the page, the whole battle long: its ticker
+   and its blink kept the compositor drawing at the display's rate under a
+   game held to thirty. Nothing moves until it is shown. */
+#newsflash:not(.on) .nf-tick span, #newsflash:not(.on) .nf-live::before { animation: none; }
 @media (prefers-reduced-motion: reduce) { #newsflash { transition: none; } #newsflash .nf-tick span { animation: none; padding-left: 12px; } }
 
 /* ── Optics: the canvas through a sensor. A filter on the canvas and a layer
@@ -3091,3 +3095,12 @@ body.range .tb-block:has(#hud-defenders) { display: none; }
 }
 #range-board::before { content: 'THE RANGE · '; color: var(--dim); }
 @media (max-width: 480px) { #range-board { font-size: 10px; letter-spacing: 0.06em; } #range-board::before { content: ''; } }
+
+/* ── On a phone, or the saver on (core/power.js, body.lean) ────────────
+   No frosted glass. A blurred panel over a picture that changes thirty
+   times a second is re-blurred by the compositor every frame, for every
+   panel, on top of the game's own drawing; the battle's panels are
+   eighty-six per cent opaque, so the blur behind them was all but
+   invisible anyway. The targeting pod's thermal glass is its picture,
+   not a panel, and keeps its filter. */
+body.lean :not(.tgp-glass), body.lean ::before, body.lean ::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
