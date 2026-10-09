@@ -16,6 +16,7 @@ let crashed = false;
 page.on('crash', () => { crashed = true; });
 page.on('pageerror', (e) => errors.push(String(e.stack || e).slice(0, 400)));
 page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !t.includes('ERR_CERT') && !t.includes('Failed to load resource')) errors.push(t.slice(0, 400)); });
+await page.addInitScript(() => { Error.stackTraceLimit = 60; });
 await page.addInitScript((t) => { try { localStorage.setItem('tt.quality', t); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} }, tier);
 await page.goto(`http://localhost:${port}/?level=${level}&lethal=${process.env.LETHAL || 4}&radius=${process.env.RADIUS || 9}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.hud, null, { timeout: 400000 });
@@ -80,7 +81,7 @@ for (let n = 0; n < 100 && !crashed; n++) {
         geo: ri.memory.geometries, tex: ri.memory.textures, calls: ri.render.calls, lost: window.__lost,
       };
     }, n);
-  } catch (e) { errors.push('probe: ' + String(e).slice(0, 300)); break; }
+  } catch (e) { errors.push('probe: ' + String(e.stack || e).slice(0, 4000)); break; }
   if (r.done) { console.log('nothing scored left standing'); break; }
   worstStep = Math.max(worstStep, r.worstQuarterMs);
   console.log(JSON.stringify(r));
