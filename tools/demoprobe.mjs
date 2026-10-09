@@ -17,7 +17,7 @@ page.on('crash', () => { crashed = true; });
 page.on('pageerror', (e) => errors.push(String(e.stack || e).slice(0, 400)));
 page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' && !t.includes('ERR_CERT') && !t.includes('Failed to load resource')) errors.push(t.slice(0, 400)); });
 await page.addInitScript((t) => { try { localStorage.setItem('tt.quality', t); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} }, tier);
-await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${port}/?level=${level}&lethal=${process.env.LETHAL || 4}&radius=${process.env.RADIUS || 9}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.hud, null, { timeout: 400000 });
 await page.waitForTimeout(1500);
 await page.evaluate(() => {
@@ -29,6 +29,8 @@ await page.evaluate(() => {
   const B = window.battle;
   B.invulnerable = true;
   if (B.garrison) B.garrison.fireEnabled = false;
+  window.__demoLethal = +(new URLSearchParams(location.search).get('lethal') || 4);
+  window.__demoRadius = +(new URLSearchParams(location.search).get('radius') || 9);
 });
 const info = await page.evaluate(() => {
   const B = window.battle, s = B.primary;
@@ -56,14 +58,17 @@ for (let n = 0; n < 100 && !crashed; n++) {
       }
       if (best < 0) return { done: true };
       const at = { x: s.px[best], y: s.py[best], z: s.pz[best] };
-      s.explode(at, 4, 9, 60000, { dir: { x: 0, y: 0.1, z: 1 }, kinetic: 0.8 });
+      s.explode(at, +(window.__demoLethal || 4), +(window.__demoRadius || 9), 60000, { dir: { x: 0, y: 0.1, z: 1 }, kinetic: 0.8 });
       let worst = 0;
       const t0 = performance.now();
       for (let k = 0; k < 12; k++) {
         const a = performance.now();
         window.__fastForward(0.25, 1 / 30);
         worst = Math.max(worst, performance.now() - a);
-        window.__frame();
+        // One drawn frame a charge: a software rasteriser takes seconds over
+        // a town, and what is asked here is the physics, the heap and the
+        // GPU's buffers, which a frame a charge keeps honest.
+        if (k === 11) window.__frame();
         await new Promise((r) => setTimeout(r, 2));
       }
       const ri = window.__engine.renderer.info;

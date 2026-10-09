@@ -180,6 +180,17 @@ export function applyWaterLook(water, look, fog) {
   const maps = THREE.ShaderChunk.lights_fragment_maps;
   if (maps.includes(RFROM)) THREE.ShaderChunk.lights_fragment_maps = maps.replace(RFROM, RTO);
   else if (!maps.includes(RTO)) console.warn('[look] three changed its environment lighting; the silhouette fade did not apply');
+  // And the sun's own highlight there. At a grazing view the GGX visibility
+  // term is 0.5 / (cos(light) x roughness): with the eye on the edge of a
+  // smooth tube and the sun across it, that is a white pixel on every pixel
+  // of the silhouette, and the gunner's own barrel under his eye wore a
+  // dashed white line down both edges (tools/layshot.mjs). Faded over the
+  // same last ten degrees as the sky's reflection.
+  const SFROM = 'reflectedLight.directSpecular += irradiance * specularBRDF * material.multiScatteringCompensation;';
+  const STO = 'reflectedLight.directSpecular += irradiance * specularBRDF * material.multiScatteringCompensation * smoothstep( 0.0, 0.18, saturate( dot( geometryNormal, geometryViewDir ) ) );';
+  const phys = THREE.ShaderChunk.lights_physical_pars_fragment;
+  if (phys.includes(SFROM)) THREE.ShaderChunk.lights_physical_pars_fragment = phys.replace(SFROM, STO);
+  else if (!phys.includes(STO)) console.warn('[look] three changed its direct specular; the silhouette fade did not apply');
 }
 
 const STYLE_UNIFORMS = {
