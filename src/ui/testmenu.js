@@ -245,19 +245,31 @@ export class TestMenu {
     this._stat(diag, 'Water quads', () => c.water.userData.quads ?? 0);
     this._stat(diag, 'Quality tier', () => c.quality.id);
 
-    // ── Performance ────────────────────────────────────────────────────────
-    // The on-device run (ui/perftest.js): a scripted fight through the real
-    // frame loop, every frame measured, the results kept and compared.
-    const perf = this._section('PERFORMANCE', true);
-    this._buttons(perf, null, [
-      ['RUN QUICK · 2½ MIN', () => this.ctx.perf?.start('quick')],
-      ['RUN LONG · 10 MIN', () => this.ctx.perf?.start('long')],
-      ['LAST RESULTS', () => this.ctx.perf?.showCard()],
+    // ── Performance & battery ──────────────────────────────────────────────
+    // The player's own play recorded (ui/playmonitor.js): every frame
+    // measured a minute at a time beside the battery, across battles, until
+    // stopped. And the scripted fight (ui/perftest.js) for a like-for-like
+    // comparison between builds.
+    const perf = this._section('PERFORMANCE & BATTERY', true);
+    this._stat(perf, 'Recording', () => this.ctx.play?.live() ?? '—');
+    this._buttons(perf, 'Your play', [
+      ['RECORD MY PLAY', () => { if (this.ctx.play?.start()) this.toggle(false); }],
+      ['STOP & SHOW', () => { if (this.ctx.play?.stop()) this.toggle(false); }],
+      ['LAST SESSION', () => { if (this.ctx.play?.showCard()) this.toggle(false); }],
     ]);
-    this._note(perf, 'Plays quiet, a camera circle, a battery firing, an air strike, the '
-      + 'landmark collapsing and quiet again, and measures every frame: frame rate, hitches, '
-      + 'CPU and GPU time, triangles, shadow redraws, heat slowdown and battery. Hands off '
-      + 'while it runs; it wrecks the battle, so restart after. LONG unplugged for battery.');
+    this._note(perf, 'RECORD MY PLAY, close this panel and play as you like: place guns, call '
+      + 'strikes, win and start the next battle. Every frame is measured, a row a minute, beside '
+      + 'the battery, until STOP & SHOW. The TEST button shows REC and the time. Unplug the phone, '
+      + 'and play twenty minutes or more for a battery reading; on an iPhone, note the battery % '
+      + 'at the start and type it into the card at the end.');
+    this._buttons(perf, 'Scripted', [
+      ['QUICK · 2½ MIN', () => { if (!this.ctx.play?.running) this.ctx.perf?.start('quick'); }],
+      ['LONG · 10 MIN', () => { if (!this.ctx.play?.running) this.ctx.perf?.start('long'); }],
+      ['LAST RUN', () => { if (this.ctx.perf?.showCard()) this.toggle(false); }],
+    ]);
+    this._note(perf, 'The scripted fight plays itself (quiet, a camera circle, a battery, an air '
+      + 'strike, quiet, the landmark collapsing) so builds compare like for like. Hands off; it '
+      + 'wrecks the battle.');
 
     // ── Self tests ─────────────────────────────────────────────────────────
     const tests = this._section('SELF TESTS', true);

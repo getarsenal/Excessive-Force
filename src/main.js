@@ -42,6 +42,7 @@ import { TAP } from './ui/pointer.js';
 import { Picker } from './core/picking.js';
 import { TestMenu } from './ui/testmenu.js';
 import { PerfTest } from './ui/perftest.js';
+import { PlayMonitor } from './ui/playmonitor.js';
 import { Ambience } from './core/ambient.js';
 import { access } from './core/access.js';
 import { Stores } from './game/stores.js';
@@ -2974,6 +2975,10 @@ async function boot() {
   });
   testMenu.ctx.perf = perfTest;
   window.__perf = perfTest;   // for the harness
+  // A session of the player's own play, recorded across battles until stopped.
+  const playRec = new PlayMonitor({ battle, engine, physics, structures, quality, level, governor, power, perf: perfTest, testMenu });
+  testMenu.ctx.play = playRec;
+  window.__play = playRec;
 
   /**
    * A regression run starts from a board nothing has happened on yet.
@@ -3262,12 +3267,14 @@ async function boot() {
     placeSun();
     // The performance test (src/ui/perftest.js) measures the frame from here:
     // the work before the draw, the draw handed over, the GPU's own clock.
-    const perfOn = perfTest.running;
-    if (perfOn) perfTest.beforeRender();
+    // A recording of the player's own play (src/ui/playmonitor.js) the same way.
+    const perfOn = perfTest.running, recOn = !perfOn && playRec.running;
+    if (perfOn) perfTest.beforeRender(); else if (recOn) playRec.beforeRender();
     const drawT0 = performance.now();
     engine.render();
     pod.render(dt);
     if (perfOn) perfTest.afterRender(dtMs, drawT0 - now, performance.now() - drawT0);
+    else if (recOn) playRec.afterRender(dtMs, drawT0 - now, performance.now() - drawT0);
     clip.frame();
 
     frames++; fpsAcc += dtMs;

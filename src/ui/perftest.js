@@ -53,7 +53,7 @@ const mean = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
 const r1 = (v) => (v == null ? null : Math.round(v * 10) / 10);
 
 /** The GPU's own clock on the frame, where the browser lends one. */
-class GpuTimer {
+export class GpuTimer {
   constructor(gl) {
     this.gl = gl;
     try { this.ext = gl.getExtension('EXT_disjoint_timer_query_webgl2'); } catch { this.ext = null; }
@@ -468,7 +468,7 @@ export class PerfTest {
 
   /** The results card: the summary, each scene, the drift, the battery, and the last run beside it. */
   showCard(rec = this.last || this.history()[0], prev = null) {
-    if (!rec) { this._toast('No performance runs yet.'); return; }
+    if (!rec) { this._toast('No performance runs yet.'); return false; }
     if (this._card) this._card.remove();
     const el = document.createElement('div');
     el.id = 'perf-card';
@@ -549,5 +549,6 @@ export class PerfTest {
     });
     document.getElementById('ui').appendChild(el);
     this._card = el;
+    return true;
   }
 }

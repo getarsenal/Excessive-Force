@@ -202,7 +202,21 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   measured pass is `docs/perf/power-2026-10-09.*`: a typical fight 30%
   fewer triangles a frame, shadow redraws 100% to 31% of frames, draw
   time 22% less.
-  On the phone itself: the test panel's PERFORMANCE section
+  On the phone, the test panel's PERFORMANCE & BATTERY section has two.
+  RECORD MY PLAY (`src/ui/playmonitor.js`) records the player's own play,
+  touching nothing: every drawn frame a row a minute (frame rate, hitches,
+  CPU work, GPU time where readable, how busy each was a second at a
+  time, triangles, shadow redraws, guns, rounds, aircraft, stone down)
+  beside the battery's level, every change of which is logged with its
+  time so the drain is taken between the first and last change; the state
+  lives in `tt.perflive` and every boot picks it up, so it runs across
+  battles until STOP & SHOW (one left half an hour without a frame is
+  closed on the next boot); the TEST button wears REC and the time; the
+  card has sparklines of frame rate, busy and battery, the minutes, the
+  phone's own percentages typed in where Safari reads none, and the last
+  twenty sessions (`tt.perfsessions`); `MINUTE=10 node tools/playprobe.mjs`
+  runs it headless across a page reload. The scripted fight is the other.
+  The scripted run
   (`src/ui/perftest.js`) runs QUICK (two and a half minutes: quiet, the
   camera circling, a battery firing, an F-15 and the gunship, quiet again
   with the guns gone and the view restored, the landmark's foot blown out)
