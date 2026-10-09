@@ -67,15 +67,18 @@ const setup = await page.evaluate(async (kind) => {
     got.push(u);
     // Two more ahead of it toward the target, as the screenshot has them.
     const dir = new T.Vector3(o.x - x, 0, o.z - z).normalize(), side = new T.Vector3(dir.z, 0, -dir.x);
-    for (const [f, s] of [[24, -9], [44, 10]]) {
+    for (const [f, s] of [[30, -14], [52, 16], [40, 28], [64, -20]]) {
       const q = p.clone().addScaledVector(dir, f).addScaledVector(side, s); q.y = terrain.heightAt(q.x, q.z);
+      if (!B.validPlacement(q, null).ok) continue;
       const v = await B.deploy(kind, q); if (v) got.push(v);
     }
   }
   for (let k = 0; k < 60 && !got.every((u) => u.model && u.state === 'ready'); k++) { window.__fastForward(0.5, 1 / 30); await new Promise((r) => setTimeout(r, 20)); }
   for (const u of B.units) { u.handHeld = true; }
   window.__lay.enter(got[0]);
-  B.layTurn(0, 0.15);
+  // Laid low, twelve degrees, as the screenshot has it: the guns ahead in
+  // the frame and the barrel under the eye, not across it.
+  B.lay.elev = 0.21; B.layTurn(0, 0);
   for (let k = 0; k < 4; k++) { window.__fastForward(1 / 30, 1 / 30); window.__frame(); }
   return { n: got.length, dist: got.slice(1).map((u) => Math.round(u.pos.distanceTo(window.__engine.camera.position))), far: got.map((u) => u.lodFar) };
 }, kind);
