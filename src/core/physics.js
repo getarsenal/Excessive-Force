@@ -153,6 +153,7 @@ export class PhysicsWorld {
    * Returns whether the body was actually frozen.
    */
   demote(body) {
+    if (!PhysicsWorld.alive(body)) return false;
     if (body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
     // One rule, no exceptions, and the lack of an exception is the point.
     // Nothing is ever frozen unless it is resting on something fixed, because
@@ -990,6 +991,8 @@ export class PhysicsWorld {
       }
     }
     for (const b of dead) {
+      // Gone already: a section's chunk destroyed above took this one with it.
+      if (!PhysicsWorld.alive(b)) continue;
       const owner = this.owners.get(b.handle);
       if (owner && owner.structure && owner.chunk !== undefined) {
         owner.structure.destroyChunk(owner.chunk);
@@ -1034,6 +1037,12 @@ export class PhysicsWorld {
     // just as well be frozen on the next frame.
     if (toDemote.length > 160) toDemote.length = 160;
     for (const b of toDemote) {
+      // The list was taken before any of it was acted on, and a wedged stone
+      // crumbled below (`destroyChunk`) can take others in the list with it:
+      // one asked about after that traps in wasm, the world stays borrowed,
+      // and every step after it throws. The aqueduct's chain of collapses
+      // did it forty per cent of the way down (tools/demoprobe.mjs).
+      if (!PhysicsWorld.alive(b)) continue;
       if (this.demote(b)) { n++; continue; }
       // Refused: at rest in clear air, which is not settled but stuck. Waking
       // it is not enough when it is wedged — it wakes into the same jam — so
@@ -1057,6 +1066,7 @@ export class PhysicsWorld {
 
   /** Take the friction off a stuck body and start it falling. */
   _loosen(body) {
+    if (!PhysicsWorld.alive(body)) return;
     if (!body.__loose) {
       body.__loose = true;
       for (let c = 0, n = body.numColliders(); c < n; c++) body.collider(c)?.setFriction(0.05);
