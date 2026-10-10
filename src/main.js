@@ -2933,7 +2933,8 @@ async function boot() {
   if (!standoff) firstPrompt();
 
   // Written down while it is being fought, so a phone call or a closed tab
-  // does not cost the battle. Boot Camp and regression runs are not kept.
+  // does not cost the battle. Boot Camp, the range and regression runs are
+  // not kept.
   let battleOver = false;
   // The frame loop's pacing and its end (see power.js and `release` below).
   let released = false, menuOpen = false, coveredBy = 0;
@@ -2945,7 +2946,8 @@ async function boot() {
     document.body.classList.toggle('covered', coveredBy > 0);
   }
   const keepBattle = () => {
-    if (battleOver || level.id === 'tutorial' || selftest) return;
+    // Boot Camp and the range are not battles to come back to (battlesave.js).
+    if (battleOver || level.id === 'tutorial' || level.sandbox || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
     try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };

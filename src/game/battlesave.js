@@ -25,10 +25,23 @@ import * as THREE from 'three';
 const KEY = 'tt.battles';
 const MAX = 6;
 
+/**
+ * Levels that are never a battle in progress: Boot Camp, and THE RANGE, a
+ * sandbox with nothing to win. The range was kept like a campaign fight, so
+ * a visit to it was the newest save and CONTINUE on the front door put the
+ * player back on a half-set-up range instead of the battle they were in.
+ * Not saved (main.js `keepBattle`), and any already saved are dropped here.
+ */
+const NOT_KEPT = new Set(['tutorial', 'range']);
+
 function readAll() {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) || '{}');
-    return v && typeof v === 'object' ? v : {};
+    if (!v || typeof v !== 'object') return {};
+    let dropped = false;
+    for (const id of NOT_KEPT) if (v[id]) { delete v[id]; dropped = true; }
+    if (dropped) writeAll(v);
+    return v;
   } catch { return {}; }
 }
 
@@ -172,7 +185,7 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
 }
 
 export function saveBattle(snap) {
-  if (!snap) return false;
+  if (!snap || NOT_KEPT.has(snap.level)) return false;
   const all = readAll();
   all[snap.level] = snap;
   // The oldest go first when there are too many.
