@@ -61,7 +61,8 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   reports itself empty, because one finger the system swallowed made every
   later drag a two-finger gesture for the rest of the battle; a dragged
   line deploys the weapon it was drawn with, not whatever is selected after
-  the first unit lands. `node tools/lineprobe.mjs` (`NOLIFT=1` for Blitz's
+  the first unit lands, and a placement never disarms the card, with the
+  lift or without it (Blitz cleared it after every gun). `node tools/lineprobe.mjs` (`NOLIFT=1` for Blitz's
   path) plants a lost finger and drags three lines.
 
 ## Verify
@@ -457,8 +458,20 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   shot together, the drag walking the ring over the ground, CLOSE the
   same at half the height, EYE the gunner's own at the tube; the machine gun is laid too,
   FIRE held being burst after burst at the point under the cross
-  (`_handBurst`), and the Javelin's cross designates; the survey stays
-  live in the lay; `node
+  (`_handBurst`), and the Javelin's cross designates; a howitzer (M119,
+  M777, Paladin: `def.indirect`) has HIGH ANGLE on the button over ZOOM
+  (`#lay-wpn`, the seat's weapon switch otherwise): `setLayIndirect` lays
+  it from the plot like the mortar (`layIndirect`, `_mortarSolve` held
+  between 45° and the barrel's own `max`), DIRECT puts it back on the low
+  line, and each does it its own way by `def.indirect.style`: the M119
+  `adjust` (the ring tightens with each round back on the same spot,
+  `L.adjust`, to FIRE FOR EFFECT), the M777 `precision` (the tightest
+  ring, the readout in mils, charge and time of flight), the Paladin
+  `mrsi` (`_mrsi`: three arcs to one point, fired steepest first and
+  held back by the difference in time of flight through `_timed`, so all
+  land together); `node tools/highangleprobe.mjs` measures each round's
+  landing time and miss, `KIND=<gun> node tools/highangleshot.mjs`
+  photographs the lay; the survey stays live in the lay; `node
   tools/layviews.mjs` lays every weapon, measures how much of the view
   is the weapon itself, zooms, and pulls the trigger (tracers, missile,
   round counted), `node tools/mortarprobe.mjs` the mortar's lay,
