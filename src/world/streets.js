@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { valueNoise } from './terrain.js';
+import { carParts, pickShape } from './carkit.js';
 
 /**
  * The street network: a city's actual skeleton.
@@ -1923,12 +1924,14 @@ export function addNetworkFurniture(props, net, terrain, rng, dense) {
         if (terrain.isWater(px, pz)) return;
         const y = terrain.heightAt(px, pz);
         const ry = Math.atan2(dir.x, dir.z);
-        const body = new THREE.BoxGeometry(1.86, 0.92, 4.3);
-        body.rotateY(ry); body.translate(px, y + 0.62, pz);
-        props.add('paint', body, CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)], 0.85 + rng() * 0.3);
-        const cabin = new THREE.BoxGeometry(1.7, 0.66, 2.2);
-        cabin.rotateY(ry); cabin.translate(px, y + 1.34, pz);
-        props.add('glass', cabin, 0x59626b, 1);
+        // A car, not two boxes (carkit.js): the paint, the glass, the tail
+        // lamps and a block for each axle, each into its own bucket.
+        const car = carParts(pickShape(rng), { wheels: 'box' });
+        for (const k of ['paint', 'glass', 'rubber', 'tail']) { car[k].rotateY(ry); car[k].translate(px, y + 0.14, pz); }
+        props.add('paint', car.paint, CAR_COLOURS[Math.floor(rng() * CAR_COLOURS.length)], 0.85 + rng() * 0.3);
+        props.add('glass', car.glass, 0x2c343c, 1);
+        props.add('dark', car.rubber, 0x1a1a1a, 1);
+        props.add('paint', car.tail, 0x9a1c14, 1);
         counts.parked++;
       });
     }

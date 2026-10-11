@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { carParts, pickShape } from './carkit.js';
 
 /**
  * Surrounding London.
@@ -2550,12 +2551,17 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
           asphalt.push(line);
           if (rng() < 0.45) {
             const q = put(u + 1.3, side * (d / 4));
-            const car = new THREE.BoxGeometry(1.8, 0.95, 4.2);
-            car.rotateY(fr.yaw);
-            car.translate(q.x, terrain.heightAt(q.x, q.z) + 0.62, q.z);
-            tintOne(car, [0x9aa3ad, 0x2f3a45, 0x8c3a32, 0x3d5a46, 0xb8b2a4][
-              Math.floor(rng() * 5)], 0.85 + rng() * 0.3);
-            asphalt.push(car);
+            const car = carParts(pickShape(rng), { wheels: 'box' });
+            const cy = terrain.heightAt(q.x, q.z) + 0.16;
+            const paint = [0x9aa3ad, 0x2f3a45, 0x8c3a32, 0x3d5a46, 0xb8b2a4][Math.floor(rng() * 5)];
+            const shade = 0.85 + rng() * 0.3;
+            for (const [k, hex, j] of [['paint', paint, shade], ['glass', 0x2c343c, 1], ['rubber', 0x1a1a1a, 1], ['tail', 0x9a1c14, 1]]) {
+              const g = car[k];
+              g.rotateY(fr.yaw);
+              g.translate(q.x, cy, q.z);
+              tintOne(g, hex, j);
+              asphalt.push(g);
+            }
           }
         }
       }

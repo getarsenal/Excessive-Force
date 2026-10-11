@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildCraft } from './craft.js';
+import { carInstanceGeometry } from './carkit.js';
 
 /**
  * The things that move.
@@ -66,11 +67,9 @@ export class Life {
   _buildTraffic(scene, n) {
     const edges = (this.net?.edges || []).filter((e) => e.pts.length > 1 && e.len > 26);
     if (!edges.length || n <= 0) return null;
-    const body = new THREE.BoxGeometry(1.85, 0.78, 4.3);
-    body.translate(0, 0.39, 0);
-    const cabin = new THREE.BoxGeometry(1.7, 0.62, 2.2);
-    cabin.translate(0, 1.06, -0.15);
-    const geo = mergeTwo(body, cabin);
+    // A saloon with its glass, lamps and tyres (carkit.js), the paint left
+    // white in the vertex colours so the instance colour is the paint.
+    const geo = carInstanceGeometry('sedan');
     const mesh = new THREE.InstancedMesh(geo,
       new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.28 }),
       n);
@@ -534,27 +533,4 @@ export class Life {
       mesh.instanceMatrix.needsUpdate = true;
     }
   }
-}
-
-/** Merge two box geometries into one, keeping a vertex colour attribute. */
-function mergeTwo(a, b) {
-  const pa = a.attributes.position.array, pb = b.attributes.position.array;
-  const na = a.attributes.normal.array, nb = b.attributes.normal.array;
-  const ia = a.index ? a.index.array : null;
-  const ib = b.index ? b.index.array : null;
-  const pos = new Float32Array(pa.length + pb.length);
-  pos.set(pa, 0); pos.set(pb, pa.length);
-  const nor = new Float32Array(na.length + nb.length);
-  nor.set(na, 0); nor.set(nb, na.length);
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-  if (ia && ib) {
-    const idx = new Uint16Array(ia.length + ib.length);
-    idx.set(ia, 0);
-    const shift = pa.length / 3;
-    for (let i = 0; i < ib.length; i++) idx[ia.length + i] = ib[i] + shift;
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
-  }
-  return g;
 }
