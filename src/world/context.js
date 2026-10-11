@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carParts, pickShape } from './carkit.js';
+import { addNotables, minHeight, maxHeight } from './notables.js';
 
 /**
  * Surrounding London.
@@ -916,6 +917,11 @@ export function buildContext(terrain, quality, opts = {}) {
       if (Math.hypot(rect.x, rect.z) < CITY_EXCLUDE) { rejects.excl = (rejects.excl || 0) + 1; continue; }
       if (Math.min(rect.w, rect.d) < 3.5) { rejects.thin = (rejects.thin || 0) + 1; continue; }
       let h = Math.max(3.5, b.h || 12);
+      // A church or a mosque stands at least as tall as its nave is wide,
+      // whatever the survey guessed (notables.js): Westminster Abbey was six
+      // metres and four inches of slab.
+      h = Math.max(h, minHeight(b.kind, b.name, rect.w, rect.d, opts.levelId));
+      h = Math.min(h, maxHeight(b.kind, b.name, rect.w, rect.d, opts.levelId));
       const cover = coverOf(e);
       if (cover.frac > 0.1) {
         const top = topOf(e, h);
@@ -943,6 +949,9 @@ export function buildContext(terrain, quality, opts = {}) {
         realShaped++;
       }
       if (realBuilt + realShaped > placedBefore) {
+        // What the survey says it is, for the notables pass.
+        const pl = plots[plots.length - 1];
+        if (pl) { pl.kind = b.kind; pl.name = b.name; }
         e.top = topOf(e, h);
         for (const k of cellsOf(e.x0, e.z0, e.x1, e.z1)) {
           let bucket = built.get(k);
@@ -1310,6 +1319,7 @@ export function buildContext(terrain, quality, opts = {}) {
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
+  counts.notables = addNotables(props, plots, opts.levelId);
   Object.assign(counts, addRiverEdge(props, terrain, rng, opts.precinct || {}));
   Object.assign(counts, addNetworkFurniture(props, net, terrain, rng, dense));
   // Paint stays on at every quality tier, thinned rather than dropped: a

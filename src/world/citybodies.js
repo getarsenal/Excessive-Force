@@ -66,6 +66,24 @@ export function buildCityBodies(physics, plots) {
     }
   }
 
+  // What stands on the notable buildings (notables.js): towers, minarets,
+  // domes and station vaults, each its own box.
+  for (const p of plots) {
+    for (const x of p.extra || []) {
+      const uh = Math.max(0.5, (x.y1 - x.y0) / 2), yaw = x.yaw || 0, half = Math.sin(yaw * 0.5);
+      physics.world.createCollider(rapier.ColliderDesc.cuboid(x.w / 2, uh, x.d / 2)
+        .setTranslation(x.x, x.y0 + uh, x.z)
+        .setRotation({ x: 0, y: half, z: 0, w: Math.cos(yaw * 0.5) })
+        .setFriction(0.9)
+        .setRestitution(0.02), body);
+      boxes.push({
+        x: x.x, z: x.z, y0: x.y0, y1: x.y1,
+        hw: x.w / 2, hd: x.d / 2, ca: Math.cos(yaw), sa: Math.sin(yaw),
+        r: Math.hypot(x.w, x.d) / 2,
+      });
+    }
+  }
+
   // A grid over the boxes, because the firing solution asks "is there a
   // building in the way" a dozen times per shot per gun, and a thousand
   // buildings times a dozen segments times every unit on the map is a walk

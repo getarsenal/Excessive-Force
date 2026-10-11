@@ -419,6 +419,7 @@ async function boot() {
   const city = await cityLoad;
   const tCity = performance.now();
   const contextGroup = buildContext(terrain, quality, {
+    levelId: level.id,
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
     // And any ground the level keeps bare of its own (the range's floor).
