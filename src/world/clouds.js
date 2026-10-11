@@ -52,7 +52,8 @@ export function cloudShadows(material, strength = 0.30) {
         '#include <color_fragment>\ndiffuseColor.rgb *= cloudShade(vCloudPos.xz);');
   };
   const key = material.customProgramCacheKey ? material.customProgramCacheKey() : '';
-  material.customProgramCacheKey = () => `${key}|clouds${strength}`;
+  // The strength is a uniform, not a define: two strengths share a program.
+  material.customProgramCacheKey = () => `${key}|clouds`;
   material.needsUpdate = true;
   return material;
 }

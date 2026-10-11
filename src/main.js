@@ -81,6 +81,18 @@ import { sightSVG } from './ui/sights.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
 
+// The offline copy (public/sw.js): a shipped build only, never the dev server,
+// whose modules are not fingerprinted. `?nosw` takes it off this browser.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  if (new URLSearchParams(location.search).has('nosw')) {
+    navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+  } else {
+    addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('[tumble] offline copy unavailable', e));
+    }, { once: true });
+  }
+}
+
 const statusEl = document.getElementById('load-status');
 const fillEl = document.getElementById('load-fill');
 

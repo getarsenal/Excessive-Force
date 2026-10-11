@@ -242,6 +242,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   thirty (`tt.perfruns`), and COPY RESULTS puts the record on the
   clipboard to send. `SCALE=0.15 node tools/perftestprobe.mjs` runs it
   headless through the panel and prints the record.
+- `public/sw.js` the offline copy, registered by a built game only (never
+  the dev server; `?nosw` removes it): the page network-first with a
+  three-second fallback, Vite's fingerprinted bundles kept for good, the
+  rest (level data, terrain, models, sound) served from the cache and
+  refreshed behind it; a page that differs from the one kept is a deploy and
+  empties both caches. `node tools/offlineprobe.mjs` loads a level online,
+  again offline, and fakes a deploy. Boot: `MARKS=1 node tools/loadprobe.mjs
+  <level>` against `vite preview --port 5190` (cold, warm, first frame;
+  `QS=` adds a query), `TT_PORT=5190 node tools/bootprofile.mjs <level>`
+  totals the load's CPU by function, and `node tools/programprobe.mjs` lists
+  the shader programs. A shipped build skips three's synchronous shader
+  checks (`?shadercheck` puts them back): two to four seconds of boot.
 - `src/world/look.js` the art direction: the climate's sky, fog, water
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against

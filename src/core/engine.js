@@ -134,6 +134,13 @@ export class Engine {
       logarithmicDepthBuffer: logDepth,
     });
     this.logDepth = logDepth;
+    // three asks every program for its compile and link status the moment it
+    // is made, which makes the main thread wait on each compile in turn:
+    // seven seconds of a phone's boot. A shipped build's shaders are the ones
+    // the suite compiled, so the check stays on in development and under
+    // `?shadercheck` and is off for players.
+    this.renderer.debug.checkShaderErrors = !!import.meta.env.DEV
+      || new URLSearchParams(location.search).has('shadercheck');
     // What the governor is allowed to turn down. The tier sets the ceiling;
     // `renderScale` is the multiplier on top of it, and it is the only lever
     // in the engine whose cost is quadratic in what it saves.
