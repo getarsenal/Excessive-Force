@@ -3,16 +3,19 @@
 // and the step each one landed on. Run it after any change to the HUD; a
 // step that stops advancing is a tutorial that has fallen behind the game.
 //
-//   node tools/tutorialwalk.mjs [/tmp/tut]      (dev server on 5177)
+//   node tools/tutorialwalk.mjs [/tmp/tut]      (dev server on 5177; TT_PORT= for another)
+//   W=393 H=852 OPENER=1 node tools/tutorialwalk.mjs /tmp/tutp   the first shot on a phone
 import { chromium } from 'playwright';
 const out = process.argv[2] || '/tmp/tut';
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
-const page = await b.newPage({ viewport: { width: 1280, height: 720 } });
+// W=393 H=852 for a phone held upright (touch, mobile); OPENER=1 stops after the first shot.
+const W = +(process.env.W || 1280), H = +(process.env.H || 720), phone = W < 600;
+const page = await b.newPage({ viewport: { width: W, height: H }, isMobile: phone, hasTouch: phone, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.log('PAGEERROR', e.message));
 page.on('console', (m) => { if (m.type() === 'error') console.log('CONSOLE', m.text().slice(0, 200)); });
 await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.opening', '0'); } catch {} });
-await page.goto('http://localhost:5177/', { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && !document.getElementById('ui').hidden, null, { timeout: 400000 });
 await page.waitForTimeout(3000);
 const shot = async (n) => { await page.screenshot({ path: `${out}-${n}.png` }); console.log('shot', n, await page.evaluate(() => document.querySelector('.tut-title')?.textContent + ' | ' + document.querySelector('.tut-count')?.textContent)); };
@@ -21,8 +24,38 @@ await shot('0-general');
 const hush = async () => { if (await page.evaluate(() => { const t = window.__tutorial; if (t && t.talking) { t.hush(); return true; } return false; })) await page.waitForTimeout(300); };
 const ok = async () => { await hush(); await page.click('.tut-ok'); };
 await hush(); await page.waitForTimeout(300); await shot(1);
-await ok(); await page.waitForTimeout(400); await shot(2);           // look around
-await ok(); await page.waitForTimeout(400); await ok();                // funds
+// The first shot: a tap on the smokestack's foot, and the game seconds and
+// stone it takes to bring it down, before any lesson.
+const ringAt0 = async () => page.evaluate(() => { const r = document.querySelector('.tut-ring').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+const title0 = () => page.evaluate(() => document.querySelector('.tut-title')?.textContent);
+if ((await title0()) === 'FIRE') {
+  await hush();
+  const g0 = await page.evaluate(() => window.battle.elapsed);
+  const [fx, fy] = await ringAt0(); await page.mouse.click(fx, fy);
+  console.log('first shot: target', await page.evaluate(() => window.battle.targetLabel), 'guns', await page.evaluate(() => window.__tutorial.battery.length));
+  for (let k = 0; k < 80 && (await title0()) !== 'TARGET'; k++) {
+    await page.evaluate(() => window.__fastForward && window.__fastForward(0.5));
+    await page.waitForTimeout(150);
+    if (k === 8) await shot('1-splash');
+    await hush();
+  }
+  console.log('first shot: stack up', await page.evaluate(() => window.__tutorial._stackUp().toFixed(2)),
+    'after', (await page.evaluate(() => window.battle.elapsed) - g0).toFixed(1), 'game s; step', await title0());
+  await hush(); await shot('1-target');
+}
+if (process.env.OPENER) { await b.close(); process.exit(0); }
+// Orientation: GOT IT where there is one, and the orbit and the zoom done
+// through the camera's own controls where the step wants the gesture.
+const advance = async () => {
+  await hush();
+  const t = await title0();
+  if (t === 'LOOK AROUND') await page.evaluate(() => { window.__tutorial.rig.desiredYaw += 0.7; });
+  else if (t === 'ZOOM') await page.evaluate(() => { window.__tutorial.rig.desiredDistance *= 1.3; });
+  else await ok();
+  for (let k = 0; k < 30 && (await title0()) === t; k++) { await page.evaluate(() => window.__fastForward && window.__fastForward(0.2)); await page.waitForTimeout(150); await hush(); }
+};
+await advance(); await page.waitForTimeout(400); await shot(2);      // target -> look around
+for (let k = 0; k < 4 && (await title0()) !== 'UNITS'; k++) await advance();
 await page.waitForTimeout(400); await shot(3);                         // units
 await hush(); await page.click('#dock-units'); await page.waitForTimeout(600); await shot(4);
 

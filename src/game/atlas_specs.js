@@ -139,6 +139,11 @@ export const SPECS = {
       connex(32, 9, 0, M.VERDE), connex(32, 12, 0, M.SANDSTONE), connex(32, 12, 2.6, M.VERDE),
       connex(-28, -16, 0, M.VERDE, 'z'), connex(-31, -16, 0, M.SANDSTONE, 'z'), connex(-31, -16, 2.6, M.VERDE, 'z'),
       connex(-34, -16, 0, M.LIMESTONE, 'z'), connex(-28, 4, 0, M.SANDSTONE, 'z'), connex(-31, 4, 0, M.VERDE, 'z'),
+      // The old boiler-house stack, out on the range: Boot Camp's first shot.
+      // A tapered brick shaft on its own ground, far enough off the tower
+      // that it falls clear of it, slim enough that a battery's first rounds
+      // into its foot bring it down.
+      { t: 'tower', tag: 'stack', x: -58, z: -40, w: 3.6, h: 28, round: true, taper: 0.7, cap: 'none', floors: 0, windows: false, roofPosts: false, mat: M.BRICK },
     ],
   },
 

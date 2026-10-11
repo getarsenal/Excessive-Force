@@ -23,7 +23,13 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   `tutorial`) teaches the real HUD by pulsing its real buttons. Any change
   to the HUD, the dock, the arsenal, targeting, strikes or the win rules
   updates the tutorial's steps in the same commit, and the tutorial's own
-  suite run (`sh tools/suiteall.sh tutorial`) stays green.
+  suite run (`sh tools/suiteall.sh tutorial`) stays green. It opens on a
+  shot, not a lecture: four M777s (`u.demo`, left out of the lessons'
+  counts) laid on a brick smokestack (tag `stack` in the Boot Camp spec),
+  the garrison holding fire, one tap on its foot and it is down in five to
+  nine seconds. `node tools/tutorialwalk.mjs` walks it all (`W=393 H=852
+  OPENER=1` for the first shot on a phone, with the seconds it took);
+  `TAG=stack AIM=base node tools/firstboomprobe.mjs` is the battery alone.
 - **Keep it a phone game.** The HUD is laid out for a thumb first: every
   control forty-four points a side under `pointer: coarse`, nothing a
   player must read under ten pixels, every edge anchored to `--pad-l` /

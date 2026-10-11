@@ -2890,7 +2890,7 @@ async function boot() {
   let tutorial = null;
   const firstPrompt = () => {
     if (level.id === 'tutorial') {
-      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio, unitCard });
+      tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio, unitCard, terrain });
       return;
     }
     if (level.sandbox) {
