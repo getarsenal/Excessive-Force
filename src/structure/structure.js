@@ -1518,6 +1518,8 @@ export class Structure {
       if (killed > 120) break;
     }
     this.physics.wakeNear(point, radius * 2.4);
+    // And what wakeNear leaves for later, now: rubble on what was just crushed.
+    if (killed) this.physics.dropHanging?.(point, radius * 2.4);
     if (killed) {
       // Everything round the crater has just lost a neighbour.
       this.shockMortar(point, radius * 2.0, Math.min(0.7, force / 160000));

@@ -33,6 +33,10 @@ import { buildStreetNetwork, buildStreetSurface, addStreetMarkings, buildDecks,
 export function buildContext(terrain, quality, opts = {}) {
   const group = new THREE.Group();
   group.name = 'context';
+  // Where the town's time goes, stage by stage, for the load log (and
+  // tools/loadprobe.mjs MARKS=1): the first question before deferring any of it.
+  const lapT = [performance.now()], lapN = [];
+  const lap = (name) => { lapT.push(performance.now()); lapN.push(name); };
 
   const rng = mulberry32(0x7e57c0de);
   const bodies = [];
@@ -1294,6 +1298,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // ── The detail pass. Everything that makes the massing read as a place
   // rather than as a diagram: street furniture on a rhythm, the parts of a
   // building that are not the box, the river's own edge, and paint on the road.
+  lap('streets, blocks and buildings');
   const props = new PropSet(quality);
   const detail = new THREE.Group();
   detail.name = 'citydetail';
@@ -1374,6 +1379,7 @@ export function buildContext(terrain, quality, opts = {}) {
     }
   }
 
+  lap('street furniture and trees');
   const nearCanopy = counts.canopy || 0;
   // ── The rest of the place, past the edge of the map.
   //
@@ -1390,6 +1396,7 @@ export function buildContext(terrain, quality, opts = {}) {
     counts.surroundAvailable = surround.userData.available;
   }
 
+  lap('surround');
   Object.assign(counts, buildOutskirts(props, terrain, rng, {
     inner: reach * 1.02,
     hinterland: opts.hinterland,
@@ -1405,6 +1412,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // thirty-five towers.
   Object.assign(counts, buildHorizon(props, terrain, mulberry32(0x5c711e),
     surround ? { beyond: 2.4 } : null));
+  lap('outskirts and horizon');
   // An invented railway for an invented town. A surveyed city has the
   // railways it has, and this one drew a viaduct across Parliament Square and
   // past the foot of the clock tower — the brown line in every screenshot of
@@ -1440,6 +1448,7 @@ export function buildContext(terrain, quality, opts = {}) {
       { cx: fr.cx, cz: fr.cz, w: fr.w - 4, d: fr.d - 4, yaw: fr.yaw }));
     counts.programmes++;
   }
+  lap('railway and open blocks');
   props.flush(detail, {
     ...MATERIALS,
     // Lamps, lit windows, signals: emissive, so they carry at distance and
@@ -1484,6 +1493,8 @@ export function buildContext(terrain, quality, opts = {}) {
     return p.base + p.h - hi > 5.0;
   });
   group.userData.plots = plots;
+  lap('merging and roofs');
+  console.log(`[tumble] town stages: ${lapN.map((n, i) => `${n} ${Math.round(lapT[i + 1] - lapT[i])} ms`).join(' · ')}`);
   return group;
 }
 

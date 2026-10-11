@@ -591,6 +591,33 @@ export class PhysicsWorld {
   }
 
   /**
+   * The ground under a spot has just been destroyed outright (a section landed
+   * on it and crushed it): any frozen rubble there that has lost its footing
+   * goes now. `wakeNear` stands aside while the budget is busy, and during a
+   * collapse it always is, so rubble left on stones the landing pulverised
+   * hung in the air until the slow sweep came round. Over the budget by a
+   * fifth at most, and past that the stone is deleted: one brick fewer in a
+   * rubble field is invisible, one brick in the sky is not.
+   */
+  dropHanging(center, radius, limit = 24) {
+    if (this.dead) return 0;
+    const hits = [];
+    this.queryBall(center, radius, (owner, parent) => {
+      if (hits.length >= limit * 3) return;
+      if (parent.bodyType() === this.rapier.RigidBodyType.Fixed && parent.__frozen) hits.push(parent);
+    });
+    let n = 0;
+    for (const body of hits) {
+      if (n >= limit) break;
+      if (!PhysicsWorld.alive(body) || this._footingIntact(body)) continue;
+      n++;
+      const room = this.dynamicSet.size < this.activeBudget * 1.2;
+      if (!(room && this.promote(body, undefined, true))) this._discard(body);
+    }
+    return n;
+  }
+
+  /**
    * Walk the frozen debris a slice at a time and let go of anything whose
    * footing has gone. The backstop for whatever `wakeNear` misses — a section
    * that leaned away, a pile that shifted — kept deliberately slow, because
@@ -658,7 +685,13 @@ export class PhysicsWorld {
           body.__hangStrikes = (body.__hangStrikes || 0) + 1;
         }
         st.noRoom++;
-        if (body.__hangStrikes < 3) { this._auditCursor++; continue; }
+        // Three strikes for a stone near the ground, where a moment's doubt
+        // is invisible; one for a stone hanging high, which is the thing
+        // people photograph and which a landing that crushed what it rested
+        // on can leave late in a fight.
+        const tp = body.translation();
+        const high = this.groundAt ? tp.y - this.groundAt(tp.x, tp.z) > 8 : false;
+        if (body.__hangStrikes < (high ? 1 : 3)) { this._auditCursor++; continue; }
         // Give up and delete it. On a phone the budget can be genuinely full for
         // long stretches, and then a stone that has lost its footing can never
         // be released at all: it hangs there for the rest of the match. One
