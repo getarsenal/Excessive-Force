@@ -1811,6 +1811,10 @@ async function boot() {
       audio.groan(Math.min(1, lean.angle / 0.13),
         new THREE.Vector3(lean.pivotX, lean.pivotY + 20, lean.pivotZ));
     };
+    st.onSectionLanded = (island) => {
+      const t = island.body.translation();
+      landingBeat(island, new THREE.Vector3(t.x, t.y, t.z));
+    };
     st.onSectionFalling = (island) => {
       if (island.mass < 400000) return;      // a minor section; no fuss
       const t = island.body.translation();
@@ -1874,6 +1878,30 @@ async function boot() {
     rig.desiredYaw = k.yaw; rig.desiredPitch = k.pitch; rig.desiredDistance = k.distance;
     rig.desiredTarget.copy(k.target);
   }
+
+  // A big section hitting the ground is the blow the whole battle builds to,
+  // so the game takes it: the fight's clock all but stops for seventy
+  // milliseconds (a hit-stop, the beat a fighting game gives a heavy hit),
+  // and the phone vibrates for it, harder the more landed and the nearer it
+  // was; an iPhone, with no vibration, gets the thump in the speaker. Once
+  // every two and a half seconds, so a tower breaking in five places is one
+  // blow and not a stutter.
+  let hitStopUntil = 0, hitStopAt = -1e9;
+  const landings = [];
+  function landingBeat(isl, where) {
+    const n = isl.members.length;
+    landings.push(n); if (landings.length > 40) landings.shift();
+    if (n < 60) return;
+    const d = engine.camera.position.distanceTo(where);
+    const near = Math.max(0.35, Math.min(1, 1 - (d - 150) / 600));
+    feedback.emit('slam', Math.min(1.5, (0.25 + n / 400) * near));
+    if (n < 150 || underHarness()) return;
+    const now = performance.now();
+    if (now - hitStopAt < 2500) return;
+    hitStopAt = now;
+    hitStopUntil = now + 70;
+  }
+  window.__hitStops = () => ({ last: hitStopAt, until: hitStopUntil, landings: landings.slice() });
 
   // Welded sections fragment when they land hard enough.
   // The physics side needs to know where the ground is: it is the difference
@@ -3305,7 +3333,7 @@ async function boot() {
     const dtMs = now - last;
     const workMs = gap ? Math.max(0, dtMs - gap + 1000 / 60) : dtMs;
     const rawDt = Math.min(dtMs / 1000, 0.05);
-    const dt = testMenu.paused ? 0 : rawDt * testMenu.timeScale;
+    const dt = testMenu.paused ? 0 : rawDt * testMenu.timeScale * (now < hitStopUntil ? 0.04 : 1);
     last = now;
 
     try {

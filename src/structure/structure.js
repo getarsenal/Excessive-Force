@@ -4089,6 +4089,22 @@ export class Structure {
     // fire for precisely the pile it exists for.
     for (const island of this.islands.values()) {
       island.age = (island.age || 0) + dt;
+      // The moment a big section lands: it came down at four metres a second
+      // or more and has lost two thirds of its best speed. A welded section
+      // meeting rubble does not stop in a frame — the solver eases it over
+      // several, never more than a metre and a half a second at a time on
+      // Westminster — so the test is on the fall as a whole, not a frame.
+      // Read off its own velocity, which costs nothing to ask, rather than
+      // the contact forces, which no collider here reports. Once per section;
+      // a piece that breaks off it is a section of its own.
+      if (this.onSectionLanded && !island.landed && island.members.length >= 60 && PhysicsWorld.alive(island.body)) {
+        const vy = island.body.linvel().y;
+        island.vyPeak = Math.min(island.vyPeak ?? 0, vy);
+        if (island.vyPeak < -4 && vy > island.vyPeak * 0.35) {
+          island.landed = true;
+          this.onSectionLanded(island, -island.vyPeak);
+        }
+      }
       if (!island.settling) continue;
       // A section may ease itself down. It may not hang there.
       //

@@ -53,6 +53,11 @@ const EVENTS = {
   rattle:    { v: [14, 30, 14], gap: 0.3, s: 'rattle' },
   burst:     { v: [60, 30, 40], gap: 0.6, s: 'burst' },
   jackpot:   { v: [40, 40, 40, 40, 200], gap: 1.0, s: 'jackpot' },
+  // A section of the landmark hitting the ground: the pattern grows with
+  // what landed and how near it was (`strength`, 0.2..1.5), a hard first
+  // pulse and a long tail. The thump is the same blow for an iPhone, which
+  // has no vibration to give it.
+  slam:      { v: (k) => [Math.round(45 + 70 * k), 25, Math.round(70 + 170 * k), 45, Math.round(25 + 110 * k)], gap: 0.9, s: 'slam' },
 };
 
 class Feedback {
@@ -98,7 +103,7 @@ class Feedback {
     const now = performance.now() / 1000;
     if (now - (this._last[kind] ?? -9) < e.gap) return;
     this._last[kind] = now;
-    if (this.haptics) this._buzz(e.v);
+    if (this.haptics) this._buzz(typeof e.v === 'function' ? e.v(Math.max(0.2, Math.min(1.5, strength))) : e.v);
     if (e.s && this._soundOn) this._sound(e.s, strength);
   }
 
@@ -197,6 +202,12 @@ class Feedback {
       case 'klaxon': for (let i = 0; i < 2; i++) tone('sawtooth', 520, 390, 0.22, 0.05, i * 0.26, 1600); break;
       case 'coin': tone('square', 1976, 1976, 0.05, 0.035, 0, 6000); tone('square', 2637, 2637, 0.12, 0.035, 0.05, 6000); break;
       case 'thud': tone('sine', 150, 55, 0.14, 0.18); break;
+      // Felt more than heard: a sub drop, a body under it, and the crack.
+      case 'slam':
+        tone('sine', 72, 26, 0.55, 0.42);
+        tone('triangle', 150, 44, 0.24, 0.16, 0, 600);
+        noise(0.32, 0.14, 0, 420);
+        break;
       case 'down': tone('sawtooth', 330, 110, 0.5, 0.07, 0, 1200); break;
       case 'rank': [784, 988, 1175].forEach((f, i) => tone('triangle', f, f, 0.12, 0.07, i * 0.07)); break;
       case 'stab': [262, 330, 392, 523].forEach((f) => tone('sawtooth', f, f, 0.35, 0.03, 0, 1800)); break;
