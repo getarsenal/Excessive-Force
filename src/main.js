@@ -1397,9 +1397,12 @@ async function boot() {
         planNote(data);
         feedback.emit(battle.airlift ? 'landed' : 'confirm');
         hud.feed(`${data.def.name} ${battle.airlift ? 'ON THE GROUND' : 'DEPLOYED'}`, 'good');
-        // With the airlift this arrives twenty seconds after the tap, and
-        // whatever the player has selected since is theirs to keep.
-        if (!battle.airlift) { battle.selectedUnitId = null; hud.hidePrompt(); }
+        // The card stays armed after a placement, with the lift or without
+        // it. Without the lift (Blitz, NO AIR, the range) this used to clear
+        // the selection the moment the first gun was down, so every tap was
+        // two taps and a dragged line went dead after its first: in a
+        // three-minute fight that is the whole fight. The player disarms it
+        // by tapping the card again or picking another.
         break;
       case 'queued':
         feedback.emit('confirm');
