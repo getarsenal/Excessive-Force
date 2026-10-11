@@ -152,6 +152,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const ICONS = {
     go: IC('<path d="M7 4.5v15l12-7.5z"/>'),
     campaign: IC('<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>'),
+    blitz: IC('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5V6M18.5 7l1.6-1.6"/>'),
     daily: IC('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
     battles: IC('<path d="M6 3h12v18l-6-4.5L6 21z"/>'),
     map: IC('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>'),
