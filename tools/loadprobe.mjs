@@ -15,7 +15,7 @@ await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 15
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
 let bytes = 0, reqs = 0;
 const marks = [];
-page.on('console', (m) => { const t = m.text(); if (/\b\d+ ?ms\b/.test(t) && t.includes('[tumble]')) marks.push(t.replace('[tumble] ', '').slice(0, 110)); });
+page.on('console', (m) => { const t = m.text(); if (/\b\d+ ?ms\b/.test(t) && t.includes('[tumble]')) marks.push(t.replace("[tumble] ", "").slice(0, 400)); });
 cdp.on('Network.loadingFinished', (e) => { bytes += e.encodedDataLength; reqs++; });
 await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.autostart', '1'); } catch {} });
 const run = async (label) => {

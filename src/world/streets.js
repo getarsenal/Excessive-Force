@@ -820,6 +820,8 @@ export function buildEdgeIndex(net) {
     }
   }
   net.segs = segs;
+  // The grid, for `bearingNear`'s nearest-midpoint search.
+  net.segGrid = { map, CELL, key };
   /** Distance from (x,z) to the nearest carriageway edge; negative if inside. */
   // `ground` asks about the roads on the ground only: a building can stand
   // under an elevated expressway, and Circular Quay does.
@@ -885,11 +887,33 @@ export function buildEdgeIndex(net) {
  * convention the callers already use.
  */
 export function bearingNear(net, x, z, reach = 12) {
-  let best = Infinity, hit = null;
-  for (const sg of net.segs) {
+  let best = Infinity, hit = null, hitI = Infinity;
+  // Ties go to the earlier segment, as the walk in order gave them.
+  const test = (sg, si) => {
     const mx = (sg.a.x + sg.b.x) / 2, mz = (sg.a.z + sg.b.z) / 2;
     const d = Math.abs(mx - x) + Math.abs(mz - z);
-    if (d < best) { best = d; hit = sg; }
+    if (d < best || (d === best && si < hitI)) { best = d; hit = sg; hitI = si; }
+  };
+  // The cells round the point first. A segment is filed under every cell its
+  // box touches, so it is filed under the cell its midpoint is in; and a
+  // midpoint within one cell's width on both axes is in this block of nine.
+  // So when the nearest found here is that close, nothing outside can be
+  // nearer and the answer is the one the full walk gives — without the walk,
+  // which was every segment in the city for every building laid. Further
+  // off than that, the full walk as before.
+  const g = net.segGrid;
+  if (g) {
+    const cx = Math.floor(x / g.CELL), cz = Math.floor(z / g.CELL);
+    for (let ax = cx - 1; ax <= cx + 1; ax++) {
+      for (let az = cz - 1; az <= cz + 1; az++) {
+        const bucket = g.map.get(g.key(ax, az));
+        if (bucket) for (const si of bucket) test(net.segs[si], si);
+      }
+    }
+  }
+  if (!g || best > (g ? g.CELL : 0)) {
+    best = Infinity; hit = null; hitI = Infinity;
+    net.segs.forEach((sg, si) => test(sg, si));
   }
   if (!hit) return { bearing: 0, dist: Infinity };
   const pts = hit.edge ? hit.edge.pts : [hit.a, hit.b];
@@ -919,8 +943,12 @@ function pointSeg(x, z, a, b) {
   const dx = b.x - a.x, dz = b.z - a.z;
   const l2 = dx * dx + dz * dz;
   let t = l2 > 0 ? ((x - a.x) * dx + (z - a.z) * dz) / l2 : 0;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t));
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  // A square root, not Math.hypot: this is the town's hottest line (asked for
+  // every building, ground quad and tree against every street near it), and
+  // hypot's overflow care costs several times the arithmetic on V8.
+  const ex = x - (a.x + dx * t), ez = z - (a.z + dz * t);
+  return Math.sqrt(ex * ex + ez * ez);
 }
 
 /**
