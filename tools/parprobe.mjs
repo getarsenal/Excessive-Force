@@ -92,56 +92,109 @@ const out = await page.evaluate(async ({ gun, limit, retarget, quiet, how, aimBy
     }
     return best < 0 ? pick(st) : new T.Vector3(st.px[best], st.py[best], st.pz[best]);
   };
-  const want = 6;
-  // The full arsenal, bought the way a player who knows it buys: the
-  // heaviest ground unit the bar has opened that the money covers, placed
-  // inside its own reach on the battery's side, and not a cheap team when a
-  // much better one is a moment's income away; ten on the ground at most.
-  // Strikes (single pass, not the strafe or the loiter) once the money covers
-  // one, on the point the battery is laid on.
-  const LADDER = ['m119', 'm777', 'm109', 'm270', 'm142'];
-  const ground = UM.UNITS.filter((d) => !d.strike && d.id !== 'm240');
-  const strikes = UM.STRIKES.filter((d) => !UM.isLoiter(d) && !d.strike?.strafe);
-  const ringFor = (d) => {
-    const out = [];
-    for (const r of [120, 160, 200, 240, 280, 340, 420]) {
-      if (r > d.range * 0.85 || r < (d.minRange || 0) + 60) continue;
-      for (let k = 0; k < 13; k++) {
-        const a = bear + ((k % 2 ? 1 : -1) * Math.ceil(k / 2) * 6) / 57.3;
-        const x = o.x + Math.cos(a) * r, z = o.z + Math.sin(a) * r;
-        out.push(new T.Vector3(x, terrain.heightAt(x, z), z));
-      }
-    }
-    return out;
+  // What the battery can see. A gun on the ground two hundred metres out
+  // cannot see the foot of a building on a plinth (the Taj stands on seven
+  // metres of marble), and laying on a stone it cannot see puts every round
+  // into the plinth, which the bar does not count. So a candidate stone is
+  // kept only if a ray from the battery's middle meets that structure first,
+  // within a metre and a half of the stone; the most loaded such stone in the
+  // bottom half of what stands is the lay. Indirect fire sees everything.
+  const PH = window.__physics || B.physics;
+  const seen = (st, i) => {
+    const live = B.units.filter((u) => u.alive && !u.def.strike && u.pos);
+    if (!live.length || live.every((u) => u.def.projectile?.kind === 'arc' && !u.def.projectile?.flat)) return true;
+    let x = 0, y = 0, z = 0;
+    for (const u of live) { x += u.pos.x; y += u.pos.y + 1.6; z += u.pos.z; }
+    x /= live.length; y /= live.length; z /= live.length;
+    const dx = st.px[i] - x, dy = st.py[i] - y, dz = st.pz[i] - z, d = Math.hypot(dx, dy, dz);
+    const hit = PH.castRay({ x, y, z }, { x: dx / d, y: dy / d, z: dz / d }, d + 2, null, PH.cityBody);
+    if (!hit) return false;
+    return hit.owner?.structure === st && hit.toi > d - 1.5;
   };
+  const pickSeen = (st = behind()) => {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < st.count; i++) if (standingIn(st, i)) { lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]); }
+    if (lo === Infinity) return null;
+    const top = lo + Math.max(3, (hi - lo) * 0.5);
+    const list = [];
+    for (let i = 0; i < st.count; i++) {
+      if (!standingIn(st, i) || st.py[i] > top) continue;
+      list.push([st.utilisation(i), i]);
+    }
+    list.sort((a, b) => b[0] - a[0]);
+    for (const [, i] of list.slice(0, 160)) if (seen(st, i)) return new T.Vector3(st.px[i], st.py[i], st.pz[i]);
+    return null;
+  };
+  const want = 6;
+  // The full arsenal, bought the way a player who knows it buys: for value.
+  // Each open ground unit is worth what it throws a second per dollar (a
+  // warhead's power over its burst's area, by the salvo, over the reload,
+  // over the price), and the bot buys the best of what the money covers,
+  // unless a better one is under twenty seconds' income away, in which case
+  // it waits for it. Placed on ground the game accepts, anywhere round the
+  // landmark inside the unit's own reach, nearest the camera's side first
+  // (the old ring was only the camera's side, and at Agra that is the far
+  // bank of the Yamuna: every spot in the river, nothing bought after the
+  // first lift). Twelve on the ground at most, the cheapest traded in for one
+  // three times its price. Strikes only out of money that has been sitting
+  // there: the battery full, twice the strike's price in hand, one a minute,
+  // the cheapest single pass that is open.
+  const ground = UM.UNITS.filter((d) => !d.strike && d.id !== 'm240' && d.warhead);
+  const strikes = UM.STRIKES.filter((d) => !UM.isLoiter(d) && !d.strike?.strafe);
+  const worth = (d) => {
+    const w = d.warhead;
+    return (w.power * w.radius * w.radius * (d.salvo?.count || 1)) / Math.max(0.5, d.reload || 1) / Math.max(1, B.costOf(d));
+  };
+  const cands = [];
+  for (let r = 90; r <= 520; r += 30) {
+    for (let k = 0; k < 36; k++) {
+      const a = bear + ((k % 2 ? 1 : -1) * Math.ceil(k / 2) * 10) / 57.3;
+      const x = o.x + Math.cos(a) * r, z = o.z + Math.sin(a) * r;
+      const off = Math.ceil(k / 2) * 10;
+      cands.push({ r, off, p: new T.Vector3(x, terrain.heightAt(x, z), z) });
+    }
+  }
+  // Nearest the camera's bearing first, then the middle of the unit's reach.
+  const ringFor = (d) => cands
+    .filter((c) => c.r <= d.range * 0.85 && c.r >= (d.minRange || 0) + 50)
+    .sort((x, y) => (x.off - y.off) || (Math.abs(x.r - d.range * 0.4) - Math.abs(y.r - d.range * 0.4)));
   const rings = new Map(ground.map((d) => [d.id, ringFor(d)]));
-  const cursor = new Map();
-  let struck = 0;
+  const used = new Map();
+  let struck = 0, lastStrike = -1e9;
+  const place = async (d) => {
+    const ring = rings.get(d.id) || [];
+    for (let k = used.get(d.id) || 0; k < ring.length; k++) {
+      const p = ring[k].p;
+      if (!B.validPlacement(p, d).ok) continue;
+      used.set(d.id, k + 1);
+      if (await B.deploy(d.id, p.clone())) return true;
+    }
+    used.set(d.id, 0);
+    return false;
+  };
   const fullStep = async () => {
     const open = ground.filter((d) => B.isUnlocked(d));
     if (!open.length) return;
-    const top = Math.max(...open.map((d) => B.costOf(d)));
     const mine = B.units.filter((u) => u.alive && !u.def.strike).length + B.pending.filter((d) => !d.lost).length;
     const aim = B.target;
-    if (aim && !B.air?.sorties.some((x) => !x.lift)) {
-      const st = strikes.filter((d) => B.isUnlocked(d) && B.money >= B.costOf(d)).sort((x, y) => B.costOf(y) - B.costOf(x))[0];
-      if (st && await B.deploy(st.id, aim.clone())) { struck++; return; }
+    const cheapStrike = strikes.filter((d) => B.isUnlocked(d)).sort((x, y) => B.costOf(x) - B.costOf(y))[0];
+    if (aim && cheapStrike && mine >= 12 && B.money >= 2 * B.costOf(cheapStrike) && B.elapsed - lastStrike > 60
+      && !B.air?.sorties.some((x) => !x.lift)) {
+      if (await B.deploy(cheapStrike.id, aim.clone())) { struck++; lastStrike = B.elapsed; return; }
     }
-    const buy = open.filter((d) => B.money >= B.costOf(d) && B.costOf(d) >= top * 0.4)
-      .sort((x, y) => B.costOf(y) - B.costOf(x))[0];
+    const ranked = open.slice().sort((x, y) => worth(y) - worth(x));
+    const best = ranked[0];
+    const soon = B.money + B.income * 20 >= B.costOf(best);
+    const buy = B.money >= B.costOf(best) ? best
+      : soon ? null
+      : ranked.find((d) => B.money >= B.costOf(d) && worth(d) >= worth(best) * 0.6);
     if (!buy) return;
-    if (mine >= 10) {
-      // Full: trade the cheapest unit in for one at least three times its price.
+    if (mine >= 12) {
       const cheap = B.units.filter((u) => u.alive && !u.def.strike).sort((x, y) => B.costOf(x.def) - B.costOf(y.def))[0];
-      if (!cheap || B.costOf(buy) < B.costOf(cheap.def) * 3) return;
+      if (!cheap || B.costOf(buy) < B.costOf(cheap.def) * 1.5 || worth(buy) < worth(cheap.def) * 1.2) return;
       B.sellUnit(cheap);
     }
-    const ring = rings.get(buy.id);
-    for (let tries = 0; tries < 10 && ring.length; tries++) {
-      const k = cursor.get(buy.id) || 0;
-      cursor.set(buy.id, k + 1);
-      if (await B.deploy(buy.id, ring[k % ring.length].clone())) break;
-    }
+    await place(buy);
   };
   const timeline = [];
   let down = null;
@@ -170,7 +223,7 @@ const out = await page.evaluate(async ({ gun, limit, retarget, quiet, how, aimBy
       if (live[0]) B.setTarget(live[0].pos.clone(), 'hunt', live[0]);
     } else if (B.elapsed - lastAim > retarget) {
       lastAim = B.elapsed;
-      const p = (how === 'face' || aimBy === 'face') ? pickFace() : pick();
+      const p = (how === 'face' || aimBy === 'face') ? (pickFace()) : (how === 'full' ? (pickSeen() || pick()) : pick());
       if (p) { B.setTarget(p, 'bot'); tags++; }
     }
     window.__fastForward(0.5, 1 / 30);
