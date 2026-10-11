@@ -17,7 +17,9 @@ const HASH = /-[A-Za-z0-9_-]{8}\.(js|css|wasm|woff2?)$/;
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    for (const k of await caches.keys()) if (!k.startsWith(VERSION)) await caches.delete(k);
+    // `ef-state` is the page's note to the reminder below, not a copy of
+    // anything: it outlives a new worker.
+    for (const k of await caches.keys()) if (!k.startsWith(VERSION) && k !== 'ef-state') await caches.delete(k);
     await self.clients.claim();
   })());
 });
@@ -82,4 +84,39 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') return e.respondWith(page(req));
   if (HASH.test(url.pathname)) return e.respondWith(hashed(req));
   e.respondWith(data(req, e));
+});
+
+// ── The daily strike's reminder (src/core/reminders.js). The browser wakes
+// this worker now and then; once a day, late enough, if the player asked and
+// today's strike is not flown and the game is not already open, one
+// notification. Nothing is sent anywhere.
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+async function remind(test = false) {
+  const c = await caches.open('ef-state');
+  const url = new URL('./__ef-state', self.registration.scope).href;
+  const r = await c.match(url);
+  if (!r) return;
+  const s = await r.json();
+  const now = new Date(), day = ymd(now);
+  if (!s.remind || s.done === day || s.told === day || now.getHours() < (s.hour ?? 17)) return;
+  const open = await self.clients.matchAll({ type: 'window' });
+  if (!test && open.some((w) => w.visibilityState === 'visible')) return;
+  const streak = s.streak ? ` Your ${s.streak}-day streak is on the line.` : '';
+  const body = s.date === day && s.target ? `Today: ${s.target}, ${s.mod}.${streak}` : `A new target is up.${streak}`;
+  await self.registration.showNotification('DAILY STRIKE', { body, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'ef-daily' });
+  s.told = day;
+  await c.put(url, new Response(JSON.stringify(s), { headers: { 'content-type': 'application/json' } }));
+}
+self.addEventListener('periodicsync', (e) => {
+  if (e.tag === 'daily-reminder') e.waitUntil(remind().catch(() => {}));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window' }).then((ws) => (ws.length ? ws[0].focus() : self.clients.openWindow('./'))));
+});
+// For tools/reminderprobe.mjs: the same decision, asked for now rather than
+// when the browser next wakes the worker, with the probe's own open page not
+// counted as the player being here.
+self.addEventListener('message', (e) => {
+  if (e.data === 'ef-remind-now') e.waitUntil(remind(true).then(() => e.source?.postMessage('ef-remind-done')).catch(() => {}));
 });

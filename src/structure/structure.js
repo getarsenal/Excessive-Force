@@ -3833,12 +3833,19 @@ export class Structure {
       localQuat[m * 4 + 2] = q.z; localQuat[m * 4 + 3] = q.w;
 
       this._detachCollider(i);
+      // A falling section reports its hard contacts (main.js
+      // `physics.onImpact`): what it lands on is crushed under it and it
+      // breaks up on a hard landing. Rapier reports nothing for a collider
+      // that does not ask, and for a long time none of these asked. Only
+      // past the force that handler acts on, so resting rubble says nothing.
       const cd = rapier.ColliderDesc.cuboid(this.hx[i], this.hy[i], this.hz[i])
         .setTranslation(lx, ly, lz)
         .setRotation(q)
         .setFriction(0.95)
         .setRestitution(0.01)
-        .setDensity(MATERIAL_PROPS[this.mat[i]].density);
+        .setDensity(MATERIAL_PROPS[this.mat[i]].density)
+        .setActiveEvents(rapier.ActiveEvents.CONTACT_FORCE_EVENTS)
+        .setContactForceEventThreshold(26000);
       const col = this.physics.world.createCollider(cd, body);
       this.colliderOf[i] = col.handle;
       this.colliderToChunk.set(col.handle, i);

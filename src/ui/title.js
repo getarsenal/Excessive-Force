@@ -29,6 +29,9 @@ import {
 import { menuMusic, eagle } from './music.js';
 import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
 import { feedback } from './feedback.js';
+import { reminders } from '../core/reminders.js';
+import { boardFor, rivalLevels, challengeLink } from '../game/rivals.js';
+import { currentSeason, seasonState } from '../game/seasons.js';
 import { crateStage } from './crateopen.js';
 import { hangarStage } from './hangar.js';
 import { showWorldMap, HOME } from './worldmap.js';
@@ -88,9 +91,16 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const daily = dailyFor(openIds);
   const dstate = dailyState();
   const dDone = dailyDoneToday();
+  // The reminder's note: today's target, whether it is flown, the streak.
+  if (daily && reminders.on) {
+    reminders.publish({ date: daily.date, target: LEVELS[daily.level]?.target || daily.level, mod: daily.mod.name,
+      done: dDone ? daily.date : null, streak: dstate.streak || 0 });
+  }
   // This week's operation: open to everyone, whatever the campaign has reached.
   const weekly = LEVELS[weeklyFor().level] ? weeklyFor() : null;
   const wstate = weekly ? weeklyState(weekly.week) : null;
+  const season = currentSeason();
+  const sstate = season ? seasonState(season) : null;
   const next = state.next;
   const released = UNITS.filter((u) => isReleased(u.id)).length;
   const slot = activeSlot();
@@ -128,6 +138,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     { act: 'campaign', name: 'CAMPAIGN', count: pts >= 2 ? pts : 0 },
     daily && { act: 'daily', name: 'DAILY STRIKE', hot: !dDone, count: dDone ? 0 : 1 },
     weekly && { act: 'weekly', name: 'WEEKLY OP', hot: !wstate.done, count: wstate.done ? 0 : 1 },
+    season && { act: 'season', name: `SEASON \u00b7 ${season.name}` },
     // Three minutes on something already open (career.js BLITZ): for the
     // player with a bus stop's worth of time rather than an evening.
     openIds.some((id) => id !== 'tutorial' && id !== 'range') && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN' },
@@ -137,6 +148,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     { act: 'orders', name: 'ORDERS', hot: ordersDone < 3, count: 3 - ordersDone },
     crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
     { act: 'medals', name: 'MEDALS' },
+    { act: 'boards', name: 'BOARDS' },
     { act: 'hangar', name: 'HANGAR' },
     { act: 'range', name: 'THE RANGE' },
     { act: 'boot', name: 'BOOT CAMP' },
@@ -158,6 +170,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     go: IC('<path d="M7 4.5v15l12-7.5z"/>'),
     campaign: IC('<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>'),
     blitz: IC('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5V6M18.5 7l1.6-1.6"/>'),
+    season: IC('<path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>'),
     weekly: IC('<rect x="3.5" y="5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4M8 14l2.5 2.5L16 12"/>'),
     daily: IC('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
     battles: IC('<path d="M6 3h12v18l-6-4.5L6 21z"/>'),
@@ -338,6 +351,26 @@ export function showTitle({ current = null, canResume = false } = {}) {
           startDailyRun({ level: daily.level, mod: daily.mod.id, date: today() });
           go(daily.level);
           break;
+        case 'deploy-board':
+          if (el?.dataset.level) go(el.dataset.level);
+          break;
+        case 'boards':
+          openSheet('BOARDS', boardsSheet(), 'list');
+          break;
+        case 'season':
+          if (season) openSheet(`SEASON \u00b7 ${season.name}`, seasonSheet(season, sstate), 'list');
+          break;
+        case 'challenge': {
+          // Tap a landmark you have closed: a link that dares a friend to beat it.
+          const id = el?.dataset.level;
+          const best = prog[id]?.bestShots;
+          if (!id || !best) break;
+          const url = challengeLink(id, best);
+          const text = `${LEVELS[id]?.target || id} came down in ${best} rounds. Can you do it in fewer?`;
+          if (navigator.share) navigator.share({ title: 'Excessive Force', text, url }).catch(() => {});
+          else navigator.clipboard?.writeText(`${text} ${url}`).then(() => { if (el) el.querySelector('em').textContent = 'LINK COPIED'; }).catch(() => {});
+          break;
+        }
         case 'weekly':
           if (!weekly) break;
           openSheet('WEEKLY OPERATION', weeklySheet(weekly, wstate), 'daily');
@@ -371,6 +404,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
             { act: 'hangar', name: 'HANGAR', sub: `THE FLEET \u00b7 ${unlockedArt(prog).length} OF ${ART.length} NOSE ART` },
             { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
+            { act: 'boards', name: 'BOARDS', sub: boardSub() },
             { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
             { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
@@ -499,6 +533,49 @@ export function showTitle({ current = null, canResume = false } = {}) {
       <p class="tt-dsheet-foot">Same target for everyone. Miss a day, lose the streak.</p>
       <button class="tt-big${isDone ? ' ghost' : ''}" type="button" data-act="strike">${isDone ? 'FLY IT AGAIN' : 'STRIKE'}</button>
     </div>`;
+  }
+
+  // The boards (rivals.js): every landmark closed or challenged on, the
+  // player's best rounds, the place among everyone who has sent a link, and
+  // the leader. No server, so no world table; the sheet says so.
+  function boardLevels() {
+    const ids = new Set([...Object.keys(prog).filter((id) => prog[id]?.bestShots > 0 && LEVELS[id]), ...rivalLevels().filter((id) => LEVELS[id])]);
+    return [...ids];
+  }
+  function boardSub() {
+    const n = boardLevels().length;
+    return n ? `${n} LANDMARK${n === 1 ? '' : 'S'} \u00b7 FEWEST ROUNDS` : 'CLOSE ONE TO GET ON';
+  }
+  function boardsSheet() {
+    const ids = boardLevels();
+    if (!ids.length) return '<p class="tt-dsheet-foot">Close a contract and its best rounds go up here. Share it, and every friend who opens your link is on the same board.</p>';
+    const rows = ids.map((id) => {
+      const mine = prog[id]?.bestShots || null;
+      const b = boardFor(id, mine);
+      const me = b.find((r) => r.you), top = b[0];
+      const lead = top && !top.you ? ` \u00b7 ${esc(top.by)} ${top.rounds}` : '';
+      const sub = mine ? `YOU ${mine} \u00b7 #${me.rank} OF ${b.length}${lead}` : `${esc(top.by)} ${top.rounds} \u00b7 NOT CLOSED YET`;
+      return `<button class="tt-row" type="button" data-act="${mine ? 'challenge' : 'deploy-board'}" data-level="${id}"><b>${esc(LEVELS[id].target || id)}</b><em>${sub}</em><span>\u203a</span></button>`;
+    });
+    return `<div class="tt-list">${rows.join('')}</div>
+      <p class="tt-dsheet-foot">Fewest rounds to bring it down. Tap a landmark you have closed to send the challenge; whoever opens it joins this board.</p>`;
+  }
+
+  // The season (seasons.js): its landmarks, open to all while it runs, the
+  // stars won on each, and the track of three rewards.
+  function seasonSheet(s, st) {
+    const pct = st.max ? Math.round((st.stars / st.max) * 100) : 0;
+    const tiers = s.tiers.map((t, i) => `<div class="tt-srow${st.paid.includes(i) ? ' paid' : ''}"><b>${t.at}\u2605</b><span>${esc(t.label)}</span><i>${st.paid.includes(i) ? 'PAID' : `${Math.max(0, t.at - st.stars)} TO GO`}</i></div>`).join('');
+    const rows = s.levels.map((id) => {
+      const lv = LEVELS[id];
+      const got = st.best[id] || 0;
+      return `<button class="tt-row" type="button" data-act="deploy-board" data-level="${id}"><b>${esc(lv.target || lv.name)}</b><em>${'\u2605'.repeat(got)}${'\u2606'.repeat(3 - got)} \u00b7 ${esc((lv.place || '').toUpperCase())}</em><span>\u203a</span></button>`;
+    }).join('');
+    return `<p class="tt-dsheet-line">${esc(s.line)} Open to everyone for ${s.daysLeft} more day${s.daysLeft === 1 ? '' : 's'}.</p>
+      <div class="tt-sbar"><span style="width:${pct}%"></span><b>${st.stars} / ${st.max} \u2605</b></div>
+      <div class="tt-stiers">${tiers}</div>
+      <div class="tt-list">${rows}</div>
+      <p class="tt-dsheet-foot">A landmark's stars count once a season: its best. Each reward pays once.</p>`;
   }
 
   function weeklySheet(w, ws) {

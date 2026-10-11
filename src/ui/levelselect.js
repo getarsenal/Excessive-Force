@@ -1,5 +1,6 @@
 import { LEVELS, DEFAULT_LEVEL, LEVEL_BLURB, levelList } from '../game/levels.js';
 import { suppressNextOpening } from './opening.js';
+import { noteRival } from '../game/rivals.js';
 
 /**
  * The challenge a shared link carried in (`?level=…&c=rounds`), for this page
@@ -166,8 +167,12 @@ export async function resolveStartLevel() {
       const u = new URL(window.location.href);
       const c = parseInt(u.searchParams.get('c'), 10);
       if (c > 0) {
-        setChallenge({ level: explicit, rounds: c });
+        // And who set it (`&by=`): their score goes on this phone's board.
+        const by = u.searchParams.get('by') || '';
+        setChallenge({ level: explicit, rounds: c, by });
+        noteRival(explicit, c, by);
         u.searchParams.delete('c');
+        u.searchParams.delete('by');
         window.history.replaceState({}, '', u.pathname + (u.search || '') + u.hash);
       }
     } catch { /* no URL in some embeds */ }

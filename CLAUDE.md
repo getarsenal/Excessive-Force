@@ -479,10 +479,30 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   4 m/s and has lost two thirds of it calls `onSectionLanded`
   (structure.js), which vibrates the phone by size and distance, thumps the
   speaker, and from a hundred and fifty stones holds the clock seventy
-  milliseconds; `node tools/hitstopprobe.mjs <level>` records it. The
-  contact-force handler in main.js (`physics.onImpact`, crushing under a
-  landing section) has never fired: no collider enables Rapier's
-  contact-force events ·
+  milliseconds; `node tools/hitstopprobe.mjs <level>` records it. A
+  falling section's colliders ask Rapier for contact-force events past
+  26,000 N (`structure.js`, the island weld), so the handler in main.js
+  (`physics.onImpact`) crushes what a section lands on and breaks a hard
+  landing up; until October 2026 nothing asked and it never ran. The cost
+  of a big collapse on the probe box is the same with it on or off ·
+  SEASONS (`src/game/seasons.js`): every six weeks a themed run of eight
+  catalogue landmarks, open to all while it runs, stars counted once per
+  landmark at its best, three tiers paid once (`grant` in progress.js: XP,
+  crates, a painting handed over early through `seasonArt`, a mark); the
+  table runs to February 2027 and a season's new aircraft or nose art is
+  content added to its record; `node tools/seasonprobe.mjs` drives the
+  books, the sheet and the boards ·
+  BOARDS (`src/game/rivals.js`): fewest rounds per landmark, the player's
+  best against every challenge link opened on this phone (`&c=rounds&by=`
+  the sender's commander name), no server and so no world table; the
+  title's BOARDS sheet, a tap on a closed landmark shares the challenge,
+  and a win prints the place ·
+  DAILY REMINDER (`src/core/reminders.js`, SETTINGS): opt-in; the offline
+  copy's worker, woken by periodic background sync (Chromium, installed
+  game only; it says so elsewhere), posts one notification after five in
+  the evening if today's strike is not flown, from the note the title and
+  the battle keep in the `ef-state` cache; no push server;
+  `node tools/reminderprobe.mjs` against the preview build ·
   par against play: `node tools/parprobe.mjs <level>` plays a level to the
   win mark as a player who has reached it (`HOW=full`: the campaign's
   arsenal by then, opened along the bar; `AIMBY=survey|face`; `QUIET=1`

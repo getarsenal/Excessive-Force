@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import { totalStars, operationsState } from './operations.js';
+import { seasonArt } from './seasons.js';
 
 /**
  * Nose art.
@@ -47,7 +48,9 @@ export function warStats(prog) {
 }
 export function unlockedArt(prog) {
   const s = warStats(prog);
-  return ART.filter((a) => Object.entries(a.need).every(([k, v]) => (s[k] || 0) >= v));
+  // And what a season's track has handed over early (seasons.js).
+  const early = new Set(seasonArt());
+  return ART.filter((a) => early.has(a.id) || Object.entries(a.need).every(([k, v]) => (s[k] || 0) >= v));
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────

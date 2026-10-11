@@ -78,6 +78,9 @@ import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
 import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
+import { reminders } from './core/reminders.js';
+import { boardFor } from './game/rivals.js';
+import { recordSeasonRun, currentSeason } from './game/seasons.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
 
@@ -1177,6 +1180,14 @@ async function boot() {
     });
   };
   let dailyBanked = 0;
+  // A season's landmark (seasons.js): the stars this run won count toward the
+  // season's track, and a tier reached pays at once.
+  const seasonRun = (th) => {
+    try {
+      const got = th?.stars?.run ? th.stars.run.filter(Boolean).length : 1;
+      for (const t of recordSeasonRun(level.id, got)) hud.feed(`SEASON · ${currentSeason()?.name || ''} · ${t.label.toUpperCase()}`, 'big');
+    } catch (err) { console.warn('[tumble] season not recorded', err); }
+  };
 
   // ── REMATCH: the same battle with the same guns ──
   // Every gun the player puts down is written into the plan, in order, where
@@ -1795,6 +1806,8 @@ async function boot() {
           dailyDone = true;
           if (dailyMet(dailyMod.id, battle.summary())) {
             const streak = markDailyDone(daily.date);
+            // Flown: tonight's reminder stands down.
+            if (reminders.on) reminders.publish({ done: daily.date, streak });
             dailyBanked = streak;
             hud.feed(`DAILY STRIKE COMPLETE · ${streak}-DAY STREAK`, 'big');
           } else {
@@ -1810,8 +1823,16 @@ async function boot() {
           const marks = markRun(sum);
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           const th = recordTheatre(level.id, true, sum, marks);
+          seasonRun(th);
           const feats = awardMedals(sum);
           banked = { sum, marks, feats, stars: th?.stars || null, xp: payOut(true, sum, { marks, feats }) };
+          // The board (rivals.js), when anyone has challenged this phone here.
+          const board = boardFor(level.id, loadProgress()[level.id]?.bestShots || sum.shotsFired);
+          if (board.length > 1) {
+            const me = board.find((r) => r.you), top = board[0];
+            hud.feed(me && me.rank === 1 ? `BOARD · FIRST OF ${board.length} · ${sum.shotsFired} ROUNDS`
+              : `BOARD · ${me ? `#${me.rank}` : 'UNPLACED'} OF ${board.length} · ${top.by} LEADS ON ${top.rounds}`, 'big');
+          }
           return banked;
         };
         window.addEventListener('pagehide', bankWin);
@@ -1857,6 +1878,7 @@ async function boot() {
           // One play is one result, however many reports it shows.
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
           const th = recordTheatre(level.id, true, sum, marks);
+          seasonRun(th);
           const cc = campaignCard(th?.stars || null);
           takeBeforeAfter(sum);
           hideNewsflash();
@@ -3023,7 +3045,7 @@ async function boot() {
     const ch = getChallenge();
     if (ch && ch.level === level.id) {
       hud.challenge = ch;
-      hud.feed(`CHALLENGE · BRING IT DOWN IN UNDER ${ch.rounds} ROUNDS`, 'big');
+      hud.feed(`CHALLENGE · ${ch.by ? `${String(ch.by).toUpperCase().slice(0, 18)} DID IT IN ${ch.rounds}` : `BRING IT DOWN IN UNDER ${ch.rounds}`} ROUNDS`, 'big');
     }
     // And then, once, the thing the game had never said out loud: that the
     // building is a load path and the player can see it. The mechanic was
@@ -3628,6 +3650,7 @@ async function boot() {
     recordResult(level.id, true, sum);
     const marks = markRun(sum);
     const th = recordTheatre(level.id, true, sum, marks);
+    seasonRun(th);
     hud.showEnd('win', sum, { marks, release: releaseNoteFor(level.id), ...campaignCard(th?.stars || null) });
   };
   // The headless harness drives the same suite the panel does, so a regression

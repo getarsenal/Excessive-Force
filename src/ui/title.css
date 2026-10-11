@@ -720,3 +720,15 @@
 /* A phone drops the frosted glass (style.css, body.lean): the title's
    lighter panels take up the difference in their own tint. */
 body.lean #title { --panel: rgba(9, 13, 19, 0.84); }
+
+/* The season sheet (seasons.js): the track bar and its three rewards. */
+.tt-sbar { position: relative; height: 22px; margin: 4px 0 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+.tt-sbar > span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #c9772e, #f0a24a); }
+.tt-sbar > b { position: relative; display: block; text-align: center; line-height: 22px; font-family: var(--f-data); font-size: 12px; letter-spacing: 0.08em; }
+.tt-stiers { display: grid; gap: 6px; margin-bottom: 14px; }
+.tt-srow { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; min-height: 44px; padding: 6px 10px; background: rgba(255,255,255,0.04); border-left: 3px solid rgba(255,255,255,0.18); }
+.tt-srow b { font-family: var(--f-data); font-size: 15px; color: var(--o2); }
+.tt-srow span { font-size: 13px; line-height: 1.25; }
+.tt-srow i { font-style: normal; font-family: var(--f-data); font-size: 11px; color: var(--mute); }
+.tt-srow.paid { border-left-color: #f0a24a; }
+.tt-srow.paid i { color: #f0a24a; }

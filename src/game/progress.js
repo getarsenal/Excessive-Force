@@ -507,3 +507,17 @@ export function medalCase() {
     feats: FEATS.map((f) => ({ ...f, won: feats[f.id] || null })),
   };
 }
+
+/**
+ * Paid outside a battle (a season's tier, seasons.js): XP and crates into the
+ * career as `award` pays them, the grade crossed counted the same way.
+ */
+export function grant({ xp = 0, crates = 0 } = {}) {
+  const c = career();
+  const gBefore = gradeFor(c.xp).i;
+  c.xp += Math.round(xp);
+  c.crates += crates;
+  for (let i = gBefore + 1; i <= gradeFor(c.xp).i && i < GRADES.length; i++) c.crates += rewardFor(i).crates;
+  save(c);
+  return c;
+}

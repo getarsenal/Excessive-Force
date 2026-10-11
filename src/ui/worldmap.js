@@ -11,6 +11,7 @@ import { IMAGE_ICONS } from './icons.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { menuMusic, eagle } from './music.js';
 import { feedback } from './feedback.js';
+import { reminders } from '../core/reminders.js';
 import { operationOf, isBoss, warlordOf, starsOf } from '../game/operations.js';
 import { BRANCHES, doctrine, freePoints, buyRank, refund } from '../game/doctrine.js';
 
@@ -246,6 +247,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             <button class="ef-set" id="ef-intros" type="button"><span>STAND-OFF INTROS</span><em></em></button>
             <button class="ef-set" id="ef-opening" type="button"><span>TITLE OPENING</span><em></em></button>
             <button class="ef-set" id="ef-haptics" type="button"><span>HAPTICS</span><em></em></button>
+            <button class="ef-set" id="ef-remind" type="button"><span>DAILY REMINDER</span><em></em></button>
           </div>
           <div class="ef-set-k sub">QUALITY · RELOADS THE LEVEL</div>
           <div class="ef-qual" id="ef-qual"></div>
@@ -848,6 +850,8 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     }).join('');
   };
 
+  // What the reminder row last said after a tap ("needs the installed game").
+  let reminderText = null;
   const paintRecords = () => {
     const best = Object.values(progress).reduce(
       (a, r) => (r.bestTime != null && (a == null || r.bestTime < a) ? r.bestTime : a), null);
@@ -861,6 +865,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     flag('#ef-intros', introsEnabled(), 'ON', 'OFF');
     flag('#ef-opening', openingEnabled(), 'ON', 'OFF');
     flag('#ef-haptics', feedback.haptics, 'ON', 'OFF');
+    flag('#ef-remind', reminders.on, reminderText || reminders.label(), reminderText || reminders.label());
     const now = detectQuality().id;
     root.querySelector('#ef-qual').innerHTML = QUALITY_IDS.map((q) => (
       `<button class="ef-q${q === now ? ' on' : ''}" type="button" data-q="${q}">${q.toUpperCase()}</button>`
@@ -1119,6 +1124,12 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     });
     root.querySelector('#ef-haptics').addEventListener('click', () => {
       feedback.haptics = !feedback.haptics; paintRecords();
+    });
+    // The reminder asks the browser twice over (notifications, then the
+    // background wake-up), and says plainly when this browser cannot.
+    root.querySelector('#ef-remind').addEventListener('click', async () => {
+      reminderText = reminders.on ? await reminders.disable() : await reminders.enable();
+      paintRecords();
     });
     root.querySelector('#ef-opening').addEventListener('click', () => {
       setOpeningEnabled(!openingEnabled()); paintRecords();

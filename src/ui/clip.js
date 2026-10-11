@@ -34,6 +34,8 @@ function pickType() {
   return null;
 }
 
+import { challengeLink } from '../game/rivals.js';
+
 export class CollapseClip {
   /**
    * @param {object} o
@@ -222,7 +224,7 @@ export class CollapseClip {
   get link() {
     const b = this.best;
     if (!b || !b.level) return 'https://getarsenal.app/';
-    return `https://getarsenal.app/?level=${encodeURIComponent(b.level)}${b.rounds > 0 ? `&c=${b.rounds}` : ''}`;
+    return challengeLink(b.level, b.rounds);
   }
 
   get caption() {
