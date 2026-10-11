@@ -54,7 +54,15 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   `/tmp/out/mobaudit/`, prints small targets / overlaps / clipping /
   safe-area hits per screen) and read the numbers before the pictures;
   `node tools/landshot.mjs` and `W=393 H=852 node tools/landshot.mjs` are
-  the quick two-shot versions.
+  the quick two-shot versions. With a weapon armed one finger lays a line
+  of guns: main.js keeps its own count of fingers (`livePointers`) and must
+  never trust it past the glass: it starts over on a new primary touch,
+  drops a finger lifted anywhere on the page, and clears when the glass
+  reports itself empty, because one finger the system swallowed made every
+  later drag a two-finger gesture for the rest of the battle; a dragged
+  line deploys the weapon it was drawn with, not whatever is selected after
+  the first unit lands. `node tools/lineprobe.mjs` (`NOLIFT=1` for Blitz's
+  path) plants a lost finger and drags three lines.
 
 ## Verify
 
@@ -260,6 +268,31 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   totals the load's CPU by function, and `node tools/programprobe.mjs` lists
   the shader programs. A shipped build skips three's synchronous shader
   checks (`?shadercheck` puts them back): two to four seconds of boot.
+- The town's detail, made to read from the guns' distance at about a
+  box's cost: `src/world/carkit.js` the cars (a side profile extruded,
+  a narrower glasshouse with the roof in the paint, tail lamps, tyres;
+  saloon, hatch, estate, van; parked ones on the kerbs and in car parks
+  with a block a tyre pair, the traffic one instanced saloon whose paint
+  is the instance colour; `node tools/carshot.mjs <level>` close and far,
+  `BOAT=1` frames a boat); `src/world/craft.js` the boats (each kind's
+  hull lofted to its draft so the waterline is at y 0, bulwarks over a
+  sunk deck, antifouling, boot-top and sheer stripe; houses with a band
+  of glass, wheelhouses, banded funnels, rails, sails on spars;
+  `node tools/boatshot.mjs [kinds]` puts every kind on one sheet with its
+  triangles) and `life.js` afloat (heave, pitch and roll by `roll`, a V
+  wake per boat in one instanced draw at renderOrder 6, after the water,
+  and boats lying alongside at `_moorings`, which the speed test skips);
+  `src/world/notables.js` the surveyed churches, mosques, shrines and
+  stations dressed in their city's manner (`STYLE` by level: Gothic,
+  Romanesque, Orthodox, Byzantine, Ottoman, Islamic, Japanese), walls held
+  between `minHeight` and `maxHeight` whatever the survey guessed, towers,
+  minarets, domes and vaults as colliders through `plot.extra`
+  (citybodies.js), all burning with the building; names with "St" alone
+  are not churches; `node tools/notableshot.mjs <level>` lists and frames
+  them; `src/world/beaches.js` parasols and loungers on warm sea fronts
+  facing open water; `node tools/shoreshot.mjs <level>` frames a level's
+  waterfront. Triangles before and after: `TT_PORT=5178 TIER=medium node
+  tools/triprobe.mjs <level>` against a snapshot of the old build.
 - `src/world/look.js` the art direction: the climate's sky, fog, water
   and light palette (`LOOKS`), and the shared material hook (`stylize`:
   wrapped diffuse, value by face, stone edges). Perf is measured against
@@ -484,7 +517,13 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   26,000 N (`structure.js`, the island weld), so the handler in main.js
   (`physics.onImpact`) crushes what a section lands on and breaks a hard
   landing up; until October 2026 nothing asked and it never ran. The cost
-  of a big collapse on the probe box is the same with it on or off ·
+  of a big collapse on the probe box is the same with it on or off. The
+  handlers destroy what they touch, so nothing in them may call into a
+  collider or body an earlier event in the batch could have removed: a call
+  into a removed one traps the wasm and halts the physics for good
+  ("recursive use of an object"). `step` resolves every event before
+  dispatching any and drops those whose bodies have gone, and
+  `chunkAtCollider` looks the stone up by handle in plain JS ·
   SEASONS (`src/game/seasons.js`): every six weeks a themed run of eight
   catalogue landmarks, open to all while it runs, stars counted once per
   landmark at its best, three tiers paid once (`grant` in progress.js: XP,
