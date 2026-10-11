@@ -224,6 +224,79 @@ export function endDailyRun() {
   try { sessionStorage.removeItem('tt.dailyrun'); } catch { /* private mode */ }
 }
 
+// ── The weekly operation.
+//
+// One landmark for the week, the same for everyone, under one rule that
+// changes how it has to be fought, open whether or not the campaign has
+// reached it. Won once in the week, it pays its own reward: XP and a supply
+// crate. The week is the ISO week, Monday to Sunday.
+
+export const WEEKLY_RULES = [
+  { id: 'mortars', name: 'MORTARS ONLY', line: 'Mortar teams and machine guns. No guns, no rockets, no air',
+    allow: ['m120', 'm240'], money: 1.5 },
+  { id: 'noair', name: 'NO AIR', line: 'Nothing from the sky: no strikes, and the guns come by road', noAir: true, money: 1 },
+  { id: 'tubes', name: 'TUBE ARTILLERY', line: 'Howitzers and machine guns. No rockets, no air',
+    allow: ['m119', 'm777', 'm109', 'm240'], money: 1.2 },
+  { id: 'rockets', name: 'ROCKETS ONLY', line: 'Launchers and rocket teams. No tubes, no air',
+    allow: ['m270', 'm142', 'at4', 'gustaf', 'rpg32', 'javelin', 'm240'], money: 1.3 },
+];
+
+// The original sixteen: the landmarks every rule has been fought on.
+export const WEEKLY_POOL = ['westminster', 'paris', 'agra', 'giza', 'chichen', 'pisa', 'sydney', 'moscow',
+  'rio', 'athens', 'istanbul', 'cologne', 'himeji', 'petronas', 'dubai', 'potala'];
+
+/** The ISO week a date falls in, as `2026-W41`, and whole days left in it. */
+export function weekOf(d = new Date()) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dow = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dow);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil(((t - y0) / 86400000 + 1) / 7);
+  return { key: `${t.getUTCFullYear()}-W${String(wk).padStart(2, '0')}`, daysLeft: 8 - dow };
+}
+
+export function weeklyFor(d = new Date()) {
+  const w = weekOf(d);
+  const h = hash(`ef-week:${w.key}`);
+  return { week: w.key, daysLeft: w.daysLeft, level: WEEKLY_POOL[h % WEEKLY_POOL.length],
+    rule: WEEKLY_RULES[(h >>> 8) % WEEKLY_RULES.length] };
+}
+
+/** This week's record, and every week ever won. */
+export function weeklyState(week = weekOf().key) {
+  const v = parse(get('tt.weekly'), {}) || {};
+  const cur = v.week === week;
+  return { week, done: cur && !!v.done, best: cur ? v.best || null : null, runs: cur ? v.runs || 0 : 0, wins: v.wins || 0 };
+}
+
+/** A run of this week's operation is over. Returns true the first time it is won. */
+export function markWeekly(week, won, sum) {
+  const s = weeklyState(week);
+  const first = won && !s.done;
+  let best = s.best;
+  if (won && sum) {
+    const run = { time: Math.round(sum.time || 0), rounds: sum.shotsFired || 0 };
+    if (!best || run.time < best.time) best = run;
+  }
+  put('tt.weekly', JSON.stringify({ week, done: s.done || won, best, runs: s.runs + 1, wins: s.wins + (first ? 1 : 0) }));
+  return first;
+}
+
+export function startWeeklyRun(w) {
+  try { sessionStorage.setItem('tt.weeklyrun', JSON.stringify({ week: w.week, level: w.level, rule: w.rule.id })); } catch { /* private mode */ }
+}
+
+/** The weekly a load was started for, if it was this week's. Read once. */
+export function takeWeeklyRun(levelId) {
+  try {
+    const v = parse(sessionStorage.getItem('tt.weeklyrun'), null);
+    sessionStorage.removeItem('tt.weeklyrun');
+    if (!v || v.level !== levelId || v.week !== weekOf().key) return null;
+    const rule = WEEKLY_RULES.find((r) => r.id === v.rule);
+    return rule ? { ...v, rule } : null;
+  } catch { return null; }
+}
+
 /**
  * BLITZ: three minutes on a contract the player has open. A battle sized for
  * a bus stop rather than an evening: the guns arrive at once (no airlift),

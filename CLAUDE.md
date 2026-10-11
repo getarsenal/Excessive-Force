@@ -459,6 +459,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   (`#blitzbar`) from the first gun, stars at 25/50/90 % of the bar, the
   best per landmark in `tt.blitz`; `node tools/blitzprobe.mjs` plays one
   as a keen player and reads the end card (`SHOT=1` photographs the bar) ·
+  the WEEKLY OP (`career.js` `WEEKLY_RULES`, `weeklyFor`): one of the
+  original sixteen for the ISO week under one rule (MORTARS ONLY, NO AIR,
+  TUBE ARTILLERY, ROCKETS ONLY), open whatever the campaign has reached;
+  the rule is `battle.allowed` (what it forbids has no card, and an empty
+  strike drawer no STRIKES button), NO AIR also grounds the lift; the
+  first win of the week pays 2,500 XP and a supply crate (`award` with
+  `weekly`), and `tt.weekly` keeps the best time and the weeks won; not
+  saved mid-fight; `node tools/weeklyprobe.mjs` (`RULE=<id>`) plays it
+  through the title ·
   REMATCH (the end card's second button, RUN IT AGAIN when no gun went
   down): every gun the player places is written into the plan where it
   stood (a sold one comes out), carried to the next load in

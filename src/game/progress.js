@@ -372,6 +372,8 @@ export function award(r) {
       add('FIRST WIN OF THE DAY', 1000, 'gold');
     }
     if (r.daily) add(`DAILY STRIKE · ${r.streak || 1}-DAY STREAK`, 1000 * (1 + 0.1 * Math.min(10, (r.streak || 1) - 1)), 'gold');
+    // The week's operation, the first time it falls: its own reward.
+    if (r.weekly) { add(`WEEKLY OPERATION · ${r.weekly}`, 2500, 'gold'); c.crates += 1; }
   }
 
   // Ribbons, as many as the fight earned.

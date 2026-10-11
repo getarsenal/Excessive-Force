@@ -24,6 +24,7 @@ import { listBattles, clearBattle } from '../game/battlesave.js';
 import {
   commander, setCommanderName, insignia, SLOT_IDS, slotInfo, activeSlot,
   switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick,
+  weeklyFor, weeklyState, startWeeklyRun,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
 import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
@@ -87,6 +88,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const daily = dailyFor(openIds);
   const dstate = dailyState();
   const dDone = dailyDoneToday();
+  // This week's operation: open to everyone, whatever the campaign has reached.
+  const weekly = LEVELS[weeklyFor().level] ? weeklyFor() : null;
+  const wstate = weekly ? weeklyState(weekly.week) : null;
   const next = state.next;
   const released = UNITS.filter((u) => isReleased(u.id)).length;
   const slot = activeSlot();
@@ -123,6 +127,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', primary: true },
     { act: 'campaign', name: 'CAMPAIGN', count: pts >= 2 ? pts : 0 },
     daily && { act: 'daily', name: 'DAILY STRIKE', hot: !dDone, count: dDone ? 0 : 1 },
+    weekly && { act: 'weekly', name: 'WEEKLY OP', hot: !wstate.done, count: wstate.done ? 0 : 1 },
     // Three minutes on something already open (career.js BLITZ): for the
     // player with a bus stop's worth of time rather than an evening.
     openIds.some((id) => id !== 'tutorial' && id !== 'range') && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN' },
@@ -153,6 +158,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     go: IC('<path d="M7 4.5v15l12-7.5z"/>'),
     campaign: IC('<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>'),
     blitz: IC('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M10 2.5h4M12 2.5V6M18.5 7l1.6-1.6"/>'),
+    weekly: IC('<rect x="3.5" y="5" width="17" height="15" rx="1.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4M8 14l2.5 2.5L16 12"/>'),
     daily: IC('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),
     battles: IC('<path d="M6 3h12v18l-6-4.5L6 21z"/>'),
     map: IC('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/>'),
@@ -332,6 +338,15 @@ export function showTitle({ current = null, canResume = false } = {}) {
           startDailyRun({ level: daily.level, mod: daily.mod.id, date: today() });
           go(daily.level);
           break;
+        case 'weekly':
+          if (!weekly) break;
+          openSheet('WEEKLY OPERATION', weeklySheet(weekly, wstate), 'daily');
+          break;
+        case 'weeklygo':
+          if (!weekly) break;
+          startWeeklyRun(weekly);
+          go(weekly.level);
+          break;
         case 'blitz': {
           const id = blitzPick(openIds);
           if (!id) break;
@@ -345,6 +360,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'today':
           openSheet('TODAY', listSheet([
             daily && { act: 'daily', name: 'DAILY STRIKE', sub: dDone ? `DONE \u00b7 ${dstate.streak}-DAY STREAK` : `${daily.mod.name}${dstate.streak ? ` \u00b7 STREAK ${dstate.streak}` : ''}`, count: dDone ? 0 : 1 },
+            weekly && { act: 'weekly', name: 'WEEKLY OPERATION', sub: `${weekly.rule.name} \u00b7 ${wstate.done ? 'DONE' : `${weekly.daysLeft} DAY${weekly.daysLeft === 1 ? '' : 'S'} LEFT`}`, count: wstate.done ? 0 : 1 },
             { act: 'orders', name: 'DAILY ORDERS', sub: `${ordersDone} OF 3 DONE`, count: 3 - ordersDone },
             { act: 'crates', name: 'SUPPLY CRATES', sub: crates ? `${crates} TO OPEN` : 'NONE WAITING', count: crates },
           ]), 'list');
@@ -482,6 +498,25 @@ export function showTitle({ current = null, canResume = false } = {}) {
       </div>
       <p class="tt-dsheet-foot">Same target for everyone. Miss a day, lose the streak.</p>
       <button class="tt-big${isDone ? ' ghost' : ''}" type="button" data-act="strike">${isDone ? 'FLY IT AGAIN' : 'STRIKE'}</button>
+    </div>`;
+  }
+
+  function weeklySheet(w, ws) {
+    const lv = LEVELS[w.level] || {};
+    const t = state.list.find((k) => k.id === w.level);
+    const best = ws.best ? `${clock(ws.best.time)}` : '\u2014';
+    return `<div class="tt-dsheet" style="--img:url(${recon(w.level)})">
+      <div class="tt-dsheet-art"><span class="tt-mod big">${w.rule.name}</span></div>
+      <h3>${esc(lv.target || lv.name || '')}</h3>
+      <p class="tt-dsheet-place">${esc(t ? `${t.city} \u00b7 ` : '')}WEEK ${w.week.slice(-2)} \u00b7 ${w.daysLeft} DAY${w.daysLeft === 1 ? '' : 'S'} LEFT</p>
+      <p class="tt-dsheet-line">${w.rule.line}.</p>
+      <div class="tt-dsheet-stats">
+        <span><b>${best}</b>BEST TIME</span>
+        <span><b>${ws.runs}</b>RUNS THIS WEEK</span>
+        <span><b>${ws.wins}</b>WEEKS WON</span>
+      </div>
+      <p class="tt-dsheet-foot">Same landmark and rule for everyone until Monday. Bring it down once for 2,500 XP and a supply crate.</p>
+      <button class="tt-big${ws.done ? ' ghost' : ''}" type="button" data-act="weeklygo">${ws.done ? 'FIGHT IT AGAIN' : 'GO'}</button>
     </div>`;
   }
 

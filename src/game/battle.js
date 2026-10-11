@@ -1785,13 +1785,15 @@ export class Battle {
    * with a bomber released still means working up to it on the day.
    */
   isUnlocked(u) {
+    // A weekly operation's rule: only what it allows exists at all.
+    if (this.allowed && !this.allowed.has(u.id)) return false;
     if (this.unlockAll) return true;
     if (!isReleased(u.id)) return false;
     return this.objectiveProgress >= this.unlockAt(u) - 1e-6;
   }
 
   /** Released by the campaign but not yet earned here, for the build bar. */
-  isReleased(u) { return this.unlockAll || isReleased(u.id); }
+  isReleased(u) { return (!this.allowed || this.allowed.has(u.id)) && (this.unlockAll || isReleased(u.id)); }
   canAfford(u) { return this.freeBuild || this.money >= this.costOf(u); }
 
   /**

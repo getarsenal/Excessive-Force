@@ -76,7 +76,7 @@ import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
-import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz } from './game/career.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
@@ -230,6 +230,8 @@ async function boot() {
   const dailyMod = daily ? DAILY_MODS.find((m) => m.id === daily.mod) : null;
   // A Blitz, if this load is one (career.js BLITZ): three minutes, read once.
   const blitz = (!selftest && !daily && !level.sandbox && level.id !== 'tutorial') ? takeBlitzRun(level.id) : null;
+  // This week's operation (career.js WEEKLY_RULES), if this load is one.
+  const weekly = (!selftest && !daily && !blitz && !level.sandbox && level.id !== 'tutorial') ? takeWeeklyRun(level.id) : null;
   const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
@@ -684,6 +686,16 @@ async function boot() {
     if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
     if (dailyMod.id === 'arsenal') battle.unlockAll = true;
   }
+  // The week's rule: only what it allows exists (the build bar and the
+  // strikes go by `battle.allowed`), all of that released, and the money it
+  // gives for fighting that way. NO AIR keeps the lift on the ground too.
+  if (weekly) {
+    const r = weekly.rule;
+    battle.unlockAll = true;
+    battle.allowed = new Set(r.allow || UNITS.filter((u) => !u.strike).map((u) => u.id));
+    if (r.noAir) battle.airlift = false;
+    battle.money = Math.round(battle.money * (r.money || 1));
+  }
   // Blitz terms (career.js BLITZ): the guns land at once, the whole arsenal
   // out, a battery's worth in the bank and faster income, and no airborne
   // drop to hold the end of a three-minute fight.
@@ -891,6 +903,8 @@ async function boot() {
       if (opts.rematch) saveRematch();
       // A Blitz again is a Blitz again, not the campaign's contract.
       if (blitz) startBlitzRun(level.id); else clearBattle(level.id);
+      // And the week's operation is the week's operation again.
+      if (weekly) startWeeklyRun({ week: weekly.week, level: level.id, rule: weekly.rule });
       goToLevel(level.id);
     },
     onNextTarget: () => {
@@ -1153,9 +1167,12 @@ async function boot() {
     paid = true;
     if (level.sandbox) return null;
     if (level.id === 'tutorial') return won ? bootCampXp() : null;
+    // The week's operation is banked here, where every run ends; its reward
+    // is paid the first time it is won.
+    const weeklyFirst = weekly ? markWeekly(weekly.week, won, sum) : false;
     return award({
       won, sum, level: level.id, ribbons, marks: extra.marks || [], feats: extra.feats || [],
-      daily: !!dailyBanked, streak: dailyBanked || 0,
+      daily: !!dailyBanked, streak: dailyBanked || 0, weekly: weeklyFirst ? weekly.rule.name : null,
       stats: { ...runStats, burnt: battle.cityFire?.burnt || 0, dumps: battle.stores?.blown || 0 },
     });
   };
@@ -3002,6 +3019,7 @@ async function boot() {
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
     if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR · THE CLOCK STARTS WITH YOUR FIRST GUN`, 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
+    if (weekly) hud.feed(`WEEKLY OPERATION · ${weekly.rule.name} · ${weekly.rule.line.toUpperCase()}`, 'big');
     const ch = getChallenge();
     if (ch && ch.level === level.id) {
       hud.challenge = ch;
@@ -3149,7 +3167,7 @@ async function boot() {
   }
   const keepBattle = () => {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
-    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || selftest) return;
+    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
     try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };

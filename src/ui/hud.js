@@ -775,7 +775,10 @@ export class HUD {
     // loitering then single pass, each cheapest first (`STRIKES`); a card
     // that stays on station says LOITER where the tier goes.
     const loiters = isLoiter;
-    const order = [...UNITS.filter((u) => !u.strike), ...STRIKES];
+    // A weekly operation's rule leaves out what it forbids: no card at all,
+    // rather than one locked for a reason the level cannot lift.
+    const allowed = this.battle.allowed;
+    const order = [...UNITS.filter((u) => !u.strike), ...STRIKES].filter((u) => !allowed || allowed.has(u.id));
     for (const u of order) {
       const bar = u.strike && this.el.strikebar ? 'strikes' : 'units';
       this.bars[bar].push(u.id);
@@ -814,6 +817,8 @@ export class HUD {
     }
     this.el.buildbar.appendChild(frags.units);
     if (this.el.strikebar) this.el.strikebar.appendChild(frags.strikes);
+    // No strikes under the rule: no STRIKES button to open an empty drawer.
+    if (this.el.dockStrikes && !this.bars.strikes.length) this.el.dockStrikes.hidden = true;
   }
 
   /**
@@ -1038,6 +1043,7 @@ export class HUD {
     const fresh = [];
     for (const u of UNITS) {
       const card = this.cards.get(u.id);
+      if (!card) continue;
       const unlocked = b.isUnlocked(u);
       const affordable = b.canAfford(u);
 
