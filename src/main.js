@@ -1393,6 +1393,9 @@ async function boot() {
         hud.feed(`${data.unit.def.name} SOLD  +$${data.refund}`, '');
         planDrop(data.unit);
         break;
+      case 'mrsi':
+        hud.status(`MRSI · ${data.rounds} ROUNDS · ALL LAND IN ${Math.round(data.tot)} s`, 2.2);
+        break;
       case 'deployed':
         planNote(data);
         feedback.emit(battle.airlift ? 'landed' : 'confirm');
@@ -2225,7 +2228,22 @@ async function boot() {
   let layHidden = [];
   const LAY_FOV = 66;
   /** The sight a weapon looks through, with a plain optic for one that says nothing. */
-  const laySightOf = (u) => u.def.sight || { kind: 'optic', zoom: [1] };
+  // A howitzer at HIGH ANGLE is laid from the plot, like the mortar, with
+  // its own close view; DIRECT puts it back on its panoramic telescope.
+  const PLOT_SIGHT = { kind: 'plot', zoom: [1, 2], labels: ['PLOT', 'CLOSE'] };
+  const laySightOf = (u) => (battle.lay?.unit === u && battle.lay.indirect ? PLOT_SIGHT : u.def.sight) || { kind: 'optic', zoom: [1] };
+  /** The HIGH ANGLE / DIRECT switch on a howitzer's lay (the seat's weapon button, which the lay has no other use for). */
+  const layModeLabel = () => {
+    const L = battle.lay;
+    const show = !!(L && L.unit.def.indirect && !battle.seat);
+    if (layWpn.hidden === show) layWpn.hidden = !show;
+    if (!show) return;
+    const t = L.indirect ? 'DIRECT' : 'HIGH ANGLE';
+    if (layWpn.textContent !== t) layWpn.textContent = t;
+    layWpn.classList.toggle('on', !!L.indirect);
+  };
+  const layHintFor = (u) => (u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK'
+    : (u.def.projectile.mortar || battle.lay?.indirect) ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO AIM');
   const layMag = () => { const L = battle.lay; if (!L) return 1; const z = laySightOf(L.unit).zoom; return z[Math.min(layZoom, z.length - 1)] || 1; };
   /** A straight shooter (and a tank gun) looks through its sight at the point of impact at every magnification; a howitzer does when zoomed. */
   const layAimed = () => { const L = battle.lay; if (!L) return false; const p = L.unit.def.projectile; if (laySightOf(L.unit).kind === 'plot') return layPlot(); return layMag() > 1 || L.unit.def.mg || p.kind === 'direct' || p.kind === 'topattack' || laySightOf(L.unit).kind === 'tank'; };
@@ -2272,7 +2290,8 @@ async function boot() {
         engine.scene.add(layView);
       }
     }
-    layHint.textContent = u.def.mg ? 'DRAG TO AIM · HOLD FIRE' : u.def.projectile.kind === 'topattack' ? 'PUT THE CROSS ON THE MARK' : u.def.projectile.mortar ? 'DRAG THE RING ONTO THE TARGET' : 'DRAG TO AIM';
+    layHint.textContent = layHintFor(u);
+    layModeLabel();
     layPct = -1;
     laySpot.until = 0; laySpotShown = null;
     layNext.hidden = layable().length < 2;
@@ -2346,6 +2365,8 @@ async function boot() {
     layDrag = null;
     layHold = false;
     layMark.hidden = true;
+    layWpn.hidden = true;
+    layWpn.classList.remove('on');
     if (layViewUnit) { layViewUnit.group.visible = true; layViewUnit = null; }
     for (const o of layHidden) o.group.visible = true;
     layHidden = [];
@@ -2385,7 +2406,17 @@ async function boot() {
     feedback.emit('tick');
   });
   layZoomBtn.addEventListener('click', () => zoomLay(1));
-  layWpn.addEventListener('click', () => { battle.seatSwitch(); seatWeaponLabel(); feedback.emit('tick'); });
+  layWpn.addEventListener('click', () => {
+    if (battle.seat) { battle.seatSwitch(); seatWeaponLabel(); feedback.emit('tick'); return; }
+    const L = battle.lay;
+    if (!L || !L.unit.def.indirect) return;
+    battle.setLayIndirect(!L.indirect);
+    layZoom = 0;
+    applyZoom();
+    layModeLabel();
+    layHint.textContent = layHintFor(L.unit);
+    feedback.emit('tick');
+  });
   seatBtn.addEventListener('click', () => { const list = battle.seatable(); if (list.length) enterSeat(list[0]); });
   // FIRE held is an automatic weapon's trigger held: it fires until it is let go or runs hot.
   layFire.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); layHold = true; fireHand(); });
@@ -2537,7 +2568,25 @@ async function boot() {
     const mg = !!u.def.mg, top = u.def.projectile.kind === 'topattack';
     const state = mg ? (L.streaming ? 'FIRING' : ready ? 'READY' : 'RELOADING') : top ? (ready ? 'SEEKER READY' : 'COOLING') : ready ? 'LOADED' : 'RELOADING';
     const sp = battle.laySpread(L);
-    const t = `${u.def.name} · ${Math.round(L.range)} m${sp > 0 ? ` ±${Math.round(sp)}` : ''}${mg || top ? '' : ` · ${deg}°`}${L.masonry ? ' · ON THE STONE' : L.blocked && !mg ? ' · BLOCKED' : ''} · ${state}`;
+    let t = `${u.def.name} · ${Math.round(L.range)} m${sp > 0 ? ` ±${Math.round(sp)}` : ''}${mg || top ? '' : ` · ${deg}°`}${L.masonry ? ' · ON THE STONE' : L.blocked && !mg ? ' · BLOCKED' : ''} · ${state}`;
+    if (L.indirect) {
+      // Each gun says its high-angle shot its own way.
+      const I = u.def.indirect, on = L.masonry ? ' · ON THE STONE' : '';
+      if (I.style === 'precision') {
+        // The section chief's numbers: quadrant elevation in mils, the
+        // charge (by the share of full muzzle velocity), time of flight.
+        const qe = Math.round(L.elev * 6400 / (2 * Math.PI));
+        const v = L.vel ? L.vel.length() : u.def.projectile.speed;
+        const chg = Math.max(1, Math.min(8, Math.ceil(8 * v / u.def.projectile.speed)));
+        t = `${u.def.name} · QE ${qe} MILS · CHG ${chg} · TOF ${Math.round(L.tof)} s · ±${Math.round(sp)} m${on} · ${state}`;
+      } else if (I.style === 'adjust') {
+        const a = Math.min(3, L.adjust || 0);
+        const stage = a >= 3 ? 'FIRE FOR EFFECT' : `ADJUST ${a + 1}/4`;
+        t = `${u.def.name} · ${Math.round(L.range)} m ±${Math.round(sp)} · ${stage}${on} · ${state}`;
+      } else if (I.style === 'mrsi') {
+        t = `${u.def.name} · MRSI ${I.rounds} RDS · ${Math.round(L.range)} m ±${Math.round(sp)} · TOT ${Math.round(L.tof)} s${on} · ${state}`;
+      }
+    }
     if (layRead.textContent !== t) layRead.textContent = t;
     // The round in the air, counting down; then the spotter's call.
     const H = battle.handRound;

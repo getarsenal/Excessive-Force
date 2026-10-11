@@ -625,6 +625,8 @@ body.laying #dock, body.laying #targetcard, body.laying #status, body.laying #hu
   font: 700 11px/1 var(--f-ui); letter-spacing: 0.1em; padding: 0 10px;
 }
 #lay-wpn[hidden] { display: none; }
+/* A howitzer at HIGH ANGLE: the switch is lit while the plot has it. */
+#lay-wpn.on { background: rgba(255, 210, 90, 0.2); border-color: #ffd25a; }
 #seat-btn {
   position: absolute; right: var(--pad-r); bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--dock-h) + 18px); z-index: 18;
   min-height: 44px; padding: 0 14px; pointer-events: auto; cursor: pointer;

@@ -246,6 +246,11 @@ export const UNITS = [
     barrel: { len: 3.0, r: 0.24, rb: 0.26, back: 1.0, recoil: 0.55, min: -0.09, max: 1.22 },
     traverse: 0.6,   // radians a second the crew turns the gun to a new bearing
     sight: { kind: 'pano', zoom: [1, 4] },   // over open sights at one; the panoramic telescope at four
+    // HIGH ANGLE in the lay (battle.setLayIndirect): laid from the plot like
+    // the mortar. The light gun's way is adjust fire: the first round is a
+    // spotting round in a wide sheaf, and each one put back on the same spot
+    // brings the sheaf in, until the fourth is fire for effect.
+    indirect: { style: 'adjust', spread: 0.04, min: 3.5 },
     range: 1100, reload: 6.0, setup: 5.0,
     crew: 5, health: 340,
     // Direct-fire howitzer: a high muzzle velocity on the *low* arc, so the
@@ -272,6 +277,11 @@ export const UNITS = [
     barrel: { r: 0.7, recoil: 0.9, min: -0.05, max: 1.25, elev: 16,
       region: { pivotT: 9.8, pivotU: -1.1, top: 0.6, side: 0.95, lo: [[4.0, -0.85], [9.6, -1.38]] } },
     sight: { kind: 'pano', zoom: [1, 4] },
+    // HIGH ANGLE: the M777A2's digital fire control lays it to the metre.
+    // The tightest sheaf of the three from the first round, and the
+    // section chief's numbers on the readout: quadrant elevation in mils,
+    // the charge, and the time of flight.
+    indirect: { style: 'precision', spread: 0.011, min: 2.5 },
     range: 1400, reload: 8.0, setup: 7.0,
     crew: 7, health: 420,
     // The opposite quarter turn to the M119, because the two towed guns are
@@ -300,6 +310,12 @@ export const UNITS = [
       region: { pivotT: 6.0, pivotU: 0, tMax: 6.1, top: 0.47, side: 0.47, lo: [[4.8, -0.36], [5.0, -0.68]], recoilTo: 5.0 } },
     eye: { hatch: true, back: 1.8, side: 0, pitch: -0.04 },   // the gunner's eye in the lay (battle.layEye)
     sight: { kind: 'pano', zoom: [1, 4] },
+    // HIGH ANGLE: multiple rounds, simultaneous impact. The Paladin's fire
+    // control solves three arcs to the one point and the autoloader sends
+    // them steepest first, each held back by the difference in time of
+    // flight, so all three land in the same second (battle._mrsi). The
+    // string costs a longer reload.
+    indirect: { style: 'mrsi', rounds: 3, spread: 0.022, min: 3 },
     range: 1600, reload: 6.5, setup: 3.0,
     crew: 0, health: 620,
     projectile: { kind: 'arc', speed: 420, gravity: 9.81, trail: 1.0 },

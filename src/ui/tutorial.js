@@ -223,7 +223,7 @@ export class Tutorial {
         done: () => b.smokeCooldown > 0,
         say: 'Smoke. The poor man\'s invisibility cloak. Works better than the expensive kind.' },
       { ch: 3, el: '#uc2-lay', fallback: '#dock-units', title: 'BE THE GUNNER',
-        text: 'Tap a gun, then GUNNER: you are standing at the breech. Drag to aim it — the line is the shell\'s flight, the mark where it lands — and ZOOM looks through the gun\'s own sight. Press FIRE; the ring round it fills as the crew reload. The spotter calls the fall — OVER, SHORT, LEFT, RIGHT, in metres — and a red cross marks it: lay the next off the last. A machine gun held on FIRE heats and locks when run hot. A gunner\'s hit pays a bonus. NEXT GUN takes the next one; DONE hands it back.',
+        text: 'Tap a gun, then GUNNER: you are standing at the breech. Drag to aim it — the line is the shell\'s flight, the mark where it lands — and ZOOM looks through the gun\'s own sight. Press FIRE; the ring round it fills as the crew reload. The spotter calls the fall — OVER, SHORT, LEFT, RIGHT, in metres — and a red cross marks it: lay the next off the last. A machine gun held on FIRE heats and locks when run hot. A howitzer also has HIGH ANGLE: laid from above like the mortar, the ring dragged onto the target, the shell plunging over whatever is in the way — the M119 tightens its ring as you keep firing on one spot, the M777 lays to the metre, the Paladin lands three rounds at once. A gunner\'s hit pays a bonus. NEXT GUN takes the next one; DONE hands it back.',
         enter: () => {
           b.selectedUnitId = null; h.closeDrawer?.();
           const u = b.units.find((x) => x.alive && b.canLay(x));

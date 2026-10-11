@@ -93,6 +93,7 @@ export class Battle {
     this.airlift = true;
     this.package = null;
     this.pending = [];
+    this._timed = [];
     this.projectiles = new ProjectileManager(this.scene, this.physics, this.quality);
 
     this.money = START_MONEY;
@@ -323,7 +324,12 @@ export class Battle {
       ref: aim ? aim.clone() : null,
       // The whole reload, for the clock on the trigger; the kick of the last shot, for the eye;
       // the barrel's heat and its lock, for the machine gun.
-      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0, rounds: 0, streaming: false };
+      reloadTotal: unit.def.reload * this.reloadFactor, kick: 0, heat: 0, over: 0, rounds: 0, streaming: false,
+      // A howitzer is a direct and an indirect fire weapon both: `indirect`
+      // is the player's choice (HIGH ANGLE), laid like the mortar from the
+      // plot. `adjust` counts rounds put on the same spot (the M119's
+      // bracketing tightens its sheaf); `lastAim` is where the last one went.
+      indirect: false, adjust: 0, lastAim: null };
     this.trigger = false;
     unit.handHeld = true;
     // The gun is handed over loaded: the crew's own reload and the burst
@@ -365,6 +371,48 @@ export class Battle {
     this.layLine.visible = true;
     this.layRing.visible = true;
     return true;
+  }
+
+  /**
+   * HIGH ANGLE or DIRECT on a howitzer in the hand (`def.indirect`). High
+   * angle lays it as the mortar is laid: by range from the plot, the crew
+   * picking the charge that makes a plunging arc over whatever is in the
+   * way, the tube between forty-five degrees and its own top elevation.
+   * Back to direct, the barrel comes down onto the low line to the same
+   * spot. Each gun keeps its own manner of it (`def.indirect.style`): the
+   * M119 adjusts onto a target, the M777 lays by digital fire control, the
+   * Paladin fires several rounds to land at once.
+   */
+  setLayIndirect(on) {
+    const L = this.lay;
+    if (!L || !L.unit.def.indirect || L.unit.def.projectile.mortar) return false;
+    on = !!on;
+    if (on === L.indirect) return true;
+    const p = L.unit.def.projectile;
+    const at = L.impact.clone();
+    L.indirect = on;
+    L.adjust = 0;
+    if (on) {
+      L.rangeWant = THREE.MathUtils.clamp(L.range || 300, 120, this._indirectMax(L));
+      this._mortarSolve(L);
+    } else {
+      const from = this._muzzle(L.unit, L.elev);
+      const v = solveArc(from, at, p.speed, p.gravity, false);
+      L.vel = null;
+      L.elev = v ? Math.atan2(v.y, Math.hypot(v.x, v.z)) : 0.05;
+    }
+    this._layArc();
+    return true;
+  }
+
+  /** Laid by range from the plot: the mortar always, a howitzer at HIGH ANGLE. */
+  layIndirect(L = this.lay) { return !!L && (L.unit.def.projectile.mortar || L.indirect); }
+
+  /** The furthest a plunging shot is laid: the charge's reach, held to the map. */
+  _indirectMax(L) {
+    const p = L.unit.def.projectile;
+    const reach = 0.92 * p.speed * p.speed / p.gravity;
+    return p.mortar ? reach : Math.min(reach, (this.terrain?.span || 900) * 1.4);
   }
 
   endLay() {
@@ -572,8 +620,15 @@ export class Battle {
    * way a dropped round's dispersion grows with the charge behind it.
    */
   laySpread(L = this.lay) {
-    if (!L || !L.unit.def.projectile.mortar) return 0;
-    return Math.max(4, L.range * 0.035);
+    if (!L) return 0;
+    if (L.unit.def.projectile.mortar) return Math.max(4, L.range * 0.035);
+    if (!L.indirect) return 0;
+    const I = L.unit.def.indirect;
+    const base = Math.max(I.min ?? 3, L.range * (I.spread ?? 0.025));
+    // Adjust fire: each round put back on the same spot brings the sheaf in,
+    // a third at a time, to fire for effect.
+    if (I.style === 'adjust') return Math.max(I.min ?? 3, base * (1 - 0.22 * Math.min(3, L.adjust || 0)));
+    return base;
   }
 
   // ── The gunner's seat ────────────────────────────────────────────────
@@ -771,10 +826,9 @@ export class Battle {
     // Down the hill: a rocket or a burst goes where the man can look.
     const lo = BB ? BB.min : straight ? -0.7 : -0.08;
     L.yaw += dyaw;
-    if (p.mortar) {
+    if (this.layIndirect(L)) {
       // Up is further: the drag walks the range and the solve sets the tube.
-      const maxR = 0.92 * p.speed * p.speed / p.gravity;
-      L.rangeWant = THREE.MathUtils.clamp(L.rangeWant + delev * 420, 45, maxR);
+      L.rangeWant = THREE.MathUtils.clamp(L.rangeWant + delev * 420, p.mortar ? 45 : 120, this._indirectMax(L));
       this._mortarSolve(L);
     } else {
       L.elev = THREE.MathUtils.clamp(L.elev + delev, lo, top);
@@ -902,7 +956,8 @@ export class Battle {
       const hi = solveArc(from, to, speed, p.gravity, true);
       if (hi) { v.copy(hi); elev = Math.atan2(v.y, Math.hypot(v.x, v.z)); }
     }
-    L.elev = THREE.MathUtils.clamp(elev, 0.785, 1.48);
+    // A howitzer's tube stops at its own top elevation (barrel.js `max`).
+    L.elev = THREE.MathUtils.clamp(elev, 0.785, L.unit.barrelB ? Math.max(0.8, L.unit.barrelB.max) : 1.48);
     // Along the lay's yaw exactly, at the solved speed and the clamped angle.
     const speed = Math.hypot(v.x, v.y, v.z), c = Math.cos(L.elev);
     L.vel = new THREE.Vector3(fx * c * speed, Math.sin(L.elev) * speed, fz * c * speed);
@@ -1043,6 +1098,15 @@ export class Battle {
       L.reloadTotal = u.cooldown;
       return true;
     }
+    if (L.indirect) {
+      const I = u.def.indirect;
+      // On the same spot as the last round (within its ring): one more
+      // round of adjustment; anywhere else starts the adjustment again.
+      const back = L.lastAim && L.lastAim.distanceTo(L.impact) < Math.max(6, sp * 1.2);
+      L.adjust = back ? Math.min(3, (L.adjust || 0) + 1) : 0;
+      L.lastAim = L.impact.clone();
+      if (I.style === 'mrsi') return this._mrsi(u, L, vel);
+    }
     const ok = this._fireOne(u, L.impact.clone(), { vel, hand: true, from: L.from });
     if (ok) {
       u.cooldown = u.def.reload * this.reloadFactor;
@@ -1053,6 +1117,81 @@ export class Battle {
       this.onEvent('handshot', { unit: u, point: L.impact.clone() });
     }
     return ok;
+  }
+
+  /**
+   * Multiple rounds, simultaneous impact: the Paladin's trick. Its fire
+   * control works out several arcs to the same point (the steepest first,
+   * since it is longest in the air) and the autoloader sends them in order,
+   * each held back by the difference in time of flight, so every round
+   * lands in the same second. One trigger, `def.indirect.rounds` shells.
+   */
+  _mrsi(u, L, vel0) {
+    const I = u.def.indirect, p = u.def.projectile, g = p.gravity;
+    const to = L.impact.clone();
+    const top = u.barrelB ? Math.max(0.85, u.barrelB.max) : 1.25;
+    const lo = Math.max(0.79, L.elev - 0.02);
+    const n = Math.max(2, I.rounds || 3);
+    const plans = [];
+    for (let k = 0; k < n; k++) {
+      const elev = top - (top - lo) * (k / Math.max(1, n - 1));
+      const from = this._muzzle(u, elev);
+      const dx = to.x - from.x, dz = to.z - from.z, R = Math.hypot(dx, dz), dh = to.y - from.y;
+      const c = Math.cos(elev), tn = Math.tan(elev);
+      const den = 2 * c * c * (R * tn - dh);
+      if (!(den > 0)) continue;
+      const speed = Math.sqrt(g * R * R / den);
+      if (!(speed > 0) || speed > p.speed) continue;
+      const t = R / (speed * c);
+      const yaw = Math.atan2(dx, dz);
+      const v = new THREE.Vector3(Math.sin(yaw) * c * speed, Math.sin(elev) * speed, Math.cos(yaw) * c * speed);
+      // The same small wander a round of this gun has at this range.
+      const sp = this.laySpread(L);
+      if (sp > 0) {
+        const off = new THREE.Vector3(gauss() * sp * 0.4, 0, gauss() * sp * 0.4);
+        v.x += off.x / Math.max(1, t); v.z += off.z / Math.max(1, t);
+      }
+      plans.push({ from, vel: v, t });
+    }
+    if (!plans.length) {
+      // Too close for more than one arc: a single round down the drawn line.
+      return this._fireOne(u, to, { vel: vel0, hand: true, from: L.from }) && this._handFired(u, L);
+    }
+    plans.sort((a, b) => b.t - a.t);
+    const tMax = plans[0].t;
+    for (const pl of plans) {
+      const delay = tMax - pl.t;
+      this._timed.push({ at: this.elapsed + delay, fn: () => {
+        if (!u.alive || this.state !== 'playing') return;
+        this._fireOne(u, to, { vel: pl.vel, hand: true, from: pl.from });
+      } });
+    }
+    this.onEvent('mrsi', { unit: u, rounds: plans.length, tot: tMax });
+    L.mrsiTot = tMax;
+    L.mrsiRounds = plans.length;
+    // The first is away now; the clock on the trigger covers the string.
+    this._runTimed(0);
+    return this._handFired(u, L, tMax);
+  }
+
+  /** After a hand round: the reload, the kick, the count, the spotter. */
+  _handFired(u, L, tof = L.tof) {
+    u.cooldown = u.def.reload * this.reloadFactor * (u.def.indirect?.style === 'mrsi' && L.indirect ? 1.6 : 1);
+    L.reloadTotal = u.cooldown;
+    L.kick = 1;
+    this.handShots++;
+    this._armSpot(u, tof, L.ref);
+    this.onEvent('handshot', { unit: u, point: L.impact.clone() });
+    return true;
+  }
+
+  /** Rounds held back for their moment (the Paladin's MRSI string). */
+  _runTimed() {
+    const q = this._timed;
+    if (!q.length) return;
+    for (let i = q.length - 1; i >= 0; i--) {
+      if (q[i].at <= this.elapsed) { const f = q[i].fn; q.splice(i, 1); f(); }
+    }
   }
 
   /**
@@ -3841,6 +3980,7 @@ export class Battle {
     if (this.lay && (!this.lay.unit.alive || this.state !== 'playing')) this.endLay();
     this._spotUpdate(dt);
     this._updateSeat(dt);
+    this._runTimed();
     if (this.state !== 'playing') {
       // The fight is over; the sky is not. Transports still in the air fly
       // on and their loads come down, rounds in flight land, the fires burn
