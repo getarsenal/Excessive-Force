@@ -3936,6 +3936,19 @@ export class TestMenu {
   }
 
   /** Synchronous variant, for the headless harness. */
+  /** The tests whose name contains `match`, alone: for chasing one failure. */
+  runOne(match) {
+    this.ctx.battle.airlift = false;
+    if (this.ctx.battle.airborne) this.ctx.battle.airborne.auto = false;
+    if (this.ctx.battle.assault) this.ctx.battle.assault.auto = false;
+    const out = [];
+    for (const [name, fn] of this.tests()) {
+      if (!name.includes(match)) continue;
+      try { out.push({ name, ok: true, detail: fn() || '' }); } catch (err) { out.push({ name, ok: false, detail: err.message }); }
+    }
+    return out;
+  }
+
   runTestsSync() {
     // The harness places a battery and expects it there: no airlift.
     this.ctx.battle.airlift = false;

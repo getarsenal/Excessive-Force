@@ -1,60 +1,50 @@
-// Run some of a level's self-tests rather than all fifty.
-//
-//   node tools/onetest.mjs <level> "<name part>"... [--upto] [--tier T] [--debug JS]
-//
-// Each argument picks the tests whose name contains it. With --upto every
-// test before the last one picked runs as well, in order, which is how to
-// reproduce a failure that only happens after what the suite did first.
-// --debug evaluates JS in the page after the run (window.testMenu is `tm`).
+// One check from the suite, alone, the way the harness loads the level (the
+// clock held, the tier forced), with every shell's impact recorded: where it
+// burst, how far above the ground, and whether it touched the landmark.
+// For chasing a single failure without the fifty around it.
+//   TEST="shells actually reach" node tools/onetest.mjs <level> [port=5178]   TT_TIER=low
 import { chromium } from 'playwright';
-
-const args = process.argv.slice(2);
-const opt = (k) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : undefined; };
-const flags = new Set(['--upto']);
-const vals = new Set(['--tier', '--debug']);
-const pos = [];
-for (let i = 0; i < args.length; i++) {
-  if (vals.has(args[i])) { i++; continue; }
-  if (!flags.has(args[i])) pos.push(args[i]);
+const level = process.argv[2] || 'rio', port = process.argv[3] || process.env.TT_PORT || 5178;
+const match = process.env.TEST || 'shells actually reach';
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
+const page = await b.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
+await page.addInitScript((tier) => { try { localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.suite', '1'); } catch {} }, process.env.TT_TIER || 'low');
+await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
+const out = await page.evaluate((match) => {
+  const B = window.battle, T = window.terrain;
+  const hits = [];
+  const orig = B._onImpact.bind(B);
+  B._onImpact = (hit) => {
+    const p = hit.point, owner = hit.owner || hit.collider?.parent?.() || null;
+    hits.push({ y: +(p.y - T.heightAt(p.x, p.z)).toFixed(1), at: [+p.x.toFixed(0), +p.y.toFixed(0), +p.z.toFixed(0)], kind: hit.proj?.kind, struct: !!(hit.structure || hit.chunk !== undefined || hit.owner?.structure) });
+    return orig(hit);
+  };
+  const res = window.__runTest(match);
+  const units = B.units.map((u) => [u.def.id, +u.pos.x.toFixed(0), +u.pos.y.toFixed(0), +u.pos.z.toFixed(0)]);
+  return { res, hits: hits.slice(0, 20), units, target: B.target ? B.target.toArray().map((v) => +v.toFixed(0)) : null, origin: B.primary.origin.toArray().map((v) => +v.toFixed(0)) };
+}, match);
+console.log(JSON.stringify(out.res));
+// DIAG=1: for the first gun, the shot the battle would choose and why.
+if (process.env.DIAG) {
+  console.log('diag', JSON.stringify(await page.evaluate(async () => {
+    const B = window.battle, T = window.terrain, P = await import('/src/game/projectiles.js');
+    const u = B.units.find((x) => x.alive && x.def.projectile);
+    if (!u || !B.target) return { none: true };
+    const p = u.def.projectile, from = B._muzzle(u), aim = B.target;
+    const low = P.solveArc(from, aim, p.speed, p.gravity, false);
+    const clear = (v) => B._trajectoryClear(from, v, p.gravity);
+    const lofted = P.solveBallistic(from, aim, p.speed, p.gravity, 9.0, clear);
+    const el = (v) => (v ? +(Math.atan2(v.y, Math.hypot(v.x, v.z)) * 57.3).toFixed(1) : null);
+    const dx = aim.x - from.x, dz = aim.z - from.z, dl = Math.hypot(dx, dz);
+    const prof = [0, 2, 4, 8, 16, 32, 64].map((d) => +(T.heightAt(from.x + dx / dl * d, from.z + dz / dl * d) - from.y).toFixed(1));
+    return { speed: p.speed, muzzleAboveGround: +(from.y - T.heightAt(from.x, from.z)).toFixed(1), lowEl: el(low), lowClear: low ? clear(low) : null,
+      loftedEl: el(lofted?.vel), barrelMax: u.barrelB ? +(u.barrelB.max * 57.3).toFixed(1) : null, groundAhead: prof, range: +dl.toFixed(0), rise: +(aim.y - from.y).toFixed(0), hold: u.hold || null };
+  })));
 }
-const [id, ...picks] = pos;
-const tier = opt('tier') || 'low';
-const upto = args.includes('--upto');
-const port = process.env.TT_PORT || 5177;
-
-const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox', '--ignore-gpu-blocklist'] });
-const page = await b.newPage({ viewport: { width: 1280, height: 720 } });
-page.on('pageerror', (e) => console.log('[PAGEERROR]', e.message.slice(0, 200)));
-page.on('console', (m) => { const t = m.text(); if (/^\[probe\]/.test(t)) console.log(t); });
-await page.addInitScript((tier) => {
-  localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
-  localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
-  // As the harness does: the clock held until a test asks for time.
-  localStorage.setItem('tt.suite', '1');
-}, tier);
-await page.goto(`http://localhost:${port}/?level=${id}`, { waitUntil: 'load', timeout: 300000 });
-await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none', null, { timeout: 400000 });
-const res = await page.evaluate(({ picks, upto }) => {
-  const tm = window.testMenu;
-  tm.ctx.battle.airlift = false;
-  const list = tm.tests();
-  const hit = (n) => picks.some((p) => n.includes(p));
-  let last = -1;
-  list.forEach(([n], i) => { if (hit(n)) last = i; });
-  const out = [];
-  list.forEach(([n, fn], i) => {
-    if (!(hit(n) || (upto && i < last))) return;
-    let ok = true, detail = '';
-    const note = tm._inPlay();
-    try { detail = (fn() || '') + note; } catch (e) { ok = false; detail = e.message + note; }
-    if (hit(n) || !ok) out.push(`${ok ? 'PASS' : 'FAIL'} ${n} :: ${String(detail).slice(0, 300)}`);
-  });
-  return out;
-}, { picks, upto });
-for (const r of res) console.log(r);
-if (opt('debug')) {
-  const r = await page.evaluate((src) => { const tm = window.testMenu; return eval(src); }, opt('debug'));
-  console.log(typeof r === 'string' ? r : JSON.stringify(r, null, 1));
-}
+console.log('target', JSON.stringify(out.target), 'origin', JSON.stringify(out.origin), 'units', JSON.stringify(out.units));
+for (const h of out.hits) console.log('  impact', JSON.stringify(h));
+console.log('errors', JSON.stringify(errors));
 await b.close();

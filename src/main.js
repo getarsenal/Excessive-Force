@@ -3656,6 +3656,7 @@ async function boot() {
   // The headless harness drives the same suite the panel does, so a regression
   // fails CI and the in-game panel identically.
   window.__runTests = () => testMenu.runTestsSync();
+  window.__runTest = (match) => testMenu.runOne(match);
 
   // The panel holds the clock for its run the way `tt.suite` does for the
   // harness, and lets it go again when the run is over.

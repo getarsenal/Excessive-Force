@@ -2670,6 +2670,15 @@ export class Battle {
       unit.group.rotation.y = unit.yaw;
     }
     const from = opts.from ? opts.from.clone() : this._muzzle(unit);
+    // A gun on a steep slope, laid up it, has its muzzle in the hillside: at
+    // Rio the battery under the summit fired every round from three metres
+    // inside the rock, and every one burst at its own feet whatever arc the
+    // solver chose. The round leaves from the ground's surface instead, so the
+    // high arc that clears the slope is a shot that actually gets out.
+    if (this.terrain && !opts.from) {
+      const g = this.terrain.heightAt(from.x, from.z);
+      if (from.y < g + 0.4) from.y = g + 0.4;
+    }
 
     // Dispersion is applied to the aim point, so error grows along the line of
     // fire the way real gun dispersion does. A crew that has landed rounds
@@ -2878,6 +2887,23 @@ export class Battle {
     const flight = Math.max(0.1, (2 * Math.max(0, vel.y)) / gravity);
     const span = Math.min(flight, 14) * 0.85;
     const steps = 12;
+    // The first eight metres, which the samples below step straight over:
+    // a fast shell's first sample is twenty metres out. A gun on a steep
+    // slope firing up it on the low line put that line into the hillside
+    // three metres in front of the muzzle — every round at Rio burst at the
+    // battery's own feet, the summit untouched. Walked in metres, against
+    // the ground with a hand's breadth to spare, and only where the path is
+    // past the gun's own footprint.
+    if (this.terrain) {
+      const sp = Math.hypot(vel.x, vel.y, vel.z) || 1;
+      for (const d of [2, 3.5, 5, 6.5, 8]) {
+        const t = d / sp;
+        const x = from.x + vel.x * t, z = from.z + vel.z * t;
+        if (Math.hypot(x - from.x, z - from.z) < 1.5) continue;
+        const y = from.y + vel.y * t - 0.5 * gravity * t * t;
+        if (y < this.terrain.heightAt(x, z) + 0.2) return false;
+      }
+    }
     a.copy(from);
     for (let i = 1; i <= steps; i++) {
       const t = (span * i) / steps;
