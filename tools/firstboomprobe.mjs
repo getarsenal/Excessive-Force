@@ -3,7 +3,7 @@
 // walkthrough skipped, puts KIND x N on the ground (no airlift), designates
 // the stones of one tag, steps the fight and prints, a second at a time, the
 // rounds fired, impacts, stones of that tag still standing and the bar.
-//   KIND=m777 N=4 TAG=cab AIM=base|middle SECS=30 node tools/firstboomprobe.mjs [port=5178]
+//   KIND=m777 N=4 TAG=cab AIM=base|middle SECS=30 [LEVEL=agra] node tools/firstboomprobe.mjs [port=5178]
 import { chromium } from 'playwright';
 const port = process.argv[2] || process.env.TT_PORT || 5178;
 const kind = process.env.KIND || 'm777', n = +(process.env.N || 4), tag = process.env.TAG || 'cab', secs = +(process.env.SECS || 30);
@@ -12,7 +12,9 @@ const page = await b.newPage({ viewport: { width: 393, height: 852 }, isMobile: 
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.stack || e).slice(0, 300)));
 await page.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.autostart', '1'); } catch {} });
-await page.goto(`http://localhost:${port}/?level=tutorial`, { waitUntil: 'load', timeout: 300000 });
+// LEVEL= any other level, with the arsenal the campaign hands over by then.
+const lv = process.env.LEVEL || 'tutorial';
+await page.goto(`http://localhost:${port}/?level=${lv}${lv === 'tutorial' ? '' : '&c=999'}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.hud, null, { timeout: 400000 });
 await page.waitForTimeout(1000);
 const out = await page.evaluate(async ({ kind, n, tag, secs, aimAt }) => {
@@ -50,7 +52,7 @@ const out = await page.evaluate(async ({ kind, n, tag, secs, aimAt }) => {
     if (sec % 10 === 9) window.__frame();
     const st = standing();
     if (first == null && st < of.length) first = sec + 1;
-    rows.push({ t: sec + 1, fired: (B.roundsFired || 0) - fired0, ready: B.units.filter((u) => u.state === 'ready').length, standing: st, bar: +(B.progress ?? 0).toFixed(3) });
+    rows.push({ t: sec + 1, fired: (B.roundsFired || 0) - fired0, ready: B.units.filter((u) => u.state === 'ready').length, standing: st, bar: +B.objectiveProgress.toFixed(4) });
     await new Promise((r) => setTimeout(r, 2));
   }
   return { tagStones: of.length, aim: aim.toArray().map((v) => +v.toFixed(1)), placed, firstLoss: first, rows };

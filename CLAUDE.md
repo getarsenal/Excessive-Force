@@ -483,6 +483,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   contact-force handler in main.js (`physics.onImpact`, crushing under a
   landing section) has never fired: no collider enables Rapier's
   contact-force events ·
+  par against play: `node tools/parprobe.mjs <level>` plays a level to the
+  win mark as a player who has reached it (`HOW=full`: the campaign's
+  arsenal by then, opened along the bar; `AIMBY=survey|face`; `QUIET=1`
+  silences the garrison; `STOPDOWN=1` stops at the win mark) and prints
+  the four marks against par; `sh tools/parsweep.sh <levels>` runs both
+  aims two at a time; `node tools/unlockprobe.mjs <levels>` lists where on
+  the bar each unit opens beside the starting money. The first sweep is
+  `docs/par/README.md`: the bot is too weak to set par from, and par was
+  not changed ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
