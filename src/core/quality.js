@@ -9,6 +9,8 @@
  * the settle threshold, and the shading cost.
  */
 
+import { gpuProbe } from './gpuprobe.js';
+
 const SIMD_PROBE = new Uint8Array([
   0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10,
   10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
@@ -93,13 +95,7 @@ function guessTier() {
   const mem = navigator.deviceMemory || (mobile ? 4 : 8);
 
   // WebGL renderer string is the most honest signal we get in a browser.
-  let renderer = '';
-  try {
-    const c = document.createElement('canvas');
-    const gl = c.getContext('webgl2') || c.getContext('webgl');
-    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
-    if (gl && ext) renderer = String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || '');
-  } catch { /* renderer string is optional */ }
+  const renderer = gpuProbe().renderer;
 
   if (mobile) {
     // Apple silicon phones genuinely can run the medium budget; most Android

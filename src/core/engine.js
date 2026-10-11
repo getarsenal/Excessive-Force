@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { access } from './access.js';
+import { gpuProbe } from './gpuprobe.js';
 
 const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -874,18 +875,7 @@ export class CameraRig {
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 /** The depth precision this device's WebGL gives a default context. */
-function depthBits() {
-  try {
-    const c = document.createElement('canvas');
-    const gl = c.getContext('webgl2') || c.getContext('webgl');
-    if (!gl) return 24;
-    const bits = gl.getParameter(gl.DEPTH_BITS);
-    gl.getExtension('WEBGL_lose_context')?.loseContext();
-    return bits || 24;
-  } catch {
-    return 24;
-  }
-}
+function depthBits() { return gpuProbe().depth; }
 
 /**
  * How much of the shake reaches the viewer at a given camera distance: full
