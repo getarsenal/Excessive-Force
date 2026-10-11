@@ -2132,6 +2132,23 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) forgetPointers(); });
   window.addEventListener('blur', forgetPointers);
   canvas.addEventListener('pointercancel', (e) => livePointers.delete(e.pointerId));
+  // A finger lifted off the canvas, or one the system took and never gave
+  // back, must not stay counted. One phantom here and every later one-finger
+  // drag reads as two: the line of guns is refused at the touch and the
+  // preview ends at the first move, for the rest of the battle. The rig has
+  // the same guard on its own count (engine.js `abandon`); this one never
+  // had it. These run after the canvas's own handlers, so the line still
+  // resolves on the lift that ends it.
+  window.addEventListener('pointerup', (e) => livePointers.delete(e.pointerId));
+  window.addEventListener('pointercancel', (e) => livePointers.delete(e.pointerId));
+  // And the glass's own count, the rig's ground truth: when the last touch
+  // leaves, whatever is still counted is a phantom. Cleared at the next
+  // touch rather than here, so a pointerup that lands after the touchend
+  // still finds its finger and resolves its line.
+  let glassEmpty = false;
+  const settleGlass = (e) => { if (e.touches.length === 0) glassEmpty = true; };
+  canvas.addEventListener('touchend', settleGlass);
+  canvas.addEventListener('touchcancel', settleGlass);
 
   /**
    * The gesture in progress, when a weapon is armed.
@@ -2706,6 +2723,10 @@ async function boot() {
   };
 
   canvas.addEventListener('pointerdown', (e) => {
+    // The first finger of a new touch, or any mouse press, starts from
+    // nothing: whatever is still counted belongs to a gesture that is over.
+    if (e.isPrimary || glassEmpty) livePointers.clear();
+    glassEmpty = false;
     livePointers.add(e.pointerId);
     hud.ripple(e.clientX, e.clientY, battle.selectedUnitId ? 'deploy' : 'aim');
     // A tap that dismisses a drawer is a dismissal and nothing else. Letting
@@ -2771,10 +2792,14 @@ async function boot() {
         if (battle.state !== 'playing') return;
         const pts = a.points.length > 1 ? a.points : [a.from];
         let placed = 0;
+        // The weapon the line was drawn with, not whatever is selected now:
+        // without the airlift (Blitz, NO AIR, the range) the first unit down
+        // clears the selection, and the rest of the line went nowhere.
+        const id = a.def.id;
         for (const p of pts) {
           if (pts.length > 1 && !p.ok) continue;
           const before = battle.units.length + battle.pending.length;
-          battle.deploy(battle.selectedUnitId, p);
+          battle.deploy(id, p);
           if (battle.units.length + battle.pending.length > before) {
             placed++;
             battle.pulse(p, 0x6fd08c, 14);
@@ -3645,6 +3670,7 @@ async function boot() {
   // `fastForward`, because that is the path with no draw in it.
   window.__frame = frame;
   window.__engine = engine;   // for the harness: the renderer's own counters
+  window.__rig = rig;         // for the harness: screen to ground, gestures
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {
     recordResult(level.id, true, sum);
