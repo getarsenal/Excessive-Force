@@ -173,7 +173,7 @@ export class HUD {
         this.onToggleSound(this.soundOn);
       });
     }
-    this.el.ecAgain.addEventListener('click', () => this.onRestart());
+    this.el.ecAgain.addEventListener('click', () => this.onRestart({ rematch: true }));
     const fr = document.getElementById('fault-restart');
     if (fr) fr.addEventListener('click', () => this.onRestart());
     const ft = document.getElementById('fault-targets');
@@ -1378,6 +1378,9 @@ export class HUD {
     // After a stalled assault the one thing to do is go again, so that is the
     // big button.
     this.el.ecAgain.classList.toggle('primary', !won);
+    // With guns on the ground it is a rematch: the same guns go back on their
+    // marks. With none it is only the same battle again.
+    this.el.ecAgain.textContent = this.rematchCount ? 'REMATCH' : 'RUN IT AGAIN';
     if (this.el.ecNext) {
       this.el.ecNext.hidden = !won;
       this.el.ecNext.textContent = this.nextTargetLabel

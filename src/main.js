@@ -884,8 +884,11 @@ async function boot() {
     // Through `goToLevel` rather than a bare reload: the level is no longer in
     // the address bar by the time anyone can press this, so a reload would
     // land on the map.
-    onRestart: () => {
+    onRestart: (opts = {}) => {
       battleOver = true;
+      // REMATCH (the end card) takes the guns along; a restart from the menu
+      // is a clean start.
+      if (opts.rematch) saveRematch();
       // A Blitz again is a Blitz again, not the campaign's contract.
       if (blitz) startBlitzRun(level.id); else clearBattle(level.id);
       goToLevel(level.id);
@@ -1158,6 +1161,72 @@ async function boot() {
   };
   let dailyBanked = 0;
 
+  // ── REMATCH: the same battle with the same guns ──
+  // Every gun the player puts down is written into the plan, in order, where
+  // it stood; a sold one comes out of it. REMATCH on the end card carries the
+  // plan into the next load, and there each gun goes back onto its mark the
+  // moment the battle would let the player put it there: unlocked by the bar
+  // and paid for, in the order it was first placed, by the same lift. So the
+  // fight is the same fight, and the half minute of putting a battery back
+  // where it was is gone. MENU and RESTART still start clean.
+  const REMATCH_KEY = 'tt.rematch';
+  const plan = [];
+  const rematchable = level.id !== 'tutorial' && !level.sandbox && !selftest;
+  let rematchQueue = null, rematchTotal = 0, rematchPlaced = 0, rematchAt = -1;
+  if (rematchable) {
+    try {
+      const raw = sessionStorage.getItem(REMATCH_KEY);
+      sessionStorage.removeItem(REMATCH_KEY);
+      const p = raw && JSON.parse(raw);
+      if (p && p.level === level.id && Array.isArray(p.units) && p.units.length) {
+        rematchQueue = p.units.filter((u) => UNITS_BY_ID[u.id] && !UNITS_BY_ID[u.id].strike);
+        rematchTotal = rematchQueue.length;
+      }
+    } catch { /* private mode: a clean start */ }
+  }
+  const planNote = (u) => {
+    if (!rematchable || u.demo || u.def.strike) return;
+    plan.push({ u, id: u.def.id, x: +u.pos.x.toFixed(2), y: +u.pos.y.toFixed(2), z: +u.pos.z.toFixed(2),
+      r: u.pos.onRoof ? 1 : 0, k: u.pos.onDeck ? 1 : 0 });
+    hud.rematchCount = plan.length;
+  };
+  const planDrop = (u) => {
+    const i = plan.findIndex((p) => p.u === u);
+    if (i >= 0) plan.splice(i, 1);
+    hud.rematchCount = plan.length;
+  };
+  const saveRematch = () => {
+    if (!rematchable || !plan.length) return false;
+    try {
+      sessionStorage.setItem(REMATCH_KEY, JSON.stringify({ level: level.id, units: plan.map(({ u, ...p }) => p) }));
+      return true;
+    } catch { return false; }
+  };
+  // Twice a second: the next gun of the plan that the bar has unlocked, if
+  // the money is there for it. In order, so the guns that went down first in
+  // the last fight go down first in this one; a locked one is passed over
+  // until its mark on the bar comes up.
+  const rematchTick = () => {
+    if (!rematchQueue?.length || battleOver || battle.state !== 'playing' || battle.elapsed - rematchAt < 0.5) return;
+    rematchAt = battle.elapsed;
+    for (let i = 0; i < rematchQueue.length; i++) {
+      const p = rematchQueue[i], def = UNITS_BY_ID[p.id];
+      if (!battle.isUnlocked(def)) continue;
+      if (!battle.freeBuild && battle.money < def.cost) return;
+      rematchQueue.splice(i, 1);
+      const at = new THREE.Vector3(p.x, p.y, p.z);
+      at.onRoof = p.r === 1; at.onDeck = p.k === 1;
+      battle.deploy(p.id, at).then((u) => {
+        if (!u) return;
+        rematchPlaced++;
+        hud.status(`rematch · ${rematchPlaced} of ${rematchTotal} back on their marks`, 2.5);
+        if (!rematchQueue.length) hud.feed('REMATCH · EVERY GUN BACK ON ITS MARK', 'good');
+      }).catch(() => {});
+      return;
+    }
+  };
+  window.__rematch = () => ({ plan: plan.length, queue: rematchQueue?.length ?? null, placed: rematchPlaced, total: rematchTotal });
+
   // ── BLITZ (career.js): the clock in the top bar, the stars, the end ──
   // The clock starts at the first gun or strike, not at the load: reading the
   // ground is free, three minutes of fighting is the game.
@@ -1293,8 +1362,10 @@ async function boot() {
         break;
       case 'sold':
         hud.feed(`${data.unit.def.name} SOLD  +$${data.refund}`, '');
+        planDrop(data.unit);
         break;
       case 'deployed':
+        planNote(data);
         feedback.emit(battle.airlift ? 'landed' : 'confirm');
         hud.feed(`${data.def.name} ${battle.airlift ? 'ON THE GROUND' : 'DEPLOYED'}`, 'good');
         // With the airlift this arrives twenty seconds after the tap, and
@@ -3368,6 +3439,7 @@ async function boot() {
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);
     blitzTick();
+    rematchTick();
     // The survey follows the solver. Throttled inside `paintSurvey` — the
     // numbers only move when the stability pass runs, and repainting thirty
     // thousand stones sixty times a second to watch that is a frame's work

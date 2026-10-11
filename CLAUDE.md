@@ -459,6 +459,21 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   (`#blitzbar`) from the first gun, stars at 25/50/90 % of the bar, the
   best per landmark in `tt.blitz`; `node tools/blitzprobe.mjs` plays one
   as a keen player and reads the end card (`SHOT=1` photographs the bar) ·
+  REMATCH (the end card's second button, RUN IT AGAIN when no gun went
+  down): every gun the player places is written into the plan where it
+  stood (a sold one comes out), carried to the next load in
+  `sessionStorage` `tt.rematch`, and put back on its mark in the order it
+  first went down as soon as the bar has unlocked it and the money is there,
+  by the same lift; MENU and RESTART start clean; `node tools/rematchprobe.mjs`
+  places three, sells one, rematches and checks the marks ·
+  the landing blow: a section of sixty stones or more that came down at
+  4 m/s and has lost two thirds of it calls `onSectionLanded`
+  (structure.js), which vibrates the phone by size and distance, thumps the
+  speaker, and from a hundred and fifty stones holds the clock seventy
+  milliseconds; `node tools/hitstopprobe.mjs <level>` records it. The
+  contact-force handler in main.js (`physics.onImpact`, crushing under a
+  landing section) has never fired: no collider enables Rapier's
+  contact-force events ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
