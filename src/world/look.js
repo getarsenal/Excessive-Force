@@ -93,8 +93,13 @@ const LEVEL_CLIME = {
   potala: 'highland', machupicchu: 'highland',
 };
 
+/** The climate a level is in, by name (`temperate`, `tropical`, ...). */
+export function climeOf(level) {
+  return level.setting?.clime || LEVEL_CLIME[level.id] || 'temperate';
+}
+
 export function lookFor(level) {
-  const id = level.setting?.clime || LEVEL_CLIME[level.id] || 'temperate';
+  const id = climeOf(level);
   return LOOKS[id] || LOOKS.temperate;
 }
 

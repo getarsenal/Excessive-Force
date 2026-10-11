@@ -2276,16 +2276,15 @@ export class TestMenu {
         // all of them; a zero-scale instance is a boat the router has hidden
         // and is not a boat.
         const life = c.life;
-        const meshes = life?.boats ? [...life.boats.meshes.values()] : [];
         const mat2 = new THREE.Matrix4();
+        // Under way only: the boats tied up along the banks lie still on purpose.
         const read = () => {
           const out = [];
-          for (const bm of meshes) {
-            for (let i = 0; i < bm.count; i++) {
-              bm.getMatrixAt(i, mat2);
-              if (mat2.elements[0] === 0) continue;
-              out.push([mat2.elements[12], mat2.elements[14]]);
-            }
+          for (const b of life?.boats?.boats || []) {
+            if (b.moored) continue;
+            b.mesh.getMatrixAt(b.slot, mat2);
+            if (mat2.elements[0] === 0) continue;
+            out.push([mat2.elements[12], mat2.elements[14]]);
           }
           return out;
         };

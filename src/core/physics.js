@@ -978,14 +978,29 @@ export class PhysicsWorld {
         if (mag < 4000) return;
         raw.push(e.collider1(), e.collider2(), mag);
       });
+      // Every event resolved before any is acted on. A listener destroys
+      // things — a landing crushes the stones under it, a hard one shatters
+      // the section — and the next event in the batch may name a collider
+      // the last one removed; asking a removed collider for its parent traps
+      // the wasm. Resolved up front, every collider is still there; at
+      // dispatch, an event whose body has gone since is dropped.
+      const ev = this._contactEv || (this._contactEv = []);
+      ev.length = 0;
       for (let i = 0; i < raw.length; i += 3) {
         const c1 = this.world.getCollider(raw[i]);
         const c2 = this.world.getCollider(raw[i + 1]);
-        const o1 = c1 && this.owners.get(c1.parent()?.handle);
-        const o2 = c2 && this.owners.get(c2.parent()?.handle);
-        for (const fn of this.contactListeners) fn(o1, o2, raw[i + 2], c1, c2);
+        const p1 = c1 ? c1.parent() : null, p2 = c2 ? c2.parent() : null;
+        ev.push([c1, c2, p1, p2, raw[i + 2]]);
       }
       raw.length = 0;
+      for (const [c1, c2, p1, p2, mag] of ev) {
+        if (this.dead) break;
+        if ((p1 && !PhysicsWorld.alive(p1)) || (p2 && !PhysicsWorld.alive(p2))) continue;
+        const o1 = p1 && this.owners.get(p1.handle);
+        const o2 = p2 && this.owners.get(p2.handle);
+        for (const fn of this.contactListeners) fn(o1, o2, mag, c1, c2);
+      }
+      ev.length = 0;
     }
     return steps;
   }

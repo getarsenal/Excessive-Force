@@ -45,7 +45,7 @@ for (let i = 0; i < spots.length; i++) {
       if (window.__frame) for (let k = 0; k < 4; k++) window.__frame();
     }, { s: spots[i], dist, pitch });
     await page.waitForTimeout(700);
-    await page.screenshot({ path: `${out}/${level}-${i}-${name}.png` });
+    await page.screenshot({ path: `${out}/${level}-${i}-${name}.png`, timeout: 120000 });
   }
   console.log(i, JSON.stringify(spots[i]));
 }

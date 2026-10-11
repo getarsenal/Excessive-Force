@@ -53,7 +53,7 @@ import { damageBill, money } from './ui/bill.js';
 import { CollapseClip } from './ui/clip.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
-import { applyLook, applyWaterLook, stylizeTree, lookFor } from './world/look.js';
+import { applyLook, applyWaterLook, stylizeTree, lookFor, climeOf } from './world/look.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
@@ -419,7 +419,7 @@ async function boot() {
   const city = await cityLoad;
   const tCity = performance.now();
   const contextGroup = buildContext(terrain, quality, {
-    levelId: level.id,
+    levelId: level.id, clime: climeOf(level),
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
     // And any ground the level keeps bare of its own (the range's floor).
@@ -2051,6 +2051,8 @@ async function boot() {
         for (const target of structures) {
           const i = target.chunkAtCollider(col);
           if (i < 0) continue;
+          // One stone belongs to one structure: once it has been crushed, no
+          // other structure is asked about a collider that no longer exists.
           const at = new THREE.Vector3(target.px[i], target.py[i] + target.hy[i], target.pz[i]);
           const gone = target.crushUnder(at, mass, force);
           if (gone > 3) {
@@ -2083,7 +2085,8 @@ async function boot() {
       if (!o || o.island === undefined) continue;
       const st = o.structure;
       const isl = st.islands.get(o.island);
-      if (!isl || !isl.body) continue;
+      // Shattered earlier in this same batch: its body is gone.
+      if (!isl || !isl.body || !PhysicsWorld.alive(isl.body)) continue;
       isl.impacts++;
       if (force > 26000) {
         const t = isl.body.translation();

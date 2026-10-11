@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { carParts, pickShape } from './carkit.js';
 import { addNotables, minHeight, maxHeight } from './notables.js';
+import { addBeaches } from './beaches.js';
 
 /**
  * Surrounding London.
@@ -1320,6 +1321,7 @@ export function buildContext(terrain, quality, opts = {}) {
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
   counts.notables = addNotables(props, plots, opts.levelId);
+  Object.assign(counts, addBeaches(props, terrain, plots, rng, opts.clime, net));
   Object.assign(counts, addRiverEdge(props, terrain, rng, opts.precinct || {}));
   Object.assign(counts, addNetworkFurniture(props, net, terrain, rng, dense));
   // Paint stays on at every quality tier, thinned rather than dropped: a

@@ -181,6 +181,46 @@ export class Life {
     return t.isRiver(x, z) && t.heightAt(x, z) < t.waterLevel - 0.3 && !this._built(x, z);
   }
 
+  /**
+   * Where a boat can lie alongside: water a boat floats in, with the bank
+   * within ten metres on one side and open water on the other, nothing built
+   * on it, kept apart from each other and off the landmark's own ground.
+   * Each comes with the way along the bank (`yaw`) and the way out from it
+   * (`ox`, `oz`), to hold the hull off the stones.
+   */
+  _moorings(max) {
+    const t = this.terrain, span = t.span * 0.9, out = [];
+    const STEP = 14, R = 9;
+    const nav = (x, z) => this._navigable(x, z);
+    const cands = [];
+    for (let x = -span; x <= span; x += STEP) {
+      for (let z = -span; z <= span; z += STEP) {
+        if (Math.hypot(x, z) < 160 || !nav(x, z)) continue;
+        let lx = 0, lz = 0, dry = 0;
+        for (let j = 0; j < 8; j++) {
+          const a = (j / 8) * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
+          if (!t.isRiver(x + dx * R, z + dz * R)) { lx += dx; lz += dz; dry++; }
+        }
+        if (dry < 1 || dry > 3) continue;
+        const L = Math.hypot(lx, lz) || 1;
+        const ox = -lx / L, oz = -lz / L;
+        // Room for the boat: open water out to twelve metres, and where it
+        // lies (four to seven metres out) water along its length.
+        if (!nav(x + ox * 12, z + oz * 12) || !nav(x + ox * 4, z + oz * 4) || !nav(x + ox * 7, z + oz * 7)) continue;
+        const ax = -oz, az = ox;
+        if (!nav(x + ox * 5 + ax * 9, z + oz * 5 + az * 9) || !nav(x + ox * 5 - ax * 9, z + oz * 5 - az * 9)) continue;
+        cands.push({ x, z, ox, oz, yaw: Math.atan2(oz, -ox) + Math.PI / 2, r: this.rng() });
+      }
+    }
+    cands.sort((a, b) => a.r - b.r);
+    for (const c of cands) {
+      if (out.length >= max) break;
+      if (out.some((o) => Math.hypot(o.x - c.x, o.z - c.z) < 55)) continue;
+      out.push(c);
+    }
+    return out;
+  }
+
   _waterways() {
     const t = this.terrain, span = t.span, lim = span * 0.95;
     // MIN_RUN is a sampan, not a barge: the Klang through Kuala Lumpur is two
@@ -274,13 +314,18 @@ export class Life {
     n = Math.max(1, Math.min(n, Math.ceil(grand / 120)));
 
     const kinds = [...new Set(fleet)];
+    // Tied up along the banks as well as under way: a working waterfront has
+    // as many boats alongside as moving, and they cost nothing but their
+    // instances (no wake, no route).
+    const moorings = this._moorings(Math.max(2, Math.round(n * 0.9)));
+    const cap = n + moorings.length;
     const meshes = new Map();
     const slots = new Map();
     for (const kind of kinds) {
       const { geo } = buildCraft(kind);
       const mesh = new THREE.InstancedMesh(geo,
-        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.58, side: THREE.DoubleSide }), n);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.58, side: THREE.DoubleSide }), cap);
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
       mesh.frustumCulled = false;
       mesh.name = `craft-${kind}`;
       mesh.count = 0;
@@ -308,6 +353,26 @@ export class Life {
         speed: (speed[0] + this.rng() * (speed[1] - speed[0])) * (this.rng() < 0.5 ? 1 : -1),
         off: (this.rng() - 0.5) * 0.4,
         k: scale[0] + this.rng() * (scale[1] - scale[0]),
+      });
+    }
+    // The moored: the smaller kinds of the fleet, alongside, bow upstream or
+    // down as it fell, held off the bank by half a beam and a fender.
+    const small = fleet.filter((k) => buildCraft(k).len < 40);
+    for (const m of moorings) {
+      const pool = small.length ? small : fleet;
+      const kind = pool[Math.floor(this.rng() * pool.length)];
+      const K = buildCraft(kind);
+      const slot = slots.get(kind); slots.set(kind, slot + 1);
+      const mesh = meshes.get(kind);
+      mesh.count = slot + 1;
+      const tint = 0.82 + this.rng() * 0.3;
+      mesh.instanceColor.setXYZ(slot, tint, tint, tint);
+      mesh.instanceColor.needsUpdate = true;
+      const off = Math.min(6, K.beam / 2 + 1.2);
+      boats.push({
+        kind, mesh, slot, moored: true, speed: 0, k: 1,
+        x: m.x + m.ox * off, z: m.z + m.oz * off,
+        yaw: m.yaw + (this.rng() < 0.5 ? Math.PI : 0),
       });
     }
     for (const b of boats) {
@@ -531,6 +596,17 @@ export class Life {
       let wi = 0;
       this._clock = (this._clock || 0) + dt;
       for (const b of boats) {
+        if (b.moored) {
+          // Alongside: no way on, a slow heave and a little roll.
+          const T = this._clock, r = (b.roll || 0.02) * 0.6;
+          this._p.set(b.x, t.waterLevel + Math.sin(T * 0.9 + b.ph[0]) * Math.min(0.08, r * 2), b.z);
+          this._e.set(Math.sin(T * 0.7 + b.ph[1]) * r * 0.4, b.yaw, Math.sin(T * 0.55 + b.ph[2]) * r, 'YXZ');
+          this._q.setFromEuler(this._e);
+          this._s.setScalar(1);
+          this._m.compose(this._p, this._q, this._s);
+          b.mesh.setMatrixAt(b.slot, this._m);
+          continue;
+        }
         const { pts, total } = b.chain;
         // Turn at the ends rather than wrapping round to the other one. A
         // river is not a loop; a working boat goes up it and then comes back.

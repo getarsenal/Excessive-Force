@@ -1458,8 +1458,12 @@ export class Structure {
   /** The standing stone behind one of this structure's colliders, or -1. */
   chunkAtCollider(col) {
     if (!col || !this.staticBody || !this.colliderToChunk) return -1;
-    const parent = col.parent();
-    if (!parent || parent.handle !== this.staticBody.handle) return -1;
+    // By handle alone, in plain JS. Asking the collider for its parent is a
+    // call into the world, and when a landing has just crushed the stone
+    // this collider belonged to, the collider is gone: the call traps the
+    // wasm, the world stays borrowed for good, and the simulation halts
+    // ("recursive use of an object"). The map is this structure's own, so a
+    // handle in it is one of its stones; one no longer standing reads dead.
     const i = this.colliderToChunk.get(col.handle);
     return (i === undefined || !(this.flags[i] & ALIVE)) ? -1 : i;
   }
