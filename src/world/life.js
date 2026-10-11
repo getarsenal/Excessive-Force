@@ -310,8 +310,62 @@ export class Life {
         k: scale[0] + this.rng() * (scale[1] - scale[0]),
       });
     }
+    for (const b of boats) {
+      const k = buildCraft(b.kind);
+      b.len = k.len; b.roll = k.roll; b.wakeK = k.wake; b.beam = k.beam;
+      b.ph = [this.rng() * 6.28, this.rng() * 6.28, this.rng() * 6.28];
+    }
     const first = meshes.values().next().value;
-    return { meshes, boats, chains, total: grand, mesh: first };
+    return { meshes, boats, chains, total: grand, mesh: first, wake: this._buildWakes(scene, n) };
+  }
+
+  /**
+   * The wakes: one instanced quad behind every boat, a V of foam spreading
+   * from the stern with a churned lane down the middle, fading as it goes.
+   * A boat without one is a model slid over a picture of water; with it the
+   * water is being pushed aside. One draw call for all of them, no shadow,
+   * no depth write, laid a few centimetres over the surface.
+   */
+  _buildWakes(scene, n) {
+    const W = 64, H = 128, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    if (!g) return null;
+    const img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) {
+      const t = y / (H - 1);                      // 0 at the stern, 1 at the tail
+      const spread = 0.08 + 0.3 * t;              // the V's half-width, of the quad's; inside its edge
+      const fade = Math.pow(1 - t, 2.2);
+      for (let x = 0; x < W; x++) {
+        const u = Math.abs(x / (W - 1) - 0.5);
+        const arm = Math.exp(-Math.pow((u - spread) / (0.025 + 0.03 * t), 2));
+        const lane = Math.exp(-Math.pow(u / (0.05 + 0.1 * t), 2)) * 0.6;
+        const a = Math.min(1, (arm * 0.8 + lane * 0.6) * fade);
+        const i = (y * W + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, 0, -0.5);                    // from the stern (z 0) back to z -1
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false, opacity: 0.38, fog: true,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }), n);
+    mesh.frustumCulled = false;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    // After the water (renderOrder 5, transparent): drawn before it, the
+    // sheet was blended over the foam and the wake all but vanished.
+    mesh.renderOrder = 6;
+    mesh.name = 'wakes';
+    mesh.count = n;
+    scene.add(mesh);
+    return mesh;
   }
 
   // ───────────────────────────────────────────────────────────────── birds ──
@@ -473,7 +527,9 @@ export class Life {
     }
 
     if (this.boats) {
-      const { boats } = this.boats;
+      const { boats, wake } = this.boats;
+      let wi = 0;
+      this._clock = (this._clock || 0) + dt;
       for (const b of boats) {
         const { pts, total } = b.chain;
         // Turn at the ends rather than wrapping round to the other one. A
@@ -495,14 +551,32 @@ export class Life {
         let x = cx + b.off * wid * 0.5;
         if (!this._navigable(x, cz)) x = cx;
         const shown = this._navigable(x, cz);
-        this._p.set(x, t.waterLevel + 0.1, cz);
-        this._q.setFromAxisAngle(UP,
-          Math.atan2(c.x - a.x, c.z - a.z) + (b.speed < 0 ? Math.PI : 0));
+        // Afloat: a slow heave, and pitch and roll in the swell, by how
+        // lively the kind is. A coracle wallows; a Rhine barge barely moves.
+        const yaw = Math.atan2(c.x - a.x, c.z - a.z) + (b.speed < 0 ? Math.PI : 0);
+        const T = this._clock, r = b.roll || 0.02;
+        const heave = Math.sin(T * 1.1 + b.ph[0]) * Math.min(0.12, r * 3);
+        this._p.set(x, t.waterLevel + heave, cz);
+        this._e.set(Math.sin(T * 0.8 + b.ph[1]) * r * 0.45, yaw, Math.sin(T * 0.62 + b.ph[2]) * r, 'YXZ');
+        this._q.setFromEuler(this._e);
         this._s.setScalar(shown ? b.k : 0);
         this._m.compose(this._p, this._q, this._s);
         b.mesh.setMatrixAt(b.slot, this._m);
+        if (wake) {
+          // From the stern back, as long as the boat times its wake share
+          // and its speed, and as wide as the V has spread.
+          const L = (b.len || 10) * b.k, v = Math.abs(b.speed);
+          const sx = Math.sin(yaw), sz = Math.cos(yaw);
+          this._p.set(x - sx * L * 0.45, t.waterLevel + 0.04, cz - sz * L * 0.45);
+          this._q.setFromAxisAngle(UP, yaw);
+          const long = shown ? L * (b.wakeK || 1) * (0.55 + v * 0.12) : 0;
+          this._s.set(shown ? (b.beam || 3) * b.k * 1.7 + long * 0.22 : 0, 1, long);
+          this._m.compose(this._p, this._q, this._s);
+          wake.setMatrixAt(wi++, this._m);
+        }
       }
       for (const m of this.boats.meshes.values()) m.instanceMatrix.needsUpdate = true;
+      if (wake) { wake.count = wi; wake.instanceMatrix.needsUpdate = true; }
       this._s.set(1, 1, 1);
     }
 

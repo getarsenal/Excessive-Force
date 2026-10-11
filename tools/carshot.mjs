@@ -1,6 +1,7 @@
 // The cars, photographed: a stretch of kerb with its parked row and the
 // traffic going past, from close (twelve metres) and from a playing distance
 // (ninety), on a phone. Writes /tmp/out/cars/<level>-near.png and -far.png.
+// BOAT=1 frames the commonest boat on the water instead (boat-near, boat-far).
 //   node tools/carshot.mjs [level=westminster] [port=5177]
 import { chromium } from 'playwright';
 import fs from 'node:fs';
@@ -16,13 +17,21 @@ await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load',
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 await page.waitForTimeout(1500);
 await page.addStyleTag({ content: '#ui, #hud, .hud, #topbar, #dock { display: none !important; }' });
-for (const [name, dist, pitch] of [['near', 12, 0.32], ['far', 90, 0.6]]) {
-  const info = await page.evaluate(({ dist, pitch }) => {
+const shots = process.env.BOAT ? [['boat-near', 45, 0.35], ['boat-far', 140, 0.6]] : [['near', 12, 0.32], ['far', 90, 0.6]];
+for (const [name, dist, pitch] of shots) {
+  const info = await page.evaluate(({ dist, pitch, boat }) => {
     const T = window.THREE, scene = window.__engine.scene, rig = window.__rig;
     // A parked car: the paint bucket's first vertex near a road, else the traffic.
     let at = null;
+    if (boat) {
+      const crafts = [];
+      scene.traverse((o) => { if (o.isInstancedMesh && o.name.startsWith('craft-') && o.count) crafts.push(o); });
+      crafts.sort((a, b) => b.count - a.count);
+      const c = crafts[0];
+      if (c) { const m = new T.Matrix4(); c.getMatrixAt(0, m); at = new T.Vector3().setFromMatrixPosition(m); }
+    }
     const traffic = scene.getObjectByName('traffic');
-    if (traffic && traffic.count) {
+    if (!at && traffic && traffic.count) {
       const m = new T.Matrix4(); traffic.getMatrixAt(Math.floor(traffic.count / 3), m);
       at = new T.Vector3().setFromMatrixPosition(m);
     }
@@ -32,7 +41,7 @@ for (const [name, dist, pitch] of [['near', 12, 0.32], ['far', 90, 0.6]]) {
     rig.desiredPitch = pitch; rig.pitch = pitch;
     if (window.__frame) for (let k = 0; k < 4; k++) window.__frame();
     return { at: at.toArray().map((v) => +v.toFixed(1)), tris: window.__engine.renderer.info.render.triangles };
-  }, { dist, pitch });
+  }, { dist, pitch, boat: !!process.env.BOAT });
   await page.waitForTimeout(800);
   await page.screenshot({ path: `${out}/${level}-${name}.png` });
   console.log(name, JSON.stringify(info));
