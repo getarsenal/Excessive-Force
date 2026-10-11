@@ -1462,10 +1462,15 @@ export class Structure {
     // call into the world, and when a landing has just crushed the stone
     // this collider belonged to, the collider is gone: the call traps the
     // wasm, the world stays borrowed for good, and the simulation halts
-    // ("recursive use of an object"). The map is this structure's own, so a
-    // handle in it is one of its stones; one no longer standing reads dead.
+    // ("recursive use of an object"). The map is this structure's own, but it
+    // holds every stone's collider, the falling ones too: only a stone still
+    // standing on the structure's own body (neither freed nor welded into a
+    // falling section) is ground a section can land on. Without that test the
+    // crush ate the falling section from the inside, and Dubai's undercut
+    // tower came straight down instead of going over.
     const i = this.colliderToChunk.get(col.handle);
-    return (i === undefined || !(this.flags[i] & ALIVE)) ? -1 : i;
+    if (i === undefined || !(this.flags[i] & ALIVE)) return -1;
+    return (this.flags[i] & (FREE | ISLAND)) ? -1 : i;
   }
 
   /**
