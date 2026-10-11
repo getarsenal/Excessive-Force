@@ -23,7 +23,7 @@ import { loadProgress } from './levelselect.js';
 import { listBattles, clearBattle } from '../game/battlesave.js';
 import {
   commander, setCommanderName, insignia, SLOT_IDS, slotInfo, activeSlot,
-  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today,
+  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
 import { career, gradeFor, dailyOrders, ordersResetIn, openCrate, medalCase, TIERS, COMMISSIONS, GRADES } from '../game/progress.js';
@@ -123,6 +123,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
     { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', primary: true },
     { act: 'campaign', name: 'CAMPAIGN', count: pts >= 2 ? pts : 0 },
     daily && { act: 'daily', name: 'DAILY STRIKE', hot: !dDone, count: dDone ? 0 : 1 },
+    // Three minutes on something already open (career.js BLITZ): for the
+    // player with a bus stop's worth of time rather than an evening.
+    openIds.some((id) => id !== 'tutorial' && id !== 'range') && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN' },
     battles.length && { act: 'battles', name: 'BATTLES', count: battles.length },
     { act: 'map', name: 'MAP' },
     { act: 'armoury', name: 'ARMOURY' },
@@ -328,6 +331,13 @@ export function showTitle({ current = null, canResume = false } = {}) {
           startDailyRun({ level: daily.level, mod: daily.mod.id, date: today() });
           go(daily.level);
           break;
+        case 'blitz': {
+          const id = blitzPick(openIds);
+          if (!id) break;
+          startBlitzRun(id);
+          go(id);
+          break;
+        }
         case 'battles':
           openSheet('BATTLES IN PROGRESS', battles.map((b) => battleCard(b, true)).join(''), 'battles');
           break;

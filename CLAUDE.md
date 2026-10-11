@@ -434,7 +434,13 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `src/ui/` HUD, level select, stand-off, test panel · `src/ui/title.js`
   the title screen in front of the contract card (continue, daily strike,
   battles in progress, armoury, commanders, the war wire) ·
-  `src/game/battlesave.js` battles saved mid-fight and resumed ·
+  `src/game/battlesave.js` battles saved mid-fight and resumed (never
+  Boot Camp, the range or a Blitz) · BLITZ (`career.js` `BLITZ`, the
+  front door's BLITZ · 3 MIN): three minutes on an open contract, no
+  airlift, full arsenal, a bank and faster income, no airborne, the clock
+  (`#blitzbar`) from the first gun, stars at 25/50/90 % of the bar, the
+  best per landmark in `tt.blitz`; `node tools/blitzprobe.mjs` plays one
+  as a keen player and reads the end card (`SHOT=1` photographs the bar) ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the

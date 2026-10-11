@@ -223,3 +223,50 @@ export function startDailyRun(d) {
 export function endDailyRun() {
   try { sessionStorage.removeItem('tt.dailyrun'); } catch { /* private mode */ }
 }
+
+/**
+ * BLITZ: three minutes on a contract the player has open. A battle sized for
+ * a bus stop rather than an evening: the guns arrive at once (no airlift),
+ * the whole arsenal is out, there is a battery's worth of money in the bank
+ * and two and a half times the income (the campaign's economy is paced for a
+ * long fight), no airborne drop holds the end, and the clock starts at the
+ * first gun or strike. Three stars by how much of the
+ * bar comes down, and the best kept per landmark. It is not the campaign:
+ * nothing is saved mid-fight and no contract is closed by it.
+ */
+export const BLITZ = { seconds: 180, stars: [0.25, 0.5, 0.9], bank: 12000, income: 2.5 };
+
+export function startBlitzRun(level) {
+  try { sessionStorage.setItem('tt.blitzrun', JSON.stringify({ level })); } catch { /* private mode */ }
+  put('tt.blitzlast', level);
+}
+
+/** The Blitz a load was started for, if it was one. Read once per load. */
+export function takeBlitzRun(levelId) {
+  try {
+    const v = parse(sessionStorage.getItem('tt.blitzrun'), null);
+    sessionStorage.removeItem('tt.blitzrun');
+    return v && v.level === levelId ? v : null;
+  } catch { return null; }
+}
+
+/** A landmark for the next Blitz: any open contract but the last one played. */
+export function blitzPick(openIds) {
+  const ids = openIds.filter((id) => id !== 'tutorial' && id !== 'range');
+  if (!ids.length) return null;
+  const last = get('tt.blitzlast');
+  const pool = ids.length > 1 ? ids.filter((id) => id !== last) : ids;
+  return pool[(Math.random() * pool.length) | 0];
+}
+
+export function blitzRecords() { return parse(get('tt.blitz'), {}) || {}; }
+
+/** Bank a Blitz: the share of the bar brought down and the stars it earned. */
+export function recordBlitz(level, share, stars) {
+  const all = blitzRecords();
+  const was = all[level] || { best: 0, stars: 0, runs: 0 };
+  const out = { best: Math.max(was.best, share), stars: Math.max(was.stars, stars), runs: was.runs + 1 };
+  all[level] = out;
+  put('tt.blitz', JSON.stringify(all));
+  return { ...out, prevBest: was.best, prevStars: was.stars };
+}

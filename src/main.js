@@ -19,7 +19,7 @@ import {
   resolveStartLevel, recordResult, marksFor, loadProgress, nextTarget, goToLevel, getChallenge,
 } from './ui/levelselect.js';
 import { UNITS, UNITS_BY_ID } from './game/units.js';
-import { recordTheatre, releaseNoteFor } from './game/campaign.js';
+import { recordTheatre, releaseNoteFor, campaignState } from './game/campaign.js';
 import { threatOf, operationsState, operationOf, isBoss, warlordOf, challengeOf } from './game/operations.js';
 import { LEVELS } from './game/levels.js';
 import { applyDoctrine } from './game/doctrine.js';
@@ -76,7 +76,7 @@ import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
-import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today } from './game/career.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
@@ -216,6 +216,8 @@ async function boot() {
   const daily = selftest ? null : (takeDailyRun(level.id)
     || (resumeSnap?.daily && resumeSnap.daily.level === level.id && resumeSnap.daily.date === today() ? resumeSnap.daily : null));
   const dailyMod = daily ? DAILY_MODS.find((m) => m.id === daily.mod) : null;
+  // A Blitz, if this load is one (career.js BLITZ): three minutes, read once.
+  const blitz = (!selftest && !daily && !level.sandbox && level.id !== 'tutorial') ? takeBlitzRun(level.id) : null;
   const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
@@ -670,6 +672,17 @@ async function boot() {
     if (dailyMod.id === 'lean') battle.money = Math.round(battle.money * 0.5);
     if (dailyMod.id === 'arsenal') battle.unlockAll = true;
   }
+  // Blitz terms (career.js BLITZ): the guns land at once, the whole arsenal
+  // out, a battery's worth in the bank and faster income, and no airborne
+  // drop to hold the end of a three-minute fight.
+  if (blitz) {
+    battle.airlift = false;
+    battle.unlockAll = true;
+    battle.money += BLITZ.bank;
+    battle.incomeScale *= BLITZ.income;
+    if (battle.airborne) battle.airborne.enabled = false;
+    if (battle.assault) battle.assault.enabled = false;
+  }
 
   // The downloaded soldier is not loaded any more: flattened, it stood in its
   // rest pose, a T, and the whole garrison held its arms straight out. The
@@ -859,8 +872,22 @@ async function boot() {
     // Through `goToLevel` rather than a bare reload: the level is no longer in
     // the address bar by the time anyone can press this, so a reload would
     // land on the map.
-    onRestart: () => { battleOver = true; clearBattle(level.id); goToLevel(level.id); },
-    onNextTarget: () => goToLevel(campaignNextId || nextTarget(level.id).id),
+    onRestart: () => {
+      battleOver = true;
+      // A Blitz again is a Blitz again, not the campaign's contract.
+      if (blitz) startBlitzRun(level.id); else clearBattle(level.id);
+      goToLevel(level.id);
+    },
+    onNextTarget: () => {
+      if (blitz) {
+        const open = campaignState().list.filter((t) => t.open && LEVELS[t.id]).map((t) => t.id);
+        const id = blitzPick(open) || level.id;
+        startBlitzRun(id);
+        goToLevel(id);
+        return;
+      }
+      goToLevel(campaignNextId || nextTarget(level.id).id);
+    },
     // The win is already banked; this just lets play carry on against
     // whatever is still standing.
     onKeepGoing: () => {
@@ -908,6 +935,11 @@ async function boot() {
           } catch { /* private mode */ }
           // The daily is this contract under today's terms: a fresh start.
           if (daily) { battleOver = true; clearBattle(level.id); goToLevel(id); return; }
+          // So is a Blitz picked from the front door, and the campaign's own
+          // save of this contract is left alone for when the player is back.
+          let blitzNext = null;
+          try { blitzNext = sessionStorage.getItem('tt.blitzrun'); } catch { /* private mode */ }
+          if (blitzNext) { battleOver = true; goToLevel(id); return; }
         }
       } finally {
         testMenu.paused = wasPaused;
@@ -1113,6 +1145,58 @@ async function boot() {
     });
   };
   let dailyBanked = 0;
+
+  // ── BLITZ (career.js): the clock in the top bar, the stars, the end ──
+  // The clock starts at the first gun or strike, not at the load: reading the
+  // ground is free, three minutes of fighting is the game.
+  const blitzBar = document.getElementById('blitzbar');
+  const blitzClock = blitzBar?.querySelector('.bz-clock'), blitzStarEl = blitzBar?.querySelector('.bz-stars');
+  if (blitz && blitzBar) blitzBar.hidden = false;
+  let blitzT0 = null, blitzShown = '';
+  const mmss = (sec) => { const n = Math.max(0, Math.ceil(sec)); return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`; };
+  const blitzShare = () => Math.min(1, battle.objectiveProgress);
+  const blitzTick = () => {
+    if (!blitz || blitz.done || !blitzBar) return;
+    const left = blitzT0 == null ? BLITZ.seconds : BLITZ.seconds - (battle.elapsed - blitzT0);
+    const n = BLITZ.stars.filter((x) => blitzShare() >= x).length;
+    const key = `${mmss(left)}|${n}|${blitzT0 == null}`;
+    if (key !== blitzShown) {
+      blitzShown = key;
+      blitzClock.textContent = blitzT0 == null ? `${mmss(left)} · FROM YOUR FIRST GUN` : mmss(left);
+      blitzStarEl.textContent = '\u2605'.repeat(n) + '\u2606'.repeat(3 - n);
+      blitzBar.classList.toggle('late', blitzT0 != null && left <= 30);
+    }
+    if (blitzT0 != null && left <= 0 && battle.state === 'playing') endBlitz('time');
+  };
+  /** The Blitz is over: on the clock, on the win, or out of funds. */
+  function endBlitz(why) {
+    if (!blitz || blitz.done) return;
+    blitz.done = true;
+    battleOver = true;
+    battle.holdEnd = true;
+    // The fight stops where it stands; the masonry goes on falling.
+    if (battle.state === 'playing') battle.state = 'won';
+    const share = blitzShare();
+    const have = BLITZ.stars.map((x) => share >= x);
+    const n = have.filter(Boolean).length;
+    const rec = recordBlitz(level.id, share, n);
+    const fresh = have.map((h, i) => h && i >= rec.prevStars);
+    const used = blitzT0 == null ? 0 : Math.min(BLITZ.seconds, battle.elapsed - blitzT0);
+    const sum = battle.summary();
+    hud.feed(why === 'time' ? 'TIME · CEASE FIRE' : why === 'funds' ? 'OUT OF FUNDS · CEASE FIRE' : 'TARGET DOWN', 'big');
+    hud.nextTargetLabel = 'ANOTHER BLITZ';
+    hud.nextIsBoss = false;
+    if (n === 3) { winOrbit = true; celebrate(); }
+    setTimeout(() => {
+      hud.showEnd(n > 0 ? 'win' : 'lose', sum, {
+        title: n === 3 ? 'Blitz · Flattened' : 'Blitz',
+        sub: `${Math.round(share * 100)}% DOWN IN ${mmss(used)}`
+          + (rec.prevBest > 0 && share <= rec.prevBest ? ` · BEST ${Math.round(rec.prevBest * 100)}%` : rec.prevBest > 0 ? ' · NEW BEST' : ''),
+        stars: { labels: BLITZ.stars.map((x) => `${Math.round(x * 100)}% DOWN`), have, fresh },
+        xp: payOut(n > 0, sum),
+      });
+    }, why === 'time' ? 1600 : 4500);
+  }
   const awardMedals = (sum) => {
     for (const u of battle.units) if (u.def) used.add(u.def.id);
     const fresh = checkMedals({
@@ -1155,6 +1239,9 @@ async function boot() {
     // Boot Camp coaches on what actually happens, as it happens.
     if (level.id === 'tutorial' && window.__tutorial?.root) window.__tutorial.onEvent(kind, data);
     if ((kind === 'deployed' || kind === 'queued' || kind === 'strike') && data?.def) used.add(data.def.id);
+    // A Blitz's clock starts with the first gun put down or strike called,
+    // whatever becomes of it: a gun killed before the next frame still started it.
+    if (blitz && blitzT0 == null && (kind === 'deployed' || kind === 'queued' || kind === 'strike')) blitzT0 = battle.elapsed;
     if (kind === 'shotdown') lostAircraft = true;
     switch (kind) {
       case 'target':
@@ -1591,6 +1678,7 @@ async function boot() {
       // Read *before* the result is banked, because banking it rewrites the
       // best — ask afterwards and every run is a personal best.
       case 'win': {
+        if (blitz) { endBlitz('win'); break; }
         battleOver = true;
         feedback.emit('win');
         clearBattle(level.id);
@@ -1652,6 +1740,7 @@ async function boot() {
         break;
       }
       case 'flattened':
+        if (blitz) { endBlitz('win'); break; }
         battleOver = true;
         clearBattle(level.id);
         winOrbit = true;
@@ -1684,6 +1773,7 @@ async function boot() {
         }, 3000);
         break;
       case 'lose':
+        if (blitz) { endBlitz('funds'); break; }
         battleOver = true;
         feedback.emit('lose');
         clearBattle(level.id);
@@ -2799,6 +2889,7 @@ async function boot() {
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
+    if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR · THE CLOCK STARTS WITH YOUR FIRST GUN`, 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     const ch = getChallenge();
     if (ch && ch.level === level.id) {
@@ -2947,7 +3038,7 @@ async function boot() {
   }
   const keepBattle = () => {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
-    if (battleOver || level.id === 'tutorial' || level.sandbox || selftest) return;
+    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
     try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
@@ -3236,6 +3327,7 @@ async function boot() {
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);
+    blitzTick();
     // The survey follows the solver. Throttled inside `paintSurvey` — the
     // numbers only move when the stability pass runs, and repainting thirty
     // thousand stones sixty times a second to watch that is a frame's work

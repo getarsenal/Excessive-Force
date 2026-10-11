@@ -2832,6 +2832,16 @@ body.clear-view #lensdirt { display: none; }
 #bossbar .bb-track > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #d4313f, #ff7a4d); transition: width 0.3s; }
 #bossbar.dead { opacity: 0.5; }
 body.ended #bossbar, body.clear-view #bossbar { display: none; }
+#blitzbar { grid-column: 1 / -1; justify-self: center; margin-top: 2px; display: flex; align-items: baseline; gap: 10px;
+  padding: 5px 12px; background: rgba(10, 12, 14, 0.8); border: 1px solid rgba(243, 193, 74, 0.6); border-radius: 6px; pointer-events: none; }
+#blitzbar[hidden] { display: none; }
+#blitzbar .bz-tag { font: 700 10px/1 var(--f-ui); letter-spacing: 0.2em; color: #f3c14a; }
+#blitzbar .bz-clock { font: 700 15px/1 var(--f-data); letter-spacing: 0.06em; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#blitzbar .bz-stars { font: 13px/1 var(--f-ui); letter-spacing: 0.12em; color: #f3c14a; }
+#blitzbar.late { border-color: rgba(255, 90, 60, 0.85); animation: blitz-late 1s steps(2, start) infinite; }
+#blitzbar.late .bz-clock { color: #ff8a6a; }
+@keyframes blitz-late { 50% { background: rgba(70, 14, 8, 0.85); } }
+body.ended #blitzbar, body.clear-view #blitzbar { display: none; }
 
 /* ── The campaign screen: operations, stars, bosses ─────────────────────── */
 .ef-star { color: #ffc53d; }
