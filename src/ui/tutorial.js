@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { access } from '../core/access.js';
 import { UNITS_BY_ID } from '../game/units.js';
 import { Typewriter } from './typewriter.js';
+import { underHarness } from '../game/progress.js';
 
 /**
  * Boot Camp: the guided first level.
@@ -296,7 +297,10 @@ export class Tutorial {
     this.stack = { idx, rest, x, z, y0, y1,
       foot: new THREE.Vector3(x, y0 + 2, z), mid: new THREE.Vector3(x, (y0 + y1) / 2, z) };
     const def = UNITS_BY_ID.m777;
-    if (!def || b.units.length) return;
+    // The regression suite drives the battle, not the walkthrough: a battery
+    // holding fire for a tap that never comes is a broken battle to it.
+    // `tools/tutorialwalk.mjs` is the first shot's test.
+    if (!def || b.units.length || underHarness()) return;
     // Off the stack's flank, square to the line from the tower to it.
     const ox = x - this.origin.x, oz = z - this.origin.z, ol = Math.hypot(ox, oz) || 1;
     const ux = ox / ol, uz = oz / ol;
