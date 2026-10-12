@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { detectQuality, setQuality, AdaptiveGovernor } from './core/quality.js';
 import { power, recoverFromCrash, armBoot, applySaver } from './core/power.js';
+import { BlackBox, harvestCrash } from './core/blackbox.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
 import { Audio } from './core/audio.js';
@@ -165,6 +166,9 @@ async function boot() {
   // The last level load died on screen: a tier down before anything is
   // built, or the phone runs out the same way again (see power.js).
   access.apply();
+  // The black box of a battle that died in view, filed before the mark that
+  // says so is taken away (core/blackbox.js).
+  const lastCrash = harvestCrash((() => { try { return localStorage.getItem('tt.boot'); } catch { return null; } })());
   const recovered = recoverFromCrash();
   if (recovered) console.warn('[tumble] last load died; quality', recovered.from, '->', recovered.to);
   const quality = detectQuality();
@@ -1346,6 +1350,7 @@ async function boot() {
   const BARK = { deployed: 'deployed', unithit: 'unithit', unitlost: 'unitlost', rank: 'rank', secondary: 'secondary',
     strike: 'strike', shotdown: 'shotdown', samlaunch: 'samlaunch', airborne: 'airborne', hqdown: 'hqdown', win: 'win' };
   function handleEvent(kind, data) {
+    window.__blackbox?.event(kind);
     if (barks && battle.state !== 'lost') {
       if (BARK[kind]) barks.say(BARK[kind], kind === 'unithit' ? data?.unit : kind === 'rank' || kind === 'deployed' ? data : data?.point || null);
       else if (kind === 'bigimpact' && data?.destroyed > 40) barks.say('bigimpact', data.point);
@@ -3360,6 +3365,11 @@ async function boot() {
   const playRec = new PlayMonitor({ battle, engine, physics, structures, quality, level, governor, power, perf: perfTest, testMenu });
   testMenu.ctx.play = playRec;
   window.__play = playRec;
+  // The black box: the last minute of the battle in storage, for the boot
+  // after a crash to file (core/blackbox.js).
+  const blackBox = new BlackBox({ battle, engine, physics, structures, quality, level, fx, stats: () => ({ fps, physMs: +physMs.toFixed(1) }) });
+  window.__blackbox = blackBox;
+  if (lastCrash) setTimeout(() => hud.feed('LAST BATTLE CRASHED · BLACK BOX IN TEST › CRASH RECORDER', 'bad'), 2500);
 
   /**
    * A regression run starts from a board nothing has happened on yet.
@@ -3420,6 +3430,7 @@ async function boot() {
    */
   let faultRun = 0, faultShown = false, faultFirst = null;
   const onFrameFault = (err, where) => {
+    window.__blackbox?.note(`fault in ${where}: ${err?.message || err}`);
     faultRun++;
     if (!faultFirst) {
       faultFirst = err;
@@ -3686,6 +3697,7 @@ async function boot() {
     e.preventDefault();
     if (released) return;
     console.error('[tumble] webgl context lost');
+    window.__blackbox?.note('webgl context lost');
     hud.showFault('the graphics context was lost',
       'the browser took the GPU back — usually because it ran out of memory');
   });

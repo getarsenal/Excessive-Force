@@ -1,3 +1,4 @@
+import { crashes, describeCrash, clearCrashes } from '../core/blackbox.js';
 import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, makeInfantryMesh } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
@@ -244,6 +245,23 @@ export class TestMenu {
       () => sum(c.structures, (s) => s.occupancy.solidCells));
     this._stat(diag, 'Water quads', () => c.water.userData.quads ?? 0);
     this._stat(diag, 'Quality tier', () => c.quality.id);
+
+    // ── Crash recorder ─────────────────────────────────────────────────────
+    // The black box (core/blackbox.js): the last minute of a battle that
+    // died in view, filed on the next boot, here to read and send.
+    const crash = this._section('CRASH RECORDER', true);
+    this._stat(crash, 'Crashes recorded', () => crashes().length);
+    this._stat(crash, 'Last crash', () => describeCrash(crashes().slice(-1)[0]));
+    this._buttons(crash, 'Black box', [
+      ['COPY LAST CRASH', () => {
+        const c = crashes().slice(-1)[0];
+        if (!c) return;
+        try { navigator.clipboard.writeText(JSON.stringify(c, null, 1)); } catch { /* no clipboard */ }
+      }],
+      ['CLEAR', () => clearCrashes()],
+    ]);
+    this._note(crash, 'Always on. If the game ever drops you back to the title in the middle of a '
+      + 'battle, the last minute before it is kept here: COPY LAST CRASH and send it.');
 
     // ── Performance & battery ──────────────────────────────────────────────
     // The player's own play recorded (ui/playmonitor.js): every frame
