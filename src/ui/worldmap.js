@@ -957,9 +957,14 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   paintFoot();
 
   const burnT = burning ? byIso.get(burning) : null;
-  if (!burnT && startView && startView !== 'door') setView(startView);
+  // Asked for a page of its own (SETTINGS, DOCTRINE): go there, whatever
+  // the map has waiting. A country still to burn used to take the screen
+  // instead, so SETTINGS opened on the campaign map after every win; it
+  // burns on the next visit to the map, unseen until then.
+  const own = startView === 'records' || startView === 'doctrine';
+  if (own || (!burnT && startView && startView !== 'door')) setView(startView);
   else setView('door');
-  if (burnT) {
+  if (burnT && !own) {
     // A contract just closed, so the map is where the player wants to be: the
     // country going up is the whole reward and it does not play on a card.
     setView('map');
