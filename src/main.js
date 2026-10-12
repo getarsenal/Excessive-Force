@@ -94,6 +94,16 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('[tumble] offline copy unavailable', e));
     }, { once: true });
+    // The worker served its kept page and the network has since brought a
+    // newer one (sw.js `page`): taken up at once on the title or the loader,
+    // where a reload loses nothing, and at the next return to the title from
+    // a battle, which is saved first (`onHome`).
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data?.type !== 'ef-update') return;
+      if (!window.__battleUp) { window.location.reload(); return; }
+      window.__updateReady = true;
+      console.log('[tumble] a newer build is kept; it loads at the next return to the title');
+    });
   }
 }
 
@@ -961,6 +971,9 @@ async function boot() {
       testMenu.paused = true;
       cover(1);
       keepBattle();
+      // A newer build is kept (see the worker's `ef-update`): the battle is
+      // saved above, and the title comes up on the new one.
+      if (window.__updateReady) { window.location.reload(); return; }
       try {
         const { openFrontDoor } = await import('./ui/title.js');
         // A finished battle has nothing to go back to: the title's first line
@@ -3263,6 +3276,7 @@ async function boot() {
 
   stopTips();
   document.getElementById('loading').style.display = 'none';
+  window.__battleUp = true;
   if (recovered) hud.feed(`LAST LOAD RAN OUT OF MEMORY · QUALITY ${recovered.to.toUpperCase()}`, 'big');
   uiEl.hidden = false;
   if (!standoff) firstPrompt();

@@ -30,15 +30,26 @@ const keep = (res) => res && res.ok && res.status === 200 && res.type === 'basic
 
 async function page(req) {
   const cache = await caches.open(PAGE);
+  // Whether the copy kept went out instead of the network's. When it did
+  // and the network then brings a newer page, every open window is told
+  // (`ef-update`) and main.js reloads it where nothing is lost: a phone on
+  // a slow connection otherwise ran the old build all day, three seconds
+  // at a time, with the new one kept for a visit that never came.
+  let servedKept = false;
   const net = fetch(req).then(async (res) => {
     if (!keep(res)) return res;
     const text = await res.clone().text();
     const old = await cache.match(pageKey());
-    if (old && (await old.text()) !== text) {
+    const changed = !!old && (await old.text()) !== text;
+    if (changed) {
       await caches.delete(HASHED);
       await caches.delete(DATA);
     }
     await cache.put(pageKey(), res.clone()).catch(() => {});
+    if (changed && servedKept) {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const w of windows) w.postMessage({ type: 'ef-update' });
+    }
     return res;
   });
   net.catch(() => {});
@@ -47,6 +58,7 @@ async function page(req) {
     const first = await Promise.race([net, slow]);
     if (first) return first;
   } catch { /* offline: the kept copy below */ }
+  servedKept = true;
   const kept = await cache.match(pageKey());
   return kept || net;
 }
