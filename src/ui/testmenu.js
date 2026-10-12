@@ -1316,8 +1316,14 @@ export class TestMenu {
           }
           const live = runOne();
           assert(live.sortie, 'no sortie: the strike could not be called');
+          // Which gun, where, and what it could see of the run, so a silent
+          // gun says why.
+          const seen = flak.map((d) => {
+            const t = live.sortie.model.position, dx = t.x - d.muzzle.x, dy = t.y - d.muzzle.y, dz = t.z - d.muzzle.z;
+            return `gun at ${d.pos.x.toFixed(0)},${d.pos.z.toFixed(0)} (${d.cover || 'open'}, ${d.alive ? 'alive' : 'dead'}, hp ${Math.round(d.health ?? -1)}, suppressed ${d.suppressed > g.time ? 'yes' : 'no'}, pinned ${d.pinned > g.time ? 'yes' : 'no'}, reload ${(d.reload ?? d.next ?? d.cooldown ?? -1).toFixed ? (d.reload ?? d.next ?? d.cooldown ?? -1).toFixed(2) : '?'}, time ${g.time.toFixed(1)}): aircraft now ${Math.round(Math.hypot(dx, dy, dz))} m slant, ${Math.round(dy)} m up, blocked ${g.city && g.city.blocks(d.muzzle, t) ? 'yes' : 'no'}, reach ${d.def.airRange || d.def.range}, air targets ${b.air.airTargets([]).length}, last blast ${JSON.stringify(d.lastBlast || null)}`;
+          }).join('; ');
           assert(live.shots > 0,
-            `${flak.length} live flak gun(s) and not one round at the aircraft`);
+            `${flak.length} live flak gun(s) and not one round at the aircraft — ${seen}`);
           assert(live.sortie.hits === 0 || live.sortie.jink > 0,
             `${live.sortie.hits} hits on the run and the bomb still goes where it was told`);
           // `released` means "has nothing left to drop", and being driven off

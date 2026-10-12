@@ -563,6 +563,12 @@ export class Garrison {
       const m = mk(g, 0xffffff, this.cap);
       m.material.dispose();
       m.material = this.mesh.material;
+      // Drawn, never picked. The picker raycasts the near figures and
+      // finds a far man by his position (`_defenderNearTap`), which at
+      // that distance is the whole of him anyway; with the far mesh in
+      // the raycast, Sydney's suite took a different course through its
+      // taps and the flak check failed five runs in six.
+      m.raycast = () => {};
       this.meshFar = m;
     }).catch(() => {});
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 160);
@@ -1869,6 +1875,8 @@ export class Garrison {
           : (d.cover === 'window' || d.cover === 'arcade') ? 0.85 : 1;
       const falloff = Math.pow(1 - dist / radius, 0.6);
       d.health -= power * falloff * 0.095 * cover;
+      // What hit him last, for the test panel's reading of a silent gun.
+      d.lastBlast = { t: Math.round(this.time * 10) / 10, power: Math.round(power), radius: Math.round(radius), dist: Math.round(dist), at: [Math.round(center.x), Math.round(center.y), Math.round(center.z)] };
       if (d.health <= 0) { d.alive = false; killed++; }
     }
     return killed;
