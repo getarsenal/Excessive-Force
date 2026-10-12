@@ -243,8 +243,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `showSessionCard`, COPY) and the last scripted perf run (COPY), so none
   of it needs a battle; `node tools/settingsprobe.mjs` plants records and
   reads the rows.
+- The army has a size the tier can carry (`maxUnits` in
+  `src/core/quality.js`: 320 on low, 480, 720, 1,000; `battle.deploy`
+  counts the guns in the lift and refuses past it with BATTERY AT FULL
+  STRENGTH). The crash that set it: 618 guns on the field and 730 waiting
+  in the lift, 10,900 meshes, the page killed with the physics idle.
+  Infantry and mortar teams are baked once a kind and cloned
+  (`battle._teamModel`, the templates pinned against `releaseTree`): an
+  M240 team baked per unit was seven geometries each. `node
+  tools/unitmem.mjs` counts what one unit of each kind leaves on the GPU.
 - The Chinook lift flies in waves (`HELI_CAP` in `src/game/aircraft.js`:
-  eighteen in the air on a phone, forty-eight otherwise; the rest of a
+  twenty-four in the air on a phone, forty-eight otherwise; the rest of a
   package waits in `air.heliQueue` and flies as the earlier ones clear, a
   third of the cap at a time). A hundred guns laid in one package used to be
   a hundred helicopters in the same minute, two hundred and thirty-eight
