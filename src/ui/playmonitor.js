@@ -306,92 +306,109 @@ export class PlayMonitor {
   // ── The card ──────────────────────────────────────────────────────────
 
   showCard(sum = this.last || this.history()[0]) {
-    if (!sum) return false;
-    if (this._card) this._card.remove();
-    const f = (v, u = '') => (v == null ? '—' : `${v}${u}`);
-    const P = sum.perf, B = sum.battery;
-    const manualRate = B.manualStart != null && B.manualEnd != null && sum.wallMin > 0 && B.manualStart > B.manualEnd
-      ? r1((B.manualStart - B.manualEnd) / (sum.wallMin / 60)) : null;
-    const rate = B.drainPerHour ?? manualRate;
-    const rateNote = B.drainPerHour != null ? `measured ${B.drainHow}`
-      : manualRate != null ? 'from the percentages typed below'
-        : B.charged ? 'charging during the session: unplug for a reading'
-          : B.start == null ? 'not readable here: type the phone\'s % below'
-            : 'too little change yet: play longer';
-    const hours = rate ? r1(100 / rate) : null;
-    // Sparklines: frame rate, how busy the GPU (or CPU) was, and the battery, a minute a point.
-    const spark = (vals, lo, hi, label) => {
-      const v = vals.map((x) => (x == null ? null : x));
-      const pts = v.map((x, i) => (x == null ? null : [v.length < 2 ? 50 : (i / (v.length - 1)) * 100, 28 - ((x - lo) / Math.max(1e-6, hi - lo)) * 24]));
-      const d = pts.filter(Boolean).map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
-      const lastV = [...v].reverse().find((x) => x != null);
-      return `<div class="ps-row"><span>${label}</span><svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${d}" /></svg><b>${f(lastV)}</b></div>`;
-    };
-    const mins = sum.minutes;
-    const busyKey = sum.gpuTimer ? 'gpuBusy' : 'cpuBusy';
-    const bats = mins.map((m) => m.battery);
-    const batLo = Math.min(...bats.filter((x) => x != null), 100), batHi = Math.max(...bats.filter((x) => x != null), 0);
-    const rows = mins.map((m, i) => `<tr><th scope="row">${i + 1}</th><td>${m.level || ''}</td><td>${f(m.fps)}</td><td>${f(m.hitchPct, '%')}</td><td>${f(m.workP50)}</td><td>${f(m.gpuP50)}</td><td>${f(m.cpuBusy, '%')} / ${f(m.gpuBusy, '%')}</td><td>${f(m.trisK, 'k')}</td><td>${f(m.shadowPct, '%')}</td><td>${m.units}</td><td>${m.shots}</td><td>${m.air}</td><td>${m.stones}</td><td>${f(m.battery, '%')}${m.charging ? ' ⚡' : ''}</td></tr>`).join('');
-    const hist = this.history().slice(0, 8).map((h) => `<tr><td>${h.at.slice(5, 16).replace('T', ' ')}</td><td>${(h.levels || []).join(', ')}</td><td>${f(h.wallMin, ' min')}</td><td>${f(h.perf.fps)}</td><td>${f(h.perf.gpuBusy ?? h.perf.cpuBusy, '%')}</td><td>${h.battery.drainPerHour != null ? `${h.battery.drainPerHour}%/h` : '—'}</td></tr>`).join('');
-    const el = document.createElement('div');
-    el.id = 'perf-card';
-    el.innerHTML = `
-      <div class="pcard" role="dialog" aria-label="Play session: performance and battery">
-        <div class="pc-head"><b>PLAY SESSION · PERFORMANCE VS BATTERY</b><span>${(sum.levels || []).join(' · ') || ''} · ${sum.tier} tier · ${f(sum.wallMin)} min · ${sum.battles} page load${sum.battles === 1 ? '' : 's'}${sum.stale ? ' · CLOSED ON RETURN' : ''}</span></div>
-        <div class="pc-tiles">
-          <div><b>${rate != null ? `${rate}%` : '—'}</b><span>battery an hour</span><i class="pd">${rateNote}</i></div>
-          <div><b>${hours != null ? `${hours} h` : '—'}</b><span>full charge would last</span></div>
-          <div><b>${f(P.fps)}</b><span>frames a second</span><i class="pd">${f(P.hitchPct, '%')} hitched</i></div>
-          <div><b>${f(P.gpuBusy ?? P.cpuBusy, '%')}</b><span>${sum.gpuTimer ? 'GPU' : 'CPU (main thread)'} busy</span><i class="pd">${sum.gpuTimer ? `CPU ${f(P.cpuBusy, '%')}` : 'GPU not readable here'}</i></div>
-          <div><b>${f(P.workP50, ' ms')}</b><span>CPU work a frame</span>${sum.gpuTimer ? `<i class="pd">GPU ${f(P.gpuP50, ' ms')}</i>` : ''}</div>
-          <div><b>${f(sum.activity.shots)}</b><span>rounds fired</span><i class="pd">${f(sum.activity.unitsMax)} guns at most · ${f(sum.activity.stones)} stones down</i></div>
-        </div>
-        <div class="ps-sparks">
-          ${spark(mins.map((m) => m.fps), 0, Math.max(30, ...mins.map((m) => m.fps || 0)), 'fps')}
-          ${spark(mins.map((m) => m[busyKey]), 0, Math.max(50, ...mins.map((m) => m[busyKey] || 0)), sum.gpuTimer ? 'GPU busy %' : 'CPU busy %')}
-          ${bats.some((x) => x != null) ? spark(bats, batLo - 1, batHi + 1, 'battery %') : ''}
-        </div>
-        <div class="pc-bat">
-          <span>Battery % at the start and end of the session, from the phone's own status bar (an iPhone does not let the game read it):</span>
-          <label>start <input id="pc-b0" type="number" inputmode="numeric" min="0" max="100" value="${B.manualStart ?? (B.start ?? '')}"></label>
-          <label>end <input id="pc-b1" type="number" inputmode="numeric" min="0" max="100" value="${B.manualEnd ?? (B.end ?? '')}"></label>
-        </div>
-        <div class="pc-scroll"><table>
-          <thead><tr><th>Min</th><th>Level</th><th>fps</th><th>hitch</th><th>CPU ms</th><th>GPU ms</th><th>busy CPU/GPU</th><th>tris</th><th>shadow</th><th>guns</th><th>rounds</th><th>air</th><th>stones</th><th>battery</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="14">No full minute recorded yet.</td></tr>'}</tbody></table></div>
-        <div class="pc-meta">${sum.device ? `${sum.device.buffer} px · ${sum.device.gpu || 'GPU unnamed'} · ` : ''}saver ${sum.saver ? 'on' : 'off'} · busy is the share of each second the processor spent on the game's frames</div>
-        <details class="pc-hist"><summary>Previous sessions</summary><div class="pc-scroll"><table>
-          <thead><tr><th>When</th><th>Levels</th><th>Length</th><th>fps</th><th>busy</th><th>battery</th></tr></thead><tbody>${hist}</tbody></table></div></details>
-        <div class="pc-btns">
-          <button type="button" data-a="copy">COPY RESULTS</button>
-          <button type="button" data-a="close">CLOSE</button>
-        </div>
-      </div>`;
-    const keep = () => {
-      const v0 = el.querySelector('#pc-b0').value, v1 = el.querySelector('#pc-b1').value;
-      sum.battery.manualStart = v0 === '' ? null : Number(v0);
-      sum.battery.manualEnd = v1 === '' ? null : Number(v1);
-      const list = this.history();
-      const i = list.findIndex((x) => x.at === sum.at);
-      if (i >= 0) { list[i] = sum; store(KEEP, list); }
-      this.showCard(sum);
-    };
-    el.querySelector('#pc-b0').addEventListener('change', keep);
-    el.querySelector('#pc-b1').addEventListener('change', keep);
-    el.querySelector('.pc-btns').addEventListener('click', async (e) => {
-      const a = e.target?.dataset?.a;
-      if (a === 'copy') {
-        const text = JSON.stringify(sum, null, 1);
-        try { await navigator.clipboard.writeText(text); e.target.textContent = 'COPIED'; }
-        catch {
-          const ta = document.createElement('textarea');
-          ta.className = 'pc-text'; ta.value = text; ta.readOnly = true;
-          el.querySelector('.pcard').appendChild(ta); ta.focus(); ta.select();
-        }
-      } else if (a === 'close') { el.remove(); this._card = null; }
-    });
-    document.getElementById('ui').appendChild(el);
-    this._card = el;
-    return true;
+    this._card = showSessionCard(sum);
+    return !!this._card;
   }
+}
+
+let cardEl = null;
+
+/** The sessions kept, newest first. */
+export function playHistory() { return load(KEEP) || []; }
+
+/**
+ * The session card: the tiles, the sparklines, the minutes and the
+ * previous sessions, with COPY RESULTS. From the test panel in a battle
+ * or from the title's SETTINGS, where there is no battle to go back into.
+ */
+export function showSessionCard(sum = playHistory()[0]) {
+if (!sum) return null;
+if (cardEl) cardEl.remove();
+  const f = (v, u = '') => (v == null ? '—' : `${v}${u}`);
+  const P = sum.perf, B = sum.battery;
+  const manualRate = B.manualStart != null && B.manualEnd != null && sum.wallMin > 0 && B.manualStart > B.manualEnd
+    ? r1((B.manualStart - B.manualEnd) / (sum.wallMin / 60)) : null;
+  const rate = B.drainPerHour ?? manualRate;
+  const rateNote = B.drainPerHour != null ? `measured ${B.drainHow}`
+    : manualRate != null ? 'from the percentages typed below'
+      : B.charged ? 'charging during the session: unplug for a reading'
+        : B.start == null ? 'not readable here: type the phone\'s % below'
+          : 'too little change yet: play longer';
+  const hours = rate ? r1(100 / rate) : null;
+  // Sparklines: frame rate, how busy the GPU (or CPU) was, and the battery, a minute a point.
+  const spark = (vals, lo, hi, label) => {
+    const v = vals.map((x) => (x == null ? null : x));
+    const pts = v.map((x, i) => (x == null ? null : [v.length < 2 ? 50 : (i / (v.length - 1)) * 100, 28 - ((x - lo) / Math.max(1e-6, hi - lo)) * 24]));
+    const d = pts.filter(Boolean).map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join('');
+    const lastV = [...v].reverse().find((x) => x != null);
+    return `<div class="ps-row"><span>${label}</span><svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${d}" /></svg><b>${f(lastV)}</b></div>`;
+  };
+  const mins = sum.minutes;
+  const busyKey = sum.gpuTimer ? 'gpuBusy' : 'cpuBusy';
+  const bats = mins.map((m) => m.battery);
+  const batLo = Math.min(...bats.filter((x) => x != null), 100), batHi = Math.max(...bats.filter((x) => x != null), 0);
+  const rows = mins.map((m, i) => `<tr><th scope="row">${i + 1}</th><td>${m.level || ''}</td><td>${f(m.fps)}</td><td>${f(m.hitchPct, '%')}</td><td>${f(m.workP50)}</td><td>${f(m.gpuP50)}</td><td>${f(m.cpuBusy, '%')} / ${f(m.gpuBusy, '%')}</td><td>${f(m.trisK, 'k')}</td><td>${f(m.shadowPct, '%')}</td><td>${m.units}</td><td>${m.shots}</td><td>${m.air}</td><td>${m.stones}</td><td>${f(m.battery, '%')}${m.charging ? ' ⚡' : ''}</td></tr>`).join('');
+  const hist = playHistory().slice(0, 8).map((h) => `<tr><td>${h.at.slice(5, 16).replace('T', ' ')}</td><td>${(h.levels || []).join(', ')}</td><td>${f(h.wallMin, ' min')}</td><td>${f(h.perf.fps)}</td><td>${f(h.perf.gpuBusy ?? h.perf.cpuBusy, '%')}</td><td>${h.battery.drainPerHour != null ? `${h.battery.drainPerHour}%/h` : '—'}</td></tr>`).join('');
+  const el = document.createElement('div');
+  el.id = 'perf-card';
+  el.innerHTML = `
+    <div class="pcard" role="dialog" aria-label="Play session: performance and battery">
+      <div class="pc-head"><b>PLAY SESSION · PERFORMANCE VS BATTERY</b><span>${(sum.levels || []).join(' · ') || ''} · ${sum.tier} tier · ${f(sum.wallMin)} min · ${sum.battles} page load${sum.battles === 1 ? '' : 's'}${sum.stale ? ' · CLOSED ON RETURN' : ''}</span></div>
+      <div class="pc-tiles">
+        <div><b>${rate != null ? `${rate}%` : '—'}</b><span>battery an hour</span><i class="pd">${rateNote}</i></div>
+        <div><b>${hours != null ? `${hours} h` : '—'}</b><span>full charge would last</span></div>
+        <div><b>${f(P.fps)}</b><span>frames a second</span><i class="pd">${f(P.hitchPct, '%')} hitched</i></div>
+        <div><b>${f(P.gpuBusy ?? P.cpuBusy, '%')}</b><span>${sum.gpuTimer ? 'GPU' : 'CPU (main thread)'} busy</span><i class="pd">${sum.gpuTimer ? `CPU ${f(P.cpuBusy, '%')}` : 'GPU not readable here'}</i></div>
+        <div><b>${f(P.workP50, ' ms')}</b><span>CPU work a frame</span>${sum.gpuTimer ? `<i class="pd">GPU ${f(P.gpuP50, ' ms')}</i>` : ''}</div>
+        <div><b>${f(sum.activity.shots)}</b><span>rounds fired</span><i class="pd">${f(sum.activity.unitsMax)} guns at most · ${f(sum.activity.stones)} stones down</i></div>
+      </div>
+      <div class="ps-sparks">
+        ${spark(mins.map((m) => m.fps), 0, Math.max(30, ...mins.map((m) => m.fps || 0)), 'fps')}
+        ${spark(mins.map((m) => m[busyKey]), 0, Math.max(50, ...mins.map((m) => m[busyKey] || 0)), sum.gpuTimer ? 'GPU busy %' : 'CPU busy %')}
+        ${bats.some((x) => x != null) ? spark(bats, batLo - 1, batHi + 1, 'battery %') : ''}
+      </div>
+      <div class="pc-bat">
+        <span>Battery % at the start and end of the session, from the phone's own status bar (an iPhone does not let the game read it):</span>
+        <label>start <input id="pc-b0" type="number" inputmode="numeric" min="0" max="100" value="${B.manualStart ?? (B.start ?? '')}"></label>
+        <label>end <input id="pc-b1" type="number" inputmode="numeric" min="0" max="100" value="${B.manualEnd ?? (B.end ?? '')}"></label>
+      </div>
+      <div class="pc-scroll"><table>
+        <thead><tr><th>Min</th><th>Level</th><th>fps</th><th>hitch</th><th>CPU ms</th><th>GPU ms</th><th>busy CPU/GPU</th><th>tris</th><th>shadow</th><th>guns</th><th>rounds</th><th>air</th><th>stones</th><th>battery</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="14">No full minute recorded yet.</td></tr>'}</tbody></table></div>
+      <div class="pc-meta">${sum.device ? `${sum.device.buffer} px · ${sum.device.gpu || 'GPU unnamed'} · ` : ''}saver ${sum.saver ? 'on' : 'off'} · busy is the share of each second the processor spent on the game's frames</div>
+      <details class="pc-hist"><summary>Previous sessions</summary><div class="pc-scroll"><table>
+        <thead><tr><th>When</th><th>Levels</th><th>Length</th><th>fps</th><th>busy</th><th>battery</th></tr></thead><tbody>${hist}</tbody></table></div></details>
+      <div class="pc-btns">
+        <button type="button" data-a="copy">COPY RESULTS</button>
+        <button type="button" data-a="close">CLOSE</button>
+      </div>
+    </div>`;
+  const keep = () => {
+    const v0 = el.querySelector('#pc-b0').value, v1 = el.querySelector('#pc-b1').value;
+    sum.battery.manualStart = v0 === '' ? null : Number(v0);
+    sum.battery.manualEnd = v1 === '' ? null : Number(v1);
+    const list = playHistory();
+    const i = list.findIndex((x) => x.at === sum.at);
+    if (i >= 0) { list[i] = sum; store(KEEP, list); }
+    showSessionCard(sum);
+  };
+  el.querySelector('#pc-b0').addEventListener('change', keep);
+  el.querySelector('#pc-b1').addEventListener('change', keep);
+  el.querySelector('.pc-btns').addEventListener('click', async (e) => {
+    const a = e.target?.dataset?.a;
+    if (a === 'copy') {
+      const text = JSON.stringify(sum, null, 1);
+      try { await navigator.clipboard.writeText(text); e.target.textContent = 'COPIED'; }
+      catch {
+        const ta = document.createElement('textarea');
+        ta.className = 'pc-text'; ta.value = text; ta.readOnly = true;
+        el.querySelector('.pcard').appendChild(ta); ta.focus(); ta.select();
+      }
+    } else if (a === 'close') { el.remove(); cardEl = null; }
+  });
+  // Over the battle's HUD, or over the title when there is no battle.
+  const ui = document.getElementById('ui');
+  (ui && !ui.hidden ? ui : document.body).appendChild(el);
+  cardEl = el;
+  return el;
 }

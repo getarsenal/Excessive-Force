@@ -14,6 +14,8 @@ import { feedback } from './feedback.js';
 import { reminders } from '../core/reminders.js';
 import { operationOf, isBoss, warlordOf, starsOf } from '../game/operations.js';
 import { BRANCHES, doctrine, freePoints, buyRank, refund } from '../game/doctrine.js';
+import { crashes, describeCrash, clearCrashes, buildId } from '../core/blackbox.js';
+import { playHistory, showSessionCard } from './playmonitor.js';
 
 /**
  * The par marks: R, $, T and L on the contract list, and the same four
@@ -251,6 +253,16 @@ export async function showWorldMap({ current = null, canResume = false, view: st
           </div>
           <div class="ef-set-k sub">QUALITY · RELOADS THE LEVEL</div>
           <div class="ef-qual" id="ef-qual"></div>
+          <div class="ef-set-k sub">TESTING · CRASHES &amp; RECORDINGS</div>
+          <div class="ef-sets" id="ef-testing">
+            <button class="ef-set" id="ef-build" type="button"><span>BUILD</span><em></em></button>
+            <button class="ef-set" id="ef-crash" type="button" data-copy="crash"><span>COPY LAST CRASH</span><em></em></button>
+            <button class="ef-set" id="ef-play" type="button"><span>SHOW LAST PLAY SESSION</span><em></em></button>
+            <button class="ef-set" id="ef-playcopy" type="button" data-copy="play"><span>COPY LAST PLAY SESSION</span><em></em></button>
+            <button class="ef-set" id="ef-perf" type="button" data-copy="perf"><span>COPY LAST PERF RUN</span><em></em></button>
+            <button class="ef-set" id="ef-crashclear" type="button"><span>CLEAR CRASHES</span><em></em></button>
+          </div>
+          <div class="ef-set-note">A battle that drops you back to the title is filed here on the next start (the black box). RECORD MY PLAY and the scripted runs are in a battle's TEST panel; their results are kept here.</div>
         </section>
 
       </main>
@@ -852,6 +864,30 @@ export async function showWorldMap({ current = null, canResume = false, view: st
 
   // What the reminder row last said after a tap ("needs the installed game").
   let reminderText = null;
+  // The testing rows: what the black box and the recorders have kept.
+  const perfRuns = () => { try { return JSON.parse(localStorage.getItem('tt.perfruns') || '[]') || []; } catch { return []; } };
+  const when = (iso) => (iso ? String(iso).slice(5, 16).replace('T', ' ') : '');
+  const paintTesting = () => {
+    const em = (id, text, on = false) => { const b = root.querySelector(id); if (!b) return; b.querySelector('em').textContent = text; b.classList.toggle('on', !!on); };
+    em('#ef-build', buildId());
+    const cs = crashes();
+    em('#ef-crash', cs.length ? `${cs.length} filed · ${describeCrash(cs[cs.length - 1])}` : 'none recorded', cs.length > 0);
+    const ps = playHistory()[0];
+    const pline = ps ? `${when(ps.at)} · ${(ps.levels || []).join(', ')} · ${ps.perf?.fps ?? '—'} fps · ${ps.wallMin ?? '—'} min` : 'none recorded';
+    em('#ef-play', pline); em('#ef-playcopy', pline);
+    const pr = perfRuns()[0];
+    em('#ef-perf', pr ? `${when(pr.at)} · ${pr.level || ''} · ${pr.tier || ''} · ${pr.mode || ''}` : 'none recorded');
+    em('#ef-crashclear', cs.length ? `${cs.length} to clear` : 'nothing to clear');
+  };
+  // Onto the clipboard, or into a box to select by hand where the clipboard is refused.
+  const copyOut = async (btn, text) => {
+    const emEl = btn.querySelector('em');
+    try { await navigator.clipboard.writeText(text); emEl.textContent = 'COPIED'; return; } catch { /* refused */ }
+    let ta = root.querySelector('#ef-copytext');
+    if (!ta) { ta = document.createElement('textarea'); ta.id = 'ef-copytext'; ta.className = 'ef-text'; ta.readOnly = true; btn.parentNode.after(ta); }
+    ta.value = text; ta.focus(); ta.select();
+    emEl.textContent = 'SELECT AND COPY BELOW';
+  };
   const paintRecords = () => {
     const best = Object.values(progress).reduce(
       (a, r) => (r.bestTime != null && (a == null || r.bestTime < a) ? r.bestTime : a), null);
@@ -866,6 +902,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     flag('#ef-opening', openingEnabled(), 'ON', 'OFF');
     flag('#ef-haptics', feedback.haptics, 'ON', 'OFF');
     flag('#ef-remind', reminders.on, reminderText || reminders.label(), reminderText || reminders.label());
+    paintTesting();
     const now = detectQuality().id;
     root.querySelector('#ef-qual').innerHTML = QUALITY_IDS.map((q) => (
       `<button class="ef-q${q === now ? ' on' : ''}" type="button" data-q="${q}">${q.toUpperCase()}</button>`
@@ -1130,6 +1167,16 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     root.querySelector('#ef-remind').addEventListener('click', async () => {
       reminderText = reminders.on ? await reminders.disable() : await reminders.enable();
       paintRecords();
+    });
+    root.querySelector('#ef-testing').addEventListener('click', (e) => {
+      const btn = e.target.closest('.ef-set');
+      if (!btn) return;
+      if (btn.id === 'ef-play') { if (!showSessionCard()) paintTesting(); return; }
+      if (btn.id === 'ef-crashclear') { clearCrashes(); paintTesting(); return; }
+      const what = btn.dataset.copy;
+      const rec = what === 'crash' ? crashes().slice(-1)[0] : what === 'play' ? playHistory()[0] : what === 'perf' ? perfRuns()[0] : null;
+      if (!rec) { btn.querySelector('em').textContent = 'none recorded'; return; }
+      copyOut(btn, JSON.stringify(rec, null, 1));
     });
     root.querySelector('#ef-opening').addEventListener('click', () => {
       setOpeningEnabled(!openingEnabled()); paintRecords();
