@@ -1726,9 +1726,9 @@ const HELI = { speed: 56, height: 62, runIn: 640, hover: 17, sling: 11.5, lower:
  * thousand triangles and a sling, and the phone killed the page. Past the
  * cap the guns wait their turn in the lift (`heliQueue`) and fly as the
  * earlier ones clear, so the package arrives in waves a few seconds apart
- * rather than all at once. Eighteen on a phone, forty-eight otherwise.
+ * rather than all at once. Twenty-four on a phone, forty-eight otherwise.
  */
-const HELI_CAP = () => (isMobile() ? 18 : 48);
+const HELI_CAP = () => (isMobile() ? 24 : 48);
 
 AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formationIndex = 0) {
   const flying = this.sorties.filter((s) => s.heli).length;
@@ -1914,10 +1914,10 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
     H.wash -= dt;
     if (H.wash <= 0) { H.wash = 0.22; this.fx.impactDust(tx + (Math.random() - 0.5) * 8, gy, tz + (Math.random() - 0.5) * 8, 0.45); }
   }
-  // Gone once it is well away: sixteen seconds at cruise is nine hundred
+  // Gone once it is well away: ten seconds at cruise is over five hundred
   // metres, and a helicopter still drawn out there holds a place in the air
   // (`HELI_CAP`) that the next wave is waiting for.
-  if (H.phase === 'away' && s.life > 16) s.done = true;
+  if (H.phase === 'away' && s.life > 10) s.done = true;
 };
 
 function ux0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.x / l : Math.sin(H.yaw); }

@@ -2285,6 +2285,16 @@ export class Battle {
     if (!this.freeBuild && this.money < def.cost) { this.onEvent('poor', def); return null; }
     const check = this.validPlacement(point, def);
     if (!check.ok) { this.onEvent('badplace', check); return null; }
+    // The army has a size the phone can carry. Six hundred guns on the
+    // field with seven hundred more waiting in the lift was eleven thousand
+    // meshes and the page killed; the tier says how many (`maxUnits`), the
+    // ones in the lift counted, and past it a gun has to be sold first.
+    const q = this.quality || this.fx?.quality;
+    const cap = q?.maxUnits ?? 480;
+    if (this.units.filter((u) => u.alive).length + this.pending.length >= cap) {
+      this.onEvent('armyfull', { cap });
+      return null;
+    }
 
     if (!this.freeBuild) {
       this.money -= def.cost;
@@ -2529,28 +2539,46 @@ export class Battle {
     return this._spawn(def, pos);
   }
 
+  /**
+   * A team's baked mesh, made once a kind and cloned for every unit of it,
+   * so the clones share one geometry on the GPU. Each M240 team used to be
+   * baked afresh — seven geometries a unit, and a player who laid six
+   * hundred of them had four thousand of them uploaded.
+   */
+  _teamModel(def) {
+    const cache = this._teams || (this._teams = new Map());
+    let t = cache.get(def.id);
+    if (!t) {
+      if (def.id === 'm120') {
+        // A mortar is a crew and a tube, not two men carrying something: the
+        // whole emplacement, laid toward the target like the unit.
+        t = flattenModel(makeMortarTeam());
+      } else {
+        // A fire team: the gunner and his number two, carrying this unit's
+        // own weapon, so a line of AT4s and a line of Javelins are not the
+        // same picture on the ground. Baked into one mesh a material: see
+        // `flattenModel`.
+        const team = new THREE.Group();
+        for (let i = 0; i < 2; i++) {
+          const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738,
+            { weapon: def.id, role: i === 0 ? 'gunner' : 'second' });
+          m.position.set((i - 0.5) * 1.3, 0, (i % 2) * 0.7);
+          team.add(m);
+        }
+        t = flattenModel(team);
+      }
+      cache.set(def.id, t);
+    }
+    const inst = t.clone(true);
+    // The two men never stand quite square to each other.
+    if (def.id !== 'm120') inst.rotation.y = (Math.random() - 0.5) * 0.2;
+    return inst;
+  }
+
   async _attachModel(unit) {
     const def = unit.def;
-    if (def.id === 'm120') {
-      // A mortar is a crew and a tube, not two men carrying something: the
-      // whole emplacement, laid toward the target like the unit.
-      unit.group.add(flattenModel(makeMortarTeam()));
-      return;
-    }
-    if (def.model === 'infantry') {
-      // A fire team: the gunner and his number two, carrying this unit's own
-      // weapon, so a line of AT4s and a line of Javelins are not the same
-      // picture on the ground.
-      // Baked into one mesh a material: see `flattenModel`.
-      const team = new THREE.Group();
-      for (let i = 0; i < 2; i++) {
-        const m = makeInfantryMesh(i === 0 ? 0x4a5340 : 0x3f4738,
-          { weapon: def.id, role: i === 0 ? 'gunner' : 'second' });
-        m.position.set((i - 0.5) * 1.3, 0, (i % 2) * 0.7);
-        m.rotation.y = (Math.random() - 0.5) * 0.3;
-        team.add(m);
-      }
-      unit.group.add(flattenModel(team));
+    if (def.id === 'm120' || def.model === 'infantry') {
+      unit.group.add(this._teamModel(def));
       return;
     }
     const wrapper = def.build
@@ -2618,7 +2646,7 @@ export class Battle {
   _dropUnit(unit) {
     if (unit.live) this._mortarLive(unit, false);
     this.scene.remove(unit.group);
-    releaseTree(unit.group, this.scene, this.models?.cache?.values());
+    releaseTree(unit.group, this.scene, [...(this.models?.cache?.values() || []), ...(this._teams ? this._teams.values() : [])]);
   }
 
   /**

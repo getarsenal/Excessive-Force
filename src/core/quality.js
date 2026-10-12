@@ -27,6 +27,7 @@ export function hasWasmSimd() {
 const TIERS = {
   low: {
     name: 'low',
+    maxUnits: 320,        // guns and teams on the field and in the lift, at most
     // Least seconds between stability solves in play (see main.js).
     solveGap: 0.1,
     activeBodies: 420,
@@ -43,6 +44,7 @@ const TIERS = {
   },
   medium: {
     name: 'medium',
+    maxUnits: 480,        // guns and teams on the field and in the lift, at most
     solveGap: 0.05,
     activeBodies: 1100,
     blockScale: 1.2,
@@ -58,6 +60,7 @@ const TIERS = {
   },
   high: {
     name: 'high',
+    maxUnits: 720,        // guns and teams on the field and in the lift, at most
     solveGap: 0,
     activeBodies: 2600,
     blockScale: 1.0,
@@ -73,6 +76,7 @@ const TIERS = {
   },
   ultra: {
     name: 'ultra',
+    maxUnits: 1000,        // guns and teams on the field and in the lift, at most
     solveGap: 0,
     activeBodies: 5000,
     blockScale: 0.85,

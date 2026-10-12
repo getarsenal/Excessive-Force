@@ -1768,6 +1768,10 @@ async function boot() {
         feedback.emit('deny'); hud.deny();
         hud.showPrompt(data.reason, 'warn');
         break;
+      case 'armyfull':
+        feedback.emit('deny'); hud.deny();
+        hud.showPrompt(`BATTERY AT FULL STRENGTH · ${data.cap} GUNS · sell one to place another`, 'warn');
+        break;
       case 'spot':
         // The spotter's call on the gunner's round (battle._spotFall).
         if (battle.lay && battle.lay.unit === data.unit) {
