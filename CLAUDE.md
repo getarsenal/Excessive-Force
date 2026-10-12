@@ -235,7 +235,21 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   it) files it in `tt.crashes` (the last five), says so in the feed, and
   shows it in the test panel's CRASH RECORDER with COPY LAST CRASH.
   `node tools/crashprobe.mjs` kills a page with CDP `Page.crash` and reads
-  back what was filed.
+  back what was filed. The panel's DIAGNOSTICS shows the build (`buildId`,
+  the bundle's fingerprint) and every filed crash names its build.
+- The Chinook lift flies in waves (`HELI_CAP` in `src/game/aircraft.js`:
+  eighteen in the air on a phone, forty-eight otherwise; the rest of a
+  package waits in `air.heliQueue` and flies as the earlier ones clear, a
+  third of the cap at a time). A hundred guns laid in one package used to be
+  a hundred helicopters in the same minute, two hundred and thirty-eight
+  aircraft over Landmark 81, and the page killed. Every Chinook is a clone
+  of one built airframe (`chinookModel`), pinned against `releaseTree`.
+  `node tools/heliprobe.mjs westminster 60 low m777 120` shows the cap and
+  the waves. `node tools/hangprobe.mjs landmark81 400 150 low` runs a
+  400-gun collapse at the phone's body budget and counts what is left over
+  the heap, frozen or still, by height: the budget's rules
+  (`recycleSettled`) reach to pieces of sixty-four stones and cull twice as
+  fast past three times the budget.
 - `src/core/power.js` how hard the game works a phone: the battery saver
   (thirty frames in battle, on by default on a phone), a few frames behind
   a menu, and `power.lean` (any phone, or the saver), which takes the

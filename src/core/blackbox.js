@@ -48,6 +48,17 @@ export function harvestCrash(bootMark) {
   return crash;
 }
 
+/**
+ * Which build this page is: the fingerprint in the bundle's file name
+ * (`index-ab12cd34.js`), which changes with every deploy, or `dev` on the
+ * dev server. On the panel so a crash can be matched to a build.
+ */
+export function buildId() {
+  const src = document.querySelector('script[type=module][src*="assets/"]')?.src || '';
+  const m = /-([A-Za-z0-9_-]{6,})\.js/.exec(src);
+  return m ? m[1] : 'dev';
+}
+
 /** The crashes filed, oldest first. */
 export function crashes() { return load(CRASHES) || []; }
 export function clearCrashes() { try { localStorage.removeItem(CRASHES); } catch { /* blocked */ } }
@@ -57,7 +68,7 @@ export function describeCrash(c) {
   if (!c) return 'none recorded';
   const s = c.samples[c.samples.length - 1] || {};
   const when = new Date(c.lastAt);
-  return `${c.level} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · ${Math.round(s.el || 0)} s in · `
+  return `${c.level} · build ${c.build || '?'} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · ${Math.round(s.el || 0)} s in · `
     + `${s.fps ?? '?'} fps · ${s.units ?? '?'} guns · ${s.air ?? '?'} aircraft · ${s.dyn ?? '?'} bodies · ${s.trisK ?? '?'}k tris`
     + (s.heapMB ? ` · ${s.heapMB} MB heap` : '')
     + (s.dead ? ` · PHYSICS HALTED (${s.deadWhy || '?'})` : '')
@@ -71,7 +82,7 @@ export class BlackBox {
   constructor(c) {
     this.c = c;
     this.events = [];
-    this.box = { level: c.level.id, tier: c.quality.id, build: document.querySelector('script[type=module][src*="assets/"]')?.src?.split('/').pop() || 'dev',
+    this.box = { level: c.level.id, tier: c.quality.id, build: buildId(),
       device: { ua: navigator.userAgent, dpr: window.devicePixelRatio, screen: `${screen.width}x${screen.height}`, cores: navigator.hardwareConcurrency || null, memGB: navigator.deviceMemory || null },
       samples: [], notes: [] };
     this._timer = setInterval(() => this.sample(), EVERY);

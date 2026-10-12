@@ -1,6 +1,7 @@
 import { decorate } from './noseart.js';
 import * as THREE from 'three';
 import { releaseTree } from '../core/release.js';
+import { isMobile } from '../core/quality.js';
 import { flyby, crack } from '../core/synth.js';
 
 /**
@@ -1152,6 +1153,7 @@ export class AirWing {
       if (s.done) this._dropSortie(s);
     }
     this.sorties = this.sorties.filter((s) => !s.done);
+    this._flyQueuedHelis();
   }
 
 
@@ -1667,6 +1669,7 @@ AirWing.prototype._updateLift = function _updateLift(s, dt) {
 
 /** Everything in the air, brought down and forgotten: the harness resets. */
 AirWing.prototype.abortLifts = function abortLifts() {
+  this.heliQueue = [];
   for (const s of this.sorties) {
     if (!s.lift && !s.heli) continue;
     if (s.lift) for (const L of s.lift.loads) for (const c of L.chutes) { this.scene.remove(c.g); releaseTree(c.g, this.scene); }
@@ -1683,7 +1686,8 @@ AirWing.prototype.abortLifts = function abortLifts() {
  */
 AirWing.prototype._dropSortie = function _dropSortie(s) {
   this.scene.remove(s.model);
-  releaseTree(s.model, this.scene);
+  // The Chinook's buffers are the template's (`chinookModel`), kept.
+  releaseTree(s.model, this.scene, chinookTemplate ? [chinookTemplate] : null);
   if (s.heli && s.heli.sling) { this.scene.remove(s.heli.sling); releaseTree(s.heli.sling, this.scene); }
 };
 
@@ -1715,7 +1719,46 @@ const HELI = { speed: 56, height: 62, runIn: 640, hover: 17, sling: 11.5, lower:
  * metres, settles into a hover over the point, lowers until the gun is on
  * the ground, lets go, and climbs away.
  */
+/**
+ * How many Chinooks may be in the air at once. A player who lays a hundred
+ * guns in one package used to get a hundred helicopters in the same minute:
+ * two hundred and thirty-eight aircraft over Landmark 81, each a few
+ * thousand triangles and a sling, and the phone killed the page. Past the
+ * cap the guns wait their turn in the lift (`heliQueue`) and fly as the
+ * earlier ones clear, so the package arrives in waves a few seconds apart
+ * rather than all at once. Eighteen on a phone, forty-eight otherwise.
+ */
+const HELI_CAP = () => (isMobile() ? 18 : 48);
+
 AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formationIndex = 0) {
+  const flying = this.sorties.filter((s) => s.heli).length;
+  const room = Math.max(0, HELI_CAP() - flying);
+  const now = drops.slice(0, room), later = drops.slice(room);
+  if (!this.heliQueue) this.heliQueue = [];
+  for (const d of later) this.heliQueue.push({ d, onLand });
+  this.heliWaves = (this.heliWaves || 0) + (later.length ? 1 : 0);
+  let eta = now.length ? this._flyHelis(now, onLand, formationIndex) : 0;
+  // The rest come a wave at a time behind: roughly a wave's flight each.
+  if (later.length) eta += Math.ceil(later.length / Math.max(1, HELI_CAP())) * 24;
+  return eta;
+};
+
+/** The queue, flown as the air clears (`update`). */
+AirWing.prototype._flyQueuedHelis = function _flyQueuedHelis() {
+  const q = this.heliQueue;
+  if (!q || !q.length) return;
+  const flying = this.sorties.filter((s) => s.heli).length;
+  const room = HELI_CAP() - flying;
+  // A wave at a time, not one by one: a third of the cap clear before the
+  // next lot comes, so they arrive as a formation rather than a dribble.
+  if (room < Math.max(1, HELI_CAP() / 3)) return;
+  const batch = q.splice(0, room);
+  const byLand = new Map();
+  for (const { d, onLand } of batch) { if (!byLand.has(onLand)) byLand.set(onLand, []); byLand.get(onLand).push(d); }
+  for (const [onLand, ds] of byLand) this._flyHelis(ds, onLand, 0);
+};
+
+AirWing.prototype._flyHelis = function _flyHelis(drops, onLand, formationIndex = 0) {
   let eta = 0;
   drops.forEach((d, i) => {
     const target = d.pos.clone();
@@ -1871,7 +1914,10 @@ AirWing.prototype._updateHeli = function _updateHeli(s, dt) {
     H.wash -= dt;
     if (H.wash <= 0) { H.wash = 0.22; this.fx.impactDust(tx + (Math.random() - 0.5) * 8, gy, tz + (Math.random() - 0.5) * 8, 0.45); }
   }
-  if (H.phase === 'away' && s.life > 26) s.done = true;
+  // Gone once it is well away: sixteen seconds at cruise is nine hundred
+  // metres, and a helicopter still drawn out there holds a place in the air
+  // (`HELI_CAP`) that the next wave is waiting for.
+  if (H.phase === 'away' && s.life > 16) s.done = true;
 };
 
 function ux0(H) { const l = Math.hypot(H.vel.x, H.vel.z); return l > 0.5 ? H.vel.x / l : Math.sin(H.yaw); }

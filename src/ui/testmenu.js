@@ -1,4 +1,4 @@
-import { crashes, describeCrash, clearCrashes } from '../core/blackbox.js';
+import { crashes, describeCrash, clearCrashes, buildId } from '../core/blackbox.js';
 import * as THREE from 'three';
 import { UNITS, UNITS_BY_ID, makeInfantryMesh } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
@@ -245,6 +245,7 @@ export class TestMenu {
       () => sum(c.structures, (s) => s.occupancy.solidCells));
     this._stat(diag, 'Water quads', () => c.water.userData.quads ?? 0);
     this._stat(diag, 'Quality tier', () => c.quality.id);
+    this._stat(diag, 'Build', () => buildId());
 
     // ── Crash recorder ─────────────────────────────────────────────────────
     // The black box (core/blackbox.js): the last minute of a battle that

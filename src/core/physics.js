@@ -1076,6 +1076,12 @@ export class PhysicsWorld {
     // forty milliseconds a frame moving rubble about. Then what is merely
     // shuffling in a heap counts as at rest, and sooner.
     const over = this.dynamicSet.size > this.activeBudget * 2;
+    // Well over, every rule below reaches further: pieces up to sixty-four
+    // stones count as rubble too, and twice as many a frame go to dust. A
+    // 461 m tower under four hundred guns throws up slabs of that size by
+    // the hundred, and a cap that could not touch them was no cap.
+    const deep = this.dynamicSet.size > this.activeBudget * 3;
+    const small = deep ? 64 : 16;
     const v2Max = over ? 0.6 : 0.04, w2Max = over ? 1.5 : 0.04;
     const frames = over ? Math.ceil(settleFrames / 2) : settleFrames;
     for (const body of this.dynamicSet) {
@@ -1090,7 +1096,7 @@ export class PhysicsWorld {
       // seconds at a time and is not stuck, and nor is one still settling.
       let still = body.isSleeping();
       const nc = still ? 0 : body.numColliders();
-      if (!still && (nc === 1 || (nc <= 16 && !this._settlingIsland(owner)))) {
+      if (!still && (nc === 1 || (nc <= small && !this._settlingIsland(owner)))) {
         const v = body.linvel();
         if (v.x * v.x + v.y * v.y + v.z * v.z < v2Max) {
           const w = body.angvel();
@@ -1124,7 +1130,7 @@ export class PhysicsWorld {
       // same — within a few metres of the ground it is resting on the
       // ground, through whatever is in between, and cannot be a stone
       // hanging in the sky.
-      if (over && this._freezeLow(b)) { n++; continue; }
+      if (over && this._freezeLow(b, small)) { n++; continue; }
       // Refused: at rest in clear air, which is not settled but stuck. Waking
       // it is not enough when it is wedged — it wakes into the same jam — so
       // the grip comes off as well, and it is started on its way down. The
@@ -1161,7 +1167,7 @@ export class PhysicsWorld {
     // a stone that cannot be given a slot does in `reclaim`. Under two
     // hundred guns nobody sees which.
     const cap = this.activeBudget * 2.5;
-    if (this.dynamicSet.size > cap) this._cullRubble(this.dynamicSet.size - cap, []);
+    if (this.dynamicSet.size > cap) this._cullRubble(this.dynamicSet.size - cap, [], small, deep ? 96 : 48);
     return n;
   }
 
@@ -1171,10 +1177,10 @@ export class PhysicsWorld {
    * `recycleSettled`). It counts as standing on the ground, so nothing shot
    * away from under it later can leave it hanging over more than that.
    */
-  _freezeLow(body) {
+  _freezeLow(body, small = 16) {
     if (!this.groundAt || body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
     const n = body.numColliders();
-    if (n < 1 || n > 16) return false;
+    if (n < 1 || n > small) return false;
     let foot = Infinity, fx = 0, fz = 0;
     for (let c = 0; c < n; c++) {
       const f = this._footOf(body.collider(c));
@@ -1206,7 +1212,7 @@ export class PhysicsWorld {
    * off the building), at most forty-eight a frame. `skip` is what is
    * already on its way to being frozen.
    */
-  _cullRubble(k, skip) {
+  _cullRubble(k, skip, small = 16, perFrame = 48) {
     const keep = new Set(skip);
     const pick = [];
     for (const body of this.dynamicSet) {
@@ -1214,13 +1220,13 @@ export class PhysicsWorld {
       const owner = this.owners.get(body.handle);
       if (!owner?.structure) continue;
       if (owner.chunk === undefined) {
-        if (owner.island == null || body.numColliders() > 16 || this._settlingIsland(owner)) continue;
+        if (owner.island == null || body.numColliders() > small || this._settlingIsland(owner)) continue;
       }
       pick.push([this._expendability(body), body, owner]);
     }
     pick.sort((a, b) => a[0] - b[0]);
     let n = 0;
-    for (let i = 0; i < pick.length && n < Math.min(k, 48); i++) {
+    for (let i = 0; i < pick.length && n < Math.min(k, perFrame); i++) {
       const [, body, owner] = pick[i];
       if (!PhysicsWorld.alive(body)) continue;
       if (owner.chunk !== undefined) owner.structure.destroyChunk(owner.chunk, 'cull');
