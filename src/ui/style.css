@@ -1690,6 +1690,8 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   letter-spacing: 0.04em; color: #6f8299; text-align: right;
 }
 .ef-set.on em { color: #e06c34; }
+#ef-testing .ef-set span { white-space: nowrap; }
+#ef-testing .ef-set em { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58%; }
 .ef-set-note { font-size: 11px; line-height: 1.45; color: #56687d; margin: 2px 0 6px; }
 .ef-text { width: 100%; min-height: 120px; margin-top: 6px; font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--edge-bright); padding: 8px; resize: vertical; }
 .ef-qual { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
