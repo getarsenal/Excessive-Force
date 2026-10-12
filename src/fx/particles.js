@@ -355,10 +355,11 @@ export class BillboardParticles {
     const fadeIn = Math.min(1, t / 0.08);
     const fadeOut = 1.0 - THREE.MathUtils.smoothstep(t, 0.35, 1.0);
     // Thinned: out of the draw (alpha nought is dropped in the vertex
-    // shader), and what is left a little denser to stand for it.
+    // shader), and what is left denser to stand for it, so the cloud keeps
+    // its body with a quarter of its layers.
     const thin = this.thin;
     this.aAlpha.array[i] = thin >= 1 ? this.alpha0[i] * fadeIn * fadeOut
-      : this.seed[i] > thin ? 0 : Math.min(1, this.alpha0[i] * fadeIn * fadeOut * Math.min(1.5, 1 / Math.sqrt(thin)));
+      : this.seed[i] > thin ? 0 : Math.min(1, this.alpha0[i] * fadeIn * fadeOut * Math.min(4, 1 / thin));
   }
 
   /**

@@ -869,7 +869,7 @@ export class ExplosionFX {
       if (f[i] > 1) big += f[i]; else small += f[i];
     }
     const budget = this.fillBudget ?? 24;
-    const thin = big + small <= budget ? 1 : Math.max(0.12, (budget - small) / Math.max(1e-6, big));
+    const thin = big + small <= budget ? 1 : Math.max(0.2, (budget - small) / Math.max(1e-6, big));
     for (let i = 0; i < pools.length; i++) pools[i].thin = f[i] > 1 ? thin : 1;
     this.fillNow = big + small;
     this.thinNow = thin;

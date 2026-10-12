@@ -157,6 +157,14 @@ for (let s = 0; s < (+process.env.SECS || 70); s++) {
         return { particles: n, screensRaw: +raw.toFixed(1), screensDrawn: +drawn.toFixed(1), governor: [+(fx.fillNow || 0).toFixed(1), +(fx.thinNow ?? 1).toFixed(2), fx.fillBudget], by };
       });
       console.log('   frame t+' + (s + 1), JSON.stringify(f));
+      // SHOT=1: the cloud photographed as drawn and with no budget, side by side.
+      if (process.env.SHOT && (s + 1 === 21 || s + 1 === 25)) {
+        for (const [tag, budget] of [['budget', null], ['unbudgeted', 1e9], ['phone', 20]]) {
+          await page.evaluate((b) => { const fx = window.battle.fx; fx._saved = fx._saved ?? fx.fillBudget; fx.fillBudget = b ?? fx._saved; fx.update(1e-4); window.__engine.render(); }, budget);
+          await page.screenshot({ path: `/tmp/out/moab-t${s + 1}-${tag}.png`, timeout: 600000 });
+        }
+        await page.evaluate(() => { const fx = window.battle.fx; fx.fillBudget = fx._saved; });
+      }
     }
   } catch (e) { errors.push('evaluate failed: ' + String(e).slice(0, 200)); break; }
   worst = Math.max(worst, ms);

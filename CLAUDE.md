@@ -136,7 +136,11 @@ model: the finished wrapper (barrel already cut) cloned and every mesh
 simplified by meshoptimizer to five centimetres of error in a worker
 (`src/game/lodworker.js`), colour-aware for the vertex-painted ones, so
 the far copy has the same pivot and barrel and `battle._lod` swaps the
-two by the camera's distance and poses whichever is shown. An M777 is
+two by the camera's distance and poses whichever is shown, a gun still in
+the lift too (its stand-in, `drop.stub`, under the Chinook or the canopy:
+it flew in on its near model, and sixteen M777s in the sling were 4.56
+million triangles a frame, now 1.83; `node tools/heliprobe.mjs westminster
+16 low m777 40` counts every pass's triangles). An M777 is
 182,675 triangles near and 11,844 far. `node tools/lodshot.mjs` renders
 each gun near and far side by side; `node tools/unitcost.mjs <level>`
 counts what the deployed units cost a frame.
@@ -200,6 +204,20 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
+- The particles' fill budget (`ExplosionFX._govern`, `src/fx/explosion.js`):
+  every puff is a blended quad, and a MOAB seen from close in was a hundred
+  and sixty screens of fill a frame. A puff is never drawn wider than half
+  its distance and fades out inside a few metres (the vertex shader in
+  `src/fx/particles.js`); the fill is added up from the camera every frame
+  and past `fx.fillBudget` screens (twenty on a phone, forty otherwise)
+  the big pools are drawn thinned to a stable share (`thin`).
+  `NEAR=1 LATE=1 EDGE=1 node tools/moabprobe.mjs <level> low` calls a
+  Lancer with the camera on it over a town already burning and prints the
+  fill a second (raw, drawn, the governor's), the milliseconds and heap of
+  each system the impact touches and the buffers before and after; `SHOT=1`
+  photographs the cloud at the budget, unbudgeted and at a phone's. A
+  gutted building (`cityfire.burn`) sends only its own stretch of the
+  town's buffers to the GPU (`addUpdateRange`), not the whole of both.
 - `src/core/power.js` how hard the game works a phone: the battery saver
   (thirty frames in battle, on by default on a phone), a few frames behind
   a menu, and `power.lean` (any phone, or the saver), which takes the
