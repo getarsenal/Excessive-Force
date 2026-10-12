@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { splitMesh } from './cells.js';
 
 /**
  * Real-world terrain.
@@ -323,6 +324,24 @@ export class Terrain {
    * scene has under every object (see world/look.js). Rewrites the ground's
    * vertex colours once, after the town is laid; no cost in the frame.
    */
+  /**
+   * The ground in cells for the render (world/cells.js `splitMesh`), once
+   * the town is laid and the contact shade written: one plane the size of
+   * the map was always in view, a hundred and thirty thousand triangles a
+   * frame on a phone for a camera that sees a third of it. `this.mesh`
+   * stays the one whole mesh, out of the scene, for its material and its
+   * geometry; the picker and the physics read the heights, not the mesh.
+   */
+  chunkForRender() {
+    if (!this.mesh || this._chunked) return 0;
+    const cells = splitMesh(this.mesh, 250, true);
+    if (cells.length < 2) return 0;
+    this._chunked = true;
+    this.group.remove(this.mesh);
+    for (const m of cells) { m.name = 'ground'; this.group.add(m); }
+    return cells.length;
+  }
+
   contactShade(plots) {
     const geo = this.mesh?.geometry;
     const col = geo?.attributes.color;
@@ -1455,7 +1474,10 @@ export class Terrain {
     if (ribbon) ribbon.position.y = edge - 0.4;
 
     this.group = new THREE.Group();
-    this.group.add(apron);
+    // The apron in wide cells (world/cells.js), so the view culls the
+    // country behind the camera: twelve kilometres of it was one mesh,
+    // a hundred and sixty thousand triangles every frame.
+    for (const m of splitMesh(apron, this.span * 2.2)) { m.name = 'apron'; this.group.add(m); }
     if (ribbon) this.group.add(ribbon);
     this.group.add(this.mesh);
     return this.group;

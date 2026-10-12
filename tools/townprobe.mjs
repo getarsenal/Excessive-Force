@@ -73,6 +73,35 @@ await page.evaluate(() => {
 });
 await census("fight camera (70 m out, pitched 0.42)");
 
+// The rest of the frame: the heaviest meshes outside the town, named by
+// their parents, with what each draws at the fight camera.
+const rest = await page.evaluate(() => {
+  const eng = window.__engine, cam = eng.camera, T = window.THREE;
+  cam.updateMatrixWorld();
+  const fr = new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse));
+  const ctx = eng.scene.getObjectByName('context');
+  const rows = [];
+  eng.scene.traverse((o) => {
+    if (!o.isMesh || !o.geometry) return;
+    let p = o; while (p) { if (p === ctx) return; p = p.parent; }
+    const g = o.geometry;
+    const per = (g.index ? g.index.count : g.attributes.position.count) / 3;
+    const n = o.isInstancedMesh ? o.count : (g.isInstancedBufferGeometry ? g.instanceCount || 0 : 1);
+    const vis = o.visible && (!o.frustumCulled || fr.intersectsObject(o));
+    const chain = []; p = o; while (p && chain.length < 4) { chain.unshift(p.name || p.type); p = p.parent; }
+    if (!g.boundingBox) g.computeBoundingBox();
+    const bb = g.boundingBox, sz = bb ? `${(bb.max.x - bb.min.x).toFixed(0)}x${(bb.max.y - bb.min.y).toFixed(0)}x${(bb.max.z - bb.min.z).toFixed(0)}` : '?';
+    const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+    const what = `${mat?.type || '?'}${mat?.color ? ' #' + mat.color.getHexString() : ''}${mat?.map ? ' map' : ''}${mat?.transparent ? ' transparent' : ''} ro${o.renderOrder} box ${sz} ud:${Object.keys(o.userData).slice(0, 4).join(',')}`;
+    rows.push({ chain: chain.join('/'), tris: per * n, inst: o.isInstancedMesh ? o.count : 0, vis, culled: o.frustumCulled, what });
+  });
+  rows.sort((a, b) => b.tris - a.tris);
+  const total = rows.reduce((a, r) => a + (r.vis ? r.tris : 0), 0);
+  return { total, rows: rows.slice(0, 14) };
+});
+console.log(`\n== the rest of the frame at the fight camera: ${(rest.total / 1000).toFixed(0)}k triangles outside the town`);
+for (const r of rest.rows) console.log(`${(r.tris / 1000).toFixed(0)}k`.padStart(7), r.vis ? 'drawn ' : 'culled', r.culled ? '' : '(no frustum test)', r.inst ? `x${r.inst} ` : '', r.chain, '·', r.what);
+
 // The burn still finds every building: gut twenty and check that each one's
 // pieces were folded in meshes whose spheres hold the building.
 const burn = await page.evaluate(() => {

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { lightGeometry } from './units.js';
 import { soldierGeometry } from './soldier.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lineOfSight } from '../structure/occupancy.js';
@@ -207,6 +208,8 @@ const FIRING_ARC = Math.cos(THREE.MathUtils.degToRad(72));
  */
 const NEAR = 7.5;
 /** Seconds a man shot down lies where he fell before he is taken off. */
+/** Within this of the eye a rifleman is drawn with his full figure. */
+const SOLDIER_NEAR = 45;
 const FALLEN = 5;
 
 /** Does the segment p→q pass through stone i of s? Exact, in the stone's own frame. */
@@ -546,6 +549,22 @@ export class Garrison {
     // the vertices and the instance colour is the uniform.
     this.mesh = mk(soldierGeometry('aim'), 0xffffff, this.cap);
     this.mesh.material.vertexColors = true;
+    // The rifleman's far figure: the same man simplified to six
+    // centimetres (units.js `lightGeometry`, the guns' worker) in a second
+    // instanced mesh, and `sync` writes each man into the near or the far
+    // one by his distance from the eye (`SOLDIER_NEAR`), which main.js
+    // sets each frame. A hundred and eighty-eight men at nine hundred and
+    // fifty triangles were a hundred and eighty thousand a frame on a
+    // phone, most of them twenty pixels tall.
+    this.eye = new THREE.Vector3(0, 1e6, 0);
+    this.meshFar = null;
+    lightGeometry(this.mesh.geometry, 0.06).then((g) => {
+      if (!g) return;
+      const m = mk(g, 0xffffff, this.cap);
+      m.material.dispose();
+      m.material = this.mesh.material;
+      this.meshFar = m;
+    }).catch(() => {});
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 160);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 240);
     this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
@@ -1797,9 +1816,9 @@ export class Garrison {
 
   // ─────────────────────────────────────────────────────────────── combat ──
 
-  /** The defender drawn as instance `id` of the figure mesh, if any. */
-  defenderForInstance(id) {
-    const order = this._drawOrder;
+  /** The defender drawn as instance `id` of the figure mesh (or the far one), if any. */
+  defenderForInstance(id, far = false) {
+    const order = far ? this._drawOrderFar : this._drawOrder;
     if (!order || id < 0 || id >= order.length) return null;
     const d = order[id];
     return d && d.alive ? d : null;
@@ -2338,7 +2357,7 @@ export class Garrison {
    * slumps down behind it (falling flat there would put him through the
    * wall); then he lies there, and for the last second sinks out of sight.
    */
-  _fallen(d, age, w) {
+  _fallen(d, age, w, mesh = this.mesh) {
     const k = Math.min(1, age / 0.45);
     const fall = k * k;
     const sink = Math.max(0, age - (FALLEN - 1));
@@ -2356,32 +2375,43 @@ export class Garrison {
       this._q.multiply(tilt);
     }
     this._m4.compose(v, this._q, sc);
-    this.mesh.setMatrixAt(w, this._m4);
+    mesh.setMatrixAt(w, this._m4);
     this._col.setHex(d.def.colour).multiplyScalar(0.55);
-    this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
+    mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
   }
 
   /** Rebuild the instance buffers: the living, and the dead for a few seconds. */
   sync() {
-    let w = 0, mw = 0, bw = 0, gw = 0, fw = 0;
+    let w = 0, wf = 0, mw = 0, bw = 0, gw = 0, fw = 0;
     // Which defender each drawn figure is, so a tap on one can be traced back.
     // The instanced mesh is packed with only the living, in no fixed order, so
     // without this the raycast knows a soldier was hit and nothing else.
     const order = this._drawOrder || (this._drawOrder = []);
+    const orderFar = this._drawOrderFar || (this._drawOrderFar = []);
     order.length = 0;
+    orderFar.length = 0;
+    const farMesh = this.meshFar;
+    const NEAR2 = SOLDIER_NEAR * SOLDIER_NEAR;
     for (const d of this.defenders) {
       if (!d.alive) {
         // A man shot down falls, and lies there a few seconds before he is
         // taken off: one who simply stopped being drawn was a kill nobody
         // saw. A man lost with his masonry (`gone`) went with the stone.
-        if (d.gone || d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' || d.def.key === 'howitzer'
-          || w >= this.mesh.instanceMatrix.count) continue;
+        if (d.gone || d.def.indirect || d.def.key === 'fieldgun' || d.def.key === 'aa' || d.def.key === 'howitzer') continue;
         if (d.diedAt == null) d.diedAt = this.time;
         const age = this.time - d.diedAt;
         if (age > FALLEN) { d.gone = true; continue; }
-        this._fallen(d, age, w);
-        order[w] = d;
-        w++;
+        if (farMesh && d.pos.distanceToSquared(this.eye) > NEAR2) {
+          if (wf >= farMesh.instanceMatrix.count) continue;
+          this._fallen(d, age, wf, farMesh);
+          orderFar[wf] = d;
+          wf++;
+        } else {
+          if (w >= this.mesh.instanceMatrix.count) continue;
+          this._fallen(d, age, w);
+          order[w] = d;
+          w++;
+        }
         continue;
       }
       this._q.setFromAxisAngle(this._axis, d.facing);
@@ -2431,13 +2461,22 @@ export class Garrison {
       const ducking = d.suppressed > this.time || d.pinned > this.time;
       if (ducking && !this._sDuck) this._sDuck = new THREE.Vector3(1, 0.55, 1);
       this._m4.compose(this._v, this._q, ducking ? this._sDuck : this._s);
-      this.mesh.setMatrixAt(w, this._m4);
       this._col.setHex(d.def.colour);
-      this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
-      order[w] = d;
-      w++;
+      // The far figure for a man past `SOLDIER_NEAR` from the eye.
+      if (farMesh && wf < farMesh.instanceMatrix.count && this._v.distanceToSquared(this.eye) > NEAR2) {
+        farMesh.setMatrixAt(wf, this._m4);
+        farMesh.instanceColor.setXYZ(wf, this._col.r, this._col.g, this._col.b);
+        orderFar[wf] = d;
+        wf++;
+      } else {
+        this.mesh.setMatrixAt(w, this._m4);
+        this.mesh.instanceColor.setXYZ(w, this._col.r, this._col.g, this._col.b);
+        order[w] = d;
+        w++;
+      }
     }
     this.mesh.count = w;
+    if (farMesh) { farMesh.count = wf; farMesh.boundingSphere = null; }
     // The pick's bounding sphere is computed once, from whoever stood there
     // at the first tap: men dropped in later, outside it, were never hit.
     this.mesh.boundingSphere = null;
@@ -2445,7 +2484,8 @@ export class Garrison {
     this.bagMesh.count = bw;
     this.gunMesh.count = gw;
     this.flakMesh.count = fw;
-    for (const m of [this.mesh, this.mortarMesh, this.bagMesh, this.gunMesh, this.flakMesh]) {
+    for (const m of [this.mesh, this.mortarMesh, this.bagMesh, this.gunMesh, this.flakMesh, farMesh]) {
+      if (!m) continue;
       m.instanceMatrix.needsUpdate = true;
       m.instanceColor.needsUpdate = true;
     }

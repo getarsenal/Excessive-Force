@@ -536,7 +536,7 @@ export class TestMenu {
     this._toggle(vis, 'Garrison', {
       get: () => b.garrison.mesh.visible,
       set: (v) => {
-        for (const m of [b.garrison.mesh, b.garrison.mortarMesh, b.garrison.bagMesh]) m.visible = v;
+        for (const m of [b.garrison.mesh, b.garrison.meshFar, b.garrison.mortarMesh, b.garrison.bagMesh]) if (m) m.visible = v;
       },
     });
     this._toggle(vis, 'Tracers', {

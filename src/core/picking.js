@@ -134,10 +134,12 @@ export class Picker {
     // it behaved. A small forward bias costs a little precision on the wall and
     // buys the ability to point at a person.
     let man = null;
-    if (garrison && garrison.mesh && garrison.mesh.count > 0) {
-      const hits = this.raycaster.intersectObject(garrison.mesh, false);
+    if (garrison && garrison.mesh && (garrison.mesh.count > 0 || garrison.meshFar?.count > 0)) {
+      // The near figures and the far ones (defenders.js `meshFar`).
+      const figs = garrison.meshFar ? [garrison.mesh, garrison.meshFar] : [garrison.mesh];
+      const hits = this.raycaster.intersectObjects(figs, false);
       for (const h of hits) {
-        const d = garrison.defenderForInstance(h.instanceId);
+        const d = garrison.defenderForInstance(h.instanceId, h.object === garrison.meshFar);
         if (!d) continue;
         man = { kind: 'defender', point: h.point.clone(), label: d.def.name,
           structure: null, chunk: -1, defender: d, distance: h.distance };

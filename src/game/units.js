@@ -38,7 +38,7 @@ export const LOD2_DIST = Math.round(LOD_ERR2 * 1300 / (2 * Math.tan(THREE.MathUt
 /** One worker for every model's simplification (lodworker.js), made on first use. */
 let lodWorker = null, lodSeq = 0;
 const lodWaiting = new Map();
-function simplifyOff(pos, cols, index, err) {
+export function simplifyOff(pos, cols, index, err) {
   if (!lodWorker) {
     lodWorker = new Worker(new URL('./lodworker.js', import.meta.url), { type: 'module' });
     lodWorker.onmessage = (e) => {
@@ -54,6 +54,32 @@ function simplifyOff(pos, cols, index, err) {
     lodWaiting.set(id, { resolve, reject });
     lodWorker.postMessage({ id, pos, cols, index, err });
   });
+}
+
+/**
+ * One geometry simplified for distance (the worker, `err` in metres), as a
+ * faceted non-indexed copy with its vertex colours, or null when nothing
+ * is left. For a model that is one mesh: the garrison's rifleman.
+ */
+export async function lightGeometry(geo, err = LOD_ERR) {
+  const pa = geo.attributes.position, col = geo.attributes.color;
+  const pos = new Float32Array(pa.count * 3);
+  for (let i = 0; i < pa.count; i++) { pos[i * 3] = pa.getX(i); pos[i * 3 + 1] = pa.getY(i); pos[i * 3 + 2] = pa.getZ(i); }
+  let cols = null;
+  if (col) {
+    cols = new Float32Array(col.count * 3);
+    for (let i = 0; i < col.count; i++) { cols[i * 3] = col.getX(i); cols[i * 3 + 1] = col.getY(i); cols[i * 3 + 2] = col.getZ(i); }
+  }
+  const index = geo.index ? new Uint32Array(geo.index.array) : null;
+  const r = await simplifyOff(pos, cols, index, err);
+  if (r.idx.length < 3) return null;
+  const ng = new THREE.BufferGeometry();
+  ng.setAttribute('position', new THREE.BufferAttribute(r.pos, 3));
+  if (r.cols) ng.setAttribute('color', new THREE.BufferAttribute(r.cols, 3));
+  ng.setIndex(new THREE.BufferAttribute(r.idx, 1));
+  const flat = ng.toNonIndexed();
+  flat.computeVertexNormals();
+  return flat;
 }
 
 async function lightModel(wrapper, ERR = LOD_ERR) {

@@ -882,6 +882,7 @@ async function boot() {
 
   // The ground darkens under the town and round its feet (see world/look.js).
   terrain.contactShade(contextGroup?.userData?.plots || []);
+  terrain.chunkForRender();
   // Cloud shadows drifting over the ground and the town.
   cloudShadows(terrain.mesh.material, 0.30);
   contextGroup?.traverse((o) => {
@@ -3596,8 +3597,10 @@ async function boot() {
     // loading and the tests starting put the stream at a different place on
     // every run — which is the whole thing the seed was for.
     if (life && !suiteHold) life.update(rawDt);
-    // The town's far cells by the camera's distance (world/detail.js).
+    // The town's far cells by the camera's distance (world/detail.js), and
+    // the garrison's near or far figure (defenders.js `SOLDIER_NEAR`).
     contextGroup.userData.lod?.(engine.camera);
+    battle.garrison?.eye?.copy(engine.camera.position);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);

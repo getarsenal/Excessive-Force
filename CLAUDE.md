@@ -230,9 +230,20 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   tools/townprobe.mjs <level>` is the census: cells per bucket, seen,
   hidden and culled, at the level's camera and a fight's 70 m out, then
   twenty buildings burnt and checked against the cells they landed in.
+  The ground is in cells too (`terrain.chunkForRender`, after the
+  contact shade; `terrain.mesh` stays whole and out of the scene for its
+  material and geometry) and so is the far apron (2 km cells: twelve
+  kilometres of it was one mesh of 166k). The garrison's rifleman has a
+  far figure (`Garrison.meshFar`, the same man simplified to six
+  centimetres by `lightGeometry` in units.js): `sync` writes each man
+  into the near or the far instanced mesh by his distance from
+  `garrison.eye` (`SOLDIER_NEAR`, 45 m; main.js sets the eye each frame),
+  the pick raycasts both, and `defenderForInstance(id, far)` maps back.
   Boudhanath at low from the fight camera: the town 1,010k triangles to
-  213k, the frame 1,755k to 936k, 138 draw calls to 96. What is left is
-  the stupa's 12,266 stones (about 450k) and the terrain.
+  213k, the ground 130k to 30k, the apron 166k to 50k, the garrison 179k
+  to 23k, the frame 1,755k to 581k, 138 draw calls to 117. The probe's
+  last section names the heaviest meshes outside the town; what is left
+  is the stupa's 12,266 instanced stones (142k).
 - The particles' fill budget (`ExplosionFX._govern`, `src/fx/explosion.js`):
   every puff is a blended quad, and a MOAB seen from close in was a hundred
   and sixty screens of fill a frame. A puff is never drawn wider than half
