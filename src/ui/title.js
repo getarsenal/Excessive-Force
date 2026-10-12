@@ -126,35 +126,38 @@ export function showTitle({ current = null, canResume = false } = {}) {
 
   const dLv = daily && LEVELS[daily.level];
   const dT = daily && state.list.find((t) => t.id === daily.level);
-  // Four rows. Everything else is one tap further in: TODAY holds what
-  // resets every day, MORE holds what is looked at now and then.
+  // Five rows, and everything else one tap further in. Eighteen tiles on
+  // a phone was a wall to read before a first tap: CONTINUE and CAMPAIGN
+  // are what the player came for, TODAY holds what resets (the strike,
+  // the weekly, the season, the orders, the crates), MODES the other ways
+  // to play (battles mid-fight, Blitz, the map, the range, Boot Camp) and
+  // MORE what is looked at now and then (the armoury, medals, the hangar,
+  // boards, commanders, settings). Each row's line says what is behind
+  // it, and the count is what is waiting there.
   const crates = car.crates || 0;
-  const todayCount = (daily && !dDone ? 1 : 0) + (3 - ordersDone) + crates;
+  const hasOpen = openIds.some((id) => id !== 'tutorial' && id !== 'range');
+  const todayCount = (daily && !dDone ? 1 : 0) + (weekly && !wstate.done ? 1 : 0) + (3 - ordersDone) + crates;
   const pts = Math.max(0, (state.ops?.total || 0) - spentPoints());
-  // Every button, one or two words each and nothing else: the counts are the
-  // only other thing on a row. What a row leads to says the rest.
-  const items = [
-    { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', primary: true },
-    { act: 'campaign', name: 'CAMPAIGN', count: pts >= 2 ? pts : 0 },
-    daily && { act: 'daily', name: 'DAILY STRIKE', hot: !dDone, count: dDone ? 0 : 1 },
-    weekly && { act: 'weekly', name: 'WEEKLY OP', hot: !wstate.done, count: wstate.done ? 0 : 1 },
-    season && { act: 'season', name: `SEASON \u00b7 ${season.name}` },
-    // Three minutes on something already open (career.js BLITZ): for the
-    // player with a bus stop's worth of time rather than an evening.
-    openIds.some((id) => id !== 'tutorial' && id !== 'range') && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN' },
-    battles.length && { act: 'battles', name: 'BATTLES', count: battles.length },
-    { act: 'map', name: 'MAP' },
-    { act: 'armoury', name: 'ARMOURY' },
-    { act: 'orders', name: 'ORDERS', hot: ordersDone < 3, count: 3 - ordersDone },
-    crates > 0 && { act: 'crates', name: 'CRATES', hot: true, count: crates },
-    { act: 'medals', name: 'MEDALS' },
-    { act: 'boards', name: 'BOARDS' },
-    { act: 'hangar', name: 'HANGAR' },
-    { act: 'range', name: 'THE RANGE' },
-    { act: 'boot', name: 'BOOT CAMP' },
-    { act: 'commanders', name: 'COMMANDERS' },
-    { act: 'records', name: 'SETTINGS' },
+  // What is still waiting today, or that nothing is; the season rides along.
+  const pending = [
+    daily && !dDone && 'STRIKE',
+    weekly && !wstate.done && 'WEEKLY OP',
+    ordersDone < 3 && `${3 - ordersDone} ORDERS`,
+    crates > 0 && `${crates} CRATE${crates === 1 ? '' : 'S'}`,
   ].filter(Boolean);
+  const todaySub = (pending.length ? pending : ['ALL DONE']).concat(season ? ['SEASON'] : []).join(' \u00b7 ');
+  const modesSub = [
+    battles.length && `${battles.length} MID-FIGHT`,
+    hasOpen && 'BLITZ',
+    'MAP', 'THE RANGE', 'BOOT CAMP',
+  ].filter(Boolean).join(' \u00b7 ');
+  const items = [
+    { act: cont.act, name: canResume ? 'RETURN' : 'CONTINUE', sub: cont.line, primary: true },
+    { act: 'campaign', name: 'CAMPAIGN', sub: pts >= 2 ? `${pts} DOCTRINE POINTS TO SPEND` : 'THE WAR, OPERATION BY OPERATION', count: pts >= 2 ? pts : 0 },
+    { act: 'today', name: 'TODAY', sub: todaySub, hot: todayCount > 0, count: todayCount },
+    { act: 'modes', name: 'MODES', sub: modesSub, hot: battles.length > 0, count: battles.length },
+    { act: 'more', name: 'MORE', sub: 'ARMOURY \u00b7 MEDALS \u00b7 HANGAR \u00b7 BOARDS \u00b7 SETTINGS' },
+  ];
 
   // The backdrop: what has been brought down, then what is next, then the rest.
   const pics = [];
@@ -186,6 +189,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
     records: IC('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
     today: IC('<rect x="4" y="5" width="16" height="16" rx="1"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
     more: IC('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>'),
+    modes: IC('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M17.5 14v7M14 17.5h7"/>'),
   };
   const iconFor = (it) => ICONS[it.primary ? 'go' : it.act] || '';
 
@@ -307,12 +311,18 @@ export function showTitle({ current = null, canResume = false } = {}) {
     const sheet = root.querySelector('.tt-sheet');
     const sheetIn = root.querySelector('.tt-sheet-in');
     let hangarUi = null;
+    // The list sheets (TODAY, MODES, MORE) are parents: a sheet opened from
+    // one gets a back arrow to it, so a wrong tap is one tap back, not a
+    // close and a hunt through the menu again.
+    const PARENTS = new Set(['today', 'modes', 'more']);
+    let sheetAct = null, sheetParent = null, pendingParent = null;
     const openSheet = (title, html, cls = '') => {
       // A hangar left running under a new sheet would keep drawing to a
       // canvas that is no longer in the page.
       if (hangarUi) { hangarUi.destroy(); hangarUi = null; }
+      sheetParent = pendingParent;
       sheetIn.className = `tt-sheet-in ${cls}`;
-      sheetIn.innerHTML = `<header class="tt-sh-top"><b>${title}</b><button class="tt-x" type="button" data-act="close" aria-label="Close">✕</button></header><div class="tt-sh-body">${html}</div>`;
+      sheetIn.innerHTML = `<header class="tt-sh-top">${sheetParent ? `<button class="tt-x tt-back" type="button" data-act="sheetback" aria-label="Back">\u2039</button>` : ''}<b>${title}</b><button class="tt-x" type="button" data-act="close" aria-label="Close">✕</button></header><div class="tt-sh-body">${html}</div>`;
       sheet.hidden = false;
       feedback.emit('open');
       requestAnimationFrame(() => sheet.classList.add('open'));
@@ -333,6 +343,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
       // Nothing else while the eagle is flying: the level is already chosen.
       if (launching) return;
       thump();
+      // Opened from a list sheet: that sheet is the one BACK returns to.
+      pendingParent = (!sheet.hidden && PARENTS.has(sheetAct) && !PARENTS.has(a) && a !== 'close' && a !== 'sheetback') ? sheetAct : null;
+      if (a !== 'close' && a !== 'sheetback') sheetAct = a;
       switch (a) {
         case 'back': done({ level: null }); break;
         case 'resume': go(el?.dataset.level || cont.id, 'resume'); break;
@@ -394,8 +407,20 @@ export function showTitle({ current = null, canResume = false } = {}) {
           openSheet('TODAY', listSheet([
             daily && { act: 'daily', name: 'DAILY STRIKE', sub: dDone ? `DONE \u00b7 ${dstate.streak}-DAY STREAK` : `${daily.mod.name}${dstate.streak ? ` \u00b7 STREAK ${dstate.streak}` : ''}`, count: dDone ? 0 : 1 },
             weekly && { act: 'weekly', name: 'WEEKLY OPERATION', sub: `${weekly.rule.name} \u00b7 ${wstate.done ? 'DONE' : `${weekly.daysLeft} DAY${weekly.daysLeft === 1 ? '' : 'S'} LEFT`}`, count: wstate.done ? 0 : 1 },
+            season && { act: 'season', name: `SEASON \u00b7 ${season.name}`, sub: `${sstate?.stars || 0} STARS THIS SEASON` },
             { act: 'orders', name: 'DAILY ORDERS', sub: `${ordersDone} OF 3 DONE`, count: 3 - ordersDone },
             { act: 'crates', name: 'SUPPLY CRATES', sub: crates ? `${crates} TO OPEN` : 'NONE WAITING', count: crates },
+          ]), 'list');
+          break;
+        case 'modes':
+          openSheet('MODES', listSheet([
+            battles.length && { act: 'battles', name: 'BATTLES IN PROGRESS', sub: `${battles.length} SAVED MID-FIGHT`, count: battles.length },
+            // Three minutes on something already open (career.js BLITZ): for
+            // the player with a bus stop's worth of time rather than an evening.
+            hasOpen && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN', sub: 'THREE MINUTES ON AN OPEN CONTRACT' },
+            { act: 'map', name: 'WORLD MAP', sub: 'EVERY CONTRACT, OPEN OR CLOSED' },
+            { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
+            { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
           ]), 'list');
           break;
         case 'more':
@@ -403,13 +428,17 @@ export function showTitle({ current = null, canResume = false } = {}) {
             { act: 'armoury', name: 'ARMOURY', sub: `${released} OF ${UNITS.length} RELEASED` },
             { act: 'medals', name: 'MEDALS', sub: `${featsWon} OF ${mc.feats.length} FEATS` },
             { act: 'hangar', name: 'HANGAR', sub: `THE FLEET \u00b7 ${unlockedArt(prog).length} OF ${ART.length} NOSE ART` },
-            { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
             { act: 'boards', name: 'BOARDS', sub: boardSub() },
-            { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
-            { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
+            { act: 'commanders', name: 'COMMANDERS', sub: `SLOT ${slot}` },
             { act: 'records', name: 'RECORDS & SETTINGS', sub: '' },
           ]), 'list');
           break;
+        case 'sheetback': {
+          const p = sheetParent;
+          sheetParent = null; pendingParent = null;
+          if (p) act(p);
+          break;
+        }
         case 'discard': {
           const id = el.dataset.level;
           clearBattle(id);

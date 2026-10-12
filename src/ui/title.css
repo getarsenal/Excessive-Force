@@ -351,6 +351,9 @@
   background: none; border: 1px solid var(--line); color: var(--mute);
 }
 .tt-x:hover { color: var(--ink); border-color: rgba(255, 255, 255, 0.3); }
+/* Back to the list sheet this one was opened from. */
+.tt-sh-top .tt-back { font-size: 24px; line-height: 1; margin-right: 10px; }
+.tt-sh-top .tt-back + b { flex: 1 1 auto; }
 .tt-sh-body {
   overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
   overscroll-behavior: none; touch-action: pan-y; padding: 12px 16px 20px;

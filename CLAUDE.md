@@ -611,8 +611,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   transport, the drop, the men digging in round the building) · `src/game/cityfire.js` and `ruins.js` the town burning · `src/game/defenders.js` the
   garrison · `src/world/` terrain, rivers, city, precinct, flags ·
   `src/ui/` HUD, level select, stand-off, test panel · `src/ui/title.js`
-  the title screen in front of the contract card (continue, daily strike,
-  battles in progress, armoury, commanders, the war wire) ·
+  the title screen in front of the contract card: five rows (CONTINUE,
+  CAMPAIGN, TODAY, MODES, MORE) and everything else one tap further in,
+  the list sheets being parents a sheet opened from them goes back to
+  (`sheetback`); eighteen tiles on a phone was a wall to read before a
+  first tap; `W=393 H=852 node tools/menushot.mjs` photographs the menu,
+  TODAY, a row inside it and MODES ·
   `src/game/battlesave.js` battles saved mid-fight and resumed (never
   Boot Camp, the range or a Blitz) · BLITZ (`career.js` `BLITZ`, the
   front door's BLITZ · 3 MIN): three minutes on an open contract, no
