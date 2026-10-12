@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FACADE_PALETTE, ROOF_PALETTE } from './city.js';
+import { splitMesh } from './detail.js';
 
 /**
  * The city past the edge of the map.
@@ -89,8 +90,13 @@ export function buildSurround(terrain, quality, outer, opts = {}) {
 
   const group = new THREE.Group();
   group.name = 'surround';
-  group.add(merge(walls, FACADE_PALETTE, rng, 0.93));
-  group.add(merge(roofs, ROOF_PALETTE, rng, 0.82));
+  // In cells (world/detail.js `splitMesh`), so the view culls the ring
+  // behind the camera: the whole of it was drawn every frame. The ring is
+  // four kilometres across and a few thousand boxes, so its cells are
+  // wide: at the town's 250 m it was five hundred draws for fifty
+  // thousand triangles.
+  for (const m of splitMesh(merge(walls, FACADE_PALETTE, rng, 0.93), 700)) group.add(m);
+  for (const m of splitMesh(merge(roofs, ROOF_PALETTE, rng, 0.82), 700)) group.add(m);
   group.userData.built = built;
   group.userData.available = Math.floor(outer.length / 6);
   /** Is there surveyed city on this ground? */
@@ -137,7 +143,7 @@ function merge(geos, palette, rng, roughness) {
   );
   mesh.castShadow = false;
   mesh.receiveShadow = false;
-  mesh.frustumCulled = false;
+  mesh.name = 'surround';
   return mesh;
 }
 

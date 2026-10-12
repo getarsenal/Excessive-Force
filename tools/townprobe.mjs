@@ -37,9 +37,9 @@ const census = async (label) => {
       const tris = (g.index ? g.index.count : g.attributes.position.count) / 3;
       const key = o.name || o.parent?.name || '?';
       let r = by.get(key);
-      if (!r) by.set(key, r = { meshes: 0, seen: 0, tris: 0, drawn: 0, culled: 0 });
-      r.meshes++; r.tris += tris;
-      const vis = !o.frustumCulled || (g.boundingSphere || g.computeBoundingSphere() || g.boundingSphere) && fr.intersectsObject(o);
+      if (!r) by.set(key, r = { meshes: 0, seen: 0, tris: 0, drawn: 0, culled: 0, far: 0 });
+      r.meshes++; r.tris += tris; if (!o.visible) r.far++;
+      const vis = o.visible && (!o.frustumCulled || (g.boundingSphere || g.computeBoundingSphere() || g.boundingSphere) && fr.intersectsObject(o));
       if (vis) { r.seen++; r.drawn += tris; } else r.culled += tris;
     });
     eng.renderer.info.autoReset = false; eng.renderer.info.reset(); window.__frame();
@@ -48,11 +48,11 @@ const census = async (label) => {
     return { calls: inf.render.calls, tris: inf.render.triangles, rows };
   });
   console.log(`\n== ${label}: ${r.calls} calls, ${(r.tris / 1000).toFixed(0)}k triangles drawn`);
-  console.log('bucket'.padEnd(14), 'meshes seen'.padStart(12), 'tris'.padStart(8), 'drawn'.padStart(8), 'culled'.padStart(8));
+  console.log('bucket'.padEnd(14), 'meshes seen'.padStart(12), 'far'.padStart(5), 'tris'.padStart(8), 'drawn'.padStart(8), 'culled'.padStart(8));
   let drawn = 0, culled = 0;
   for (const x of r.rows) {
     drawn += x.drawn; culled += x.culled;
-    console.log(x.bucket.padEnd(14), `${x.meshes}/${x.seen}`.padStart(12), `${(x.tris / 1000).toFixed(0)}k`.padStart(8),
+    console.log(x.bucket.padEnd(14), `${x.meshes}/${x.seen}`.padStart(12), `${x.far}`.padStart(5), `${(x.tris / 1000).toFixed(0)}k`.padStart(8),
       `${(x.drawn / 1000).toFixed(0)}k`.padStart(8), `${(x.culled / 1000).toFixed(0)}k`.padStart(8));
   }
   console.log(`town drawn ${(drawn / 1000).toFixed(0)}k, culled ${(culled / 1000).toFixed(0)}k`);

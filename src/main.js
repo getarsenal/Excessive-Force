@@ -3596,6 +3596,8 @@ async function boot() {
     // loading and the tests starting put the stream at a different place on
     // every run — which is the whole thing the seed was for.
     if (life && !suiteHold) life.update(rawDt);
+    // The town's far cells by the camera's distance (world/detail.js).
+    contextGroup.userData.lod?.(engine.camera);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
     if (!suiteHold) battle.update(dt);

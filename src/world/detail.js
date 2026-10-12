@@ -68,6 +68,13 @@ export class PropSet {
   constructor(quality) {
     this.quality = quality;
     this.buckets = new Map();
+    /**
+     * While set, every piece added is a small thing — a lamp post, a bin,
+     * a door, the tank on a roof — that a cell may stop drawing at a
+     * distance (`FAR_CUT`). Off for anything that reads from across the
+     * map: a church, the skyline ring, a river wall.
+     */
+    this.far = false;
   }
 
   /**
@@ -82,6 +89,7 @@ export class PropSet {
     if (!b) this.buckets.set(key, b = []);
     if (colour !== undefined) tint(geo, colour, jitter);
     if (this.plot !== undefined) geo.userData.plot = this.plot;
+    if (this.far) geo.userData.far = 1;
     b.push(geo);
     return geo;
   }
@@ -152,7 +160,7 @@ export const CELL = 250;
 /**
  * Merge `geos` into one mesh per cell, sharing `material`.
  *
- * @param {object} opts { cell, name, cast, receive, burn, renderOrder, min }
+ * @param {object} opts { cell, name, cast, receive, burn, renderOrder, min, far }
  *   `cell` metres a side (Infinity for one mesh); `burn` marks every cell
  *   burnable (the material's shader expects the attribute); a list with
  *   fewer than `min` vertices stays one mesh, since cutting a bucket of
@@ -160,14 +168,32 @@ export const CELL = 250;
  * @returns {THREE.Mesh[]}
  */
 export function mergeChunked(geos, material, opts = {}) {
+  // The small things and the rest are merged apart, so a cell of lamp
+  // posts can stop being drawn at a distance while the church beside
+  // them is not.
+  if (!opts.far && geos.some((g) => g.userData.far)) {
+    return [
+      ...mergeChunked(geos.filter((g) => !g.userData.far), material, { ...opts, far: 0 }),
+      ...mergeChunked(geos.filter((g) => g.userData.far), material, { ...opts, far: 1 }),
+    ];
+  }
   const out = [];
   if (!geos.length) return out;
   let total = 0;
-  for (const g of geos) total += g.attributes.position.count;
-  const cell = total < (opts.min ?? 80000) ? Infinity : (opts.cell || CELL);
+  const bb = new THREE.Box3();
+  const ext = new THREE.Box3();
+  for (const g of geos) {
+    total += g.attributes.position.count;
+    bb.setFromBufferAttribute(g.attributes.position);
+    ext.expandByPoint(bb.min); ext.expandByPoint(bb.max);
+  }
+  // A list that reaches past the map (the skyline ring, the outskirts)
+  // takes a wider cell, so no bucket is ever more than about eight cells
+  // a side.
+  const span = Math.max(ext.max.x - ext.min.x, ext.max.z - ext.min.z);
+  const cell = total < (opts.min ?? 80000) ? Infinity : Math.max(opts.cell || CELL, span / 8);
   const cells = new Map();
   const plotCell = new Map();
-  const bb = new THREE.Box3();
   for (const g of geos) {
     let key = g.userData.plot !== undefined ? plotCell.get(g.userData.plot) : undefined;
     if (key === undefined) {
@@ -194,12 +220,116 @@ export function mergeChunked(geos, material, opts = {}) {
     mesh.castShadow = !!opts.cast;
     mesh.receiveShadow = !!opts.receive;
     if (opts.renderOrder) mesh.renderOrder = opts.renderOrder;
+    if (opts.far === 1 || opts.far === true) mesh.userData.farCut = true;
     // One mesh for the whole bucket is the old shape of it, and it kept
     // its frustum test off; a cell has a real sphere and uses it.
     mesh.frustumCulled = cell !== Infinity;
     out.push(mesh);
   }
   return out;
+}
+
+/**
+ * Cut one built geometry into cells by triangle, for the meshes that are
+ * not merged from pieces: the street surface, the block ground, the
+ * surround. Every attribute is carried over; the index is resolved. The
+ * mesh's material, name, shadows and render order are kept on each cell.
+ *
+ * @returns {THREE.Mesh[]}
+ */
+export function splitMesh(mesh, cell = CELL) {
+  const g = mesh.geometry;
+  const pos = g.attributes.position;
+  const idx = g.index ? g.index.array : null;
+  const n = idx ? idx.length : pos.count;
+  if (n < 3 * 2000) return [mesh];
+  const cells = new Map();
+  for (let t = 0; t < n; t += 3) {
+    const a = idx ? idx[t] : t, b = idx ? idx[t + 1] : t + 1, c = idx ? idx[t + 2] : t + 2;
+    const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
+    const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+    const key = `${Math.floor(cx / cell)},${Math.floor(cz / cell)}`;
+    let list = cells.get(key);
+    if (!list) cells.set(key, list = []);
+    list.push(a, b, c);
+  }
+  if (cells.size < 2) return [mesh];
+  const names = Object.keys(g.attributes);
+  const out = [];
+  for (const [, tri] of cells) {
+    const geo = new THREE.BufferGeometry();
+    for (const name of names) {
+      const src = g.attributes[name];
+      const k = src.itemSize;
+      const arr = new src.array.constructor(tri.length * k);
+      for (let i = 0; i < tri.length; i++) {
+        const o = tri[i] * k, d = i * k;
+        for (let j = 0; j < k; j++) arr[d + j] = src.array[o + j];
+      }
+      geo.setAttribute(name, new THREE.BufferAttribute(arr, k, src.normalized));
+    }
+    geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, mesh.material);
+    m.name = mesh.name;
+    m.castShadow = mesh.castShadow;
+    m.receiveShadow = mesh.receiveShadow;
+    m.renderOrder = mesh.renderOrder;
+    m.frustumCulled = true;
+    out.push(m);
+  }
+  g.dispose();
+  return out;
+}
+
+/**
+ * How far a cell of each kind of thing is drawn, by tier: a phone first,
+ * then the rest. Past it the cell is not drawn at all. A lamp post is
+ * fourteen centimetres wide and a phone's pixel at two hundred and sixty
+ * metres is sixty: what is cut here was already smaller than a pixel. The
+ * ground, the buildings' bodies and roofs and the town's walls are never
+ * cut; the surveyed churches and station fronts (`stone`) only at a phone
+ * and only across the map.
+ */
+export const FAR_CUT = {
+  dark: [260, 420], metal: [260, 420], grime: [260, 420], markings: [260, 420],
+  glow: [260, 420], railings: [260, 420], roofplant: [300, 480], glass: [400, 650],
+  paint: [400, 650], stone: [400, 650], crowns: [600, 900], trunks: [600, 900],
+  foliage: [600, 900], hulls: [500, 800],
+};
+
+/**
+ * Walk a town group once built: every cell mesh takes its cut from the
+ * table by name, and the group gets `userData.lod(camera)`, which main.js
+ * calls each frame to show and hide the cells by the camera's distance to
+ * their spheres. Only a cell of small things (`PropSet.far`, or a
+ * `far` merge) is ever cut. A hidden cell is still folded by cityfire,
+ * so nothing is left standing when it comes back.
+ */
+export function installTownLod(group, quality) {
+  const phone = quality?.name === 'low';
+  const cells = [];
+  group.traverse((o) => {
+    if (!o.isMesh || !o.frustumCulled || !o.userData.farCut || !o.geometry?.boundingSphere) return;
+    const cut = FAR_CUT[o.name];
+    if (!cut) return;
+    const far = cut[phone ? 0 : 1];
+    if (!Number.isFinite(far)) return;
+    o.userData.far = far;
+    cells.push(o);
+  });
+  const last = new THREE.Vector3(Infinity, Infinity, Infinity);
+  group.userData.lodCells = cells;
+  group.userData.lod = (camera, force = false) => {
+    const p = camera.position;
+    if (!force && p.distanceToSquared(last) < 4) return;
+    last.copy(p);
+    for (const m of cells) {
+      const s = m.geometry.boundingSphere;
+      m.visible = s.center.distanceTo(p) - s.radius < m.userData.far;
+    }
+  };
+  group.userData.lod({ position: new THREE.Vector3(0, 1e6, 0) }, true);
+  return cells.length;
 }
 
 /** Give a merged geometry its burn channel: nothing has burnt yet. */

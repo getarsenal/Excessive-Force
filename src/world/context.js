@@ -24,7 +24,7 @@ import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF, FLAT_ROOF_PALETTE as F
   TRIM_PALETTE as TRIM_STONE } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
-  addRiverEdge, addRoofAndFrontage, burnable, mergeChunked, plotPoint, onRoof } from './detail.js';
+  addRiverEdge, addRoofAndFrontage, burnable, mergeChunked, splitMesh, installTownLod, plotPoint, onRoof } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
@@ -1264,7 +1264,7 @@ export function buildContext(terrain, quality, opts = {}) {
   for (const m of cityMeshes) group.add(m);
   group.userData.cityMeshes = cityMeshes;
 
-  group.add(buildBlockGround(terrain, net, quality, inPrecinct));
+  for (const m of splitMesh(buildBlockGround(terrain, net, quality, inPrecinct))) group.add(m);
   // The paved forecourt is a Westminster thing — a stone apron in front of
   // the Palace. Laid at the exclusion radius on every map it put three
   // hundred metres of paving under the Taj's garden and a disc of it on the
@@ -1280,7 +1280,7 @@ export function buildContext(terrain, quality, opts = {}) {
       (opts.landmarks || []).filter((l) => court || !l.scenery), realNet ? 0 : YAW, EXCLUDE,
       court ? { paving: 0x9e998f, edge: 0x86817a } : null));
   }
-  group.add(buildStreetSurface(net, terrain, quality));
+  for (const m of splitMesh(buildStreetSurface(net, terrain, quality))) group.add(m);
   group.add(buildBridge(terrain, quality, bridge));
   // The surveyed crossings, built by the same hand: arches, piers, balustrade
   // and lamps on the real alignment. The flat slab is kept only for a run that
@@ -1317,17 +1317,27 @@ export function buildContext(terrain, quality, opts = {}) {
     junctions: net.nodes.length, streets: net.edges.length,
     real: realBuilt + realShaped, realShaped, filled,
     plan: realNet ? 'surveyed' : 'generated' };
+  // The small things (`props.far`): cells of them stop being drawn at a
+  // distance where they were under a pixel (world/detail.js `FAR_CUT`).
+  // The churches, the river wall and everything after the markings read
+  // from across the map and are never cut.
+  props.far = true;
   Object.assign(counts, addStreetFurniture(props, terrain, plots, rng, dense));
   Object.assign(counts, addBuildingDetail(props, terrain, plots, rng, dense));
   Object.assign(counts, addRoofAndFrontage(props, terrain, plots, rng, dense));
+  props.far = false;
   counts.notables = addNotables(props, plots, opts.levelId);
+  props.far = true;
   Object.assign(counts, addBeaches(props, terrain, plots, rng, opts.clime, net));
+  props.far = false;
   Object.assign(counts, addRiverEdge(props, terrain, rng, opts.precinct || {}));
+  props.far = true;
   Object.assign(counts, addNetworkFurniture(props, net, terrain, rng, dense));
   // Paint stays on at every quality tier, thinned rather than dropped: a
   // crossing and a centre line are two of the few things that read as a city
   // from directly above, and they cost a handful of flat quads.
   Object.assign(counts, addStreetMarkings(props, net, terrain, rng, dense));
+  props.far = false;
   // Square to the building, not to the street plan. An invented grid has one
   // angle and the landmark was placed on it; a surveyed city has no single
   // angle, `measureYaw` picks the commonest, and an enclosure turned to that
@@ -1506,6 +1516,9 @@ export function buildContext(terrain, quality, opts = {}) {
     return p.base + p.h - hi > 5.0;
   });
   group.userData.plots = plots;
+  // The cells of small things take a distance past which they are not
+  // drawn (`FAR_CUT`); main.js calls `group.userData.lod(camera)` a frame.
+  counts.lodCells = installTownLod(group, quality);
   lap('merging and roofs');
   console.log(`[tumble] town stages: ${lapN.map((n, i) => `${n} ${Math.round(lapT[i + 1] - lapT[i])} ms`).join(' · ')}`);
   return group;
@@ -1691,9 +1704,8 @@ function buildBlockGround(terrain, net, quality, inPrecinct) {
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97,
       polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }));
   mesh.receiveShadow = quality.shadowMapSize > 0;
-  mesh.frustumCulled = false;
-  g.add(mesh);
-  return g;
+  mesh.name = 'blockground';
+  return mesh;
 }
 
 /**
@@ -2654,7 +2666,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
   lay(gravel, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
     { name: 'gravel', receive: shadows });
   lay(railings, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }),
-    { name: 'railings', cast: shadows });
+    { name: 'railings', cast: shadows, far: true });
 
   // In the yards behind the terraces: a tree or two per plot, on the garden
   // side, which is the side away from the street.
@@ -2686,9 +2698,9 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
   }
 
   lay(trunks, new THREE.MeshStandardMaterial({ color: 0x5a4432, roughness: 0.95 }),
-    { name: 'trunks', cast: shadows });
+    { name: 'trunks', cast: shadows, far: true });
   lay(crowns, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
-    { name: 'crowns', cast: shadows });
+    { name: 'crowns', cast: shadows, far: true });
 
   // ── Roof furniture. From directly above, a bare extruded box reads as a
   // box; chimney stacks, lift housings and a parapet are what make it read as
@@ -2741,7 +2753,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     }
   }
   lay(roofBits, burnable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })),
-    { name: 'roofplant', burn: true, cast: shadows, receive: shadows });
+    { name: 'roofplant', burn: true, cast: shadows, receive: shadows, far: true });
 
   // ── Back gardens. The inside of a block is not paving: it is the yards
   // behind the terraces, and from above they are the green that stops a block
@@ -2798,7 +2810,7 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     hulls.push(house);
   }
   lay(hulls, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }),
-    { name: 'hulls', cast: shadows });
+    { name: 'hulls', cast: shadows, far: true });
 
   g.userData.squares = squares;
   g.userData.carparks = carparks;

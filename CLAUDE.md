@@ -210,6 +210,29 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
 
 ## Where things are
 
+- The town is drawn in cells (`mergeChunked` and `splitMesh`,
+  `src/world/detail.js`): every merge the town builder makes, the building
+  bodies and roofs, each prop bucket, the street surface, the block ground
+  and the surround ring, is laid in 250 m cells (wider for a list that
+  reaches past the map, so no bucket is more than eight cells a side; a
+  bucket under 80,000 vertices stays one mesh), each with its own sphere,
+  so the view culls what is behind the camera. One mesh a material was
+  always in view, and on Boudhanath that was 12,000 surveyed buildings
+  and a million triangles of town a frame on a phone before a gun landed.
+  A building's pieces all go in the building's cell, so cityfire's
+  `plotRanges` still fold it. The small things (lamp posts, bins, doors,
+  roof plant, markings, tree crowns: `PropSet.far` while a pass adds
+  them, or `far: true` on a merge) stop being drawn past `FAR_CUT`
+  metres (260 on a phone for a lamp post, 600 for a tree), where they
+  were under a pixel; a church, the skyline ring and a river wall are
+  never cut, and `installTownLod` hangs the test on the group as
+  `userData.lod(camera)`, which main.js calls each frame. `node
+  tools/townprobe.mjs <level>` is the census: cells per bucket, seen,
+  hidden and culled, at the level's camera and a fight's 70 m out, then
+  twenty buildings burnt and checked against the cells they landed in.
+  Boudhanath at low from the fight camera: the town 1,010k triangles to
+  213k, the frame 1,755k to 936k, 138 draw calls to 96. What is left is
+  the stupa's 12,266 stones (about 450k) and the terrain.
 - The particles' fill budget (`ExplosionFX._govern`, `src/fx/explosion.js`):
   every puff is a blended quad, and a MOAB seen from close in was a hundred
   and sixty screens of fill a frame. A puff is never drawn wider than half
