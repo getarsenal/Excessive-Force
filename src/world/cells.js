@@ -24,6 +24,9 @@ export const CELL = 250;
  * @returns {THREE.Mesh[]}
  */
 export function splitMesh(mesh, cell = CELL, keep = false) {
+  // A builder with nothing to build hands back an empty group, or nothing.
+  if (!mesh) return [];
+  if (!mesh.isMesh || !mesh.geometry?.attributes?.position) return [mesh];
   const g = mesh.geometry;
   const pos = g.attributes.position;
   const idx = g.index ? g.index.array : null;
