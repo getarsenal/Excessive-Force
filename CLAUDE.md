@@ -236,7 +236,13 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   shows it in the test panel's CRASH RECORDER with COPY LAST CRASH.
   `node tools/crashprobe.mjs` kills a page with CDP `Page.crash` and reads
   back what was filed. The panel's DIAGNOSTICS shows the build (`buildId`,
-  the bundle's fingerprint) and every filed crash names its build.
+  the bundle's fingerprint) and every filed crash names its build. The
+  title's SETTINGS screen (`src/ui/worldmap.js`, the records view) has a
+  TESTING section with the same: build, COPY LAST CRASH, CLEAR CRASHES,
+  the last play session (SHOW opens the card over the title through
+  `showSessionCard`, COPY) and the last scripted perf run (COPY), so none
+  of it needs a battle; `node tools/settingsprobe.mjs` plants records and
+  reads the rows.
 - The Chinook lift flies in waves (`HELI_CAP` in `src/game/aircraft.js`:
   eighteen in the air on a phone, forty-eight otherwise; the rest of a
   package waits in `air.heliQueue` and flies as the earlier ones clear, a
