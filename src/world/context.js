@@ -1168,8 +1168,12 @@ export function buildContext(terrain, quality, opts = {}) {
     }
   }
 
-  const facade = makeFacadeTexture(64);
-  const lit = makeWindowEmissive(64);
+  // One bay a tile, 3.5 m: the near detail of every wall in the town is
+  // this one texture and its normal map, so it costs the same on twelve
+  // thousand buildings as on one (see `makeFacadeNormal`).
+  const facade = makeFacadeTexture(256);
+  const lit = makeWindowEmissive(256);
+  const relief = makeFacadeNormal(256);
   for (const t of [facade, lit]) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = quality.anisotropy;
@@ -1245,6 +1249,8 @@ export function buildContext(terrain, quality, opts = {}) {
   const bodyMat = new THREE.MeshStandardMaterial({
     vertexColors: true, roughness: 0.93, metalness: 0.01,
     map: facade,
+    normalMap: relief,
+    normalScale: new THREE.Vector2(0.55, 0.55),
     emissive: new THREE.Color(0xffd9a0),
     emissiveMap: lit,
     emissiveIntensity: 0.16,
@@ -2367,36 +2373,104 @@ function scaleBoxUVs(geo, w, h, d, unit) {
 }
 
 /** One window bay: recessed opening in a stone field. */
+/**
+ * The bay. Everything is in units of the tile so the 64-pixel tile this
+ * replaces and the 256 one are the same drawing: the wall, faint coursing,
+ * a reveal round the opening, the glass with its sky in the top third, a
+ * mullion and a transom, a lintel over and a sill under.
+ */
+function bay(size) {
+  const u = size / 64;
+  const m = size * 0.26;
+  return { u, m, ww: size - m * 2, wh: size * 0.46, wy: size * 0.26, course: 8 * u };
+}
+
 function makeFacadeTexture(size) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const ctx = c.getContext('2d');
+  const { u, m, ww, wh, wy, course } = bay(size);
   ctx.fillStyle = '#f2ece1';
   ctx.fillRect(0, 0, size, size);
 
-  // Faint coursing so the wall isn't a flat field.
+  // Faint coursing so the wall isn't a flat field, and a little grain in
+  // the render so a close wall is not a flat colour.
   ctx.fillStyle = 'rgba(0,0,0,0.05)';
-  for (let y = 0; y < size; y += 8) ctx.fillRect(0, y, size, 1);
-
-  const m = size * 0.26;           // margin around the opening
-  const ww = size - m * 2;
-  const wh = size * 0.46;
-  const wy = size * 0.26;
+  for (let y = 0; y < size; y += course) ctx.fillRect(0, y, size, Math.max(1, u * 0.6));
+  if (u >= 2) {
+    const rnd = mulberry32(0xfaca0e);
+    for (let i = 0; i < size * 6; i++) {
+      ctx.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.035)' : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(Math.floor(rnd() * size), Math.floor(rnd() * size), 1 + Math.floor(rnd() * 2 * u), 1);
+    }
+  }
 
   ctx.fillStyle = '#cdc4b4';       // reveal
-  ctx.fillRect(m - 2, wy - 2, ww + 4, wh + 4);
+  ctx.fillRect(m - 2 * u, wy - 2 * u, ww + 4 * u, wh + 4 * u);
+  ctx.fillStyle = '#dcd3c2';       // lintel
+  ctx.fillRect(m - 3 * u, wy - 4 * u, ww + 6 * u, 2.5 * u);
   ctx.fillStyle = '#4d525c';       // glass
   ctx.fillRect(m, wy, ww, wh);
   ctx.fillStyle = 'rgba(255,255,255,0.10)';
   ctx.fillRect(m, wy, ww, wh * 0.36);
   ctx.fillStyle = '#b8ae9d';       // mullion + transom
-  ctx.fillRect(m + ww / 2 - 1, wy, 2, wh);
-  ctx.fillRect(m, wy + wh * 0.45, ww, 2);
+  ctx.fillRect(m + ww / 2 - u, wy, 2 * u, wh);
+  ctx.fillRect(m, wy + wh * 0.45, ww, 2 * u);
+  if (u >= 2) {                    // the frame, inside the reveal
+    ctx.strokeStyle = '#a89f8e';
+    ctx.lineWidth = u * 0.8;
+    ctx.strokeRect(m + u * 0.4, wy + u * 0.4, ww - u * 0.8, wh - u * 0.8);
+  }
   ctx.fillStyle = '#e4dccd';       // sill
-  ctx.fillRect(m - 3, wy + wh, ww + 6, 3);
+  ctx.fillRect(m - 3 * u, wy + wh, ww + 6 * u, 3 * u);
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';   // and its shadow line
+  ctx.fillRect(m - 3 * u, wy + wh + 3 * u, ww + 6 * u, u);
 
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/**
+ * The bay's relief as a normal map: the reveal and the glass sunk into
+ * the wall, the lintel and the sill standing out of it, the coursing a
+ * groove. Drawn as a height field at the same marks as the colour, then
+ * the gradient taken. Studios put the detail of a distant wall in the
+ * texture, not the geometry: this is the one texture, and near the eye
+ * the light catches every reveal and sill in the town for nothing.
+ */
+function makeFacadeNormal(size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  const { u, m, ww, wh, wy, course } = bay(size);
+  const h = (v) => { const g = Math.round(v * 255); ctx.fillStyle = `rgb(${g},${g},${g})`; };
+  h(0.5); ctx.fillRect(0, 0, size, size);
+  h(0.44); for (let y = 0; y < size; y += course) ctx.fillRect(0, y, size, Math.max(1, u * 0.6));
+  h(0.62); ctx.fillRect(m - 3 * u, wy - 4 * u, ww + 6 * u, 2.5 * u);          // lintel
+  h(0.36); ctx.fillRect(m - 2 * u, wy - 2 * u, ww + 4 * u, wh + 4 * u);       // reveal
+  h(0.28); ctx.fillRect(m, wy, ww, wh);                                       // glass
+  h(0.40); ctx.fillRect(m + ww / 2 - u, wy, 2 * u, wh); ctx.fillRect(m, wy + wh * 0.45, ww, 2 * u);
+  h(0.66); ctx.fillRect(m - 3 * u, wy + wh, ww + 6 * u, 3 * u);              // sill
+  const src = ctx.getImageData(0, 0, size, size).data;
+  const out = ctx.createImageData(size, size);
+  const at = (x, y) => src[(((y + size) % size) * size + ((x + size) % size)) * 4] / 255;
+  const K = 3.0;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * K;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * K;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * size + x) * 4;
+      out.data[i] = Math.round((-dx / len * 0.5 + 0.5) * 255);
+      out.data[i + 1] = Math.round((dy / len * 0.5 + 0.5) * 255);
+      out.data[i + 2] = Math.round((1 / len * 0.5 + 0.5) * 255);
+      out.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
   return t;
 }
 
@@ -2407,11 +2481,9 @@ function makeWindowEmissive(size) {
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, size, size);
-  const m = size * 0.26;
-  const ww = size - m * 2;
-  const wh = size * 0.46;
+  const { m, ww, wh, wy } = bay(size);
   ctx.fillStyle = '#6a5230';
-  ctx.fillRect(m, size * 0.26, ww, wh);
+  ctx.fillRect(m, wy, ww, wh);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

@@ -243,7 +243,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   213k, the ground 130k to 30k, the apron 166k to 50k, the garrison 179k
   to 23k, the frame 1,755k to 581k, 138 draw calls to 117. The probe's
   last section names the heaviest meshes outside the town; what is left
-  is the stupa's 12,266 instanced stones (142k).
+  is the stupa's 12,266 instanced stones (142k). The near detail of every
+  wall is one texture: the facade bay at 256 px (`makeFacadeTexture`,
+  context.js) with a relief map drawn from the same marks
+  (`makeFacadeNormal`: reveal and glass sunk, lintel and sill proud,
+  coursing a groove), so it costs the same on twelve thousand buildings
+  as on one; `node tools/facadeshot.mjs <level>` frames the tallest of
+  the forty buildings nearest the landmark from 28 m and 90 m, and
+  `node tools/garrisonshot.mjs <level>` the garrison from 120 m and 30 m
+  with the near and far counts.
 - The particles' fill budget (`ExplosionFX._govern`, `src/fx/explosion.js`):
   every puff is a blended quad, and a MOAB seen from close in was a hundred
   and sixty screens of fill a frame. A puff is never drawn wider than half
