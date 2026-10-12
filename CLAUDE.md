@@ -319,7 +319,12 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   rest (level data, terrain, models, sound) served from the cache and
   refreshed behind it; a page that differs from the one kept is a deploy and
   empties both caches. `node tools/offlineprobe.mjs` loads a level online,
-  again offline, and fakes a deploy. Boot: `MARKS=1 node tools/loadprobe.mjs
+  again offline, and fakes a deploy. When the three-second fallback served
+  the kept page and the network then brings a different one, the worker
+  posts `ef-update` and main.js reloads on the title or the loader, or at
+  the next return to the title from a battle (saved first): a slow phone
+  otherwise ran the old build all day. `node tools/slowproxy.mjs 5191 5190`
+  in front of the preview and `node tools/updateprobe.mjs 5191` prove it. Boot: `MARKS=1 node tools/loadprobe.mjs
   <level>` against `vite preview --port 5190` (cold, warm, first frame;
   `QS=` adds a query), `TT_PORT=5190 node tools/bootprofile.mjs <level>`
   totals the load's CPU by function, and `node tools/programprobe.mjs` lists
