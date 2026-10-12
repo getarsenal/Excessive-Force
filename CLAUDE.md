@@ -242,7 +242,10 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the last play session (SHOW opens the card over the title through
   `showSessionCard`, COPY) and the last scripted perf run (COPY), so none
   of it needs a battle; `node tools/settingsprobe.mjs` plants records and
-  reads the rows.
+  reads the rows. SETTINGS and DOCTRINE open where they were asked to
+  whatever the map has waiting: a country still to burn used to take the
+  screen, so SETTINGS opened on the map after every win;
+  `node tools/settingsrouteprobe.mjs` plants a won contract and checks.
 - The army has a size the tier can carry (`maxUnits` in
   `src/core/quality.js`: 320 on low, 480, 720, 1,000; `battle.deploy`
   counts the guns in the lift and refuses past it with BATTERY AT FULL
