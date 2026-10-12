@@ -17,15 +17,15 @@ const open = async () => {
   await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
   return page;
 };
-const p1 = await open();
+console.log('opening'); const p1 = await open(); console.log('loaded');
 await p1.evaluate(() => { window.battle.freeBuild = true; window.testMenu.spawnAt('m777', 4, 1, 220); });
 await p1.waitForTimeout(7000);
 const box = await p1.evaluate(() => JSON.parse(localStorage.getItem('tt.blackbox') || 'null'));
 console.log('box before the crash:', box ? `${box.samples.length} samples, last ${JSON.stringify(box.samples.at(-1))}` : 'NONE');
 const cdp = await ctx.newCDPSession(p1);
-await cdp.send('Page.crash').catch(() => {});
+console.log('crashing'); cdp.send('Page.crash').catch(() => {});   // never answers: the renderer it would answer from is gone
 await new Promise((r) => setTimeout(r, 1000));
-const p2 = await open();
+console.log('reopening'); const p2 = await open(); console.log('reloaded');
 await p2.waitForTimeout(3500);
 const out = await p2.evaluate(async () => {
   const m = await import('/src/core/blackbox.js');

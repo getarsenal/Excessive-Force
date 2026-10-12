@@ -224,6 +224,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   photographs the cloud at the budget, unbudgeted and at a phone's. A
   gutted building (`cityfire.burn`) sends only its own stretch of the
   town's buffers to the GPU (`addUpdateRange`), not the whole of both.
+- `src/core/blackbox.js` the crash recorder: a phone that kills the tab
+  reloads to the title with nothing caught, so every two seconds of a
+  battle a snapshot goes to storage (`tt.blackbox`, the last thirty:
+  clock, fps, guns, lift, aircraft, rounds, bodies and budget, sections,
+  stone down, town burnt, geometries, textures, programs, visible
+  triangles, particles and fill, heap where told, context loss, the last
+  dozen events; a lost context or a frame fault at once), and the next
+  boot that finds power.js's mark (only a page that died in view leaves
+  it) files it in `tt.crashes` (the last five), says so in the feed, and
+  shows it in the test panel's CRASH RECORDER with COPY LAST CRASH.
+  `node tools/crashprobe.mjs` kills a page with CDP `Page.crash` and reads
+  back what was filed.
 - `src/core/power.js` how hard the game works a phone: the battery saver
   (thirty frames in battle, on by default on a phone), a few frames behind
   a menu, and `power.lean` (any phone, or the saver), which takes the
