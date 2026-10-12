@@ -522,7 +522,6 @@ export class AirWing {
     side.set(-dir.z, 0, dir.x);
     model.rotation.y = Math.atan2(dir.x, dir.z);
     model.position.y = alt;
-    model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
     const runLen = Math.hypot(target.x - model.position.x, target.z - model.position.z);
     const s = {
@@ -639,7 +638,6 @@ export class AirWing {
     model.position.copy(from).addScaledVector(dir, -(backFor(R) + a.runIn));
     model.position.y = rollY;
     model.rotation.y = Math.atan2(dir.x, dir.z);
-    model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
     const corner = a.runIn / v;
     const openAt = corner + preDive;
@@ -1363,7 +1361,6 @@ AirWing.prototype.deliver = function deliver(drops, ceiling, onLand, ceilingAlon
     // the run was not.
     const alt = Math.max(target.y + LIFT.height, low + LIFT.clearance);
     model.position.y = alt;
-    model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
     this.scene.add(model);
     const runLen = Math.hypot(target.x - model.position.x, target.z - model.position.z);
     const overAt = runLen / LIFT.speed;
@@ -1959,7 +1956,6 @@ AirWing.prototype._callLoiter = function _callLoiter(def, target, ceiling, opts 
   const model = makeAirframe(def);
   if (def.aircraft?.kind !== 'tomahawk') decorate(model, def.aircraft?.kind);
   model.rotation.order = 'YXZ';
-  model.traverse((m) => { if (m.isMesh) m.frustumCulled = false; });
   this.scene.add(model);
   const s = {
     def, model, dir, side, target: target.clone(),

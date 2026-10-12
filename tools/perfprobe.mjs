@@ -13,6 +13,7 @@ await page.addInitScript((tier) => { try {
   localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
   localStorage.setItem('tt.tutorial', 'done'); } catch {} }, process.env.TIER || 'low');
+if (process.env.KINDS) await page.addInitScript((k) => { window.__kinds = k.split(','); }, process.env.KINDS);
 await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 await page.waitForTimeout(2000);
@@ -23,7 +24,7 @@ const r = await page.evaluate(([n, secs, warm, gapMode]) => {
     obj[name] = function (...a) { const t = performance.now(); try { return f.apply(this, a); } finally { T[key] = (T[key] || 0) + performance.now() - t; C[key] = (C[key] || 0) + 1; } };
   };
   const tm = window.testMenu, bt = window.battle, g = bt.garrison;
-  const kinds = ['m119', 'm777', 'at4', 'javelin', 'm109', 'stryker', 'm120', 'gustaf'];
+  const kinds = window.__kinds || ['m119', 'm777', 'at4', 'javelin', 'm109', 'stryker', 'm120', 'gustaf'];
   let placed = 0;
   for (let i = 0; placed < n && i < n * 3; i++) {
     const id = kinds[i % kinds.length];
@@ -76,10 +77,24 @@ const r = await page.evaluate(([n, secs, warm, gapMode]) => {
   const unitsHidden = (() => { for (const u of bt.units) u.group.visible = false; inf.reset(); window.__frame(); const r = { calls: inf.render.calls, tris: inf.render.triangles }; for (const u of bt.units) u.group.visible = true; return r; })();
   const render = { withUnits, unitTris, rootTris, unitsHidden, calls: inf.render.calls, tris: inf.render.triangles, geos: inf.memory.geometries, tex: inf.memory.textures, frameMs: frameMs.toFixed(0), renderMs: renderMs.toFixed(1), unitMeshes, byRoot };
   const per = {}; for (const k in T) per[k] = `${(T[k] / secs).toFixed(1)} ms/s  (${C[k]} calls)`;
+  // What the moving bodies are: welded sections (islands) by size, single
+  // stones, anything else, how many asleep, and how fast the rest go.
+  const P = window.physics, bodies = { island: 0, stone: 0, other: 0, asleep: 0, slow: 0, fast: 0, sizes: {} };
+  for (const body of P.dynamicSet) {
+    const o = P.owners.get(body.handle);
+    if (o?.island != null) {
+      bodies.island++;
+      const isl = o.structure.islands.get(o.island), m = isl ? isl.members.length : -1;
+      const k = m < 0 ? 'gone' : m <= 4 ? '1-4' : m <= 16 ? '5-16' : m <= 64 ? '17-64' : '65+';
+      bodies.sizes[k] = (bodies.sizes[k] || 0) + 1;
+    } else if (o?.chunk != null) bodies.stone++; else bodies.other++;
+    if (body.isSleeping()) bodies.asleep++;
+    else { const v = body.linvel(); if (Math.hypot(v.x, v.y, v.z) < 0.34) bodies.slow++; else bodies.fast++; }
+  }
   return { placed, alive: bt.units.filter((u) => u.alive).length, defenders: g.defenders.filter((d) => d.alive).length,
     shells: bt.projectiles?.list?.length ?? bt.projectiles?.active?.length, awake: window.physics.awakeCount, sim: window.physics.dynamicSet.size,
     destroyed: window.structures.reduce((a, s) => a + s.destroyedCount, 0),
-    render, wallMsPerSimSec: (wall / secs).toFixed(1), losPerSec: ((g.losChecks - l0) / secs).toFixed(0), per };
+    frozenLow: window.physics.frozenLow || 0, culled: window.physics.rubbleCulled || 0, bodies, islands: window.structures.reduce((a, s) => a + s.islands.size, 0), render, wallMsPerSimSec: (wall / secs).toFixed(1), losPerSec: ((g.losChecks - l0) / secs).toFixed(0), per };
 }, [+nUnits, +secs, +warm, process.env.GAP ?? '1']);
 console.log(JSON.stringify(r, null, 1));
 await b.close();

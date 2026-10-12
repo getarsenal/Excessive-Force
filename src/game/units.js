@@ -23,6 +23,17 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  */
 const LOD_ERR = 0.05;
 export const LOD_DIST = Math.round(LOD_ERR * 1300 / (2 * Math.tan(THREE.MathUtils.degToRad(26))));
+/**
+ * And a second, for the guns a long way off. A big battery stands in a ring
+ * two to five hundred metres round the building, which is where the camera
+ * looks from too, and at that range the far model's twelve thousand
+ * triangles an M777 are a pixel's error drawn twelve thousand times: two
+ * hundred and seventy guns on a phone were four and a half million
+ * triangles a frame. Past `LOD2_DIST` each is the far model simplified
+ * again to a quarter of a metre, which there is still under the pixel.
+ */
+const LOD_ERR2 = 0.25;
+export const LOD2_DIST = Math.round(LOD_ERR2 * 1300 / (2 * Math.tan(THREE.MathUtils.degToRad(26))));
 
 /** One worker for every model's simplification (lodworker.js), made on first use. */
 let lodWorker = null, lodSeq = 0;
@@ -45,7 +56,7 @@ function simplifyOff(pos, cols, index, err) {
   });
 }
 
-async function lightModel(wrapper) {
+async function lightModel(wrapper, ERR = LOD_ERR) {
   const low = wrapper.clone(true);
   low.updateMatrixWorld(true);
   let before = 0, after = 0;
@@ -60,7 +71,7 @@ async function lightModel(wrapper) {
     const geo = o.geometry;
     before += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
     o.getWorldScale(sc);
-    const err = LOD_ERR / Math.max(1e-6, (Math.abs(sc.x) + Math.abs(sc.y) + Math.abs(sc.z)) / 3);
+    const err = ERR / Math.max(1e-6, (Math.abs(sc.x) + Math.abs(sc.y) + Math.abs(sc.z)) / 3);
     const pa = geo.attributes.position;
     const pos = new Float32Array(pa.count * 3);
     for (let i = 0; i < pa.count; i++) { pos[i * 3] = pa.getX(i); pos[i * 3 + 1] = pa.getY(i); pos[i * 3 + 2] = pa.getZ(i); }
@@ -731,8 +742,13 @@ export class ModelLibrary {
       try {
         const t0 = performance.now();
         const L = await lightModel(wrapper);
-        if (L.after < L.before * 0.6) this.lods.set(wrapper, L);
-        console.log(`[tumble] ${file}: ${L.before} triangles, ${L.after} beyond ${LOD_DIST} m (${Math.round(performance.now() - t0)} ms)`);
+        if (L.after < L.before * 0.6) {
+          // The farther copy, from the far one: a twelfth of the work.
+          const L2 = await lightModel(L.low, LOD_ERR2);
+          if (L2.after < L.after * 0.6) { L.low2 = L2.low; L.after2 = L2.after; }
+          this.lods.set(wrapper, L);
+        }
+        console.log(`[tumble] ${file}: ${L.before} triangles, ${L.after} beyond ${LOD_DIST} m, ${L.after2 ?? '—'} beyond ${LOD2_DIST} m (${Math.round(performance.now() - t0)} ms)`);
       } catch (e) { console.warn('[tumble] no far model for', file, e); }
     }
     this.cache.set(key, wrapper);
@@ -764,10 +780,14 @@ export class ModelLibrary {
     return wrapper;
   }
 
+  /**
+   * A gun of this type, sharing the type's buffers. Culled to the view like
+   * anything else: every gun on the map used to be drawn whether it was on
+   * the screen or behind the camera, which with a battery of two hundred and
+   * seventy round the building was most of them drawn for nothing.
+   */
   instance(wrapper) {
-    const clone = wrapper.clone(true);
-    clone.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
-    return clone;
+    return wrapper.clone(true);
   }
 }
 

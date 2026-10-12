@@ -140,8 +140,14 @@ two by the camera's distance and poses whichever is shown, a gun still in
 the lift too (its stand-in, `drop.stub`, under the Chinook or the canopy:
 it flew in on its near model, and sixteen M777s in the sling were 4.56
 million triangles a frame, now 1.83; `node tools/heliprobe.mjs westminster
-16 low m777 40` counts every pass's triangles). An M777 is
-182,675 triangles near and 11,844 far. `node tools/lodshot.mjs` renders
+16 low m777 40` counts every pass's triangles). Past `LOD2_DIST` (333 m)
+a gun draws a third copy, the far one simplified again to a quarter of a
+metre (an M777 2,845 triangles), and guns are culled to the view like
+everything else (they were not: every gun on the map was drawn, behind the
+camera or not). `node tools/armytris.mjs saintsava 240` puts a 240-gun
+battery down on a phone's screen and counts a frame with and without it:
+the guns were 1.63 million triangles and 576 calls, now 82,000 and 179.
+An M777 is 182,675 triangles near and 11,844 far. `node tools/lodshot.mjs` renders
 each gun near and far side by side; `node tools/unitcost.mjs <level>`
 counts what the deployed units cost a frame.
 
@@ -554,7 +560,20 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   into a removed one traps the wasm and halts the physics for good
   ("recursive use of an object"). `step` resolves every event before
   dispatching any and drops those whose bodies have gone, and
-  `chunkAtCollider` looks the stone up by handle in plain JS ·
+  `chunkAtCollider` looks the stone up by handle in plain JS. The crush
+  breaks up only sections of more than sixteen stones: a smaller piece is
+  rubble already, and breaking it again on every knock was fifty splits a
+  step in a heap under a barrage. Rubble under a big battery
+  (`recycleSettled`, physics.js): past twice the body budget a small piece
+  (sixteen stones or fewer, not settling) counts as at rest when merely
+  shuffling, and one lying within `LOW_PILE` (3.5 m) of the ground is frozen
+  where it lies even on other loose pieces (`_freezeLow`); past two and a
+  half times the budget the smallest and lowest go to dust (`_cullRubble`,
+  `destroyIsland`). Two hundred and forty guns on Saint Sava held a thousand
+  pieces awake and physics at 1.5 s a simulated second; now about four
+  hundred and 0.5 s. `KINDS=m777,m777,m119 node tools/perfprobe.mjs
+  saintsava 240 20 60` runs that fight and says what the moving bodies are
+  (sections by size, stones, asleep, slow, fast, frozen low, culled) ·
   SEASONS (`src/game/seasons.js`): every six weeks a themed run of eight
   catalogue landmarks, open to all while it runs, stars counted once per
   landmark at its best, three tiers paid once (`grant` in progress.js: XP,

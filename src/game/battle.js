@@ -19,7 +19,7 @@ const HEAT = { mgRound: 0.018, seatSecs: 5, cool: 0.1, lock: 4.0, reset: 0.45 };
 import { barrelTip, poseBarrel } from './barrel.js';
 import { bombWhistle, carAlarm, crack } from '../core/synth.js';
 import { isReleased } from './campaign.js';
-import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR, LOD_DIST } from './units.js';
+import { UNITS, UNITS_BY_ID, ModelLibrary, makeInfantryMesh, makeMortarTeam, flattenModel, MORTAR, LOD_DIST, LOD2_DIST } from './units.js';
 import { releaseTree } from '../core/release.js';
 
 /** How long a lift package stays open after the first unit is placed. */
@@ -464,7 +464,12 @@ export class Battle {
       u.barrelElev += Math.abs(d) <= step ? d : Math.sign(d) * step;
     }
     u.recoilT = Math.max(0, (u.recoilT || 0) - dt * 1.4);
-    poseBarrel(u.lodFar && u.barrelLo ? u.barrelLo : u.barrel, B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+    poseBarrel(this._shownBarrel(u), B, u.barrelElev, B.recoil * u.recoilT * u.recoilT);
+  }
+
+  /** The barrel of whichever of the gun's models is drawn. */
+  _shownBarrel(u) {
+    return (u.lodFar === 2 && u.barrelLo2) || (u.lodFar && u.barrelLo) || u.barrel;
   }
 
   /**
@@ -473,13 +478,16 @@ export class Battle {
    * so a swap never shows the other's stale elevation.
    */
   _lod(u, at = u.pos) {
-    const far = this.camera.position.distanceToSquared(at) > LOD_DIST * LOD_DIST;
-    if (far === u.lodFar) return;
+    // 0 near, 1 far, 2 farther (`LOD2_DIST`, when the gun has the third).
+    const d2 = this.camera.position.distanceToSquared(at);
+    const far = d2 > LOD2_DIST * LOD2_DIST && u.modelLo2 ? 2 : d2 > LOD_DIST * LOD_DIST ? 1 : 0;
+    if (far === (u.lodFar || 0)) return;
     u.lodFar = far;
-    u.model.visible = !far;
-    u.modelLo.visible = far;
+    u.model.visible = far === 0;
+    u.modelLo.visible = far === 1;
+    if (u.modelLo2) u.modelLo2.visible = far === 2;
     const B = u.barrelB;
-    if (B) poseBarrel(far && u.barrelLo ? u.barrelLo : u.barrel, B, u.barrelElev, B.recoil * (u.recoilT || 0) ** 2);
+    if (B) poseBarrel(this._shownBarrel(u), B, u.barrelElev, B.recoil * (u.recoilT || 0) ** 2);
   }
 
   /**
@@ -2571,7 +2579,15 @@ export class Battle {
       unit.group.add(lo);
       unit.modelLo = lo;
       unit.barrelLo = lo.getObjectByName('barrel') || null;
-      unit.lodFar = false;
+      unit.lodFar = 0;
+      if (lod.low2) {
+        const lo2 = this.models.instance(lod.low2);
+        lo2.rotation.y = inst.rotation.y;
+        lo2.visible = false;
+        unit.group.add(lo2);
+        unit.modelLo2 = lo2;
+        unit.barrelLo2 = lo2.getObjectByName('barrel') || null;
+      }
     }
     if (unit.drop) unit.drop.model = inst;
   }
@@ -2585,7 +2601,7 @@ export class Battle {
   _adoptModel(unit, drop) {
     const s = drop.stub || {};
     unit.model = drop.model;
-    for (const k of ['barrel', 'barrelB', 'barrelElev', 'barrelWant', 'recoilT', 'modelLo', 'barrelLo', 'lodFar']) {
+    for (const k of ['barrel', 'barrelB', 'barrelElev', 'barrelWant', 'recoilT', 'modelLo', 'barrelLo', 'modelLo2', 'barrelLo2', 'lodFar']) {
       if (s[k] !== undefined) unit[k] = s[k];
     }
   }

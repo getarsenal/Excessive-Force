@@ -2098,7 +2098,10 @@ async function boot() {
       // Shattered earlier in this same batch: its body is gone.
       if (!isl || !isl.body || !PhysicsWorld.alive(isl.body)) continue;
       isl.impacts++;
-      if (force > 26000) {
+      // A piece of sixteen stones or fewer is already rubble: breaking it up
+      // again on every hard knock only made more bodies of it, fifty times a
+      // step in a heap under a barrage, each with its own puff and thud.
+      if (force > 26000 && isl.members.length > 16) {
         const t = isl.body.translation();
         fx.impactDust(t.x, terrain.heightAt(t.x, t.z), t.z,
           Math.min(3.5, isl.members.length / 90));

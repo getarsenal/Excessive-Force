@@ -48,6 +48,8 @@ const GROUNDED = Object.freeze({ grounded: true });
  * that far above the heap reads as resting on it.
  */
 const AIR_UNDER = 1.0;
+/** How deep a heap of rubble may be frozen into where it lies, under load (`_freezeLow`). */
+const LOW_PILE = 3.5;
 
 export class PhysicsWorld {
   constructor(quality) {
@@ -1068,6 +1070,14 @@ export class PhysicsWorld {
   recycleSettled(settleFrames) {
     if (this.dead) return 0;
     const toDemote = [];
+    // Twice over the budget is a battery shelling its own rubble: two
+    // hundred and forty guns on Saint Sava held a thousand broken pieces of
+    // one to sixteen stones awake, six of them asleep, and a phone spent
+    // forty milliseconds a frame moving rubble about. Then what is merely
+    // shuffling in a heap counts as at rest, and sooner.
+    const over = this.dynamicSet.size > this.activeBudget * 2;
+    const v2Max = over ? 0.6 : 0.04, w2Max = over ? 1.5 : 0.04;
+    const frames = over ? Math.ceil(settleFrames / 2) : settleFrames;
     for (const body of this.dynamicSet) {
       const owner = this.owners.get(body.handle);
       if (!owner) continue;
@@ -1075,19 +1085,21 @@ export class PhysicsWorld {
       // to end between two walls is a flat arch as far as the contact solver
       // is concerned, and it holds one up in the air indefinitely, trembling
       // too much ever to sleep — so "not moving" is the test, not "asleep".
-      // Single stones only: a welded section easing over on the lean is slow
-      // for seconds at a time and is not stuck.
+      // Single stones and small broken pieces (a sixteenth of a section or
+      // less) only: a welded section easing over on the lean is slow for
+      // seconds at a time and is not stuck, and nor is one still settling.
       let still = body.isSleeping();
-      if (!still && body.numColliders() === 1) {
+      const nc = still ? 0 : body.numColliders();
+      if (!still && (nc === 1 || (nc <= 16 && !this._settlingIsland(owner)))) {
         const v = body.linvel();
-        if (v.x * v.x + v.y * v.y + v.z * v.z < 0.04) {
+        if (v.x * v.x + v.y * v.y + v.z * v.z < v2Max) {
           const w = body.angvel();
-          still = w.x * w.x + w.y * w.y + w.z * w.z < 0.04;
+          still = w.x * w.x + w.y * w.y + w.z * w.z < w2Max;
         }
       }
       if (still) {
         owner.settleTimer = (owner.settleTimer || 0) + 1;
-        if (owner.settleTimer > settleFrames) toDemote.push(body);
+        if (owner.settleTimer > frames) toDemote.push(body);
       } else {
         owner.settleTimer = 0;
       }
@@ -1096,6 +1108,13 @@ export class PhysicsWorld {
     // Also bounded: a collapse settles in waves, and the rest of a wave can
     // just as well be frozen on the next frame.
     if (toDemote.length > 160) toDemote.length = 160;
+    // And a ceiling. What is still moving after all that is being kept moving
+    // — a heap under a barrage, every shell into it throwing the pieces about
+    // again — and past two and a half times the budget the smallest and lowest of
+    // them go to dust, as a stone that cannot be given a slot does in
+    // `reclaim`. Under two hundred guns nobody sees which.
+    const cap = this.activeBudget * 2.5;
+    if (this.dynamicSet.size - toDemote.length > cap) this._cullRubble(this.dynamicSet.size - toDemote.length - cap, toDemote);
     for (const b of toDemote) {
       // The list was taken before any of it was acted on, and a wedged stone
       // crumbled below (`destroyChunk`) can take others in the list with it:
@@ -1104,12 +1123,23 @@ export class PhysicsWorld {
       // did it forty per cent of the way down (tools/demoprobe.mjs).
       if (!PhysicsWorld.alive(b)) continue;
       if (this.demote(b)) { n++; continue; }
+      // Refused for want of anything fixed under it, which in a heap is most
+      // of the heap: each piece lies on others that are just as loose, and
+      // none of them can go before the one beneath. Under a heavy load a
+      // small piece lying low in the rubble is frozen where it lies all the
+      // same — within a few metres of the ground it is resting on the
+      // ground, through whatever is in between, and cannot be a stone
+      // hanging in the sky.
+      if (over && this._freezeLow(b)) { n++; continue; }
       // Refused: at rest in clear air, which is not settled but stuck. Waking
       // it is not enough when it is wedged — it wakes into the same jam — so
       // the grip comes off as well, and it is started on its way down. The
       // grip goes back when it freezes, on whatever it lands on.
       const owner = this.owners.get(b.handle);
       if (owner) owner.settleTimer = 0;
+      // A broken piece in a heap of others is held up by its neighbours, not
+      // jammed: it waits for them to freeze under it.
+      if (b.numColliders() > 1) continue;
       // Loosened once and still there, with clear air under it: it is not
       // resting on anything, it is jammed by its corners between two stones
       // that are still standing, which no amount of friction taken away will
@@ -1122,6 +1152,78 @@ export class PhysicsWorld {
       this._loosen(b);
     }
     return n;
+  }
+
+  /**
+   * Freeze a small piece of rubble whose foot is within `LOW_PILE` of the
+   * ground under it, without asking what it is touching (see
+   * `recycleSettled`). It counts as standing on the ground, so nothing shot
+   * away from under it later can leave it hanging over more than that.
+   */
+  _freezeLow(body) {
+    if (!this.groundAt || body.bodyType() === this.rapier.RigidBodyType.Fixed) return false;
+    const n = body.numColliders();
+    if (n < 1 || n > 16) return false;
+    let foot = Infinity, fx = 0, fz = 0;
+    for (let c = 0; c < n; c++) {
+      const f = this._footOf(body.collider(c));
+      if (f && f.y - f.hy < foot) { foot = f.y - f.hy; fx = f.x; fz = f.z; }
+    }
+    const g = this.groundAt(fx, fz);
+    if (!isFinite(foot) || !isFinite(g) || foot > g + LOW_PILE) return false;
+    body.setBodyType(this.rapier.RigidBodyType.Fixed, false);
+    if (body.__loose) {
+      body.__loose = false;
+      for (let c = 0; c < n; c++) body.collider(c)?.setFriction(0.92);
+    }
+    this.dynamicSet.delete(body);
+    const owner = this.owners.get(body.handle);
+    if (owner) { owner.dynamic = false; owner.settled = true; }
+    body.__supGround = true;
+    body.__supCol = undefined;
+    body.__supBody = null;
+    body.__frozen = true;
+    body.__frozenAt = this.stepCount;
+    this.frozen.push(body);
+    this.frozenLow = (this.frozenLow || 0) + 1;
+    return true;
+  }
+
+  /**
+   * Turn `k` of the smallest, lowest loose pieces to dust (single stones,
+   * and broken pieces of sixteen stones or fewer that are not still settling
+   * off the building), at most forty-eight a frame. `skip` is what is
+   * already on its way to being frozen.
+   */
+  _cullRubble(k, skip) {
+    const keep = new Set(skip);
+    const pick = [];
+    for (const body of this.dynamicSet) {
+      if (keep.has(body) || body.__doomed) continue;
+      const owner = this.owners.get(body.handle);
+      if (!owner?.structure) continue;
+      if (owner.chunk === undefined) {
+        if (owner.island == null || body.numColliders() > 16 || this._settlingIsland(owner)) continue;
+      }
+      pick.push([this._expendability(body), body, owner]);
+    }
+    pick.sort((a, b) => a[0] - b[0]);
+    let n = 0;
+    for (let i = 0; i < pick.length && n < Math.min(k, 48); i++) {
+      const [, body, owner] = pick[i];
+      if (!PhysicsWorld.alive(body)) continue;
+      if (owner.chunk !== undefined) owner.structure.destroyChunk(owner.chunk, 'cull');
+      else owner.structure.destroyIsland(owner.island);
+      n++;
+    }
+    this.rubbleCulled = (this.rubbleCulled || 0) + n;
+    return n;
+  }
+
+  /** Is this owner a welded section still easing over on the lean? */
+  _settlingIsland(owner) {
+    if (owner.island == null || !owner.structure) return false;
+    return !!owner.structure.islands?.get(owner.island)?.settling;
   }
 
   /** Take the friction off a stuck body and start it falling. */

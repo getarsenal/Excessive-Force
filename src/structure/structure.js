@@ -2300,6 +2300,22 @@ export class Structure {
     this.stabilityDirty = true;
   }
 
+  /**
+   * A broken piece of rubble gone to dust, every stone of it (physics.js
+   * `_cullRubble`). Only the first two throw their dust: a piece is one
+   * puff, not sixteen.
+   */
+  destroyIsland(id) {
+    const island = this.islands.get(id);
+    if (!island) return 0;
+    const members = Array.from(island.members);
+    const cb = this.onChunkDestroyed;
+    try {
+      members.forEach((i, k) => { this.onChunkDestroyed = k < 2 ? cb : null; this.destroyChunk(i, 'cull'); });
+    } finally { this.onChunkDestroyed = cb; }
+    return members.length;
+  }
+
   _detachCollider(i) {
     // Leaving the static body means this stone no longer blocks anyone's line
     // of sight, whether it was destroyed, freed or welded into an island.
