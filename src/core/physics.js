@@ -1108,13 +1108,7 @@ export class PhysicsWorld {
     // Also bounded: a collapse settles in waves, and the rest of a wave can
     // just as well be frozen on the next frame.
     if (toDemote.length > 160) toDemote.length = 160;
-    // And a ceiling. What is still moving after all that is being kept moving
-    // — a heap under a barrage, every shell into it throwing the pieces about
-    // again — and past two and a half times the budget the smallest and lowest of
-    // them go to dust, as a stone that cannot be given a slot does in
-    // `reclaim`. Under two hundred guns nobody sees which.
-    const cap = this.activeBudget * 2.5;
-    if (this.dynamicSet.size - toDemote.length > cap) this._cullRubble(this.dynamicSet.size - toDemote.length - cap, toDemote);
+
     for (const b of toDemote) {
       // The list was taken before any of it was acted on, and a wedged stone
       // crumbled below (`destroyChunk`) can take others in the list with it:
@@ -1138,8 +1132,16 @@ export class PhysicsWorld {
       const owner = this.owners.get(b.handle);
       if (owner) owner.settleTimer = 0;
       // A broken piece in a heap of others is held up by its neighbours, not
-      // jammed: it waits for them to freeze under it.
-      if (b.numColliders() > 1) continue;
+      // jammed: it waits for them to freeze under it. Under a heavy load it
+      // waits asleep, if there is something under it: a heap of three
+      // hundred pieces forty metres high on Landmark 81 lay still for good
+      // with every piece of it awake, a solver's worth of work a step for
+      // nothing. A hit or a landing wakes it; with nothing under it, it is
+      // woken to fall.
+      if (b.numColliders() > 1) {
+        if (over) { if (this._overSomething(b)) b.sleep?.(); else b.wakeUp(); }
+        continue;
+      }
       // Loosened once and still there, with clear air under it: it is not
       // resting on anything, it is jammed by its corners between two stones
       // that are still standing, which no amount of friction taken away will
@@ -1151,6 +1153,15 @@ export class PhysicsWorld {
       }
       this._loosen(b);
     }
+    // And a ceiling, counted after the freezing above rather than before it:
+    // what was put on the list and refused is still moving. What is still
+    // moving after all that is being kept moving — a heap under a barrage,
+    // every shell into it throwing the pieces about again — and past two and
+    // a half times the budget the smallest and lowest of them go to dust, as
+    // a stone that cannot be given a slot does in `reclaim`. Under two
+    // hundred guns nobody sees which.
+    const cap = this.activeBudget * 2.5;
+    if (this.dynamicSet.size > cap) this._cullRubble(this.dynamicSet.size - cap, []);
     return n;
   }
 

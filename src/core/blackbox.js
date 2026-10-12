@@ -59,7 +59,9 @@ export function describeCrash(c) {
   const when = new Date(c.lastAt);
   return `${c.level} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · ${Math.round(s.el || 0)} s in · `
     + `${s.fps ?? '?'} fps · ${s.units ?? '?'} guns · ${s.air ?? '?'} aircraft · ${s.dyn ?? '?'} bodies · ${s.trisK ?? '?'}k tris`
-    + (s.heapMB ? ` · ${s.heapMB} MB heap` : '');
+    + (s.heapMB ? ` · ${s.heapMB} MB heap` : '')
+    + (s.dead ? ` · PHYSICS HALTED (${s.deadWhy || '?'})` : '')
+    + (s.frozenHigh || s.stuckHigh ? ` · ${s.frozenHigh || 0} frozen / ${s.stuckHigh || 0} stuck over 30 m` : '');
 }
 
 export class BlackBox {
@@ -103,12 +105,22 @@ export class BlackBox {
       let particles = 0;
       for (const p of [fx?.fire, fx?.smoke, fx?.sparks, fx?.dust, fx?.plume, fx?.clods, fx?.flourish?.paper]) if (p) particles += p.count;
       let bodies = null; try { bodies = P.world.bodies.len(); } catch { /* dead world */ }
+      // What is up in the air and not falling: frozen pieces and still ones
+      // more than thirty metres over the ground under them.
+      let frozenHigh = 0, stuckHigh = 0;
+      if (!P.dead && P.groundAt) {
+        try {
+          for (const b of P.frozen || []) { if (b.__removed) continue; const t = b.translation(); if (t.y - P.groundAt(t.x, t.z) > 30) frozenHigh++; }
+          for (const b of P.dynamicSet) { const t = b.translation(); if (t.y - P.groundAt(t.x, t.z) <= 30) continue; const v = b.linvel(); if (v.x * v.x + v.y * v.y + v.z * v.z < 0.1) stuckHigh++; }
+        } catch { /* a body gone under us */ }
+      }
       const s = {
         at: Date.now(), el: Math.round(B.elapsed), state: B.state, hidden: document.hidden,
         fps: stats?.().fps ?? null, physMs: stats?.().physMs ?? null,
         units: B.units.filter((u) => u.alive).length, lift: B.pending.length, air: B.air?.sorties?.length ?? null,
         shells: B.projectiles?.inFlight ?? B.projectiles?.list?.length ?? null,
-        dyn: P.dynamicSet.size, bodies, budget: P.activeBudget, dead: !!P.dead,
+        dyn: P.dynamicSet.size, bodies, budget: P.activeBudget, dead: !!P.dead, deadWhy: P.deadReason || null,
+        frozenHigh, stuckHigh, culled: P.rubbleCulled || 0,
         islands: S.reduce((a, st) => a + st.islands.size, 0), stonesDown: S.reduce((a, st) => a + st.destroyedCount, 0),
         burnt: B.cityFire?.burnt ?? null, fires: B.fires?.list?.length ?? null,
         geos: I.memory.geometries, tex: I.memory.textures, programs: I.programs?.length ?? null,

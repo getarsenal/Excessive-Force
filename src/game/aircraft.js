@@ -1692,6 +1692,20 @@ AirWing.prototype._dropSortie = function _dropSortie(s) {
 export { makeChinook } from './airframes/chinook.js';
 import { makeChinook } from './airframes/chinook.js';
 
+/**
+ * One Chinook, built and baked once a session, and every lift flown by a
+ * clone of it sharing its buffers and materials (the rotors are turned by
+ * their own nodes, which a clone has its own of; the nose art is painted on
+ * each clone as decals of its own). A lift of seventy towed guns built and
+ * baked seventy airframes, each its own geometry on the GPU, in a battle
+ * already carrying two hundred guns and a falling skyscraper.
+ */
+let chinookTemplate = null;
+function chinookModel() {
+  if (!chinookTemplate) chinookTemplate = makeChinook();
+  return chinookTemplate.clone(true);
+}
+
 const HELI = { speed: 56, height: 62, runIn: 640, hover: 17, sling: 11.5, lower: 1.7, spacing: 70, stagger: 1.6 };
 
 /**
@@ -1709,7 +1723,7 @@ AirWing.prototype._deliverHelis = function _deliverHelis(drops, onLand, formatio
     const dl = Math.hypot(dx, dz) || 1;
     const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    const model = makeChinook();
+    const model = chinookModel();
     decorate(model, 'chinook');
     const lateral = -40 - (i + formationIndex) * 26;
     const behind = HELI.runIn + i * HELI.stagger * HELI.speed;
