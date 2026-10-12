@@ -257,9 +257,9 @@ export async function showWorldMap({ current = null, canResume = false, view: st
           <div class="ef-sets" id="ef-testing">
             <button class="ef-set" id="ef-build" type="button"><span>BUILD</span><em></em></button>
             <button class="ef-set" id="ef-crash" type="button" data-copy="crash"><span>COPY LAST CRASH</span><em></em></button>
-            <button class="ef-set" id="ef-play" type="button"><span>SHOW LAST PLAY SESSION</span><em></em></button>
-            <button class="ef-set" id="ef-playcopy" type="button" data-copy="play"><span>COPY LAST PLAY SESSION</span><em></em></button>
-            <button class="ef-set" id="ef-perf" type="button" data-copy="perf"><span>COPY LAST PERF RUN</span><em></em></button>
+            <button class="ef-set" id="ef-play" type="button"><span>LAST PLAY SESSION</span><em></em></button>
+            <button class="ef-set" id="ef-playcopy" type="button" data-copy="play"><span>COPY PLAY SESSION</span><em></em></button>
+            <button class="ef-set" id="ef-perf" type="button" data-copy="perf"><span>COPY PERF RUN</span><em></em></button>
             <button class="ef-set" id="ef-crashclear" type="button"><span>CLEAR CRASHES</span><em></em></button>
           </div>
           <div class="ef-set-note">A battle that drops you back to the title is filed here on the next start (the black box). RECORD MY PLAY and the scripted runs are in a battle's TEST panel; their results are kept here.</div>
@@ -871,12 +871,13 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     const em = (id, text, on = false) => { const b = root.querySelector(id); if (!b) return; b.querySelector('em').textContent = text; b.classList.toggle('on', !!on); };
     em('#ef-build', buildId());
     const cs = crashes();
-    em('#ef-crash', cs.length ? `${cs.length} filed · ${describeCrash(cs[cs.length - 1])}` : 'none recorded', cs.length > 0);
+    const lc = cs[cs.length - 1];
+    em('#ef-crash', lc ? `${cs.length} filed · ${lc.level} · ${when(lc.lastAt)}` : 'none recorded', cs.length > 0);
     const ps = playHistory()[0];
-    const pline = ps ? `${when(ps.at)} · ${(ps.levels || []).join(', ')} · ${ps.perf?.fps ?? '—'} fps · ${ps.wallMin ?? '—'} min` : 'none recorded';
+    const pline = ps ? `${(ps.levels || []).slice(-1)[0] || ''} · ${when(ps.at)} · ${ps.perf?.fps ?? '—'} fps` : 'none recorded';
     em('#ef-play', pline); em('#ef-playcopy', pline);
     const pr = perfRuns()[0];
-    em('#ef-perf', pr ? `${when(pr.at)} · ${pr.level || ''} · ${pr.tier || ''} · ${pr.mode || ''}` : 'none recorded');
+    em('#ef-perf', pr ? `${pr.level || ''} · ${when(pr.at)} · ${pr.mode || ''}` : 'none recorded');
     em('#ef-crashclear', cs.length ? `${cs.length} to clear` : 'nothing to clear');
   };
   // Onto the clipboard, or into a box to select by hand where the clipboard is refused.
