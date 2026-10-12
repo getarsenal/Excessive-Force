@@ -2931,8 +2931,24 @@ export class TestMenu {
         // that pressure is exactly what used to freeze stone in the air.
         const wasBudget = P.activeBudget;
         P.setBudget(200);
+        // How many stones the recycler has frozen so far: the pressure the
+        // check is about. Six rounds used to be enough, but what the rounds
+        // free depends on what the tests before this one left standing, and
+        // on a run where the wing came down in one piece a band of six found
+        // twelve stones to recycle and the guard went unexercised. So the
+        // rounds go on, up to fourteen, until the recycler has had sixty.
+        const recycled = () => {
+          let n = 0;
+          for (let i = 0; i < st.count; i++) {
+            if (!(st.flags[i] & 1) || !(st.flags[i] & 2)) continue;
+            const body = st.bodyOf[i];
+            if (body && !body.__removed && body.bodyType() === RT.Fixed) n++;
+          }
+          return n;
+        };
         try {
-          for (let r = 0; r < 6; r++) {
+          for (let r = 0; r < 14; r++) {
+            if (r >= 6 && recycled() > 60) break;
             let best = -1, bestd = Infinity;
             let lo = Infinity, hi = -Infinity;
             for (let i = 0; i < st.count; i++) {
@@ -2941,7 +2957,7 @@ export class TestMenu {
               lo = Math.min(lo, st.py[i]); hi = Math.max(hi, st.py[i]);
             }
             if (!isFinite(lo)) break;
-            const wantY = lo + (hi - lo) * (0.3 + r * 0.09);
+            const wantY = lo + (hi - lo) * (0.3 + (r % 7) * 0.09);
             // The outermost stone at that height: the one a shell fired at
             // the building would meet. The first stone found at the height
             // was, on a pyramid, a stone in the middle of the core, and a
