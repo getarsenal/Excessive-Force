@@ -24,7 +24,7 @@ import { FACADE_PALETTE as PALETTE, ROOF_PALETTE as ROOF, FLAT_ROOF_PALETTE as F
   TRIM_PALETTE as TRIM_STONE } from './city.js';
 import { valueNoise } from './terrain.js';
 import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
-  addRiverEdge, addRoofAndFrontage, burnable, plotRanges, markBurnable, plotPoint, onRoof } from './detail.js';
+  addRiverEdge, addRoofAndFrontage, burnable, mergeChunked, plotPoint, onRoof } from './detail.js';
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
@@ -1256,10 +1256,10 @@ export function buildContext(terrain, quality, opts = {}) {
   burnable(bodyMat);
   burnable(roofMat);
   const cityMeshes = [];
-  if (bodies.length) cityMeshes.push(mergeTinted(bodies, bodyMat, PALETTE, rng, quality));
+  if (bodies.length) cityMeshes.push(...mergeTinted(bodies, bodyMat, PALETTE, rng, quality, 'bodies'));
   if (roofs.length) {
-    cityMeshes.push(mergeTinted(roofs, roofMat,
-      { main: FLAT_ROOF, pitched: ROOF, trim: TRIM_STONE }, rng, quality));
+    cityMeshes.push(...mergeTinted(roofs, roofMat,
+      { main: FLAT_ROOF, pitched: ROOF, trim: TRIM_STONE }, rng, quality, 'roofs'));
   }
   for (const m of cityMeshes) group.add(m);
   group.userData.cityMeshes = cityMeshes;
@@ -1550,7 +1550,7 @@ function gableRoof(len, span, rise) {
   return g;
 }
 
-function mergeTinted(geos, material, palette, rng, quality) {
+function mergeTinted(geos, material, palette, rng, quality, name) {
   // One colour per building and part, not per piece. Every box used to draw
   // its own colour, so a building's upper storey was a different stone from
   // the storeys under it, its plinth and cornice were two more roof colours,
@@ -1597,14 +1597,10 @@ function mergeTinted(geos, material, palette, rng, quality) {
     }
     g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   }
-  // Where each building ends up in the merge, by vertex, so it can be burnt.
-  const ranges = plotRanges(geos);
-  const merged = markBurnable(BufferGeometryUtils.mergeGeometries(geos, false));
-  const mesh = new THREE.Mesh(merged, material);
-  mesh.castShadow = quality.shadowMapSize > 0;
-  mesh.receiveShadow = quality.shadowMapSize > 0;
-  mesh.userData.plotRanges = ranges;
-  return mesh;
+  // One mesh a cell, each knowing where its buildings are by vertex so
+  // they can be burnt.
+  const shadows = quality.shadowMapSize > 0;
+  return mergeChunked(geos, material, { name, burn: true, cast: shadows, receive: shadows });
 }
 
 
@@ -2649,31 +2645,16 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     }
     squares++;
   }
-  if (asphalt.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(asphalt, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93 }),
-    );
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
-  for (const [arr, rough] of [[gravel, 0.95]]) {
-    if (!arr.length) continue;
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(arr, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough }),
-    );
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
-  if (railings.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(railings, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }),
-    );
-    mesh.castShadow = shadows;
-    g.add(mesh);
-  }
+  // Every merge below is laid in cells (`mergeChunked`) so the view culls it.
+  const lay = (list, material, opts) => {
+    for (const m of mergeChunked(list, material, opts)) g.add(m);
+  };
+  lay(asphalt, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93 }),
+    { name: 'asphalt', receive: shadows });
+  lay(gravel, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+    { name: 'gravel', receive: shadows });
+  lay(railings, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.25 }),
+    { name: 'railings', cast: shadows });
 
   // In the yards behind the terraces: a tree or two per plot, on the garden
   // side, which is the side away from the street.
@@ -2704,22 +2685,10 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     treeAt(x, z, 0.9 + rng() * 0.5);
   }
 
-  if (trunks.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(trunks, false),
-      new THREE.MeshStandardMaterial({ color: 0x5a4432, roughness: 0.95 }),
-    );
-    mesh.castShadow = shadows;
-    g.add(mesh);
-  }
-  if (crowns.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(crowns, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
-    );
-    mesh.castShadow = shadows;
-    g.add(mesh);
-  }
+  lay(trunks, new THREE.MeshStandardMaterial({ color: 0x5a4432, roughness: 0.95 }),
+    { name: 'trunks', cast: shadows });
+  lay(crowns, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
+    { name: 'crowns', cast: shadows });
 
   // ── Roof furniture. From directly above, a bare extruded box reads as a
   // box; chimney stacks, lift housings and a parapet are what make it read as
@@ -2771,17 +2740,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
       }
     }
   }
-  if (roofBits.length) {
-    const ranges = plotRanges(roofBits);
-    const mesh = new THREE.Mesh(
-      markBurnable(BufferGeometryUtils.mergeGeometries(roofBits, false)),
-      burnable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })),
-    );
-    mesh.userData.plotRanges = ranges;
-    mesh.castShadow = shadows;
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
+  lay(roofBits, burnable(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })),
+    { name: 'roofplant', burn: true, cast: shadows, receive: shadows });
 
   // ── Back gardens. The inside of a block is not paving: it is the yards
   // behind the terraces, and from above they are the green that stops a block
@@ -2800,14 +2760,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     tintOne(yard, rng() < 0.3 ? 0x8f8368 : 0x4a6c33, 0.8 + rng() * 0.4);
     yards.push(yard);
   }
-  if (yards.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(yards, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
-    );
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
+  lay(yards, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97 }),
+    { name: 'yards', receive: shadows });
 
   // ── Forecourts. A pale apron between the building line and the pavement,
   // which is what makes a terrace sit *on* a street rather than float beside
@@ -2820,14 +2774,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     tintOne(apron, 0xb9b3a4, 0.85 + rng() * 0.25);
     aprons.push(apron);
   }
-  if (aprons.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(aprons, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }),
-    );
-    mesh.receiveShadow = shadows;
-    g.add(mesh);
-  }
+  lay(aprons, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96 }),
+    { name: 'aprons', receive: shadows });
 
   // ── River traffic. A couple of barges give the water a sense of scale and
   // of being *used*, and they move, which nothing else on the river does.
@@ -2849,14 +2797,8 @@ function buildStreetDetail(terrain, quality, plots, net, rng, clearings = []) {
     tintOne(house, 0xc9c2b2, 0.9);
     hulls.push(house);
   }
-  if (hulls.length) {
-    const mesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(hulls, false),
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }),
-    );
-    mesh.castShadow = shadows;
-    g.add(mesh);
-  }
+  lay(hulls, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 }),
+    { name: 'hulls', cast: shadows });
 
   g.userData.squares = squares;
   g.userData.carparks = carparks;

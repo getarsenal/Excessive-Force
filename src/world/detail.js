@@ -91,12 +91,9 @@ export class PropSet {
     const shadows = this.quality.shadowMapSize > 0;
     for (const [key, geos] of this.buckets) {
       if (!geos.length) continue;
-      const ranges = plotRanges(geos);
-      const merged = BufferGeometryUtils.mergeGeometries(geos, false);
-      if (!merged) continue;
-      if (ranges.size) markBurnable(merged, ranges);
+      const burns = geos.some((g) => g.userData.plot !== undefined);
       const spec = materials[key] || {};
-      const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({
+      const material = new THREE.MeshStandardMaterial({
         vertexColors: true,
         roughness: spec.roughness ?? 0.92,
         metalness: spec.metalness ?? 0.0,
@@ -108,14 +105,11 @@ export class PropSet {
         polygonOffset: !!spec.offset,
         polygonOffsetFactor: spec.offset ? -(spec.offsetLevel ?? 2) : 0,
         polygonOffsetUnits: spec.offset ? -(spec.offsetLevel ?? 2) : 0,
-      }));
-      mesh.name = key;
-      if (ranges.size) { burnable(mesh.material); mesh.userData.plotRanges = ranges; }
-      mesh.castShadow = shadows && spec.cast !== false;
-      mesh.receiveShadow = shadows && spec.receive !== false;
-      if (spec.renderOrder) mesh.renderOrder = spec.renderOrder;
-      mesh.frustumCulled = false;
-      group.add(mesh);
+      });
+      if (burns) burnable(material);
+      for (const mesh of mergeChunked(geos, material, { name: key, burn: burns,
+        cast: shadows && spec.cast !== false, receive: shadows && spec.receive !== false,
+        renderOrder: spec.renderOrder })) group.add(mesh);
       this.buckets.set(key, []);
     }
   }
@@ -139,6 +133,73 @@ export function plotRanges(geos) {
     off += n;
   }
   return ranges;
+}
+
+/**
+ * The town is merged in cells of this many metres a side.
+ *
+ * One mesh a material was right for the draw calls and wrong for the GPU:
+ * a mesh that is the whole map is always in view, so every building in
+ * the town was transformed every frame whichever way the camera looked —
+ * on Boudhanath, 12,000 of them for a frame that could see a third. Cut
+ * into cells, each with its own bounding sphere, three's own frustum test
+ * drops the cells behind the camera and off its sides. A building's pieces
+ * all go in the building's cell, so `plotRanges` still names where it is
+ * and cityfire can still fold it.
+ */
+export const CELL = 250;
+
+/**
+ * Merge `geos` into one mesh per cell, sharing `material`.
+ *
+ * @param {object} opts { cell, name, cast, receive, burn, renderOrder, min }
+ *   `cell` metres a side (Infinity for one mesh); `burn` marks every cell
+ *   burnable (the material's shader expects the attribute); a list with
+ *   fewer than `min` vertices stays one mesh, since cutting a bucket of
+ *   twenty bins into nine draws saves nothing.
+ * @returns {THREE.Mesh[]}
+ */
+export function mergeChunked(geos, material, opts = {}) {
+  const out = [];
+  if (!geos.length) return out;
+  let total = 0;
+  for (const g of geos) total += g.attributes.position.count;
+  const cell = total < (opts.min ?? 80000) ? Infinity : (opts.cell || CELL);
+  const cells = new Map();
+  const plotCell = new Map();
+  const bb = new THREE.Box3();
+  for (const g of geos) {
+    let key = g.userData.plot !== undefined ? plotCell.get(g.userData.plot) : undefined;
+    if (key === undefined) {
+      if (cell === Infinity) key = '0';
+      else {
+        bb.setFromBufferAttribute(g.attributes.position);
+        key = `${Math.floor((bb.min.x + bb.max.x) * 0.5 / cell)},${Math.floor((bb.min.z + bb.max.z) * 0.5 / cell)}`;
+      }
+      if (g.userData.plot !== undefined) plotCell.set(g.userData.plot, key);
+    }
+    let list = cells.get(key);
+    if (!list) cells.set(key, list = []);
+    list.push(g);
+  }
+  for (const [, list] of cells) {
+    const ranges = plotRanges(list);
+    const merged = BufferGeometryUtils.mergeGeometries(list, false);
+    if (!merged) continue;
+    if (opts.burn || ranges.size) markBurnable(merged);
+    merged.computeBoundingSphere();
+    const mesh = new THREE.Mesh(merged, material);
+    if (ranges.size) mesh.userData.plotRanges = ranges;
+    if (opts.name) mesh.name = opts.name;
+    mesh.castShadow = !!opts.cast;
+    mesh.receiveShadow = !!opts.receive;
+    if (opts.renderOrder) mesh.renderOrder = opts.renderOrder;
+    // One mesh for the whole bucket is the old shape of it, and it kept
+    // its frustum test off; a cell has a real sphere and uses it.
+    mesh.frustumCulled = cell !== Infinity;
+    out.push(mesh);
+  }
+  return out;
 }
 
 /** Give a merged geometry its burn channel: nothing has burnt yet. */
