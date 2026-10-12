@@ -1362,6 +1362,7 @@ async function boot() {
   window.__barks = barks;
   const BARK = { deployed: 'deployed', unithit: 'unithit', unitlost: 'unitlost', rank: 'rank', secondary: 'secondary',
     strike: 'strike', shotdown: 'shotdown', samlaunch: 'samlaunch', airborne: 'airborne', hqdown: 'hqdown', win: 'win' };
+  let dugInTold = false;
   function handleEvent(kind, data) {
     window.__blackbox?.event(kind);
     if (barks && battle.state !== 'lost') {
@@ -1400,7 +1401,9 @@ async function boot() {
         break;
       }
       case 'dugin':
-        hud.feed(`${data.def.name} DUG IN`, 'good');
+        // Said once a battle, with what it means. A line for every gun that
+        // dug in was a line every few seconds under a big battery.
+        if (!dugInTold) { dugInTold = true; hud.feed(`${data.def.name} DUG IN · TAKES A THIRD LESS`, 'good'); }
         break;
       case 'smoke':
         hud.feed('SMOKE LAID', 'good');
@@ -1487,14 +1490,14 @@ async function boot() {
         // Signals hear it coming: time to spread the guns, put the M240s up
         // and buy what will be needed when the sky is shut again.
         feedback.emit('strike');
-        hud.feed('SIGINT · ENEMY BRIGADE STAGING · HEAVY DROP AT 75% · SAMS ON PALLETS', 'warn');
+        hud.feed('SIGINT · HEAVY DROP COMING AT 75%', 'warn');
         hud.status('counter-attack coming at 75% · spread your guns · M240 teams up · strike before the SAMs land', 9);
         if (comcard) comcard.assaultWarn();
         break;
       case 'assault':
         feedback.emit('lost');
         feedback.emit('strike');
-        hud.feed(`COUNTER-ATTACK · ${data.planes}× ${data.name} · ${data.men} MEN · ${data.squads} SQUADS ACROSS THE MAP${data.sams ? ` · ${data.sams} SAM LAUNCHERS` : ''}`, 'bad');
+        hud.feed(`COUNTER-ATTACK · ${data.men} MEN · ${data.squads} SQUADS${data.sams ? ` · ${data.sams} SAMS` : ''}`, 'bad');
         hud.status(`counter-attack inbound · ${data.men} men · mortar squads all over the map · M240 teams engage aircraft`, 8);
         if (data.point) battle.pulse(data.point, 0xd04030, 60, true);
         if (comcard) comcard.assault();
@@ -1505,7 +1508,7 @@ async function boot() {
       case 'winheld':
         // The building is down and the drop is not: the level waits for it.
         feedback.emit('strike');
-        hud.feed(`OBJECTIVE DOWN · ${data.left} ENEMY FROM THE DROP STILL FIGHTING · CLEAR THEM TO WIN`, 'warn');
+        hud.feed(`OBJECTIVE DOWN · ${data.left} OF THE DROP STILL FIGHTING`, 'warn');
         hud.status(`clear the drop to win · ${data.left} left · each one is marked in red`, 8);
         break;
       case 'dropsleft':
@@ -1604,28 +1607,29 @@ async function boot() {
       case 'depotdown':
         feedback.emit('jackpot');
         ribbon('depot');
-        hud.feed('AMMO DEPOT DESTROYED · +$10,000 — THEY ARE SHORT OF ROUNDS: EVERY GUN SLOWER, THE MORTARS SLOWEST', 'big');
+        hud.feed('AMMO DEPOT DESTROYED · +$10,000 · THEIR GUNS SLOW', 'big');
         battle.onEvent('stamp', { text: 'AMMO DEPOT DESTROYED', point: data.point, kind: 'hit' });
         if (comcard) comcard.hvt('depot');
         break;
       case 'checkpointdown':
         feedback.emit('jackpot');
         ribbon('checkpoint');
-        hud.feed('CHECKPOINT DESTROYED · +$8,000 — THE ROAD IS CUT: NO MORE TRUCKS COME UP IT', 'big');
+        hud.feed('CHECKPOINT DESTROYED · +$8,000 · THE ROAD IS CUT', 'big');
         battle.onEvent('stamp', { text: 'ROAD CUT', point: data.point, kind: 'hit' });
         if (comcard) comcard.hvt('road');
         break;
       case 'batterydown':
         feedback.emit('jackpot');
         ribbon('battery');
-        hud.feed('ENEMY BATTERY SILENCED · +$10,000 — COUNTER-BATTERY: YOUR GUNS RELOAD 25% FASTER FOR 2 MINUTES', 'big');
+        hud.feed('BATTERY SILENCED · +$10,000 · YOUR GUNS RELOAD 25% FASTER · 2 MIN', 'big');
         battle.onEvent('stamp', { text: 'BATTERY SILENCED', point: data.point, kind: 'hit' });
         if (comcard) comcard.hvt('battery');
         break;
       case 'generalinbound':
         feedback.emit('strike');
-        hud.feed(`INTEL: THE ENEMY GENERAL IS ON THE ROAD — THREE VEHICLES, ${data.eta} s TO COVER · $20,000 ON THE BLACK CAR`, 'warn');
-        hud.status('the general\'s convoy is marked in gold · catch it before it gets in', 8);
+        // The General says it (comcard) and the status row points at it:
+        // a four-line intel card on top of both was the same thing thrice.
+        hud.status(`the general's convoy is marked in gold · ${data.eta} s · $20,000 on the black car`, 10);
         if (data.point) battle.pulse(data.point, 0xf3c14a, 30, true);
         if (comcard) comcard.hvt('generalinbound');
         break;
@@ -1643,7 +1647,7 @@ async function boot() {
         hud.feed('THE GENERAL GOT AWAY', 'bad');
         break;
       case 'columninbound':
-        hud.feed(`ENEMY TRUCKS ON THE ROAD · ${data.eta} s OUT · DESTROY THE CHECKPOINT TO CUT IT`, 'warn');
+        hud.feed(`ENEMY TRUCKS · ${data.eta} s OUT · CUT THE CHECKPOINT`, 'warn');
         break;
       case 'columnlanded':
         hud.feed(`ENEMY TRUCKS UNLOADED · ${data.men} MEN UP FROM THE ROAD`, 'bad');
@@ -1654,7 +1658,7 @@ async function boot() {
       case 'firemission':
         feedback.emit('strike');
         ribbon('streak');
-        hud.feed(`KILL STREAK — FIRE MISSION: TWELVE 155 mm ROUNDS ON THE ${String(data.what || 'TARGET').toUpperCase()}`, 'big');
+        hud.feed(`KILL STREAK · FIRE MISSION · 12 × 155 mm ON THE ${String(data.what || 'TARGET').toUpperCase()}`, 'big');
         if (data.point) battle.pulse(data.point, 0xf3c14a, 40, true);
         break;
       case 'samhit': {
@@ -1700,7 +1704,7 @@ async function boot() {
         battle.hv?.noteKill(data.point);
         feedback.emit('jackpot');
         ribbon('hq');
-        hud.feed('ENEMY COMMAND POST DESTROYED · +$12,000 · COMMS CUT: THEIR FIRE IS RAGGED, THEIR MORTARS BLIND', 'big');
+        hud.feed('COMMAND POST DESTROYED · +$12,000 · THEIR FIRE IS RAGGED', 'big');
         hud.status('comms cut for 90 s · any drop they send for now comes a third short', 8);
         battle.onEvent('stamp', { text: 'COMMAND POST DESTROYED', point: data.point, kind: 'hit' });
         if (comcard) comcard.hqDown();
@@ -3144,12 +3148,12 @@ async function boot() {
     if (level.sandbox) {
       // The range: the line is hot, and the one thing to know.
       hud.status('range is hot \u00b7 deploy on the line, GUNNER on any weapon, ZOOM through its sight', 7);
-      hud.feed('THE RANGE \u00b7 PAPER AT 50 \u00b7 POPPERS AT 100 \u00b7 GONGS TO 500 \u00b7 DRONES OVERHEAD', 'big');
+      hud.feed('THE RANGE \u00b7 PAPER 50 \u00b7 POPPERS 100 \u00b7 GONGS TO 500', 'big');
       return;
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
-    if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR · THE CLOCK STARTS WITH YOUR FIRST GUN`, 'big');
+    if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR`, 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     if (weekly) hud.feed(`WEEKLY OPERATION · ${weekly.rule.name} · ${weekly.rule.line.toUpperCase()}`, 'big');
     const ch = getChallenge();

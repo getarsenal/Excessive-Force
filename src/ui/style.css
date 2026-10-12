@@ -1223,8 +1223,11 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
      is what put them back through the readouts on a tall bar. */
   #targetcard { width: 142px; padding: 7px 9px; }
   #perf { font-size: 9px; }
-  /* Two lines of the feed, not none: the kills are the score. */
+  /* Two lines of the feed, not none: the kills are the score. And two
+     lines of text each: a four-line intel card with the General's card
+     under it took the top half of the screen. */
   .feed-line:nth-last-child(n+3) { display: none; }
+  .feed-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
   .tb-block { min-width: 0; }
   #testmenu { top: calc(var(--hud-top) + 8px + var(--rail-step)); max-height: calc(100vh - var(--hud-top) - 130px); }
 }
