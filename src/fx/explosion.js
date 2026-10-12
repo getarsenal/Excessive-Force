@@ -842,8 +842,42 @@ export class ExplosionFX {
     });
   }
 
+  /**
+   * The fill budget. Every puff is a camera-facing quad blended over what
+   * is behind it, and a big cloud seen from close in is a great many of
+   * them, each a large part of the screen: the MOAB from a hundred and
+   * forty metres was a hundred and sixty screens of blended fill a frame,
+   * the dust surge and the mushroom's cap each a full pool of puffs a
+   * hundred metres across. A desktop GPU shrugs; a phone's is several
+   * frames behind at once, and that is a tab the system kills. So the fill
+   * is added up from the camera every frame (`fill` per pool) and, past
+   * `fillBudget` screens, the big pools are drawn thinned to fit: the same
+   * stable share of each, the rest still in the air and only not drawn.
+   * Dense smoke hides what is behind it either way; the picture changes
+   * little and the cost is capped.
+   */
+  _govern() {
+    const cam = this.camera;
+    const pools = this._pools || (this._pools = [this.fire, this.smoke, this.sparks, this.dust, this.plume, this.clods, this.flourish.paper].filter(Boolean));
+    if (!cam) return;
+    cam.updateMatrixWorld();
+    const k = 2 * Math.tan((cam.fov * Math.PI) / 360), aspect = cam.aspect || 1;
+    let big = 0, small = 0;
+    const f = this._fills || (this._fills = new Float32Array(pools.length));
+    for (let i = 0; i < pools.length; i++) {
+      f[i] = pools[i].count ? pools[i].fill(cam, cam.matrixWorldInverse, k, aspect) : 0;
+      if (f[i] > 1) big += f[i]; else small += f[i];
+    }
+    const budget = this.fillBudget ?? 24;
+    const thin = big + small <= budget ? 1 : Math.max(0.12, (budget - small) / Math.max(1e-6, big));
+    for (let i = 0; i < pools.length; i++) pools[i].thin = f[i] > 1 ? thin : 1;
+    this.fillNow = big + small;
+    this.thinNow = thin;
+  }
+
   update(dt) {
     this.time += dt;
+    this._govern();
     // The second beat of any large blast that is due.
     for (let i = this._rolls.length - 1; i >= 0; i--) {
       const r = this._rolls[i];

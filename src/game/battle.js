@@ -472,8 +472,8 @@ export class Battle {
    * light copy beyond. The barrel of whichever is shown is posed at once,
    * so a swap never shows the other's stale elevation.
    */
-  _lod(u) {
-    const far = this.camera.position.distanceToSquared(u.pos) > LOD_DIST * LOD_DIST;
+  _lod(u, at = u.pos) {
+    const far = this.camera.position.distanceToSquared(at) > LOD_DIST * LOD_DIST;
     if (far === u.lodFar) return;
     u.lodFar = far;
     u.model.visible = !far;
@@ -3079,6 +3079,17 @@ export class Battle {
   }
 
   _updateUnits(dt) {
+    // A gun still in the lift — hanging under a Chinook, or on a pallet under
+    // its canopy — is drawn by its stand-in (`drop.stub`), and it is swapped
+    // near and far by the same rule. It used to be left on its near model
+    // the whole way in: sixteen M777s in the sling were three million
+    // triangles, drawn twice with the shadows, on a sortie flown at the far
+    // edge of the map.
+    for (const d of this.pending) {
+      const s = d.stub;
+      if (!s?.modelLo || !s.model) continue;
+      this._lod(s, d.group.getWorldPosition(this._lodV || (this._lodV = new THREE.Vector3())));
+    }
     for (const u of this.units) {
       if (!u.alive) continue;
 

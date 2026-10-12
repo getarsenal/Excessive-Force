@@ -22,8 +22,12 @@ const snap = (label) => page.evaluate((label) => {
   const mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null;
   let rMs = 0, uMs = 0, calls = null, tris = null;
   if (E) {
+    // Every pass of the frame counted, shadows and post included: with the
+    // reset left to each render the count is the last pass's, the output
+    // quad's one triangle.
     let t0 = performance.now(); for (let i = 0; i < 3; i++) E.render(); rMs = +((performance.now() - t0) / 3).toFixed(1);
-    calls = I.render.calls; tris = I.render.triangles;
+    const auto = I.autoReset; I.autoReset = false; I.reset(); E.render();
+    calls = I.render.calls; tris = I.render.triangles; I.autoReset = auto;
     t0 = performance.now(); for (let i = 0; i < 3; i++) B.update(1 / 60); uMs = +((performance.now() - t0) / 3).toFixed(1);
   }
   let objs = 0, fxObjs = 0; E?.scene?.traverse((o) => { objs++; if (o.isSprite || o.isPoints) fxObjs++; });

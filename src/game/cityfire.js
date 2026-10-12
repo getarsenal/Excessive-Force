@@ -214,6 +214,7 @@ export class CityFire {
       if (!a) continue;
       for (const [start, count] of ranges) {
         for (let i = start; i < start + count; i++) a.setX(i, v);
+        a.addUpdateRange?.(start, count);
       }
       a.needsUpdate = true;
     }
@@ -234,11 +235,17 @@ export class CityFire {
       if (!ranges) continue;
       const pos = m.geometry.attributes.position;
       const a = m.geometry.attributes.aBurn;
+      // Only the building's own stretch of each buffer goes back to the GPU.
+      // The whole of it did, every city mesh once a building, so a MOAB's
+      // sixty in half a second re-sent the town sixty times over, on the
+      // same frames as the biggest cloud in the game.
       for (const [start, count] of ranges) {
         for (let i = start; i < start + count; i++) {
           pos.setXYZ(i, p.x, p.base - 0.5, p.z);
           if (a) a.setX(i, 1);
         }
+        pos.addUpdateRange?.(start * 3, count * 3);
+        a?.addUpdateRange?.(start, count);
       }
       pos.needsUpdate = true;
       if (a) a.needsUpdate = true;

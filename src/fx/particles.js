@@ -40,8 +40,20 @@ const VERT = /* glsl */`
     vec2 p = position.xy;
     vec2 r = vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);
 
-    vec3 world = iPos + (camRight * r.x + camUp * r.y) * iData.x;
-    gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+    // Never wider than half the distance to it: a puff the camera is inside
+    // or nearly inside covers the whole screen, and a MOAB's cloud is
+    // hundreds of them eighty metres across — dozens of full-screen layers
+    // of blended fill a frame, which on a phone is the GPU's whole budget
+    // several times over. From any distance the cloud is drawn from, this
+    // never binds. Inside a few metres the puff fades to nothing and is
+    // dropped before it is rasterised.
+    vec4 mv = viewMatrix * vec4(iPos, 1.0);
+    float dist = -mv.z;
+    float size = min(iData.x, max(dist, 0.0) * 0.5);
+    vAlpha *= smoothstep(0.5, 3.0, dist);
+    mv.xy += r * size;
+    gl_Position = projectionMatrix * mv;
+    if (vAlpha < 0.004) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     #include <logdepthbuf_vertex>
   }
 `;
@@ -146,6 +158,10 @@ export class BillboardParticles {
   constructor(max, map, opts = {}) {
     this.max = max;
     this.count = 0;
+    // The share of the pool drawn this frame (`ExplosionFX._govern`): the
+    // particles whose seed is under it, the same ones frame after frame, so
+    // a thinned cloud does not flicker. The rest are simulated, not drawn.
+    this.thin = 1;
 
     this.pos = new Float32Array(max * 3);
     this.vel = new Float32Array(max * 3);
@@ -338,6 +354,31 @@ export class BillboardParticles {
 
     const fadeIn = Math.min(1, t / 0.08);
     const fadeOut = 1.0 - THREE.MathUtils.smoothstep(t, 0.35, 1.0);
-    this.aAlpha.array[i] = this.alpha0[i] * fadeIn * fadeOut;
+    // Thinned: out of the draw (alpha nought is dropped in the vertex
+    // shader), and what is left a little denser to stand for it.
+    const thin = this.thin;
+    this.aAlpha.array[i] = thin >= 1 ? this.alpha0[i] * fadeIn * fadeOut
+      : this.seed[i] > thin ? 0 : Math.min(1, this.alpha0[i] * fadeIn * fadeOut * Math.min(1.5, 1 / Math.sqrt(thin)));
+  }
+
+  /**
+   * How many screens of fill this pool is, seen from `cam` (`k` the view's
+   * height at one metre, `aspect` its width over that): each particle's
+   * quad over the screen at its distance, as the vertex shader sizes it,
+   * at most one screen each.
+   */
+  fill(cam, inv, k, aspect) {
+    const e = inv.elements;
+    let sum = 0;
+    for (let i = 0; i < this.count; i++) {
+      const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
+      const d = -(e[2] * x + e[6] * y + e[10] * z + e[14]);
+      if (d < 0.5) continue;
+      const t = Math.min(1, this.age[i] / this.life[i]);
+      const size = Math.min(this.size0[i] + (this.size1[i] - this.size0[i]) * Math.pow(t, 0.55), d * 0.5);
+      const s = size / (k * d);
+      sum += Math.min(1, (s * s) / aspect);
+    }
+    return sum;
   }
 }

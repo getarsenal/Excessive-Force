@@ -504,6 +504,10 @@ async function boot() {
   await progress(56, `setting ${totalBlocks.toLocaleString()} stones`);
 
   const fx = new ExplosionFX(engine.scene, quality);
+  // The particles' fill budget, in screens of blended quads a frame
+  // (`ExplosionFX._govern`): a phone's GPU has a third of a desktop's.
+  fx.camera = engine.camera;
+  fx.fillBudget = power.lean ? 12 : 30;
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
   const contactShadows = new ContactShadows(engine.scene);
