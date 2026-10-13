@@ -724,26 +724,38 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the phone cut, `W=1920 H=1080` the wide one); a software box draws two
   to eight seconds a frame, so a thirty-second cut is the better part of
   an hour ·
-  THE STUDIO (`src/ui/studio.js`): the game as a camera, behind the
-  dock's VIEW button (the HUD's clear view opens it; SHOW UI, H or EXIT
-  closes it with the interface back). A band on the thumb line, chips
-  forty-four points a side: the clock (held, ¼, ½, 1, 2, 4, 8×), FOLLOW
-  (a tap on a gun, an aircraft, a shell, the lift or the building; a
-  second tap cycles through what is in the air and on the ground; a
-  thing that dies hands the camera back), ORBIT (slow, brisk, the other
-  way), SET A / SET B / PLAY A→B (a move over eight seconds with the rig
-  held), LENS (72/52/30/16°), SNAP (the canvas as a JPEG) and REC (the
-  canvas at thirty frames with the game's sound tapped after the
-  limiter, mp4 where the browser records it, webm otherwise; the band
-  goes while it runs and the red pill at the top stops it; saved through
-  the share sheet, SAVE VIDEO on an iPhone, or as a download, and SAVE
-  CLIP on the band keeps the last one for another tap). Slow motion
+  THE STUDIO (`src/ui/studio.js`): the game as a camera, over the game.
+  STUDIO on the dock opens a band on the thumb line above the dock, and
+  the fight goes on under it: pause, pick a unit, deploy, designate,
+  call a strike, all as in play. Chips forty-four points a side: EXIT,
+  FOLLOW (a tap on a gun, an aircraft, a shell, the lift or the
+  building; a gun with its card open needs no tap; a second tap cycles
+  through what is in the air and on the ground; a thing that dies hands
+  the camera back), ORBIT (slow, brisk, the other way), SET A / SET B /
+  PLAY A→B (a move over eight seconds with the rig held), LENS
+  (72/52/30/16°), HUD (the clear view, for the phone's own screen
+  recorder; the band stays), the clock (▶/❚❚ a toggle, ¼, ½, 1, 2, 4,
+  8×), SNAP (the canvas as a JPEG) and REC (the canvas at thirty frames
+  with the game's sound tapped after the limiter, mp4 where the browser
+  records it, webm otherwise; the canvas alone, so the interface is
+  never in the clip and the band stays; REC reads STOP with the time;
+  the stop is finished on the recorder's stop event, an error, or a
+  four-second timer, since an iPhone left the band saying STOP for
+  good; saved through the share sheet, SAVE VIDEO on an iPhone, or as a
+  download, and SAVE CLIP on the band keeps the last one). In a battle
+  the band is a camera and nothing else. THE STUDIO under the title's
+  MODES is the sandbox (`startStudioRun`/`takeStudioRun` in career.js,
+  `battle.studioRun`): any open landmark, free build, everything
+  unlocked, nothing counted (no pay-out, no save), the battle never
+  ending (`holdEnd`), the band up from the start, and ENEMY on the band
+  holding the garrison, the SAMs and the airborne together. Slow motion
   steps the physics finer (`physics.setTimeStep`, 240 Hz at a quarter),
   not less often; a time lapse lifts the step cap (`maxSteps`, `maxDt`)
   and main.js steps the battle in thirtieths, so the guns keep time with
   the stones; the governor leaves the picture's size alone while a
   recording runs. `node tools/studioprobe.mjs` drives all of it on a
-  phone viewport and photographs the band upright and on its side ·
+  phone viewport (`SANDBOX=1` the run off the title) and photographs the
+  band over the dock, clean, and on its side ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the

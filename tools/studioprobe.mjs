@@ -1,4 +1,6 @@
-// The studio (ui/studio.js) driven on a phone: VIEW opens it, the clock is
+// The studio (ui/studio.js) driven on a phone: STUDIO on the dock opens
+// the band over the game (the dock stays and a unit can be deployed under
+// it), HUD takes the interface off and back, the clock is
 // slowed and the physics step follows, a strike is called and FOLLOW
 // cycles onto the aircraft, ORBIT turns the view, a move is set from A to B
 // and played, the lens changes, a still is taken, two seconds are recorded
@@ -6,6 +8,7 @@
 // the band upright and on its side.
 //
 //   node tools/studioprobe.mjs [level]      -> /tmp/out/studio/*.png
+//   SANDBOX=1 node tools/studioprobe.mjs    the run off the title's MODES: free build, nothing counted, ENEMY on the band
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const level = process.argv[2] || 'westminster';
@@ -27,23 +30,77 @@ const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
 const ctx = await b.newContext({ viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
 const page = await ctx.newPage();
-await page.addInitScript((tier) => { try {
+const SANDBOX = !!process.env.SANDBOX;
+await page.addInitScript(([tier, sandbox, level]) => { try {
   localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
-  localStorage.setItem('tt.tutorial', 'done'); } catch {} }, process.env.TIER || 'low');
+  localStorage.setItem('tt.tutorial', 'done');
+  if (sandbox) sessionStorage.setItem('tt.studiorun', JSON.stringify({ level })); } catch {} }, [process.env.TIER || 'low', SANDBOX, level]);
 page.on('pageerror', (e) => { console.log('page error:', String(e).slice(0, 200)); fails++; });
+page.on('framenavigated', (f) => { if (f === page.mainFrame()) console.log('navigated:', f.url()); });
+page.on('crash', () => { console.log('page crashed'); fails++; });
+page.on('console', (m) => { if (m.type() === 'error' || /reload|\[vite\]/.test(m.text())) console.log('console:', m.text().slice(0, 200)); });
 await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.__studio, null, { timeout: 400000 });
 await page.waitForTimeout(1500);
 await page.evaluate(() => { window.__drive = async (n) => { for (let k = 0; k < n; k++) { window.__frame(); await new Promise((r) => setTimeout(r, 36)); } }; });
 await page.evaluate(() => { const B = window.battle; B.airborne.auto = false; B.assault.auto = false; B.invulnerable = true; B.freeBuild = true; B.unlockAll = true; if (B.garrison) B.garrison.fireEnabled = false; if (B.sams) B.sams._engage = () => {}; });
 
-// In through VIEW.
-await page.click('#dock-view');
-await page.waitForTimeout(300);
-let r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), band: !document.getElementById('studio').hidden, dock: getComputedStyle(document.getElementById('dock')).display }));
-check(r.studio && r.clear && r.band && r.dock === 'none', `VIEW opens the studio: band shown, dock hidden (${JSON.stringify(r)})`);
+// In through STUDIO on the dock (a sandbox run opens it by itself).
+let r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), run: !!window.battle.studioRun, free: !!window.battle.freeBuild, unlocked: !!window.battle.unlockAll, hold: !!window.battle.holdEnd, enemy: !document.getElementById('st-enemy').hidden }));
+if (SANDBOX) check(r.studio && r.run && r.free && r.unlocked && r.hold && r.enemy, `the sandbox run: band up, free build, unlocked, never ending, ENEMY on the band (${JSON.stringify(r)})`);
+else {
+  check(!r.studio && !r.run && !r.hold && !r.enemy, `a battle: no band yet, the battle can end, no ENEMY chip (${JSON.stringify(r)})`);
+  await page.click('#dock-view');
+  await page.waitForTimeout(300);
+}
+r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), band: !document.getElementById('studio').hidden, dock: getComputedStyle(document.getElementById('dock')).display, over: (() => { const b = document.getElementById('studio').getBoundingClientRect(), d = document.getElementById('dock').getBoundingClientRect(); return b.bottom <= d.top + 1; })() }));
+check(r.studio && !r.clear && r.band && r.dock !== 'none' && r.over, `STUDIO opens the band over the game: dock still there, band above it, interface on (${JSON.stringify(r)})`);
+// The game goes on under it: a gun deployed while the band is up.
+r = await page.evaluate(() => {
+  const B = window.battle, o = B.primary.origin, T = window.THREE, terrain = window.terrain;
+  const before = B.units.length + B.pending.length;
+  // Somewhere a gun can stand: round the landmark at a hundred and fifty
+  // metres, the first spot the battle takes (the river takes the rest).
+  let at = null;
+  for (let k = 0; k < 16 && !at; k++) {
+    const a = k * Math.PI / 8, x = o.x + Math.cos(a) * 150, z = o.z + Math.sin(a) * 150;
+    const y = terrain?.heightAt ? terrain.heightAt(x, z) : B.originGround;
+    B.deploy('m777', new T.Vector3(x, y, z));
+    if (B.units.length + B.pending.length > before) at = [Math.round(x), Math.round(z)];
+  }
+  return { before, after: B.units.length + B.pending.length, at };
+});
+check(r.after > r.before, `a gun deploys under the band (${r.before} -> ${r.after} at ${JSON.stringify(r.at)})`);
+// HUD takes the interface off and back; the band stays.
+await tap(page, '#st-hud');
+r = await page.evaluate(() => ({ clear: document.body.classList.contains('clear-view'), band: !document.getElementById('studio').hidden && getComputedStyle(document.getElementById('studio')).display !== 'none', dock: getComputedStyle(document.getElementById('dock')).display, label: document.getElementById('st-hud').textContent }));
+check(r.clear && r.band && r.dock === 'none' && r.label === 'HUD OFF', `HUD OFF: interface gone, band stays (${JSON.stringify(r)})`);
+await page.screenshot({ path: '/tmp/out/studio/band-clean.png', timeout: 180000, animations: 'disabled' });
+await tap(page, '#st-hud');
+r = await page.evaluate(() => ({ clear: document.body.classList.contains('clear-view'), dock: getComputedStyle(document.getElementById('dock')).display }));
+check(!r.clear && r.dock !== 'none', `HUD ON: interface back (${JSON.stringify(r)})`);
+if (SANDBOX) {
+  await tap(page, '#st-enemy');
+  r = await page.evaluate(() => ({ fire: window.battle.garrison?.fireEnabled, auto: window.battle.airborne?.auto, label: document.getElementById('st-enemy').textContent }));
+  check(r.fire === false && r.auto === false && r.label === 'ENEMY OFF', `ENEMY OFF holds the garrison and the airborne (${JSON.stringify(r)})`);
+  await tap(page, '#st-enemy');
+}
 await page.screenshot({ path: '/tmp/out/studio/band-portrait.png' });
+
+// A recorder whose stop never comes (an iPhone did this) is finished by the timer.
+r = await page.evaluate(() => {
+  const S = window.__studio;
+  S.recording = true; S.recT0 = performance.now() - 3000; S._chunks = [new Blob([new Uint8Array(1000)])]; S._mimeUsed = 'video/webm';
+  S.rec = { state: 'recording', stop() { /* never fires onstop */ }, requestData() {} };
+  S._stream = null; S.lastClip = null; S._got = S._got || []; S._deliver = async () => { S._got.push('x'); };
+  S.stopRecording();
+  return { still: S.recording };
+});
+await page.waitForFunction(() => !window.__studio.recording && !!window.__studio.lastClip, null, { timeout: 15000 }).catch(() => {});
+r = await page.evaluate(() => ({ rec: window.__studio.recording, clip: !!window.__studio.lastClip, label: document.getElementById('st-rec').textContent }));
+check(!r.rec && r.clip && r.label === '● REC', `a stop that never fires is finished by the timer in four seconds (${JSON.stringify(r)})`);
+await page.evaluate(() => { window.__studio.lastClip = null; window.__studio._got = []; delete window.__studio._deliver; window.__studio._paint(); });
 
 // On its side, while the page is still fresh enough to photograph.
 await page.setViewportSize({ width: 852, height: 393 });
@@ -80,9 +137,11 @@ r = await page.evaluate(async () => {
 // every fiftieth or sixtieth of it, so the stones keep up with the guns.
 check(r.clock > 2.4 && Math.abs(r.steps - r.clock * baseHz) < 12, `ten frames at 8x: the battle ran ${r.clock.toFixed(1)} s (${r.real.toFixed(2)} s on this box), ${r.steps} physics steps (${(r.clock * baseHz).toFixed(0)} due)`);
 await tap(page, '#studio [data-speed="0"]');
-r = await page.evaluate(async () => { const B = window.battle, t0 = B.elapsed; await window.__drive(5); return B.elapsed - t0; });
-check(r === 0, `held: the clock stood still (${r})`);
-await tap(page, '#studio [data-speed="1"]');
+r = await page.evaluate(async () => { const B = window.battle, t0 = B.elapsed; await window.__drive(5); return { d: B.elapsed - t0, label: document.querySelector('#studio [data-speed="0"]').textContent }; });
+check(r.d === 0 && r.label === '▶', `held: the clock stood still, the chip offers play (${JSON.stringify(r)})`);
+await tap(page, '#studio [data-speed="0"]');
+r = await page.evaluate(() => window.__studio.speed);
+check(r === 1, `the hold chip again is play (${r}x)`);
 
 // FOLLOW an aircraft.
 await page.evaluate(() => { const B = window.battle, o = B.primary.origin, T = window.THREE; B.callStrike('f15', new T.Vector3(o.x, B.originGround, o.z)); });
@@ -109,7 +168,9 @@ r = await page.evaluate(() => {
 await page.touchscreen.tap(r.x, r.y);
 await page.waitForTimeout(300);
 r = await page.evaluate(() => { const S = window.__studio; return { mode: S.mode, kind: S.target?.kind, name: S.target?.name }; });
-check(r.mode === 'follow' && (r.kind === 'point' || r.kind === 'unit'), `a tap on the building follows it: ${r.kind} ${r.name}`);
+// The nearest thing within forty-four points of the tap wins, and in a
+// sandbox the lift may be hanging over the building just then.
+check(r.mode === 'follow' && ['point', 'unit', 'drop', 'sortie', 'shell'].includes(r.kind), `a tap on the building follows what is there: ${r.kind} ${r.name}`);
 
 // ORBIT.
 await tap(page, '#st-orbit');
@@ -164,12 +225,13 @@ const can = await page.evaluate(() => window.__studio.canRecord());
 console.log(`recording ${can ? 'available' : 'not available'} here`);
 if (can) {
   await tap(page, '#st-rec');
-  r = await page.evaluate(() => ({ rec: window.__studio.recording, band: document.getElementById('studio').hidden, pill: !document.getElementById('studio-recpill').hidden, scale: window.__engine.renderScale }));
-  check(r.rec && r.band && r.pill && r.scale === 1, `recording: band hidden, pill shown, full size (${JSON.stringify(r)})`);
+  await frames(page, 2);
+  r = await page.evaluate(() => ({ rec: window.__studio.recording, band: !document.getElementById('studio').hidden, label: document.getElementById('st-rec').textContent, scale: window.__engine.renderScale }));
+  check(r.rec && r.band && /STOP/.test(r.label) && r.scale === 1, `recording: band stays, REC reads STOP with the time, full size (${JSON.stringify(r)})`);
   // No photograph here: the recorder has the compositor, and a screenshot waits on it for minutes.
-  await frames(page, 8);
+  await frames(page, 6);
   await page.waitForTimeout(800);
-  await tap(page, '#studio-recpill');
+  await tap(page, '#st-rec');
   // The recorder's stop arrives once it has flushed, which with twelve
   // megabytes on a slow box is a while.
   await page.waitForFunction(() => !window.__studio.recording && window.__studio.lastClip, null, { timeout: 180000 });
@@ -181,16 +243,20 @@ if (can) {
 await tap(page, '#st-exit');
 await page.waitForTimeout(300);
 r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), hz: Math.round(1 / window.battle.physics.fixedStep), ts: window.__studio.testMenu.timeScale, paused: window.__studio.testMenu.paused, fov: window.__engine.camera.fov, max: window.battle.physics.maxSteps, dock: getComputedStyle(document.getElementById('dock')).display }));
-check(!r.studio && !r.clear && r.hz === baseHz && r.ts === 1 && !r.paused && r.fov === fov0 && r.max === 3 && r.dock !== 'none', `EXIT: interface back, clock and lens and physics restored (${JSON.stringify(r)})`);
-// And H / SHOW UI reopen and close it the same way.
+check(!r.studio && !r.clear && r.hz === baseHz && r.ts === 1 && !r.paused && r.fov === fov0 && r.max === 3 && r.dock !== 'none', `EXIT: band down, clock and lens and physics restored (${JSON.stringify(r)})`);
+// The H key is still the plain clear view, and does not open the band.
 await page.keyboard.press('KeyH');
 await page.waitForTimeout(200);
-r = await page.evaluate(() => document.body.classList.contains('studio'));
-check(r, 'the H key opens the studio too');
+r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view') }));
+check(!r.studio && r.clear, `H is the clear view alone (${JSON.stringify(r)})`);
 await page.keyboard.press('KeyH');
-await page.waitForTimeout(200);
+// STUDIO on the dock toggles the band.
+await tap(page, '#dock-view'); await page.waitForTimeout(200);
 r = await page.evaluate(() => document.body.classList.contains('studio'));
-check(!r, 'and closes it');
+check(r, 'STUDIO on the dock opens the band again');
+await tap(page, '#dock-view'); await page.waitForTimeout(200);
+r = await page.evaluate(() => document.body.classList.contains('studio'));
+check(!r, 'and a second tap closes it');
 
 await b.close();
 console.log(fails ? `\n${fails} FAILED` : '\nall good');

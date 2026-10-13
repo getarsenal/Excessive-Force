@@ -3797,6 +3797,9 @@ async function boot() {
   Object.defineProperty(window, 'standoff', { get: () => standoff, configurable: true });
   studio = new Studio({ engine, rig, battle, physics, hud, audio, testMenu, canvas, quality, feedback, unitCard, pick: (x, y) => pick(x, y, false) });
   window.__studio = studio;
+  // A sandbox run has the band up from the start (the start hook above may
+  // have run before the studio existed).
+  if (studioRun) studio.enter();
   // STUDIO on the dock opens and closes it over the game; the HUD chip on
   // its band is the clear view, and the band repaints when that changes.
   hud.onView = () => studio.toggle();
