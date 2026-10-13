@@ -143,9 +143,9 @@
         <span class="db-icon"></span>
         <span class="db-label">ORDERS</span>
       </button>
-      <button class="dock-btn" id="dock-view" title="Hide the interface and just watch">
+      <button class="dock-btn" id="dock-view" title="The studio: the camera, the clock, a recording">
         <span class="db-icon"></span>
-        <span class="db-label">VIEW</span>
+        <span class="db-label">STUDIO</span>
       </button>
       <button class="dock-btn" id="dock-menu" title="Pause">
         <span class="db-icon"></span>
@@ -207,15 +207,17 @@
     </div>
     <button id="sound-toggle" hidden></button>
     <button id="restore-btn" hidden>SHOW UI</button>
-    <!-- The studio (ui/studio.js): the game as a camera, behind VIEW. -->
+    <!-- The studio (ui/studio.js): the game as a camera, over the game, behind STUDIO on the dock. -->
     <div id="studio" hidden>
       <div id="studio-hint"></div>
       <div class="st-row">
-        <button id="st-exit" title="Back to the fight">EXIT</button>
+        <button id="st-exit" title="Close the band">EXIT</button>
         <button id="st-follow" title="Follow a gun, an aircraft or a shell">FOLLOW</button>
         <button id="st-orbit" title="Orbit what is in focus">ORBIT</button>
         <button id="st-dolly" title="A move from one view to another">SET A</button>
         <button id="st-lens" title="Lens">LENS · NORMAL</button>
+        <button id="st-hud" title="The interface off the glass, for the phone's screen recorder">HUD ON</button>
+        <button id="st-enemy" title="The enemy's fire" hidden>ENEMY ON</button>
       </div>
       <div class="st-row">
         <button data-speed="0" title="Hold">❚❚</button>
@@ -230,7 +232,6 @@
         <button id="st-save" hidden>SAVE CLIP</button>
       </div>
     </div>
-    <button id="studio-recpill" hidden>● 0:00 · TAP TO STOP</button>
     <div id="menu" hidden>
       <div class="menu-inner">
         <div class="menu-title">PAUSED</div>

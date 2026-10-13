@@ -78,7 +78,7 @@ import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
-import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly } from './game/career.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly, takeStudioRun } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
 import { reminders } from './core/reminders.js';
 import { boardFor } from './game/rivals.js';
@@ -250,6 +250,9 @@ async function boot() {
   const blitz = (!selftest && !daily && !level.sandbox && level.id !== 'tutorial') ? takeBlitzRun(level.id) : null;
   // This week's operation (career.js WEEKLY_RULES), if this load is one.
   const weekly = (!selftest && !daily && !blitz && !level.sandbox && level.id !== 'tutorial') ? takeWeeklyRun(level.id) : null;
+  // THE STUDIO (ui/studio.js), if this load is one: free build, nothing
+  // counted, the battle never ending, the camera's band up from the start.
+  const studioRun = (!selftest && !daily && !blitz && !weekly && !level.sandbox && level.id !== 'tutorial') ? takeStudioRun(level.id) : null;
   const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
@@ -669,6 +672,7 @@ async function boot() {
   // and the range with its targets round the firing line.
   // Deployed where the finger lands: no airlift onto a practice range.
   if (level.sandbox) { battle.freeBuild = true; battle.unlockAll = true; battle.airlift = false; document.body.classList.add('range'); }
+  if (studioRun) { battle.freeBuild = true; battle.unlockAll = true; battle.holdEnd = true; battle.studioRun = true; document.body.classList.add('studio-run'); }
   // The camera stays on the firing line: it turns and zooms, it does not wander off down the lanes.
   if (level.sandbox) rig.panLocked = true;
   const range = level.range ? new Range({ scene: engine.scene, physics, terrain, battle, fx, audio, origin, groundY, quality }) : null;
@@ -1200,7 +1204,7 @@ async function boot() {
   const payOut = (won, sum, extra = {}) => {
     if (paid) return null;
     paid = true;
-    if (level.sandbox) return null;
+    if (level.sandbox || studioRun) return null;
     if (level.id === 'tutorial') return won ? bootCampXp() : null;
     // The week's operation is banked here, where every run ends; its reward
     // is paid the first time it is won.
@@ -3157,6 +3161,12 @@ async function boot() {
       tutorial = new Tutorial({ hud, battle, rig, camera: engine.camera, origin, groundY, level, audio, unitCard, terrain });
       return;
     }
+    if (studioRun) {
+      hud.feed('THE STUDIO · FREE BUILD · NOTHING COUNTED', 'big');
+      hud.status('the studio · play the fight and film it · STUDIO on the dock closes the band', 7);
+      studio?.enter();
+      return;
+    }
     if (level.sandbox) {
       // The range: the line is hot, and the one thing to know.
       hud.status('range is hot \u00b7 deploy on the line, GUNNER on any weapon, ZOOM through its sight', 7);
@@ -3316,7 +3326,7 @@ async function boot() {
   }
   const keepBattle = () => {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
-    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || selftest) return;
+    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || studioRun || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
     try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
@@ -3785,13 +3795,14 @@ async function boot() {
   });
   // Live, because it is replaced by null when the stand-off ends.
   Object.defineProperty(window, 'standoff', { get: () => standoff, configurable: true });
-  studio = new Studio({ engine, rig, battle, physics, hud, audio, testMenu, canvas, quality, feedback, pick: (x, y) => pick(x, y, false) });
+  studio = new Studio({ engine, rig, battle, physics, hud, audio, testMenu, canvas, quality, feedback, unitCard, pick: (x, y) => pick(x, y, false) });
   window.__studio = studio;
-  // VIEW is the studio's door: the HUD's clear view opens it, and SHOW UI,
-  // the H key or EXIT closes it with the interface put back.
+  // STUDIO on the dock opens and closes it over the game; the HUD chip on
+  // its band is the clear view, and the band repaints when that changes.
+  hud.onView = () => studio.toggle();
   {
     const scv = hud.setClearView;
-    hud.setClearView = (on) => { scv(on); if (on) studio.enter(); else if (studio.active) studio.exit(); };
+    hud.setClearView = (on) => { scv(on); studio._paint(); };
   }
   window.__fastForward = fastForward;
   // One real frame, on demand. The suite uses it to prove that an update which

@@ -314,6 +314,23 @@ export function startBlitzRun(level) {
   put('tt.blitzlast', level);
 }
 
+/**
+ * THE STUDIO off the title's MODES (ui/studio.js): any open landmark with
+ * the whole arsenal free, nothing counted, the battle never ending.
+ */
+export function startStudioRun(level) {
+  try { sessionStorage.setItem('tt.studiorun', JSON.stringify({ level })); } catch { /* private mode */ }
+}
+
+/** The studio run a load was started for, if it was one. Read once per load. */
+export function takeStudioRun(levelId) {
+  try {
+    const v = parse(sessionStorage.getItem('tt.studiorun'), null);
+    sessionStorage.removeItem('tt.studiorun');
+    return v && v.level === levelId ? v : null;
+  } catch { return null; }
+}
+
 /** The Blitz a load was started for, if it was one. Read once per load. */
 export function takeBlitzRun(levelId) {
   try {

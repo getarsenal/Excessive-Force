@@ -1,19 +1,24 @@
 /**
- * The studio: the game as a camera.
+ * The studio: the game as a camera, over the game.
  *
- * Behind the dock's VIEW button. The interface goes, and a band on the thumb
- * line takes its place with the things a content studio wants from a fight
- * it is filming: the clock (paused, a quarter, a half, real time, two, four
- * and eight times), a camera that follows a gun, an aircraft or a shell
- * through the air, a slow orbit round whatever is in focus, a move from one
- * pose to another over eight seconds, four lenses, a still at full size and
- * a recording of the canvas with the game's own sound, saved through the
- * phone's share sheet (SAVE VIDEO on an iPhone) or as a download.
+ * Behind the dock's STUDIO button. The interface stays: the player still
+ * pauses, selects a unit, deploys it, designates, calls a strike, and the
+ * band on the thumb line adds what a content studio wants from a fight it
+ * is filming. The clock (held, a quarter, a half, real time, two, four and
+ * eight times). A camera that follows a gun, an aircraft, a shell or the
+ * lift. A slow orbit round whatever is in focus. A move from one pose to
+ * another over eight seconds. Four lenses. A still at full size. A
+ * recording of the canvas with the game's own sound, saved through the
+ * phone's share sheet (SAVE VIDEO on an iPhone) or as a download. HUD
+ * takes the interface off the glass for the phone's own screen recorder;
+ * the in-app recorder reads the canvas alone, so the interface is never in
+ * its clip and the band stays while it runs.
  *
- * Nothing here is a cheat: the battle runs as it runs, only slower, faster
- * or held. The trailer tool (`tools/trailer.mjs`) does the same things to
- * the same rig from outside the page; this is the same camera in the
- * player's hand.
+ * In a battle this is a camera and nothing else: no money, no unlocks, the
+ * enemy as it is. THE STUDIO off the title's MODES (career.js
+ * `startStudioRun`) is the sandbox: any open landmark with the whole
+ * arsenal free, nothing counted toward the campaign, the battle never
+ * ending, and ENEMY on the band to hold the garrison's fire.
  *
  * Slow motion is smooth because the physics is told to step finer, not
  * less often (`physics.setTimeStep`): at a quarter speed and sixty frames a
@@ -41,13 +46,13 @@ const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 export class Studio {
   /**
    * @param {object} o engine, rig, battle, physics, hud, audio, testMenu,
-   *   canvas, quality, feedback (optional)
+   *   canvas, quality, feedback (optional), pick (x, y) => hit, unitCard
    */
   constructor(o) {
     Object.assign(this, o);
     this.active = false;
     this.speed = 1;
-    this.mode = 'free';           // free | follow | orbit | dolly
+    this.mode = 'free';           // free | follow
     this.armed = false;           // the next tap picks what to follow
     this.target = null;           // { kind, ref, name, point }
     this.orbitIx = 0;
@@ -59,6 +64,7 @@ export class Studio {
     this.recT0 = 0;
     this.lastClip = null;
     this.snapPending = false;
+    this.enemy = true;
     this._baseFov = this.engine.camera.fov;
     this._baseHz = Math.round(1 / this.physics.fixedStep);
     this._v = new THREE.Vector3();
@@ -70,27 +76,30 @@ export class Studio {
   _el() {
     const $ = (id) => document.getElementById(id);
     this.el = {
-      band: $('studio'), hint: $('studio-hint'), pill: $('studio-recpill'),
+      band: $('studio'), hint: $('studio-hint'),
       exit: $('st-exit'), follow: $('st-follow'), orbit: $('st-orbit'), dolly: $('st-dolly'),
-      lens: $('st-lens'), snap: $('st-snap'), rec: $('st-rec'), save: $('st-save'),
+      lens: $('st-lens'), hud: $('st-hud'), enemy: $('st-enemy'),
+      snap: $('st-snap'), rec: $('st-rec'), save: $('st-save'),
       speeds: [...document.querySelectorAll('#studio [data-speed]')],
     };
     if (!this.el.band) return;
-    this.el.exit.addEventListener('click', () => this.exit());
-    this.el.follow.addEventListener('click', () => this.followTap());
-    this.el.orbit.addEventListener('click', () => this.orbitTap());
-    this.el.dolly.addEventListener('click', () => this.dollyTap());
-    this.el.lens.addEventListener('click', () => this.lensTap());
-    this.el.snap.addEventListener('click', () => { this.snapPending = true; this._tick(); });
-    this.el.rec.addEventListener('click', () => (this.recording ? this.stopRecording() : this.startRecording()));
-    this.el.save.addEventListener('click', () => this._saveClip());
-    this.el.pill.addEventListener('click', () => this.stopRecording());
-    for (const b of this.el.speeds) b.addEventListener('click', () => this.setSpeed(+b.dataset.speed));
+    const E = this.el;
+    E.exit.addEventListener('click', () => this.exit());
+    E.follow.addEventListener('click', () => this.followTap());
+    E.orbit.addEventListener('click', () => this.orbitTap());
+    E.dolly.addEventListener('click', () => this.dollyTap());
+    E.lens.addEventListener('click', () => this.lensTap());
+    E.hud.addEventListener('click', () => this.hudTap());
+    E.enemy.addEventListener('click', () => this.enemyTap());
+    E.snap.addEventListener('click', () => { this.snapPending = true; this._tick(); this._hint('STILL ON THE NEXT FRAME'); });
+    E.rec.addEventListener('click', () => (this.recording ? this.stopRecording() : this.startRecording()));
+    E.save.addEventListener('click', () => this._saveClip());
+    for (const b of E.speeds) b.addEventListener('click', () => this.speedTap(+b.dataset.speed));
     window.addEventListener('keydown', (e) => {
       if (!this.active || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
       const k = e.code;
-      if (k === 'Space') { e.preventDefault(); this.setSpeed(this.speed === 0 ? 1 : 0); }
+      if (k === 'Space') { e.preventDefault(); this.speedTap(0); }
       else if (k === 'BracketLeft') this.setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(this.speed) - 1)]);
       else if (k === 'BracketRight') this.setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(this.speed) + 1)]);
       else if (k === 'KeyF') this.followTap();
@@ -110,6 +119,8 @@ export class Studio {
     const E = this.el;
     if (!E.band) return;
     for (const b of E.speeds) b.classList.toggle('on', +b.dataset.speed === this.speed);
+    const hold = E.speeds.find((b) => b.dataset.speed === '0');
+    if (hold) hold.textContent = this.speed === 0 ? '▶' : '❚❚';
     E.follow.classList.toggle('on', this.mode === 'follow' || this.armed);
     E.follow.textContent = this.armed ? 'TAP IT' : this.mode === 'follow' ? 'FOLLOW ·' : 'FOLLOW';
     E.orbit.classList.toggle('on', this.orbitIx !== 0);
@@ -118,15 +129,24 @@ export class Studio {
     E.dolly.classList.toggle('on', d.t >= 0);
     E.dolly.textContent = d.t >= 0 ? 'STOP' : !d.a ? 'SET A' : !d.b ? 'SET B' : 'PLAY A→B';
     E.lens.textContent = `LENS · ${LENSES[this.lensIx].name}`;
+    const clear = !!this.hud?.clearView;
+    E.hud.classList.toggle('on', clear);
+    E.hud.textContent = clear ? 'HUD OFF' : 'HUD ON';
+    const sandbox = !!this.battle.studioRun;
+    E.enemy.hidden = !sandbox;
+    E.enemy.classList.toggle('on', sandbox && this.enemy);
+    E.enemy.textContent = this.enemy ? 'ENEMY ON' : 'ENEMY OFF';
     E.rec.classList.toggle('on', this.recording);
-    E.rec.textContent = this.recording ? '■ STOP' : '● REC';
+    if (!this.recording) E.rec.textContent = '● REC';
     E.save.hidden = !this.lastClip || this.recording;
     if (this.lastClip) E.save.textContent = `SAVE CLIP · ${this.lastClip.secs}s`;
     E.rec.disabled = !this.canRecord();
-    E.rec.title = this.canRecord() ? 'Record the picture and the sound' : 'This browser cannot record the canvas; use the phone\'s screen recorder';
+    E.rec.title = this.canRecord() ? 'Record the picture and the sound' : 'This browser cannot record the canvas; use the phone\'s screen recorder with HUD OFF';
   }
 
   // ── In and out.
+
+  toggle() { if (this.active) this.exit(); else this.enter(); }
 
   enter() {
     if (this.active) return;
@@ -134,7 +154,9 @@ export class Studio {
     document.body.classList.add('studio');
     if (this.el.band) this.el.band.hidden = false;
     this.setSpeed(1);
-    this._hint('THE INTERFACE IS OFF · DRAG TO LOOK, PINCH TO ZOOM');
+    this._hint(this.battle.studioRun
+      ? 'THE STUDIO · EVERYTHING IS FREE AND NOTHING IS COUNTED · PLAY THE FIGHT, FILM IT'
+      : 'THE STUDIO · PLAY ON, THE BAND IS THE CAMERA · HUD OFF FOR A CLEAN SCREEN');
     this._paint();
   }
 
@@ -153,14 +175,40 @@ export class Studio {
     this._applyLens();
     document.body.classList.remove('studio');
     if (this.el.band) this.el.band.hidden = true;
-    if (this.el.pill) this.el.pill.hidden = true;
-    this._paint();
-    // The interface back, through the HUD's own switch (which is wrapped in
-    // main.js to call this very method, so guard against the echo).
     if (this.hud?.clearView) this.hud.setClearView(false);
+    this._paint();
+  }
+
+  hudTap() {
+    if (!this.hud) return;
+    this.hud.setClearView(!this.hud.clearView);
+    this._hint(this.hud.clearView ? 'INTERFACE OFF · THE BAND STAYS · HUD ON BRINGS IT BACK' : 'INTERFACE ON');
+    this._tick();
+    this._paint();
+  }
+
+  /** The sandbox's enemy: the garrison's fire, the SAMs and the airborne together. */
+  enemyTap() {
+    const B = this.battle;
+    if (!B.studioRun) return;
+    this.enemy = !this.enemy;
+    if (B.garrison) B.garrison.fireEnabled = this.enemy;
+    if (B.sams) { if (!this.enemy) { B.sams._engageOff = B.sams._engageOff || B.sams._engage; B.sams._engage = () => {}; } else if (B.sams._engageOff) B.sams._engage = B.sams._engageOff; }
+    if (B.airborne) B.airborne.auto = this.enemy;
+    if (B.assault) B.assault.auto = this.enemy;
+    this._hint(this.enemy ? 'THE ENEMY FIRES' : 'THE ENEMY HOLDS ITS FIRE');
+    this._tick();
+    this._paint();
   }
 
   // ── The clock.
+
+  speedTap(s) {
+    // The hold chip is a toggle: held, then back to real time.
+    if (s === 0 && this.speed === 0) s = 1;
+    this.setSpeed(s);
+    this._tick();
+  }
 
   setSpeed(s) {
     if (!SPEEDS.includes(s)) s = 1;
@@ -182,7 +230,7 @@ export class Studio {
       // A second tap cycles through what is in the air and on the ground
       // rather than waiting for a finger on it.
       const list = this._candidates();
-      if (!list.length) { this._hint('NOTHING TO FOLLOW YET'); return; }
+      if (!list.length) { this._hint('NOTHING TO FOLLOW YET'); this.armed = false; this._paint(); return; }
       const i = this.target ? list.findIndex((c) => c.ref === this.target.ref) : -1;
       this._follow(list[(i + 1) % list.length]);
       this.armed = false;
@@ -195,6 +243,9 @@ export class Studio {
       this._paint();
       return;
     }
+    // A gun with its card open is the one to follow, no tap needed.
+    const u = this.unitCard?.unit;
+    if (u && (this.battle.units || []).includes(u)) { this._follow({ kind: 'unit', ref: u, name: u.def?.name || 'GUN' }); return; }
     this.armed = true;
     this._hint('TAP A GUN, AN AIRCRAFT, A SHELL OR THE BUILDING · OR TAP FOLLOW AGAIN TO CYCLE');
     this._paint();
@@ -243,9 +294,8 @@ export class Studio {
   }
 
   /**
-   * A tap on the canvas while the studio is up (main.js routes it here
-   * before the battle's own tap handling). Only a tap with FOLLOW armed does
-   * anything; the rest is the rig's.
+   * A tap on the canvas while FOLLOW is armed (main.js routes it here before
+   * the battle's own tap handling). Every other tap is the game's.
    */
   tap(x, y) {
     if (!this.active || !this.armed) return false;
@@ -322,6 +372,10 @@ export class Studio {
   update(dt) {
     if (!this.active) return;
     const R = this.rig, d = this.dolly;
+    if (this.recording && this.el.rec) {
+      const s = Math.floor((performance.now() - this.recT0) / 1000);
+      this.el.rec.textContent = `■ STOP ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
     if (d.t >= 0) {
       d.t = Math.min(1, d.t + dt / this.dollySecs);
       const k = ease(d.t), a = d.a, b = d.b;
@@ -345,10 +399,6 @@ export class Studio {
     }
     const w = ORBIT_RATES[this.orbitIx];
     if (w) { R.desiredYaw += w * dt; R.yaw += w * dt; }
-    if (this.recording && this.el.pill) {
-      const s = Math.floor((performance.now() - this.recT0) / 1000);
-      this.el.pill.textContent = `● ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} · TAP TO STOP`;
-    }
   }
 
   // ── The still and the clip.
@@ -359,7 +409,7 @@ export class Studio {
     this.snapPending = false;
     const name = `excessive-force-${this.battle.level?.id || 'shot'}-${stamp()}.jpg`;
     try {
-      this.canvas.toBlob((blob) => { if (blob) this._deliver(blob, name, 'image/jpeg'); }, 'image/jpeg', 0.92);
+      this.canvas.toBlob((blob) => { if (blob) this._deliver(blob, name, 'image/jpeg'); else this._hint('THE STILL FAILED'); }, 'image/jpeg', 0.92);
       this._hint('STILL TAKEN');
     } catch (e) { this._hint('THE STILL FAILED'); }
   }
@@ -375,7 +425,8 @@ export class Studio {
 
   startRecording() {
     if (this.recording || !this.canRecord()) return;
-    const stream = this.canvas.captureStream(30);
+    let stream;
+    try { stream = this.canvas.captureStream(30); } catch (e) { this._hint('THIS BROWSER WILL NOT HAND OVER THE CANVAS'); return; }
     // The game's own sound, tapped after the limiter.
     const A = this.audio;
     try {
@@ -386,39 +437,60 @@ export class Studio {
     const chunks = [];
     let rec;
     try { rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 14e6, audioBitsPerSecond: 160e3 }); }
-    catch (e) { this._hint('RECORDING FAILED TO START'); return; }
+    catch (e) {
+      // Without the sound track, then: a browser that takes the canvas and
+      // not a mixed stream is still a recorder.
+      try { rec = new MediaRecorder(this.canvas.captureStream(30), { mimeType }); }
+      catch (e2) { this._hint('RECORDING FAILED TO START'); return; }
+    }
+    this._chunks = chunks;
+    this._mimeUsed = mimeType;
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-    rec.onstop = () => {
-      const secs = Math.max(1, Math.round((performance.now() - this.recT0) / 1000));
-      const type = mimeType.split(';')[0];
-      const blob = new Blob(chunks, { type });
-      const ext = type.includes('mp4') ? 'mp4' : 'webm';
-      this.lastClip = { blob, name: `excessive-force-${this.battle.level?.id || 'clip'}-${stamp()}.${ext}`, type, secs };
-      this.recording = false;
-      this.rec = null;
-      if (this.el.pill) this.el.pill.hidden = true;
-      if (this.el.band && this.active) this.el.band.hidden = false;
-      this._paint();
-      this._saveClip();
-    };
-    this.engine.setRenderScale(1);
+    // Stop is finished on `onstop`, on an error, or on a timer when neither
+    // comes: an iPhone that never fired `onstop` left the band saying STOP.
+    rec.onstop = () => this._finish();
+    rec.onerror = () => this._finish();
     this.rec = rec;
+    this._stream = stream;
+    this.engine.setRenderScale(1);
+    try { rec.start(1000); } catch (e) { try { rec.start(); } catch (e2) { this._hint('RECORDING FAILED TO START'); this.rec = null; return; } }
     this.recording = true;
     this.recT0 = performance.now();
-    this._stream = stream;
-    rec.start(1000);
-    // The band goes, so the recording is the picture alone; the pill is
-    // the way to stop and is the one thing left on the glass.
-    if (this.el.band) this.el.band.hidden = true;
-    if (this.el.pill) { this.el.pill.hidden = false; this.el.pill.textContent = '● 0:00 · TAP TO STOP'; }
+    this._hint('RECORDING · THE CANVAS AND THE SOUND · STOP IS ON THE BAND');
     this._tick();
     this._paint();
   }
 
   stopRecording() {
-    if (!this.recording || !this.rec) return;
-    try { this.rec.stop(); } catch { this.recording = false; }
-    for (const t of this._stream?.getVideoTracks?.() || []) t.stop();
+    const rec = this.rec;
+    if (!this.recording || !rec) return;
+    this._hint('STOPPING');
+    if (rec.state === 'inactive') { this._finish(); return; }
+    try { rec.requestData?.(); } catch { /* a recorder without it */ }
+    try { rec.stop(); } catch { this._finish(); return; }
+    clearTimeout(this._stopTimer);
+    this._stopTimer = setTimeout(() => this._finish(), 4000);
+  }
+
+  /** The clip out of the chunks, once; whichever of stop, error or timer gets here first. */
+  _finish() {
+    clearTimeout(this._stopTimer);
+    if (!this.recording) return;
+    this.recording = false;
+    const secs = Math.max(1, Math.round((performance.now() - this.recT0) / 1000));
+    const type = (this._mimeUsed || 'video/webm').split(';')[0];
+    const chunks = this._chunks || [];
+    for (const t of this._stream?.getTracks?.() || []) { try { if (t.kind === 'video') t.stop(); } catch { /* gone */ } }
+    this.rec = null;
+    this._stream = null;
+    this._chunks = null;
+    this._paint();
+    if (!chunks.length) { this._hint('NOTHING WAS RECORDED · TRY THE PHONE\'S SCREEN RECORDER WITH HUD OFF'); return; }
+    const blob = new Blob(chunks, { type });
+    const ext = type.includes('mp4') ? 'mp4' : 'webm';
+    this.lastClip = { blob, name: `excessive-force-${this.battle.level?.id || 'clip'}-${stamp()}.${ext}`, type, secs };
+    this._paint();
+    this._saveClip();
   }
 
   _saveClip() {
@@ -438,7 +510,7 @@ export class Studio {
       }
     } catch (e) {
       // Not in a gesture, or cancelled: the SAVE CLIP chip stays for a tap.
-      if (e && e.name === 'AbortError') { this._hint('NOT SAVED · SAVE CLIP IS ON THE BAND'); this._paint(); return; }
+      if (e && (e.name === 'AbortError' || e.name === 'NotAllowedError')) { this._hint('NOT SAVED · TAP SAVE CLIP ON THE BAND'); this._paint(); return; }
     }
     try {
       const url = URL.createObjectURL(blob);
@@ -447,7 +519,7 @@ export class Studio {
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       this._hint(`SAVED ${name}`);
-    } catch (e) { this._hint('COULD NOT SAVE · TRY SAVE CLIP ON THE BAND'); }
+    } catch (e) { this._hint('COULD NOT SAVE · TAP SAVE CLIP ON THE BAND'); }
     this._paint();
   }
 }

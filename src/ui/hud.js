@@ -130,7 +130,9 @@ export class HUD {
       document.body.classList.toggle('clear-view', this.clearView);
       if (this.el.restoreBtn) this.el.restoreBtn.hidden = !this.clearView;
     };
-    this.el.clearBtn?.addEventListener('click', () => this.setClearView(true));
+    // STUDIO on the dock (ui/studio.js) when main has wired it, the plain
+    // clear view otherwise.
+    this.el.clearBtn?.addEventListener('click', () => (this.onView ? this.onView() : this.setClearView(true)));
     this.el.restoreBtn?.addEventListener('click', () => this.setClearView(false));
 
     // The survey. `onSurvey` is handed to the structures by `main`; the HUD

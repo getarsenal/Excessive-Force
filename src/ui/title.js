@@ -23,7 +23,7 @@ import { loadProgress } from './levelselect.js';
 import { listBattles, clearBattle } from '../game/battlesave.js';
 import {
   commander, setCommanderName, insignia, SLOT_IDS, slotInfo, activeSlot,
-  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick,
+  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick, startStudioRun,
   weeklyFor, weeklyState, startWeeklyRun,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
@@ -346,6 +346,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       // Opened from a list sheet: that sheet is the one BACK returns to.
       pendingParent = (!sheet.hidden && PARENTS.has(sheetAct) && !PARENTS.has(a) && a !== 'close' && a !== 'sheetback') ? sheetAct : null;
       if (a !== 'close' && a !== 'sheetback') sheetAct = a;
+      if (a.startsWith('studio:')) { const id = a.slice(7); startStudioRun(id); go(id); return; }
       switch (a) {
         case 'back': done({ level: null }); break;
         case 'resume': go(el?.dataset.level || cont.id, 'resume'); break;
@@ -403,6 +404,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
         case 'battles':
           openSheet('BATTLES IN PROGRESS', battles.map((b) => battleCard(b, true)).join(''), 'battles');
           break;
+        case 'studio':
+          openSheet('THE STUDIO', listSheet(openIds.map((id) => ({ act: `studio:${id}`, name: LEVELS[id]?.target || id, sub: LEVELS[id]?.city || LEVELS[id]?.place || '' }))), 'list');
+          break;
         case 'today':
           openSheet('TODAY', listSheet([
             daily && { act: 'daily', name: 'DAILY STRIKE', sub: dDone ? `DONE \u00b7 ${dstate.streak}-DAY STREAK` : `${daily.mod.name}${dstate.streak ? ` \u00b7 STREAK ${dstate.streak}` : ''}`, count: dDone ? 0 : 1 },
@@ -420,6 +424,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
             hasOpen && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN', sub: 'THREE MINUTES ON AN OPEN CONTRACT' },
             { act: 'map', name: 'WORLD MAP', sub: 'EVERY CONTRACT, OPEN OR CLOSED' },
             { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
+            // The sandbox for filming (ui/studio.js): free build on any open
+            // landmark, nothing counted, the camera's band over the fight.
+            hasOpen && { act: 'studio', name: 'THE STUDIO', sub: 'FILM A FIGHT · FREE BUILD, NOTHING COUNTED' },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
           ]), 'list');
           break;

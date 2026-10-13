@@ -988,9 +988,9 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 /* One rule, so nothing new can be added to the HUD and quietly stay on
    screen through a clear view: everything inside #ui goes, and the handful
    of things that must remain are named back in. */
-body.clear-view #ui > *:not(#restore-btn):not(#studio):not(#studio-recpill) { display: none !important; }
-/* In the studio the band has the bottom and EXIT is on it. */
-body.studio #restore-btn { display: none !important; }
+body.clear-view #ui > *:not(#restore-btn):not(#studio) { display: none !important; }
+/* In the studio with the interface off, HUD ON on the band is the way back. */
+body.studio.clear-view #restore-btn { display: none !important; }
 
 /* ── Test menu ───────────────────────────────────────────────────────── */
 #test-btn:hover { border-color: var(--edge-bright); color: var(--text); }
@@ -3200,12 +3200,16 @@ body.lean :not(.tgp-glass), body.lean ::before, body.lean ::after { backdrop-fil
    forty-four points tall, and a hint line over it. Nothing else on the glass. */
 #studio {
   position: absolute; z-index: 30; left: 50%; transform: translateX(-50%);
-  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 8px);
+  /* Over the dock, so the player still has UNITS and STRIKES under it. */
+  bottom: calc(var(--dock-h) + max(8px, env(safe-area-inset-bottom)) + 14px);
   width: calc(100vw - var(--pad-l) - var(--pad-r)); max-width: 640px;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   pointer-events: none;
 }
 #studio[hidden] { display: none; }
+body.clear-view #studio { bottom: calc(max(8px, env(safe-area-inset-bottom)) + 8px); }
+/* A drawer takes the bottom of the screen; the band comes back when it closes. */
+body.drawer-open #studio { display: none; }
 #studio .st-row {
   display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
   pointer-events: auto;
@@ -3227,19 +3231,11 @@ body.lean :not(.tgp-glass), body.lean ::before, body.lean ::after { backdrop-fil
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); text-align: center; min-height: 12px;
   padding: 0 8px; max-width: 100%;
 }
-#studio-recpill {
-  position: absolute; z-index: 31; left: 50%; transform: translateX(-50%);
-  top: calc(var(--hud-top, 12px) + 4px);
-  min-height: 44px; padding: 0 16px; border-radius: 22px;
-  font-family: inherit; font-size: 10px; letter-spacing: 0.18em;
-  color: #fff; background: rgba(232, 96, 76, 0.55); border: 1px solid rgba(255, 150, 130, 0.6);
-  backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); cursor: pointer;
-  animation: st-blink 1.4s ease-in-out infinite;
-}
-#studio-recpill[hidden] { display: none; }
-@keyframes st-blink { 0%, 100% { opacity: 0.95; } 50% { opacity: 0.55; } }
+@keyframes st-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+#studio .st-row button.st-rec.on { animation: st-blink 1.4s ease-in-out infinite; }
 @media (orientation: landscape) and (max-height: 500px) {
-  #studio { bottom: calc(max(4px, env(safe-area-inset-bottom)) + 4px); gap: 4px; }
+  #studio { bottom: calc(var(--dock-h) + max(4px, env(safe-area-inset-bottom)) + 8px); gap: 4px; }
+  body.clear-view #studio { bottom: calc(max(4px, env(safe-area-inset-bottom)) + 4px); }
   #studio .st-row { gap: 4px; }
   #studio .st-row button { padding: 0 9px; }
 }
