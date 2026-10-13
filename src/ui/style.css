@@ -3255,7 +3255,7 @@ body.laying #studio {
 body.laying #studio .st-row { display: contents; }
 body.laying #studio .st-row button { pointer-events: auto; }
 body.laying #studio-hint { width: 100%; order: 99; }
-body.laying #st-follow, body.laying #st-orbit, body.laying #st-dolly, body.laying #st-lens, body.laying #st-enemy { display: none; }
+body.laying #st-follow, body.laying #st-orbit, body.laying #st-dolly, body.laying #st-lens, body.laying #st-chase, body.laying #st-enemy { display: none; }
 /* With the interface off behind the gun, only STOP/REC and HUD ON remain, faint. */
 body.clear-view.laying #studio [data-speed], body.clear-view.laying #st-snap, body.clear-view.laying #st-save,
 body.clear-view.laying #studio-hint { display: none; }

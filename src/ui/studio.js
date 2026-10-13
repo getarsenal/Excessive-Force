@@ -38,6 +38,15 @@ const LENSES = [
   { name: 'LONG', fov: 16 },
 ];
 const ORBIT_RATES = [0, 0.09, 0.2, -0.09];   // radians a second: off, slow, brisk, slow the other way
+// The chase: the camera rides with the aircraft (or the bomb) and looks at
+// the target, so the run-in plays out with both in the frame. BEHIND
+// trails it, a little high and off to one side; LEAD waits ahead of it
+// and lets it overtake and fly on into the picture.
+const CHASE = [
+  { name: 'CHASE', back: 0 },
+  { name: 'CHASE · BEHIND', back: 72, up: 18, side: 14 },
+  { name: 'CHASE · LEAD', back: -95, up: 12, side: 18 },
+];
 const DOLLY_SECS = 8;
 const TAP_PX = 44;
 
@@ -56,6 +65,7 @@ export class Studio {
     this.armed = false;           // the next tap picks what to follow
     this.target = null;           // { kind, ref, name, point }
     this.orbitIx = 0;
+    this.chaseIx = 0;
     this.lensIx = 1;
     this.dolly = { a: null, b: null, t: -1 };
     this.dollySecs = DOLLY_SECS;   // the probe shortens it
@@ -78,7 +88,7 @@ export class Studio {
     this.el = {
       band: $('studio'), hint: $('studio-hint'),
       follow: $('st-follow'), orbit: $('st-orbit'), dolly: $('st-dolly'),
-      lens: $('st-lens'), hud: $('st-hud'), enemy: $('st-enemy'),
+      lens: $('st-lens'), hud: $('st-hud'), enemy: $('st-enemy'), chase: $('st-chase'),
       snap: $('st-snap'), rec: $('st-rec'), save: $('st-save'),
       speeds: [...document.querySelectorAll('#studio [data-speed]')],
     };
@@ -89,6 +99,7 @@ export class Studio {
     E.dolly.addEventListener('click', () => this.dollyTap());
     E.lens.addEventListener('click', () => this.lensTap());
     E.hud.addEventListener('click', () => this.hudTap());
+    E.chase.addEventListener('click', () => this.chaseTap());
     E.enemy.addEventListener('click', () => this.enemyTap());
     E.snap.addEventListener('click', () => { this.snapPending = true; this._tick(); this._hint('STILL ON THE NEXT FRAME'); });
     E.rec.addEventListener('click', () => (this.recording ? this.stopRecording() : this.startRecording()));
@@ -103,6 +114,7 @@ export class Studio {
       else if (k === 'BracketRight') this.setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(this.speed) + 1)]);
       else if (k === 'KeyF') this.followTap();
       else if (k === 'KeyO') this.orbitTap();
+      else if (k === 'KeyC') this.chaseTap();
       else if (k === 'KeyB') this.dollyTap();
       else if (k === 'KeyL') this.lensTap();
       else if (k === 'KeyP') this.snapPending = true;
@@ -128,6 +140,10 @@ export class Studio {
     E.dolly.classList.toggle('on', d.t >= 0);
     E.dolly.textContent = d.t >= 0 ? 'STOP' : !d.a ? 'SET A' : !d.b ? 'SET B' : 'PLAY A→B';
     E.lens.textContent = `LENS · ${LENSES[this.lensIx].name}`;
+    const flying = this.mode === 'follow' && this.target && (this.target.kind === 'sortie' || this.target.kind === 'shell');
+    E.chase.hidden = !flying;
+    E.chase.classList.toggle('on', flying && this.chaseIx !== 0);
+    E.chase.textContent = CHASE[this.chaseIx].name;
     const clear = !!this.hud?.clearView;
     E.hud.classList.toggle('on', clear);
     E.hud.textContent = clear ? 'HUD OFF' : 'HUD ON';
@@ -167,6 +183,7 @@ export class Studio {
     this.mode = 'free';
     this.target = null;
     this.orbitIx = 0;
+    this.chaseIx = 0;
     this.dolly = { a: null, b: null, t: -1 };
     this.rig.enabled = true;
     this.setSpeed(1);
@@ -238,7 +255,7 @@ export class Studio {
       return;
     }
     if (this.mode === 'follow') {
-      this.mode = 'free'; this.target = null;
+      this.mode = 'free'; this.target = null; this.chaseIx = 0; this.rig.enabled = true;
       this._hint('FREE CAMERA');
       this._paint();
       return;
@@ -324,6 +341,44 @@ export class Studio {
     return true;
   }
 
+  chaseTap() {
+    this.chaseIx = (this.chaseIx + 1) % CHASE.length;
+    this.rig.enabled = this.chaseIx === 0;
+    if (this.chaseIx) this.orbitIx = 0;
+    this._hint(['CHASE OFF · FREE ORBIT ROUND IT', 'RIDING BEHIND IT, EYES ON THE TARGET', 'WAITING AHEAD OF IT · IT FLIES PAST YOU TO THE TARGET'][this.chaseIx]);
+    this._tick();
+    this._paint();
+  }
+
+  /** Where the thing in the air is going: the strike's aim point, the landmark otherwise. */
+  _aimOf(t) {
+    const B = this.battle, r = t.ref;
+    if (t.kind === 'sortie' && r.target) return r.target;
+    if (t.kind === 'shell' && r.target) return r.target;
+    return B.primary?.origin || null;
+  }
+
+  /** The chase camera: a pose behind or ahead of the thing, the focus on the target. */
+  _chase(t) {
+    const c = CHASE[this.chaseIx], R = this.rig, r = t.ref;
+    const p = this._position(t, this._v); if (!p) return false;
+    const aim = this._aimOf(t); if (!aim) return false;
+    let dx, dz;
+    if (t.kind === 'sortie' && r.dir) { dx = r.dir.x; dz = r.dir.z; }
+    else if (t.kind === 'shell' && r.vel) { dx = r.vel.x; dz = r.vel.z; }
+    else { dx = aim.x - p.x; dz = aim.z - p.z; }
+    const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
+    const sx = -dz, sz = dx;
+    const cx = p.x - dx * c.back + sx * c.side, cy = p.y + c.up, cz = p.z - dz * c.back + sz * c.side;
+    const fx = aim.x, fy = aim.y, fz = aim.z;
+    const d = Math.hypot(cx - fx, cy - fy, cz - fz) || 1;
+    R.target.set(fx, fy, fz); R.desiredTarget.copy(R.target);
+    R.distance = R.desiredDistance = d;
+    R.yaw = R.desiredYaw = Math.atan2(cx - fx, cz - fz);
+    R.pitch = R.desiredPitch = Math.asin(Math.max(-1, Math.min(1, (cy - fy) / d)));
+    return true;
+  }
+
   orbitTap() {
     this.orbitIx = (this.orbitIx + 1) % ORBIT_RATES.length;
     this._hint(['ORBIT OFF', 'SLOW ORBIT', 'BRISK ORBIT', 'SLOW ORBIT · THE OTHER WAY'][this.orbitIx]);
@@ -391,7 +446,9 @@ export class Studio {
     if (this.mode === 'follow' && this.target) {
       if (!this._alive(this.target)) {
         this._hint(`${this.target.name} IS GONE · FREE CAMERA`);
-        this.mode = 'free'; this.target = null; this._paint();
+        this.mode = 'free'; this.target = null; this.chaseIx = 0; R.enabled = true; this._paint();
+      } else if (this.chaseIx && (this.target.kind === 'sortie' || this.target.kind === 'shell')) {
+        this._chase(this.target);
       } else {
         const p = this._position(this.target, this._v);
         if (p) R.desiredTarget.copy(p);
