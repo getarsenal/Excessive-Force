@@ -3248,8 +3248,13 @@ body.drawer-open #studio { display: none; }
    the bottom, so the band goes up under the top bar, and the camera chips
    (the eye is the gunner's) come off it: the clock, SNAP, REC and HUD stay. */
 body.laying #studio {
-  top: calc(var(--talk-top) - 2px); bottom: auto; flex-direction: column-reverse;
+  top: calc(var(--talk-top) - 2px); bottom: auto;
+  /* One flowing line of chips, the hint under it. */
+  flex-direction: row; flex-wrap: wrap; justify-content: center;
 }
+body.laying #studio .st-row { display: contents; }
+body.laying #studio .st-row button { pointer-events: auto; }
+body.laying #studio-hint { width: 100%; order: 99; }
 body.laying #st-follow, body.laying #st-orbit, body.laying #st-dolly, body.laying #st-lens, body.laying #st-enemy { display: none; }
 /* With the interface off behind the gun, only STOP/REC and HUD ON remain, faint. */
 body.clear-view.laying #studio [data-speed], body.clear-view.laying #st-snap, body.clear-view.laying #st-save,
