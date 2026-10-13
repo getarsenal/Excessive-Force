@@ -727,8 +727,8 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   THE STUDIO (`src/ui/studio.js`): the game as a camera, over the game.
   STUDIO on the dock opens a band on the thumb line above the dock, and
   the fight goes on under it: pause, pick a unit, deploy, designate,
-  call a strike, all as in play. Chips forty-four points a side: EXIT,
-  FOLLOW (a tap on a gun, an aircraft, a shell, the lift or the
+  call a strike, all as in play, and STUDIO again closes it. Chips
+  forty-four points a side: FOLLOW (a tap on a gun, an aircraft, a shell, the lift or the
   building; a gun with its card open needs no tap; a second tap cycles
   through what is in the air and on the ground; a thing that dies hands
   the camera back), ORBIT (slow, brisk, the other way), SET A / SET B /

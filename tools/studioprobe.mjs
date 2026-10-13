@@ -240,10 +240,10 @@ if (can) {
 }
 
 // EXIT puts it all back.
-await tap(page, '#st-exit');
+await tap(page, '#dock-view');
 await page.waitForTimeout(300);
 r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), hz: Math.round(1 / window.battle.physics.fixedStep), ts: window.__studio.testMenu.timeScale, paused: window.__studio.testMenu.paused, fov: window.__engine.camera.fov, max: window.battle.physics.maxSteps, dock: getComputedStyle(document.getElementById('dock')).display }));
-check(!r.studio && !r.clear && r.hz === baseHz && r.ts === 1 && !r.paused && r.fov === fov0 && r.max === 3 && r.dock !== 'none', `EXIT: band down, clock and lens and physics restored (${JSON.stringify(r)})`);
+check(!r.studio && !r.clear && r.hz === baseHz && r.ts === 1 && !r.paused && r.fov === fov0 && r.max === 3 && r.dock !== 'none', `STUDIO on the dock again: band down, clock and lens and physics restored (${JSON.stringify(r)})`);
 // The H key is still the plain clear view, and does not open the band.
 await page.keyboard.press('KeyH');
 await page.waitForTimeout(200);

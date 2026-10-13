@@ -77,14 +77,13 @@ export class Studio {
     const $ = (id) => document.getElementById(id);
     this.el = {
       band: $('studio'), hint: $('studio-hint'),
-      exit: $('st-exit'), follow: $('st-follow'), orbit: $('st-orbit'), dolly: $('st-dolly'),
+      follow: $('st-follow'), orbit: $('st-orbit'), dolly: $('st-dolly'),
       lens: $('st-lens'), hud: $('st-hud'), enemy: $('st-enemy'),
       snap: $('st-snap'), rec: $('st-rec'), save: $('st-save'),
       speeds: [...document.querySelectorAll('#studio [data-speed]')],
     };
     if (!this.el.band) return;
     const E = this.el;
-    E.exit.addEventListener('click', () => this.exit());
     E.follow.addEventListener('click', () => this.followTap());
     E.orbit.addEventListener('click', () => this.orbitTap());
     E.dolly.addEventListener('click', () => this.dollyTap());
@@ -156,7 +155,7 @@ export class Studio {
     this.setSpeed(1);
     this._hint(this.battle.studioRun
       ? 'THE STUDIO · EVERYTHING IS FREE AND NOTHING IS COUNTED · PLAY THE FIGHT, FILM IT'
-      : 'THE STUDIO · PLAY ON, THE BAND IS THE CAMERA · HUD OFF FOR A CLEAN SCREEN');
+      : 'THE STUDIO · PLAY ON, THE BAND IS THE CAMERA · STUDIO ON THE DOCK CLOSES IT');
     this._paint();
   }
 
