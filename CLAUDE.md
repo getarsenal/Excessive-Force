@@ -696,6 +696,22 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the bar each unit opens beside the starting money. The first sweep is
   `docs/par/README.md`: the bot is too weak to set par from, and par was
   not changed ·
+  THE TRAILER (`tools/trailer.mjs`): cut from the game itself. Playwright
+  drives the real game a frame at a time with `performance.now` faked, so
+  every driven frame is exactly 1/FPS of game time whatever the box can
+  draw; the HUD is hidden, the governor's hands are taken off the
+  picture (it sheds pixels when a frame runs long, and a resize after the
+  draw leaves a black canvas to read), each shot in `SHOTS` scripts a beat
+  through the hooks the probes use (deploy, setTarget, callStrike,
+  explode, the lift) with the camera eased between two poses, the
+  pre-roll is the harness's fast-forward (sim only, a hundred times
+  quicker than a drawn frame) with the last second drawn, frames are read
+  off the canvas as JPEGs, title cards are HTML screenshotted at the same
+  size, and ffmpeg-static assembles the cut over the menu track.
+  `node tools/trailer.mjs` is the 720x1280 rough cut (`W=1080 H=1920`
+  the phone cut, `W=1920 H=1080` the wide one, `ONLY=opener,stupa` a
+  few shots); a software box draws two to five seconds a frame, so a
+  thirty-second cut is the better part of an hour ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
