@@ -207,6 +207,30 @@
     </div>
     <button id="sound-toggle" hidden></button>
     <button id="restore-btn" hidden>SHOW UI</button>
+    <!-- The studio (ui/studio.js): the game as a camera, behind VIEW. -->
+    <div id="studio" hidden>
+      <div id="studio-hint"></div>
+      <div class="st-row">
+        <button id="st-exit" title="Back to the fight">EXIT</button>
+        <button id="st-follow" title="Follow a gun, an aircraft or a shell">FOLLOW</button>
+        <button id="st-orbit" title="Orbit what is in focus">ORBIT</button>
+        <button id="st-dolly" title="A move from one view to another">SET A</button>
+        <button id="st-lens" title="Lens">LENS · NORMAL</button>
+      </div>
+      <div class="st-row">
+        <button data-speed="0" title="Hold">❚❚</button>
+        <button data-speed="0.25" title="Quarter speed">¼×</button>
+        <button data-speed="0.5" title="Half speed">½×</button>
+        <button data-speed="1" class="on" title="Real time">1×</button>
+        <button data-speed="2" title="Double">2×</button>
+        <button data-speed="4" title="Time lapse">4×</button>
+        <button data-speed="8" title="Time lapse">8×</button>
+        <button id="st-snap" title="A still at full size">SNAP</button>
+        <button id="st-rec" class="st-rec" title="Record the picture and the sound">● REC</button>
+        <button id="st-save" hidden>SAVE CLIP</button>
+      </div>
+    </div>
+    <button id="studio-recpill" hidden>● 0:00 · TAP TO STOP</button>
     <div id="menu" hidden>
       <div class="menu-inner">
         <div class="menu-title">PAUSED</div>

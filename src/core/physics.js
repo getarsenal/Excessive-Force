@@ -60,6 +60,11 @@ export class PhysicsWorld {
 
     this.fixedStep = 1 / quality.physicsHz;
     this.world.integrationParameters.dt = this.fixedStep;
+    // How many fixed steps one frame may take and how much time a frame
+    // may bank: three and a tenth of a second in play, so a long frame
+    // never spirals. The studio's time lapse raises both (ui/studio.js).
+    this.maxSteps = 3;
+    this.maxDt = 0.1;
     // Structures need stiff contacts or tall stacks visibly sag. Trading a
     // little solver time for stack rigidity is the right call here.
     this.world.integrationParameters.numSolverIterations = 6;
@@ -919,6 +924,18 @@ export class PhysicsWorld {
   setBudget(n) { this.activeBudget = n; }
 
   /**
+   * The fixed step, in steps a second. The studio's slow motion steps the
+   * world finer rather than less often, so a collapse at a quarter speed is
+   * still sixty pictures a second of motion, not fifteen.
+   */
+  setTimeStep(hz) {
+    const step = 1 / Math.max(30, Math.min(480, hz));
+    if (Math.abs(step - this.fixedStep) < 1e-9) return;
+    this.fixedStep = step;
+    this.world.integrationParameters.dt = step;
+  }
+
+  /**
    * Fixed-timestep stepping with a bounded catch-up. If a frame takes 200 ms
    * we deliberately drop the extra sub-steps rather than spiral.
    */
@@ -936,10 +953,10 @@ export class PhysicsWorld {
     // else has begun: nothing is holding a body reference at this point, which
     // is the whole reason they were queued rather than done where they arose.
     this._drainDoomed();
-    this.accumulator += Math.min(dt, 0.1);
+    this.accumulator += Math.min(dt, this.maxDt);
     let steps = 0;
     try {
-      while (this.accumulator >= this.fixedStep && steps < 3) {
+      while (this.accumulator >= this.fixedStep && steps < this.maxSteps) {
         this.world.step(this.eventQueue);
         this.accumulator -= this.fixedStep;
         steps++;

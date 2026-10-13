@@ -58,6 +58,7 @@ import { applyLook, applyWaterLook, stylizeTree, lookFor, climeOf } from './worl
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
+import { Studio } from './ui/studio.js';
 import { newsflash, hideNewsflash } from './ui/newsflash.js';
 import { WhiteFlags } from './fx/whiteflags.js';
 import { ContactShadows } from './fx/contactshadows.js';
@@ -633,6 +634,13 @@ async function boot() {
       + `${manned} of ${fieldWorks.posts.length} positions manned`);
   }
 
+  // The studio (ui/studio.js), built once the battle and the HUD exist.
+  // While it records, the governor keeps its hands off the picture's size.
+  let studio = null;
+  {
+    const srs = engine.setRenderScale.bind(engine);
+    engine.setRenderScale = (f) => (studio?.recording ? false : srs(f));
+  }
   const rig = new CameraRig(engine.camera, canvas, {
     tx: 0, ty: groundY + level.camera.height, tz: 0,
     distance: level.camera.distance, yaw: level.camera.yaw, pitch: level.camera.pitch,
@@ -2905,6 +2913,8 @@ async function boot() {
       }
     }
     if (rig.wasDrag) return;
+    // With FOLLOW armed in the studio the tap picks what the camera follows.
+    if (studio?.active && studio.armed) { studio.tap(e.clientX, e.clientY); return; }
     if (battle.state !== 'playing') return;
     const strike = !!(battle.selectedUnitId && UNITS_BY_ID[battle.selectedUnitId].strike);
     const hit = pick(e.clientX, e.clientY, !battle.selectedUnitId || strike);
@@ -3604,7 +3614,13 @@ async function boot() {
     battle.garrison?.eye?.copy(engine.camera.position);
     audio.setListener(engine.camera);
     battle.tracerFX.setCamera(engine.camera);
-    if (!suiteHold) battle.update(dt);
+    if (!suiteHold) {
+      // The studio's time lapse hands the battle a big step: taken in
+      // thirtieths, as the harness's fast-forward does, so the guns keep
+      // time with the stones.
+      const sub = dt > 0.06 ? Math.ceil(dt / (1 / 30)) : 1;
+      for (let i = 0; i < sub; i++) battle.update(dt / sub);
+    }
     blitzTick();
     rematchTick();
     // The survey follows the solver. Throttled inside `paintSurvey` — the
@@ -3683,6 +3699,7 @@ async function boot() {
     sky.position.copy(engine.camera.position);
     cloudUniforms.uCloudTime.value = now * 0.001;
 
+    studio?.update(rawDt);
     const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
     layCamera(rawDt);
@@ -3694,6 +3711,7 @@ async function boot() {
     if (perfOn) perfTest.beforeRender(); else if (recOn) playRec.beforeRender();
     const drawT0 = performance.now();
     engine.render();
+    studio?.afterRender();
     pod.render(dt);
     if (perfOn) perfTest.afterRender(dtMs, drawT0 - now, performance.now() - drawT0);
     else if (recOn) playRec.afterRender(dtMs, drawT0 - now, performance.now() - drawT0);
@@ -3767,6 +3785,14 @@ async function boot() {
   });
   // Live, because it is replaced by null when the stand-off ends.
   Object.defineProperty(window, 'standoff', { get: () => standoff, configurable: true });
+  studio = new Studio({ engine, rig, battle, physics, hud, audio, testMenu, canvas, quality, feedback, pick: (x, y) => pick(x, y, false) });
+  window.__studio = studio;
+  // VIEW is the studio's door: the HUD's clear view opens it, and SHOW UI,
+  // the H key or EXIT closes it with the interface put back.
+  {
+    const scv = hud.setClearView;
+    hud.setClearView = (on) => { scv(on); if (on) studio.enter(); else if (studio.active) studio.exit(); };
+  }
   window.__fastForward = fastForward;
   // One real frame, on demand. The suite uses it to prove that an update which
   // throws still reaches the draw — which cannot be asserted from
