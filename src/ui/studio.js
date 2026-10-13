@@ -53,6 +53,7 @@ export class Studio {
     this.orbitIx = 0;
     this.lensIx = 1;
     this.dolly = { a: null, b: null, t: -1 };
+    this.dollySecs = DOLLY_SECS;   // the probe shortens it
     this.recording = false;
     this.rec = null;
     this.recT0 = 0;
@@ -322,7 +323,7 @@ export class Studio {
     if (!this.active) return;
     const R = this.rig, d = this.dolly;
     if (d.t >= 0) {
-      d.t = Math.min(1, d.t + dt / DOLLY_SECS);
+      d.t = Math.min(1, d.t + dt / this.dollySecs);
       const k = ease(d.t), a = d.a, b = d.b;
       R.target.lerpVectors(a.target, b.target, k); R.desiredTarget.copy(R.target);
       R.distance = R.desiredDistance = a.distance + (b.distance - a.distance) * k;

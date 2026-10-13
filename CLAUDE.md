@@ -724,6 +724,26 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the phone cut, `W=1920 H=1080` the wide one); a software box draws two
   to eight seconds a frame, so a thirty-second cut is the better part of
   an hour ·
+  THE STUDIO (`src/ui/studio.js`): the game as a camera, behind the
+  dock's VIEW button (the HUD's clear view opens it; SHOW UI, H or EXIT
+  closes it with the interface back). A band on the thumb line, chips
+  forty-four points a side: the clock (held, ¼, ½, 1, 2, 4, 8×), FOLLOW
+  (a tap on a gun, an aircraft, a shell, the lift or the building; a
+  second tap cycles through what is in the air and on the ground; a
+  thing that dies hands the camera back), ORBIT (slow, brisk, the other
+  way), SET A / SET B / PLAY A→B (a move over eight seconds with the rig
+  held), LENS (72/52/30/16°), SNAP (the canvas as a JPEG) and REC (the
+  canvas at thirty frames with the game's sound tapped after the
+  limiter, mp4 where the browser records it, webm otherwise; the band
+  goes while it runs and the red pill at the top stops it; saved through
+  the share sheet, SAVE VIDEO on an iPhone, or as a download, and SAVE
+  CLIP on the band keeps the last one for another tap). Slow motion
+  steps the physics finer (`physics.setTimeStep`, 240 Hz at a quarter),
+  not less often; a time lapse lifts the step cap (`maxSteps`, `maxDt`)
+  and main.js steps the battle in thirtieths, so the guns keep time with
+  the stones; the governor leaves the picture's size alone while a
+  recording runs. `node tools/studioprobe.mjs` drives all of it on a
+  phone viewport and photographs the band upright and on its side ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the

@@ -1,0 +1,195 @@
+// The studio (ui/studio.js) driven on a phone: VIEW opens it, the clock is
+// slowed and the physics step follows, a strike is called and FOLLOW
+// cycles onto the aircraft, ORBIT turns the view, a move is set from A to B
+// and played, the lens changes, a still is taken, two seconds are recorded
+// and the clip's size read, then EXIT puts everything back. Photographs
+// the band upright and on its side.
+//
+//   node tools/studioprobe.mjs [level]      -> /tmp/out/studio/*.png
+import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
+const level = process.argv[2] || 'westminster';
+const port = process.env.TT_PORT || 5177;
+mkdirSync('/tmp/out/studio', { recursive: true });
+let fails = 0;
+// Frames are driven, not waited for: on a software rasteriser a frame is
+// seconds, and a check that waits a second of the wall clock sees none.
+// Chips are clicked from inside the page: Playwright's own click waits for
+// the chip to hold still over two frames, and at eight times a frame is work.
+const tap = (page, sel) => page.evaluate((sel) => document.querySelector(sel).click(), sel);
+// Paced: the battery saver (on by default on a phone) skips a frame that
+// comes under a thirtieth of a second after the last, so back-to-back
+// calls would be mostly skipped.
+const frames = (page, n) => page.evaluate((n) => window.__drive(n), n);
+const check = (ok, what) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}`); if (!ok) fails++; };
+
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium',
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
+const ctx = await b.newContext({ viewport: { width: 393, height: 852 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
+const page = await ctx.newPage();
+await page.addInitScript((tier) => { try {
+  localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
+  localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0');
+  localStorage.setItem('tt.tutorial', 'done'); } catch {} }, process.env.TIER || 'low');
+page.on('pageerror', (e) => { console.log('page error:', String(e).slice(0, 200)); fails++; });
+await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.__studio, null, { timeout: 400000 });
+await page.waitForTimeout(1500);
+await page.evaluate(() => { window.__drive = async (n) => { for (let k = 0; k < n; k++) { window.__frame(); await new Promise((r) => setTimeout(r, 36)); } }; });
+await page.evaluate(() => { const B = window.battle; B.airborne.auto = false; B.assault.auto = false; B.invulnerable = true; B.freeBuild = true; B.unlockAll = true; if (B.garrison) B.garrison.fireEnabled = false; if (B.sams) B.sams._engage = () => {}; });
+
+// In through VIEW.
+await page.click('#dock-view');
+await page.waitForTimeout(300);
+let r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), band: !document.getElementById('studio').hidden, dock: getComputedStyle(document.getElementById('dock')).display }));
+check(r.studio && r.clear && r.band && r.dock === 'none', `VIEW opens the studio: band shown, dock hidden (${JSON.stringify(r)})`);
+await page.screenshot({ path: '/tmp/out/studio/band-portrait.png' });
+
+// On its side, while the page is still fresh enough to photograph.
+await page.setViewportSize({ width: 852, height: 393 });
+await page.waitForTimeout(600);
+await page.screenshot({ path: '/tmp/out/studio/band-landscape.png', timeout: 180000, animations: 'disabled' });
+r = await page.evaluate(() => { const q = document.getElementById('studio').getBoundingClientRect(); return { top: Math.round(q.top), bottom: Math.round(q.bottom), h: innerHeight }; });
+check(r.bottom <= r.h && r.top > r.h * 0.5, `landscape: the band sits in the lower half (${r.top}..${r.bottom} of ${r.h})`);
+await page.setViewportSize({ width: 393, height: 852 });
+await page.waitForTimeout(400);
+
+// Targets 44 points a side.
+const small = await page.evaluate(() => [...document.querySelectorAll('#studio button')].filter((b) => !b.hidden).map((b) => { const q = b.getBoundingClientRect(); return [b.textContent.trim(), Math.round(q.width), Math.round(q.height)]; }).filter((x) => x[1] < 44 || x[2] < 44));
+check(small.length === 0, `every chip at least 44 points a side${small.length ? ': ' + JSON.stringify(small) : ''}`);
+
+// The clock.
+const baseHz = await page.evaluate(() => Math.round(1 / window.battle.physics.fixedStep));
+await tap(page, '#studio [data-speed="0.25"]');
+r = await page.evaluate(() => ({ ts: window.__testMenu?.timeScale ?? window.__studio.testMenu.timeScale, hz: Math.round(1 / window.battle.physics.fixedStep), paused: window.__studio.testMenu.paused }));
+check(r.ts === 0.25 && r.hz === baseHz * 4 && !r.paused, `quarter speed: timeScale ${r.ts}, physics ${r.hz} Hz (was ${baseHz})`);
+await tap(page, '#studio [data-speed="8"]');
+r = await page.evaluate(() => ({ ts: window.__studio.testMenu.timeScale, hz: Math.round(1 / window.battle.physics.fixedStep), max: window.battle.physics.maxSteps, maxDt: window.battle.physics.maxDt }));
+check(r.ts === 8 && r.hz === baseHz && r.max === 24 && r.maxDt === 0.5, `time lapse: timeScale ${r.ts}, ${r.max} steps a frame, ${r.maxDt} s banked`);
+// The guns and the stones in the same time: eight seconds of the clock in a second of frames.
+r = await page.evaluate(async () => {
+  const B = window.battle, t0 = B.elapsed, s0 = B.physics.stepCount, f0 = performance.now();
+  await window.__drive(10);
+  return { clock: B.elapsed - t0, steps: B.physics.stepCount - s0, real: (performance.now() - f0) / 1000 };
+});
+// Eight seconds of battle a second of frames, and a physics step a
+// sixtieth of each of them, so the guns and the stones agree.
+// Ten frames are at least ten thirtieths of a second of the frame's
+// clock (paced at a thirtieth, capped at a twentieth), so eight times is
+// at least two and a half seconds of battle; and a physics step for
+// every fiftieth or sixtieth of it, so the stones keep up with the guns.
+check(r.clock > 2.4 && Math.abs(r.steps - r.clock * baseHz) < 12, `ten frames at 8x: the battle ran ${r.clock.toFixed(1)} s (${r.real.toFixed(2)} s on this box), ${r.steps} physics steps (${(r.clock * baseHz).toFixed(0)} due)`);
+await tap(page, '#studio [data-speed="0"]');
+r = await page.evaluate(async () => { const B = window.battle, t0 = B.elapsed; await window.__drive(5); return B.elapsed - t0; });
+check(r === 0, `held: the clock stood still (${r})`);
+await tap(page, '#studio [data-speed="1"]');
+
+// FOLLOW an aircraft.
+await page.evaluate(() => { const B = window.battle, o = B.primary.origin, T = window.THREE; B.callStrike('f15', new T.Vector3(o.x, B.originGround, o.z)); });
+await page.waitForTimeout(400);
+await tap(page, '#st-follow');
+await tap(page, '#st-follow');   // armed, then cycle onto the first thing in the air
+r = await page.evaluate(() => { const S = window.__studio; return { mode: S.mode, kind: S.target?.kind, name: S.target?.name, hint: document.getElementById('studio-hint').textContent }; });
+check(r.mode === 'follow' && r.kind === 'sortie', `FOLLOW cycles onto the aircraft: ${r.kind} ${r.name} · "${r.hint}"`);
+r = await page.evaluate(async () => {
+  const S = window.__studio, R = window.__rig;
+  const a = R.target.clone(); await window.__drive(12);
+  const p = S.target?.ref?.model?.position; const moved = R.target.distanceTo(a);
+  return { moved, gap: p ? R.desiredTarget.distanceTo(p) : -1, lag: p ? R.target.distanceTo(p) : -1 };
+});
+check(r.moved > 20 && r.gap < 1, `the focus moved ${r.moved.toFixed(0)} m with it, ${r.gap.toFixed(2)} m off the aircraft (${r.lag.toFixed(0)} m behind it)`);
+// Tap to follow: a tap on the landmark.
+await tap(page, '#st-follow');  // off
+await tap(page, '#st-follow');  // armed
+r = await page.evaluate(() => {
+  const B = window.battle, o = B.primary.origin, T = window.THREE, cam = window.__engine.camera;
+  const v = new T.Vector3(o.x, o.y + 20, o.z).project(cam); const c = document.querySelector('canvas').getBoundingClientRect();
+  return { x: c.left + (v.x + 1) / 2 * c.width, y: c.top + (1 - v.y) / 2 * c.height };
+});
+await page.touchscreen.tap(r.x, r.y);
+await page.waitForTimeout(300);
+r = await page.evaluate(() => { const S = window.__studio; return { mode: S.mode, kind: S.target?.kind, name: S.target?.name }; });
+check(r.mode === 'follow' && (r.kind === 'point' || r.kind === 'unit'), `a tap on the building follows it: ${r.kind} ${r.name}`);
+
+// ORBIT.
+await tap(page, '#st-orbit');
+r = await page.evaluate(async () => { const R = window.__rig, y0 = R.yaw, f0 = performance.now(); await window.__drive(12); return { turn: R.yaw - y0, real: (performance.now() - f0) / 1000 }; });
+// Twelve driven frames are at least twelve twentieths of a second of
+// camera time (the frame's clock is capped there whatever the box took),
+// so the slow orbit has turned at least three degrees.
+check(Math.abs(r.turn) > 0.045, `the slow orbit turned ${(r.turn * 180 / Math.PI).toFixed(1)}° over twelve frames (${r.real.toFixed(1)} s on this box)`);
+await tap(page, '#st-orbit'); await tap(page, '#st-orbit'); await tap(page, '#st-orbit');  // back to off
+r = await page.evaluate(() => window.__studio.orbitIx);
+check(r === 0, 'orbit cycles back to off');
+
+// A → B.
+await tap(page, '#st-follow');  // free camera
+// A frame here is seconds, so the eight-second move is run as a two-second one.
+await page.evaluate(() => { window.__studio.dollySecs = 2; });
+await tap(page, '#st-dolly');   // A
+await page.evaluate(() => { const R = window.__rig; R.desiredYaw = R.yaw = R.yaw + 1.2; R.desiredDistance = R.distance = R.distance * 0.6; R.desiredPitch = R.pitch = 0.5; });
+await tap(page, '#st-dolly');   // B
+await tap(page, '#st-dolly');   // play
+r = await page.evaluate(() => ({ t: window.__studio.dolly.t, label: document.getElementById('st-dolly').textContent, enabled: window.__rig.enabled }));
+check(r.t >= 0 && r.label === 'STOP' && !r.enabled, `the move is rolling (${r.label})`);
+r = await page.evaluate(async () => {
+  const S = window.__studio, R = window.__rig, a = S.dolly.a, b = S.dolly.b;
+  // Part way in: still on the way. Then until it is done.
+  await window.__drive(2);
+  const mid = { t: S.dolly.t, yaw: R.yaw };
+  for (let k = 0; k < 10 && S.dolly.t >= 0; k++) await window.__drive(10);
+  return { t: S.dolly.t, dy: Math.abs(R.yaw - b.yaw), dd: Math.abs(R.distance - b.distance), enabled: R.enabled, mid, a: a.yaw, b: b.yaw };
+});
+check(r.t < 0 && r.enabled && r.dy < 0.01 && r.dd < 0.5 && r.mid.t > 0 && r.mid.t < 1, `the move finished on B and gave the rig back (yaw off ${r.dy.toFixed(3)}, distance off ${r.dd.toFixed(1)}; part way in it was ${(r.mid.t * 100).toFixed(0)}% along, yaw ${r.mid.yaw.toFixed(2)} between ${r.a.toFixed(2)} and ${r.b.toFixed(2)})`);
+
+// LENS.
+const fov0 = await page.evaluate(() => window.__engine.camera.fov);
+await tap(page, '#st-lens');
+r = await page.evaluate(() => ({ fov: window.__engine.camera.fov, label: document.getElementById('st-lens').textContent }));
+check(r.fov !== fov0 && r.fov === 30, `lens: ${r.label} is ${r.fov}°`);
+
+// SNAP: the still is delivered as a JPEG of the canvas.
+await page.evaluate(() => { const S = window.__studio; S._got = []; S._deliver = async (blob, name, type) => { S._got.push({ size: blob.size, name, type }); }; });
+await tap(page, '#st-snap');
+await frames(page, 1);
+// The blob arrives when the encoder gets a turn, which on a busy box is a while.
+await page.waitForFunction(() => window.__studio._got.length > 0, null, { timeout: 120000 }).catch(() => {});
+r = await page.evaluate(() => window.__studio._got);
+check(r.length === 1 && r[0].size > 20000 && r[0].type === 'image/jpeg', `SNAP delivered ${JSON.stringify(r)}`);
+
+// REC two seconds.
+const can = await page.evaluate(() => window.__studio.canRecord());
+console.log(`recording ${can ? 'available' : 'not available'} here`);
+if (can) {
+  await tap(page, '#st-rec');
+  r = await page.evaluate(() => ({ rec: window.__studio.recording, band: document.getElementById('studio').hidden, pill: !document.getElementById('studio-recpill').hidden, scale: window.__engine.renderScale }));
+  check(r.rec && r.band && r.pill && r.scale === 1, `recording: band hidden, pill shown, full size (${JSON.stringify(r)})`);
+  await page.screenshot({ path: '/tmp/out/studio/recording.png', timeout: 180000, animations: 'disabled' });
+  await frames(page, 8);
+  await page.waitForTimeout(800);
+  await tap(page, '#studio-recpill');
+  // The recorder's stop arrives once it has flushed, which with twelve
+  // megabytes on a slow box is a while.
+  await page.waitForFunction(() => !window.__studio.recording && window.__studio.lastClip, null, { timeout: 180000 });
+  r = await page.evaluate(() => { const c = window.__studio.lastClip; return { size: c.blob.size, type: c.type, secs: c.secs, got: window.__studio._got.length, save: !document.getElementById('st-save').hidden }; });
+  check(r.size > 50000 && r.secs >= 2 && r.got === 2 && r.save, `the clip: ${(r.size / 1024).toFixed(0)} kB ${r.type}, ${r.secs} s, delivered, SAVE CLIP on the band`);
+}
+
+// EXIT puts it all back.
+await tap(page, '#st-exit');
+await page.waitForTimeout(300);
+r = await page.evaluate(() => ({ studio: document.body.classList.contains('studio'), clear: document.body.classList.contains('clear-view'), hz: Math.round(1 / window.battle.physics.fixedStep), ts: window.__studio.testMenu.timeScale, paused: window.__studio.testMenu.paused, fov: window.__engine.camera.fov, max: window.battle.physics.maxSteps, dock: getComputedStyle(document.getElementById('dock')).display }));
+check(!r.studio && !r.clear && r.hz === baseHz && r.ts === 1 && !r.paused && r.fov === fov0 && r.max === 3 && r.dock !== 'none', `EXIT: interface back, clock and lens and physics restored (${JSON.stringify(r)})`);
+// And H / SHOW UI reopen and close it the same way.
+await page.keyboard.press('KeyH');
+await page.waitForTimeout(200);
+r = await page.evaluate(() => document.body.classList.contains('studio'));
+check(r, 'the H key opens the studio too');
+await page.keyboard.press('KeyH');
+await page.waitForTimeout(200);
+r = await page.evaluate(() => document.body.classList.contains('studio'));
+check(!r, 'and closes it');
+
+await b.close();
+console.log(fails ? `\n${fails} FAILED` : '\nall good');
+process.exit(fails ? 1 : 0);
