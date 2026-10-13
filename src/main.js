@@ -1169,6 +1169,7 @@ async function boot() {
   window.__comcard = comcard;      // for the harness
   window.__hunt = huntMarkers;
   window.__hvt = hvtMarkers;
+  window.__pod = pod;         // the trailer turns the inset off
   let winOrbit = false;
   // What went into the fight, for the medals: every weapon deployed or
   // called, and whether an aircraft was lost doing it.

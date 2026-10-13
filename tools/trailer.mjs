@@ -12,7 +12,8 @@
 //   node tools/trailer.mjs                     -> /tmp/out/trailer/trailer-720x1280.mp4
 //   W=1080 H=1920 node tools/trailer.mjs       the phone cut at full size
 //   W=1920 H=1080 node tools/trailer.mjs       the wide cut
-//   ONLY=opener,stupa node tools/trailer.mjs   a few shots, to look at one
+//   ONLY=moab,stupa node tools/trailer.mjs    redo those shots, keep the rest
+//   REUSE=1 node tools/trailer.mjs             reassemble from the shots kept
 //   FPS=30 QUALITY=medium MUSIC=public/assets/audio/menu.mp3
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -76,7 +77,9 @@ const SHOTS = [
       mx /= placed || 1; mz /= placed || 1;
       B.setTarget(new T.Vector3(o.x, g + 28, o.z), 'palace');
       return { focus: [mx, terrain.heightAt(mx, mz) + 2, mz], yaw };`,
-    cam: { from: { at: [0, 0, 0], dist: 42, yaw: 2.6, pitch: 0.1 }, to: { at: [0, 2, 0], dist: 52, yaw: 3.5, pitch: 0.14 } } },
+    // The rig stands at target + (sin yaw, cos yaw) * dist, so the level's
+    // own yaw puts the camera behind the row, looking over it at the Palace.
+    cam: { from: { at: [0, 0, 0], dist: 42, yaw: 0.15, pitch: 0.1 }, to: { at: [0, 2, 0], dist: 52, yaw: 0.85, pitch: 0.14 } } },
 
   { id: 'lift', level: 'westminster', secs: 4.5, pre: 7, until: 'B.air && B.air.sorties.some((s) => s.model && s.def?.id !== "b1")',
     // Sixteen guns under sixteen Chinooks, over the river.
@@ -99,16 +102,29 @@ const SHOTS = [
 
   { card: { lines: ['REAL LANDMARKS.', 'REAL GROUND.'], secs: 1.6 } },
 
-  { id: 'moab', level: 'westminster', secs: 5.5, pre: 1.5, until: 'B.air && B.air.sorties.some((s) => s.released)',
-    // The B-1 over the Palace. The white-out is the shot.
+  { id: 'moab', level: 'westminster', secs: 6, pre: 0, until: 'B.air && B.air.sorties.some((s) => s.released)',
+    // The B-1 over the Palace. The white-out is the shot: the capture
+    // starts a second and a half before the bomb lands, which `lead`
+    // measures on a first, sim-only pass (the fall is a matter of the
+    // level's geometry, so it is the same the second time).
+    lead: { flag: 'window.__moabHit', before: 1.5, max: 30 },
     setup: `
       B.invulnerable = true; B.freeBuild = true; B.unlockAll = true;
+      window.__moabHit = false;
+      const orig = B._strikeImpact;
+      B._strikeImpact = function (...a) { window.__moabHit = true; return orig.apply(this, a); };
       B.callStrike('b1', new T.Vector3(o.x, g, o.z));
       return { focus: [o.x, g + 20, o.z] };`,
     cam: { from: { at: [0, 0, 0], dist: 380, yaw: 0.6, pitch: 0.32 }, to: { at: [0, 10, 0], dist: 440, yaw: 0.9, pitch: 0.36 } } },
 
-  { id: 'stupa', level: 'boudhanath', secs: 6, pre: 0.4,
-    // The dome's foot cut on one side; the stupa comes down stone by stone.
+  { id: 'stupa', level: 'boudhanath', secs: 6.5, pre: 1.0,
+    // The dome's foot cut right round, a charge at a time from the camera's
+    // side, so the collapse runs round the stupa and the cap drops last.
+    // A dome stands on two thirds of its foot (the solver holds it as an
+    // arch): only the full ring brings it down. The body budget is lifted
+    // so every stone falls as a stone; on a phone's budget the game turns
+    // most of six thousand into dust, which is right for a phone and wrong
+    // for a picture.
     setup: `
       B.invulnerable = true; B.freeBuild = true; B.unlockAll = true;
       if (B.garrison) B.garrison.fireEnabled = false;
@@ -117,14 +133,27 @@ const SHOTS = [
       for (let i = 0; i < s.count; i++) if (s.tagOf[i] === 'dome') { ylo = Math.min(ylo, s.py[i]); }
       for (let i = 0; i < s.count; i++) if (s.tagOf[i] === 'dome' && s.py[i] < ylo + 3) { rad += Math.hypot(s.px[i] - o.x, s.pz[i] - o.z); n++; }
       rad = n ? rad / n : 40;
-      const a0 = 0.6;
-      for (let k = -2; k <= 2; k++) {
-        const a = a0 + k * 0.22;
-        s.explode({ x: o.x + Math.cos(a) * rad, y: ylo + 2.5, z: o.z + Math.sin(a) * rad }, 3, 16, 26000, { dir: { x: Math.cos(a), y: 0.1, z: Math.sin(a) }, kinetic: 0.9 });
-      }
-      s.stabilityDirty = true;
-      return { focus: [o.x, ylo + 18, o.z], a0, rad };`,
-    cam: { from: { at: [0, 0, 0], dist: 150, yaw: 0.6 - 0.5, pitch: 0.2 }, to: { at: [0, 6, 0], dist: 120, yaw: 0.6 + 0.45, pitch: 0.26 } } },
+      B.physics.activeBudget = 6000; B.physics.setBudget = () => {};  // the governor sets it every frame
+      const N = 16, order = [];
+      for (let k = 0; k < N; k++) order.push(k % 2 ? -(k + 1) / 2 : k / 2);
+      let fired = 0, a0 = null;
+      window.__trailerTick = (t) => {
+        if (a0 === null) { const c = window.__engine.camera.position; a0 = Math.atan2(c.z - o.z, c.x - o.x); }
+        while (fired < N && t >= 0.3 + fired * 0.22) {
+          const a = a0 + order[fired] * (Math.PI * 2 / N); fired++;
+          const p = { x: o.x + Math.cos(a) * rad, y: ylo + 3, z: o.z + Math.sin(a) * rad };
+          s.explode(p, 8, 30, 150000, { dir: { x: Math.cos(a), y: 0.15, z: Math.sin(a) }, kinetic: 0.9 });
+          s.stabilityDirty = true;
+          // The structure's own explode is the cut alone; the blast the
+          // player sees is the battle's, so each charge gets a bomb's.
+          const v = new T.Vector3(p.x, p.y, p.z);
+          B.fx.strikeBlast(v, 3.0, { groundY: ylo });
+          B.fx.stoneBurst(p.x, p.y, p.z, 2.0);
+          B.engine.addShake(0.5);
+        }
+      };
+      return { focus: [o.x, ylo + 22, o.z], rad };`,
+    cam: { from: { at: [0, 0, 0], dist: 300, yaw: 0.3, pitch: 0.24 }, to: { at: [0, -6, 0], dist: 250, yaw: 0.3 + 0.5, pitch: 0.3 } } },
 
   { card: { lines: ['FREEDOM,', 'DELIVERED.'], sub: 'getarsenal.app', secs: 3, logo: true } },
 ];
@@ -133,9 +162,14 @@ const SHOTS = [
 const ease = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const pad = (n) => String(n).padStart(5, '0');
 mkdirSync(`${OUT}/frames`, { recursive: true });
+mkdirSync(`${OUT}/shots`, { recursive: true });
 for (const f of readdirSync(`${OUT}/frames`)) rmSync(`${OUT}/frames/${f}`);
 let frameNo = 0;
 const timeline = [];
+// A shot's frames live in their own folder, so a cut can be reassembled
+// with one shot redone (`ONLY=stupa`) and the rest kept.
+const shotDir = (id) => `${OUT}/shots/${id}`;
+const shotFrames = (id) => existsSync(shotDir(id)) ? readdirSync(shotDir(id)).filter((f) => f.endsWith('.jpg')).sort() : [];
 
 const cardHtml = (c) => `<!doctype html><meta charset="utf-8"><style>
   @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
@@ -166,7 +200,7 @@ async function renderCard(browser, c) {
   await page.close();
 }
 
-async function renderShot(browser, sh) {
+async function renderShot(browser, sh, preOverride = null) {
   const t0 = Date.now();
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   await page.addInitScript((q) => { try {
@@ -185,6 +219,13 @@ async function renderShot(browser, sh) {
     performance.now = () => fake;
     window.__tick = (ms) => { fake += ms; };
     const B = window.battle; B.airborne.auto = false; B.assault.auto = false;
+    // No end card, no fireworks: a shot that drops the landmark goes on.
+    B.holdEnd = true;
+    // The gold diamonds over the SAMs and the red arrows over the drop
+    // are the HUD's, not the picture's.
+    for (const m of [window.__hvt, window.__hunt]) if (m) { m.updatePoints = () => {}; m.update = () => {}; m.mesh.visible = false; }
+    // The targeting pod's inset is drawn into the canvas's corner.
+    if (window.__pod) { window.__pod.off = true; window.__pod.hide(); }
     for (const id of ['ui']) { const e = document.getElementById(id); if (e) e.style.visibility = 'hidden'; }
     document.querySelectorAll('.feed, #feed, .barks, #barks').forEach((e) => { e.style.visibility = 'hidden'; });
   });
@@ -198,9 +239,13 @@ async function renderShot(browser, sh) {
   // The frame is read in the same call that draws it: a read in a later
   // call came after the compositor had taken the drawing buffer, and on
   // Westminster every frame read back black.
-  const step = async (cam, capture = false) => {
-    return await page.evaluate(([ms, cam, focus, follow, capture]) => {
+  // `t` is the shot's clock, zero at the first captured frame: a shot
+  // that stages its beats (`window.__trailerTick(t)`, set up by the shot)
+  // is told it before every driven frame.
+  const step = async (cam, capture = false, t = 0) => {
+    return await page.evaluate(([ms, cam, focus, follow, capture, t]) => {
       window.__tick(ms);
+      window.__trailerTick?.(t);
       const rig = window.__rig, B = window.battle, T = window.THREE;
       let f = new T.Vector3(...focus);
       if (follow === 'sortie') {
@@ -220,31 +265,46 @@ async function renderShot(browser, sh) {
       if (e && e.renderScale !== 1) e.setRenderScale(1);
       window.__frame();
       return capture ? document.querySelector('canvas').toDataURL('image/jpeg', 0.9) : null;
-    }, [1000 / FPS, cam, info.focus, sh.follow || null, capture]);
+    }, [1000 / FPS, cam, info.focus, sh.follow || null, capture, t]);
   };
   const lerpCam = (t) => {
     const k = ease(t), a = sh.cam.from, b = sh.cam.to;
     return { at: a.at.map((v, i) => v + (b.at[i] - v) * k), dist: a.dist + (b.dist - a.dist) * k, yaw: a.yaw + (b.yaw - a.yaw) * k, pitch: a.pitch + (b.pitch - a.pitch) * k };
   };
   // Run up to the beat: a condition, then the pre-roll, neither captured.
+  // The simulation alone is stepped for it (the harness's fast-forward,
+  // physics and battle at 1/60), a hundred times quicker than a drawn
+  // frame on a software rasteriser; the last second before the capture
+  // is drawn, so the smoke and the camera are already moving.
+  const ff = (secs) => page.evaluate(([s, ms]) => { window.__fastForward(s, 1 / 60); window.__tick(ms); }, [secs, secs * 1000]);
   if (sh.until) {
-    const cond = new Function('B', `return !!(${sh.until});`);
     let waited = 0;
-    while (waited < 60 && !(await page.evaluate((src) => new Function('B', src)(window.battle), `return !!(${sh.until});`))) {
-      await step(lerpCam(0)); waited += 1 / FPS;
+    while (waited < 90 && !(await page.evaluate((src) => new Function('B', src)(window.battle), `return !!(${sh.until});`))) {
+      await ff(0.25); waited += 0.25;
     }
     console.log(`  ${sh.id}: condition met after ${waited.toFixed(1)} s`);
-    void cond;
   }
-  for (let t = 0; t < sh.pre; t += 1 / FPS) await step(lerpCam(0));
+  // The lead: a first pass, simulation only, measures how long the beat
+  // takes to arrive after the condition; the shot is then drawn again
+  // from a fresh load with the capture starting `before` seconds ahead.
+  if (sh.lead && preOverride == null) {
+    let F = 0;
+    while (F < sh.lead.max && !(await page.evaluate((src) => new Function(src)(), `return !!(${sh.lead.flag});`))) { await ff(1 / FPS); F += 1 / FPS; }
+    console.log(`  ${sh.id}: the beat lands ${F.toFixed(2)} s after the condition`);
+    await page.close();
+    return renderShot(browser, sh, Math.max(0, F - sh.lead.before));
+  }
+  const pre = preOverride ?? sh.pre;
+  const drawn = Math.min(pre, 1.0);
+  if (pre - drawn > 0) await ff(pre - drawn);
+  for (let t = 0; t < drawn; t += 1 / FPS) await step(lerpCam(0), false, t - drawn);
   const n = Math.round(sh.secs * FPS);
-  const start = frameNo;
+  mkdirSync(shotDir(sh.id), { recursive: true });
+  for (const f of readdirSync(shotDir(sh.id))) rmSync(`${shotDir(sh.id)}/${f}`);
   for (let k = 0; k < n; k++) {
-    const data = await step(lerpCam(k / Math.max(1, n - 1)), true);
-    writeFileSync(`${OUT}/frames/${pad(frameNo)}.jpg`, Buffer.from(data.split(',')[1], 'base64'));
-    frameNo++;
+    const data = await step(lerpCam(k / Math.max(1, n - 1)), true, k / FPS);
+    writeFileSync(`${shotDir(sh.id)}/${pad(k)}.jpg`, Buffer.from(data.split(',')[1], 'base64'));
   }
-  timeline.push({ id: sh.id, from: start / FPS, secs: sh.secs });
   console.log(`  ${sh.id}: ${n} frames in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   await page.close();
 }
@@ -253,9 +313,18 @@ const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromi
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
 console.log(`trailer ${W}x${H} @ ${FPS} fps, quality ${QUALITY}`);
 for (const sh of SHOTS) {
-  if (sh.card) { if (!ONLY) await renderCard(browser, sh.card); continue; }
-  if (ONLY && !ONLY.has(sh.id)) continue;
+  if (sh.card) continue;
+  const kept = shotFrames(sh.id).length;
+  if (ONLY ? !ONLY.has(sh.id) && kept : kept && process.env.REUSE) { console.log(`  ${sh.id}: kept (${kept} frames)`); continue; }
   await renderShot(browser, sh);
+}
+// The cut, in order: cards drawn fresh, shots from their folders.
+for (const sh of SHOTS) {
+  if (sh.card) { await renderCard(browser, sh.card); continue; }
+  const frames = shotFrames(sh.id);
+  const start = frameNo;
+  for (const f of frames) { copyFileSync(`${shotDir(sh.id)}/${f}`, `${OUT}/frames/${pad(frameNo)}.jpg`); frameNo++; }
+  timeline.push({ id: sh.id, from: start / FPS, secs: frames.length / FPS });
 }
 await browser.close();
 

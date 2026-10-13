@@ -708,10 +708,22 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   quicker than a drawn frame) with the last second drawn, frames are read
   off the canvas as JPEGs, title cards are HTML screenshotted at the same
   size, and ffmpeg-static assembles the cut over the menu track.
-  `node tools/trailer.mjs` is the 720x1280 rough cut (`W=1080 H=1920`
-  the phone cut, `W=1920 H=1080` the wide one, `ONLY=opener,stupa` a
-  few shots); a software box draws two to five seconds a frame, so a
-  thirty-second cut is the better part of an hour ·
+  Each shot's frames are kept in `/tmp/out/trailer/shots/<id>/`, so
+  `ONLY=moab,stupa` redoes those and keeps the rest and `REUSE=1`
+  reassembles. A shot with `lead` is rendered twice: a simulation-only
+  pass times the beat (a flag such as the MOAB's impact) from its
+  condition, and the second starts the capture `before` seconds ahead of
+  it. A shot that stages its beats sets `window.__trailerTick(t)` in its
+  setup and is told the shot's clock before every frame (the stupa fires
+  a ring of sixteen charges round the dome's foot a charge at a time from
+  the camera's side: a dome stands on two thirds of its foot, only the
+  full ring drops it, and the body budget is lifted to six thousand so
+  every stone falls as a stone rather than the phone's dust). The HUD, the
+  gold and red markers, the targeting pod's inset and the end card are all
+  off. `node tools/trailer.mjs` is the 720x1280 rough cut (`W=1080 H=1920`
+  the phone cut, `W=1920 H=1080` the wide one); a software box draws two
+  to eight seconds a frame, so a thirty-second cut is the better part of
+  an hour ·
   `src/game/career.js` save slots, rank, the daily strike ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
