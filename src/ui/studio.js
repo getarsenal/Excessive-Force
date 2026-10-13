@@ -181,7 +181,8 @@ export class Studio {
   hudTap() {
     if (!this.hud) return;
     this.hud.setClearView(!this.hud.clearView);
-    this._hint(this.hud.clearView ? 'INTERFACE OFF · THE BAND STAYS · HUD ON BRINGS IT BACK' : 'INTERFACE ON');
+    const laying = document.body.classList.contains('laying');
+    this._hint(this.hud.clearView ? (laying ? 'INTERFACE OFF · FIRE AND THE SIGHT STAY · HUD ON AT THE TOP BRINGS IT BACK' : 'INTERFACE OFF · THE BAND STAYS · HUD ON BRINGS IT BACK') : 'INTERFACE ON');
     this._tick();
     this._paint();
   }

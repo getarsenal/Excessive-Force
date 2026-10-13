@@ -988,7 +988,11 @@ body.loitering #status { top: calc(var(--lo-bottom, 190px) + 6px); }
 /* One rule, so nothing new can be added to the HUD and quietly stay on
    screen through a clear view: everything inside #ui goes, and the handful
    of things that must remain are named back in. */
-body.clear-view #ui > *:not(#restore-btn):not(#studio) { display: none !important; }
+body.clear-view #ui > *:not(#restore-btn):not(#studio):not(#lay) { display: none !important; }
+/* Behind the gun with the interface off: the sight and FIRE stay, so a
+   gunner's shot can be filmed with the phone's own recorder and still
+   fired; the readouts, the hints, DONE, ZOOM and the rest go. */
+body.clear-view #lay > *:not(#lay-sight):not(#lay-hit):not(#lay-mark):not(#lay-fire) { display: none !important; }
 /* In the studio with the interface off, HUD ON on the band is the way back. */
 body.studio.clear-view #restore-btn { display: none !important; }
 
@@ -3238,4 +3242,20 @@ body.drawer-open #studio { display: none; }
   body.clear-view #studio { bottom: calc(max(4px, env(safe-area-inset-bottom)) + 4px); }
   #studio .st-row { gap: 4px; }
   #studio .st-row button { padding: 0 9px; }
+}
+
+/* ── Behind the gun (body.laying, the seat too): the gunner's controls own
+   the bottom, so the band goes up under the top bar, and the camera chips
+   (the eye is the gunner's) come off it: the clock, SNAP, REC and HUD stay. */
+body.laying #studio {
+  top: calc(var(--talk-top) - 2px); bottom: auto; flex-direction: column-reverse;
+}
+body.laying #st-follow, body.laying #st-orbit, body.laying #st-dolly, body.laying #st-lens, body.laying #st-enemy { display: none; }
+/* With the interface off behind the gun, only STOP/REC and HUD ON remain, faint. */
+body.clear-view.laying #studio [data-speed], body.clear-view.laying #st-snap, body.clear-view.laying #st-save,
+body.clear-view.laying #studio-hint { display: none; }
+body.clear-view.laying #studio .st-row button { opacity: 0.4; }
+body.clear-view.laying #studio .st-row button:active { opacity: 1; }
+@media (orientation: landscape) and (max-height: 500px) {
+  body.laying #studio { top: calc(var(--talk-top) - 2px); bottom: auto; }
 }
