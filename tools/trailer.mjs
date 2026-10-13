@@ -221,6 +221,10 @@ async function renderShot(browser, sh, preOverride = null) {
     const B = window.battle; B.airborne.auto = false; B.assault.auto = false;
     // No end card, no fireworks: a shot that drops the landmark goes on.
     B.holdEnd = true;
+    // The air defence stands down: a sortie shot down counts as released
+    // and the B-1's beat never came, one run in three.
+    if (B.garrison) B.garrison.fireEnabled = false;
+    if (B.sams) B.sams._engage = () => {};
     // The gold diamonds over the SAMs and the red arrows over the drop
     // are the HUD's, not the picture's.
     for (const m of [window.__hvt, window.__hunt]) if (m) { m.updatePoints = () => {}; m.update = () => {}; m.mesh.visible = false; }
