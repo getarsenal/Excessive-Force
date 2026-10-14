@@ -16,14 +16,14 @@
  */
 import { ART, unlockedArt } from '../game/noseart.js';
 import { spentPoints } from '../game/doctrine.js';
-import { LEVELS } from '../game/levels.js';
+import { LEVELS, LEVEL_ORDER } from '../game/levels.js';
 import { UNITS, STRIKES } from '../game/units.js';
 import { THEATRES, campaignState, isReleased } from '../game/campaign.js';
 import { loadProgress } from './levelselect.js';
 import { listBattles, clearBattle } from '../game/battlesave.js';
 import {
   commander, setCommanderName, insignia, SLOT_IDS, slotInfo, activeSlot,
-  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick, startStudioRun,
+  switchSlot, eraseSlot, dailyFor, dailyState, dailyDoneToday, startDailyRun, today, startBlitzRun, blitzPick, startStudioRun, startFreeRun,
   weeklyFor, weeklyState, startWeeklyRun,
 } from '../game/career.js';
 import { menuMusic, eagle } from './music.js';
@@ -88,6 +88,9 @@ export function showTitle({ current = null, canResume = false } = {}) {
   const featsWon = mc.feats.filter((f) => f.won).length;
   const battles = listBattles().filter((b) => LEVELS[b.level]);
   const openIds = state.list.filter((t) => t.open && LEVELS[t.id]).map((t) => t.id);
+  // Every landmark there is, for FREE PLAY and THE STUDIO: the campaign's
+  // order, the ones that are not battles left out.
+  const allIds = LEVEL_ORDER.filter((id) => LEVELS[id] && id !== 'tutorial' && id !== 'range');
   const daily = dailyFor(openIds);
   const dstate = dailyState();
   const dDone = dailyDoneToday();
@@ -347,6 +350,7 @@ export function showTitle({ current = null, canResume = false } = {}) {
       pendingParent = (!sheet.hidden && PARENTS.has(sheetAct) && !PARENTS.has(a) && a !== 'close' && a !== 'sheetback') ? sheetAct : null;
       if (a !== 'close' && a !== 'sheetback') sheetAct = a;
       if (a.startsWith('studio:')) { const id = a.slice(7); startStudioRun(id); go(id); return; }
+      if (a.startsWith('free:')) { const id = a.slice(5); startFreeRun(id); go(id); return; }
       switch (a) {
         case 'back': done({ level: null }); break;
         case 'resume': go(el?.dataset.level || cont.id, 'resume'); break;
@@ -405,7 +409,10 @@ export function showTitle({ current = null, canResume = false } = {}) {
           openSheet('BATTLES IN PROGRESS', battles.map((b) => battleCard(b, true)).join(''), 'battles');
           break;
         case 'studio':
-          openSheet('THE STUDIO', listSheet(openIds.map((id) => ({ act: `studio:${id}`, name: LEVELS[id]?.target || id, sub: LEVELS[id]?.city || LEVELS[id]?.place || '' }))), 'list');
+          openSheet('THE STUDIO', listSheet(allIds.map((id) => ({ act: `studio:${id}`, name: LEVELS[id]?.target || id, sub: LEVELS[id]?.place || '' }))), 'list');
+          break;
+        case 'free':
+          openSheet('FREE PLAY', listSheet(allIds.map((id) => ({ act: `free:${id}`, name: LEVELS[id]?.target || id, sub: `${LEVELS[id]?.place || ''}${openIds.includes(id) ? '' : ' · NOT YET IN THE CAMPAIGN'}` }))), 'list');
           break;
         case 'today':
           openSheet('TODAY', listSheet([
@@ -423,10 +430,13 @@ export function showTitle({ current = null, canResume = false } = {}) {
             // the player with a bus stop's worth of time rather than an evening.
             hasOpen && { act: 'blitz', name: 'BLITZ \u00b7 3 MIN', sub: 'THREE MINUTES ON AN OPEN CONTRACT' },
             { act: 'map', name: 'WORLD MAP', sub: 'EVERY CONTRACT, OPEN OR CLOSED' },
+            // Any landmark, the campaign's gates aside: the win pays and the
+            // best score is kept, the campaign's stars are not written.
+            { act: 'free', name: 'FREE PLAY', sub: 'ANY LANDMARK · XP COUNTS, THE CAMPAIGN DOES NOT' },
             { act: 'range', name: 'THE RANGE', sub: 'EVERY WEAPON, LIVE' },
             // The sandbox for filming (ui/studio.js): free build on any open
             // landmark, nothing counted, the camera's band over the fight.
-            hasOpen && { act: 'studio', name: 'THE STUDIO', sub: 'FILM A FIGHT · FREE BUILD, NOTHING COUNTED' },
+            { act: 'studio', name: 'THE STUDIO', sub: 'FILM A FIGHT · FREE BUILD, NOTHING COUNTED' },
             { act: 'boot', name: 'BOOT CAMP', sub: 'TRAINING' },
           ]), 'list');
           break;

@@ -322,6 +322,23 @@ export function startStudioRun(level) {
   try { sessionStorage.setItem('tt.studiorun', JSON.stringify({ level })); } catch { /* private mode */ }
 }
 
+/**
+ * FREE PLAY off the title's MODES: any landmark as a normal battle. The
+ * win pays and the best score is kept, but the campaign's stars are not
+ * written, so the campaign's gates still mean something.
+ */
+export function startFreeRun(level) {
+  try { sessionStorage.setItem('tt.freerun', JSON.stringify({ level })); } catch { /* private mode */ }
+}
+
+export function takeFreeRun(levelId) {
+  try {
+    const v = parse(sessionStorage.getItem('tt.freerun'), null);
+    sessionStorage.removeItem('tt.freerun');
+    return v && v.level === levelId ? v : null;
+  } catch { return null; }
+}
+
 /** The studio run a load was started for, if it was one. Read once per load. */
 export function takeStudioRun(levelId) {
   try {

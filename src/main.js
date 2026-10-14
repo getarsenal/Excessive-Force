@@ -78,7 +78,7 @@ import { feedback, installTapFeedback } from './ui/feedback.js';
 import { runOpening, shouldPlayOpening } from './ui/opening.js';
 import { menuMusic } from './ui/music.js';
 import { snapshotBattle, saveBattle, clearBattle, battleFor, restoreBattle } from './game/battlesave.js';
-import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly, takeStudioRun } from './game/career.js';
+import { takeDailyRun, endDailyRun, dailyMet, markDailyDone, DAILY_MODS, today, BLITZ, takeBlitzRun, startBlitzRun, blitzPick, recordBlitz, takeWeeklyRun, startWeeklyRun, markWeekly, takeStudioRun, takeFreeRun } from './game/career.js';
 import { sightSVG } from './ui/sights.js';
 import { reminders } from './core/reminders.js';
 import { boardFor } from './game/rivals.js';
@@ -253,6 +253,9 @@ async function boot() {
   // THE STUDIO (ui/studio.js), if this load is one: free build, nothing
   // counted, the battle never ending, the camera's band up from the start.
   const studioRun = (!selftest && !daily && !blitz && !weekly && !level.sandbox && level.id !== 'tutorial') ? takeStudioRun(level.id) : null;
+  // FREE PLAY (career.js): a normal battle on any landmark, the campaign's
+  // stars not written.
+  const freeRun = (!selftest && !daily && !blitz && !weekly && !studioRun && !level.sandbox && level.id !== 'tutorial') ? takeFreeRun(level.id) : null;
   const intros = introsEnabled() && level.intros !== false && !selftest && !resumeSnap;
   const castReady = intros ? preloadCast(level.id) : Promise.resolve();
   await physicsReady;
@@ -1873,8 +1876,8 @@ async function boot() {
           const sum = battle.summary();
           const marks = markRun(sum);
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
-          const th = recordTheatre(level.id, true, sum, marks);
-          seasonRun(th);
+          const th = freeRun ? null : recordTheatre(level.id, true, sum, marks);
+          if (th) seasonRun(th);
           const feats = awardMedals(sum);
           banked = { sum, marks, feats, stars: th?.stars || null, xp: payOut(true, sum, { marks, feats }) };
           // The board (rivals.js), when anyone has challenged this phone here.
@@ -1928,8 +1931,8 @@ async function boot() {
           const marks = markRun(sum);
           // One play is one result, however many reports it shows.
           if (!winRecorded) { winRecorded = true; recordResult(level.id, true, sum); }
-          const th = recordTheatre(level.id, true, sum, marks);
-          seasonRun(th);
+          const th = freeRun ? null : recordTheatre(level.id, true, sum, marks);
+          if (th) seasonRun(th);
           const cc = campaignCard(th?.stars || null);
           takeBeforeAfter(sum);
           hideNewsflash();
@@ -3176,6 +3179,7 @@ async function boot() {
     hud.status(`${TAP} the tower to designate a target`, 4);
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
     if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR`, 'big');
+    if (freeRun) hud.feed('FREE PLAY · XP COUNTS, THE CAMPAIGN DOES NOT', 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
     if (weekly) hud.feed(`WEEKLY OPERATION · ${weekly.rule.name} · ${weekly.rule.line.toUpperCase()}`, 'big');
     const ch = getChallenge();
@@ -3326,7 +3330,7 @@ async function boot() {
   }
   const keepBattle = () => {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
-    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || studioRun || selftest) return;
+    if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || studioRun || freeRun || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
     try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
