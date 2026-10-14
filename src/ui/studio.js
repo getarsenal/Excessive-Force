@@ -140,7 +140,7 @@ export class Studio {
     E.dolly.classList.toggle('on', d.t >= 0);
     E.dolly.textContent = d.t >= 0 ? 'STOP' : !d.a ? 'SET A' : !d.b ? 'SET B' : 'PLAY A→B';
     E.lens.textContent = `LENS · ${LENSES[this.lensIx].name}`;
-    const flying = this.mode === 'follow' && this.target && (this.target.kind === 'sortie' || this.target.kind === 'shell');
+    const flying = this.mode === 'follow' && this.target && ['sortie', 'shell', 'missile', 'transport'].includes(this.target.kind);
     E.chase.hidden = !flying;
     E.chase.classList.toggle('on', flying && this.chaseIx !== 0);
     E.chase.textContent = CHASE[this.chaseIx].name;
@@ -272,15 +272,25 @@ export class Studio {
   _candidates() {
     const B = this.battle, out = [];
     for (const s of B.air?.sorties || []) if (s.model) out.push({ kind: 'sortie', ref: s, name: s.def?.name || 'AIRCRAFT' });
-    for (const d of B.pending || []) if (d.group) out.push({ kind: 'drop', ref: d, name: 'THE LIFT' });
+    // Your own loads under canopy, out of the C-130 and the Chinook lift.
+    for (const s of B.air?.sorties || []) for (const L of s.lift?.loads || []) for (const c of L.chutes || []) if (c.g && !c.gone) out.push({ kind: 'chute', ref: c, name: L.troops ? 'THE STICK' : 'THE DROP' });
+    for (const d of B.pending || []) if (d.group && !out.some((c) => c.kind === 'chute')) out.push({ kind: 'drop', ref: d, name: 'THE LIFT' });
+    // The enemy's: the transports, the men under canopy, the SAM's missiles.
+    for (const p of B.airborne?.planes || []) if (this._pos3(p)) out.push({ kind: 'transport', ref: p, name: 'THEIR TRANSPORT' });
+    for (const m of B.airborne?.men || []) if (m.pos && !m.dead) out.push({ kind: 'man', ref: m, name: 'THEIR PARATROOPER' });
+    for (const M of B.sams?.missiles || []) if (M.mesh && !M.done) out.push({ kind: 'missile', ref: M, name: 'THE SAM' });
     const shells = (B.projectiles?.list || []).filter((p) => !p.hostile).slice(-4);
     for (const p of shells) out.push({ kind: 'shell', ref: p, name: p.kind === 'bomb' ? 'THE BOMB' : 'THE ROUND' });
     for (const u of B.units || []) if (u.group) out.push({ kind: 'unit', ref: u, name: u.def?.name || 'GUN' });
     return out;
   }
 
+  /** Whatever a thing calls its position: a model, a group, a mesh or a point. */
+  _pos3(r) { return r?.model?.position || r?.grp?.position || r?.g?.position || r?.mesh?.position || r?.pos || null; }
+
   _position(t, out) {
     const r = t.ref;
+    if (t.kind === 'chute' || t.kind === 'transport' || t.kind === 'man' || t.kind === 'missile') { const p = this._pos3(r); return p ? out.copy(p) : null; }
     if (t.kind === 'sortie') return r.model ? out.copy(r.model.position) : null;
     if (t.kind === 'drop') return r.group ? out.copy(r.group.position) : null;
     if (t.kind === 'shell') return r.pos ? out.copy(r.pos) : null;
@@ -292,6 +302,10 @@ export class Studio {
   _alive(t) {
     const B = this.battle, r = t.ref;
     if (t.kind === 'sortie') return (B.air?.sorties || []).includes(r) && !!r.model;
+    if (t.kind === 'chute') return !r.gone && (B.air?.sorties || []).some((s) => (s.lift?.loads || []).some((L) => (L.chutes || []).includes(r)));
+    if (t.kind === 'transport') return (B.airborne?.planes || []).includes(r) && !!this._pos3(r);
+    if (t.kind === 'man') return (B.airborne?.men || []).includes(r) && !r.dead;
+    if (t.kind === 'missile') return (B.sams?.missiles || []).includes(r) && !r.done;
     if (t.kind === 'drop') return (B.pending || []).includes(r);
     if (t.kind === 'shell') return (B.projectiles?.list || []).includes(r);
     if (t.kind === 'unit') return (B.units || []).includes(r);
@@ -303,7 +317,7 @@ export class Studio {
     this.mode = 'follow';
     // A thing in the air is better seen from a little closer than the
     // player keeps the map, and a gun from closer still.
-    const near = c.kind === 'unit' ? 28 : c.kind === 'shell' ? 60 : 110;
+    const near = c.kind === 'unit' ? 28 : (c.kind === 'shell' || c.kind === 'missile' || c.kind === 'man') ? 60 : 110;
     if (this.rig.desiredDistance > near * 3) this.rig.desiredDistance = near * 2;
     this._hint(`FOLLOWING ${c.name}`);
     this._tick();
@@ -355,6 +369,8 @@ export class Studio {
     const B = this.battle, r = t.ref;
     if (t.kind === 'sortie' && r.target) return r.target;
     if (t.kind === 'shell' && r.target) return r.target;
+    if (t.kind === 'missile') return r.sortie?.model?.position || r.aim || null;
+    if (t.kind === 'transport') return r.target || B.primary?.origin || null;
     return B.primary?.origin || null;
   }
 
@@ -366,6 +382,8 @@ export class Studio {
     let dx, dz;
     if (t.kind === 'sortie' && r.dir) { dx = r.dir.x; dz = r.dir.z; }
     else if (t.kind === 'shell' && r.vel) { dx = r.vel.x; dz = r.vel.z; }
+    else if (t.kind === 'missile' && r.dir) { dx = r.dir.x; dz = r.dir.z; }
+    else if (t.kind === 'transport' && r.dir) { dx = r.dir.x; dz = r.dir.z; }
     else { dx = aim.x - p.x; dz = aim.z - p.z; }
     const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
     const sx = -dz, sz = dx;
@@ -447,7 +465,7 @@ export class Studio {
       if (!this._alive(this.target)) {
         this._hint(`${this.target.name} IS GONE · FREE CAMERA`);
         this.mode = 'free'; this.target = null; this.chaseIx = 0; R.enabled = true; this._paint();
-      } else if (this.chaseIx && (this.target.kind === 'sortie' || this.target.kind === 'shell')) {
+      } else if (this.chaseIx && ['sortie', 'shell', 'missile', 'transport'].includes(this.target.kind)) {
         this._chase(this.target);
       } else {
         const p = this._position(this.target, this._v);
@@ -493,20 +511,28 @@ export class Studio {
     const mimeType = this._mime();
     const chunks = [];
     let rec;
+    this._lastError = null;
     try { rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 14e6, audioBitsPerSecond: 160e3 }); }
     catch (e) {
-      // Without the sound track, then: a browser that takes the canvas and
-      // not a mixed stream is still a recorder.
-      try { rec = new MediaRecorder(this.canvas.captureStream(30), { mimeType }); }
-      catch (e2) { this._hint('RECORDING FAILED TO START'); return; }
+      // The options refused, then the sound track: a browser that takes the
+      // canvas and not a mixed stream is still a recorder.
+      try { rec = new MediaRecorder(stream, { mimeType }); }
+      catch (e1) {
+        try { rec = new MediaRecorder(this.canvas.captureStream(30), { mimeType }); }
+        catch (e2) { this._hint(`RECORDING FAILED TO START (${e2?.name || 'error'})`); return; }
+      }
     }
     this._chunks = chunks;
     this._mimeUsed = mimeType;
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunks.push(e.data);
+      // Data still arriving after STOP: the flush is under way, give it time.
+      if (this._stopTimer) { clearTimeout(this._stopTimer); this._stopTimer = setTimeout(() => this._finish(), 6000); }
+    };
     // Stop is finished on `onstop`, on an error, or on a timer when neither
     // comes: an iPhone that never fired `onstop` left the band saying STOP.
     rec.onstop = () => this._finish();
-    rec.onerror = () => this._finish();
+    rec.onerror = (e) => { this._lastError = e?.error?.name || e?.name || 'error'; this._finish(); };
     this.rec = rec;
     this._stream = stream;
     this.engine.setRenderScale(1);
@@ -525,8 +551,10 @@ export class Studio {
     if (rec.state === 'inactive') { this._finish(); return; }
     try { rec.requestData?.(); } catch { /* a recorder without it */ }
     try { rec.stop(); } catch { this._finish(); return; }
+    // The flush of a long clip on a phone can take a while: the timer is
+    // only the last resort, and every chunk that arrives pushes it back.
     clearTimeout(this._stopTimer);
-    this._stopTimer = setTimeout(() => this._finish(), 4000);
+    this._stopTimer = setTimeout(() => this._finish(), 12000);
   }
 
   /** The clip out of the chunks, once; whichever of stop, error or timer gets here first. */
@@ -542,7 +570,7 @@ export class Studio {
     this._stream = null;
     this._chunks = null;
     this._paint();
-    if (!chunks.length) { this._hint('NOTHING WAS RECORDED · TRY THE PHONE\'S SCREEN RECORDER WITH HUD OFF'); return; }
+    if (!chunks.length) { this._hint(`NOTHING WAS RECORDED${this._lastError ? ` (${this._lastError})` : ''} · TRY THE PHONE'S SCREEN RECORDER WITH HUD OFF`); return; }
     const blob = new Blob(chunks, { type });
     const ext = type.includes('mp4') ? 'mp4' : 'webm';
     this.lastClip = { blob, name: `excessive-force-${this.battle.level?.id || 'clip'}-${stamp()}.${ext}`, type, secs };
