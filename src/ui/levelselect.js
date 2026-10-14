@@ -139,7 +139,10 @@ export function goToLevel(id, opts = {}) {
     if (st) st.textContent = 'moving out';
   }
   try { window.__releaseLevel?.(); } catch { /* going anyway */ }
-  window.location.search = params.toString();
+  // A beat for the context loss to reach the driver before the next page
+  // starts allocating.
+  const next = params.toString();
+  setTimeout(() => { window.location.search = next; }, 40);
 }
 
 

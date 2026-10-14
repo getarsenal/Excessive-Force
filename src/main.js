@@ -262,6 +262,25 @@ async function boot() {
 
   const canvas = document.getElementById('game-canvas');
   const engine = new Engine(canvas, quality);
+  // The way out, from the first allocation: `goToLevel` (ui/levelselect.js)
+  // calls it before it asks for the next level, and on a phone the two do
+  // not fit at once. It used to be installed at the end of the load, so a
+  // map left early was never taken down before the next one came up, and
+  // the tab died one time in two. Whatever exists by the time it is called
+  // is freed; what does not yet is skipped.
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    try { engine.renderer.dispose(); } catch { /* going anyway */ }
+    try { engine.renderer.forceContextLoss(); } catch { /* going anyway */ }
+    try { physics.dead = true; physics.world.free(); } catch { /* not yet, or going anyway */ }
+    try { ambience.stop(); } catch { /* not yet, or going anyway */ }
+    try { if (audio.ctx) audio.ctx.close(); } catch { /* not yet, or going anyway */ }
+  };
+  window.__releaseLevel = release;
+  window.addEventListener('pagehide', release);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) window.location.reload(); });
   const physics = new PhysicsWorld(quality);
   const audio = new Audio();
   // Every event's touch, sound and sight: see feedback.js.
@@ -3320,7 +3339,7 @@ async function boot() {
   // not kept.
   let battleOver = false;
   // The frame loop's pacing and its end (see power.js and `release` below).
-  let released = false, menuOpen = false, coveredBy = 0;
+  let menuOpen = false, coveredBy = 0;
   // The front door or the map over the battle. Said on the body as well, so
   // the battle's keys (and the HUD's) can stand down while it is covered:
   // a digit pressed on the map armed a gun behind it.
@@ -3774,19 +3793,6 @@ async function boot() {
   // the next level died loading and was loaded again, over and over. So the
   // old one is taken down first, and a page brought back from that cache is
   // simply loaded fresh.
-  const release = () => {
-    if (released) return;
-    released = true;
-    try { engine.renderer.dispose(); } catch { /* going anyway */ }
-    try { engine.renderer.forceContextLoss(); } catch { /* going anyway */ }
-    try { physics.dead = true; physics.world.free(); } catch { /* going anyway */ }
-    try { ambience.stop(); } catch { /* going anyway */ }
-    try { if (audio.ctx) audio.ctx.close(); } catch { /* going anyway */ }
-  };
-  window.__releaseLevel = release;
-  window.addEventListener('pagehide', release);
-  window.addEventListener('pageshow', (e) => { if (e.persisted) window.location.reload(); });
-
   frame();
 
   Object.assign(window, {
