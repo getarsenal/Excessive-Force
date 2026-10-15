@@ -140,11 +140,11 @@ export class Orbital {
     const from = path.pts[0], to = path.pts[path.pts.length - 1];
     const g = new THREE.Group();
     // The column comes in off the vertical: the platform is never straight
-    // overhead. Five to ten degrees, on a heading of its own each time, and
+    // overhead. Twelve to twenty degrees, on a heading of its own each time, and
     // drifting a little through the walk as the platform moves on. Everything
     // that is the beam hangs under `lean`; the mark on the ground does not.
     const lean = new THREE.Group();
-    lean.userData.tilt = THREE.MathUtils.degToRad(5 + Math.random() * 5);
+    lean.userData.tilt = THREE.MathUtils.degToRad(12 + Math.random() * 8);
     lean.userData.az = Math.random() * Math.PI * 2;
     g.add(lean);
     const core = column(B.width * 7);
@@ -184,7 +184,17 @@ export class Orbital {
   }
 
   /** The point `u` of the way down the path, on the first thing under the sky there. */
-  _placeFoot(b, u) {
+  /**
+   * The foot walks the path; its height is what the beam is standing on.
+   * Found by a ray down from the sky, but only standing things count (the
+   * town, the masonry, the ground: colliders with no owner; a loose stone
+   * thrown up through the ray or a gun under it carries one and is passed
+   * through), and the height follows its target at a rate rather than
+   * jumping to it: a lamp post, a parapet, a cornice and a falling chunk
+   * each had the whole column hopping, and now the beam slides up a wall
+   * and burns down through a roof instead.
+   */
+  _placeFoot(b, u, dt = 0) {
     const P = b.path, s = u * P.len, c = P.cum;
     let i = 1; while (i < c.length - 1 && c[i] < s) i++;
     const pa = P.pts[i - 1], pb = P.pts[i] || pa;
@@ -194,13 +204,26 @@ export class Orbital {
     let y = gy, built = false;
     if (this.physics && this.physics.castRay) {
       const top = Math.max(gy, b.from.y, b.to.y) + SKY;
-      const res = this.physics.castRay({ x, y: top, z }, this._down, SKY + 50);
-      if (res && res.toi != null) {
-        const hy = top - res.toi;
-        if (hy > gy + 0.3) { y = hy; built = true; }
+      let from = top, left = SKY + 50;
+      // Through anything owned, up to four times, to the first standing thing.
+      for (let k = 0; k < 4 && left > 0; k++) {
+        const res = this.physics.castRay({ x, y: from, z }, this._down, left);
+        if (!res || res.toi == null) break;
+        const hy = from - res.toi;
+        if (res.owner) { from = hy - 0.25; left = Math.max(0, from - (gy - 5)); continue; }
+        if (hy > gy + 0.6) { y = hy; built = true; }
+        break;
       }
     }
-    b.foot.set(x, y, z);
+    if (b.footY == null || dt <= 0) b.footY = y;
+    else {
+      const diff = y - b.footY;
+      // Up a wall quickly, down through a roof at the beam's own pace; a
+      // hand's breadth is not a step.
+      if (Math.abs(diff) > 0.4) b.footY += diff * Math.min(1, dt * (diff > 0 ? 9 : 5));
+      else b.footY = y;
+    }
+    b.foot.set(x, b.footY, z);
     b.built = built;
     return b.foot;
   }
@@ -245,7 +268,7 @@ export class Orbital {
       }
       const cam = this.camera.position;
       const walk = Math.min(1, (b.t - b.charge) / B.walk);
-      this._placeFoot(b, walk);
+      this._placeFoot(b, walk, dt);
       b.group.position.copy(b.foot);
       if (b.sound && b.sound.move) b.sound.move(b.foot);
       // The flicker: the core breathes, the glow throbs out of step with it.
