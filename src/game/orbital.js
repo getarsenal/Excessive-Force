@@ -121,6 +121,8 @@ export class Orbital {
     /** Camera shake, an amount a frame while the beam is on the ground. */
     this.onShake = null;
     this._v = new THREE.Vector3();
+    this._axis = new THREE.Vector3();
+    this._up = new THREE.Vector3(0, 1, 0);
     this._down = { x: 0, y: -1, z: 0 };
     // The colour the bite's dust starts: a THREE.Color, which is what the
     // particles read (a bare number there was NaN in every vertex, and the
@@ -137,20 +139,28 @@ export class Orbital {
     const B = def.strike.beam;
     const from = path.pts[0], to = path.pts[path.pts.length - 1];
     const g = new THREE.Group();
+    // The column comes in off the vertical: the platform is never straight
+    // overhead. Five to ten degrees, on a heading of its own each time, and
+    // drifting a little through the walk as the platform moves on. Everything
+    // that is the beam hangs under `lean`; the mark on the ground does not.
+    const lean = new THREE.Group();
+    lean.userData.tilt = THREE.MathUtils.degToRad(5 + Math.random() * 5);
+    lean.userData.az = Math.random() * Math.PI * 2;
+    g.add(lean);
     const core = column(B.width * 7);
-    g.add(core);
+    lean.add(core);
     // The array: five thinner beams standing in a ring round the mark as
     // the platform brings its emitters to bear, converging on the centre
     // over `FOCUS` seconds into the one fine beam.
     const rays = [];
-    for (let k = 0; k < 5; k++) { const r = column(B.width * 2.6); r.visible = false; r.material.opacity = 0; g.add(r); rays.push(r); }
+    for (let k = 0; k < 5; k++) { const r = column(B.width * 2.6); r.visible = false; r.material.opacity = 0; lean.add(r); rays.push(r); }
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({
       map: flareTexture(), transparent: true, blending: THREE.AdditiveBlending,
       depthWrite: false, depthTest: false, fog: false, toneMapped: false,
     }));
     flare.renderOrder = 41;
     flare.scale.setScalar(B.width * 5);
-    g.add(flare);
+    lean.add(flare);
     // The targeting mark before the beam: a thin ring on the ground, pulsing.
     const mark = new THREE.Mesh(new THREE.RingGeometry(B.width * 2.2, B.width * 2.8, 32),
       new THREE.MeshBasicMaterial({ color: 0xff8a40, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false }));
@@ -162,7 +172,7 @@ export class Orbital {
     this.scene.add(g);
     const b = {
       def, B, path, from: from.clone(), to: to.clone(), t: 0, done: false,
-      foot: from.clone(), group: g, core, flare, mark, rays, landed: false,
+      foot: from.clone(), group: g, lean, core, flare, mark, rays, landed: false,
       charge: B.charge, dur: B.charge + B.walk + B.hold, nextBite: B.charge, bites: 0,
       sound: null, seed: Math.random() * 100, lit: false,
     };
@@ -254,7 +264,17 @@ export class Orbital {
       if (this.audio && b.t - (b.rumbleAt ?? -9) > 0.5 && f >= 1) { b.rumbleAt = b.t; this.audio.rumble(Math.min(1, 0.45 + 0.2 * B.width) * end, b.foot); }
       // Turned to the camera, and leaning a hair as it walks, as if the
       // platform were slewing.
-      b.group.rotation.set(Math.cos(b.t * 2.3 + b.seed) * 0.004, Math.atan2(cam.x - b.foot.x, cam.z - b.foot.z), Math.sin(b.t * 3.1 + b.seed) * 0.004, 'YXZ');
+      // The lean: the column's axis tilted off the vertical on its heading,
+      // the heading drifting, and the quads turned to the camera within it.
+      const L = b.lean, tilt = L.userData.tilt + Math.sin(b.t * 2.3 + b.seed) * 0.004, az = L.userData.az + b.t * 0.06;
+      this._axis.set(Math.sin(tilt) * Math.cos(az), Math.cos(tilt), Math.sin(tilt) * Math.sin(az));
+      L.quaternion.setFromUnitVectors(this._up, this._axis);
+      b.group.rotation.set(0, 0, 0);
+      b.group.updateMatrixWorld(true);
+      const lc = L.worldToLocal(this._v.copy(cam));
+      const yaw = Math.atan2(lc.x, lc.z);
+      b.core.rotation.y = yaw;
+      for (const r of b.rays) r.rotation.y = yaw;
       // The bites, and the show at the foot between them.
       while (b.t >= b.nextBite && b.t <= b.dur) {
         b.nextBite += B.tick;
