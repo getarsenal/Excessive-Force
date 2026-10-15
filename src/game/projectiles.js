@@ -1,4 +1,28 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { releaseTree } from '../core/release.js';
+
+/**
+ * A free-fall bomb, nose along +z, 2.2 m long (a Mk 82; the MOAB is the
+ * same drawing at four times the size): the body, an ogive nose, a boat
+ * tail and four fins. One geometry, instanced, oriented along the round's
+ * velocity each frame.
+ */
+function bombGeometry() {
+  const parts = [];
+  const body = new THREE.CylinderGeometry(0.135, 0.135, 1.3, 12); body.rotateX(Math.PI / 2); parts.push(body);
+  const nose = new THREE.LatheGeometry([[0.135, 0], [0.12, 0.25], [0.085, 0.5], [0.04, 0.68], [0, 0.76]].map(([r, y]) => new THREE.Vector2(r, y)), 12);
+  nose.rotateX(Math.PI / 2); nose.translate(0, 0, 0.65); parts.push(nose);
+  const tail = new THREE.CylinderGeometry(0.135, 0.09, 0.5, 12); tail.rotateX(-Math.PI / 2); tail.translate(0, 0, -0.9); parts.push(tail);
+  for (let k = 0; k < 4; k++) {
+    const fin = new THREE.BoxGeometry(0.02, 0.26, 0.42);
+    fin.translate(0, 0.2, -0.95);
+    fin.rotateZ(k * Math.PI / 2 + Math.PI / 4);
+    parts.push(fin);
+  }
+  for (const g of parts) { g.deleteAttribute('uv'); if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]); }
+  return mergeGeometries(parts, false);
+}
 
 /**
  * Projectiles and firing solutions.
@@ -265,6 +289,9 @@ const GUIDED = { pitchOver: 50 * Math.PI / 180, glideTurn: 1.5, diveTurn: 12 };
 export class Projectile {
   constructor(opts) {
     this.id = ++PROJ_ID;
+    // A model that is the round (a cruise missile's airframe): flown by
+    // the manager along the round and released at the impact.
+    this.model = opts.model || null;
     this.pos = opts.pos.clone();
     this.vel = opts.vel.clone();
     this.gravity = opts.gravity ?? 9.81;
@@ -477,6 +504,25 @@ export class ProjectileManager {
     this._m4 = new THREE.Matrix4();
     this._scale = new THREE.Vector3(1, 1, 1);
     this._q = new THREE.Quaternion();
+    // The bombs: olive drab, finned, along their fall.
+    this.bombMesh = new THREE.InstancedMesh(bombGeometry(), new THREE.MeshStandardMaterial({ color: 0x4d5a3a, roughness: 0.6, metalness: 0.25 }), 64);
+    this.bombMesh.frustumCulled = false;
+    this.bombMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.bombMesh.count = 0;
+    this.bombMesh.castShadow = true;
+    scene.add(this.bombMesh);
+    this._fwd = new THREE.Vector3(0, 0, 1);
+    this._dir = new THREE.Vector3();
+  }
+
+  /** A free-fall bomb from an aircraft, as against a shell, a rocket or a gun's round. */
+  _isBomb(p) { return p.kind === 'bomb' && !!p.strikeDef && p.gravity > 5 && (p.speed || 0) < 350; }
+
+  /** The orientation of a round along its path, nose first. */
+  _along(p, q) {
+    const v = this._dir.copy(p.vel);
+    if (v.lengthSq() < 1e-6) return q.identity();
+    return q.setFromUnitVectors(this._fwd, v.normalize());
   }
 
   fire(opts) {
@@ -493,7 +539,7 @@ export class ProjectileManager {
    */
   update(dt, fx, terrain, onHit) {
     const rapier = this.physics.rapier;
-    let write = 0;
+    let write = 0, bombs = 0;
 
     for (const p of this.list) {
       if (!p.alive) continue;
@@ -543,8 +589,24 @@ export class ProjectileManager {
 
       if (p.pos.y < -200) { p.alive = false; continue; }
 
+      if (p.model) {
+        // The airframe is the round: carried along it, nose on its path.
+        p.model.position.copy(p.pos);
+        this._along(p, p.model.quaternion);
+        continue;
+      }
+      if (this._isBomb(p)) {
+        if (bombs < 64) {
+          this._scale.setScalar(p.drag > 0.08 ? 4.2 : 1);
+          this._along(p, this._q);
+          this._m4.compose(p.pos, this._q, this._scale);
+          this.bombMesh.setMatrixAt(bombs++, this._m4);
+        }
+        continue;
+      }
       if (write < 256) {
-        this._scale.setScalar(p.kind === 'bomb' ? (p.drag > 0.08 ? 4.5 : 2.2) : 1);
+        this._scale.setScalar(p.kind === 'bomb' ? 2.2 : 1);
+        this._q.identity();
         this._m4.compose(p.pos, this._q, this._scale);
         this.mesh.setMatrixAt(write, this._m4);
         // Incoming rounds burn red so the player can tell at a glance which
@@ -558,6 +620,9 @@ export class ProjectileManager {
     this.mesh.count = Math.min(write, 256);
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.instanceColor.needsUpdate = true;
+    this.bombMesh.count = bombs;
+    this.bombMesh.instanceMatrix.needsUpdate = true;
+    for (const p of this.list) if (!p.alive && p.model) { this.scene.remove(p.model); releaseTree(p.model, this.scene); p.model = null; }
     this.list = this.list.filter((p) => p.alive);
   }
 

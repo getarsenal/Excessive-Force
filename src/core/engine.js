@@ -135,6 +135,9 @@ export class Engine {
       logarithmicDepthBuffer: logDepth,
     });
     this.logDepth = logDepth;
+    // Per-material clipping planes: the mortar round is cut at the muzzle
+    // as it goes down the tube (battle.js `_animateMortar`).
+    this.renderer.localClippingEnabled = true;
     // three asks every program for its compile and link status the moment it
     // is made, which makes the main thread wait on each compile in turn:
     // seven seconds of a phone's boot. A shipped build's shaders are the ones

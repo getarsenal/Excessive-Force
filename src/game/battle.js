@@ -557,11 +557,27 @@ export class Battle {
     // fast, and the shell leaves when it strikes the pin at the bottom
     // (`MORTAR_DROP` seconds). The loader lets go and ducks at once.
     if (A.drop != null) {
+      // From wherever the hands had it onto the tube's axis over the first
+      // part of the drop (a round let go a hair early used to jump), and
+      // cut at the muzzle on the way in: a clipping plane on the round's
+      // own materials, so nothing of it is drawn through the tube wall.
+      if (A.dropFrom == null) {
+        A.dropFrom = A.round.position.clone();
+        if (!A.clip) {
+          A.clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6);
+          A.round.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.clippingPlanes = [A.clip]; } });
+        }
+      }
       A.drop += dt;
       const d = Math.min(1, A.drop / MORTAR_DROP);
       A.round.visible = d < 1;
-      A.round.position.copy(A.tubeDir).multiplyScalar(-1.5 * d * d);
-      if (d >= 1) { A.drop = null; this._mortarLaunch(u); }
+      const onto = Math.min(1, d / 0.3);
+      A.round.position.copy(A.tubeDir).multiplyScalar(-1.5 * d * d).addScaledVector(A.dropFrom, 1 - onto);
+      const mz = this._muzzleW || (this._muzzleW = new THREE.Vector3()), ax = this._axisW || (this._axisW = new THREE.Vector3());
+      A.tube.localToWorld(mz.copy(A.heldAt));
+      A.tube.localToWorld(ax.copy(A.heldAt).add(A.tubeDir)).sub(mz).normalize();
+      A.clip.setFromNormalAndCoplanarPoint(ax, mz);
+      if (d >= 1) { A.drop = null; A.dropFrom = null; A.clip.set(new THREE.Vector3(0, 1, 0), 1e6); this._mortarLaunch(u); }
     }
     const ease = (x) => { x = THREE.MathUtils.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
     const FACE = -Math.PI / 2;   // the loader faces the tube

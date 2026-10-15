@@ -1083,7 +1083,7 @@ export class AirWing {
         if (bomb) bomb.visible = false;
         // A cruise missile has nothing to let go of: the airframe is the
         // round, and from here the projectile is what the player watches.
-        if (s.def.aircraft.consumed) { m.visible = false; s.done = true; }
+        if (s.def.aircraft.consumed) { s.done = true; s.handedOff = true; }
         const p = s.def.projectile;
         // A salvo goes out as one release of `n` rounds spaced back along the
         // run, so they arrive one after another along a line through the
@@ -1100,6 +1100,7 @@ export class AirWing {
             warhead: s.def.warhead, owner: null,
             target: n > 1 ? s.target.clone().addScaledVector(s.dir, along) : s.target, trail: p.trail,
             strikeDef: s.def,
+            model: s.def.aircraft.consumed ? m : null,
           });
         }
         if (this.audio) this.audio.play('rocket', m.position, { rate: 0.7, gain: 0.5, rolloff: 900 });
@@ -1685,6 +1686,9 @@ AirWing.prototype.abortLifts = function abortLifts() {
  * it. Nothing of theirs is shared with anything that stays.
  */
 AirWing.prototype._dropSortie = function _dropSortie(s) {
+  // A cruise missile's airframe went on as the round (projectiles.js), which
+  // takes it down at the impact.
+  if (s.handedOff) return;
   this.scene.remove(s.model);
   // The Chinook's buffers are the template's (`chinookModel`), kept.
   releaseTree(s.model, this.scene, chinookTemplate ? [chinookTemplate] : null);
