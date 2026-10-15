@@ -48,7 +48,12 @@ const CHASE = [
   // the camera off to the side of the line between them and pulling back
   // as they part. The bomb lands and the aircraft peels away over it.
   { name: 'CHASE · BOTH', both: true },
-  { name: 'CHASE · BEHIND', back: 72, up: 18, side: 14 },
+  // BEHIND: back and right of the aircraft on the run-in, eyes on the
+  // target; at the release the camera lets the aircraft go, climbs and
+  // swings ahead of the target and turns to look back at the impact, so
+  // the aircraft comes in toward the lens, on the left, and overflies as
+  // the bomb hits.
+  { name: 'CHASE · BEHIND', back: 72, up: 18, side: 14, ahead: { fwd: 150, side: 36, up: 48 }, blend: 2.4 },
   { name: 'CHASE · LEAD', back: -95, up: 12, side: 18 },
 ];
 const DOLLY_SECS = 8;
@@ -364,7 +369,8 @@ export class Studio {
     this.rig.enabled = this.chaseIx === 0;
     if (this.chaseIx) this.orbitIx = 0;
     this.chaseSide = 0;   // picked on the first frame, from where the camera stands
-    this._hint(['CHASE OFF · FREE ORBIT ROUND IT', 'TARGET AND AIRCRAFT IN THE ONE FRAME · IT PEELS AWAY OVER THE HIT', 'RIDING BEHIND IT, EYES ON THE TARGET', 'WAITING AHEAD OF IT · IT FLIES PAST YOU TO THE TARGET'][this.chaseIx]);
+    this.chaseBlend = 0;
+    this._hint(['CHASE OFF · FREE ORBIT ROUND IT', 'TARGET AND AIRCRAFT IN THE ONE FRAME · IT PEELS AWAY OVER THE HIT', 'BEHIND IT ON THE RUN-IN · AT THE RELEASE THE CAMERA GOES AHEAD AND TURNS TO MEET IT', 'WAITING AHEAD OF IT · IT FLIES PAST YOU TO THE TARGET'][this.chaseIx]);
     this._tick();
     this._paint();
   }
@@ -380,7 +386,7 @@ export class Studio {
   }
 
   /** The chase camera: a pose behind or ahead of the thing, the focus on the target. */
-  _chase(t) {
+  _chase(t, dt = 0) {
     const c = CHASE[this.chaseIx], R = this.rig, r = t.ref;
     const p = this._position(t, this._v); if (!p) return false;
     const aim = this._aimOf(t); if (!aim) return false;
@@ -416,7 +422,20 @@ export class Studio {
     else { dx = aim.x - p.x; dz = aim.z - p.z; }
     const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L;
     const sx = -dz, sz = dx;
-    const cx = p.x - dx * c.back + sx * c.side, cy = p.y + c.up, cz = p.z - dz * c.back + sz * c.side;
+    let cx = p.x - dx * c.back + sx * c.side, cy = p.y + c.up, cz = p.z - dz * c.back + sz * c.side;
+    if (c.ahead) {
+      // The release lets the camera go: over `blend` seconds it eases from
+      // the chase pose to the one ahead of the target, on the same side of
+      // the line, and holds there while the aircraft comes through.
+      const released = t.kind === 'sortie' ? !!r.released : t.kind === 'shell';
+      if (!released) this.chaseBlend = 0;
+      else this.chaseBlend = Math.min(1, (this.chaseBlend || 0) + dt / c.blend);
+      const k = ease(this.chaseBlend || 0);
+      if (k > 0) {
+        const ax = aim.x + dx * c.ahead.fwd + sx * c.ahead.side, ay = aim.y + c.ahead.up, az = aim.z + dz * c.ahead.fwd + sz * c.ahead.side;
+        cx += (ax - cx) * k; cy += (ay - cy) * k; cz += (az - cz) * k;
+      }
+    }
     const fx = aim.x, fy = aim.y, fz = aim.z;
     const d = Math.hypot(cx - fx, cy - fy, cz - fz) || 1;
     R.target.set(fx, fy, fz); R.desiredTarget.copy(R.target);
@@ -495,7 +514,7 @@ export class Studio {
         this._hint(`${this.target.name} IS GONE · FREE CAMERA`);
         this.mode = 'free'; this.target = null; this.chaseIx = 0; R.enabled = true; this._paint();
       } else if (this.chaseIx && ['sortie', 'shell', 'missile', 'transport'].includes(this.target.kind)) {
-        this._chase(this.target);
+        this._chase(this.target, dt);
       } else {
         const p = this._position(this.target, this._v);
         if (p) R.desiredTarget.copy(p);
