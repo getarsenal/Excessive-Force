@@ -207,7 +207,10 @@ export class Battle {
       audio: this.audio, camera: this.camera, quality: this.quality,
     });
     this.orbital.onBite = (point, w, structureHit, beam) => {
-      const proj = { warhead: w, vel: this._beamVel || (this._beamVel = new THREE.Vector3(0, -600, 0)),
+      // The bite's own show is a fraction of a shell's: seven a second
+      // piled into one point whited the frame out, and the beam is the show.
+      const wh = beam.bite || (beam.bite = { ...w, fx: w.fx * 0.3 });
+      const proj = { warhead: wh, vel: this._beamVel || (this._beamVel = new THREE.Vector3(0, -600, 0)),
         kind: 'beam', owner: null, hostile: false, strikeDef: null, quiet: true, hand: false, spot: null };
       const before = this.structures.reduce((n, st) => n + st.destroyedCount, 0);
       this._onImpact({ point, proj, structureHit, groundHit: !structureHit, owner: null });

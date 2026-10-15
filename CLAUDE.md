@@ -427,6 +427,24 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   are a lighting one: look at the dots at one-to-one first.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
+- `src/game/orbital.js` the lasgun: the ORBIT cards (`laser`, `lance` in
+  units.js, `strike.beam`), aimed as the A-10's run is (press and drag;
+  `battle.strikeLine` is the shared clamp), nothing flying: a second after
+  the call a column of light stands on the start of the line and walks it,
+  the foot found by a ray down from the sky so it cuts a roof or a tower
+  from the top, biting every `tick` seconds through the ordinary impact
+  handler (`orbital.onBite` → `_onImpact` with a `beam` round, quiet, its
+  `fx` cut to a third). Drawn as one tall quad turned to the camera each
+  frame, painted across with the beam's profile and fading up it (the
+  three additive cylinders it started as summed past white and the bloom
+  whited the frame), a flare sprite at the foot; `lasgun` in synth.js is
+  the sound until a clip arrives (put it in audio.js `CLIPS` as `lasgun`
+  and it is preferred). A colour hint to the particles is a `THREE.Color`:
+  a bare number was NaN in every vertex, and one NaN under the bloom pass
+  is a black or white frame. `node tools/laserprobe.mjs <level> [tier]`
+  calls both on a line through the landmark's foot and prints bites,
+  stones and men (`SHOT=1` photographs the LANCE on open ground, wide and
+  close); the studio's FOLLOW takes THE BEAM.
 - `src/game/airframes/` the aircraft, one module each (`geo.js` is the
   loft/surface vocabulary they are built from); the A-10 is still in
   `aircraft.js`. A builder says what an aircraft is made of a part at a

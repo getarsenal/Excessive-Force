@@ -7,11 +7,15 @@
  * the Arrakeen field. There is no run-in for the flak to work on and no
  * aircraft to lose; the price buys the instant.
  *
- * The beam is drawn, not simulated: a white core, a violet sheath and a
- * wide orange glow, three open cylinders standing `TOP` metres over the
- * foot with their alpha fading to nothing up the column (a four-component
- * colour attribute, so the ordinary basic material does the fade), their
- * radius flickering every frame, a flare sprite at the foot. The damage is
+ * The beam is drawn, not simulated: one tall quad standing `TOP` metres
+ * over the foot and turned to the camera every frame, painted across with
+ * the beam's profile (a white core, a violet sheath, a wide orange glow,
+ * each a gaussian, in one texture) and fading to nothing up the column (a
+ * four-component colour attribute, so the ordinary basic material does the
+ * fade), its width flickering every frame, a flare sprite at the foot.
+ * Three open additive cylinders were the first draft: front and back
+ * faces of three overlapping tubes summed to several times white and the
+ * bloom pass turned the whole frame white from forty metres. The damage is
  * real: every `tick` seconds the beam bites once at its foot, `depth`
  * metres into whatever it stands on, and the bite goes through the same
  * impact handler as a shell (`onBite`), so it takes masonry, lights the
@@ -48,23 +52,55 @@ function flareTexture() {
   return _flareTex;
 }
 
-/** An open cylinder whose alpha fades from `a0` at the foot to nought at the top. */
-function column(radius, colour, a0, order) {
-  const geo = new THREE.CylinderGeometry(radius, radius, TOP, 14, 6, true);
+let _beamTex = null;
+/** The beam's profile across its width: core, sheath and glow, each a gaussian. */
+function beamTexture() {
+  if (_beamTex) return _beamTex;
+  const W = 256;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = 4;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, 4);
+  for (let x = 0; x < W; x++) {
+    const r = Math.abs(x - W / 2 + 0.5) / (W / 2);
+    const core = Math.exp(-((r / 0.07) ** 2));
+    const sheath = Math.exp(-((r / 0.2) ** 2)) * 0.55;
+    const glow = Math.exp(-((r / 0.62) ** 2)) * 0.3;
+    const a = Math.min(1, core + sheath + glow);
+    // The colour is the mix of the three, weighted by what is there.
+    const wsum = core + sheath + glow || 1;
+    const R = (core * 255 + sheath * 205 + glow * 255) / wsum;
+    const G = (core * 255 + sheath * 175 + glow * 106) / wsum;
+    const B = (core * 255 + sheath * 255 + glow * 40) / wsum;
+    for (let y = 0; y < 4; y++) {
+      const i = (y * W + x) * 4;
+      img.data[i] = R; img.data[i + 1] = G; img.data[i + 2] = B; img.data[i + 3] = Math.round(a * 255);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  _beamTex = new THREE.CanvasTexture(c);
+  _beamTex.colorSpace = THREE.SRGBColorSpace;
+  _beamTex.wrapS = _beamTex.wrapT = THREE.ClampToEdgeWrapping;
+  return _beamTex;
+}
+
+/** The column: a quad `width` across, `TOP` tall, its alpha fading up it. */
+function column(width) {
+  const geo = new THREE.PlaneGeometry(width, TOP, 1, 10);
+  geo.translate(0, TOP / 2, 0);
   const pos = geo.attributes.position;
   const col = new Float32Array(pos.count * 4);
-  const c = new THREE.Color(colour);
   for (let i = 0; i < pos.count; i++) {
-    const h = (pos.getY(i) + TOP / 2) / TOP;           // 0 at the foot, 1 at the top
-    const a = a0 * Math.pow(1 - h, 1.6);
-    col[i * 4] = c.r; col[i * 4 + 1] = c.g; col[i * 4 + 2] = c.b; col[i * 4 + 3] = a;
+    const h = pos.getY(i) / TOP;                          // 0 at the foot, 1 at the top
+    const a = Math.pow(1 - h, 1.4);
+    col[i * 4] = 1; col[i * 4 + 1] = 1; col[i * 4 + 2] = 1; col[i * 4 + 3] = a;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
   const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-    vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
+    map: beamTexture(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending,
     depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: false,
   }));
-  m.renderOrder = order;
+  m.renderOrder = 40;
   m.frustumCulled = false;
   return m;
 }
@@ -81,22 +117,24 @@ export class Orbital {
     this.onDone = null;
     this._v = new THREE.Vector3();
     this._down = { x: 0, y: -1, z: 0 };
+    // The colour the bite's dust starts: a THREE.Color, which is what the
+    // particles read (a bare number there was NaN in every vertex, and the
+    // bloom pass spread the NaN over the whole frame).
+    this._ember = new THREE.Color(0xffb060);
   }
 
   /** The beam called on the line `from`→`to` (already clamped by the caller). */
   call(def, from, to) {
     const B = def.strike.beam;
     const g = new THREE.Group();
-    const core = column(B.width * 0.38, 0xffffff, 1.0, 40);
-    const sheath = column(B.width * 0.9, 0xc8a8ff, 0.55, 39);
-    const glow = column(B.width * 2.6, 0xff6a24, 0.22, 38);
-    for (const m of [glow, sheath, core]) { m.position.y = TOP / 2; g.add(m); }
+    const core = column(B.width * 7);
+    g.add(core);
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({
       map: flareTexture(), transparent: true, blending: THREE.AdditiveBlending,
       depthWrite: false, depthTest: false, fog: false, toneMapped: false,
     }));
     flare.renderOrder = 41;
-    flare.scale.setScalar(B.width * 9);
+    flare.scale.setScalar(B.width * 5);
     g.add(flare);
     // The targeting mark before the beam: a thin ring on the ground, pulsing.
     const mark = new THREE.Mesh(new THREE.RingGeometry(B.width * 2.2, B.width * 2.8, 32),
@@ -105,11 +143,11 @@ export class Orbital {
     mark.renderOrder = 36;
     g.add(mark);
     g.visible = true;
-    core.visible = sheath.visible = glow.visible = flare.visible = false;
+    core.visible = flare.visible = false;
     this.scene.add(g);
     const b = {
       def, B, from: from.clone(), to: to.clone(), t: 0, done: false,
-      foot: from.clone(), group: g, core, sheath, glow, flare, mark,
+      foot: from.clone(), group: g, core, flare, mark,
       charge: B.charge, dur: B.charge + B.walk + B.hold, nextBite: B.charge, bites: 0,
       sound: null, seed: Math.random() * 100, lit: false,
     };
@@ -156,7 +194,7 @@ export class Orbital {
       if (!b.lit) {
         b.lit = true;
         b.mark.visible = false;
-        b.core.visible = b.sheath.visible = b.glow.visible = b.flare.visible = true;
+        b.core.visible = b.flare.visible = true;
       }
       const walk = Math.min(1, (b.t - b.charge) / B.walk);
       this._placeFoot(b, walk);
@@ -166,13 +204,13 @@ export class Orbital {
       const n1 = 0.82 + 0.18 * Math.sin(b.t * 61 + b.seed) * Math.sin(b.t * 17.3);
       const n2 = 0.75 + 0.25 * Math.sin(b.t * 23 + b.seed * 2) * Math.cos(b.t * 7.1);
       const end = b.t > b.dur - 0.35 ? Math.max(0, (b.dur - b.t) / 0.35) : 1;
-      b.core.scale.set(n1 * end, 1, n1 * end);
-      b.sheath.scale.set(n2 * end, 1, n2 * end);
-      b.glow.scale.set((0.8 + 0.4 * n2) * end, 1, (0.8 + 0.4 * n2) * end);
-      b.flare.scale.setScalar(B.width * (7 + 4 * n1) * end);
-      // The column leans a hair as it walks, as if the platform were slewing.
-      b.group.rotation.z = Math.sin(b.t * 3.1 + b.seed) * 0.004;
-      b.group.rotation.x = Math.cos(b.t * 2.3 + b.seed) * 0.004;
+      b.core.scale.set(Math.max(0.01, n1 * end), 1, 1);
+      b.core.material.opacity = 0.8 + 0.2 * n2;
+      b.flare.scale.setScalar(B.width * (4 + 2.5 * n1) * end);
+      // Turned to the camera, and leaning a hair as it walks, as if the
+      // platform were slewing.
+      const cam = this.camera.position;
+      b.group.rotation.set(Math.cos(b.t * 2.3 + b.seed) * 0.004, Math.atan2(cam.x - b.foot.x, cam.z - b.foot.z), Math.sin(b.t * 3.1 + b.seed) * 0.004, 'YXZ');
       // The bites, and the show at the foot between them.
       while (b.t >= b.nextBite && b.t <= b.dur) {
         b.nextBite += B.tick;
@@ -181,7 +219,7 @@ export class Orbital {
         at.y -= B.depth * (b.built ? 1 : 0.4);
         if (this.onBite) this.onBite(at, b.def.warhead, b.built, b);
         if (fx) {
-          fx.stoneBurst(b.foot.x, b.foot.y, b.foot.z, 0.5 + B.width * 0.25, 0xffb060);
+          fx.stoneBurst(b.foot.x, b.foot.y, b.foot.z, 0.5 + B.width * 0.25, this._ember);
           fx.impactDust(b.foot.x, b.foot.y, b.foot.z, 0.6 + B.width * 0.3);
           if (b.bites % 3 === 0) fx.dustColumn(b.foot.x, b.foot.y, b.foot.z, 0.5 + B.width * 0.3);
         }
@@ -197,7 +235,7 @@ export class Orbital {
     b.done = true;
     if (b.sound && b.sound.stop) b.sound.stop();
     this.scene.remove(b.group);
-    for (const m of [b.core, b.sheath, b.glow, b.mark]) { m.geometry.dispose(); m.material.dispose(); }
+    for (const m of [b.core, b.mark]) { m.geometry.dispose(); m.material.dispose(); }
     b.flare.material.dispose();
     if (this.onDone) this.onDone(b);
   }
