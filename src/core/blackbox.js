@@ -70,7 +70,7 @@ export function describeCrash(c) {
   const when = new Date(c.lastAt);
   return `${c.level} · build ${c.build || '?'} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · ${Math.round(s.el || 0)} s in · `
     + `${s.fps ?? '?'} fps · ${s.units ?? '?'} guns · ${s.air ?? '?'} aircraft · ${s.dyn ?? '?'} bodies · ${s.trisK ?? '?'}k tris`
-    + (s.heapMB ? ` · ${s.heapMB} MB heap` : '')
+    + (s.heapMB ? ` · ${s.heapMB} MB heap` : '') + (s.geoMB != null ? ` · ${s.geoMB} MB geometry · ${s.texMB} MB textures` : '')
     + (s.dead ? ` · PHYSICS HALTED (${s.deadWhy || '?'})` : '')
     + (s.frozenHigh || s.stuckHigh ? ` · ${s.frozenHigh || 0} frozen / ${s.stuckHigh || 0} stuck over 30 m` : '');
 }
@@ -107,9 +107,25 @@ export class BlackBox {
       const { battle: B, engine: E, physics: P, structures: S, fx, stats } = this.c;
       const R = E.renderer, I = R.info;
       let tris = 0, meshes = 0;
-      E.scene.traverseVisible((o) => {
+      // The bytes behind the counts: every geometry's buffers once (shared
+      // ones shared) and every texture at four bytes a pixel, so a phone
+      // that kills the tab without a word (Safari reports no heap) at least
+      // says how much the picture weighed. Over the whole scene, not the
+      // visible part: what is culled is still allocated.
+      const seenG = new Set(), seenT = new Set();
+      let geoBytes = 0, texBytes = 0;
+      const mat = (m) => { if (!m) return; for (const k of ['map', 'normalMap', 'emissiveMap', 'alphaMap', 'roughnessMap', 'metalnessMap']) { const t = m[k]; if (t && !seenT.has(t)) { seenT.add(t); const im = t.image; if (im && im.width) texBytes += im.width * im.height * 4 * (t.generateMipmaps ? 1.34 : 1); } } };
+      E.scene.traverse((o) => {
         if (!o.isMesh || !o.geometry) return;
-        const g = o.geometry, n = (g.index ? g.index.count : (g.attributes.position?.count || 0)) / 3;
+        const g = o.geometry;
+        if (!seenG.has(g)) {
+          seenG.add(g);
+          for (const a of Object.values(g.attributes)) if (a?.array) geoBytes += a.array.byteLength;
+          if (g.index?.array) geoBytes += g.index.array.byteLength;
+        }
+        if (Array.isArray(o.material)) o.material.forEach(mat); else mat(o.material);
+        if (!o.visible) return;
+        const n = (g.index ? g.index.count : (g.attributes.position?.count || 0)) / 3;
         tris += n * (o.isInstancedMesh ? o.count : (g.isInstancedBufferGeometry ? g.instanceCount || 0 : 1));
         meshes++;
       });
@@ -135,6 +151,7 @@ export class BlackBox {
         islands: S.reduce((a, st) => a + st.islands.size, 0), stonesDown: S.reduce((a, st) => a + st.destroyedCount, 0),
         burnt: B.cityFire?.burnt ?? null, fires: B.fires?.list?.length ?? null,
         geos: I.memory.geometries, tex: I.memory.textures, programs: I.programs?.length ?? null,
+        geoMB: Math.round(geoBytes / 1048576), texMB: Math.round(texBytes / 1048576),
         trisK: Math.round(tris / 1000), meshes, particles, fill: fx?.fillNow != null ? Math.round(fx.fillNow) : null,
         heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
         lost: R.getContext().isContextLost?.() || false,
