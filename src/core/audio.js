@@ -70,28 +70,68 @@ export class Audio {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) { this._failed = true; return; }
+      // iOS: the page's sound is playback, not ambient. Ambient is what a
+      // web page gets by default, and ambient is silenced by the ring/silent
+      // switch and dropped for good by the first interruption; playback
+      // rides the switch and is handed back after a call or an app switch.
+      try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch { /* not iOS 17 */ }
       this.ctx = new Ctx();
       if (this.ctx.state === 'suspended') await this.ctx.resume();
-
-      this.master = this.ctx.createGain();
-      // Muted before the first tap is still muted after it.
-      this.master.gain.value = this.enabled ? 0.75 : 0;
-      // A limiter stops a barrage from clipping into distortion; without it a
-      // HIMARS salvo plus its impacts is a wall of crackle.
-      this.limiter = this.ctx.createDynamicsCompressor();
-      this.limiter.threshold.value = -8;
-      this.limiter.knee.value = 6;
-      this.limiter.ratio.value = 12;
-      this.limiter.attack.value = 0.003;
-      this.limiter.release.value = 0.25;
-      this.master.connect(this.limiter).connect(this.ctx.destination);
-
+      this._graph();
       await this._loadAll();
       this.ready = true;
       this._watch();
     } catch (e) {
       console.warn('[tumble] audio unavailable:', e.message);
       this._failed = true;
+    }
+  }
+
+  /** The master gain and the limiter into the context's output. */
+  _graph() {
+    this.master = this.ctx.createGain();
+    // Muted before the first tap is still muted after it.
+    this.master.gain.value = this.enabled ? 0.75 : 0;
+    // A limiter stops a barrage from clipping into distortion; without it a
+    // HIMARS salvo plus its impacts is a wall of crackle.
+    this.limiter = this.ctx.createDynamicsCompressor();
+    this.limiter.threshold.value = -8;
+    this.limiter.knee.value = 6;
+    this.limiter.ratio.value = 12;
+    this.limiter.attack.value = 0.003;
+    this.limiter.release.value = 0.25;
+    this.master.connect(this.limiter).connect(this.ctx.destination);
+  }
+
+  /**
+   * A new context in place of one that will not come back.
+   *
+   * iOS hands a page back from an app switch, a call or the lock screen
+   * with its context 'interrupted', and `resume()` on that context resolves
+   * and changes nothing: the clock stays stopped, or runs with the output
+   * route gone, and every sound after it is silent until the page reloads.
+   * The one thing that works is a fresh context, made inside a gesture.
+   * The decoded clips are plain data and play in the new one as they did
+   * in the old; whoever tapped the old graph (the studio's recorder) is
+   * told through `onRebuild`.
+   */
+  _rebuild() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const old = this.ctx;
+    try {
+      this.ctx = new Ctx();
+      this._graph();
+      this.voices = 0;
+      this._lastPlayed.clear();
+      this.rebuilt = (this.rebuilt || 0) + 1;
+      if (this.ctx.state !== 'running') this.ctx.resume().catch(() => { /* the next gesture */ });
+      if (old) old.close().catch(() => { /* gone already */ });
+      if (this.onRebuild) this.onRebuild(this.ctx);
+      console.warn('[tumble] audio context rebuilt');
+    } catch (e) {
+      this.ctx = old;
+      console.warn('[tumble] audio rebuild failed:', e.message);
     }
   }
 
@@ -114,6 +154,17 @@ export class Audio {
     if (this._watching) return;
     this._watching = true;
     const wake = () => this.resume();
+    // A gesture is the one place a context can be made or started on iOS: if
+    // the one we have is not running by now, or sits 'interrupted', it is
+    // replaced here and now, on the tap, rather than asked again.
+    const gesture = () => {
+      if (!this.ctx || this._failed) return;
+      const st = this.ctx.state;
+      if (st === 'running') { this._stuckSince = 0; return; }
+      if (st === 'interrupted' || (this._stuckSince && performance.now() - this._stuckSince > 700)) { this._rebuild(); return; }
+      if (!this._stuckSince) this._stuckSince = performance.now();
+      this.resume();
+    };
     // Put away with the page: a phone keeps a running context, and the CPU
     // behind it, awake in the background for as long as the app is left
     // there, mixing a battle that is no longer being drawn.
@@ -125,16 +176,21 @@ export class Audio {
     window.addEventListener('focus', wake);
     // Not `once`: the gesture is a fallback for every return, not just the
     // first one.
-    window.addEventListener('pointerdown', wake, { passive: true });
-    window.addEventListener('keydown', wake);
+    window.addEventListener('pointerdown', gesture, { passive: true });
+    window.addEventListener('touchend', gesture, { passive: true });
+    window.addEventListener('keydown', gesture);
   }
 
   /** Start the clock again if something stopped it. Safe to call at any time. */
   resume() {
     if (!this.ctx || this._failed) return;
-    if (this.ctx.state === 'running') return;
-    this.ctx.resume().catch(() => { /* still no gesture; the next one will do */ });
+    if (this.ctx.state === 'running') { this._stuckSince = 0; return; }
+    if (!this._stuckSince) this._stuckSince = performance.now();
+    this.ctx.resume().then(() => { if (this.ctx.state === 'running') this._stuckSince = 0; }).catch(() => { /* still no gesture; the next one will do */ });
   }
+
+  /** The context's state, for the diagnostics and the crash recorder. */
+  get state() { return this.ctx ? this.ctx.state : (this._failed ? 'failed' : 'none'); }
 
   async _loadAll() {
     const jobs = Object.entries(CLIPS).map(async ([name, url]) => {

@@ -3857,6 +3857,7 @@ async function boot() {
   // `fastForward`, because that is the path with no draw in it.
   window.__frame = frame;
   window.__engine = engine;   // for the harness: the renderer's own counters
+  window.__audio = audio;     // for the harness: the context's state and the rebuild
   window.__rig = rig;         // for the harness: screen to ground, gestures
   // Exercised by the UI probe: the end-of-level path without having to win.
   window.__recordAndEnd = (sum) => {

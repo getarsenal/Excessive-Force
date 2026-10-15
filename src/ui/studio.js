@@ -556,7 +556,9 @@ export class Studio {
     // The game's own sound, tapped after the limiter.
     const A = this.audio;
     try {
-      if (A?.ctx && A.limiter && !this._dest) { this._dest = A.ctx.createMediaStreamDestination(); A.limiter.connect(this._dest); }
+      // The tap is on this context's limiter: a context rebuilt after an
+      // interruption (audio.js `_rebuild`) is a new graph, tapped afresh.
+      if (A?.ctx && A.limiter && (!this._dest || this._destCtx !== A.ctx)) { this._dest = A.ctx.createMediaStreamDestination(); this._destCtx = A.ctx; A.limiter.connect(this._dest); }
       if (this._dest) for (const t of this._dest.stream.getAudioTracks()) stream.addTrack(t);
     } catch { /* picture only */ }
     const mimeType = this._mime();
