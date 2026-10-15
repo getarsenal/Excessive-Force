@@ -437,9 +437,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `fx` cut to a third). Drawn as one tall quad turned to the camera each
   frame, painted across with the beam's profile and fading up it (the
   three additive cylinders it started as summed past white and the bloom
-  whited the frame), a flare sprite at the foot; `lasgun` in synth.js is
-  the sound until a clip arrives (put it in audio.js `CLIPS` as `lasgun`
-  and it is preferred). A colour hint to the particles is a `THREE.Color`:
+  whited the frame), a flare sprite at the foot. It lands as an array:
+  five thinner rays in a ring closing on the mark over `FOCUS` seconds
+  while the main column narrows from four times wide to the fine beam,
+  and the moment it closes (`onLand`) the ground bursts, the camera
+  kicks, the phone gets the section-landing slam, and from then on every
+  frame shakes a little by the beam's width and the camera's distance
+  (`onShake`) with `audio.rumble` under it every half second; dirt goes
+  up from under the foot every other bite on open ground. The sound is
+  the owner's three takes (`public/assets/lasgun1..3.mp3`, audio.js
+  `CLIPS`), one picked a beam and looped, over a rumble bed built in
+  synth.js's `lasgun` (a sub saw and brown noise that throb), which also
+  builds the whole voice when no clip loaded. A colour hint to the particles is a `THREE.Color`:
   a bare number was NaN in every vertex, and one NaN under the bloom pass
   is a black or white frame. `node tools/laserprobe.mjs <level> [tier]`
   calls both on a line through the landmark's foot and prints bites,

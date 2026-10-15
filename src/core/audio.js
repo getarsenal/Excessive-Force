@@ -39,6 +39,11 @@ const CLIPS = {
   enemy: 'assets/enemy_shot.mp3',
   // The A-10's gun, as heard near its target: impacts, then the gun.
   brrt: 'assets/a10_gun.mp3',
+  // The lasgun, three takes of it: synth.js's `lasgun` picks one a beam and
+  // loops it for the beam's time over its own rumble bed.
+  lasgun1: 'assets/lasgun1.mp3',
+  lasgun2: 'assets/lasgun2.mp3',
+  lasgun3: 'assets/lasgun3.mp3',
 };
 
 export class Audio {

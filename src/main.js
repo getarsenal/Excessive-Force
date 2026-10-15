@@ -1505,6 +1505,10 @@ async function boot() {
         // And the pilot's picture of it in the corner, for a single pass.
         if (data.point && !data.def?.aircraft?.station && !data.beam) pod.show(data.point, data.eta || 10, data.def.name);
         break;
+      case 'beamland':
+        // The array closes to the beam: the blow in the hand, as a section landing.
+        feedback.emit('slam', Math.min(1.5, 0.6 + 0.6 * (data.near || 0.5)));
+        break;
       case 'beamdone':
         if (data.destroyed > 6) hud.feed(`${data.def.name} · ${data.destroyed} STONES CUT`, 'big');
         break;

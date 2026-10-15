@@ -288,9 +288,10 @@ export function fanfare(audio) {
 }
 
 /**
- * The lasgun: the beam from orbit, as a sound. Nothing in the game is
- * recorded for it yet (the owner's clip goes in audio.js's CLIPS as
- * `lasgun` when it arrives and is preferred here), so it is built: a charge
+ * The lasgun: the beam from orbit, as a sound. The owner's three takes
+ * (audio.js CLIPS `lasgun1..3`) are the voice, one picked a beam and
+ * looped, over a rumble bed built here; without them the voice is built
+ * too: a charge
  * whine climbing over `charge` seconds into a low two-oscillator hum that
  * beats against itself, a square an octave up under a throbbing filter, a
  * band of noise sizzling over it with its own tremolo, and a thin high
@@ -308,13 +309,36 @@ export function lasgun(audio, pos, dur = 8, size = 1, charge = 1.0) {
   master.gain.setValueAtTime(0.0001, t0);
   if (pan) { pan.pan.value = pl.pan; master.connect(pan).connect(audio.master); } else master.connect(audio.master);
   const nodes = [];
-  // A clip, when the owner has supplied one: it is the performance.
-  const buf = audio.buffers.get('lasgun');
+  // The owner's clips, one of the three picked a beam and looped for the
+  // beam's time; it is the voice. Under it, whichever voice it is, the
+  // rumble bed: the earth under the beam, a sub tone and brown noise that
+  // throbs, in with the beam and out with it.
+  const takes = ['lasgun1', 'lasgun2', 'lasgun3', 'lasgun'].filter((k) => audio.buffers.has(k));
+  const buf = takes.length ? audio.buffers.get(takes[Math.floor(Math.random() * takes.length)]) : null;
   try {
+    {
+      const bed = c.createGain(); bed.gain.setValueAtTime(0.0001, t0);
+      bed.gain.exponentialRampToValueAtTime(0.42 * size, t0 + charge + 0.25);
+      bed.connect(master);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 110; lp.Q.value = 0.8;
+      const sub = c.createOscillator(); sub.type = 'sawtooth'; sub.frequency.value = 36;
+      const subG = c.createGain(); subG.gain.value = 0.5;
+      const throb = c.createOscillator(); throb.frequency.value = 0.9; const throbG = c.createGain(); throbG.gain.value = 0.22;
+      throb.connect(throbG).connect(subG.gain); throb.start(t0); nodes.push(throb);
+      sub.connect(subG).connect(lp); sub.start(t0); nodes.push(sub);
+      const n = c.createBufferSource(); n.buffer = noise(c); n.loop = true;
+      const nG = c.createGain(); nG.gain.value = 0.9;
+      const trem = c.createOscillator(); trem.frequency.value = 7.5; const tremG = c.createGain(); tremG.gain.value = 0.35;
+      trem.connect(tremG).connect(nG.gain); trem.start(t0); nodes.push(trem);
+      n.connect(nG).connect(lp); n.start(t0, Math.random()); nodes.push(n);
+      lp.connect(bed);
+    }
     if (buf) {
       const src = c.createBufferSource(); src.buffer = buf; src.loop = buf.duration < dur + 1;
-      src.connect(master); src.start(t0); nodes.push(src);
-      master.gain.exponentialRampToValueAtTime(0.9 * size * pl.gain, t0 + Math.min(charge, 0.4));
+      const vg = c.createGain(); vg.gain.value = 0.9;
+      src.connect(vg).connect(master); src.start(t0 + Math.max(0, charge - 0.6)); nodes.push(src);
+      master.gain.exponentialRampToValueAtTime(0.35 * size * pl.gain, t0 + charge * 0.8);
+      master.gain.exponentialRampToValueAtTime(0.95 * size * pl.gain, t0 + charge + 0.12);
     } else {
       const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 6;
       lp.frequency.setValueAtTime(220, t0);

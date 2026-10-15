@@ -59,8 +59,22 @@ if (SHOT) {
     const mid = new T.Vector3(o.x + 95, 0, o.z + 10);
     const beam = B.callStrike('lance', from, { path: [from, mid, to] });
     window.__laserBeam = beam;
-    let t = 0; while (t < beam.charge + beam.B.walk * 0.4) { window.__fastForward(0.1, 1 / 60); t += 0.1; }
+    // Stopped a third of the way through the focus: the array still open.
+    let t = 0; while (t < beam.charge + 0.3) { window.__fastForward(0.05, 1 / 60); t += 0.05; }
   });
+  {
+    const data = await page.evaluate(() => {
+      const T = window.THREE, rig = window.__rig, E = window.__engine, beam = window.__laserBeam;
+      rig.target.copy(beam.foot).add(new T.Vector3(0, 15, 0)); rig.desiredTarget.copy(rig.target);
+      rig.distance = rig.desiredDistance = 140; rig.pitch = rig.desiredPitch = 0.22; rig.yaw = rig.desiredYaw = 2.2;
+      if (E.renderScale !== 1) E.setRenderScale(1);
+      for (let k = 0; k < 2; k++) window.__frame();
+      return document.querySelector('canvas').toDataURL('image/jpeg', 0.9);
+    });
+    writeFileSync(`/tmp/out/laser-${level}-array.jpg`, Buffer.from(data.split(',')[1], 'base64'));
+    console.log(`/tmp/out/laser-${level}-array.jpg`);
+    await page.evaluate(() => { const beam = window.__laserBeam; let t = 0; while (t < beam.B.walk * 0.4) { window.__fastForward(0.1, 1 / 60); t += 0.1; } });
+  }
   const frame = (dist, pitch, up) => page.evaluate(({ dist, pitch, up }) => {
     const T = window.THREE, rig = window.__rig, E = window.__engine, beam = window.__laserBeam;
     rig.target.copy(beam.foot).add(new T.Vector3(0, up, 0)); rig.desiredTarget.copy(rig.target);

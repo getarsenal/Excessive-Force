@@ -216,6 +216,13 @@ export class Battle {
       this._onImpact({ point, proj, structureHit, groundHit: !structureHit, owner: null });
       beam.destroyed = (beam.destroyed || 0) + this.structures.reduce((n, st) => n + st.destroyedCount, 0) - before;
     };
+    this.orbital.onShake = (a) => this.engine.addShake(a);
+    this.orbital.onLand = (beam) => {
+      const d = this.camera.position.distanceTo(beam.foot);
+      const near = Math.max(0.3, Math.min(1, 1 - (d - 120) / 600));
+      this.engine.addShake(0.45 * near);
+      this.onEvent('beamland', { def: beam.def, point: beam.foot.clone(), near });
+    };
     this.orbital.onDone = (beam) => {
       this.onEvent('beamdone', { def: beam.def, point: beam.foot.clone(), destroyed: beam.destroyed || 0 });
     };

@@ -33,6 +33,7 @@ import { lasgun } from '../core/synth.js';
 
 const TOP = 1500;        // metres of column drawn over the foot
 const SKY = 900;         // where the search for the foot starts
+const FOCUS = 0.9;       // seconds the array takes to close to the fine beam
 
 let _flareTex = null;
 function flareTexture() {
@@ -115,6 +116,10 @@ export class Orbital {
     this.onBite = null;
     /** A beam shut off: `(beam)`. */
     this.onDone = null;
+    /** The array focused and the full charge on the ground: `(beam)`. */
+    this.onLand = null;
+    /** Camera shake, an amount a frame while the beam is on the ground. */
+    this.onShake = null;
     this._v = new THREE.Vector3();
     this._down = { x: 0, y: -1, z: 0 };
     // The colour the bite's dust starts: a THREE.Color, which is what the
@@ -134,6 +139,11 @@ export class Orbital {
     const g = new THREE.Group();
     const core = column(B.width * 7);
     g.add(core);
+    // The array: five thinner beams standing in a ring round the mark as
+    // the platform brings its emitters to bear, converging on the centre
+    // over `FOCUS` seconds into the one fine beam.
+    const rays = [];
+    for (let k = 0; k < 5; k++) { const r = column(B.width * 2.6); r.visible = false; r.material.opacity = 0; g.add(r); rays.push(r); }
     const flare = new THREE.Sprite(new THREE.SpriteMaterial({
       map: flareTexture(), transparent: true, blending: THREE.AdditiveBlending,
       depthWrite: false, depthTest: false, fog: false, toneMapped: false,
@@ -152,7 +162,7 @@ export class Orbital {
     this.scene.add(g);
     const b = {
       def, B, path, from: from.clone(), to: to.clone(), t: 0, done: false,
-      foot: from.clone(), group: g, core, flare, mark,
+      foot: from.clone(), group: g, core, flare, mark, rays, landed: false,
       charge: B.charge, dur: B.charge + B.walk + B.hold, nextBite: B.charge, bites: 0,
       sound: null, seed: Math.random() * 100, lit: false,
     };
@@ -204,7 +214,26 @@ export class Orbital {
         b.lit = true;
         b.mark.visible = false;
         b.core.visible = b.flare.visible = true;
+        for (const r of b.rays) r.visible = true;
       }
+      // The focus: from a wide, faint array to the fine beam, and the ground
+      // takes the full charge the moment it closes.
+      const f = Math.min(1, (b.t - b.charge) / FOCUS);
+      const fe = 1 - (1 - f) * (1 - f) * (1 - f);           // out-cubic
+      const ring = B.width * 9 * (1 - fe);
+      for (let k = 0; k < b.rays.length; k++) {
+        const r = b.rays[k], a = b.t * 1.6 + k * Math.PI * 2 / 5;
+        r.position.set(Math.cos(a) * ring, 0, Math.sin(a) * ring);
+        r.material.opacity = 0.7 * (1 - fe);
+        r.scale.set(Math.max(0.01, 0.4 + 0.6 * (1 - fe)), 1, 1);
+        r.visible = f < 1;
+      }
+      if (f >= 1 && !b.landed) {
+        b.landed = true;
+        if (this.onLand) this.onLand(b);
+        if (fx) { const gy = this.terrain.heightAt(b.foot.x, b.foot.z); fx.groundBurst(b.foot, 0.9 + B.width * 0.4, gy); fx.dustColumn(b.foot.x, b.foot.y, b.foot.z, 1 + B.width * 0.4); }
+      }
+      const cam = this.camera.position;
       const walk = Math.min(1, (b.t - b.charge) / B.walk);
       this._placeFoot(b, walk);
       b.group.position.copy(b.foot);
@@ -213,12 +242,18 @@ export class Orbital {
       const n1 = 0.82 + 0.18 * Math.sin(b.t * 61 + b.seed) * Math.sin(b.t * 17.3);
       const n2 = 0.75 + 0.25 * Math.sin(b.t * 23 + b.seed * 2) * Math.cos(b.t * 7.1);
       const end = b.t > b.dur - 0.35 ? Math.max(0, (b.dur - b.t) / 0.35) : 1;
-      b.core.scale.set(Math.max(0.01, n1 * end), 1, 1);
-      b.core.material.opacity = 0.8 + 0.2 * n2;
-      b.flare.scale.setScalar(B.width * (4 + 2.5 * n1) * end);
+      const wide = 1 + 3.5 * (1 - fe);                         // the beam closing down
+      b.core.scale.set(Math.max(0.01, n1 * end * wide), 1, 1);
+      b.core.material.opacity = (0.8 + 0.2 * n2) * (0.3 + 0.7 * fe);
+      b.flare.scale.setScalar(B.width * (4 + 2.5 * n1) * end * (0.3 + 0.7 * fe));
+      // The hand of God on the ground: a shake every frame, by the beam's
+      // size and the camera's distance, and the earth's own roar under it.
+      const dist = cam.distanceTo(b.foot);
+      const near = Math.min(1, 110 / Math.max(30, dist));
+      if (this.onShake) this.onShake((0.012 + 0.012 * Math.min(2, B.width)) * near * fe * end);
+      if (this.audio && b.t - (b.rumbleAt ?? -9) > 0.5 && f >= 1) { b.rumbleAt = b.t; this.audio.rumble(Math.min(1, 0.45 + 0.2 * B.width) * end, b.foot); }
       // Turned to the camera, and leaning a hair as it walks, as if the
       // platform were slewing.
-      const cam = this.camera.position;
       b.group.rotation.set(Math.cos(b.t * 2.3 + b.seed) * 0.004, Math.atan2(cam.x - b.foot.x, cam.z - b.foot.z), Math.sin(b.t * 3.1 + b.seed) * 0.004, 'YXZ');
       // The bites, and the show at the foot between them.
       while (b.t >= b.nextBite && b.t <= b.dur) {
@@ -228,9 +263,13 @@ export class Orbital {
         at.y -= B.depth * (b.built ? 1 : 0.4);
         if (this.onBite) this.onBite(at, b.def.warhead, b.built, b);
         if (fx) {
+          // Embers off whatever it is cutting, and the dirt thrown up from
+          // under it: a ground burst every other bite on open ground, the
+          // column of it every third, dust always.
           fx.stoneBurst(b.foot.x, b.foot.y, b.foot.z, 0.5 + B.width * 0.25, this._ember);
-          fx.impactDust(b.foot.x, b.foot.y, b.foot.z, 0.6 + B.width * 0.3);
-          if (b.bites % 3 === 0) fx.dustColumn(b.foot.x, b.foot.y, b.foot.z, 0.5 + B.width * 0.3);
+          fx.impactDust(b.foot.x, b.foot.y, b.foot.z, 0.8 + B.width * 0.35);
+          if (!b.built && b.bites % 2 === 0) fx.groundBurst(b.foot, 0.45 + B.width * 0.2, this.terrain.heightAt(b.foot.x, b.foot.z));
+          if (b.bites % 3 === 0) fx.dustColumn(b.foot.x, b.foot.y, b.foot.z, 0.6 + B.width * 0.35);
         }
       }
       if (fx && fx.trail) fx.trail(b.foot, 1.2 + B.width * 0.4);
@@ -244,7 +283,7 @@ export class Orbital {
     b.done = true;
     if (b.sound && b.sound.stop) b.sound.stop();
     this.scene.remove(b.group);
-    for (const m of [b.core, b.mark]) { m.geometry.dispose(); m.material.dispose(); }
+    for (const m of [b.core, b.mark, ...b.rays]) { m.geometry.dispose(); m.material.dispose(); }
     b.flare.material.dispose();
     if (this.onDone) this.onDone(b);
   }
