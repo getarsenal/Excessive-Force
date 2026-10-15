@@ -559,6 +559,46 @@ export const UNITS = [
     dispersion: 0,
     blurb: 'Two and a half tonnes that goes in before it goes off. For the things that will not fall over.',
   },
+  // ── Orbit ────────────────────────────────────────────────────────────
+  //
+  // The lasgun. Nothing flies: a second after the call a beam stands on
+  // the start of the line the player drew (press and drag, as the A-10's
+  // run is) and walks it, burning through whatever it crosses — the
+  // Harkonnen lasgun chasing the ornithopter across the field at Arrakeen.
+  // There is no run-in for the flak and nothing to shoot down; the price
+  // buys the instant. `strike.beam` is read by src/game/orbital.js: `charge`
+  // seconds from the call to the beam, `walk` seconds down the line, `hold`
+  // seconds standing at the end, `tick` seconds between bites, `width` the
+  // beam's radius on the ground, `depth` metres into the masonry each bite
+  // goes off. `warhead` is one bite. LASER is the teaser: a short walk, in
+  // bites of two thirds of a mortar round, five a second — about half what
+  // a mortar battery does over the same seconds. LANCE is the full charge:
+  // a wider beam in bites bigger than an M777's round, seven a second for
+  // eight seconds, and it goes through a tower.
+  {
+    id: 'laser', name: 'LASER', full: 'Orbital lasgun · low power', tier: 'ORBIT',
+    cost: 12000, unlockFrac: 0.08,
+    model: 'aircraft',
+    strike: { strafe: true, beam: { charge: 1.0, walk: 5.0, hold: 0.6, tick: 0.2, width: 1.2, depth: 1.5 },
+      minLen: 20, maxLen: 120, defaultLen: 70 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'direct', speed: 1e6, gravity: 0, trail: 0 },
+    warhead: { lethal: 1.5, radius: 3.4, power: 2600, fx: 0.45, kinetic: 0.3 },
+    dispersion: 0,
+    blurb: 'A beam from orbit on the line you draw, a second after you let go. Nothing to shoot down.',
+  },
+  {
+    id: 'lance', name: 'LANCE', full: 'Orbital lasgun · full power', tier: 'ORBIT',
+    cost: 250000, unlockFrac: 0.3,
+    model: 'aircraft',
+    strike: { strafe: true, beam: { charge: 1.2, walk: 8.0, hold: 1.0, tick: 0.14, width: 3.0, depth: 4.0 },
+      minLen: 30, maxLen: 220, defaultLen: 120 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'direct', speed: 1e6, gravity: 0, trail: 0 },
+    warhead: { lethal: 7.5, radius: 11, power: 44000, fx: 1.5, kinetic: 0.5 },
+    dispersion: 0,
+    blurb: 'The full charge: eight seconds of beam down the line you draw. It goes through a tower.',
+  },
 // Cheapest first, everywhere a list of them is shown: the dock, the number
 // keys, the armoury. Written in the order they were designed; sorted here.
 ].sort((a, b) => a.cost - b.cost);

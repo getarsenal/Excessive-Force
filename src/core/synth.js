@@ -286,3 +286,86 @@ export function fanfare(audio) {
     }
   } catch { /* no audio */ }
 }
+
+/**
+ * The lasgun: the beam from orbit, as a sound. Nothing in the game is
+ * recorded for it yet (the owner's clip goes in audio.js's CLIPS as
+ * `lasgun` when it arrives and is preferred here), so it is built: a charge
+ * whine climbing over `charge` seconds into a low two-oscillator hum that
+ * beats against itself, a square an octave up under a throbbing filter, a
+ * band of noise sizzling over it with its own tremolo, and a thin high
+ * carrier with vibrato — the thing that reads as "energy" rather than
+ * "engine". Fades in over the charge, holds for `dur`, and cuts off over
+ * a third of a second when stopped. Returns `{move(pos), stop()}`.
+ */
+export function lasgun(audio, pos, dur = 8, size = 1, charge = 1.0) {
+  if (!ok(audio)) return null;
+  const c = audio.ctx;
+  const pl = place(audio, pos, 1400);
+  const t0 = c.currentTime;
+  const pan = c.createStereoPanner ? c.createStereoPanner() : null;
+  const master = c.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  if (pan) { pan.pan.value = pl.pan; master.connect(pan).connect(audio.master); } else master.connect(audio.master);
+  const nodes = [];
+  // A clip, when the owner has supplied one: it is the performance.
+  const buf = audio.buffers.get('lasgun');
+  try {
+    if (buf) {
+      const src = c.createBufferSource(); src.buffer = buf; src.loop = buf.duration < dur + 1;
+      src.connect(master); src.start(t0); nodes.push(src);
+      master.gain.exponentialRampToValueAtTime(0.9 * size * pl.gain, t0 + Math.min(charge, 0.4));
+    } else {
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 6;
+      lp.frequency.setValueAtTime(220, t0);
+      lp.frequency.exponentialRampToValueAtTime(900, t0 + charge);
+      const lfo = c.createOscillator(); lfo.frequency.value = 8.5;
+      const lfoG = c.createGain(); lfoG.gain.value = 260;
+      lfo.connect(lfoG).connect(lp.frequency); lfo.start(t0); nodes.push(lfo);
+      // The hum: two saws a hair apart, beating.
+      for (const f of [48, 48.7, 96.3]) {
+        const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * (size >= 1 ? 1 : 1.3);
+        const g = c.createGain(); g.gain.value = f > 90 ? 0.18 : 0.32;
+        o.connect(g).connect(lp); o.start(t0); nodes.push(o);
+      }
+      const sq = c.createOscillator(); sq.type = 'square'; sq.frequency.value = 193;
+      const sqG = c.createGain(); sqG.gain.value = 0.07;
+      sq.connect(sqG).connect(lp); sq.start(t0); nodes.push(sq);
+      lp.connect(master);
+      // The sizzle: a band of noise with a fast tremolo on it.
+      const n = c.createBufferSource(); n.buffer = noise(c); n.loop = true;
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2; bp.frequency.value = 2600;
+      const trem = c.createGain(); trem.gain.value = 0.11;
+      const tl = c.createOscillator(); tl.frequency.value = 13; const tlG = c.createGain(); tlG.gain.value = 0.07;
+      tl.connect(tlG).connect(trem.gain); tl.start(t0); nodes.push(tl);
+      n.connect(bp).connect(trem).connect(master); n.start(t0, Math.random()); nodes.push(n);
+      // The carrier: a thin high tone that climbs through the charge and
+      // then shivers.
+      const w = c.createOscillator(); w.type = 'sine';
+      w.frequency.setValueAtTime(420, t0);
+      w.frequency.exponentialRampToValueAtTime(size >= 1 ? 1760 : 2350, t0 + charge);
+      const vib = c.createOscillator(); vib.frequency.value = 6.2; const vibG = c.createGain(); vibG.gain.value = 28;
+      vib.connect(vibG).connect(w.frequency); vib.start(t0); nodes.push(vib);
+      const wG = c.createGain(); wG.gain.value = 0.06;
+      w.connect(wG).connect(master); w.start(t0); nodes.push(w);
+      // In over the charge, a hard rise at the end of it: the beam lands.
+      master.gain.exponentialRampToValueAtTime(0.25 * size * pl.gain, t0 + charge * 0.85);
+      master.gain.exponentialRampToValueAtTime(0.95 * size * pl.gain, t0 + charge + 0.08);
+    }
+  } catch { return null; }
+  let stopped = false;
+  const stop = () => {
+    if (stopped) return; stopped = true;
+    const t = c.currentTime;
+    try {
+      master.gain.cancelScheduledValues(t);
+      master.gain.setValueAtTime(master.gain.value, t);
+      master.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      for (const o of nodes) o.stop(t + 0.4);
+    } catch { /* already gone */ }
+  };
+  // Stops itself a little after its time, if nobody stops it first.
+  setTimeout(stop, (dur + 1.5) * 1000);
+  const move = (p) => { if (!pan) return; const q = place(audio, p, 1400); pan.pan.value = q.pan; };
+  return { stop, move };
+}

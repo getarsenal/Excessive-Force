@@ -271,6 +271,25 @@ const BODY = {
     <path d="M34 24.9 l-3.2 -1.3 v2.6 Z" fill="${C.oliveDark}"/>
     <path d="M53 17.6 l5.4 1.2 l-5.4 1.2 Z" fill="${C.heat}"/>`,
 
+  // The lasgun: no aircraft to draw. A column of light from the top of the
+  // card to the ground line, a flare where it lands and the ground thrown
+  // up either side; the lance is the same beam at twice the width.
+  laser: `${GROUND}
+    <rect x="29" y="0" width="6" height="35" fill="${C.heat}" opacity="0.35"/>
+    <rect x="30.6" y="0" width="2.8" height="35" fill="#ffffff"/>
+    <ellipse cx="32" cy="34.6" rx="9" ry="2.6" fill="${C.heat}" opacity="0.8"/>
+    <ellipse cx="32" cy="34.6" rx="4" ry="1.3" fill="#fff4e0"/>
+    <path d="M22 33 l-4 -5 l1.6 -0.6 l3.6 5 Z M42 33 l4 -5 l-1.6 -0.6 l-3.6 5 Z" fill="${C.heat}"/>
+    <path d="M26 31 l-1.4 -7 l1.4 0.2 l1.2 6.6 Z M38 31 l1.4 -7 l-1.4 0.2 l-1.2 6.6 Z" fill="${C.thermo}"/>`,
+  lance: `${GROUND}
+    <rect x="24" y="0" width="16" height="35" fill="${C.heat}" opacity="0.35"/>
+    <rect x="27" y="0" width="10" height="35" fill="${C.thermo}" opacity="0.55"/>
+    <rect x="29.6" y="0" width="4.8" height="35" fill="#ffffff"/>
+    <ellipse cx="32" cy="34.6" rx="15" ry="3.4" fill="${C.heat}" opacity="0.8"/>
+    <ellipse cx="32" cy="34.6" rx="7" ry="1.8" fill="#fff4e0"/>
+    <path d="M17 33 l-6 -7 l1.8 -0.8 l5.4 7 Z M47 33 l6 -7 l-1.8 -0.8 l-5.4 7 Z" fill="${C.heat}"/>
+    <path d="M22 30 l-2 -10 l1.6 0.2 l1.6 9.4 Z M42 30 l2 -10 l-1.6 0.2 l-1.6 9.4 Z" fill="${C.thermo}"/>`,
+
   // Lancer: a long blended spindle with the wings swept flat back against it,
   // one tall fin, and a bomb bay the size of a bus. Drawn dark, because the one
   // people picture is black and flying low.

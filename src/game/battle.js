@@ -29,6 +29,7 @@ import {
 } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
+import { Orbital } from './orbital.js';
 import { EnemyAirborne, ASSAULT } from './reinforce.js';
 import { HQ } from './hq.js';
 import { lineOfSight } from '../structure/occupancy.js';
@@ -198,6 +199,23 @@ export class Battle {
     // nearest the aim point, `fire` is one burst on it.
     // The A-10's stream is drawn as tracer the same way the garrison's is.
     this.air.tracers = this.tracerFX;
+    // The lasgun (src/game/orbital.js): every bite of the beam is an impact
+    // like a shell's, straight down, without a bang of its own (the beam
+    // has its own sound) and without a crew to credit.
+    this.orbital = new Orbital({
+      scene: this.scene, terrain: this.terrain, physics: this.physics, fx: this.fx,
+      audio: this.audio, camera: this.camera, quality: this.quality,
+    });
+    this.orbital.onBite = (point, w, structureHit, beam) => {
+      const proj = { warhead: w, vel: this._beamVel || (this._beamVel = new THREE.Vector3(0, -600, 0)),
+        kind: 'beam', owner: null, hostile: false, strikeDef: null, quiet: true, hand: false, spot: null };
+      const before = this.structures.reduce((n, st) => n + st.destroyedCount, 0);
+      this._onImpact({ point, proj, structureHit, groundHit: !structureHit, owner: null });
+      beam.destroyed = (beam.destroyed || 0) + this.structures.reduce((n, st) => n + st.destroyedCount, 0) - before;
+    };
+    this.orbital.onDone = (beam) => {
+      this.onEvent('beamdone', { def: beam.def, point: beam.foot.clone(), destroyed: beam.destroyed || 0 });
+    };
     // The enemy's airborne: half the garrison again, flown in over the
     // building when the bar is about halfway to the win.
     this.airborne = new EnemyAirborne(this);
@@ -1649,6 +1667,7 @@ export class Battle {
       len = THREE.MathUtils.clamp(len, st.minLen, st.maxLen);
     }
     this._strafeArgs = { x: from.x, z: from.z, dx, dz, len };
+    this._strafeInk.material.color.setHex(st.beam ? 0xff6a30 : 0xffb020);
     this._drawStrafe();
     this._strafeLine.visible = true;
   }
@@ -2258,6 +2277,32 @@ export class Battle {
    * Call an air strike on a point. Paid for on the call; the aircraft comes
    * in from behind the camera and the bomb lands a few seconds later.
    */
+  /**
+   * The line a drawn strike (the gun run, the beam) will walk: from the
+   * press to the lift, clamped to the strike's `minLen`..`maxLen`; a tap
+   * (no drag to speak of) is the default length through the point along
+   * the camera's look. Both ends on the ground.
+   */
+  strikeLine(target, to, def) {
+    const st = def.strike;
+    let from = target.clone();
+    to = to ? to.clone() : null;
+    if (!to || Math.hypot(to.x - from.x, to.z - from.z) < 12) {
+      const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+      const l = Math.hypot(dx, dz) || 1;
+      const half = st.defaultLen / 2;
+      from = new THREE.Vector3(target.x - dx / l * half, 0, target.z - dz / l * half);
+      to = new THREE.Vector3(target.x + dx / l * half, 0, target.z + dz / l * half);
+    }
+    const len0 = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+    const len = THREE.MathUtils.clamp(len0, st.minLen, st.maxLen);
+    const dx = (to.x - from.x) / len0, dz = (to.z - from.z) / len0;
+    to.set(from.x + dx * len, 0, from.z + dz * len);
+    from.y = this.terrain.heightAt(from.x, from.z);
+    to.y = this.terrain.heightAt(to.x, to.z);
+    return { from, to, len };
+  }
+
   callStrike(id, point, opts = {}) {
     const def = UNITS_BY_ID[id];
     if (!def || !def.strike) return null;
@@ -2274,6 +2319,17 @@ export class Battle {
     if (this.isFreeStrike(def)) {
       this.strikeCredits--;
       this.onEvent('freestrike', { def, left: this.strikeCredits });
+    }
+    // The beam: no aircraft, no flak, no run-in. The line as the gun run
+    // takes it (a tap is the default line through the point, away from the
+    // camera), and the beam is on it a second later.
+    if (def.strike.beam) {
+      const L = this.strikeLine(point, opts.to || null, def);
+      const beam = this.orbital.call(def, L.from, L.to);
+      this.shotsFired++;
+      this.selectedUnitId = null;
+      this.onEvent('strike', { def, point: L.from.clone(), eta: def.strike.beam.charge, beam: true, to: L.to.clone() });
+      return beam;
     }
     const at = point.clone();
     // Aim at the ground under the point if it is in the open, or at the
@@ -4058,6 +4114,7 @@ export class Battle {
       // and the smoke drifts — under the collapse and behind the report,
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
+      this.orbital.update(dt);
       if (this.sams) this.sams.update(dt, this.elapsed);
       if (this.hq) this.hq.update(dt);
       if (this.hv) this.hv.update(dt);
@@ -4095,6 +4152,7 @@ export class Battle {
     this._updateUnits(dt);
     this._whistles();
     this.air.update(dt);
+    this.orbital.update(dt);
     if (this.sams) this.sams.update(dt, this.elapsed);
     if (this.hq) this.hq.update(dt);
     if (this.hv) this.hv.update(dt);

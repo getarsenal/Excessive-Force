@@ -273,7 +273,7 @@ export class Studio {
     const u = this.unitCard?.unit;
     if (u && (this.battle.units || []).includes(u)) { this._follow({ kind: 'unit', ref: u, name: u.def?.name || 'GUN' }); return; }
     this.armed = true;
-    this._hint('TAP A GUN, AN AIRCRAFT, A SHELL OR THE BUILDING · OR TAP FOLLOW AGAIN TO CYCLE');
+    this._hint('TAP A GUN, AN AIRCRAFT, A SHELL, A BEAM OR THE BUILDING · OR TAP FOLLOW AGAIN TO CYCLE');
     this._paint();
   }
 
@@ -288,6 +288,7 @@ export class Studio {
     for (const p of B.airborne?.planes || []) if (this._pos3(p)) out.push({ kind: 'transport', ref: p, name: 'THEIR TRANSPORT' });
     for (const m of B.airborne?.men || []) if (m.pos && !m.dead) out.push({ kind: 'man', ref: m, name: 'THEIR PARATROOPER' });
     for (const M of B.sams?.missiles || []) if (M.mesh && !M.done) out.push({ kind: 'missile', ref: M, name: 'THE SAM' });
+    for (const b of B.orbital?.beams || []) if (!b.done) out.push({ kind: 'beam', ref: b, name: 'THE BEAM' });
     const shells = (B.projectiles?.list || []).filter((p) => !p.hostile).slice(-4);
     for (const p of shells) out.push({ kind: 'shell', ref: p, name: p.kind === 'bomb' ? 'THE BOMB' : 'THE ROUND' });
     for (const u of B.units || []) if (u.group) out.push({ kind: 'unit', ref: u, name: u.def?.name || 'GUN' });
@@ -303,6 +304,7 @@ export class Studio {
     if (t.kind === 'sortie') return r.model ? out.copy(r.model.position) : null;
     if (t.kind === 'drop') return r.group ? out.copy(r.group.position) : null;
     if (t.kind === 'shell') return r.pos ? out.copy(r.pos) : null;
+    if (t.kind === 'beam') return out.copy(r.foot).add(new THREE.Vector3(0, 6, 0));
     if (t.kind === 'unit') return r.group ? out.copy(r.group.position).add(new THREE.Vector3(0, 1.5, 0)) : null;
     if (t.kind === 'point') return out.copy(t.point);
     return null;
@@ -317,6 +319,7 @@ export class Studio {
     if (t.kind === 'missile') return (B.sams?.missiles || []).includes(r) && !r.done;
     if (t.kind === 'drop') return (B.pending || []).includes(r);
     if (t.kind === 'shell') return (B.projectiles?.list || []).includes(r);
+    if (t.kind === 'beam') return (B.orbital?.beams || []).includes(r) && !r.done;
     if (t.kind === 'unit') return (B.units || []).includes(r);
     return true;
   }

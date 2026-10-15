@@ -937,7 +937,7 @@ async function boot() {
       // what the player wants next is the map it was standing over.
       if (battle.selectedUnitId) hud.closeDrawer();
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike?.strafe) hud.status('press and drag along the line to strafe', 4);
+      else if (UNITS_BY_ID[id].strike?.strafe) hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and drag the line the beam will walk' : 'press and drag along the line to strafe', 4);
       else if (UNITS_BY_ID[id].strike) hud.status('drag to aim the strike', 4);
       else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
@@ -1494,16 +1494,19 @@ async function boot() {
       case 'strike':
         feedback.emit('strike');
         runStats.strikes++;
-        hud.feed(`${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
+        hud.feed(data.beam ? `${data.def.name} · BEAM IN ${Math.max(1, Math.round(data.eta))} s` : `${data.def.name} INBOUND · ${Math.round(data.eta)} s`, 'big');
         hud.hidePrompt();
-        battle.pulse(data.point, 0xffa040, 22, true);
+        battle.pulse(data.point, data.beam ? 0xff6a30 : 0xffa040, 22, true);
         // The spot marked for the pilot with a smoke canister, burning until
-        // the strike is in and a while after.
-        if (data.point && fx.flourish) fx.flourish.markerSmoke(data.point, (data.eta || 10) + 10);
+        // the strike is in and a while after. The beam has no pilot.
+        if (data.point && fx.flourish && !data.beam) fx.flourish.markerSmoke(data.point, (data.eta || 10) + 10);
         // The first aircraft over a town sets its sirens going.
         if (!sirenSounded && life?.cars) { sirenSounded = true; airRaidSiren(audio); }
         // And the pilot's picture of it in the corner, for a single pass.
-        if (data.point && !data.def?.aircraft?.station) pod.show(data.point, data.eta || 10, data.def.name);
+        if (data.point && !data.def?.aircraft?.station && !data.beam) pod.show(data.point, data.eta || 10, data.def.name);
+        break;
+      case 'beamdone':
+        if (data.destroyed > 6) hud.feed(`${data.def.name} · ${data.destroyed} STONES CUT`, 'big');
         break;
       case 'airborne':
         // The enemy sends for help. Said big, with the count, so the player
@@ -3009,7 +3012,7 @@ async function boot() {
         aiming.to = hit.point.clone();
         battle.showStrafe(aiming.at, aiming.to, aiming.def);
         const len = Math.hypot(aiming.to.x - aiming.at.x, aiming.to.z - aiming.at.z);
-        hud.status(len < 12 ? 'drag along the line to strafe' : `GUN RUN · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
+        hud.status(len < 12 ? (aiming.def.strike.beam ? 'drag the line the beam will walk' : 'drag along the line to strafe') : `${aiming.def.strike.beam ? 'BEAM' : 'GUN RUN'} · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
         return;
       }
       if (aiming.kind === 'strike') {
@@ -3127,7 +3130,8 @@ async function boot() {
       const row = (e.shiftKey || hud.openDrawer === 'strikes') ? hud.bars.strikes : hud.bars.units;
       const id = row[n - 1];
       if (id && battle.selectUnit(id)) {
-        hud.status(UNITS_BY_ID[id].strike?.strafe ? 'press and drag along the line to strafe'
+        hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and drag the line the beam will walk'
+          : UNITS_BY_ID[id].strike?.strafe ? 'press and drag along the line to strafe'
           : UNITS_BY_ID[id].strike ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
       }
     }
