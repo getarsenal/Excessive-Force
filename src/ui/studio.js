@@ -44,6 +44,10 @@ const ORBIT_RATES = [0, 0.09, 0.2, -0.09];   // radians a second: off, slow, bri
 // and lets it overtake and fly on into the picture.
 const CHASE = [
   { name: 'CHASE', back: 0 },
+  // BOTH: the target and the aircraft in the one frame whatever they do,
+  // the camera off to the side of the line between them and pulling back
+  // as they part. The bomb lands and the aircraft peels away over it.
+  { name: 'CHASE · BOTH', both: true },
   { name: 'CHASE · BEHIND', back: 72, up: 18, side: 14 },
   { name: 'CHASE · LEAD', back: -95, up: 12, side: 18 },
 ];
@@ -359,7 +363,8 @@ export class Studio {
     this.chaseIx = (this.chaseIx + 1) % CHASE.length;
     this.rig.enabled = this.chaseIx === 0;
     if (this.chaseIx) this.orbitIx = 0;
-    this._hint(['CHASE OFF · FREE ORBIT ROUND IT', 'RIDING BEHIND IT, EYES ON THE TARGET', 'WAITING AHEAD OF IT · IT FLIES PAST YOU TO THE TARGET'][this.chaseIx]);
+    this.chaseSide = 0;   // picked on the first frame, from where the camera stands
+    this._hint(['CHASE OFF · FREE ORBIT ROUND IT', 'TARGET AND AIRCRAFT IN THE ONE FRAME · IT PEELS AWAY OVER THE HIT', 'RIDING BEHIND IT, EYES ON THE TARGET', 'WAITING AHEAD OF IT · IT FLIES PAST YOU TO THE TARGET'][this.chaseIx]);
     this._tick();
     this._paint();
   }
@@ -379,6 +384,30 @@ export class Studio {
     const c = CHASE[this.chaseIx], R = this.rig, r = t.ref;
     const p = this._position(t, this._v); if (!p) return false;
     const aim = this._aimOf(t); if (!aim) return false;
+    if (c.both) {
+      // The line from the target to the aircraft; the camera stands off it
+      // to one side (the side it was on when the shot began), a little
+      // high, far enough back that both ends fit the narrower axis of the
+      // frame, and looks at a point between them, nearer the target.
+      const cam = this.engine.camera;
+      let lx = p.x - aim.x, lz = p.z - aim.z;
+      const sep = Math.hypot(lx, lz, p.y - aim.y) || 1;
+      const L = Math.hypot(lx, lz) || 1; lx /= L; lz /= L;
+      let sx = -lz, sz = lx;
+      if (!this.chaseSide) this.chaseSide = ((cam.position.x - aim.x) * sx + (cam.position.z - aim.z) * sz) >= 0 ? 1 : -1;
+      sx *= this.chaseSide; sz *= this.chaseSide;
+      const vfov = cam.fov * Math.PI / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * cam.aspect);
+      const half = Math.min(vfov, hfov) / 2;
+      const d = Math.max(60, (sep / 2) / Math.tan(half) * 1.3);
+      const fx = aim.x + (p.x - aim.x) * 0.4, fy = aim.y + (p.y - aim.y) * 0.4, fz = aim.z + (p.z - aim.z) * 0.4;
+      const cx = fx + sx * d, cy = fy + d * 0.28, cz = fz + sz * d;
+      const dd = Math.hypot(cx - fx, cy - fy, cz - fz) || 1;
+      R.target.set(fx, fy, fz); R.desiredTarget.copy(R.target);
+      R.distance = R.desiredDistance = dd;
+      R.yaw = R.desiredYaw = Math.atan2(cx - fx, cz - fz);
+      R.pitch = R.desiredPitch = Math.asin(Math.max(-1, Math.min(1, (cy - fy) / dd)));
+      return true;
+    }
     let dx, dz;
     if (t.kind === 'sortie' && r.dir) { dx = r.dir.x; dz = r.dir.z; }
     else if (t.kind === 'shell' && r.vel) { dx = r.vel.x; dz = r.vel.z; }
