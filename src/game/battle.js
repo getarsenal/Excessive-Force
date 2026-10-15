@@ -220,8 +220,11 @@ export class Battle {
     this.orbital.onLand = (beam) => {
       const d = this.camera.position.distanceTo(beam.foot);
       const near = Math.max(0.3, Math.min(1, 1 - (d - 120) / 600));
-      this.engine.addShake(0.45 * near);
-      this.onEvent('beamland', { def: beam.def, point: beam.foot.clone(), near });
+      // The kick as the beam lands: a nudge for the LASER, the hand of God
+      // for the LANCE, and the width is what says which.
+      const big = beam.B.width >= 2.5;
+      this.engine.addShake((big ? 0.7 : 0.22) * near);
+      this.onEvent('beamland', { def: beam.def, point: beam.foot.clone(), near, big });
     };
     this.orbital.onDone = (beam) => {
       this.onEvent('beamdone', { def: beam.def, point: beam.foot.clone(), destroyed: beam.destroyed || 0 });

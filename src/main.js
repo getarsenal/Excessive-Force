@@ -1506,8 +1506,9 @@ async function boot() {
         if (data.point && !data.def?.aircraft?.station && !data.beam) pod.show(data.point, data.eta || 10, data.def.name);
         break;
       case 'beamland':
-        // The array closes to the beam: the blow in the hand, as a section landing.
-        feedback.emit('slam', Math.min(1.5, 0.6 + 0.6 * (data.near || 0.5)));
+        // The array closes to the beam: the blow in the hand, as a section
+        // landing, a tap for the LASER and the full slam for the LANCE.
+        feedback.emit('slam', Math.min(1.5, (data.big ? 0.9 : 0.35) + 0.6 * (data.near || 0.5)));
         break;
       case 'beamdone':
         if (data.destroyed > 6) hud.feed(`${data.def.name} · ${data.destroyed} STONES CUT`, 'big');
@@ -2201,6 +2202,11 @@ async function boot() {
   // that is moving cannot — see `Picker.pick`.
   const pickMoving = (x, y, own = false) =>
     picker.pick(x, y, structures, contextGroup, garrison, own ? battle.units : null, true);
+  // The ground under the finger and nothing else: a drawn strike (the gun
+  // run, the beam's path) is laid on the ground, and a finger crossing a
+  // tower used to land its points on the tower's face, which is wherever
+  // the face happens to project, not where the finger is going.
+  const pickGround = (x, y) => picker.pick(x, y, [], null, null, null, true);
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -2869,7 +2875,7 @@ async function boot() {
     if (battle.lay || battle.seat) { if (!layDrag) layDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: 0 }; aiming = { swallow: true }; return; }
     const def = armedDef();
     if (!def || livePointers.size > 1) return;
-    const hit = pick(e.clientX, e.clientY, !!def.strike);
+    const hit = (def.strike?.beam || def.strike?.strafe) ? pickGround(e.clientX, e.clientY) : pick(e.clientX, e.clientY, !!def.strike);
     if (!hit) return;
     if (def.strike?.beam) {
       // The beam walks whatever the finger draws: down where it lands, the
@@ -3021,7 +3027,7 @@ async function boot() {
     // the only way either of them exists on a touch screen.
     if (aiming && !aiming.swallow) {
       if (livePointers.size > 1) { endAiming(); return; }
-      const hit = pickMoving(e.clientX, e.clientY, aiming.kind === 'strike');
+      const hit = (aiming.kind === 'beam' || aiming.kind === 'strafe') ? pickGround(e.clientX, e.clientY) : pickMoving(e.clientX, e.clientY, aiming.kind === 'strike');
       if (!hit) return;
       if (aiming.kind === 'beam') {
         const last = aiming.points[aiming.points.length - 1];
