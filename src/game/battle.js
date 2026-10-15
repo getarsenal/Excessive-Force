@@ -1618,6 +1618,166 @@ export class Battle {
     this._strikeAt = null;
     if (this._strafeLine) this._strafeLine.visible = false;
     this._strafeArgs = null;
+    this._beamPath = null;
+  }
+
+  /**
+   * The path the beam will walk, while it is being drawn: any line the
+   * finger draws, not the gun run's straight one. Resampled every two
+   * metres along the drawing and cut at the strike's `maxLen` (the walk is
+   * a fixed number of seconds, so the length is the budget), stretched to
+   * `minLen` along its last heading when it is shorter. One point is the
+   * aperture alone, before the finger has moved.
+   */
+  beamPath(points, def) {
+    const st = def.strike;
+    const raw = [];
+    for (const p of points || []) {
+      const q = raw[raw.length - 1];
+      if (!q || Math.hypot(p.x - q.x, p.z - q.z) > 0.4) raw.push(new THREE.Vector3(p.x, 0, p.z));
+    }
+    let total = 0;
+    for (let i = 1; i < raw.length; i++) total += raw[i].distanceTo(raw[i - 1]);
+    if (raw.length < 2 || total < 12) {
+      if (!points || !points.length) return null;
+      const L = this.strikeLine(points[0], null, def);
+      return this._densify([L.from, L.to], st.maxLen, st.minLen, raw.length < 2 || total < 12);
+    }
+    return this._densify(raw, st.maxLen, st.minLen, false);
+  }
+
+  _densify(raw, maxLen, minLen, tapped) {
+    const pts = [raw[0].clone()], cum = [0];
+    let acc = 0;
+    for (let i = 1; i < raw.length && acc < maxLen - 1e-6; i++) {
+      const a = raw[i - 1], b = raw[i];
+      const d = a.distanceTo(b);
+      if (d < 1e-6) continue;
+      const room = maxLen - acc;
+      const take = Math.min(d, room);
+      for (let sgm = 2; sgm < take; sgm += 2) { pts.push(a.clone().lerp(b, sgm / d)); cum.push(acc + sgm); }
+      pts.push(a.clone().lerp(b, take / d)); cum.push(acc + take);
+      acc += take;
+    }
+    // Too short for a walk: carried on along its last heading.
+    if (acc < minLen && pts.length >= 2) {
+      const a = pts[pts.length - 2], b = pts[pts.length - 1];
+      const dir = b.clone().sub(a); dir.y = 0;
+      if (dir.lengthSq() > 1e-6) {
+        dir.normalize();
+        while (acc < minLen) { const step = Math.min(2, minLen - acc); const q = pts[pts.length - 1].clone().addScaledVector(dir, step); pts.push(q); acc += step; cum.push(acc); }
+      }
+    }
+    for (const q of pts) q.y = this.terrain.heightAt(q.x, q.z);
+    return { pts, cum, len: acc, capped: acc >= maxLen - 1e-6, tapped };
+  }
+
+  /** The beam's path overlay, redrawn as the finger adds to it. */
+  showBeamPath(points, def) {
+    if (!this._strafeLine) this.showStrafe(new THREE.Vector3(), new THREE.Vector3(), def);
+    const P = this.beamPath(points, def) || { pts: [], cum: [], len: 0 };
+    P.def = def;
+    P.start = points && points[0] ? new THREE.Vector3(points[0].x, this.terrain.heightAt(points[0].x, points[0].z), points[0].z) : null;
+    // Before the finger has moved the overlay is the aperture alone: the
+    // default line is what a lift there would get, but it is not drawn.
+    if (P.tapped) { P.pts = []; P.cum = []; P.len = 0; P.capped = false; }
+    this._beamPath = P;
+    this._strafeArgs = null;
+    this._strafeInk.material.color.setHex(0xff6a30);
+    this._drawBeamPath();
+    this._strafeLine.visible = true;
+  }
+
+  /**
+   * The overlay a targeting officer would draw for a beam from orbit: the
+   * aperture at the start (four corner brackets about a cross, the sensor's
+   * own frame), the path as a ribbon with range ticks every ten metres and
+   * a longer one every fifty, chevrons flowing the way the beam will walk,
+   * a stop bar across the end and a second bar when the budget is spent.
+   * The same ink and outline meshes as the gun run, so it reads the same
+   * way over anything, and the same pixel floor.
+   */
+  _drawBeamPath() {
+    const P = this._beamPath;
+    if (!P) return;
+    const ink = [], line = [];
+    const T = this.terrain;
+    const segW = (out, ax, az, bx, bz, w) => {
+      let px = -(bz - az), pz = bx - ax;
+      const pl = Math.hypot(px, pz) || 1;
+      px = px / pl * w / 2; pz = pz / pl * w / 2;
+      const ay = T.heightAt(ax, az) + 0.8, by = T.heightAt(bx, bz) + 0.8;
+      out.push(ax + px, ay, az + pz, ax - px, ay, az - pz, bx + px, by, bz + pz,
+        bx + px, by, bz + pz, ax - px, ay, az - pz, bx - px, by, bz - pz);
+    };
+    const cam = this.camera;
+    const ref = P.pts.length ? P.pts[P.pts.length >> 1] : P.start;
+    if (!ref) return;
+    const d = Math.hypot(cam.position.x - ref.x, cam.position.y - ref.y, cam.position.z - ref.z);
+    const perPx = 2 * d * Math.tan((cam.fov || 50) * Math.PI / 360) / Math.max(1, window.innerHeight || 720);
+    const k = Math.max(1, 2 * perPx / 0.9);
+    const both = (ax, az, bx, bz, w) => { segW(ink, ax, az, bx, bz, w * k); segW(line, ax, az, bx, bz, (w + 1.6) * k); };
+    // The point and the heading `s` metres along the path.
+    const at = (s) => {
+      const c = P.cum, n = c.length;
+      let i = 1; while (i < n - 1 && c[i] < s) i++;
+      const a = P.pts[i - 1], b = P.pts[i];
+      const t = c[i] > c[i - 1] ? (s - c[i - 1]) / (c[i] - c[i - 1]) : 0;
+      let dx = b.x - a.x, dz = b.z - a.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+      return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, dx, dz };
+    };
+    // The aperture at the start: brackets at the corners of a square,
+    // seven metres a side, and a cross at the middle that the beam lands on.
+    const S = P.start;
+    if (S) {
+      const h = 7, l = 2.6;
+      for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        both(S.x + sx * h, S.z + sz * h, S.x + sx * (h - l), S.z + sz * h, 1.0);
+        both(S.x + sx * h, S.z + sz * h, S.x + sx * h, S.z + sz * (h - l), 1.0);
+      }
+      both(S.x - 2.2, S.z, S.x + 2.2, S.z, 0.9);
+      both(S.x, S.z - 2.2, S.x, S.z + 2.2, 0.9);
+      // The square's sides, dashed: the sensor's frame.
+      const spin = ((this.elapsed || 0) * 6) % 4;
+      for (let u = -h + 1.5 + spin; u < h - 2.5; u += 4) {
+        both(S.x + u, S.z - h, S.x + u + 1.6, S.z - h, 0.7);
+        both(S.x + u, S.z + h, S.x + u + 1.6, S.z + h, 0.7);
+        both(S.x - h, S.z + u, S.x - h, S.z + u + 1.6, 0.7);
+        both(S.x + h, S.z + u, S.x + h, S.z + u + 1.6, 0.7);
+      }
+    }
+    if (P.pts.length < 2) { this._put(ink, line); return; }
+    // The ribbon.
+    for (let i = 1; i < P.pts.length; i++) both(P.pts[i - 1].x, P.pts[i - 1].z, P.pts[i].x, P.pts[i].z, 1.1);
+    // Range ticks: ten metres, and a long one every fifty.
+    for (let u = 10; u < P.len - 1; u += 10) {
+      const q = at(u), big = u % 50 === 0, w = big ? 4.2 : 2.2;
+      both(q.x - q.dz * w, q.z + q.dx * w, q.x + q.dz * w, q.z - q.dx * w, big ? 1.2 : 0.8);
+    }
+    // Chevrons flowing the way the beam walks.
+    const phase = ((this.elapsed || 0) * 18) % 24;
+    for (let u = 8 + phase; u < P.len - 4; u += 24) {
+      const q = at(u);
+      both(q.x - q.dx * 4 - q.dz * 3, q.z - q.dz * 4 + q.dx * 3, q.x, q.z, 1.0);
+      both(q.x - q.dx * 4 + q.dz * 3, q.z - q.dz * 4 - q.dx * 3, q.x, q.z, 1.0);
+    }
+    // The stop bar across the end; doubled when the budget is spent.
+    const e = at(P.len);
+    both(e.x - e.dz * 5, e.z + e.dx * 5, e.x + e.dz * 5, e.z - e.dx * 5, 1.6);
+    if (P.capped) both(e.x - e.dx * 2.4 - e.dz * 5, e.z - e.dz * 2.4 + e.dx * 5, e.x - e.dx * 2.4 + e.dz * 5, e.z - e.dz * 2.4 - e.dx * 5, 1.6);
+    this._put(ink, line);
+  }
+
+  _put(ink, line) {
+    const put = (mesh, arr) => {
+      const at = mesh.geometry.attributes.position;
+      const n = Math.min(arr.length, at.array.length);
+      at.array.set(arr.length > at.array.length ? arr.slice(0, n) : arr);
+      at.needsUpdate = true;
+      mesh.geometry.setDrawRange(0, n / 3);
+    };
+    put(this._strafeInk, ink);
+    put(this._strafeOutline, line);
   }
 
   /**
@@ -1677,6 +1837,7 @@ export class Battle {
 
   /** Lay the gun-run overlay's ribbons down for the current line and moment. */
   _drawStrafe() {
+    if (this._beamPath) { this._drawBeamPath(); return; }
     const A = this._strafeArgs;
     if (!A) return;
     const { x: x0, z: z0, dx, dz, len } = A;
@@ -2327,11 +2488,16 @@ export class Battle {
     // takes it (a tap is the default line through the point, away from the
     // camera), and the beam is on it a second later.
     if (def.strike.beam) {
-      const L = this.strikeLine(point, opts.to || null, def);
-      const beam = this.orbital.call(def, L.from, L.to);
+      // The path the finger drew (`opts.path`), or the gun run's straight
+      // line from a tap or a `to`.
+      let P;
+      if (opts.path && opts.path.length) P = this.beamPath(opts.path, def);
+      else { const L = this.strikeLine(point, opts.to || null, def); P = this._densify([L.from, L.to], def.strike.maxLen, def.strike.minLen, false); }
+      if (!P || P.pts.length < 2) return null;
+      const beam = this.orbital.call(def, P);
       this.shotsFired++;
       this.selectedUnitId = null;
-      this.onEvent('strike', { def, point: L.from.clone(), eta: def.strike.beam.charge, beam: true, to: L.to.clone() });
+      this.onEvent('strike', { def, point: P.pts[0].clone(), eta: def.strike.beam.charge, beam: true, to: P.pts[P.pts.length - 1].clone() });
       return beam;
     }
     const at = point.clone();

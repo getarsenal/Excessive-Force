@@ -937,7 +937,7 @@ async function boot() {
       // what the player wants next is the map it was standing over.
       if (battle.selectedUnitId) hud.closeDrawer();
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike?.strafe) hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and drag the line the beam will walk' : 'press and drag along the line to strafe', 4);
+      else if (UNITS_BY_ID[id].strike?.strafe) hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and draw the path the beam will walk' : 'press and drag along the line to strafe', 4);
       else if (UNITS_BY_ID[id].strike) hud.status('drag to aim the strike', 4);
       else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
@@ -2867,7 +2867,13 @@ async function boot() {
     if (!def || livePointers.size > 1) return;
     const hit = pick(e.clientX, e.clientY, !!def.strike);
     if (!hit) return;
-    if (def.strike?.strafe) {
+    if (def.strike?.beam) {
+      // The beam walks whatever the finger draws: down where it lands, the
+      // path from there.
+      const at = hit.point.clone();
+      aiming = { kind: 'beam', def, at, points: [at] };
+      battle.showBeamPath(aiming.points, def);
+    } else if (def.strike?.strafe) {
       // A gun run is a line: down where the stream starts, drag along it.
       const at = hit.point.clone();
       aiming = { kind: 'strafe', def, at, to: at.clone() };
@@ -2911,6 +2917,11 @@ async function boot() {
       if (a.kind === 'strafe') {
         battle.hideStrikeAim();
         if (battle.state === 'playing') battle.callStrike(battle.selectedUnitId, a.at, { to: a.to });
+        return;
+      }
+      if (a.kind === 'beam') {
+        battle.hideStrikeAim();
+        if (battle.state === 'playing') battle.callStrike(battle.selectedUnitId, a.at, { path: a.points });
         return;
       }
       if (a.kind === 'line') {
@@ -3008,11 +3019,19 @@ async function boot() {
       if (livePointers.size > 1) { endAiming(); return; }
       const hit = pickMoving(e.clientX, e.clientY, aiming.kind === 'strike');
       if (!hit) return;
+      if (aiming.kind === 'beam') {
+        const last = aiming.points[aiming.points.length - 1];
+        if (Math.hypot(hit.point.x - last.x, hit.point.z - last.z) >= 2) aiming.points.push(hit.point.clone());
+        battle.showBeamPath(aiming.points, aiming.def);
+        const P = battle._beamPath, st = aiming.def.strike;
+        hud.status(!P || P.len < 1 ? 'draw the path the beam will walk' : `BEAM PATH · ${Math.round(P.len)} m${P.capped ? ' · FULL' : ` of ${st.maxLen}`} · ${st.beam.walk} s`, 1.2);
+        return;
+      }
       if (aiming.kind === 'strafe') {
         aiming.to = hit.point.clone();
         battle.showStrafe(aiming.at, aiming.to, aiming.def);
         const len = Math.hypot(aiming.to.x - aiming.at.x, aiming.to.z - aiming.at.z);
-        hud.status(len < 12 ? (aiming.def.strike.beam ? 'drag the line the beam will walk' : 'drag along the line to strafe') : `${aiming.def.strike.beam ? 'BEAM' : 'GUN RUN'} · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
+        hud.status(len < 12 ? (aiming.def.strike.beam ? 'draw the path the beam will walk' : 'drag along the line to strafe') : `${aiming.def.strike.beam ? 'BEAM' : 'GUN RUN'} · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
         return;
       }
       if (aiming.kind === 'strike') {
@@ -3055,6 +3074,7 @@ async function boot() {
       battle.rangeRing.visible = false;
       if (!hit) { battle.hideStrikeAim(); return; }
       // A gun run previews the default line through the point.
+      if (def.strike.beam) { battle.showBeamPath([hit.point], def); return; }
       if (def.strike.strafe) { battle.showStrafe(hit.point, hit.point, def); return; }
       battle.showStrikeAim(hit.kind === 'defender' ? hit.defender.pos : hit.point, def);
       return;
@@ -3130,7 +3150,7 @@ async function boot() {
       const row = (e.shiftKey || hud.openDrawer === 'strikes') ? hud.bars.strikes : hud.bars.units;
       const id = row[n - 1];
       if (id && battle.selectUnit(id)) {
-        hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and drag the line the beam will walk'
+        hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and draw the path the beam will walk'
           : UNITS_BY_ID[id].strike?.strafe ? 'press and drag along the line to strafe'
           : UNITS_BY_ID[id].strike ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
       }

@@ -30,7 +30,9 @@ for (const kind of ['laser', 'lance']) {
     const sx = -dz / l, sz = dx / l;
     const from = new T.Vector3(o.x - sx * 40, 0, o.z - sz * 40), to = new T.Vector3(o.x + sx * 40, 0, o.z + sz * 40);
     from.y = window.terrain.heightAt(from.x, from.z); to.y = window.terrain.heightAt(to.x, to.z);
-    const beam = B.callStrike(kind, from, { to });
+    // Drawn, not straight: a hook through the foot, out and back round.
+    const mid = new T.Vector3(o.x + dz / l * 30, 0, o.z - dx / l * 30);
+    const beam = B.callStrike(kind, from, { path: [from, mid, to] });
     if (!beam) return { kind, error: 'not called' };
     const foot0 = beam.foot.clone();
     let t = 0, peakY = -1e9;
@@ -54,7 +56,8 @@ if (SHOT) {
     document.getElementById('ui').style.visibility = 'hidden';
     const from = new T.Vector3(o.x + 60, 0, o.z - 40), to = new T.Vector3(o.x + 60, 0, o.z + 60);
     from.y = window.terrain.heightAt(from.x, from.z); to.y = window.terrain.heightAt(to.x, to.z);
-    const beam = B.callStrike('lance', from, { to });
+    const mid = new T.Vector3(o.x + 95, 0, o.z + 10);
+    const beam = B.callStrike('lance', from, { path: [from, mid, to] });
     window.__laserBeam = beam;
     let t = 0; while (t < beam.charge + beam.B.walk * 0.4) { window.__fastForward(0.1, 1 / 60); t += 0.1; }
   });

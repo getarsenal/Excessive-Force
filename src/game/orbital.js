@@ -123,9 +123,14 @@ export class Orbital {
     this._ember = new THREE.Color(0xffb060);
   }
 
-  /** The beam called on the line `from`→`to` (already clamped by the caller). */
-  call(def, from, to) {
+  /**
+   * The beam called down a path: `{pts, cum, len}` from `battle.beamPath`,
+   * points along the drawing with their distance from its start, walked at
+   * one speed over `walk` seconds whatever its shape.
+   */
+  call(def, path) {
     const B = def.strike.beam;
+    const from = path.pts[0], to = path.pts[path.pts.length - 1];
     const g = new THREE.Group();
     const core = column(B.width * 7);
     g.add(core);
@@ -146,7 +151,7 @@ export class Orbital {
     core.visible = flare.visible = false;
     this.scene.add(g);
     const b = {
-      def, B, from: from.clone(), to: to.clone(), t: 0, done: false,
+      def, B, path, from: from.clone(), to: to.clone(), t: 0, done: false,
       foot: from.clone(), group: g, core, flare, mark,
       charge: B.charge, dur: B.charge + B.walk + B.hold, nextBite: B.charge, bites: 0,
       sound: null, seed: Math.random() * 100, lit: false,
@@ -158,9 +163,13 @@ export class Orbital {
     return b;
   }
 
-  /** The point `u` of the way down the line, on the first thing under the sky there. */
+  /** The point `u` of the way down the path, on the first thing under the sky there. */
   _placeFoot(b, u) {
-    const x = b.from.x + (b.to.x - b.from.x) * u, z = b.from.z + (b.to.z - b.from.z) * u;
+    const P = b.path, s = u * P.len, c = P.cum;
+    let i = 1; while (i < c.length - 1 && c[i] < s) i++;
+    const pa = P.pts[i - 1], pb = P.pts[i] || pa;
+    const t = c[i] > c[i - 1] ? Math.min(1, Math.max(0, (s - c[i - 1]) / (c[i] - c[i - 1]))) : 0;
+    const x = pa.x + (pb.x - pa.x) * t, z = pa.z + (pb.z - pa.z) * t;
     const gy = this.terrain.heightAt(x, z);
     let y = gy, built = false;
     if (this.physics && this.physics.castRay) {
