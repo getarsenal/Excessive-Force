@@ -19,7 +19,7 @@ page.on('pageerror', (e) => console.log('[PAGEERROR]', e.message.slice(0, 250)))
 await page.addInitScript(() => { try {
   localStorage.setItem('tt.quality', 'medium'); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); } catch {} });
-await page.goto(`http://localhost:5177/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${process.env.TT_PORT || 5177}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none',
   null, { timeout: 400000 });
 await page.evaluate(() => window.hud.setClearView(true));

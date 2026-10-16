@@ -304,6 +304,7 @@ export function realNetwork(data, terrain, opts = {}) {
   // one onto the other, and the two become the same road. Welding again after
   // each pass, because a snapped junction has moved.
   let welded = 0, snapped = 0;
+  WELDS.length = 0;
   for (let pass = 0; pass < 3; pass++) {
     welded += weldJunctions(nodes, edges);
     dedupeEdges(nodes, edges, terrain);
@@ -365,7 +366,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
+      welded, snapped, welds: WELDS.slice(), ...ends, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -870,6 +871,9 @@ function thinLadders(nodes, edges) {
  * met any member now meets it, and the roads that only ran between members
  * — the ten-metre links across the central reservation — are gone.
  */
+/** Every weld of the current build, for the probes: where, how far apart, the threshold. */
+export const WELDS = [];
+
 function weldJunctions(nodes, edges) {
   const live = [];
   for (let i = 0; i < nodes.length; i++) if (nodes[i].links.length) live.push(i);
@@ -925,6 +929,7 @@ function weldJunctions(nodes, edges) {
           const root = Math.min(ri, rj), other = Math.max(ri, rj);
           parent.set(other, root);
           box.set(root, { x0, x1, z0, z1, r });
+          WELDS.push({ x: Math.round((n.x + m.x) / 2), z: Math.round((n.z + m.z) / 2), d: Math.round(d), at: Math.round(weldAt(i, j)), arms: n.links.length + m.links.length });
           welds++;
         }
       }

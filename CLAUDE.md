@@ -456,10 +456,13 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   close); the studio's FOLLOW takes THE BEAM.
 - The street plan's templates, agreed with the owner in October 2026 and
   built in `src/world/streets.js` and `realstreets.js`: a junction of five
-  arms or more, or with two arms closer than fifty degrees, is a
-  **roundabout** (`roundaboutRadius`: a paved disc the arms stop at, a ring
-  of pavement with its kerb between the arms, an island from thirteen
-  metres; two that would touch are welded into one, `weldRoundabouts`);
+  arms or more, or of four roads (street or wider, no lane among them)
+  with two closer than fifty degrees, is a **roundabout**
+  (`roundaboutRadius`: a paved disc the arms stop at, a ring of pavement
+  with its kerb between the arms, an island from thirteen metres; two that
+  would touch are welded into one, `weldRoundabouts`; a three-arm fork is
+  never one, and a lane joining an avenue at forty degrees at Chichen Itza
+  drew forty metres of black over the village);
   two carriageways side by side are **one divided road** (`mergeDuals`:
   the longer kept one class up, two avenues a `boulevard` with a kerbed
   median band, two streets an avenue, laid down the middle of the pair,
@@ -472,7 +475,13 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   and the ground is **benched** under every surveyed street (main.js,
   `terrain.benchRoads`, a four-metre shoulder) so nothing rises through a
   road. `node tools/roadview.mjs <level> <out> [dist] [x] [z]` looks
-  straight down at a spot.
+  straight down at a spot (`TT_PORT=5178` against an old build); the
+  network's `debug.welds` lists every junction weld of the build, where,
+  how far apart and the threshold, which is how a moved junction is found.
+  The suite's "square to its street" test measures the typical building
+  against the nearest road and allows twenty-five degrees: a village of
+  huts off a track reads twenty-two once two of the track's junctions
+  weld, and that is the village, not a survey error.
 - The street plan's hand fixes: `src/world/streetfixes.js` (`STREET_FIXES`
   by level id: `drop` a road at a point, `narrow` it a class, `weld` the
   junctions within a radius into one), applied after the automatic passes;

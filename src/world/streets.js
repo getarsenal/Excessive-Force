@@ -977,7 +977,17 @@ function pointSeg(x, z, a, b) {
  */
 export function roundaboutRadius(node) {
   const n = node.links.length;
-  if (n < 3) return 0;
+  // A fork of three arms is a fork, however close two of them run: a
+  // roundabout wants four arms with two closer than fifty degrees, or five.
+  // And it is a thing built for roads: two tracks meeting a lane in the
+  // Yucatán scrub made a roundabout, which then welded with the junction
+  // beside it and turned the whole village off its own street.
+  if (n < 4) return 0;
+  if (!node.links.some((l) => (KIND_RANK[l.edge.cls] || 0) >= KIND_RANK.street)) return 0;
+  // Four arms make one only when all four are roads: a lane joining an
+  // avenue's junction at forty degrees is a lane, and the disc drawn for it
+  // was forty metres of black over a Yucatán village.
+  if (n < 5 && node.links.some((l) => (KIND_RANK[l.edge.cls] || 0) < KIND_RANK.street)) return 0;
   let maxHalf = 0;
   const angs = node.links.map((l) => { const d = linkDir(node, l); maxHalf = Math.max(maxHalf, halfWidth(l.edge.cls)); return Math.atan2(d.z, d.x); }).sort((a, b) => a - b);
   let minSep = Math.PI * 2;
