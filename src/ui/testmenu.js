@@ -2323,13 +2323,24 @@ export class TestMenu {
         // a boat on dry land.
         if (life && life.channels === 0) return 'the water reaches the edge but no channel of it is navigable; no fleet';
         assert(was.length >= 1, 'there is a river but nothing is on it');
-        for (let k = 0; k < 10; k++) life.update(0.1);
-        const now = read();
+        // Distance made good step by step, not the net displacement over the
+        // second: a boat at the end of its channel turns about, and one that
+        // happened to be turning as the test ran came back to where it
+        // started and read as adrift at 0.0 m/s (Red Fort, October 2026).
+        const run = was.map(() => 0);
+        let prev = was;
+        for (let k = 0; k < 10; k++) {
+          life.update(0.1);
+          const now = read();
+          for (let i = 0; i < Math.min(prev.length, now.length); i++) {
+            run[i] += Math.hypot(now[i][0] - prev[i][0], now[i][1] - prev[i][1]);
+          }
+          prev = now;
+        }
         let fastest = 0, slowest = Infinity;
-        for (let i = 0; i < Math.min(was.length, now.length); i++) {
-          const v = Math.hypot(now[i][0] - was[i][0], now[i][1] - was[i][1]);
-          fastest = Math.max(fastest, v);
-          slowest = Math.min(slowest, v);
+        for (let i = 0; i < Math.min(was.length, prev.length); i++) {
+          fastest = Math.max(fastest, run[i]);
+          slowest = Math.min(slowest, run[i]);
         }
         assert(fastest < 9,
           `a boat is doing ${fastest.toFixed(1)} m/s — about ${Math.round(fastest * 1.94)} knots`);

@@ -279,6 +279,9 @@ export class Terrain {
       const w = 1 - u * u * (3 - 2 * u);
       if (w <= 0) continue;
       const was = h[k];
+      // Never out of the water: a road along a bank benched with its
+      // shoulder lifted the riverbed beside it, and a boat lane ran aground.
+      if (was < this.waterLevel + 0.3 && top[k] > was) continue;
       h[k] = was + (top[k] - was) * w;
       moved = Math.max(moved, Math.abs(h[k] - was));
     }
