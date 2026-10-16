@@ -454,6 +454,25 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   calls both on a line through the landmark's foot and prints bites,
   stones and men (`SHOT=1` photographs the LANCE on open ground, wide and
   close); the studio's FOLLOW takes THE BEAM.
+- The street plan's templates, agreed with the owner in October 2026 and
+  built in `src/world/streets.js` and `realstreets.js`: a junction of five
+  arms or more, or with two arms closer than fifty degrees, is a
+  **roundabout** (`roundaboutRadius`: a paved disc the arms stop at, a ring
+  of pavement with its kerb between the arms, an island from thirteen
+  metres; two that would touch are welded into one, `weldRoundabouts`);
+  two carriageways side by side are **one divided road** (`mergeDuals`:
+  the longer kept one class up, two avenues a `boulevard` with a kerbed
+  median band, two streets an avenue, laid down the middle of the pair,
+  the other dropped and its junctions snapped onto it); pavements **wrap**
+  every ordinary junction with kerb returns (`junctionRing`, its clamp 1.2
+  of the pad radius); a **dry bridge is a flyover** (`dropDryFlyovers`:
+  not built where surface roads run alongside, a plain road otherwise);
+  arms within fourteen degrees at a junction lose the shorter
+  (`dropFolds`); junctions closer than the sum of their half-widths weld;
+  and the ground is **benched** under every surveyed street (main.js,
+  `terrain.benchRoads`, a four-metre shoulder) so nothing rises through a
+  road. `node tools/roadview.mjs <level> <out> [dist] [x] [z]` looks
+  straight down at a spot.
 - The street plan's hand fixes: `src/world/streetfixes.js` (`STREET_FIXES`
   by level id: `drop` a road at a point, `narrow` it a class, `weld` the
   junctions within a radius into one), applied after the automatic passes;

@@ -25,7 +25,7 @@ for (const level of levels) {
   const r = await page.evaluate(() => {
     const net = window.cityGroup.userData.network, T = window.terrain;
     const plots = window.cityGroup.userData.plots || [];
-    const W = { avenue: 13 / 2 + 4.4 + 0.8, street: 8.8 / 2 + 3.2 + 0.6, mews: 3 + 1.9 + 0.45 };
+    const W = { boulevard: 21 / 2 + 4.4 + 0.8, avenue: 13 / 2 + 4.4 + 0.8, street: 8.8 / 2 + 3.2 + 0.6, mews: 3 + 1.9 + 0.45 };
     const segs = [];
     net.edges.forEach((e, ei) => {
       for (let i = 0; i + 1 < e.pts.length; i++) {

@@ -35,13 +35,16 @@ import { carParts, pickShape } from './carkit.js';
 
 /** Road classes, in metres. The hierarchy is most of what makes a plan legible. */
 export const ROAD_CLASS = {
+  // A divided road: two carriageways the survey drew as two roads, built as
+  // one with a kerbed median down the middle (realstreets.js `mergeDuals`).
+  boulevard: { road: 21.0, pave: 4.4, kerb: 0.8, dashes: true, trees: true, lamp: 24, median: 3.2 },
   avenue: { road: 13.0, pave: 4.4, kerb: 0.8, dashes: true, trees: true, lamp: 24 },
   street: { road: 8.8, pave: 3.2, kerb: 0.6, dashes: false, trees: false, lamp: 30 },
   mews: { road: 6.0, pave: 1.9, kerb: 0.45, dashes: false, trees: false, lamp: 46 },
 };
 
 /** Which class outranks which, for merging two pieces of the same road. */
-const KIND_RANK = { avenue: 3, street: 2, mews: 1 };
+const KIND_RANK = { boulevard: 4, avenue: 3, street: 2, mews: 1 };
 
 export function halfWidth(cls) {
   const c = ROAD_CLASS[cls];
@@ -961,7 +964,35 @@ function pointSeg(x, z, a, b) {
  * end and the gap filled with a triangle — a road stopping in a spike, with a
  * hole behind it that buildings and ground cover were also told to keep out of.
  */
+/**
+ * A junction built as a roundabout: a paved disc the arms run into, a ring
+ * of pavement between them, and an island in the middle when there is room.
+ *
+ * Five arms or more, or any two arms coming in closer than fifty degrees
+ * apart, and the kerb-crossing geometry below has no good answer: the
+ * corner between two arms that close is swept out to its clamp and the pad
+ * draws as a black fan with notches in it. A disc is always clean, and most
+ * of these junctions in Delhi, Paris and Moscow are roundabouts in fact.
+ * Returns the disc's radius, or 0 for a junction built the ordinary way.
+ */
+export function roundaboutRadius(node) {
+  const n = node.links.length;
+  if (n < 3) return 0;
+  let maxHalf = 0;
+  const angs = node.links.map((l) => { const d = linkDir(node, l); maxHalf = Math.max(maxHalf, halfWidth(l.edge.cls)); return Math.atan2(d.z, d.x); }).sort((a, b) => a - b);
+  let minSep = Math.PI * 2;
+  for (let i = 0; i < n; i++) {
+    let d = angs[(i + 1) % n] - angs[i];
+    if (d <= 0) d += Math.PI * 2;
+    minSep = Math.min(minSep, d);
+  }
+  if (n < 5 && minSep >= 0.87) return 0;
+  return Math.min(24, Math.max(11, maxHalf * 1.35 + 1.5 * n));
+}
+
 export function padRadius(node) {
+  const rb = roundaboutRadius(node);
+  if (rb) return rb;
   // Two arms is a point in the middle of a street, not a junction — the pad is
   // built from where neighbouring arms' kerb lines cross, and two arms that
   // carry on through have no crossing. Trimming the ribbons back for one is how
@@ -1191,7 +1222,15 @@ export function buildStreetSurface(net, terrain, quality) {
   // ── Ribbons.
   for (const e of net.edges) {
     const c = ROAD_CLASS[e.cls];
-    const lanes = [
+    const lanes = c.median ? [
+      [-c.road / 2 - c.pave - c.kerb, -c.road / 2 - c.pave, KERB],
+      [-c.road / 2 - c.pave, -c.road / 2, PAVE],
+      [-c.road / 2, -c.median / 2, ASPHALT],
+      [-c.median / 2, -c.median / 2 + 0.4, KERB],
+      [-c.median / 2 + 0.4, c.median / 2 - 0.4, PAVE],
+      [c.median / 2 - 0.4, c.median / 2, KERB],
+      [c.median / 2, c.road / 2, ASPHALT],
+    ] : [
       [-c.road / 2 - c.pave - c.kerb, -c.road / 2 - c.pave, KERB],
       [-c.road / 2 - c.pave, -c.road / 2, PAVE],
       [-c.road / 2, c.road / 2, ASPHALT],
@@ -1332,6 +1371,8 @@ export function buildStreetSurface(net, terrain, quality) {
     // Nothing to pave where the road simply carries on; `padRadius` says so.
     if (padRadius(n) <= 0) continue;
     const y = n.y + LIFT;
+    const rb = roundaboutRadius(n);
+    if (rb) { roundabout(n, rb, y, vert, dry); continue; }
     // Star-shaped around the node, so a fan from the centre triangulates it.
     fan(junctionRing(n, (a) => a.full), n, y, PAVE, vert, dry);
     fan(junctionRing(n, (a) => a.road), n, y + 0.03, ASPHALT, vert, dry);
@@ -1515,6 +1556,54 @@ function fan(ring, n, y, colour, vert, dry) {
     vert(n.x, n.z, y, colour);
     vert(p.x, p.z, y, colour);
     vert(q.x, q.z, y, colour);
+  }
+}
+
+/**
+ * The roundabout: an asphalt disc of radius `R`, a pavement ring with its
+ * kerb round it broken where each arm's carriageway comes in (the arm's
+ * own pavements meet the ring's ends), and, from thirteen metres, a kerbed
+ * island in the middle. The arms' ribbons stop at the disc (`padRadius`).
+ */
+function roundabout(n, R, y, vert, dry) {
+  const pave = 3.2, kerb = 0.6;
+  const disc = [];
+  for (let k = 0; k < 40; k++) { const a = (k / 40) * Math.PI * 2; disc.push({ x: n.x + Math.cos(a) * R, z: n.z + Math.sin(a) * R }); }
+  fan(disc, n, y + 0.03, ASPHALT, vert, dry);
+  // The arms, by bearing, each with the half-angle its carriageway takes up
+  // at the disc's edge.
+  const arms = n.links.map((l) => {
+    const d = linkDir(n, l), c = ROAD_CLASS[l.edge.cls];
+    return { ang: Math.atan2(d.z, d.x), half: Math.asin(Math.min(0.95, (c.road / 2 + 0.3) / R)) };
+  }).sort((a, b) => a.ang - b.ang);
+  const band = (a0, a1, r0, r1, colour, yy) => {
+    let d = a1 - a0;
+    while (d < 0) d += Math.PI * 2;
+    const steps = Math.max(2, Math.ceil(d / 0.2));
+    for (let k = 0; k < steps; k++) {
+      const b0 = a0 + (d * k) / steps, b1 = a0 + (d * (k + 1)) / steps;
+      const p0 = { x: n.x + Math.cos(b0) * r0, z: n.z + Math.sin(b0) * r0 }, p1 = { x: n.x + Math.cos(b1) * r0, z: n.z + Math.sin(b1) * r0 };
+      const p2 = { x: n.x + Math.cos(b1) * r1, z: n.z + Math.sin(b1) * r1 }, p3 = { x: n.x + Math.cos(b0) * r1, z: n.z + Math.sin(b0) * r1 };
+      if (dry && (!dry(p0) || !dry(p1) || !dry(p2) || !dry(p3))) continue;
+      vert(p0.x, p0.z, yy, colour); vert(p1.x, p1.z, yy, colour); vert(p2.x, p2.z, yy, colour);
+      vert(p0.x, p0.z, yy, colour); vert(p2.x, p2.z, yy, colour); vert(p3.x, p3.z, yy, colour);
+    }
+  };
+  for (let i = 0; i < arms.length; i++) {
+    const a = arms[i], b = arms[(i + 1) % arms.length];
+    let from = a.ang + a.half, to = b.ang - b.half;
+    let span = to - from;
+    while (span < 0) span += Math.PI * 2;
+    if (span < 0.05 || span > Math.PI * 2 - 0.05) continue;
+    band(from, from + span, R - 0.3, R + pave, PAVE, y + 0.04);
+    band(from, from + span, R + pave, R + pave + kerb, KERB, y + 0.04);
+  }
+  if (R >= 13) {
+    const Ri = R * 0.45;
+    band(0, Math.PI * 2 - 1e-6, Ri - kerb, Ri, KERB, y + 0.07);
+    const island = [];
+    for (let k = 0; k < 32; k++) { const a = (k / 32) * Math.PI * 2; island.push({ x: n.x + Math.cos(a) * (Ri - kerb), z: n.z + Math.sin(a) * (Ri - kerb) }); }
+    fan(island, n, y + 0.06, PAVE, vert, dry);
   }
 }
 

@@ -315,9 +315,18 @@ async function boot() {
   // the masonry, the mesh, the collider and the streets all read the ground
   // with the bench in it. Only where a level lays a road up its own slope.
   const cityLoad = loadCity(level.terrain);
-  if (level.road) {
-    const moved = terrain.benchRoads(benchLines(level.road, await cityLoad, terrain));
-    console.log(`[tumble] road benched into the hillside, up to ${moved.toFixed(1)} m of cut and fill`);
+  // And every surveyed street, on every level: a ribbon laid at the ground's
+  // height at its vertices had the ground between them rising through it
+  // wherever the ground was not flat, which read as earth lying on the road.
+  // Benched, the ground under a road is the road's own surface across its
+  // width, with a shoulder ramping to the land either side.
+  {
+    const city = await cityLoad;
+    const surveyed = !!(city && city.roads && Array.isArray(city.roads.edges) && city.roads.edges.length);
+    if (level.road || surveyed) {
+      const moved = terrain.benchRoads(benchLines(level.road, city, terrain), level.road ? 9 : 4);
+      console.log(`[tumble] roads benched into the ground, up to ${moved.toFixed(1)} m of cut and fill`);
+    }
   }
   const specs = level.structures(quality, { terrain });
   const landmarks = specs.map((sp) => {

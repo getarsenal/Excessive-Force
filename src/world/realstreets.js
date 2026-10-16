@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildEdgeIndex, dissolveThroughNodes, halfWidth, GRID_YAW, SURFACE_LIFT }
+import { buildEdgeIndex, dissolveThroughNodes, halfWidth, roundaboutRadius, GRID_YAW, SURFACE_LIFT }
   from './streets.js';
 import { applyStreetFixes } from './streetfixes.js';
 
@@ -331,6 +331,16 @@ export function realNetwork(data, terrain, opts = {}) {
   // with two arms.
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
+  // Two carriageways side by side are one divided road with a median; then
+  // another weld and snap, since the dropped carriageway's junctions now
+  // belong on the one that is left.
+  const duals = mergeDuals(nodes, edges, terrain);
+  if (duals) {
+    weldJunctions(nodes, edges);
+    dedupeEdges(nodes, edges, terrain);
+    snapNodesToRoads(nodes, edges, terrain);
+    dedupeEdges(nodes, edges, terrain);
+  }
   // Parallel lanes closer than their own paving (a bus stand, a market, a
   // car park drawn as rows of service roads) are narrowed to fit between
   // each other, and the owner's own fixes for this level go on last.
@@ -339,6 +349,10 @@ export function realNetwork(data, terrain, opts = {}) {
   if (fixes.drop || fixes.narrow || fixes.weld) dedupeEdges(nodes, edges, terrain);
   const shadowed = dropShadowed(nodes, edges);
   const folds = dropFolds(nodes, edges);
+  // Two junctions that would each be built as a roundabout, close enough
+  // for the discs to touch, are one roundabout.
+  const rounds = weldRoundabouts(nodes, edges, terrain);
+  if (rounds) dedupeEdges(nodes, edges, terrain);
   const more = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
   ends.joined += more.joined; ends.pruned += more.pruned;
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
@@ -351,7 +365,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, shadowed, ladders, folds, flyovers, fixes, wetCut, bridges: bridges.length },
+      welded, snapped, ...ends, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -407,7 +421,7 @@ function cutWet(nodes, edges, terrain) {
   return cut;
 }
 
-const RANK = { avenue: 3, street: 2, mews: 1 };
+const RANK = { boulevard: 4, avenue: 3, street: 2, mews: 1 };
 
 /**
  * A road lying along a bigger one.
@@ -554,6 +568,53 @@ function dropDryFlyovers(nodes, edges, terrain) {
 }
 
 /**
+ * Roundabouts that touch are one roundabout.
+ *
+ * The knot where a flyover came down at the Red Fort was five junctions
+ * fifteen to forty metres apart, three of them with arms close enough to be
+ * built as roundabouts, and three discs of eleven to twenty metres on
+ * centres that near is three rings drawn over each other and over the
+ * streets between. Where two such junctions stand closer than the sum of
+ * their radii they are welded to their centre, every road between them
+ * going, and the one disc takes all the arms. Repeated until nothing
+ * touches.
+ */
+function weldRoundabouts(nodes, edges, terrain) {
+  let welds = 0;
+  for (let pass = 0; pass < 6; pass++) {
+    const rb = new Map();
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].links.length < 3) continue;
+      const r = roundaboutRadius(nodes[i]);
+      if (r) rb.set(i, r);
+    }
+    let did = false;
+    const idx = [...rb.keys()];
+    for (let a = 0; a < idx.length && !did; a++) {
+      for (let b = a + 1; b < idx.length; b++) {
+        const i = idx[a], j = idx[b];
+        const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].z - nodes[j].z);
+        if (d >= rb.get(i) + rb.get(j) + 2) continue;
+        const cx = (nodes[i].x + nodes[j].x) / 2, cz = (nodes[i].z + nodes[j].z) / 2;
+        nodes[i].x = cx; nodes[i].z = cz; nodes[i].y = terrain.heightAt(cx, cz);
+        for (const e of edges) {
+          if (e.a === j) { e.a = i; }
+          if (e.b === j) { e.b = i; }
+          if (e.a === i) e.pts[0] = { x: cx, z: cz, y: nodes[i].y };
+          if (e.b === i) e.pts[e.pts.length - 1] = { x: cx, z: cz, y: nodes[i].y };
+        }
+        for (let k = edges.length - 1; k >= 0; k--) if (edges[k].a === edges[k].b) edges.splice(k, 1);
+        relink(nodes, edges);
+        welds++; did = true;
+        break;
+      }
+    }
+    if (!did) break;
+  }
+  return welds;
+}
+
+/**
  * Folds: two arms leaving a junction within fourteen degrees of each other.
  *
  * That is a slip road, a ramp or a dual carriageway drawn as two roads, and
@@ -602,6 +663,117 @@ function dropFolds(nodes, edges) {
   for (const e of kept) edges.push(e);
   relink(nodes, edges);
   return drop.size;
+}
+
+/**
+ * Duals: two carriageways side by side, built as one divided road.
+ *
+ * The survey draws a dual carriageway as two roads a dozen or twenty metres
+ * apart, and at our widths each gets its own pavements, so the median is two
+ * pavements and two kerbs wide with nothing on it: the "medians" down every
+ * main road. Where exactly two roads of the same class run alongside each
+ * other (within a lane of touching, within twenty-five degrees of parallel,
+ * for more than sixty per cent of the shorter), the longer is kept one class
+ * up (two avenues a boulevard with a kerbed median, two streets an avenue,
+ * two mews a street), laid down the middle of the pair, and the other is
+ * dropped; its junctions are welded and snapped onto the one that is left by
+ * the passes that follow. Three or more alongside are a yard (`thinLadders`).
+ */
+function mergeDuals(nodes, edges, terrain) {
+  const UP = { avenue: 'boulevard', street: 'avenue', mews: 'street' };
+  const C = 24, grid = new Map();
+  const segsOf = new Map();
+  for (const e of edges) {
+    if (e.bridge || e.bank || e.approach || !UP[e.cls]) continue;
+    const list = [];
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const sg = { e, p, q, dx: q.x - p.x, dz: q.z - p.z };
+      list.push(sg);
+      for (let cx = Math.floor(Math.min(p.x, q.x) / C) - 2; cx <= Math.floor(Math.max(p.x, q.x) / C) + 2; cx++) {
+        for (let cz = Math.floor(Math.min(p.z, q.z) / C) - 2; cz <= Math.floor(Math.max(p.z, q.z) / C) + 2; cz++) {
+          const k = cx * 8192 + cz;
+          let a = grid.get(k);
+          if (!a) grid.set(k, a = []);
+          a.push(sg);
+        }
+      }
+    }
+    segsOf.set(e, list);
+  }
+  const lenOf = (e) => { let L = 0; for (let i = 1; i < e.pts.length; i++) L += Math.hypot(e.pts[i].x - e.pts[i - 1].x, e.pts[i].z - e.pts[i - 1].z); return L; };
+  // Signed distance of a point from a segment's line (left positive), and
+  // whether it is within the segment's run.
+  const side = (x, z, sg) => {
+    const L2 = sg.dx * sg.dx + sg.dz * sg.dz || 1;
+    const t = ((x - sg.p.x) * sg.dx + (z - sg.p.z) * sg.dz) / L2;
+    if (t < -0.05 || t > 1.05) return null;
+    const L = Math.sqrt(L2);
+    return (-(sg.dz) * (x - sg.p.x) + sg.dx * (z - sg.p.z)) / L;
+  };
+  // For each road: which others run alongside it, and how much of it they cover.
+  const partners = new Map();
+  for (const e of segsOf.keys()) {
+    const cover = new Map(), offs = new Map();
+    let len = 0;
+    for (const sg of segsOf.get(e)) {
+      const L = Math.hypot(sg.dx, sg.dz);
+      const ux = sg.dx / (L || 1), uz = sg.dz / (L || 1);
+      const n = Math.max(1, Math.round(L / 4));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, x = sg.p.x + sg.dx * t, z = sg.p.z + sg.dz * t;
+        len += L / n;
+        const near = grid.get(Math.floor(x / C) * 8192 + Math.floor(z / C)) || [];
+        let hit = null, hd = Infinity, hs = 0;
+        for (const o of near) {
+          if (o.e === e || o.e.cls !== e.cls) continue;
+          const Lo = Math.hypot(o.dx, o.dz) || 1;
+          if (Math.abs((ux * o.dx + uz * o.dz) / Lo) < 0.9) continue;
+          const sd = side(x, z, o);
+          if (sd === null) continue;
+          const d = Math.abs(sd);
+          if (d < halfWidth(e.cls) + halfWidth(o.e.cls) + 4 && d > 2 && d < hd) { hd = d; hit = o.e; hs = sd; }
+        }
+        if (hit) { cover.set(hit, (cover.get(hit) || 0) + L / n); offs.set(hit, (offs.get(hit) || 0) + hs); }
+      }
+    }
+    partners.set(e, { len, cover, offs });
+  }
+  const drop = new Set();
+  let merged = 0;
+  for (const [e, P] of partners) {
+    if (drop.has(e)) continue;
+    const near = [...P.cover.entries()].filter(([, c]) => c > Math.min(P.len, 1e9) * 0.6);
+    if (near.length !== 1) continue;
+    const [o, c] = near[0];
+    const Q = partners.get(o);
+    if (!Q || drop.has(o)) continue;
+    const back = [...Q.cover.entries()].filter(([, cc]) => cc > Q.len * 0.6);
+    if (back.length !== 1 || back[0][0] !== e) continue;
+    // Both see only each other. The longer stays, up a class, moved half the
+    // mean separation toward the other: the middle of the pair.
+    const keep = lenOf(e) >= lenOf(o) ? e : o, lose = keep === e ? o : e;
+    const K = partners.get(keep);
+    const samples = Math.max(1, Math.round(K.cover.get(lose) / 4));
+    const shift = (K.offs.get(lose) || 0) / samples / 2;
+    for (let i = 0; i < keep.pts.length; i++) {
+      const a = keep.pts[Math.max(0, i - 1)], b = keep.pts[Math.min(keep.pts.length - 1, i + 1)];
+      const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1;
+      // Not the ends: they are junctions, and the snap moves those.
+      if (i === 0 || i === keep.pts.length - 1) continue;
+      keep.pts[i] = { x: keep.pts[i].x + (-dz / L) * shift, z: keep.pts[i].z + (dx / L) * shift, y: 0 };
+      keep.pts[i].y = terrain.heightAt(keep.pts[i].x, keep.pts[i].z);
+    }
+    keep.cls = UP[keep.cls];
+    drop.add(lose);
+    merged++;
+  }
+  if (!drop.size) return 0;
+  const kept = edges.filter((e) => !drop.has(e));
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return merged;
 }
 
 /**
