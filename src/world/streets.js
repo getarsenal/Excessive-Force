@@ -1102,7 +1102,7 @@ export function junctionRing(n, widthOf) {
       const p1 = { x: n.x + na.x * wa, z: n.z + na.z * wa };
       const p2 = { x: n.x - nb.x * wb, z: n.z - nb.z * wb };
       const c = intersect(p1, a.dir, p2, b.dir);
-      const lim = R * 1.4;
+      const lim = R * 1.2;
       if (!c || Math.hypot(c.x - n.x, c.z - n.z) > lim) {
         arc(left, nextRight, Math.max(wa, wb), 4);
         continue;
@@ -1138,7 +1138,7 @@ export function junctionRing(n, widthOf) {
     // sit behind the node or beyond the pad, and no pair can cross. This is
     // the guard that makes the two cases above unable to produce a spike
     // however strangely the streets happen to meet.
-    const lim2 = R * 1.4;
+    const lim2 = R * 1.2;
     for (const q of out) {
       const dx = q.x - n.x, dz = q.z - n.z;
       const r2 = Math.hypot(dx, dz);

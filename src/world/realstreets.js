@@ -312,6 +312,9 @@ export function realNetwork(data, terrain, opts = {}) {
     dedupeEdges(nodes, edges, terrain);
     if (!n && pass > 0) break;
   }
+  // A bridge with no water under it is a flyover, and a flyover laid on the
+  // ground is a road through the roads it was built to pass over.
+  const flyovers = dropDryFlyovers(nodes, edges, terrain);
   landBridges(edges, nodes, terrain);
   // Whole roads before loose ends. A surveyed road arrives in pieces of a few
   // dozen metres, and a dead-end rule applied to pieces eats a long road one
@@ -335,6 +338,7 @@ export function realNetwork(data, terrain, opts = {}) {
   const fixes = applyStreetFixes(opts.levelId, nodes, edges, terrain);
   if (fixes.drop || fixes.narrow || fixes.weld) dedupeEdges(nodes, edges, terrain);
   const shadowed = dropShadowed(nodes, edges);
+  const folds = dropFolds(nodes, edges);
   const more = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
   ends.joined += more.joined; ends.pruned += more.pruned;
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
@@ -347,7 +351,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, shadowed, ladders, fixes, wetCut, bridges: bridges.length },
+      welded, snapped, ...ends, shadowed, ladders, folds, flyovers, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -474,6 +478,133 @@ function dropShadowed(nodes, edges) {
 }
 
 /**
+ * Flyovers: a bridge with no water under it.
+ *
+ * The survey marks an elevated road a bridge, and the game has one way to
+ * build a bridge: a deck with parapets, at the height of the road it joins,
+ * because every bridge it was written for crosses water. A flyover built
+ * that way lies on the ground beside the carriageways it was meant to pass
+ * over, which from above is three parallel roads with pavements between
+ * them where one street should be (Netaji Subhash Marg at the Red Fort),
+ * and from the ground a deck with parapets standing in the dirt.
+ *
+ * So a bridge that is dry end to end comes down. Where surface roads run
+ * alongside it for most of its length it is not built at all: the traffic is
+ * on them. Where nothing runs alongside (a viaduct that is the only road
+ * through, a bridge over a dry bed the DEM never saw) it is built as the
+ * plain road it stands in for, following the ground.
+ */
+function dropDryFlyovers(nodes, edges, terrain) {
+  const dry = (x, z) => !terrain.isWater(x, z) && terrain.heightAt(x, z) > terrain.waterLevel + 0.35;
+  const C = 24, grid = new Map();
+  for (const e of edges) {
+    if (e.bridge || e.approach) continue;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const sg = { e, p, q, dx: q.x - p.x, dz: q.z - p.z };
+      for (let cx = Math.floor(Math.min(p.x, q.x) / C) - 2; cx <= Math.floor(Math.max(p.x, q.x) / C) + 2; cx++) {
+        for (let cz = Math.floor(Math.min(p.z, q.z) / C) - 2; cz <= Math.floor(Math.max(p.z, q.z) / C) + 2; cz++) {
+          const k = cx * 8192 + cz;
+          let a = grid.get(k);
+          if (!a) grid.set(k, a = []);
+          a.push(sg);
+        }
+      }
+    }
+  }
+  const dist = (x, z, sg) => {
+    const L2 = sg.dx * sg.dx + sg.dz * sg.dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - sg.p.x) * sg.dx + (z - sg.p.z) * sg.dz) / L2));
+    return Math.hypot(x - sg.p.x - sg.dx * t, z - sg.p.z - sg.dz * t);
+  };
+  const drop = new Set();
+  let grounded = 0;
+  for (const e of edges) {
+    if (!e.bridge || e.approach) continue;
+    if (!e.pts.every((p) => dry(p.x, p.z))) continue;
+    // How much of it has a surface road alongside, within forty metres and
+    // within twenty-five degrees of parallel.
+    let len = 0, beside = 0;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const L = Math.hypot(q.x - p.x, q.z - p.z);
+      const ux = (q.x - p.x) / (L || 1), uz = (q.z - p.z) / (L || 1);
+      const n = Math.max(1, Math.round(L / 5));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, x = p.x + (q.x - p.x) * t, z = p.z + (q.z - p.z) * t;
+        len += L / n;
+        const near = grid.get(Math.floor(x / C) * 8192 + Math.floor(z / C)) || [];
+        for (const sg of near) {
+          const Ls = Math.hypot(sg.dx, sg.dz) || 1;
+          if (Math.abs((ux * sg.dx + uz * sg.dz) / Ls) < 0.9) continue;
+          if (dist(x, z, sg) < 40) { beside += L / n; break; }
+        }
+      }
+    }
+    if (len > 10 && beside > len * 0.5) drop.add(e);
+    else { e.bridge = false; e.bank = false; grounded++; }
+  }
+  if (drop.size) {
+    const kept = edges.filter((e) => !drop.has(e));
+    edges.length = 0;
+    for (const e of kept) edges.push(e);
+    relink(nodes, edges);
+  }
+  return { dropped: drop.size, grounded };
+}
+
+/**
+ * Folds: two arms leaving a junction within fourteen degrees of each other.
+ *
+ * That is a slip road, a ramp or a dual carriageway drawn as two roads, and
+ * it is the worst input the junction geometry can have: the kerb lines of
+ * two arms that close never cross, so the pad is swept out to its clamp
+ * and the junction draws as a black fan with a notch in it. The generated
+ * plan prunes these (streets.js); the surveyed one did not. The shorter arm
+ * goes, unless it is a bridge or taking it would strand one; the dead-end
+ * pass that follows takes whatever that leaves hanging.
+ */
+function dropFolds(nodes, edges) {
+  const FOLD = Math.cos(14 * Math.PI / 180);
+  const dirOf = (n, l) => {
+    const pts = l.edge.pts, fwd = l.at === 0, m = pts.length;
+    let dx = 0, dz = 0;
+    for (let k = 1; k < m; k++) {
+      const p = pts[fwd ? k : m - 1 - k];
+      dx = p.x - n.x; dz = p.z - n.z;
+      if (dx * dx + dz * dz > 36) break;
+    }
+    const d = Math.hypot(dx, dz) || 1;
+    return { x: dx / d, z: dz / d };
+  };
+  const lenOf = (e) => { let L = 0; for (let i = 1; i < e.pts.length; i++) L += Math.hypot(e.pts[i].x - e.pts[i - 1].x, e.pts[i].z - e.pts[i - 1].z); return L; };
+  const drop = new Set();
+  for (const n of nodes) {
+    if (n.links.length < 2) continue;
+    for (let i = 0; i < n.links.length; i++) {
+      for (let j = i + 1; j < n.links.length; j++) {
+        const ea = n.links[i].edge, eb = n.links[j].edge;
+        if (drop.has(ea) || drop.has(eb) || ea === eb) continue;
+        if (ea.approach || eb.approach) continue;
+        const a = dirOf(n, n.links[i]), b = dirOf(n, n.links[j]);
+        if (a.x * b.x + a.z * b.z < FOLD) continue;
+        if (ea.bridge && eb.bridge) continue;
+        const cand = ea.bridge ? eb : eb.bridge ? ea : (lenOf(ea) <= lenOf(eb) ? ea : eb);
+        const carries = (k) => nodes[k].links.some((l) => l.edge.bridge);
+        if ((carries(cand.a) && nodes[cand.a].links.length < 3) || (carries(cand.b) && nodes[cand.b].links.length < 3)) continue;
+        drop.add(cand);
+      }
+    }
+  }
+  if (!drop.size) return 0;
+  const kept = edges.filter((e) => !drop.has(e));
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return drop.size;
+}
+
+/**
  * Ladders: parallel streets closer together than their own paving.
  *
  * A bus stand, a bazaar, a car park, a depot: the survey draws the rows a
@@ -571,15 +702,18 @@ function weldJunctions(nodes, edges) {
   const live = [];
   for (let i = 0; i < nodes.length; i++) if (nodes[i].links.length) live.push(i);
   // Each junction's half-width: the widest road at it. Two junctions weld when
-  // they are closer than the sum of their half-widths, less a fifth — which is
-  // to say when their paving overlaps. Two avenues: eighteen metres.
+  // they are closer than the sum of their half-widths — which is to say when
+  // their paving overlaps. Two avenues: twenty-three metres. It was less a
+  // fifth, and the pads of two junctions in the gap between (a knot of five
+  // where a flyover came down at the Red Fort, fifteen to forty metres apart)
+  // drew over each other as one black fan with notches in it.
   const reach = new Map();
   for (const i of live) {
     let r = 0;
     for (const l of nodes[i].links) r = Math.max(r, halfWidth(l.edge.cls));
     reach.set(i, r);
   }
-  const weldAt = (i, j) => (reach.get(i) + reach.get(j)) * 0.8;
+  const weldAt = (i, j) => (reach.get(i) + reach.get(j)) * 1.0;
   const parent = new Map(live.map((i) => [i, i]));
   const box = new Map(live.map((i) => [i, {
     x0: nodes[i].x, x1: nodes[i].x, z0: nodes[i].z, z1: nodes[i].z, r: reach.get(i) * 1.6 }]));
