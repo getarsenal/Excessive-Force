@@ -454,6 +454,28 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   calls both on a line through the landmark's foot and prints bites,
   stones and men (`SHOT=1` photographs the LANCE on open ground, wide and
   close); the studio's FOLLOW takes THE BEAM.
+- The street plan's hand fixes: `src/world/streetfixes.js` (`STREET_FIXES`
+  by level id: `drop` a road at a point, `narrow` it a class, `weld` the
+  junctions within a radius into one), applied after the automatic passes;
+  `&xz=1` on the URL prints the ground under every tap as `x, z` on the
+  status line, which is how a fault is named. `thinLadders` in
+  realstreets.js narrows parallel streets closer than their own paving (a
+  bus stand, a market, a car park drawn as rows of service roads: Red
+  Fort's yard west of the fort was one black field), and
+  `node tools/streetaudit.mjs <level>` counts crossings without a
+  junction, roads lying along another, roads through buildings, wet
+  pieces and dead ends, with `--shots DIR` for the worst.
+- The enemy field gun (`fieldGunGeometry`, defenders.js) is a towed gun
+  with its colours baked into the geometry (`tint`; the gun mesh draws
+  vertex colours, its instance colour white). It traverses: the pit's own
+  facing (`d.home`) is the centre of a 220° arc (`GUN_ARC`), the gun slews
+  onto a target at `GUN_SLEW` radians a second and fires when it is on
+  (it used to fire only within the rifleman's arc of wherever it last
+  pointed, so a pit facing away from the battery never fired). A mortar,
+  the player's or the garrison's, is solved by `solveLob` (projectiles.js):
+  the high arc only, never under forty-five degrees; `solveBallistic` falls
+  back to the flat shot when the high arc is long in the air, which at the
+  far end of a mortar's range it always is.
 - `src/game/airframes/` the aircraft, one module each (`geo.js` is the
   loft/surface vocabulary they are built from); the A-10 is still in
   `aircraft.js`. A builder says what an aircraft is made of a part at a

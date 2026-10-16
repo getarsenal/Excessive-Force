@@ -2207,6 +2207,9 @@ async function boot() {
   // tower used to land its points on the tower's face, which is wherever
   // the face happens to project, not where the finger is going.
   const pickGround = (x, y) => picker.pick(x, y, [], null, null, null, true);
+  // `&xz=1` on the URL: the ground under every tap, in the level's metres, on
+  // the status line, for naming a street fault to fix by hand (streetfixes.js).
+  const SHOW_XZ = new URLSearchParams(window.location.search).has('xz');
 
   // Every touch gets an immediate screen-space acknowledgement, before any of
   // the work below decides what the touch meant. Feedback that waits on a
@@ -2861,6 +2864,7 @@ async function boot() {
   };
 
   canvas.addEventListener('pointerdown', (e) => {
+    if (SHOW_XZ) { const g = pickGround(e.clientX, e.clientY); if (g) hud.status(`${Math.round(g.point.x)}, ${Math.round(g.point.z)}`, 8); }
     // The first finger of a new touch, or any mouse press, starts from
     // nothing: whatever is still counted belongs to a gesture that is over.
     if (e.isPrimary || glassEmpty) livePointers.clear();

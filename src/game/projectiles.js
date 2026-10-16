@@ -83,6 +83,43 @@ export function solveArc(from, to, speed, gravity, high = true) {
  *
  * @returns {{vel: THREE.Vector3, speed: number, time: number}|null}
  */
+/**
+ * A mortar's solution: the high arc, and nothing else.
+ *
+ * A mortar has no flat shot in it. The round goes up the tube and comes down
+ * on the point on the charge that makes the arc, and the elevation is never
+ * under forty-five degrees, which is what the high root of the arc gives.
+ * `solveBallistic` was used here and it falls back to the flat shot when the
+ * high arc is too long in the air, which at the far end of a mortar's range
+ * it always is: that was a mortar team firing horizontally. Minimum energy
+ * plus a sixth, as the gun's loft; with `clear` (the caller's masonry test)
+ * the charge walks up until the arc gets out from under whatever the tube
+ * stands in. Returns `{vel, speed, time}` or null when out of range.
+ */
+export function solveLob(from, to, maxSpeed, gravity, clear = null) {
+  const dx = to.x - from.x, dz = to.z - from.z;
+  const d = Math.hypot(dx, dz);
+  const h = to.y - from.y;
+  const vMin = Math.sqrt(Math.max(1, gravity * (h + Math.hypot(h, d))));
+  if (vMin > maxSpeed) return null;
+  const attempt = (speed) => {
+    const vel = solveArc(from, to, speed, gravity, true);
+    if (!vel) return null;
+    const horiz = Math.hypot(vel.x, vel.z);
+    return { vel, speed, time: horiz > 0.01 ? d / horiz : 0 };
+  };
+  let first = null;
+  for (let k = 0; k < 10; k++) {
+    const speed = Math.min(maxSpeed, vMin * (1.16 + k * 0.1));
+    const sol = attempt(speed);
+    if (!sol) continue;
+    if (!first) first = sol;
+    if (!clear || clear(sol.vel)) return sol;
+    if (speed >= maxSpeed) break;
+  }
+  return first;
+}
+
 export function solveBallistic(from, to, maxSpeed, gravity, maxFlight = 8.5,
   clear = null) {
   const dx = to.x - from.x;

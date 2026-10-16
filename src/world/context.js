@@ -174,7 +174,7 @@ export function buildContext(terrain, quality, opts = {}) {
   const city = (opts.city && Array.isArray(opts.city.buildings)
     && opts.city.buildings.length > 0) ? opts.city : null;
   const realNet = city
-    ? realNetwork(city.roads, terrain, { exclude: EXCLUDE, reserved: precinct, road: opts.road })
+    ? realNetwork(city.roads, terrain, { exclude: EXCLUDE, reserved: precinct, road: opts.road, levelId: opts.levelId })
     : null;
 
   /**

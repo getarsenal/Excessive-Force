@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildEdgeIndex, dissolveThroughNodes, halfWidth, GRID_YAW, SURFACE_LIFT }
   from './streets.js';
+import { applyStreetFixes } from './streetfixes.js';
 
 /**
  * The real street plan.
@@ -327,6 +328,12 @@ export function realNetwork(data, terrain, opts = {}) {
   // with two arms.
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
+  // Parallel lanes closer than their own paving (a bus stand, a market, a
+  // car park drawn as rows of service roads) are narrowed to fit between
+  // each other, and the owner's own fixes for this level go on last.
+  const ladders = thinLadders(nodes, edges);
+  const fixes = applyStreetFixes(opts.levelId, nodes, edges, terrain);
+  if (fixes.drop || fixes.narrow || fixes.weld) dedupeEdges(nodes, edges, terrain);
   const shadowed = dropShadowed(nodes, edges);
   const more = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
   ends.joined += more.joined; ends.pruned += more.pruned;
@@ -340,7 +347,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, ...ends, shadowed, wetCut, bridges: bridges.length },
+      welded, snapped, ...ends, shadowed, ladders, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -464,6 +471,79 @@ function dropShadowed(nodes, edges) {
   for (const e of kept) edges.push(e);
   relink(nodes, edges);
   return drop.size;
+}
+
+/**
+ * Ladders: parallel streets closer together than their own paving.
+ *
+ * A bus stand, a bazaar, a car park, a depot: the survey draws the rows a
+ * vehicle moves along as service roads a dozen or fifteen metres apart, and
+ * at a street's full width (carriageway, pavements, kerbs: sixteen metres)
+ * the ribbons touch or overlap. From above that is one black field with the
+ * kerbs lost in it, and every junction in it a pad swept across the lot.
+ * Red Fort has such a yard west of the fort: six streets sixteen metres
+ * apart for seventy metres. The dedupe and the shadow pass find roads drawn
+ * twice; these are real roads, only too wide for how close they stand.
+ *
+ * A road that for most of its length has another, of its own class or
+ * wider, running alongside within a lane's width of touching is one class
+ * narrower; both of a pair are, so the rows read as rows with ground
+ * between them. A mews that is still inside another mews is dropped (the
+ * shadow pass does that, after this).
+ */
+function thinLadders(nodes, edges) {
+  const C = 24, grid = new Map();
+  for (const e of edges) {
+    if (e.bridge || e.bank || e.approach) continue;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const sg = { e, p, q, dx: q.x - p.x, dz: q.z - p.z };
+      const L = Math.hypot(sg.dx, sg.dz) || 1; sg.ux = sg.dx / L; sg.uz = sg.dz / L;
+      for (let cx = Math.floor(Math.min(p.x, q.x) / C) - 1; cx <= Math.floor(Math.max(p.x, q.x) / C) + 1; cx++) {
+        for (let cz = Math.floor(Math.min(p.z, q.z) / C) - 1; cz <= Math.floor(Math.max(p.z, q.z) / C) + 1; cz++) {
+          const k = cx * 8192 + cz;
+          let a = grid.get(k);
+          if (!a) grid.set(k, a = []);
+          a.push(sg);
+        }
+      }
+    }
+  }
+  const dist = (x, z, sg) => {
+    const L2 = sg.dx * sg.dx + sg.dz * sg.dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - sg.p.x) * sg.dx + (z - sg.p.z) * sg.dz) / L2));
+    return Math.hypot(x - sg.p.x - sg.dx * t, z - sg.p.z - sg.dz * t);
+  };
+  const NARROWER = { avenue: 'street', street: 'mews' };
+  const narrow = [];
+  for (const e of edges) {
+    if (e.bridge || e.bank || e.approach || !NARROWER[e.cls]) continue;
+    let len = 0, beside = 0;
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const p = e.pts[i], q = e.pts[i + 1];
+      const L = Math.hypot(q.x - p.x, q.z - p.z);
+      const ux = (q.x - p.x) / (L || 1), uz = (q.z - p.z) / (L || 1);
+      const n = Math.max(1, Math.round(L / 4));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n, x = p.x + (q.x - p.x) * t, z = p.z + (q.z - p.z) * t;
+        len += L / n;
+        const near = grid.get(Math.floor(x / C) * 8192 + Math.floor(z / C)) || [];
+        for (const sg of near) {
+          const o = sg.e;
+          if (o === e || (RANK[o.cls] || 0) < (RANK[e.cls] || 0)) continue;
+          if (Math.abs(ux * sg.ux + uz * sg.uz) < 0.9) continue;          // within ~25° of parallel
+          const shared = [e.a, e.b].find((j) => j === o.a || j === o.b);
+          if (shared !== undefined && Math.hypot(x - nodes[shared].x, z - nodes[shared].z) < 15) continue;
+          const d = dist(x, z, sg);
+          // Closer than the two pavings plus a lane of ground between them.
+          if (d < halfWidth(e.cls) + halfWidth(o.cls) + 3) { beside += L / n; break; }
+        }
+      }
+    }
+    if (len > 12 && beside > len * 0.55) narrow.push(e);
+  }
+  for (const e of narrow) e.cls = NARROWER[e.cls];
+  return narrow.length;
 }
 
 /**

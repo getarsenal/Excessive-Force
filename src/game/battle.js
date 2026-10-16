@@ -26,7 +26,7 @@ import { releaseTree } from '../core/release.js';
 const LIFT_WINDOW = 8;
 import {
   solveArc, solveBallistic, solveBoosted, solveDirect, ProjectileManager, ROCKET_BOOST,
-} from './projectiles.js';
+ solveLob } from './projectiles.js';
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
 import { Orbital } from './orbital.js';
@@ -345,7 +345,7 @@ export class Battle {
       yaw = Math.atan2(aim.x - from.x, aim.z - from.z);
       // The crew's own solution: a gun's low shot, a mortar's high one, a
       // straight shooter's line of sight.
-      const sol = p.mortar ? solveBallistic(from, aim, p.speed, p.gravity, 12.0, null)?.vel
+      const sol = p.mortar ? solveLob(from, aim, p.speed, p.gravity)?.vel
         : p.gravity > 0 ? solveArc(from, aim, p.speed, p.gravity, false) : null;
       if (sol) elev = Math.atan2(sol.y, Math.hypot(sol.x, sol.z));
       else if (p.gravity <= 0) elev = Math.atan2(aim.y - from.y, Math.hypot(aim.x - from.x, aim.z - from.z));
@@ -3147,7 +3147,7 @@ export class Battle {
       // down on the point, on the charge that makes the arc. The low
       // solution a gun takes when the way is clear was a mortar shooting
       // horizontally at something fifty feet away.
-      const sol = solveBallistic(from, aim, p.speed, p.gravity, 12.0, null);
+      const sol = solveLob(from, aim, p.speed, p.gravity);
       if (!sol) { unit.hold = 'out of range'; return false; }
       vel = sol.vel;
     } else if (p.flat || p.kind === 'arc') {

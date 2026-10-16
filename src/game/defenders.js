@@ -3,7 +3,7 @@ import { lightGeometry } from './units.js';
 import { soldierGeometry } from './soldier.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lineOfSight } from '../structure/occupancy.js';
-import { solveBallistic } from './projectiles.js';
+import { solveBallistic, solveLob } from './projectiles.js';
 import { TOWER, WING } from '../structure/landmarks/bigben.js';
 import { EIFFEL, legAt as eiffelLegAt } from '../structure/landmarks/eiffel.js';
 import { CASTILLO, WARRIORS } from '../structure/landmarks/chichen.js';
@@ -180,6 +180,12 @@ export const DEFENDER_TYPES = {
  * in about a second.
  */
 const FIRING_ARC = Math.cos(THREE.MathUtils.degToRad(72));
+// A field gun in its pit is man-handled round to a target up to this far off
+// the pit's own facing, at `GUN_SLEW` radians a second, and fires only when
+// it is on. It used to fire only inside the rifleman's arc about wherever it
+// last pointed: a pit facing away from the battery never fired a round.
+const GUN_ARC = Math.cos(THREE.MathUtils.degToRad(110));
+const GUN_SLEW = 0.6;
 
 /**
  * How much of the near end of a shot to ignore.
@@ -400,32 +406,63 @@ function mortarGeometry() {
  * they sit in is world geometry — `world/works.js` builds the spoil — and this
  * is only the piece inside it.
  */
+/** A colour baked into a part, so one instanced mesh can be several colours. */
+function tint(geo, hex) {
+  const c = new THREE.Color(hex);
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 function fieldGunGeometry() {
+  // A towed field gun as the eye reads one from a gun position across the
+  // way: the long tube over split trails, a sloped two-piece shield with the
+  // tube through the gap, the recuperator cylinders above the tube, the
+  // breech ring, big tyred wheels on their hubs, spades at the trail ends and
+  // the ready rounds in their boxes. Baked colours (`tint`), so the one
+  // instanced draw has olive steel, dark gunmetal, black rubber and the
+  // wood of the ammunition boxes; the instance colour is left white.
+  const OLIVE = 0x4e5639, OLIVE_D = 0x3f4730, METAL = 0x2e322f, RUBBER = 0x1d1f22, WOOD = 0x6a5636;
   const parts = [];
-  const barrel = new THREE.CylinderGeometry(0.11, 0.14, 4.4, 8);
-  barrel.rotateX(Math.PI / 2);
-  barrel.translate(0, 1.15, 1.7);
-  parts.push(barrel);
-  const brake = new THREE.CylinderGeometry(0.2, 0.2, 0.42, 8);
-  brake.rotateX(Math.PI / 2);
-  brake.translate(0, 1.15, 3.8);
-  parts.push(brake);
-  const shield = new THREE.BoxGeometry(2.3, 1.1, 0.12);
-  shield.translate(0, 0.9, 0.3);
-  parts.push(shield);
-  const breech = new THREE.BoxGeometry(0.55, 0.55, 1.0);
-  breech.translate(0, 1.1, -0.35);
-  parts.push(breech);
+  const add = (geo, hex) => { parts.push(tint(geo, hex)); return geo; };
+  const cyl = (r0, r1, h, seg = 10) => new THREE.CylinderGeometry(r0, r1, h, seg);
+  const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+  // The tube: a long taper, thicker at the breech, with the brake at the muzzle.
+  const barrel = cyl(0.11, 0.17, 5.0, 12); barrel.rotateX(Math.PI / 2); barrel.translate(0, 1.38, 1.9); add(barrel, METAL);
+  const brake = box(0.44, 0.44, 0.5); brake.translate(0, 1.38, 4.3); add(brake, METAL);
+  const brakeSlot = box(0.5, 0.14, 0.22); brakeSlot.translate(0, 1.38, 4.3); add(brakeSlot, RUBBER);
+  // The recuperators over the tube, and the cradle it rides in.
+  for (const sx of [-0.15, 0.15]) { const rc = cyl(0.1, 0.1, 1.9, 8); rc.rotateX(Math.PI / 2); rc.translate(sx, 1.68, 0.5); add(rc, OLIVE); }
+  const cradle = box(0.56, 0.42, 1.5); cradle.translate(0, 1.22, 0.1); add(cradle, OLIVE);
+  // The breech ring and block behind the shield.
+  const ring = box(0.62, 0.62, 0.7); ring.translate(0, 1.38, -0.75); add(ring, METAL);
+  const block = box(0.3, 0.3, 0.3); block.translate(0.38, 1.38, -1.0); add(block, OLIVE_D);
+  // The shield: two plates swept back, the tube through the gap, a fold at the top.
   for (const sx of [-1, 1]) {
-    const wheel = new THREE.CylinderGeometry(0.52, 0.52, 0.2, 12);
-    wheel.rotateZ(Math.PI / 2);
-    wheel.translate(sx * 1.05, 0.52, 0.1);
-    parts.push(wheel);
-    const trail = new THREE.BoxGeometry(0.16, 0.16, 2.6);
-    trail.rotateY(sx * 0.16);
-    trail.translate(sx * 0.5, 0.3, -1.5);
-    parts.push(trail);
+    const plate = box(1.2, 1.35, 0.08); plate.rotateY(sx * 0.2); plate.translate(sx * 0.72, 1.1, 0.62 + Math.abs(sx) * 0); add(plate, OLIVE);
+    const fold = box(1.2, 0.34, 0.08); fold.rotateX(-0.55); fold.rotateY(sx * 0.2); fold.translate(sx * 0.72, 1.86, 0.5); add(fold, OLIVE);
   }
+  // Axle, wheels, hubs.
+  const axle = cyl(0.07, 0.07, 2.3, 8); axle.rotateZ(Math.PI / 2); axle.translate(0, 0.66, 0.05); add(axle, METAL);
+  for (const sx of [-1, 1]) {
+    const tyre = cyl(0.66, 0.66, 0.3, 18); tyre.rotateZ(Math.PI / 2); tyre.translate(sx * 1.2, 0.66, 0.05); add(tyre, RUBBER);
+    const hub = cyl(0.36, 0.36, 0.34, 12); hub.rotateZ(Math.PI / 2); hub.translate(sx * 1.2, 0.66, 0.05); add(hub, OLIVE);
+    const cap = cyl(0.12, 0.12, 0.4, 8); cap.rotateZ(Math.PI / 2); cap.translate(sx * 1.2, 0.66, 0.05); add(cap, METAL);
+  }
+  // Split trails back to their spades.
+  for (const sx of [-1, 1]) {
+    const trail = box(0.2, 0.26, 3.4); trail.rotateY(sx * 0.2); trail.translate(sx * 0.78, 0.36, -1.9); add(trail, OLIVE);
+    const spade = box(0.5, 0.36, 0.14); spade.rotateY(sx * 0.2); spade.translate(sx * 1.12, 0.2, -3.55); add(spade, METAL);
+  }
+  // The gunner's handwheels on the left of the cradle, the sight bracket on the right.
+  for (const [y, z] of [[1.05, -0.2], [1.05, 0.35]]) { const hw = cyl(0.17, 0.17, 0.05, 12); hw.rotateZ(Math.PI / 2); hw.translate(-0.66, y, z); add(hw, METAL); }
+  const sight = box(0.1, 0.5, 0.12); sight.translate(0.62, 1.75, 0.2); add(sight, METAL);
+  // Ready rounds: two boxes by the right trail, three rounds standing in the open one.
+  const crate = box(0.9, 0.32, 0.42); crate.translate(1.55, 0.16, -1.3); add(crate, WOOD);
+  const crate2 = box(0.9, 0.32, 0.42); crate2.translate(1.55, 0.48, -1.3); add(crate2, WOOD);
+  for (let k = 0; k < 3; k++) { const rd = cyl(0.06, 0.06, 0.6, 8); rd.translate(1.3 + k * 0.25, 0.95, -1.3); add(rd, 0xb09a5c); }
   return BufferGeometryUtils.mergeGeometries(parts, false);
 }
 
@@ -574,6 +611,7 @@ export class Garrison {
     this.mortarMesh = mk(mortarGeometry(), 0xffffff, 160);
     this.bagMesh = mk(sandbagGeometry(), 0xffffff, 240);
     this.gunMesh = mk(fieldGunGeometry(), 0xffffff, 40);
+    this.gunMesh.material.vertexColors = true;   // the piece's own colours, baked (`tint`)
     this.flakMesh = mk(flakGeometry(), 0xffffff, 36);
     this._mk = mk;
 
@@ -672,6 +710,7 @@ export class Garrison {
     }
 
     const d = {
+      home: facing,   // the position's own facing: a pit's arc is about this
       type, def,
       pos: snapped,
       facing,
@@ -2042,6 +2081,18 @@ export class Garrison {
 
       const best = this._acquire(d, playerUnits, structures);
       if (!best) { d.cooldown = 0.4; continue; }
+      // The field gun comes round onto its target first, and fires when it is on.
+      if (d.def.key === 'fieldgun') {
+        const want = Math.atan2(best.pos.x - d.pos.x, best.pos.z - d.pos.z);
+        let diff = want - d.facing;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        if (Math.abs(diff) > 0.08) {
+          d.facing += Math.max(-GUN_SLEW * dt, Math.min(GUN_SLEW * dt, diff));
+          d.cooldown = 0.05;
+          continue;
+        }
+      }
 
       const dist = d.pos.distanceTo(best.pos);
       // Accuracy falls off with range.
@@ -2197,7 +2248,10 @@ export class Garrison {
 
   /** Nearest live unit inside range, arc and line of sight. */
   _acquire(d, playerUnits, structures) {
-    const fx = Math.sin(d.facing), fz = Math.cos(d.facing);
+    const gun = d.def.key === 'fieldgun';
+    const base = gun ? (d.home ?? d.facing) : d.facing;
+    const arc = gun ? GUN_ARC : FIRING_ARC;
+    const fx = Math.sin(base), fz = Math.cos(base);
     const r2 = d.def.range * d.def.range;
     // Sort by distance implicitly: take candidates nearest first so the
     // line-of-sight test runs on as few as possible.
@@ -2211,7 +2265,7 @@ export class Garrison {
       const dd = dx * dx + dy * dy + dz * dz;
       if (dd >= bestD) continue;
       const flat = Math.hypot(dx, dz);
-      if (!d.def.indirect && flat > 0.001 && (dx * fx + dz * fz) / flat < FIRING_ARC) {
+      if (!d.def.indirect && flat > 0.001 && (dx * fx + dz * fz) / flat < arc) {
         continue;
       }
       blockedOnly.push({ u, dd });
@@ -2309,7 +2363,7 @@ export class Garrison {
   mortarSolution(d, aim) {
     const sh = d.def.shell;
     const clear = (vel) => this._arcClear(d.muzzle, vel, sh.gravity);
-    const sol = solveBallistic(d.muzzle, aim, sh.speed, sh.gravity, 14.0, clear);
+    const sol = solveLob(d.muzzle, aim, sh.speed, sh.gravity, clear);
     // The solver hands back its best guess even when nothing clears; a mortar
     // does not fire that one.
     return sol && clear(sol.vel) ? sol : null;
@@ -2448,7 +2502,7 @@ export class Garrison {
         if (cur < pit.instanceMatrix.count) {
           this._m4.compose(d.pos, this._q, this._s);
           pit.setMatrixAt(cur, this._m4);
-          this._col.setHex(0x4e5639);
+          this._col.setHex(d.def.key === 'aa' ? 0x4e5639 : 0xffffff);
           pit.instanceColor.setXYZ(cur, this._col.r, this._col.g, this._col.b);
           if (d.def.key === 'aa') fw++; else gw++;
         }
