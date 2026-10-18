@@ -88,7 +88,11 @@ import { makeWeaponView } from './game/units.js';
 
 // The offline copy (public/sw.js): a shipped build only, never the dev server,
 // whose modules are not fingerprinted. `?nosw` takes it off this browser.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Not in the App Store build either: there the whole game is in the bundle,
+// the page is served from capacitor://localhost and a worker has nothing to
+// keep.
+const nativeApp = location.protocol === 'capacitor:' || !!window.Capacitor?.isNativePlatform?.();
+if ('serviceWorker' in navigator && import.meta.env.PROD && !nativeApp) {
   if (new URLSearchParams(location.search).has('nosw')) {
     navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
   } else {

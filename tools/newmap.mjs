@@ -215,7 +215,7 @@ patch('src/game/campaign.js', (s) => {
 patch('src/game/cast.js', (s) => {
   let at = closerAfter(s, 'export const CAST = {', '};');
   s = s.slice(0, at) + `  ${code}: {
-    id: '${code}', file: 'assets/characters/${code}-officer.png',   // TODO(${id}) the rank in the file name
+    id: '${code}', file: 'assets/characters/${code}-officer.webp',   // TODO(${id}) the rank in the file name
     rank: 'TODO(${id})', name: 'TODO(${id})', nation: '${nation}', side: 'right',
     colours: ['#888888', '#cccccc', '#888888'],                   // TODO(${id}) three flag colours
   },
@@ -261,7 +261,7 @@ Defender: **TODO(${id}) Rank Name**, ${nation}. Level id \`${id}\`.
 const manifestPath = 'public/assets/characters/manifest.json';
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
 manifest.enemies[id] = {
-  id: `${code}-officer`, file: `${code}-officer.png`, nation, defends: `the ${landmark}`,
+  id: `${code}-officer`, file: `${code}-officer.webp`, nation, defends: `the ${landmark}`,
   look: `TODO(${id}) the officer's uniform, rank insignia and bearing, for the artist.`,
 };
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');

@@ -17,27 +17,27 @@ import { ATLAS_CAST, ATLAS_DEFENDER_OF, ATLAS_STANDOFF } from './atlas.js';
  */
 export const CAST = {
   us: {
-    id: 'us', file: 'assets/characters/us-general.png',
+    id: 'us', file: 'assets/characters/us-general.webp',
     rank: 'Gen.', name: 'Buck Hollister', nation: 'United States', side: 'left',
     colours: ['#b22234', '#ffffff', '#3c3b6e'],
   },
   uk: {
-    id: 'uk', file: 'assets/characters/uk-field-marshal.png',
+    id: 'uk', file: 'assets/characters/uk-field-marshal.webp',
     rank: 'F.M.', name: 'Sir Reginald Pomp', nation: 'United Kingdom', side: 'right',
     colours: ['#c8102e', '#ffffff', '#012169'],
   },
   fr: {
-    id: 'fr', file: 'assets/characters/fr-marshal.png',
+    id: 'fr', file: 'assets/characters/fr-marshal.webp',
     rank: 'Maréchal', name: 'Gaspard DeRetreat', nation: 'France', side: 'right',
     colours: ['#0055a4', '#ffffff', '#ef4135'],
   },
   in: {
-    id: 'in', file: 'assets/characters/in-maharaja-general.png',
+    id: 'in', file: 'assets/characters/in-maharaja-general.webp',
     rank: 'Maharaja-Gen.', name: 'Arvind Rathore', nation: 'India', side: 'right',
     colours: ['#ff9933', '#ffffff', '#138808'],
   },
   eg: {
-    id: 'eg', file: 'assets/characters/eg-field-marshal.png',
+    id: 'eg', file: 'assets/characters/eg-field-marshal.webp',
     rank: 'Mushir', name: 'Tarek El-Masry', nation: 'Egypt', side: 'right',
     colours: ['#ce1126', '#ffffff', '#000000'],
   },
@@ -45,130 +45,130 @@ export const CAST = {
   // — cigar, arms folded, the flag worn — and described in
   // `characters/manifest.json`.
   mx: {
-    id: 'mx', file: 'assets/characters/mx-general.png',
+    id: 'mx', file: 'assets/characters/mx-general.webp',
     rank: 'Gral. de División', name: 'Rodrigo Salazar-Quiroz', nation: 'Mexico',
     side: 'right', colours: ['#006847', '#ffffff', '#ce1126'],
   },
   it: {
-    id: 'it', file: 'assets/characters/it-generale.png',
+    id: 'it', file: 'assets/characters/it-generale.webp',
     rank: 'Generale', name: 'Ottavio Bambino', nation: 'Italy', side: 'right',
     colours: ['#008c45', '#ffffff', '#cd212a'],
   },
   ru: {
-    id: 'ru', file: 'assets/characters/ru-marshal.png',
+    id: 'ru', file: 'assets/characters/ru-marshal.webp',
     rank: 'Marshal', name: 'Lev Zimyanin', nation: 'Russia', side: 'right',
     colours: ['#ffffff', '#0039a6', '#d52b1e'],
   },
   au: {
-    id: 'au', file: 'assets/characters/au-general.png',
+    id: 'au', file: 'assets/characters/au-general.webp',
     rank: 'Gen.', name: 'Angus Kerrigan', nation: 'Australia', side: 'right',
     colours: ['#00247d', '#ffffff', '#c8202f'],
   },
   br: {
-    id: 'br', file: 'assets/characters/br-marechal.png',
+    id: 'br', file: 'assets/characters/br-marechal.webp',
     rank: 'Marechal', name: 'Joaquim Duarte-Ribeiro', nation: 'Brazil',
     side: 'right', colours: ['#009739', '#fedd00', '#012169'],
   },
   // The third five. Art pending: the file names are the slots, and the
   // stand-off and the dossier both tolerate the picture being missing.
   gr: {
-    id: 'gr', file: 'assets/characters/gr-strategos.png',
+    id: 'gr', file: 'assets/characters/gr-strategos.webp',
     rank: 'Strategos', name: 'Aris Vlachopoulos', nation: 'Greece', side: 'right',
     colours: ['#0d5eaf', '#ffffff', '#0d5eaf'],
   },
   tr: {
-    id: 'tr', file: 'assets/characters/tr-orgeneral.png',
+    id: 'tr', file: 'assets/characters/tr-orgeneral.webp',
     rank: 'Orgeneral', name: 'Selim Karabulut', nation: 'Turkey', side: 'right',
     colours: ['#e30a17', '#ffffff', '#e30a17'],
   },
   de: {
-    id: 'de', file: 'assets/characters/de-general.png',
+    id: 'de', file: 'assets/characters/de-general.webp',
     rank: 'General', name: 'Friedrich von Steinhauer', nation: 'Germany', side: 'right',
     colours: ['#000000', '#dd0000', '#ffce00'],
   },
   jp: {
-    id: 'jp', file: 'assets/characters/jp-taisho.png',
+    id: 'jp', file: 'assets/characters/jp-taisho.webp',
     rank: 'Taishō', name: 'Kenji Takamura', nation: 'Japan', side: 'right',
     colours: ['#ffffff', '#bc002d', '#ffffff'],
   },
   ae: {
-    id: 'ae', file: 'assets/characters/ae-fariq.png',
+    id: 'ae', file: 'assets/characters/ae-fariq.webp',
     rank: 'Fariq Awwal', name: 'Saif bin Hamdan', nation: 'United Arab Emirates', side: 'right',
     colours: ['#ff0000', '#00732f', '#000000'],
   },
   // The last two. Art pending, as above.
   my: {
-    id: 'my', file: 'assets/characters/my-jeneral.png',
+    id: 'my', file: 'assets/characters/my-jeneral.webp',
     rank: 'Jeneral', name: 'Hafiz bin Zulkifli', nation: 'Malaysia', side: 'right',
     colours: ['#cc0001', '#ffffff', '#010066'],
   },
   cn: {
-    id: 'cn', file: 'assets/characters/cn-shangjiang.png',
+    id: 'cn', file: 'assets/characters/cn-shangjiang.webp',
     rank: 'Shàngjiàng', name: 'Wen Jiahao', nation: 'China', side: 'right',
     colours: ['#de2910', '#ffde00', '#de2910'],
   },
   es: {
-    id: 'es', file: 'assets/characters/es-capitan-general.png',
+    id: 'es', file: 'assets/characters/es-capitan-general.webp',
     rank: 'Capitán General', name: 'Íñigo Valdés de la Serna', nation: 'Spain', side: 'right',
     colours: ['#aa151b', '#f1bf00', '#aa151b'],
   },
   be: {
-    id: 'be', file: 'assets/characters/be-luitenant-generaal.png',
+    id: 'be', file: 'assets/characters/be-luitenant-generaal.webp',
     rank: 'Luitenant-generaal', name: 'Maarten Vandenbroucke', nation: 'Belgium', side: 'right',
     colours: ['#111111', '#fdda24', '#ef3340'],
   },
   hu: {
-    id: 'hu', file: 'assets/characters/hu-vezerezredes.png',
+    id: 'hu', file: 'assets/characters/hu-vezerezredes.webp',
     rank: 'Vezérezredes', name: 'Bálint Szentgyörgyi', nation: 'Hungary', side: 'right',
     colours: ['#ce2939', '#f4f2ec', '#477050'],
   },
   pt: {
-    id: 'pt', file: 'assets/characters/pt-general.png',
+    id: 'pt', file: 'assets/characters/pt-general.webp',
     rank: 'General', name: 'Duarte Albuquerque Sá', nation: 'Portugal', side: 'right',
     colours: ['#046a38', '#da291c', '#ffe900'],
   },
   ma: {
-    id: 'ma', file: 'assets/characters/ma-general.png',
+    id: 'ma', file: 'assets/characters/ma-general.webp',
     rank: 'Général de Corps d’Armée', name: 'Youssef El Mansouri', nation: 'Morocco', side: 'right',
     colours: ['#c1272d', '#006233', '#c1272d'],
   },
   kw: {
-    id: 'kw', file: 'assets/characters/kw-fariq-awwal.png',
+    id: 'kw', file: 'assets/characters/kw-fariq-awwal.webp',
     rank: 'Farīq Awwal', name: 'Fahad Al-Mutairi', nation: 'Kuwait', side: 'right',
     colours: ['#007a3d', '#f4f2ec', '#ce1126'],
   },
   kr: {
-    id: 'kr', file: 'assets/characters/kr-daejang.png',
+    id: 'kr', file: 'assets/characters/kr-daejang.webp',
     rank: 'Daejang', name: 'Baek Seung-ho', nation: 'South Korea', side: 'right',
     colours: ['#f4f2ec', '#cd2e3a', '#0047a0'],
   },
   th: {
-    id: 'th', file: 'assets/characters/th-phon-ek.png',
+    id: 'th', file: 'assets/characters/th-phon-ek.webp',
     rank: 'Phon Ek', name: 'Somchai Wattanakul', nation: 'Thailand', side: 'right',
     colours: ['#a51931', '#f4f5f8', '#2d2a4a'],
   },
   mm: {
-    id: 'mm', file: 'assets/characters/mm-bogyoke.png',
+    id: 'mm', file: 'assets/characters/mm-bogyoke.webp',
     rank: 'Bogyoke', name: 'Thura Kyaw Zeya', nation: 'Myanmar', side: 'right',
     colours: ['#fecb00', '#34b233', '#ea2839'],
   },
   kh: {
-    id: 'kh', file: 'assets/characters/kh-oudom-seney.png',
+    id: 'kh', file: 'assets/characters/kh-oudom-seney.webp',
     rank: 'Oudom Seney', name: 'Sok Vannarith', nation: 'Cambodia', side: 'right',
     colours: ['#032ea1', '#e00025', '#032ea1'],
   },
   id: {
-    id: 'id', file: 'assets/characters/id-jenderal.png',
+    id: 'id', file: 'assets/characters/id-jenderal.webp',
     rank: 'Jenderal', name: 'Bagus Wiranto Hadi', nation: 'Indonesia', side: 'right',
     colours: ['#ce1126', '#f4f2ec', '#ce1126'],
   },
   gt: {
-    id: 'gt', file: 'assets/characters/gt-general-de-division.png',
+    id: 'gt', file: 'assets/characters/gt-general-de-division.webp',
     rank: 'General de División', name: 'Rodrigo Ixcot Morales', nation: 'Guatemala', side: 'right',
     colours: ['#4997d0', '#f4f2ec', '#4997d0'],
   },
   pe: {
-    id: 'pe', file: 'assets/characters/pe-general-de-ejercito.png',
+    id: 'pe', file: 'assets/characters/pe-general-de-ejercito.webp',
     rank: 'General de Ejército', name: 'Ernesto Quispe Huamán', nation: 'Peru', side: 'right',
     colours: ['#d91023', '#f4f2ec', '#d91023'],
   },

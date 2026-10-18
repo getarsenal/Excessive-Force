@@ -1,0 +1,65 @@
+# Excessive Force — iOS build and TestFlight upload.
+#
+# Mirrors Leave Her Johnny's proven pipeline (same Apple team, same signing
+# method: an App Store distribution profile for this bundle id uploaded into
+# Codemagic's code-signing UI, applied by the ios_signing block below).
+#
+# Builds on a push to the `appstore` branch, not `main`: main deploys the web
+# game to GitHub Pages on every commit, and an IPA on every commit would burn
+# the build minutes. To cut a TestFlight build:
+#     git push origin main:appstore
+workflows:
+  ios-workflow:
+    name: Excessive Force iOS Build
+    max_build_duration: 90
+    integrations:
+      app_store_connect: Scheidel Holdings LLC
+    environment:
+      xcode: latest
+      node: 22
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.scheidelholdings.excessiveforce
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: appstore
+          include: true
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Build the web game
+        script: |
+          npx vite build
+          du -sh dist
+      - name: Sync Capacitor
+        script: |
+          npx cap sync ios
+      - name: Apply code signing profiles
+        script: |
+          xcode-project use-profiles --verbose
+          SETTINGS=$(xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -showBuildSettings 2>/dev/null || true)
+          echo "$SETTINGS" | grep -iE "CODE_SIGN_STYLE|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER|CODE_SIGN_IDENTITY|PRODUCT_BUNDLE_IDENTIFIER" || echo "(no signing settings resolved)"
+          if ! echo "$SETTINGS" | grep -qiE "PROVISIONING_PROFILE_SPECIFIER = [A-Za-z0-9]"; then
+            echo "STOPPING: no provisioning profile is wired into the App target."
+            echo "Upload the App Store distribution profile for com.scheidelholdings.excessiveforce in Codemagic > Code signing identities, then rebuild."
+            exit 1
+          fi
+      - name: Set build number from timestamp
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          BUILD_NUMBER=$(date +%Y%m%d%H%M)
+          agvtool new-version -all $BUILD_NUMBER
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

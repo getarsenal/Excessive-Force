@@ -390,7 +390,7 @@ export class Tutorial {
     root.innerHTML = `
       <div class="tut-ring" hidden></div>
       <div class="tut-gen" hidden>
-        <img class="tut-gen-face" src="assets/characters/us-general.png" alt="">
+        <img class="tut-gen-face" src="assets/characters/us-general.webp" alt="">
         <div class="tut-gen-body"><b>GEN. BUCK HOLLISTER</b><span class="tut-gen-line"></span>
           <button type="button" class="tut-gen-ok">CARRY ON</button></div>
       </div>

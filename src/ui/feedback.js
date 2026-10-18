@@ -108,7 +108,35 @@ class Feedback {
   }
 
   // ── touch ────────────────────────────────────────────────────────────────
+  _native() {
+    if (this._isNative === undefined) {
+      this._isNative = typeof window !== 'undefined'
+        && (window.location?.protocol === 'capacitor:' || !!window.Capacitor?.isNativePlatform?.());
+      if (this._isNative) {
+        import('@capacitor/haptics').then((m) => { this._haptics = m.Haptics; this._styles = m.ImpactStyle; }).catch(() => { this._isNative = false; });
+      }
+    }
+    return this._isNative;
+  }
+
+  _tap(pattern) {
+    const H = this._haptics;
+    if (!H) return;
+    let t = 0;
+    for (let i = 0; i < pattern.length; i += 2) {
+      const on = pattern[i];
+      const style = on >= 40 ? this._styles.Heavy : on >= 18 ? this._styles.Medium : this._styles.Light;
+      const fire = () => H.impact({ style }).catch(() => {});
+      if (t === 0) fire(); else setTimeout(fire, t);
+      t += on + (pattern[i + 1] || 0);
+      if (i >= 6) break;          // four taps is all a pattern needs
+    }
+  }
+
   _buzz(pattern) {
+    // The App Store build has the Taptic Engine through Capacitor's Haptics
+    // plugin: one impact per pulse, light, medium or heavy by its length.
+    if (this._native()) { this._tap(pattern); return; }
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       try { navigator.vibrate(pattern); } catch { /* not allowed */ }
       return;

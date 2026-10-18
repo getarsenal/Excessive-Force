@@ -204,7 +204,7 @@ ATLAS_PATTERNS.usa = (ctx, w, h) => drawFlagSpec(ctx, w, h, [
 const slug = (s) => s.toLowerCase().replace(/ł/g, 'l').replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 export const ATLAS_CAST = Object.fromEntries(Object.entries(NEW_OFFICERS).map(([code, o]) => [code, {
-  id: code, file: `assets/characters/${code}-${slug(o.rank)}.png`,
+  id: code, file: `assets/characters/${code}-${slug(o.rank)}.webp`,
   rank: o.rank, name: o.name, nation: o.nation, side: 'right', colours: o.colours,
 }]));
 
