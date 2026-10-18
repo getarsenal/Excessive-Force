@@ -42,6 +42,9 @@ async function battle(level, kinds, seconds, name, aim) {
   await p.evaluate(({ kinds, seconds, aim }) => {
     const B = window.battle, tm = window.testMenu, T = window.THREE;
     B.freeBuild = true;
+    // A picture of the demolition, not of the garrison winning: the battery is
+    // invulnerable and the defenders hold their fire, as the par probe does.
+    B.invulnerable = true; if (B.garrison) B.garrison.fireEnabled = false;
     document.getElementById('test-btn')?.setAttribute('hidden', '');   // a developer's button, not the store's
     for (const [kind, n, ang, dist] of kinds) tm.spawnAt(kind, n, ang, dist);
     // The landmark stands on the origin: designate its body so the battery
@@ -58,7 +61,7 @@ async function battle(level, kinds, seconds, name, aim) {
   console.log(name, 'shot in', ((Date.now() - t0) / 1000).toFixed(0), 's');
   await p.close();
 }
-await battle('westminster', [['m777', 6, 1.1, 230], ['m119', 4, 0.6, 180]], 30, '02-battery', 30);
-await battle('agra', [['m777', 8, 0.9, 300], ['m777', 6, 2.2, 300], ['m109', 4, 1.6, 280]], 150, '03-collapse', 10);
+await battle('westminster', [['m777', 6, 1.1, 230], ['m119', 4, 0.6, 180]], 75, '02-battery', 30);
+await battle('agra', [['m777', 8, 0.9, 300], ['m777', 6, 2.2, 300], ['m109', 4, 1.6, 280]], 260, '03-collapse', 30);
 await b.close();
 console.log(fs.readdirSync('/tmp/out/store').join(' '));
