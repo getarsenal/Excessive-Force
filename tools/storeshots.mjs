@@ -1,8 +1,10 @@
 // App Store screenshots: the iPhone 6.9" set (1320x2868) rendered from the
-// game itself, as a 440x956 viewport at three times the density, which is the
-// phone's own point size. Four frames: the title, a battery firing on Big Ben,
-// the Taj Mahal coming down, and the campaign map.
+// game itself at the phone's own point size (440x956). The title and the
+// campaign map are drawn at three times the density; a battle is drawn at
+// twice (the software rasteriser never finishes a load at 3.8 Mpx a frame)
+// and scaled to the set's size by tools/storeshots_scale.py afterwards.
 //   node tools/storeshots.mjs            -> /tmp/out/store/{01-title,02-battery,03-collapse,04-campaign}.png
+//   python3.13 tools/storeshots_scale.py -> every frame at 1320x2868
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 const port = process.env.TT_PORT || 5177;
@@ -28,11 +30,12 @@ try {
 await page.close();
 
 // 2 and 3. A battle each: a battery laid, time run on, the frame drawn.
+const ctx2 = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
 async function battle(level, kinds, seconds, name, aim) {
-  const p = await ctx.newPage();
-  await p.addInitScript(() => { try { localStorage.setItem('tt.quality', 'medium'); localStorage.setItem('tt.autostart', '1'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.suite', '1'); } catch {} });
+  const p = await ctx2.newPage();
+  await p.addInitScript(() => { try { localStorage.setItem('tt.quality', 'low'); localStorage.setItem('tt.autostart', '1'); localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done'); localStorage.setItem('tt.suite', '1'); } catch {} });
   await p.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
-  await p.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.testMenu, null, { timeout: 400000 });
+  await p.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle && window.testMenu, null, { timeout: 900000 });
   await p.evaluate(({ kinds, seconds, aim }) => {
     const B = window.battle, tm = window.testMenu;
     B.freeBuild = true;
