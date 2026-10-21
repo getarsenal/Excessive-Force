@@ -213,6 +213,10 @@ export class BillboardParticles {
       depthWrite: opts.depthWrite ?? false,
       depthTest: true,
       blending: opts.blending ?? THREE.NormalBlending,
+      // Half precision on a phone: a puff is a texture times a colour times
+      // an alpha, and twenty screens of them a frame is the biggest single
+      // fill in the game. An Apple GPU runs mediump at twice the rate.
+      precision: (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 'mediump' : null,
     });
 
     this.geometry = geo;

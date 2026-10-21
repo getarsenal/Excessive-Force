@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { detectQuality, setQuality, AdaptiveGovernor } from './core/quality.js';
 import { power, recoverFromCrash, armBoot, applySaver } from './core/power.js';
+import { heat } from './core/heat.js';
 import { BlackBox, harvestCrash } from './core/blackbox.js';
 import { initPhysics, PhysicsWorld } from './core/physics.js';
 import { Engine, CameraRig, SUN_OFFSET } from './core/engine.js';
@@ -571,7 +572,11 @@ async function boot() {
   // The particles' fill budget, in screens of blended quads a frame
   // (`ExplosionFX._govern`): a phone's GPU has a third of a desktop's.
   fx.camera = engine.camera;
-  fx.fillBudget = power.lean ? 20 : 40;
+  // Fourteen screens on a phone, from twenty: the governor thins the big
+  // pools to fit and never the near puffs, and the heat ladder below takes
+  // it further as the phone warms.
+  const fillBase = power.lean ? 14 : 40;
+  fx.fillBudget = fillBase;
   const pod = new TargetingPod(engine, quality);
   const whiteFlags = new WhiteFlags(engine.scene);
   const contactShadows = new ContactShadows(engine.scene);
@@ -3652,13 +3657,34 @@ async function boot() {
     const key = `${x},${y},${z}`;
     shadowAge++;
     const busy = physics.awakeCount > 0 || battle.shadowBusy();
-    if (key !== shadowKey || shadowAge >= (busy ? 2 : 10)) {
+    // The heat ladder (core/heat.js): a warm phone redraws the map every
+    // third or sixth frame while things move, and a critical one not at all.
+    const every = heat.rung.shadowEvery;
+    if (every === 0) { engine.renderer.shadowMap.needsUpdate = false; return; }
+    if (key !== shadowKey || shadowAge >= (busy ? 2 * every : 10 * every)) {
       shadowKey = key;
       shadowAge = 0;
       engine.renderer.shadowMap.needsUpdate = true;
       shadowDraws++;
     }
   };
+  // The heat ladder, applied as one: the engine's pixel ratio, the particle
+  // fill, the frame cap; the shadow cadence reads the rung itself. Low Power
+  // Mode on the phone is the battery saver on here.
+  const applyHeat = () => {
+    const r = heat.rung;
+    engine.setHeatScale(r.scale);
+    fx.fillBudget = Math.max(4, Math.round(fillBase * r.fill));
+    power.capFps = r.fps >= 30 ? 0 : r.fps;
+    if (heat.lowPower && !power.saver) power.saver = true;
+    if (heat.level > 0) console.log(`[heat] ${heat.says}: scale ${r.scale} · fill ${fx.fillBudget} · ${r.fps} fps · shadows every ${r.shadowEvery || '∞'}`);
+  };
+  heat.onChange(applyHeat);
+  heat.attach().then((ok) => { if (ok) applyHeat(); });
+  window.__heat = heat;
+  // For the probes: the engine, the particles and the pacing as the frame sees them.
+  window.engine = engine; window.fx = fx; window.__power = power;
+  window.__powerGap = () => power.gap({ menu: menuOpen, covered: coveredBy > 0, over: battleOver });
   let shadowDraws = 0, shadowFrames = 0;
   // For the harness: frames drawn, and of them how many redrew the shadow map.
   window.__shadows = () => ({ frames: shadowFrames, draws: shadowDraws, onDemand: shadowDemand });
@@ -3691,6 +3717,7 @@ async function boot() {
     // Cologne's hanging rubble was the last test still flipping on it.
     if (!suiteHold) {
       physics.setBudget(governor.update(workMs));
+      if (governor.lastP80 != null) { heat.observe(governor.lastP80, physics.awakeCount + battle.units.length * 4); governor.lastP80 = null; }
       physics.step(dt);
       physics.recycleSettled(quality.settleFrames);
       physics.auditFrozen();

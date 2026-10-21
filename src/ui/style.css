@@ -3276,3 +3276,24 @@ body.clear-view.laying #studio .st-row button:active { opacity: 1; }
 @media (orientation: landscape) and (max-height: 500px) {
   body.laying #studio { top: calc(var(--talk-top) - 2px); bottom: auto; }
 }
+
+/* ── Heat: the interface at ten steps a second on a phone (core/power.js
+   body.lean). A CSS animation that eases runs at the display's own rate,
+   which on a ProMotion phone is a hundred and twenty composites a second
+   of whatever layer it is on: the loader's slow pan over the hero art was
+   a full-screen composite at 120 Hz while the player waited. In steps the
+   value changes ten times a second and the compositor sleeps between. The
+   blinks were steps already. ── */
+body.lean .load-bg { animation-timing-function: steps(320); }
+body.lean .ef-hero-art img { animation-timing-function: steps(260); }
+body.lean .op-dust { animation-timing-function: steps(140); }
+body.lean .op-logo { animation-timing-function: steps(45); }
+body.lean .so-hint { animation-timing-function: steps(18); }
+body.lean .wm-pin.next .wm-ping, body.lean .wm-pin.here .wm-ping { animation-timing-function: steps(24); }
+body.lean .ecx-crates { animation-timing-function: steps(16); }
+body.lean .pr-burst { animation-timing-function: steps(180); }
+body.lean .tut-ring { animation-timing-function: steps(10); }
+body.lean .unit-card.selected { animation-timing-function: steps(13); }
+body.lean #tgp .tgp-box { animation-timing-function: steps(16); }
+body.lean #newsflash .nf-tick span { animation-timing-function: steps(440); }
+body.lean #studio .st-row button.st-rec.on { animation-timing-function: steps(14); }

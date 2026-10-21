@@ -62,8 +62,14 @@ export const power = {
     if (covered) return 250;
     if (menu) return 100;
     if (over) return this.saver ? 50 : 0;
+    // The heat governor's frame cap (core/heat.js): twenty-four or twenty
+    // frames on a phone the system reports serious or critical, whatever
+    // the saver says; thirty on the saver otherwise.
+    if (this.capFps && this.capFps < 30) return 1000 / this.capFps;
     return this.saver ? 1000 / 30 : 0;
   },
+  /** Set by the heat governor; 0 or 30 means no cap of its own. */
+  capFps: 0,
 };
 
 /**

@@ -85,6 +85,26 @@ in `public/assets/characters/` are WebP: sixty-one PNGs were 149 MB of a
 300 MB app. `node tools/storeshots.mjs` renders the App Store screenshots at
 1320x2868.
 
+## Heat
+
+A phone's power is fill: every full-screen pass at the pixel ratio, every
+PBR fragment, twenty screens of smoke. `docs/perf/HEAT.md` is the ledger.
+On a phone the ratio is 1.35 of the device's (was 1.5) with a
+contrast-adaptive sharpen in the grade pass (`uSharpen`, engine.js), the
+grade pass and the particles run at `mediump`, the rim light is not added,
+the VSM blur is four samples, the particle fill budget is fourteen screens
+and the interface's looping animations run in ten steps a second under
+`body.lean`. `src/core/heat.js` is the heat governor: the App Store build
+reads the phone's `ProcessInfo.thermalState`, Low Power Mode and battery
+through `ios/App/App/ThermalPlugin.swift` (registered by
+`AppViewController`), and the web infers throttling from the frame
+governor's p80 at a steady load; each rung (`RUNGS`: nominal, fair,
+serious, critical) sets the engine's `heatScale`, the fill budget, the
+frame cap (`power.capFps`: 30, 30, 24, 20) and the shadow redraw cadence
+(`shadowEvery`), and Low Power Mode switches the saver on.
+`node tools/thermalprobe.mjs` plants a plugin on the page, walks the
+ladder and reads each rung back; `window.__heat.set(n)` forces a rung.
+
 ## Verify
 
 ```

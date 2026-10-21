@@ -26,6 +26,8 @@ const GradeShader = {
     uSaturation: { value: 1.05 },
     uContrast: { value: 1.055 },
     uShake: { value: new THREE.Vector2(0, 0) },
+    uSharpen: { value: 0 },
+    uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
     toneMappingExposure: { value: 1 },
   },
   vertexShader: /* glsl */`
@@ -39,6 +41,8 @@ const GradeShader = {
     uniform float uSaturation;
     uniform float uContrast;
     uniform vec2 uShake;
+    uniform float uSharpen;
+    uniform vec2 uTexel;
     varying vec2 vUv;
     // The tone curve and the transfer to the screen's colour space, which
     // used to be a pass of their own (OutputPass) after this one: a whole
@@ -59,6 +63,19 @@ const GradeShader = {
       col.r = texture2D(tDiffuse, uv + d * ca).r;
       col.g = texture2D(tDiffuse, uv).g;
       col.b = texture2D(tDiffuse, uv - d * ca).b;
+      // Contrast-adaptive sharpen, where the picture is drawn under the
+      // panel's own pixels (a phone at 1.35 of its ratio): the four
+      // neighbours' mean against the centre, weighted down where the
+      // neighbourhood already has contrast so an edge is not ringed. Off
+      // (uSharpen 0) on a desktop at full ratio.
+      if (uSharpen > 0.0) {
+        vec3 n = texture2D(tDiffuse, uv + vec2(0.0, uTexel.y)).rgb + texture2D(tDiffuse, uv - vec2(0.0, uTexel.y)).rgb
+               + texture2D(tDiffuse, uv + vec2(uTexel.x, 0.0)).rgb + texture2D(tDiffuse, uv - vec2(uTexel.x, 0.0)).rgb;
+        vec3 mean4 = n * 0.25;
+        float contrast = dot(abs(col - mean4), vec3(0.333));
+        float w = uSharpen * (1.0 - smoothstep(0.08, 0.35, contrast));
+        col += (col - mean4) * w;
+      }
 
       // Saturation around perceptual luma, so pushing colour does not also
       // push brightness and blow the stonework out.
@@ -149,6 +166,9 @@ export class Engine {
     // `renderScale` is the multiplier on top of it, and it is the only lever
     // in the engine whose cost is quadratic in what it saves.
     this.renderScale = 1;
+    // The heat governor's own multiplier on top of the tier and the frame
+    // governor (core/heat.js), so the two never fight over one number.
+    this.heatScale = 1;
     this.renderer.setPixelRatio(this._pixelRatio());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -244,7 +264,10 @@ export class Engine {
       // covers 1.36 km, and a wide blur at that scale starts leaking shadow
       // through thin geometry — a lattice tower being the worst possible case.
       this.sun.shadow.radius = 2.2;
-      this.sun.shadow.blurSamples = 8;
+      // Four samples on a phone: the radius is 2.2 texels of a 1024 map,
+      // which four already cover; the blur is two passes over the whole map
+      // on every redraw.
+      this.sun.shadow.blurSamples = COARSE ? 4 : 8;
       this.sun.shadow.camera.updateProjectionMatrix();
     }
     this.scene.add(this.sun);
@@ -264,9 +287,14 @@ export class Engine {
     this.scene.add(this.ambient);
 
     // A rim from behind separates the tower from the sky haze.
+    // Not on a phone: a second direct light is evaluated by every PBR
+    // fragment on the screen, and at arm's length the separation it buys
+    // the tower from the haze is a few per cent of the picture for a tenth
+    // of the shading. The hemisphere's sky side carries a little of it.
     this.rim = new THREE.DirectionalLight(0x9fccf4, 0.55);
     this.rim.position.set(280, 120, -260);
-    this.scene.add(this.rim);
+    if (!COARSE) this.scene.add(this.rim);
+    else this.hemi.intensity *= 1.08;
 
     // Aerial perspective.
     //
@@ -312,6 +340,14 @@ export class Engine {
     else if (tm === THREE.AgXToneMapping) defines.AGX_TONE_MAPPING = '';
     else if (tm === THREE.LinearToneMapping) defines.LINEAR_TONE_MAPPING = '';
     this.gradePass.material.defines = defines;
+    if (COARSE) {
+      // A phone draws under its own pixels (1.35 of the ratio): sharpen to
+      // meet the panel. And half precision for this pass: it works on 0..1
+      // colour and dithers after, and an Apple GPU runs it at twice the
+      // rate for half the energy.
+      this.gradePass.uniforms.uSharpen.value = 0.42;
+      this.gradePass.material.precision = 'mediump';
+    }
     this.composer.addPass(this.gradePass);
 
     // Anti-aliasing works on the finished, display-referred picture, so it
@@ -326,8 +362,11 @@ export class Engine {
     // Anything worked with a finger — a phone whatever its tier, a tablet —
     // is capped at one and a half: at arm's length the half of the pixels
     // above that cannot be seen, and the frame they cost can.
-    const cap = Math.min(this.quality.pixelRatioCap, COARSE ? 1.5 : Infinity);
-    return Math.min(window.devicePixelRatio, cap) * this.renderScale;
+    // 1.35 now, from 1.5: nineteen per cent fewer fragments in every pass,
+    // and the grade pass sharpens what is left (uSharpen), so the picture
+    // reads as crisp as it did at arm's length while the phone runs cooler.
+    const cap = Math.min(this.quality.pixelRatioCap, COARSE ? 1.35 : Infinity);
+    return Math.min(window.devicePixelRatio, cap) * this.renderScale * (this.heatScale || 1);
   }
 
   /**
@@ -348,6 +387,17 @@ export class Engine {
     this.renderer.setPixelRatio(this._pixelRatio());
     // The composer keeps its own copy of the ratio and sizes every pass by
     // it: without this the governor's scale only shrank the final blit.
+    this.composer.setPixelRatio(this._pixelRatio());
+    this._onResize();
+    return true;
+  }
+
+  /** The heat governor's multiplier on the pixel ratio (core/heat.js). */
+  setHeatScale(f) {
+    const next = Math.max(0.5, Math.min(1, f));
+    if (Math.abs(next - (this.heatScale || 1)) < 0.01) return false;
+    this.heatScale = next;
+    this.renderer.setPixelRatio(this._pixelRatio());
     this.composer.setPixelRatio(this._pixelRatio());
     this._onResize();
     return true;
@@ -386,6 +436,10 @@ export class Engine {
     if (this.renderer.getPixelRatio() !== pr) { this.renderer.setPixelRatio(pr); this.composer.setPixelRatio(pr); }
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
+    if (this.gradePass) {
+      const db = this.renderer.getDrawingBufferSize(this._dbSize || (this._dbSize = new THREE.Vector2()));
+      this.gradePass.uniforms.uTexel.value.set(1 / Math.max(1, db.x), 1 / Math.max(1, db.y));
+    }
   }
 
   /**

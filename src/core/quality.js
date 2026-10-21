@@ -263,6 +263,7 @@ export class AdaptiveGovernor {
     const sorted = [...this.samples].sort((a, b) => a - b);
     const p80 = sorted[Math.floor(sorted.length * 0.8)];
     this.samples.length = 0;
+    this.lastP80 = p80;          // read by the heat governor's web proxy (core/heat.js)
 
     if (this.cooldown > 0) { this.cooldown--; return this.budget; }
 
