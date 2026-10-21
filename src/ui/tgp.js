@@ -38,7 +38,16 @@ export class TargetingPod {
       <div class="tgp-x"></div><div class="tgp-y"></div><div class="tgp-box"></div>
       <span class="tgp-tl">TGP · WHOT</span><span class="tgp-tr" data-k="name"></span>
       <span class="tgp-bl" data-k="tti"></span><span class="tgp-br">LSR ARM</span>`;
-    document.body.appendChild(el);
+    // In the right-hand column, under the target card and the aircraft on
+    // station: as a fixed corner of its own it sat on the top bar's UNITS
+    // and the card (an iPhone, October 2026), and in the column it pushes
+    // the talk band down under it as well (--right-bottom, hud.js).
+    const col = document.getElementById('hud-right');
+    if (col) {
+      el.classList.add('in-col');
+      const loiters = document.getElementById('loiters');
+      col.insertBefore(el, loiters ? loiters.nextSibling : null);
+    } else document.body.appendChild(el);
     this.el = el;
     this.tti = el.querySelector('[data-k="tti"]');
     this.name = el.querySelector('[data-k="name"]');

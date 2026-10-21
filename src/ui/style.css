@@ -2503,6 +2503,18 @@ body.a11y-lefty #dock { justify-content: flex-start; }
 }
 #tgp.on { display: block; animation: tgp-in 0.35s steps(4) both; }
 @keyframes tgp-in { from { clip-path: inset(50% 0 50% 0); } to { clip-path: inset(0 0 0 0); } }
+#tgp.in-col { position: relative; right: auto; top: auto; flex: none; pointer-events: none; }
+#hud-right > #tgp.in-col { pointer-events: none; }
+/* On its side the screen is under four hundred points tall and the column
+   shares it with the feed above the dock's right-hand corner: a smaller
+   picture, a third of the height. */
+@media (orientation: landscape) and (max-height: 500px) {
+  #tgp { width: min(22vw, 150px); }
+  /* And the feed stands down for the run-in: under the pod it reached the
+     dock's MENU. The pod is up for the dozen seconds before the aircraft
+     arrives and the feed comes back with it gone. */
+  #hud-right:has(> #tgp.on) > #feed { display: none; }
+}
 #tgp .tgp-glass {
   position: absolute; inset: 0;
   -webkit-backdrop-filter: grayscale(1) contrast(1.55) brightness(1.08);
