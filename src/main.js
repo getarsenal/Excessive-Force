@@ -84,6 +84,7 @@ import { sightSVG } from './ui/sights.js';
 import { reminders } from './core/reminders.js';
 import { boardFor } from './game/rivals.js';
 import { recordSeasonRun, currentSeason } from './game/seasons.js';
+import { store } from './core/store.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
 
@@ -162,6 +163,11 @@ function progress(pct, msg) {
 }
 
 async function boot() {
+  // The App Store build keeps its records in the app's own preferences as
+  // well as in the web storage, and reads them back before anything looks
+  // (core/store.js): WKWebView can lose the last writes with a killed app.
+  await store.restore();
+  window.__store = store;
   installTapFeedback();
   applySaver();
   // A regression run is reproducible, so its randomness is too.
@@ -252,6 +258,8 @@ async function boot() {
   } catch { /* private mode */ }
   // Back into a battle in progress, from the front door (see battlesave.js).
   let resumeSnap = null;
+  // A save that would not fit this build (another tier), said out loud.
+  let resumeRefused = null;
   try {
     if (sessionStorage.getItem('tt.resume') === level.id) resumeSnap = battleFor(level.id);
     sessionStorage.removeItem('tt.resume');
@@ -3264,6 +3272,7 @@ async function boot() {
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
+    if (resumeRefused) hud.feed(`SAVED BATTLE WAS FOUGHT AT ${String(resumeRefused.tier || 'ANOTHER').toUpperCase()} QUALITY · THIS IS ${quality.id.toUpperCase()} · STARTING FRESH`, 'big');
     if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR`, 'big');
     if (freeRun) hud.feed('FREE PLAY · XP COUNTS, THE CAMPAIGN DOES NOT', 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
@@ -3387,6 +3396,7 @@ async function boot() {
         console.log(`[tumble] resumed ${level.id}: ${resumeSnap.units.length} units, $${resumeSnap.money}`);
       } else {
         console.warn('[tumble] saved battle does not fit this build of the level; starting fresh');
+        resumeRefused = resumeSnap;
         resumeSnap = null;
       }
     } catch (err) {
@@ -3419,7 +3429,7 @@ async function boot() {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
     if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || studioRun || freeRun || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
-    try { saveBattle(snapshotBattle({ level, battle, structures, daily, used })); } catch (err) { console.warn('[tumble] battle not saved', err); }
+    try { saveBattle(snapshotBattle({ level, battle, structures, daily, used, tier: quality.id })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
   window.__keepBattle = keepBattle;
   setInterval(keepBattle, 10000);

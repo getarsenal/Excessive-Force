@@ -96,7 +96,7 @@ function unpackBits(b64, n, fn) {
  * The battle as it stands, or null if there is nothing worth keeping: no gun
  * on the ground and not a stone touched is a contract not yet started.
  */
-export function snapshotBattle({ level, battle, structures, daily = null, used = null }) {
+export function snapshotBattle({ level, battle, structures, daily = null, used = null, tier = null }) {
   if (!battle || battle.state !== 'playing') return null;
   const units = battle.units.filter((u) => u.alive && u.health > 0).map((u) => ({
     id: u.def.id,
@@ -126,6 +126,9 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
     v: 1,
     level: level.id,
     at: Date.now(),
+    // The tier it was fought at: another tier builds the stones differently
+    // and the save will not fit it (`restoreBattle`), which the player is told.
+    tier,
     target: level.target || level.name,
     place: level.place || level.subtitle || '',
     money: Math.round(battle.money),
@@ -184,6 +187,9 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
   };
 }
 
+/** The last save this page made: when, which, how big, whether it went in. */
+export const saveLog = { at: 0, level: null, bytes: 0, ok: null, saves: 0, failed: 0 };
+
 export function saveBattle(snap) {
   if (!snap || NOT_KEPT.has(snap.level)) return false;
   const all = readAll();
@@ -192,9 +198,12 @@ export function saveBattle(snap) {
   const keep = Object.values(all).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, MAX);
   const out = {};
   for (const b of keep) out[b.level] = b;
-  if (writeAll(out)) return true;
   // Out of room: this one matters more than the others.
-  return writeAll({ [snap.level]: snap });
+  const ok = writeAll(out) || writeAll({ [snap.level]: snap });
+  saveLog.at = Date.now(); saveLog.level = snap.level; saveLog.ok = ok;
+  try { saveLog.bytes = JSON.stringify(snap).length; } catch { saveLog.bytes = 0; }
+  if (ok) saveLog.saves++; else saveLog.failed++;
+  return ok;
 }
 
 /**

@@ -15,6 +15,8 @@ import { reminders } from '../core/reminders.js';
 import { operationOf, isBoss, warlordOf, starsOf } from '../game/operations.js';
 import { BRANCHES, doctrine, freePoints, buyRank, refund } from '../game/doctrine.js';
 import { crashes, describeCrash, clearCrashes, buildId } from '../core/blackbox.js';
+import { listBattles, saveLog } from '../game/battlesave.js';
+import { store } from '../core/store.js';
 import { playHistory, showSessionCard } from './playmonitor.js';
 
 /**
@@ -261,8 +263,11 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             <button class="ef-set" id="ef-playcopy" type="button" data-copy="play"><span>COPY PLAY SESSION</span><em></em></button>
             <button class="ef-set" id="ef-perf" type="button" data-copy="perf"><span>COPY PERF RUN</span><em></em></button>
             <button class="ef-set" id="ef-crashclear" type="button"><span>CLEAR CRASHES</span><em></em></button>
+            <button class="ef-set" id="ef-sound" type="button" data-copy="sound"><span>SOUND CLIPS</span><em></em></button>
+            <button class="ef-set" id="ef-soundcheck" type="button"><span>SOUND CHECK</span><em></em></button>
+            <button class="ef-set" id="ef-saves" type="button" data-copy="save"><span>SAVED BATTLES</span><em></em></button>
           </div>
-          <div class="ef-set-note">A battle that drops you back to the title is filed here on the next start (the black box). RECORD MY PLAY and the scripted runs are in a battle's TEST panel; their results are kept here.</div>
+          <div class="ef-set-note">A battle that drops you back to the title is filed here on the next start (the black box). RECORD MY PLAY and the scripted runs are in a battle's TEST panel; their results are kept here. SOUND CLIPS says which recordings this phone decoded (COPY sends the list); SAVED BATTLES which fights it kept, and what the app's own store restored.</div>
         </section>
 
       </main>
@@ -879,7 +884,25 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     const pr = perfRuns()[0];
     em('#ef-perf', pr ? `${pr.level || ''} · ${when(pr.at)} · ${pr.mode || ''}` : 'none recorded');
     em('#ef-crashclear', cs.length ? `${cs.length} to clear` : 'nothing to clear');
+    // The clips the phone decoded, and the battles it kept: the two things
+    // the App Store build got wrong first, readable here without a fight.
+    const au = window.__audio;
+    em('#ef-sound', au ? au.says() : 'not started · tap first', !!(au && au.loadReport && au.loadReport.ok < au.loadReport.total));
+    if (au && au.ctx && !au.loadReport && !au._failed) setTimeout(paintTesting, 1500);
+    em('#ef-soundcheck', au && au.loadReport ? `plays the ${au.loadReport.ok} loaded` : 'needs the clips');
+    const bl = listBattles();
+    const b0 = bl[0];
+    em('#ef-saves', `${b0 ? `${bl.length} · ${b0.level} · ${when(new Date(b0.at).toISOString())} · ${b0.tier || '?'}` : 'none'} · ${store.says()}`, !!store.report?.restored?.length);
   };
+  /** What SAVED BATTLES copies: the saves' headers, the store's boot report, the page's last save. */
+  const saveReport = () => ({
+    at: new Date().toISOString(),
+    battles: listBattles().map((b) => ({ level: b.level, at: new Date(b.at).toISOString(), tier: b.tier, elapsed: b.elapsed, units: b.units?.length, integrity: b.integrity })),
+    lastSave: saveLog.at ? { ...saveLog, at: new Date(saveLog.at).toISOString() } : null,
+    store: store.report,
+    storeWrites: store.writes, storeErrors: store.errors, storeLastError: store.lastError,
+    resumeAsked: (() => { try { return sessionStorage.getItem('tt.resume'); } catch { return null; } })(),
+  });
   // Onto the clipboard, or into a box to select by hand where the clipboard is refused.
   const copyOut = async (btn, text) => {
     const emEl = btn.querySelector('em');
@@ -1179,8 +1202,16 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       if (!btn) return;
       if (btn.id === 'ef-play') { if (!showSessionCard()) paintTesting(); return; }
       if (btn.id === 'ef-crashclear') { clearCrashes(); paintTesting(); return; }
+      if (btn.id === 'ef-soundcheck') {
+        const au = window.__audio;
+        const played = au ? au.check() : [];
+        btn.querySelector('em').textContent = played.length ? `playing ${played.join(' ')}` : (au && au.ctx ? `nothing loaded · ${au.state}` : 'tap again');
+        return;
+      }
       const what = btn.dataset.copy;
-      const rec = what === 'crash' ? crashes().slice(-1)[0] : what === 'play' ? playHistory()[0] : what === 'perf' ? perfRuns()[0] : null;
+      const rec = what === 'crash' ? crashes().slice(-1)[0] : what === 'play' ? playHistory()[0] : what === 'perf' ? perfRuns()[0]
+        : what === 'sound' ? (window.__audio?.loadReport || null) : what === 'save' ? saveReport() : null;
+      if (what === 'sound' && !rec) { btn.querySelector('em').textContent = window.__audio?.ctx ? 'still loading' : 'not started · tap first'; return; }
       if (!rec) { btn.querySelector('em').textContent = 'none recorded'; return; }
       copyOut(btn, JSON.stringify(rec, null, 1));
     });

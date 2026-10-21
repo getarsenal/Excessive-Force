@@ -155,3 +155,18 @@ Edit `ios/` by hand (no Mac here) or on a Mac with `npx cap open ios`. After
 changing the Capacitor dependencies in `package.json`, run `npx cap sync ios`
 and commit the regenerated `ios/App/CapApp-SPM/Package.swift`. Never commit
 `ios/App/App/public`.
+
+## What the native build does differently (and how to check it on the phone)
+
+- **Records.** WKWebView can lose localStorage's last writes when the app is
+  killed from the switcher, which lost a battle in progress in TestFlight.
+  `src/core/store.js` mirrors every `tt.*` write into `@capacitor/preferences`
+  (UserDefaults) and restores the mirror at boot. SETTINGS › TESTING › SAVED
+  BATTLES says how many saves there are and what the store restored; COPY
+  puts the headers and the store's boot report on the clipboard.
+- **Sound.** The recorded clips are shipped as mp3 and as AAC (`.m4a`) and the
+  native app asks for the AAC first (`src/core/audio.js`). SETTINGS › TESTING ›
+  SOUND CLIPS says how many of the nine decoded and in which format; SOUND
+  CHECK plays each one in turn; COPY sends the per-clip report with the
+  decoder's error for any that failed. New or replaced clips go through
+  `sh tools/clips.sh`.

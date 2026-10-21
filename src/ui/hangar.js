@@ -615,10 +615,20 @@ export function hangarStage(host, { prog } = {}) {
   function loadBoom() {
     if (boomLoading) return;
     boomLoading = true;
-    fetch('assets/cannon.mp3').then((r) => r.arrayBuffer()).then((b) => {
-      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-      return actx.decodeAudioData(b);
-    }).then((b) => { boomBuf = b; }).catch(() => { /* the synthetic one will do */ });
+    // The game's own loader has it decoded already when the battle has run;
+    // otherwise the AAC copy first in the native app, as audio.js does.
+    const have = window.__audio?.buffers?.get('gun');
+    if (have) { boomBuf = have; return; }
+    const native = window.location.protocol === 'capacitor:' || !!window.Capacitor?.isNativePlatform?.();
+    const urls = native ? ['assets/cannon.m4a', 'assets/cannon.mp3'] : ['assets/cannon.mp3', 'assets/cannon.m4a'];
+    const tryAt = (i) => {
+      if (i >= urls.length) return;
+      fetch(urls[i]).then((r) => r.arrayBuffer()).then((b) => {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        return actx.decodeAudioData(b);
+      }).then((b) => { boomBuf = b; }).catch(() => tryAt(i + 1)); // the synthetic one will do
+    };
+    tryAt(0);
   }
   function boom(gain) {
     if (!menuMusic.enabled) return;

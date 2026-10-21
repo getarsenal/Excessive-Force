@@ -69,7 +69,7 @@ export const heat = {
       if (changed) this._fire();
     };
     try { take(await plugin.state()); } catch (e) { console.warn('[heat] no state', e); }
-    try { plugin.addListener('change', take); } catch { /* no events; the state call stands */ }
+    try { const h = plugin.addListener('change', take); if (h && typeof h.catch === 'function') h.catch(() => { /* no events; the state call stands */ }); } catch { /* same */ }
     console.log(`[heat] the phone reports ${LEVELS[this.level]}${this.lowPower ? ' · low power mode' : ''}`);
     return true;
   },

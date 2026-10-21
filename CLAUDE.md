@@ -79,7 +79,25 @@ this bundle id (`docs/APP_STORE.md` has every step and the owner's side). In
 the native app the page runs from `capacitor://localhost`: main.js registers
 no service worker there, `feedback.js` sends its pulses to the Taptic Engine
 through `@capacitor/haptics` instead of a hidden switch, the status bar is
-hidden and the HUD keeps to the safe-area insets as on the web. iPhone only
+hidden and the HUD keeps to the safe-area insets as on the web. Two things
+the web build never had to think about: WKWebView writes its localStorage
+to disk behind the page and an app killed from the switcher can come back
+without the last writes (the battle it was saving among them), so on the
+native build every `tt.*` write is mirrored a beat behind into the app's own
+preferences (`src/core/store.js`, `@capacitor/preferences`) and `boot`
+awaits `store.restore()` before anything reads, the mirror winning where
+the two differ; and WebKit's decoder refused the owner's mp3 clips while
+the synthesised sounds played on the same context, so every clip is shipped
+twice (`sh tools/clips.sh`: the mp3 with its tags stripped losslessly and
+an AAC copy in an m4a) and `audio.js` asks for the m4a first in the native
+app, the other on failure, with `audio.loadReport` saying what each clip
+came in as. SETTINGS › TESTING shows both without a battle: SOUND CLIPS
+(decoded/total, the format, the context; COPY sends the report), SOUND
+CHECK (plays every loaded clip in turn), SAVED BATTLES (the saves with
+their tier, what the store restored at boot; COPY sends the headers). A
+save records the tier it was fought at and a resume refused for a
+different tier says so in the feed instead of silently starting over.
+iPhone only
 (`TARGETED_DEVICE_FAMILY = 1`) until there are iPad screenshots. The portraits
 in `public/assets/characters/` are WebP: sixty-one PNGs were 149 MB of a
 300 MB app. `node tools/storeshots.mjs` renders the App Store screenshots at

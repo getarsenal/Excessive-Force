@@ -32,19 +32,34 @@ const MAX_DELAY = 3.0;      // beyond this, late audio reads as broken, not dist
 const MAX_VOICES = 32;
 
 const CLIPS = {
-  gun: 'assets/cannon.mp3',
-  rocket: 'assets/rocket.mp3',
-  explosion: 'assets/explosion.mp3',
-  mg: 'assets/machine_gun.mp3',
-  enemy: 'assets/enemy_shot.mp3',
+  gun: 'assets/cannon',
+  rocket: 'assets/rocket',
+  explosion: 'assets/explosion',
+  mg: 'assets/machine_gun',
+  enemy: 'assets/enemy_shot',
   // The A-10's gun, as heard near its target: impacts, then the gun.
-  brrt: 'assets/a10_gun.mp3',
+  brrt: 'assets/a10_gun',
   // The lasgun, three takes of it: synth.js's `lasgun` picks one a beam and
   // loops it for the beam's time over its own rumble bed.
-  lasgun1: 'assets/lasgun1.mp3',
-  lasgun2: 'assets/lasgun2.mp3',
-  lasgun3: 'assets/lasgun3.mp3',
+  lasgun1: 'assets/lasgun1',
+  lasgun2: 'assets/lasgun2',
+  lasgun3: 'assets/lasgun3',
 };
+
+/**
+ * Every clip is shipped twice, as the mp3 the owner made and as an AAC copy
+ * of it (`tools/clips.sh`), and the loader takes the other when the first
+ * will not decode. The App Store build asks for the AAC first: the clips
+ * played on the web and were silent in the native app, every one of them,
+ * with the synthesised sounds playing on the same context, which is a
+ * decoder saying no and not a muted page; AAC in an m4a is CoreAudio's own
+ * format and the surest thing WebKit can be handed. The order is settled
+ * once; `loadReport` says which each clip came in as, or why neither did.
+ */
+const NATIVE_APP = (() => {
+  try { return window.location?.protocol === 'capacitor:' || !!window.Capacitor?.isNativePlatform?.(); } catch { return false; }
+})();
+const FORMATS = NATIVE_APP ? ['m4a', 'mp3'] : ['mp3', 'm4a'];
 
 export class Audio {
   constructor() {
@@ -129,6 +144,8 @@ export class Audio {
       if (old) old.close().catch(() => { /* gone already */ });
       if (this.onRebuild) this.onRebuild(this.ctx);
       console.warn('[tumble] audio context rebuilt');
+      // Clips the first context never decoded get a second chance on this one.
+      if (this.buffers.size < Object.keys(CLIPS).length) this._loadAll().catch(() => { /* reported in loadReport */ });
     } catch (e) {
       this.ctx = old;
       console.warn('[tumble] audio rebuild failed:', e.message);
@@ -193,18 +210,83 @@ export class Audio {
   get state() { return this.ctx ? this.ctx.state : (this._failed ? 'failed' : 'none'); }
 
   async _loadAll() {
-    const jobs = Object.entries(CLIPS).map(async ([name, url]) => {
+    const t0 = performance.now();
+    const clips = await Promise.all(Object.entries(CLIPS).map(([name, base]) => this._loadOne(name, base)));
+    this.loadReport = {
+      at: new Date().toISOString(),
+      native: NATIVE_APP,
+      formats: FORMATS.join(' then '),
+      ctx: this.ctx ? { state: this.ctx.state, sampleRate: this.ctx.sampleRate } : null,
+      ms: Math.round(performance.now() - t0),
+      ok: clips.filter((c) => c.ok).length,
+      total: clips.length,
+      clips,
+    };
+    const failed = clips.filter((c) => !c.ok);
+    if (failed.length) console.warn('[tumble] clips not loaded:', failed.map((c) => `${c.name} (${c.tried.map((t) => `${t.format}: ${t.error}`).join('; ')})`).join(', '));
+  }
+
+  /**
+   * One clip, in the first format that fetches and decodes. The decode is
+   * asked for in the callback form as well as the promise one: WebKit had
+   * the callbacks long before it returned a promise, and the two never
+   * disagree where both exist. A buffer handed to the decoder is detached by
+   * it, so every attempt fetches its own.
+   */
+  async _loadOne(name, base) {
+    const rec = { name, ok: false, format: null, bytes: 0, seconds: 0, tried: [] };
+    for (const format of FORMATS) {
+      const url = `${base}.${format}`;
+      const t = { format, error: null };
       try {
         const res = await fetch(url);
-        if (!res.ok) throw new Error(`${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const bytes = await res.arrayBuffer();
-        const buf = await this.ctx.decodeAudioData(bytes);
+        rec.bytes = bytes.byteLength;
+        if (bytes.byteLength < 64) throw new Error(`${bytes.byteLength} bytes (${res.headers.get('content-type') || 'no type'})`);
+        const buf = await new Promise((resolve, reject) => {
+          try {
+            const p = this.ctx.decodeAudioData(bytes, resolve, reject);
+            if (p && typeof p.then === 'function') p.then(resolve, reject);
+          } catch (e) { reject(e); }
+        });
         this.buffers.set(name, buf);
+        rec.ok = true; rec.format = format; rec.seconds = Math.round(buf.duration * 100) / 100;
+        rec.tried.push(t);
+        break;
       } catch (e) {
-        console.warn(`[tumble] could not load ${url}:`, e.message);
+        t.error = (e && (e.message || e.name)) ? `${e.name || 'Error'}: ${e.message || ''}`.trim() : String(e);
+        rec.tried.push(t);
       }
-    });
-    await Promise.all(jobs);
+    }
+    return rec;
+  }
+
+  /** The clips the fight has, as one line for the SETTINGS sheet. */
+  says() {
+    if (this._failed) return 'audio unavailable';
+    const r = this.loadReport;
+    if (!r) return this.ctx ? 'loading' : 'not started · tap first';
+    const failed = r.clips.filter((c) => !c.ok).map((c) => c.name);
+    const via = [...new Set(r.clips.filter((c) => c.ok).map((c) => c.format))].join('+') || '—';
+    const ctx = this.ctx ? `${this.ctx.state} ${Math.round(this.ctx.sampleRate / 1000)}k` : 'no context';
+    return `${r.ok}/${r.total} clips · ${via} · ${ctx}${failed.length ? ` · missing ${failed.join(' ')}` : ''}${this.rebuilt ? ` · rebuilt ×${this.rebuilt}` : ''}`;
+  }
+
+  /**
+   * Every loaded clip once, in turn, flat and at a third: the SOUND CHECK
+   * row on SETTINGS, so the owner can hear which clips the phone has without
+   * a battle. Returns the names it played.
+   */
+  check() {
+    if (!this.ready || this._failed || !this.ctx) return [];
+    const names = Object.keys(CLIPS).filter((n) => this.buffers.has(n));
+    let at = 0;
+    for (const n of names) {
+      this.play(n, null, { gain: 0.35, delay: at, priority: true, cooldown: 0 });
+      at += Math.min(2.5, this.buffers.get(n).duration) + 0.25;
+    }
+    return names;
   }
 
   /** Call once per frame so positioning has somewhere to measure from. */
