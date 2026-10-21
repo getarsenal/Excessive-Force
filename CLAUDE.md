@@ -622,8 +622,9 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   `battle._onImpact` routes a round into one to `range.hit` and every
   impact to `range.blast`. The level is a sandbox (`level.sandbox`: no
   win or loss, garrison, SAMs, airborne, generals, perks or XP; free and
-  unlocked; no airlift; the field works unmanned and hidden; the camera's
-  focus pinned to the line, `rig.panLocked`) with the bullet-trap berm as its one Structure
+  unlocked; no airlift; the field works unmanned and hidden; the camera
+  the battle's own, free to go down the lanes — it was pinned to the
+  firing line while the range was a hall) with the bullet-trap berm as its one Structure
   and its readouts hidden (`body.range`), the tally on the top bar
   (`#range-board`: the rounds fired down the range and the share that
   found a target, `range.open`/`close` round each impact and each MG

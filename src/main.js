@@ -732,8 +732,6 @@ async function boot() {
   // Deployed where the finger lands: no airlift onto a practice range.
   if (level.sandbox) { battle.freeBuild = true; battle.unlockAll = true; battle.airlift = false; document.body.classList.add('range'); }
   if (studioRun) { battle.freeBuild = true; battle.unlockAll = true; battle.holdEnd = true; battle.studioRun = true; document.body.classList.add('studio-run'); }
-  // The camera stays on the firing line: it turns and zooms, it does not wander off down the lanes.
-  if (level.sandbox) rig.panLocked = true;
   const range = level.range ? new Range({ scene: engine.scene, physics, terrain, battle, fx, audio, origin, groundY, quality }) : null;
   window.__range = range;
   // A level can set its own terms: Boot Camp opens the whole arsenal and

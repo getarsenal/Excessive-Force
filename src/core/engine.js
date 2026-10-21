@@ -820,7 +820,7 @@ export class CameraRig {
    * ground plane.
    */
   _pan(dx, dy, sx, sy) {
-    // A level may pin the camera's focus (the range: the firing line).
+    // A level may pin the camera's focus (nothing does now; the range did while it was a hall).
     if (this.panLocked) return;
     if (sx !== undefined && sy !== undefined) {
       const a = this._panA || (this._panA = new THREE.Vector3());
