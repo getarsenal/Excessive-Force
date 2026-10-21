@@ -86,12 +86,16 @@ without the last writes (the battle it was saving among them), so on the
 native build every `tt.*` write is mirrored a beat behind into the app's own
 preferences (`src/core/store.js`, `@capacitor/preferences`) and `boot`
 awaits `store.restore()` before anything reads, the mirror winning where
-the two differ; and WebKit's decoder refused the owner's mp3 clips while
-the synthesised sounds played on the same context, so every clip is shipped
-twice (`sh tools/clips.sh`: the mp3 with its tags stripped losslessly and
-an AAC copy in an m4a) and `audio.js` asks for the m4a first in the native
-app, the other on failure, with `audio.loadReport` saying what each clip
-came in as. SETTINGS › TESTING shows both without a battle: SOUND CLIPS
+the two differ; and Capacitor's iOS asset handler answers a media file
+(mp3, m4a, wav: its own list) with a plain URLResponse and no HTTP status,
+so `fetch` had the bytes with `ok` false and the loader threw every clip
+away while the synthesised sounds played on the same context:
+`fetchBytes` (audio.js) takes a body on a status-less answer and asks
+again through XMLHttpRequest when fetch will not, every clip is shipped
+twice anyway (`sh tools/clips.sh`: the mp3 with its tags stripped
+losslessly and an AAC copy in an m4a), `audio.js` asks for the m4a first
+in the native app and the other on failure, and `audio.loadReport` says
+what each clip came in as and by which road. SETTINGS › TESTING shows both without a battle: SOUND CLIPS
 (decoded/total, the format, the context; COPY sends the report), SOUND
 CHECK (plays every loaded clip in turn), SAVED BATTLES (the saves with
 their tier, what the store restored at boot; COPY sends the headers). A

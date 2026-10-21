@@ -3,6 +3,7 @@ import { makeAirframe, makeHercules, makeChinook } from '../game/aircraft.js';
 import { ART, unlockedArt, warStats, paintNoseArt, artChoice, setArtChoice } from '../game/noseart.js';
 import { feedback } from './feedback.js';
 import { TracerFX } from '../fx/tracers.js';
+import { fetchBytes } from '../core/audio.js';
 import { menuMusic } from './music.js';
 import { power } from '../core/power.js';
 
@@ -623,9 +624,9 @@ export function hangarStage(host, { prog } = {}) {
     const urls = native ? ['assets/cannon.m4a', 'assets/cannon.mp3'] : ['assets/cannon.mp3', 'assets/cannon.m4a'];
     const tryAt = (i) => {
       if (i >= urls.length) return;
-      fetch(urls[i]).then((r) => r.arrayBuffer()).then((b) => {
+      fetchBytes(urls[i]).then(({ bytes }) => {
         actx = actx || new (window.AudioContext || window.webkitAudioContext)();
-        return actx.decodeAudioData(b);
+        return actx.decodeAudioData(bytes);
       }).then((b) => { boomBuf = b; }).catch(() => tryAt(i + 1)); // the synthetic one will do
     };
     tryAt(0);

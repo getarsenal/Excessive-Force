@@ -61,6 +61,44 @@ const NATIVE_APP = (() => {
 })();
 const FORMATS = NATIVE_APP ? ['m4a', 'mp3'] : ['mp3', 'm4a'];
 
+/**
+ * A file's bytes, from a server that may not speak HTTP.
+ *
+ * Capacitor's iOS asset handler answers a media file (mp3, m4a, wav: its
+ * own list) with a plain URLResponse rather than an HTTP one, for the
+ * media elements' sake, so `fetch` gets the body with no status: `ok` is
+ * false and `status` 0, and a loader that checked `ok` first threw every
+ * clip away while the JSON and the models, served with a 200, loaded.
+ * That was every recorded sound silent in the App Store build. A body on
+ * a status-less answer is taken; a fetch that will not even do that is
+ * asked again through XMLHttpRequest, which has always handed over the
+ * bytes of a non-HTTP load with its status at 0.
+ */
+export async function fetchBytes(url) {
+  let first;
+  try {
+    const res = await fetch(url);
+    if (!res.ok && res.status !== 0) throw new Error(`HTTP ${res.status}`);
+    const bytes = await res.arrayBuffer();
+    if (bytes.byteLength >= 64) return { bytes, via: res.status === 0 ? 'fetch (no status)' : 'fetch' };
+    throw new Error(`${bytes.byteLength} bytes (${res.headers.get('content-type') || 'no type'}, status ${res.status})`);
+  } catch (e) { first = e; }
+  return new Promise((resolve, reject) => {
+    try {
+      const x = new XMLHttpRequest();
+      x.open('GET', url, true);
+      x.responseType = 'arraybuffer';
+      x.onload = () => {
+        const n = x.response ? x.response.byteLength : 0;
+        if (n >= 64) resolve({ bytes: x.response, via: `xhr (status ${x.status})` });
+        else reject(new Error(`fetch: ${first.message}; xhr: status ${x.status}, ${n} bytes`));
+      };
+      x.onerror = () => reject(new Error(`fetch: ${first.message}; xhr: failed`));
+      x.send();
+    } catch (e) { reject(new Error(`fetch: ${first.message}; xhr: ${e.message}`)); }
+  });
+}
+
 export class Audio {
   constructor() {
     this.ctx = null;
@@ -239,11 +277,9 @@ export class Audio {
       const url = `${base}.${format}`;
       const t = { format, error: null };
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const bytes = await res.arrayBuffer();
-        rec.bytes = bytes.byteLength;
-        if (bytes.byteLength < 64) throw new Error(`${bytes.byteLength} bytes (${res.headers.get('content-type') || 'no type'})`);
+        const got = await fetchBytes(url);
+        const bytes = got.bytes;
+        rec.bytes = bytes.byteLength; t.via = got.via;
         const buf = await new Promise((resolve, reject) => {
           try {
             const p = this.ctx.decodeAudioData(bytes, resolve, reject);

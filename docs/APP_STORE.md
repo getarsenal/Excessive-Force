@@ -164,8 +164,11 @@ and commit the regenerated `ios/App/CapApp-SPM/Package.swift`. Never commit
   (UserDefaults) and restores the mirror at boot. SETTINGS › TESTING › SAVED
   BATTLES says how many saves there are and what the store restored; COPY
   puts the headers and the store's boot report on the clipboard.
-- **Sound.** The recorded clips are shipped as mp3 and as AAC (`.m4a`) and the
-  native app asks for the AAC first (`src/core/audio.js`). SETTINGS › TESTING ›
+- **Sound.** Capacitor's asset handler serves a media file with no HTTP
+  status, which a `fetch` that checks `ok` throws away: `fetchBytes` in
+  `src/core/audio.js` takes the body anyway. The recorded clips are also
+  shipped as mp3 and as AAC (`.m4a`) and the native app asks for the AAC
+  first. SETTINGS › TESTING ›
   SOUND CLIPS says how many of the nine decoded and in which format; SOUND
   CHECK plays each one in turn; COPY sends the per-clip report with the
   decoder's error for any that failed. New or replaced clips go through
