@@ -152,9 +152,24 @@ function auditInPage(opts) {
   // Horizontal scroll.
   const se = document.scrollingElement || document.documentElement;
   const hscroll = { doc: se.scrollWidth > W + 1, docW: se.scrollWidth, body: document.body.scrollWidth > W + 1 };
-  for (const s of ['#title', '#worldmap', '.ef-body', '.tt-shell']) {
-    const el = document.querySelector(s); if (el && visible(el)) hscroll[s] = el.scrollWidth > el.clientWidth + 1;
+  for (const s of ['#title', '#worldmap', '.ef-body', '.tt-shell', '.ef', '.ef-view', '.wm-panel', '.ef-list']) {
+    // Wider content under a clipped box (the title's drifting slides, its
+    // grain) is not a scroll; a box that can be panned is.
+    const el = document.querySelector(s); if (el && visible(el)) hscroll[s] = el.scrollWidth > el.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(el).overflowX);
   }
+  // Any scroller on the screen that can be panned sideways, by whatever
+  // name: a phone screen scrolls one way. The card bar and the perf card's
+  // table are the carousels that are meant to.
+  const MEANT = ['.cardbar', '.pc-scroll', '.tt-list', '.st-chips'];
+  hscroll.els = [];
+  for (const el of document.querySelectorAll('body *')) {
+    if (el.scrollWidth <= el.clientWidth + 1 || !visible(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.overflowX !== 'auto' && cs.overflowX !== 'scroll') continue;
+    if (MEANT.some((m) => el.matches(m))) continue;
+    hscroll.els.push(`${sel(el)} ${el.clientWidth}<${el.scrollWidth}`);
+  }
+  hscroll.any = hscroll.doc || hscroll.els.length > 0 || Object.keys(hscroll).some((k) => k.startsWith('.') || k.startsWith('#') ? hscroll[k] === true : false);
   // Canvas.
   const c = document.getElementById('game-canvas');
   const cr = c ? c.getBoundingClientRect() : null;
@@ -267,7 +282,7 @@ for (const vp of todo) {
     fs.writeFileSync(`${OUT}/${vp.id}-${name}.json`, JSON.stringify(a, null, 1));
     const c = a.counts || {};
     console.log(`  ${name.padEnd(16)} ${vw.width}x${vw.height} small=${c.small} iovl=${c.ioverlaps} povl=${c.poverlaps} clip=${c.clipped} safe=${c.safe} txt<11=${c.smallText}` +
-      (a.hscroll?.doc ? ' HSCROLL' : '') + (a.canvas ? ` canvas ${a.canvas.bufW}x${a.canvas.bufH} css ${a.canvas.cssW}x${a.canvas.cssH}` : ''));
+      (a.hscroll?.any ? ` HSCROLL ${(a.hscroll.els || []).join(' | ') || 'doc'}` : '') + (a.canvas ? ` canvas ${a.canvas.bufW}x${a.canvas.bufH} css ${a.canvas.cssW}x${a.canvas.cssH}` : ''));
     return a;
   };
 

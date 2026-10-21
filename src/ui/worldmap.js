@@ -183,7 +183,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
   root.innerHTML = `
     <div class="ef" data-view="door">
       <header class="ef-top">
-        <div class="ef-ledger"><b class="ef-star">\u2605 ${state.ops?.total ?? 0}</b> &middot; ${String(state.done).padStart(2, '0')} / ${state.total} CLOSED</div>
+        <div class="ef-ledger"><b class="ef-star">\u2605 ${state.ops?.total ?? 0}</b> &middot; ${String(state.done).padStart(2, '0')} / ${state.total}<i class="ef-ledger-word"> CLOSED</i></div>
         <div class="ef-brand">
           <img class="ef-logo" src="./logo-512.png" alt="" width="512" height="512">
           <span>EXCESSIVE FORCE</span>
@@ -801,8 +801,13 @@ export async function showWorldMap({ current = null, canResume = false, view: st
         const lv = LEVELS[b.id] || {};
         const cls = `${b.won ? 'won' : ''}${b.open ? ' open' : ''}${b.boss ? ' boss' : ''}${b.id === t.id ? ' here' : ''}`;
         const sub = b.boss && b.needStars ? `NEED ${b.needStars}\u2605` : b.stars.filter(Boolean).length ? '\u2605'.repeat(b.stars.filter(Boolean).length) : (b.open ? 'OPEN' : '');
-        return `<button type="button" class="ef-op-pip ${cls}" data-level="${b.id}">`
-          + `<b>${b.boss ? '\u2620 ' : ''}${(lv.place || b.id).toUpperCase()}</b><em>${sub}</em></button>`;
+        // A fifth of a phone takes a city, not an address: the shortest part
+        // of the place ("Agra, Uttar Pradesh" is AGRA; "Red Square, Moscow"
+        // MOSCOW), the whole of it on the button's label.
+        const place = lv.place || b.id;
+        const short = place.split(',').map((x) => x.trim()).filter(Boolean).sort((x, y) => x.length - y.length)[0] || place;
+        return `<button type="button" class="ef-op-pip ${cls}" data-level="${b.id}" aria-label="${place}" title="${place}">`
+          + `<b>${b.boss ? '\u2620 ' : ''}${short.toUpperCase()}</b><em>${sub}</em></button>`;
       }).join('')}</div>`;
     for (const b of holder.querySelectorAll('.ef-op-pip')) {
       b.addEventListener('click', (e) => { e.stopPropagation(); select(b.dataset.level); });

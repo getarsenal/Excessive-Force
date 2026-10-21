@@ -1542,7 +1542,12 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
   min-height: 0;
 }
 
-.ef-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
+/* The ledger may shrink and be cut; the tools never: on a 393 phone the row
+   was 26 px wider than the glass and the settings gear hung off the edge. */
+.ef-top { display: grid; grid-template-columns: minmax(0, 1fr) auto max-content; align-items: center; gap: 12px; }
+.ef-ledger { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ef-ledger-word { font-style: normal; }
+@media (max-width: 430px) { .ef-ledger-word { display: none; } }
 .ef-ledger {
   font-family: var(--f-data); font-size: 11px; letter-spacing: 0.08em;
   color: #6f8299; white-space: nowrap;
@@ -1569,6 +1574,10 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
 
 .ef-body { flex: 1 1 auto; min-height: 0; display: flex; }
 .ef-view { display: none; flex: 1 1 auto; min-height: 0; flex-direction: column; gap: 10px; }
+/* A phone screen scrolls one way. Nothing in a sheet may push it wider than
+   the glass: a row that overflows is cut, never panned (the operation strip's
+   five pips once drew the whole contract file 1.7 screens wide). */
+.ef, .ef-body, .ef-view, .wm-panel, .ef-list { overflow-x: hidden; }
 .ef[data-view="door"] .ef-view[data-view="door"],
 .ef[data-view="map"] .ef-view[data-view="map"],
 .ef[data-view="dossier"] .ef-view[data-view="dossier"],
@@ -1862,7 +1871,7 @@ body.ended #ui > *:not(#endcard) { display: none !important; }
    coordinates, the brief, then objectives and record side by side, what the
    close releases, and the order. The photograph and the man holding the
    place sit down the right. */
-.ef-view[data-view="dossier"] { overflow: auto; -webkit-overflow-scrolling: touch; }
+.ef-view[data-view="dossier"] { overflow: hidden auto; -webkit-overflow-scrolling: touch; }
 .wm-panel { min-height: 1px; }
 .wm-doss {
   position: relative;
@@ -2879,10 +2888,14 @@ body.ended #blitzbar, body.clear-view #blitzbar { display: none; }
 .ef-opstrip[hidden] { display: none; }
 .ef-op-head { display: flex; justify-content: space-between; font: 600 11.5px/1 var(--f-ui); letter-spacing: 0.16em; color: var(--dim); margin-bottom: 6px; }
 .ef-op-head b { color: #ffc53d; font-weight: 600; }
-.ef-op-pips { display: grid; grid-template-columns: repeat(4, 1fr) 1.3fr; gap: 5px; }
-.ef-op-pip { min-height: 46px; border: 1px solid var(--edge); border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--dim);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px; cursor: pointer; font: inherit; }
-.ef-op-pip b { font: 600 9.5px/1.1 var(--f-ui); letter-spacing: 0.06em; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.ef-op-pips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.3fr); gap: 5px; }
+/* `min-width: 0`: a grid item is as wide as its longest word unless told it
+   may be narrower, and "PIAZZA DEI MIRACOLI, PISA" is wider than a fifth of
+   a phone. The name wraps to two lines and is cut after them. */
+.ef-op-pip { min-width: 0; min-height: 50px; border: 1px solid var(--edge); border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--dim);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 3px; cursor: pointer; font: inherit; overflow: hidden; }
+.ef-op-pip b { font: 600 9.5px/1.15 var(--f-ui); letter-spacing: 0.06em; text-align: center; overflow: hidden; max-width: 100%;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ef-op-pip em { font-style: normal; font-size: 10px; color: #ffc53d; letter-spacing: 0; }
 .ef-op-pip.open { color: var(--text); border-color: var(--edge-bright); }
 .ef-op-pip.won { background: rgba(111, 208, 140, 0.16); color: var(--text); }
