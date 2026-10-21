@@ -138,11 +138,18 @@ export function goToLevel(id, opts = {}) {
     const st = document.getElementById('load-status');
     if (st) st.textContent = 'moving out';
   }
+  try { localStorage.setItem('tt.movefrom', JSON.stringify({ from: window.__levelId || null, to: id, at: Date.now() })); } catch { /* no storage */ }
   try { window.__releaseLevel?.(); } catch { /* going anyway */ }
   // A beat for the context loss to reach the driver before the next page
-  // starts allocating.
+  // starts allocating. In the App Store build the page is replaced rather
+  // than pushed: a pushed page can be kept whole for the back gesture (its
+  // three hundred megabytes of heap with it) while the next map loads in the
+  // same web process, and the phone kills both. There is no back gesture in
+  // the app to keep it for, and it gets longer to let go.
   const next = params.toString();
-  setTimeout(() => { window.location.search = next; }, 40);
+  const native = window.location.protocol === 'capacitor:' || !!window.Capacitor?.isNativePlatform?.();
+  if (native) setTimeout(() => { window.location.replace(`${window.location.pathname}?${next}`); }, 250);
+  else setTimeout(() => { window.location.search = next; }, 40);
 }
 
 

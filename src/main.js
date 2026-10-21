@@ -146,9 +146,16 @@ function startTips(level) {
   return () => { clearInterval(t); };
 }
 
+// Where the load is, in storage as it goes: a page the phone kills mid-load
+// has written no black box yet (that starts with the battle), so this is all
+// that says how far it got (core/blackbox.js `harvestCrash`).
+let loadingLevel = null, loadingTier = null;
 function progress(pct, msg) {
   if (fillEl) fillEl.style.width = `${pct}%`;
   if (statusEl && msg) statusEl.textContent = msg;
+  if (loadingLevel) {
+    try { localStorage.setItem('tt.loadstage', JSON.stringify({ level: loadingLevel, tier: loadingTier, pct, msg: msg || null, at: Date.now() })); } catch { /* full or blocked */ }
+  }
   // Yield twice so the browser actually paints the new state.
   return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 }
@@ -216,6 +223,10 @@ async function boot() {
   const level = await resolveStartLevel();
   console.log('[tumble] level', level.id, '·', level.name);
   armBoot(level.id);
+  loadingLevel = level.id; loadingTier = quality.id;
+  window.__levelId = level.id;
+  window.__goToLevel = goToLevel;      // for the probes: the real hand-off between maps
+  try { localStorage.setItem('tt.loadstage', JSON.stringify({ level: level.id, tier: quality.id, pct: 0, msg: 'starting', at: Date.now() })); } catch { /* full or blocked */ }
   const sub = document.querySelector('.load-sub');
   if (sub) sub.textContent = level.name.toUpperCase();
   // The place itself behind the loader: its dossier photograph, dark and
@@ -3487,7 +3498,9 @@ async function boot() {
   // after a crash to file (core/blackbox.js).
   const blackBox = new BlackBox({ battle, engine, physics, structures, quality, level, fx, stats: () => ({ fps, physMs: +physMs.toFixed(1) }) });
   window.__blackbox = blackBox;
-  if (lastCrash) setTimeout(() => hud.feed('LAST BATTLE CRASHED · BLACK BOX IN TEST › CRASH RECORDER', 'bad'), 2500);
+  if (lastCrash) setTimeout(() => hud.feed(lastCrash.during === 'load'
+    ? `LAST LOAD CRASHED · ${String(lastCrash.level).toUpperCase()} · SETTINGS › TESTING`
+    : 'LAST BATTLE CRASHED · BLACK BOX IN TEST › CRASH RECORDER', 'bad'), 2500);
 
   /**
    * A regression run starts from a board nothing has happened on yet.

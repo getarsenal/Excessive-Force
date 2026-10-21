@@ -35,11 +35,27 @@ const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } ca
  */
 export function harvestCrash(bootMark) {
   const box = load(BOX);
-  try { localStorage.removeItem(BOX); } catch { /* blocked */ }
-  if (!bootMark || !box || !box.samples?.length) return null;
-  const last = box.samples[box.samples.length - 1];
+  const stage = load('tt.loadstage');
+  const moved = load('tt.movefrom');
+  try { localStorage.removeItem(BOX); localStorage.removeItem('tt.loadstage'); localStorage.removeItem('tt.movefrom'); } catch { /* blocked */ }
+  if (!bootMark) return null;
+  const last = box?.samples?.length ? box.samples[box.samples.length - 1] : null;
   // A box from some other, older page is not this crash's.
-  if (box.level !== bootMark || Date.now() - last.at > 30 * 60 * 1000) return null;
+  if (!last || box.level !== bootMark || Date.now() - last.at > 30 * 60 * 1000) {
+    // No battle box for this level: the page died while the level was
+    // loading, before the box writes its first sample. The load's own
+    // breadcrumb says how far it got, and the hand-off which map it came
+    // from (a phone runs out on the second map, not the first).
+    if (!stage || stage.level !== bootMark || Date.now() - stage.at > 30 * 60 * 1000) return null;
+    const crash = { kind: 'crash', during: 'load', filedAt: new Date().toISOString(), level: bootMark,
+      tier: stage.tier, stage: stage.msg, pct: stage.pct, from: moved?.to === bootMark ? moved.from : null,
+      device: { ua: navigator.userAgent, dpr: window.devicePixelRatio, screen: `${screen.width}x${screen.height}` },
+      build: buildId(), lastAt: new Date(stage.at).toISOString(), samples: [], notes: [] };
+    const all = load(CRASHES) || [];
+    all.push(crash);
+    store(CRASHES, all.slice(-5));
+    return crash;
+  }
   const crash = { kind: 'crash', filedAt: new Date().toISOString(), level: box.level, tier: box.tier,
     device: box.device, build: box.build, lastAt: new Date(last.at).toISOString(), samples: box.samples, notes: box.notes || [] };
   const all = load(CRASHES) || [];
@@ -66,6 +82,11 @@ export function clearCrashes() { try { localStorage.removeItem(CRASHES); } catch
 /** One line about a filed crash, for the panel. */
 export function describeCrash(c) {
   if (!c) return 'none recorded';
+  if (c.during === 'load') {
+    const when = new Date(c.lastAt);
+    return `${c.level} · build ${c.build || '?'} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · died LOADING at "${c.stage || '?'}" (${c.pct ?? '?'}%)`
+      + (c.from ? ` · after ${c.from}` : '') + ` · tier ${c.tier || '?'}` + (/iPhone|iPad/.test(c.device?.ua || '') ? (/Safari\//.test(c.device.ua) ? ' · Safari' : ' · app') : '');
+  }
   const s = c.samples[c.samples.length - 1] || {};
   const when = new Date(c.lastAt);
   return `${c.level} · build ${c.build || '?'} · ${when.toLocaleDateString()} ${when.toLocaleTimeString()} · ${Math.round(s.el || 0)} s in · `
