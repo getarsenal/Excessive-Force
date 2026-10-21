@@ -17,6 +17,9 @@ await page.addInitScript(() => { try {
 await page.goto(`http://localhost:${port}/`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForSelector('#title .tt-menu', { timeout: 120000 });
 await page.waitForTimeout(2500);
+// HANGAR is a row of MORE since the title went to five rows.
+await page.click('#title [data-act="more"]');
+await page.waitForTimeout(700);
 await page.click('#title [data-act="hangar"]');
 await page.waitForTimeout(4000);
 await page.screenshot({ path: '/tmp/out/hangar-phone.png' });

@@ -696,8 +696,9 @@
 .hg-ammo b { display: block; font: 700 22px/1 var(--f-data, monospace); color: var(--ink); letter-spacing: 0.06em; }
 .hg-ammo i, .hg-ammo u { display: block; margin-top: 3px; font: 500 10px/1 var(--f-data, monospace); letter-spacing: 0.14em; color: var(--mute); font-style: normal; text-decoration: none; }
 .hg-ammo.dry b { color: var(--o); }
-.hg-chips { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.hg-chips::-webkit-scrollbar { display: none; }
+/* The fleet's chips wrap to a second row: a strip that scrolled sideways
+   left two of the seven off a portrait phone, with nothing to say so. */
+.hg-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 4px; }
 .hg-chip {
   flex: 0 0 auto; min-height: 44px; padding: 0 14px; cursor: pointer; white-space: nowrap;
   background: var(--panel); border: 1px solid var(--line); color: var(--mute);
@@ -705,10 +706,12 @@
 }
 .hg-chip.on { border-color: var(--o); color: var(--ink); background: rgba(236, 123, 63, 0.12); }
 .hg-k { padding: 10px 16px 6px; font: 600 10.5px/1 var(--f-ui, sans-serif); letter-spacing: 0.2em; color: var(--mute); }
-.hg-art { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.hg-art::-webkit-scrollbar { display: none; }
+/* The gallery is a grid down the sheet, three to a row (six with the phone
+   on its side), scrolling with the sheet: it was a strip four screens wide. */
+.hg-art { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 0 16px 6px; }
+@media (orientation: landscape) and (max-height: 500px) { .hg-art { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .hg-piece {
-  flex: 0 0 auto; width: 118px; min-height: 44px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 6px; cursor: pointer; background: #5a6166; border: 1px solid rgba(255,255,255,0.12); color: var(--ink);
   font: inherit; text-align: center;
 }

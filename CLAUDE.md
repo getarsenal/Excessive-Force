@@ -54,7 +54,12 @@ WASM, Vite, deployed from `main` by GitHub Pages to https://getarsenal.app.
   `/tmp/out/mobaudit/`, prints small targets / overlaps / clipping /
   safe-area hits per screen) and read the numbers before the pictures;
   `node tools/landshot.mjs` and `W=393 H=852 node tools/landshot.mjs` are
-  the quick two-shot versions. With a weapon armed one finger lays a line
+  the quick two-shot versions. A phone screen scrolls one way:
+  `node tools/sheetsweep.mjs` (`LAND=1` on its side) opens every sheet
+  off the title and every view of the campaign screen and names anything
+  laid out past the right edge or pannable sideways; the battle's card bar
+  is the one strip meant to. The audit's HSCROLL does the same for the
+  battle's screens. With a weapon armed one finger lays a line
   of guns: main.js keeps its own count of fingers (`livePointers`) and must
   never trust it past the glass: it starts over on a new primary touch,
   drops a finger lifted anywhere on the page, and clears when the glass
