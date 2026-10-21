@@ -3391,6 +3391,7 @@ async function boot() {
 
   stopTips();
   document.getElementById('loading').style.display = 'none';
+  try { localStorage.removeItem('tt.movefrom'); } catch { /* the hand-off arrived */ }
   window.__battleUp = true;
   if (recovered) hud.feed(`LAST LOAD RAN OUT OF MEMORY · QUALITY ${recovered.to.toUpperCase()}`, 'big');
   uiEl.hidden = false;

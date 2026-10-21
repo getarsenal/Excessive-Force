@@ -37,8 +37,12 @@ export function harvestCrash(bootMark) {
   const box = load(BOX);
   const stage = load('tt.loadstage');
   const moved = load('tt.movefrom');
-  try { localStorage.removeItem(BOX); localStorage.removeItem('tt.loadstage'); localStorage.removeItem('tt.movefrom'); } catch { /* blocked */ }
+  // The hand-off is kept until a load finishes (main.js takes it away when
+  // the loader comes down): this boot is the next map's, and it is the one
+  // the phone may yet kill.
+  try { localStorage.removeItem(BOX); localStorage.removeItem('tt.loadstage'); } catch { /* blocked */ }
   if (!bootMark) return null;
+  try { localStorage.removeItem('tt.movefrom'); } catch { /* blocked */ }
   const last = box?.samples?.length ? box.samples[box.samples.length - 1] : null;
   // A box from some other, older page is not this crash's.
   if (!last || box.level !== bootMark || Date.now() - last.at > 30 * 60 * 1000) {
@@ -56,7 +60,7 @@ export function harvestCrash(bootMark) {
     store(CRASHES, all.slice(-5));
     return crash;
   }
-  const crash = { kind: 'crash', filedAt: new Date().toISOString(), level: box.level, tier: box.tier,
+  const crash = { kind: 'crash', filedAt: new Date().toISOString(), level: box.level, tier: box.tier, from: moved?.to === bootMark ? moved.from : null,
     device: box.device, build: box.build, lastAt: new Date(last.at).toISOString(), samples: box.samples, notes: box.notes || [] };
   const all = load(CRASHES) || [];
   all.push(crash);
