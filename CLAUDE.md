@@ -902,6 +902,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   phone viewport (`SANDBOX=1` the run off the title) and photographs the
   band over the dock, clean, and on its side ·
   `src/game/career.js` save slots, rank, the daily strike ·
+  `src/game/progress.js` the career: XP, the fifty-grade ladder (`LADDER`,
+  `GRADES`; the curve `COST`, 2,500 + 900i + 28i², is numbered `CURVE` and a
+  save from an older curve is moved across keeping its grade and its way
+  into it, `moveCurve`; a win pays ten to twenty thousand once ribbons,
+  medals and orders are in, so the first stripe is inside the first battle,
+  Sergeant Major of the Army about the twenty-fifth win and Field Marshal
+  past a hundred and fifty), ribbons, career medals, daily orders and
+  crates; `node tools/parprobe.mjs <level>` prints the XP a won run paid,
+  line by line ·
   `tools/bake_terrain.py` the ground · `tools/bake_overture.py` the real
   buildings, streets and coastline · `src/world/realstreets.js` the
   surveyed graph · `tools/shot.mjs` the harness.

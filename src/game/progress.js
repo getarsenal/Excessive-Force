@@ -52,9 +52,20 @@ export const underHarness = () => get('tt.suite') === '1';
  * to General, and Field Marshal over the top — the five-star rank the Army
  * has only ever held in wartime, here earned.
  *
- * Fifty grades, as before, on the same XP curve, so a save keeps its place:
- * the longer ranks are split into steps (I, II, III). `id` names the icon in
- * `public/assets/ranks/`; until one is there the insignia is drawn.
+ * Fifty grades: the longer ranks are split into steps (I, II, III). `id`
+ * names the icon in `public/assets/ranks/`; until one is there the insignia
+ * is drawn.
+ *
+ * The curve (`CURVE`): what a grade costs from the one below. A winning
+ * battle pays ten to twenty thousand XP once the ribbons, the medals and the
+ * day's orders are counted, and the first curve (900 + 260i + 12i², 848k to
+ * the top) was built for a tenth of that: the owner was Sergeant Major of
+ * the Army on the fourth contract of a fresh campaign. This one is four
+ * times as long (2,500 + 900i + 28i²: the first stripe inside the first
+ * battle, the next few inside the first evening, Sergeant Major of the Army
+ * about the twenty-fifth win, a commission about the fortieth, Field Marshal
+ * past a hundred and fifty), and a career saved under the old curve is moved
+ * across keeping its grade and how far into it it was (`career`, `CURVE`).
  *
  *   [name, steps, id, kind, n, rockers, device, metal]
  */
@@ -93,6 +104,11 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 export const insigniaOf = (g) => ({ id: g.id, kind: g.kind, n: g.n, r: g.r, dev: g.dev, metal: g.metal });
 /** Prestige, past the top of the ladder. */
 export const PRESTIGE_INSIGNIA = { id: 'prestige', kind: 'prestige', n: 5, metal: 'gold' };
+/** The curve's version, written into a career once it has been moved across. */
+export const CURVE = 2;
+const COST = (i) => Math.round(2500 + 900 * i + 28 * i * i);
+/** The first curve, kept only to read where an old save stood. */
+const COST_V1 = (i) => Math.round(900 + 260 * i + 12 * i * i);
 /** Every grade: its name, its insignia, and the XP it takes to reach it from the one below. */
 export const GRADES = (() => {
   const out = [];
@@ -101,12 +117,30 @@ export const GRADES = (() => {
       out.push({ name: steps > 1 ? `${name} ${ROMAN[s]}` : name, base: name, id, kind, n, r, dev, metal });
     }
   }
-  out.forEach((g, i) => { g.cost = i === 0 ? 0 : Math.round(900 + 260 * i + 12 * i * i); });
+  out.forEach((g, i) => { g.cost = i === 0 ? 0 : COST(i); });
   let acc = 0;
   for (const g of out) { acc += g.cost; g.at = acc; }
   return out;
 })();
 export const TOP = GRADES.length - 1;
+/** Past the top, this much more goes round to the next prestige: a grade and a half's worth. */
+export const PRESTIGE_OVER = Math.round(GRADES[TOP].cost * 1.4);
+
+/**
+ * A career saved under an earlier curve, moved onto this one: the same grade,
+ * the same way into it, so nobody is demoted by a change to the ladder.
+ */
+function moveCurve(c) {
+  if ((c.curve || 1) >= CURVE) return c;
+  const at = [0];
+  for (let i = 1; i <= TOP; i++) at.push(at[i - 1] + COST_V1(i));
+  let g = 0;
+  while (g < TOP && c.xp >= at[g + 1]) g++;
+  const frac = g < TOP ? Math.max(0, Math.min(1, (c.xp - at[g]) / (at[g + 1] - at[g]))) : 0;
+  c.xp = Math.round(GRADES[g].at + (g < TOP ? frac * GRADES[g + 1].cost : 0));
+  c.curve = CURVE;
+  return c;
+}
 
 /**
  * Every fifth grade carries a commission: a small advantage that stays. Funds
@@ -246,6 +280,7 @@ const LOOT = [
 
 function blank() {
   return {
+    curve: CURVE,
     xp: 0, prestige: 0, seenGrade: 0,
     counts: {}, medals: {}, places: {},
     orders: { date: null, prog: {}, done: [], bonus: false },
@@ -263,7 +298,11 @@ export function career() {
   let c = parse(get(KEY), null);
   if (c && typeof c.xp === 'number') {
     const b = blank();
-    return { ...b, ...c, orders: { ...b.orders, ...(c.orders || {}) }, perks: { ...b.perks, ...(c.perks || {}) } };
+    // The curve is the saved one's, not the blank's: a save from before the
+    // curves were numbered is on the first.
+    const out = { ...b, ...c, curve: c.curve || 1, orders: { ...b.orders, ...(c.orders || {}) }, perks: { ...b.perks, ...(c.perks || {}) } };
+    if (out.curve < CURVE) { moveCurve(out); save(out); }
+    return out;
   }
   c = blank();
   const prog = parse(get('tt.progress'), {}) || {};
@@ -437,8 +476,8 @@ export function award(r) {
   c.xp += total;
   // Past the top, the ladder goes round again with a star for it.
   let prestiged = false;
-  if (c.xp >= GRADES[TOP].at + 60000) {
-    c.xp -= GRADES[TOP].at + 60000;
+  if (c.xp >= GRADES[TOP].at + PRESTIGE_OVER) {
+    c.xp -= GRADES[TOP].at + PRESTIGE_OVER;
     c.prestige += 1;
     prestiged = true;
   }

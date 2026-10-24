@@ -248,5 +248,16 @@ console.log('  bar past the win mark at', JSON.stringify(out.down));
 if (full) console.log('  strikes called', out.struck, '· guns used', JSON.stringify(out.kit));
 for (const t of out.timeline) console.log('   ', JSON.stringify(t));
 console.log('JSON', JSON.stringify({ level, gun, how: process.env.HOW || 'survey', aimBy: process.env.AIMBY || 'survey', quiet: !!process.env.QUIET, state: out.state, ...s, down: out.down, par }));
+// The XP the win paid, line by line off the card, and the grade it left the
+// career at: the pace of the ladder is read from here.
+if (out.state === 'won') {
+  await page.waitForFunction(() => document.querySelectorAll('.ecx-line').length > 0, null, { timeout: 30000 }).catch(() => {});
+  const xp = await page.evaluate(() => ({
+    lines: [...document.querySelectorAll('.ecx-line')].map((e) => `${e.querySelector('span')?.textContent} ${e.querySelector('b')?.textContent}`),
+    career: JSON.parse(localStorage.getItem('tt.career') || '{}').xp,
+  }));
+  console.log('  XP paid:'); for (const l of xp.lines) console.log('   ', l);
+  console.log('  career xp after', xp.career);
+}
 console.log('errors', JSON.stringify(errors.slice(0, 5)));
 await b.close();
