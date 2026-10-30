@@ -124,8 +124,8 @@ environment map, the town's burn channel carried across), the ground is
 three muted tones from the level's palette (`groundTones` in terrain.js:
 grass, earth, rock; earth-first on an arid map) with no texture at all, and
 the landmark keeps its standard material so the target stands apart. That
-bought the phone's pixel ratio back from 1.35 to 2.0 (`PHONE_RATIO`,
-engine.js) with a light sharpen (`uSharpen` 0.25). The grade pass and the
+bought the phone's pixel ratio back from 1.35 to 1.75 (`PHONE_RATIO`,
+engine.js; 2.0 waits on phase two) with a light sharpen (`uSharpen` 0.25). The grade pass and the
 particles run at `mediump`, the rim light is not added, the VSM blur is four
 samples, the particle fill budget is fourteen screens and the interface's
 looping animations run in ten steps a second under `body.lean`. This is

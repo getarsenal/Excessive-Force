@@ -112,8 +112,16 @@ islands as the reference). Phase one, every level:
   kept, a hemisphere fill in place of the environment map's sky light, the
   town's burn channel carried across. The landmark, the guns, the garrison
   and the aircraft keep the standard material.
-- **Spent on:** the phone's pixel ratio, 1.35 → 2.0 of the device's
-  (`PHONE_RATIO`); the sharpen lightened from 0.42 to 0.25.
+- **Measured** (`powerbench`, Westminster, the iPhone tier, 30 frames a
+  scene): at equal pixels the frame is 10–17% cheaper (quiet 1371 → 1143 ms
+  in the software rasteriser, pan 1398 → 1174, battery 1762 → 1538,
+  collapse 1786 → 1603). With the 1.1M triangles a fixed cost here, the
+  fit across the runs puts a fragment's cost down about 31%; at 2.0 of the
+  ratio the frame came out 1371 → 1750 ms quiet, about 1.5× the old fragment
+  work.
+- **Spent on:** the phone's pixel ratio, 1.35 → 1.75 of the device's
+  (`PHONE_RATIO`), about 1.16× the old fragment work for 30% more resolution
+  each way; 2.0 waits on phase two. The sharpen lightened from 0.42 to 0.25.
 - **The ladder reordered:** "fair" no longer drops resolution (scale 1, fill
   0.5, shadows every third frame); "serious" 0.85, "critical" 0.7.
 
