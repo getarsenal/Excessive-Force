@@ -2114,6 +2114,19 @@ export class TestMenu {
         // `wall` is the river wall, and a level with no river has none.
         const traits = c.level.traits || {};
         if (traits.remote) return 'remote: a village on a rock has no lamps, parked cars or street trees to count';
+        // The abstract world (world/abstract.js) has no lamp posts or
+        // cornices by design: its detail is buildings, trees and rocks, inside
+        // the budget, and that is what is counted.
+        if (city.userData.network?.abstract) {
+          const thinA = [['buildings', 120], ['canopy', 150]].filter(([k, n]) => !(d[k] >= n));
+          assert(thinA.length === 0, `too little of: ${thinA.map(([k]) => `${k}=${d[k] ?? 0}`).join(', ')}`);
+          const cap = 60000 + 34000 + 8000 + 8000 + 30000;
+          assert(d.tris <= cap, `the town is ${d.tris} triangles, over its budget of ${cap}`);
+          for (const e of city.userData.network.edges) {
+            for (const p of e.pts) assert(!this.ctx.terrain.isWater(p.x, p.z), `a road runs into the water at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
+          }
+          return `abstract: ${d.buildings} buildings, ${d.canopy} trees, ${d.tris} triangles`;
+        }
         const want = ['lamps', 'parked', 'cornices', 'porches', 'streetTrees'];
         if (traits.river !== false) want.push('wall');
         const thin = want.filter((k) => !(d[k] > 20));
@@ -2206,6 +2219,9 @@ export class TestMenu {
         if (traits.remote) { delete want.fields; delete want.towers; delete want.track; }
         // A surveyed city has the railways it has, and no invented one.
         if (c.cityGroup?.userData?.network?.real) delete want.track;
+        // The abstract world: a natural bank, no railway, and the scatter past
+        // the edge instead of the surveyed skyline ring.
+        if (c.cityGroup?.userData?.network?.abstract) { delete want.wall; delete want.track; delete want.towers; }
         // Programmes go in the blocks that were left open, so what is being
         // asked is that an open block is *for* something — not that there are
         // four of them. A surveyed plan has the blocks its streets enclose and
@@ -2220,7 +2236,7 @@ export class TestMenu {
         // And that edge is the one this river actually has: a parapet with a
         // balustrade along the Thames, steps down to the water at Agra. Both
         // are river walls; only one of them has balusters on it.
-        if (traits.river !== false) {
+        if (traits.river !== false && !c.cityGroup?.userData?.network?.abstract) {
           assert((d.balusters || 0) >= 200 || (d.stairs || 0) >= 30,
             `the river wall has neither a balustrade (${d.balusters || 0}) nor `
             + `steps down to the water (${d.stairs || 0})`);
@@ -2434,6 +2450,17 @@ export class TestMenu {
         // nothing in the carriageway, nothing in the river, nothing on the
         // bridge, every block used — which is where the bugs actually are and
         // which is checked identically either way.
+        // The abstract plan: generated, so its own invariants. A ring, the
+        // avenues and the street grid; every building clear of every road; and
+        // the approach avenue there, the lane the battery sets up along.
+        if (net.abstract) {
+          assert(net.edges.length >= 40, `only ${net.edges.length} roads in the abstract plan`);
+          const plots = city.userData.plots || [];
+          let inRoad = 0;
+          for (const p of plots) if (net.roadClearance(p.x, p.z) < Math.min(p.w, p.d) / 2) inRoad++;
+          assert(inRoad === 0, `${inRoad} buildings stand in a carriageway`);
+          return `abstract: ${net.edges.length} roads, ${plots.length} buildings, none in a road`;
+        }
         const surveyed = !!net.real;
         if (surveyed) {
           // Kilometres, not edges. An edge used to be one block of one street,

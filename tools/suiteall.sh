@@ -16,13 +16,14 @@
 #   JOBS=1 sh tools/suiteall.sh westminster         one at a time, for a timing
 #   TIER=high sh tools/suiteall.sh pisa
 #   TT_PORT=5181 OUT=/tmp/out-a sh tools/suiteall.sh athens   against another dev server
+#   QS=env=abstract sh tools/suiteall.sh westminster        with a query added (the abstract world)
 out=${OUT:-/tmp/out}
 jobs=${JOBS:-3}
 mkdir -p "$out"
 
 # Self-dispatch: `--one` is a single level, which is what the pool calls.
 if [ "$1" = "--one" ]; then
-  TT_URL="http://localhost:${TT_PORT:-5177}/?level=$2" TT_TIER=${TIER:-low} TT_SUITE=1 \
+  TT_URL="http://localhost:${TT_PORT:-5177}/?level=$2${QS:+&$QS}" TT_TIER=${TIER:-low} TT_SUITE=1 \
     node tools/shot.mjs "$out/$2" tools/suite.js > "$out/$2-run.log" 2>&1 || true
   exit 0
 fi

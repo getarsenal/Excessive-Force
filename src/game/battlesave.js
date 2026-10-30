@@ -96,7 +96,7 @@ function unpackBits(b64, n, fn) {
  * The battle as it stands, or null if there is nothing worth keeping: no gun
  * on the ground and not a stone touched is a contract not yet started.
  */
-export function snapshotBattle({ level, battle, structures, daily = null, used = null, tier = null }) {
+export function snapshotBattle({ level, battle, structures, daily = null, used = null, tier = null, env = 'survey' }) {
   if (!battle || battle.state !== 'playing') return null;
   const units = battle.units.filter((u) => u.alive && u.health > 0).map((u) => ({
     id: u.def.id,
@@ -129,6 +129,8 @@ export function snapshotBattle({ level, battle, structures, daily = null, used =
     // The tier it was fought at: another tier builds the stones differently
     // and the save will not fit it (`restoreBattle`), which the player is told.
     tier,
+    // And the world it was fought in (world/abstract.js): the town's plots differ.
+    env,
     target: level.target || level.name,
     place: level.place || level.subtitle || '',
     money: Math.round(battle.money),

@@ -85,6 +85,7 @@ import { reminders } from './core/reminders.js';
 import { boardFor } from './game/rivals.js';
 import { recordSeasonRun, currentSeason } from './game/seasons.js';
 import { store } from './core/store.js';
+import { envMode, buildAbstract } from './world/abstract.js';
 import { Range } from './game/range.js';
 import { makeWeaponView } from './game/units.js';
 
@@ -256,6 +257,12 @@ async function boot() {
     selftest = sessionStorage.getItem('tt.selftest') === '1';
     sessionStorage.removeItem('tt.selftest');
   } catch { /* private mode */ }
+  // The world round the target: the surveyed town, or the themed abstract
+  // one (world/abstract.js), chosen on SETTINGS or `?env=`. Boot Camp and the
+  // range keep the ground they were designed on.
+  const abstractEnv = envMode() === 'abstract' && level.id !== 'tutorial' && !level.sandbox;
+  const envNow = abstractEnv ? 'abstract' : 'survey';
+  window.__env = envNow;
   // Back into a battle in progress, from the front door (see battlesave.js).
   let resumeSnap = null;
   // A save that would not fit this build (another tier), said out loud.
@@ -264,6 +271,13 @@ async function boot() {
     if (sessionStorage.getItem('tt.resume') === level.id) resumeSnap = battleFor(level.id);
     sessionStorage.removeItem('tt.resume');
   } catch { /* private mode */ }
+  // A battle fought in the other world (SETTINGS › WORLD) has other buildings
+  // under the same numbers: refused, and said so, rather than burning the
+  // wrong ones.
+  if (resumeSnap && (resumeSnap.env || 'survey') !== envNow) {
+    resumeRefused = { ...resumeSnap, why: `THE ${(resumeSnap.env || 'survey') === 'abstract' ? 'ABSTRACT' : 'SURVEYED'} WORLD` };
+    resumeSnap = null;
+  }
   // Today's daily strike, if this load is one.
   // A daily is read once per load, so a daily left mid-fight and resumed
   // carries its terms in the save, while it is still the same day.
@@ -338,7 +352,7 @@ async function boot() {
   // A mountain road is cut into the mountain, before anything stands on it:
   // the masonry, the mesh, the collider and the streets all read the ground
   // with the bench in it. Only where a level lays a road up its own slope.
-  const cityLoad = loadCity(level.terrain);
+  const cityLoad = abstractEnv ? Promise.resolve(null) : loadCity(level.terrain);
   // And every surveyed street, on every level: a ribbon laid at the ground's
   // height at its vertices had the ground between them rising through it
   // wherever the ground was not flat, which read as earth lying on the road.
@@ -446,6 +460,7 @@ async function boot() {
     if (haze.density !== undefined) engine.scene.fog.density = haze.density;
   }
   terrain.farTint = lookFor(level).fog;
+  terrain.abstract = abstractEnv;
   engine.scene.add(terrain.buildMesh());
   // The ground, kept by handle: anything resting on the terrain is settled for
   // good, and the freezing bookkeeping can stop worrying about it.
@@ -491,15 +506,20 @@ async function boot() {
   // still built around them.
   const city = await cityLoad;
   const tCity = performance.now();
-  const contextGroup = buildContext(terrain, quality, {
+  const clearings = (level.turret
+    ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
+      r: 5.2 * (level.turret.scale ?? 1.4) * 4.2 }]
+    : []).concat((level.clearings || []).map((c) => ({ x: origin.x + c.x, z: origin.z + c.z, r: c.r })));
+  const contextGroup = abstractEnv ? buildAbstract(terrain, quality, {
+    levelId: level.id, clime: climeOf(level), landmarks, precinct: level.precinct,
+    exclude: level.contextExclude, clearings, hinterland: level.setting?.hinterland,
+    cameraYaw: level.camera?.yaw,
+  }) : buildContext(terrain, quality, {
     levelId: level.id, clime: climeOf(level),
     landmarks, precinct: level.precinct, exclude: level.contextExclude,
     // The turret's emplacement, kept clear of the forest.
     // And any ground the level keeps bare of its own (the range's floor).
-    clearings: (level.turret
-      ? [{ x: origin.x + level.turret.x, z: origin.z + level.turret.z,
-        r: 5.2 * (level.turret.scale ?? 1.4) * 4.2 }]
-      : []).concat((level.clearings || []).map((c) => ({ x: origin.x + c.x, z: origin.z + c.z, r: c.r }))),
+    clearings,
     city, cityExclude: level.cityExcludeRadius, road: level.road,
     // What is beyond the town. A level says where it is; the generator does
     // not guess it from the terrain, because fields and forest look much the
@@ -3276,7 +3296,9 @@ async function boot() {
     }
     hud.status(`${TAP} the tower to designate a target`, 4);
     if (resumeSnap) hud.feed(`BATTLE RESUMED · ${Math.round(resumeSnap.integrity * 100)}% STANDING`, 'big');
-    if (resumeRefused) hud.feed(`SAVED BATTLE WAS FOUGHT AT ${String(resumeRefused.tier || 'ANOTHER').toUpperCase()} QUALITY · THIS IS ${quality.id.toUpperCase()} · STARTING FRESH`, 'big');
+    if (resumeRefused) hud.feed(resumeRefused.why
+      ? `SAVED BATTLE WAS FOUGHT IN ${resumeRefused.why} · STARTING FRESH`
+      : `SAVED BATTLE WAS FOUGHT AT ${String(resumeRefused.tier || 'ANOTHER').toUpperCase()} QUALITY · THIS IS ${quality.id.toUpperCase()} · STARTING FRESH`, 'big');
     if (blitz) hud.feed(`BLITZ · ${BLITZ.seconds / 60} MINUTES · ${Math.round(BLITZ.stars[0] * 100)}% DOWN FOR A STAR`, 'big');
     if (freeRun) hud.feed('FREE PLAY · XP COUNTS, THE CAMPAIGN DOES NOT', 'big');
     if (dailyMod) hud.feed(`DAILY STRIKE · ${dailyMod.name} · ${dailyMod.line.toUpperCase()}`, 'big');
@@ -3433,7 +3455,7 @@ async function boot() {
     // Boot Camp and the range are not battles to come back to (battlesave.js).
     if (battleOver || level.id === 'tutorial' || level.sandbox || blitz || weekly || studioRun || freeRun || selftest) return;
     try { if (localStorage.getItem('tt.suite') === '1') return; } catch { /* private mode */ }
-    try { saveBattle(snapshotBattle({ level, battle, structures, daily, used, tier: quality.id })); } catch (err) { console.warn('[tumble] battle not saved', err); }
+    try { saveBattle(snapshotBattle({ level, battle, structures, daily, used, tier: quality.id, env: envNow })); } catch (err) { console.warn('[tumble] battle not saved', err); }
   };
   window.__keepBattle = keepBattle;
   setInterval(keepBattle, 10000);

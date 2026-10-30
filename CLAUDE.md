@@ -122,15 +122,45 @@ one diffuse-only material (`envizeTree` in `src/world/look.js`: Lambert with
 the wrapped sun, value by face and a sky fill standing in for the
 environment map, the town's burn channel carried across), the ground is
 three muted tones from the level's palette (`groundTones` in terrain.js:
-grass, earth, rock; earth-first on an arid map) with no texture at all, and
+grass, earth, rock; earth-first on an arid map; each held to a band of
+lightness in sRGB, so a desert palette's near-white paving does not wash
+the ground into the haze) with no texture at all, and
 the landmark keeps its standard material so the target stands apart. That
 bought the phone's pixel ratio back from 1.35 to 1.75 (`PHONE_RATIO`,
 engine.js; 2.0 waits on phase two) with a light sharpen (`uSharpen` 0.25). The grade pass and the
 particles run at `mediump`, the rim light is not added, the VSM blur is four
 samples, the particle fill budget is fourteen screens and the interface's
-looping animations run in ten steps a second under `body.lean`. This is
-phase one of the low-poly abstraction; phase two replaces the surveyed town
-with a themed, generated one under a hard triangle budget. `src/core/heat.js` is the heat governor: the App Store build
+looping animations run in ten steps a second under `body.lean`.
+
+The abstract world (`src/world/abstract.js`, phase two of the low-poly
+direction): SETTINGS › WORLD (`tt.env`, mirrored to the phone's store) or
+`?env=abstract` swaps the surveyed town for a themed, generated one on the
+real ground and water (Boot Camp and the range keep theirs). From the
+landmark out: a ring road just outside its ground with dense one- and
+two-storey cover round it, six avenues out (the first laid toward the
+level's own camera, the approach, where nothing over two storeys stands),
+a street grid square to it from the ring to past an outer ring, buildings
+fronting every road in the town band with a second row behind, tall
+anchors only well out and off the approach, farms, tree clumps, boulders on
+the slopes and a scatter past the edge. One theme per climate (`KITS`:
+temperate, nordic, mediterranean, tropical, desert, highland: walls, a
+window band of colour a storey, gabled, hipped, flat, domed or Tibetan
+roofs, broadleaf, conifer, umbrella pine or palm), flat-shaded colour, no
+textures, to a budget (`BUDGET`: buildings 60k, trees 34k, roads 8k, the
+scatter 8k). It publishes what the surveyed builder does (`plots`,
+burnable `cityMeshes` with each building's ranges, `roofs`, a `network`
+with `roadClearance` and `nodeClearance`), so the fire, the colliders, the
+garrison, the traffic, the checkpoint and the strike sites work unchanged;
+the terrain takes `abstract` (no survey street mask painted on the grass,
+the ground coarsened to ten metres a cell, a lighter apron). Westminster at
+the phone's tier: the environment 891k triangles to 186k (town 545k to
+64k, ground and apron 303k to 56k); `node tools/envbudget.mjs <level>`
+(`ENV=survey` for the other) counts it by owner. A battle saved in one
+world is refused in the other and says so. The suite's survey-only tests
+(lamp posts, the river wall, the railway, street counts) carry an abstract
+branch that checks the abstract world's own invariants instead;
+`QS=env=abstract sh tools/suiteall.sh <level>` runs it, and `QS=` passes
+any query to `postcard.mjs` and `triprobe.mjs` too. `src/core/heat.js` is the heat governor: the App Store build
 reads the phone's `ProcessInfo.thermalState`, Low Power Mode and battery
 through `ios/App/App/ThermalPlugin.swift` (registered by
 `AppViewController`), and the web infers throttling from the frame

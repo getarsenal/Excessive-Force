@@ -35,10 +35,20 @@ const ROCK = new THREE.Color(0x6e675f);
  */
 export function groundTones(P) {
   const hsl = { h: 0, s: 0, l: 0 };
-  const mute = (c, k) => { c.getHSL(hsl); return c.setHSL(hsl.h, hsl.s * k, hsl.l); };
-  const grass = mute(P.park.clone().lerp(P.parkAlt || P.park, 0.5), 0.86);
-  const earth = mute(P.urban.clone().lerp(P.bank || P.urban, 0.5), 0.82);
-  const rock = mute((P.rock || ROCK).clone(), 0.8);
+  // Muted, and held to a band of value: a desert palette's paving is nearly
+  // white, and as the ground it washed Giza, Boot Camp and the Potala's plain
+  // into the haze (the first cut of this). Earth keeps a little colour too, so
+  // sand reads as sand and not as fog.
+  // In sRGB, the space the eye and the palettes are in: the working space is
+  // linear, where a lightness of 0.6 is all but white on the screen.
+  const SRGB = THREE.SRGBColorSpace;
+  const tone = (c, k, l0, l1, s0 = 0) => {
+    c.getHSL(hsl, SRGB);
+    return c.setHSL(hsl.h, Math.max(s0, hsl.s * k), Math.min(l1, Math.max(l0, hsl.l)), SRGB);
+  };
+  const grass = tone(P.park.clone().lerp(P.parkAlt || P.park, 0.5), 0.86, 0.28, 0.45);
+  const earth = tone(P.urban.clone().lerp(P.bank || P.urban, 0.5), 0.9, 0.44, 0.62, 0.26);
+  const rock = tone((P.rock || ROCK).clone(), 0.55, 0.38, 0.54);
   const u = P.urban;
   const arid = u.r > 0.5 && u.r > u.b * 1.25;
   return { grass, earth, rock, bed: earth.clone().multiplyScalar(0.72), arid };
@@ -1129,7 +1139,13 @@ export class Terrain {
   }
 
   buildMesh() {
-    if (this.quality.name === 'low' && !this._coarse) this.coarsen();
+    // The abstract world (world/abstract.js) is one detail level throughout:
+    // the coarse grid at every tier, as a phone has it.
+    if ((this.quality.name === 'low' || this.abstract) && !this._coarse) this.coarsen();
+    // And coarser again, to ten metres a cell or more: a phone's ground was a
+    // hundred and thirty thousand triangles, the abstract world's whole
+    // budget, for relief the low-poly look draws in broad planes anyway.
+    while (this.abstract && this.cellSize < 10 && this.size > 65) this.coarsen();
     // Again, on the coarse grid. `coarsen` resamples the heights and the mask,
     // and a wet cell sunk under the surface at fine resolution averages back
     // up against its dry neighbours at coarse: Petronas went from nineteen
@@ -1197,7 +1213,9 @@ export class Terrain {
       // and the parcels a house stands on (the bake paints those at a third
       // of a street). On an arid map the other way round: earth, and grass
       // in the parks and in the odd watered pocket.
-      const hard = THREE.MathUtils.clamp(m.road / 0.34, 0, 1);
+      // (Not in the abstract world, whose streets are its own: the survey's
+      // would be a ghost of a town painted on the grass.)
+      const hard = this.abstract ? 0 : THREE.MathUtils.clamp(m.road / 0.34, 0, 1);
       let g;
       if (G.arid) {
         const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
@@ -1263,7 +1281,8 @@ export class Terrain {
     // Subdivided far more finely than it needs to be as a flat sheet, because
     // it is no longer flat: the river's channel is cut through it, and a cut
     // with ten divisions across seven kilometres is a staircase.
-    const apronGeo = gradedFrame(this.span, this.span * 7);
+    // Coarser in the abstract world: one detail level, and the fog has it.
+    const apronGeo = this.abstract ? gradedFrame(this.span, this.span * 7, 72, 220) : gradedFrame(this.span, this.span * 7);
     const ap = apronGeo.attributes.position;
     // Carve the channel. The apron sits at the DEM's edge height, which is
     // above the waterline — so without this the river simply ran into a wall of
@@ -1800,10 +1819,9 @@ export async function loadTerrain(levelId, quality) {
  * metres, and coarse toward the horizon, where it is fog. ±inner is always
  * in the list, so the grid meets the playfield's edge exactly.
  */
-export function gradedCoords(inner, outer) {
+export function gradedCoords(inner, outer, FINE = 24, COARSE = 80) {
   const near = Math.min(outer, inner * 2.6);
   const out = new Set();
-  const FINE = 24, COARSE = 80;
   for (let c = 0; c <= near; c += FINE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
   for (let c = near; c < outer; c += COARSE) { out.add(+c.toFixed(2)); out.add(-(+c.toFixed(2))); }
   for (const c of [inner, -inner, near, -near, outer, -outer]) out.add(+c.toFixed(2));
@@ -1821,8 +1839,8 @@ export function gradedCoords(inner, outer) {
  * mesh dipped under it. Twenty-four metres to the cell out to two and a half
  * spans now, eighty beyond, and fewer vertices than before.
  */
-function gradedFrame(inner, outer) {
-  const cs = gradedCoords(inner, outer);
+function gradedFrame(inner, outer, fine, coarse) {
+  const cs = gradedCoords(inner, outer, fine, coarse);
   const n = cs.length;
   const pos = new Float32Array(n * n * 3);
   for (let j = 0; j < n; j++) {

@@ -36,7 +36,7 @@ await page.addInitScript(() => {
     localStorage.setItem('tt.opening', '0');
   } catch { /* private mode */ }
 });
-await page.goto(`http://localhost:${port}/?level=${id}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${port}/?level=${id}${process.env.QS ? `&${process.env.QS}` : ""}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none', null, { timeout: 400000 });
 await page.waitForTimeout(2000);
 

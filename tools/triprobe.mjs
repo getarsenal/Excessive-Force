@@ -14,7 +14,7 @@ await page.addInitScript((tier) => { try {
   localStorage.setItem('tt.quality', tier); localStorage.setItem('tt.autostart', '1');
   localStorage.setItem('tt.intros', '0'); localStorage.setItem('tt.opening', '0'); localStorage.setItem('tt.tutorial', 'done');
 } catch {} }, process.env.TIER || 'medium');
-await page.goto(`http://localhost:${port}/?level=${level}`, { waitUntil: 'load', timeout: 300000 });
+await page.goto(`http://localhost:${port}/?level=${level}${process.env.QS ? `&${process.env.QS}` : ""}`, { waitUntil: 'load', timeout: 300000 });
 await page.waitForFunction(() => document.getElementById('loading')?.style.display === 'none' && window.battle, null, { timeout: 400000 });
 await page.waitForTimeout(3000);
 const r = await page.evaluate(() => {

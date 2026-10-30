@@ -17,6 +17,7 @@ import { BRANCHES, doctrine, freePoints, buyRank, refund } from '../game/doctrin
 import { crashes, describeCrash, clearCrashes, buildId } from '../core/blackbox.js';
 import { listBattles, saveLog } from '../game/battlesave.js';
 import { store } from '../core/store.js';
+import { envMode, setEnvMode } from '../world/abstract.js';
 import { playHistory, showSessionCard } from './playmonitor.js';
 
 /**
@@ -251,6 +252,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             <button class="ef-set" id="ef-intros" type="button"><span>STAND-OFF INTROS</span><em></em></button>
             <button class="ef-set" id="ef-opening" type="button"><span>TITLE OPENING</span><em></em></button>
             <button class="ef-set" id="ef-haptics" type="button"><span>HAPTICS</span><em></em></button>
+            <button class="ef-set" id="ef-world" type="button"><span>WORLD</span><em></em></button>
             <button class="ef-set" id="ef-remind" type="button"><span>DAILY REMINDER</span><em></em></button>
           </div>
           <div class="ef-set-k sub">QUALITY · RELOADS THE LEVEL</div>
@@ -930,6 +932,9 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     flag('#ef-intros', introsEnabled(), 'ON', 'OFF');
     flag('#ef-opening', openingEnabled(), 'ON', 'OFF');
     flag('#ef-haptics', feedback.haptics, 'ON', 'OFF');
+    // The town round the target: the survey, or the themed low-poly one
+    // (world/abstract.js). Takes effect on the next battle loaded.
+    flag('#ef-world', envMode() === 'abstract', 'ABSTRACT · NEXT BATTLE', 'SURVEYED');
     flag('#ef-remind', reminders.on, reminderText || reminders.label(), reminderText || reminders.label());
     paintTesting();
     const now = detectQuality().id;
@@ -1192,6 +1197,9 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     });
     root.querySelector('#ef-intros').addEventListener('click', () => {
       setIntrosEnabled(!introsEnabled()); paintRecords();
+    });
+    root.querySelector('#ef-world').addEventListener('click', () => {
+      setEnvMode(envMode() === 'abstract' ? 'survey' : 'abstract'); paintRecords();
     });
     root.querySelector('#ef-haptics').addEventListener('click', () => {
       feedback.haptics = !feedback.haptics; paintRecords();
