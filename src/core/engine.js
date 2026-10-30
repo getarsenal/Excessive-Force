@@ -3,6 +3,8 @@ import { access } from './access.js';
 import { gpuProbe } from './gpuprobe.js';
 
 const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+/** The pixel ratio a phone draws at, of its own: see `_pixelRatio`. */
+export const PHONE_RATIO = 2.0;
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -341,11 +343,11 @@ export class Engine {
     else if (tm === THREE.LinearToneMapping) defines.LINEAR_TONE_MAPPING = '';
     this.gradePass.material.defines = defines;
     if (COARSE) {
-      // A phone draws under its own pixels (1.35 of the ratio): sharpen to
-      // meet the panel. And half precision for this pass: it works on 0..1
+      // A phone draws under its own pixels (PHONE_RATIO of a ratio of three):
+      // sharpen, lightly, to meet the panel. And half precision for this pass: it works on 0..1
       // colour and dithers after, and an Apple GPU runs it at twice the
       // rate for half the energy.
-      this.gradePass.uniforms.uSharpen.value = 0.42;
+      this.gradePass.uniforms.uSharpen.value = 0.25;
       this.gradePass.material.precision = 'mediump';
     }
     this.composer.addPass(this.gradePass);
@@ -362,10 +364,13 @@ export class Engine {
     // Anything worked with a finger — a phone whatever its tier, a tablet —
     // is capped at one and a half: at arm's length the half of the pixels
     // above that cannot be seen, and the frame they cost can.
-    // 1.35 now, from 1.5: nineteen per cent fewer fragments in every pass,
-    // and the grade pass sharpens what is left (uSharpen), so the picture
-    // reads as crisp as it did at arm's length while the phone runs cooler.
-    const cap = Math.min(this.quality.pixelRatioCap, COARSE ? 1.35 : Infinity);
+    // It was 1.35 through October 2026, when the phone ran hot: a fifth of
+    // an iPhone's own pixels, and the picture soft. The environment is now
+    // one diffuse-only material over a ground with no textures (world/look.js
+    // `envizeTree`), which is most of the screen at a fraction of the cost a
+    // pixel, and that saving is spent here: render quality is the last thing
+    // to give, so the heat ladder (core/heat.js) takes everything else first.
+    const cap = Math.min(this.quality.pixelRatioCap, COARSE ? PHONE_RATIO : Infinity);
     return Math.min(window.devicePixelRatio, cap) * this.renderScale * (this.heatScale || 1);
   }
 

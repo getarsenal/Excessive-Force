@@ -94,3 +94,28 @@ water is a shade deeper without the rim.
 - The environment map on a phone: a single hemisphere term in its place
   would remove the costliest part of the PBR fragment; it changes the
   metals and the glass, so it needs pictures first.
+
+
+## October 2026, second pass: the environment pays for the pixels
+
+The owner's direction: render quality is the last thing to give, and the
+world round the target becomes a clean low-poly abstraction (Fortnite's
+islands as the reference). Phase one, every level:
+
+- **The ground:** three muted tones from the level's own palette (grass,
+  earth, rock; `groundTones` in terrain.js), no grain map and no normal map
+  (the 256 px pair tiled 170 times, two texture reads a pixel and the tiling
+  the eye found), on a Lambert material. The far apron the same.
+- **The environment's one material:** everything under the town, the ground
+  and the works swapped from MeshStandardMaterial to its Lambert twin
+  (`envizeTree`, look.js): diffuse only, the wrapped sun and value by face
+  kept, a hemisphere fill in place of the environment map's sky light, the
+  town's burn channel carried across. The landmark, the guns, the garrison
+  and the aircraft keep the standard material.
+- **Spent on:** the phone's pixel ratio, 1.35 → 2.0 of the device's
+  (`PHONE_RATIO`); the sharpen lightened from 0.42 to 0.25.
+- **The ladder reordered:** "fair" no longer drops resolution (scale 1, fill
+  0.5, shadows every third frame); "serious" 0.85, "critical" 0.7.
+
+Phase two replaces the surveyed town with a themed, generated settlement
+under a hard budget (150k triangles for everything but the target).

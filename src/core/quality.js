@@ -159,7 +159,7 @@ export function isMobile() {
  */
 function forPhone(tier) {
   if (!isMobile()) return tier;
-  return { ...tier, bloom: false, pixelRatioCap: Math.min(tier.pixelRatioCap, 1.5) };
+  return { ...tier, bloom: false, pixelRatioCap: Math.min(tier.pixelRatioCap, 2.0) };
 }
 
 export function detectQuality(override) {

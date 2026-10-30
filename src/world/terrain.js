@@ -16,6 +16,34 @@ import { splitMesh } from './cells.js';
 /** The rock a steep face shows when the level's palette names none. */
 const ROCK = new THREE.Color(0x6e675f);
 
+/**
+ * The ground in three tones: grass, earth and rock.
+ *
+ * The owner's direction (October 2026): the world is a clean low-poly
+ * abstraction, the way Fortnite draws its islands, and the ground is a few
+ * solid muted colours with nothing tiled across it. So the ground no longer
+ * carries a grain map and a normal map repeated a hundred and seventy times
+ * (the tiling the eye found, and two texture reads a pixel on a phone), nor
+ * eight palette entries and two octaves of mottling. It is three tones, taken
+ * from the level's own palette so every place keeps its character — London's
+ * green, Agra's dust, the Corcovado's rock — and muted; the light, the relief
+ * and the shadows do the rest. A broad drift of a few per cent keeps a flat
+ * city from reading as one sheet of card.
+ *
+ * `arid` (the paving warmer than it is grey, as main.js reads a desert) turns
+ * the ground over: earth everywhere, grass only in the watered parks.
+ */
+export function groundTones(P) {
+  const hsl = { h: 0, s: 0, l: 0 };
+  const mute = (c, k) => { c.getHSL(hsl); return c.setHSL(hsl.h, hsl.s * k, hsl.l); };
+  const grass = mute(P.park.clone().lerp(P.parkAlt || P.park, 0.5), 0.86);
+  const earth = mute(P.urban.clone().lerp(P.bank || P.urban, 0.5), 0.82);
+  const rock = mute((P.rock || ROCK).clone(), 0.8);
+  const u = P.urban;
+  const arid = u.r > 0.5 && u.r > u.b * 1.25;
+  return { grass, earth, rock, bed: earth.clone().multiplyScalar(0.72), arid };
+}
+
 export class Terrain {
   constructor(meta, heightData, maskData, quality, farData = null) {
     this.meta = meta;
@@ -1152,19 +1180,7 @@ export class Terrain {
       bed: new THREE.Color(0x2b4239),     // wet riverbed, cold green
       dry: new THREE.Color(0xc2b184),     // sun-bleached ground on high spots
     });
-    // The ground a step more saturated than the palettes were written: the
-    // palettes were tuned under a beige haze and a white sky, and under a blue
-    // one they read as grey-green. Lightness is left alone, so the value
-    // spread the palette was built on survives (see world/look.js).
-    if (!this._paletteLifted) {
-      this._paletteLifted = true;
-      const hsl = { h: 0, s: 0, l: 0 };
-      for (const k of Object.keys(P)) {
-        if (k === 'road') continue;
-        P[k].getHSL(hsl);
-        P[k].setHSL(hsl.h, Math.min(1, hsl.s * 1.35 + 0.03), hsl.l);
-      }
-    }
+    const G = this.tones || (this.tones = groundTones(P));
     const tmp = new THREE.Color();
     const tmp2 = new THREE.Color();
 
@@ -1175,125 +1191,52 @@ export class Terrain {
       pos.setY(i, h);
 
       const m = this.maskAt(x, z);
-
-      // Broad districts: which part of town this is.
       const broad = valueNoise(x * 0.0048, z * 0.0048);
-      const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
 
-      tmp.copy(P.urban).lerp(P.urbanAlt, THREE.MathUtils.clamp(broad * 2.2 + 0.5, 0, 1));
-      // Squares, gardens and verges outside the mapped parks — but *patches*,
-      // not a wash. Thresholded rather than ramped, so green appears as
-      // discrete pockets of ground with edges, which is what a city looks like
-      // from above. Ramping it instead turns the entire map into one lawn.
-      // The edge is a few vertices wide whatever the grid: a threshold that
-      // fell within one cell drew every patch as a hard-edged square.
-      const soft = Math.min(0.24, 0.10 + cell * 0.018);
-      // And they do not happen on the tarmac. Where the bake says hardstanding
-      // — a street, a yard, a built parcel — the ground is hardstanding, not a
-      // verge with a road drawn over the top of it.
-      const green = THREE.MathUtils.smoothstep(patch, 0.20 - soft, 0.20 + soft)
-        * 0.62 * (1 - THREE.MathUtils.clamp(m.road * 1.6, 0, 1));
-      tmp2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
-      tmp.lerp(tmp2, Math.max(green * (1 - m.water), m.park * 0.92));
+      // Grass, or earth where the ground is worked: the streets, the yards
+      // and the parcels a house stands on (the bake paints those at a third
+      // of a street). On an arid map the other way round: earth, and grass
+      // in the parks and in the odd watered pocket.
+      const hard = THREE.MathUtils.clamp(m.road / 0.34, 0, 1);
+      let g;
+      if (G.arid) {
+        const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
+        g = Math.max(THREE.MathUtils.smoothstep(patch, 0.16, 0.30) * 0.5 * (1 - hard), m.park * 0.95);
+      } else {
+        g = Math.max(1 - hard * 0.92, m.park);
+      }
+      tmp.copy(G.earth).lerp(G.grass, g * (1 - m.water));
 
-      // Higher, drier ground bleaches out.
-      const rel = THREE.MathUtils.clamp(
-        (h - this.meta.minElevation) / Math.max(1, this.meta.maxElevation - this.meta.minElevation),
-        0, 1,
-      );
-      tmp.lerp(P.dry, rel * 0.22);
-
-      // Roads, straight from the bake mask — hard edges are exactly what a
-      // noise-only ground lacks, and they give the eye something to measure
-      // distance against.
-      //
-      // The streets are asphalt. The built parcels, which the bake paints at
-      // a third of a street, are not: they are yards, courts and the ground a
-      // house stands on, and painting them a third of the way to asphalt drew
-      // grey fragments between the buildings that read as bits of road going
-      // nowhere. They are the town's own ground, a shade duller than the open.
-      const asphalt = THREE.MathUtils.clamp((m.road - 0.45) / 0.45, 0, 1);
-      const yard = THREE.MathUtils.clamp(m.road / 0.34, 0, 1) * (1 - asphalt);
-      tmp2.copy(P.urbanAlt).lerp(P.road, 0.3);
-      tmp.lerp(tmp2, yard * 0.72);
-      tmp.lerp(P.road, asphalt * 0.82);
-
-      // Then the water margin, which overrides everything.
-      //
-      // The foreshore is the part of this that was wrong. Driving it from
-      // height alone put the silt in a band of exactly constant width all the
-      // way along both banks, so the river met the land on a drawn line — the
-      // one edge in the whole frame with no texture in it, and the first thing
-      // the eye goes to. A real foreshore is ragged: it is wide where the bank
-      // shelves and pinches to nothing where it is steep, and it is strewn
-      // with the stuff the tide leaves.
-      //
-      // So the waterline is perturbed by two octaves of noise along the bank,
-      // and the silt band is widened where the ground is shallow. `shelf` is
-      // the local gradient, measured by sampling eight metres out: flat ground
-      // gets a beach, a steep bank gets a lip.
+      // The water's margin, earth, ragged where the bank shelves (two octaves
+      // of noise along it, wider on flat ground and a lip on a steep one), and
+      // the bed under the water the same earth in shadow.
       const ripple = (valueNoise(x * 0.018 + 5.1, z * 0.018 - 2.3) - 0.5) * 2.4
                    + (valueNoise(x * 0.071 - 8.8, z * 0.071 + 4.4) - 0.5) * 0.9;
       const slope = Math.abs(this.heightAt(x + 8, z) - this.heightAt(x - 8, z))
                   + Math.abs(this.heightAt(x, z + 8) - this.heightAt(x, z - 8));
       const shelf = THREE.MathUtils.clamp(1 - slope / 2.4, 0, 1);
-      // Measured in *height* above the waterline, so it has to shrink on flat
-      // ground, not grow: a six-metre band on a shelving bank is a hundred
-      // metres of beach in plan, and the first cut of this turned both banks
-      // of the Thames into the Wash. A steep bank can take a taller band
-      // because a tall band there is still only a few metres wide.
       const margin = 1.1 + (1 - shelf) * 2.2;
       const wet = THREE.MathUtils.clamp(
         (this.waterLevel + margin + ripple * 0.5 - h) / (1.4 + (1 - shelf) * 2.0), 0, 1);
-      tmp.lerp(P.bank, Math.pow(wet, 1.3) * 0.86);
-      tmp.lerp(P.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
-      // Rock where the ground is steep. Every synthetic hill — Marpo Ri,
-      // Castle Rock, the Corcovado — was a smooth dome in the same grass;
-      // past about twenty degrees the grass gives way to the rock's own
-      // colour, which a level's palette may name (`rock`) and which is a
-      // grey-brown otherwise. `slope` is the summed rise over sixteen metres
-      // on both axes, so 5.5 is about twenty degrees and 14 about forty-five.
+      tmp.lerp(G.earth, Math.pow(wet, 1.3) * 0.9);
+      tmp.lerp(G.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
+      // Rock past about twenty degrees: `slope` is the rise over sixteen
+      // metres on both axes, so 5.5 is about twenty degrees and 14 forty-five.
       const steep = THREE.MathUtils.clamp((slope - 5.5) / 8.5, 0, 1);
-      if (steep > 0) tmp.lerp(P.rock || ROCK, steep * 0.85);
+      if (steep > 0) tmp.lerp(G.rock, steep * 0.9);
 
-      // Fine mottling on top of all of it — but no octave finer than the grid
-      // can carry. Noise with a three-metre period sampled at vertices seven
-      // metres apart is a random value per vertex, and a random value per
-      // vertex is a checkerboard. The grain texture supplies the fine detail
-      // instead, at every resolution.
-      const n = valueNoise(x * 0.055, z * 0.055) * (cell < 4.5 ? 0.22 : 0.16)
-              + (cell < 2.2 ? valueNoise(x * 0.34, z * 0.34) * 0.10 : 0.05)
-              + broad * 0.16;
-      tmp.multiplyScalar(0.80 + n);
+      // The drift: a few per cent over a few hundred metres, no finer.
+      tmp.multiplyScalar(1 + broad * 0.08);
 
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
     geo.computeVertexNormals();
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-    // Vertex colours alone give large flat fields of one tone — the mesh has a
-    // vertex every 3.5 m, which is nowhere near enough detail at ground level.
-    // A tiled grain map multiplied over them adds the high-frequency break-up,
-    // and a matching normal map catches the low sun so the ground has relief
-    // instead of reading as painted card.
-    const grain = makeGrainTexture(256);
-    const grainN = makeGrainNormal(256);
-    for (const t of [grain, grainN]) {
-      t.wrapS = t.wrapT = THREE.RepeatWrapping;
-      t.repeat.set(170, 170);
-      t.anisotropy = this.quality.anisotropy;
-    }
-    // The normal map is doing most of the work that relief would do on a hillier
-    // map, so it is pushed hard: at this scale the sun rakes across it and the
-    // ground picks up texture instead of reading as painted card.
-    const mat = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      map: grain,
-      normalMap: grainN,
-      normalScale: new THREE.Vector2(0.85, 0.85),
-      roughness: 0.94,
-      metalness: 0.0,
-    });
+    // The ground is its vertex colours and nothing else: no tiled grain, no
+    // normal map (see `groundTones`). Lambert, not standard: the ground has
+    // no specular worth paying for, and it is most of the screen.
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.mesh = new THREE.Mesh(geo, mat);
     this.mesh.receiveShadow = this.quality.shadowMapSize > 0;
     this.mesh.frustumCulled = false;
@@ -1404,39 +1347,24 @@ export class Terrain {
     const apronColour = (x, z, ch) => {
       const broad = valueNoise(x * 0.0048, z * 0.0048);
       const patch = valueNoise(x * 0.021 + 91.3, z * 0.021 - 17.7);
-      at.copy(P.urban).lerp(P.urbanAlt, THREE.MathUtils.clamp(broad * 2.2 + 0.5, 0, 1));
-      at2.copy(P.park).lerp(P.parkAlt, THREE.MathUtils.clamp(broad * 2.0 + 0.5, 0, 1));
-      // More green further out: the suburbs and then open country.
+      // Open country past the map: grass, with earth in pockets nearer the
+      // edge where the town would have run on; on an arid map earth, greener
+      // only where the hinterland is forest or jungle.
       const rural = THREE.MathUtils.clamp(
         (Math.max(Math.abs(x), Math.abs(z)) - this.span) / (this.span * 3), 0, 1,
       );
-      // How green the country is. Fields and suburbs are half built colour;
-      // rainforest is not built at all, and the Yucatan and the Tijuca were
-      // both coming out the colour of a car park.
-      const wild = (this.hinterland === 'jungle' || this.hinterland === 'forest')
-        ? 0.86 : 0.38;
-      // Clamped. `Color.lerp` extrapolates past its target for an alpha over
-      // one, so the old weights adding to exactly 1.0 were load-bearing and
-      // did not look it: raising the rural share to 0.86 took the far country
-      // to an alpha of 1.48 and extrapolated the green straight through black,
-      // which is what turned the Tijuca into a pale grey plain.
-      at.lerp(at2, Math.min(1, THREE.MathUtils.smoothstep(patch, 0.08, 0.28) * 0.62
-        + rural * wild));
-      const n2 = valueNoise(x * 0.055, z * 0.055) * 0.22 + broad * 0.16;
-      at.multiplyScalar(0.80 + n2);
-      // Down the channel: silt on the shore, riverbed under the water. The
-      // sheet only covers the flat bed, so the bank between the waterline and
-      // the fields has to read as a bank.
+      const wild = (this.hinterland === 'jungle' || this.hinterland === 'forest');
+      const g = G.arid
+        ? (wild ? 0.85 : THREE.MathUtils.smoothstep(patch, 0.16, 0.30) * 0.4)
+        : Math.min(1, 0.72 + rural * 0.28 + THREE.MathUtils.smoothstep(patch, 0.0, 0.25) * 0.2);
+      at.copy(G.earth).lerp(G.grass, g);
+      // Down the channel: earth on the shore, the bed under the water.
       if (ch > 0) {
-        at2.copy(P.bank).lerp(P.bed, THREE.MathUtils.smoothstep(ch, 0.55, 0.95));
+        at2.copy(G.earth).lerp(G.bed, THREE.MathUtils.smoothstep(ch, 0.55, 0.95));
         at.lerp(at2, THREE.MathUtils.smoothstep(ch, 0.04, 0.4));
       }
-      // And the seabed, on a map whose surround is open water. Without this
-      // the harbour beyond the map is farmland with a sheet of water over it,
-      // which shows wherever the sheet is shallow or the sun is low.
-      if (this.openSea && this.surfaceAt(x, z) < this.waterLevel - 1) {
-        at.copy(P.bed);
-      }
+      if (this.openSea && this.surfaceAt(x, z) < this.waterLevel - 1) at.copy(G.bed);
+      at.multiplyScalar(1 + broad * 0.08);
       return at;
     };
     const apColors = new Float32Array(ap.count * 3);
@@ -1458,9 +1386,7 @@ export class Terrain {
       }
     }
     apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
-    const apron = new THREE.Mesh(apronGeo, new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 1.0, metalness: 0,
-    }));
+    const apron = new THREE.Mesh(apronGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
     apron.position.y = edge - 0.4;
     apron.frustumCulled = false;
     apron.renderOrder = -5;
@@ -1921,98 +1847,6 @@ function gradedFrame(inner, outer) {
     : new THREE.BufferAttribute(new Uint16Array(index), 1));
   geo.computeVertexNormals();
   return geo;
-}
-
-/** Tileable multi-octave grain, generated once at boot. */
-function makeGrainTexture(size) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      // Wrapped sampling keeps the tile seamless.
-      //
-      // And warped. Value noise is a blob at every lattice point, and with
-      // half the amplitude in one octave at four blobs a tile — two metres
-      // apart on the ground — the tile was a grid of blobs, and the ground
-      // seen from above was a lattice: the "weird lines" over Pisa's plain,
-      // where there is nothing else to look at. Offsetting the sample by a
-      // second noise field tears the lattice into blotches, and spreading
-      // the amplitude over the octaves stops any one period showing.
-      const [wx, wy] = warp(x, y, size);
-      let n = 0;
-      n += tileNoise(wx, wy, size, 5) * 0.3;
-      n += tileNoise(wx, wy, size, 11) * 0.3;
-      n += tileNoise(wx, wy, size, 23) * 0.25;
-      n += tileNoise(wx, wy, size, 47) * 0.15;
-      const v = Math.round(232 + (n - 0.5) * 88);
-      const o = (y * size + x) * 4;
-      img.data[o] = img.data[o + 1] = img.data[o + 2] = Math.max(150, Math.min(255, v));
-      img.data[o + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-/** Normal map derived from the same grain field, so lighting agrees with it. */
-function makeGrainNormal(size) {
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(size, size);
-  const h = (x, y) => {
-    const [wx, wy] = warp(x, y, size);
-    return tileNoise(wx, wy, size, 11) * 0.55 + tileNoise(wx, wy, size, 23) * 0.45;
-  };
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const dx = h((x + 1) % size, y) - h((x - 1 + size) % size, y);
-      const dy = h(x, (y + 1) % size) - h(x, (y - 1 + size) % size);
-      const o = (y * size + x) * 4;
-      img.data[o] = Math.round((-dx * 0.5 + 0.5) * 255);
-      img.data[o + 1] = Math.round((-dy * 0.5 + 0.5) * 255);
-      img.data[o + 2] = 255;
-      img.data[o + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return new THREE.CanvasTexture(c);
-}
-
-/**
- * The sample point, pushed about by a slower noise so the grain's own lattice
- * never lines up. Both offsets are periodic in the tile, so the tile still
- * wraps.
- */
-function warp(x, y, size) {
-  const k = size * 0.09;
-  return [
-    x + (tileNoise(x, y, size, 3) - 0.5) * k + (tileNoise(x, y, size, 7) - 0.5) * k * 0.5,
-    y + (tileNoise(x + size * 0.37, y + size * 0.61, size, 3) - 0.5) * k
-      + (tileNoise(x + size * 0.11, y + size * 0.83, size, 7) - 0.5) * k * 0.5,
-  ];
-}
-
-/** Value noise on a wrapped lattice, so the result tiles without a seam. */
-function tileNoise(x, y, size, freq) {
-  const fx = (x / size) * freq;
-  const fy = (y / size) * freq;
-  const xi = Math.floor(fx), yi = Math.floor(fy);
-  const tx = fx - xi, ty = fy - yi;
-  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-  const hsh = (a, b) => {
-    a = ((a % freq) + freq) % freq;
-    b = ((b % freq) + freq) % freq;
-    let n = Math.imul(a + 1, 374761393) ^ Math.imul(b + 1, 668265263) ^ Math.imul(freq, 2246822519);
-    n = Math.imul(n ^ (n >>> 13), 1274126177);
-    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
-  };
-  const a = hsh(xi, yi), b = hsh(xi + 1, yi), cc = hsh(xi, yi + 1), d = hsh(xi + 1, yi + 1);
-  return (a * (1 - sx) + b * sx) * (1 - sy) + (cc * (1 - sx) + d * sx) * sy;
 }
 
 /**

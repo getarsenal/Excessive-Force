@@ -118,6 +118,10 @@ export function applyLook(engine, level, sky) {
   engine.hemi.intensity = L.hemiIntensity ?? 0.60;
   engine.ambient.color.setHex(L.ambient);
   engine.ambient.intensity = L.ambientIntensity ?? 0.22;
+  // The environment material's stand-in for the sky the standard materials
+  // take from the environment map (see `envStyle`): the same sky and ground.
+  ENV_UNIFORMS.uEnvSky.value.setHex(L.hemiSky);
+  ENV_UNIFORMS.uEnvGround.value.setHex(L.hemiGround);
   // The sun carries the contrast: less fill and exposure, so the lit side
   // is bright and the shadow side is colour rather than grey. A look may
   // say otherwise (the range, lit by lamps).
@@ -269,6 +273,110 @@ export function stylizeTree(root) {
     if (!o.isMesh) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) if (m && m.isMeshStandardMaterial && !m.userData.stylized) { stylize(m); n++; }
+  });
+  return n;
+}
+
+// ── The environment's one material ───────────────────────────────────────
+
+/**
+ * Everything that is not the target, the guns or the aircraft — the ground,
+ * the town, the trees, the works — is drawn by one cheap material: Lambert
+ * (diffuse only: no specular lobe, no sky reflection, no roughness or metal
+ * maps, no normal map), with the same wrapped sun and value by face as the
+ * stylized standard material, so a form still carries its shape on the
+ * shadow side and tops read light, sides middling, undersides dark.
+ *
+ * Two reasons, both the owner's (October 2026). The look: a clean low-poly
+ * abstraction, the way Fortnite draws an island, where colour and light do
+ * the work and nothing glints. And the phone: the environment is most of the
+ * screen, and a physically based fragment with two or three texture reads
+ * was most of what the phone spent; that budget goes to resolution instead.
+ * The landmark keeps its standard material and its stone edges, so the
+ * target stands apart from the world round it.
+ *
+ * `envizeTree(root)` swaps every standard material under a root for its
+ * Lambert twin (one twin per source, so shared materials stay shared, and a
+ * source's own shader patch — the town's burn channel — is carried across:
+ * it hooks chunks Lambert has too) and styles every Lambert material there.
+ */
+const ENV_KEYS = ['name', 'color', 'map', 'vertexColors', 'emissive', 'emissiveMap', 'emissiveIntensity',
+  'transparent', 'opacity', 'alphaTest', 'alphaMap', 'side', 'depthWrite', 'depthTest', 'colorWrite',
+  'polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits', 'fog', 'flatShading', 'toneMapped',
+  'visible', 'wireframe', 'aoMap', 'aoMapIntensity', 'lightMap', 'lightMapIntensity', 'blending'];
+const envTwins = new WeakMap();
+
+/**
+ * The sky's fill. A standard material takes a soft sky light from the
+ * environment map on its shadow side; Lambert takes none, and the first cut
+ * of this drew the Corcovado's trees black on the slope away from the sun.
+ * So the environment material adds the sky (above) and the ground's bounce
+ * (below) by the surface's facing, at about the share the map gave.
+ */
+const ENV_UNIFORMS = {
+  uEnvSky: { value: new THREE.Color(0x9cc0ea) },
+  uEnvGround: { value: new THREE.Color(0x7a6642) },
+  uEnvFill: { value: 0.3 },
+};
+
+export function envMaterial(src) {
+  if (!src || !src.isMeshStandardMaterial) return src;
+  let m = envTwins.get(src);
+  if (m) return m;
+  m = new THREE.MeshLambertMaterial();
+  for (const k of ENV_KEYS) if (src[k] !== undefined) m[k] = src[k];
+  m.userData = { ...src.userData };
+  delete m.userData.stylized;
+  if (Object.prototype.hasOwnProperty.call(src, 'onBeforeCompile')) m.onBeforeCompile = src.onBeforeCompile;
+  if (Object.prototype.hasOwnProperty.call(src, 'customProgramCacheKey')) m.customProgramCacheKey = src.customProgramCacheKey;
+  envTwins.set(src, m);
+  return envStyle(m);
+}
+
+export function envStyle(material) {
+  if (!material || !material.isMeshLambertMaterial || material.userData.envStyled) return material;
+  material.userData.envStyled = true;
+  const prev = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, renderer) => {
+    if (prev) prev(shader, renderer);
+    Object.assign(shader.uniforms, STYLE_UNIFORMS, ENV_UNIFORMS);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform float uWrap; uniform float uFaceTop; uniform float uFaceSide; uniform float uFaceUnder;
+uniform vec3 uEnvSky; uniform vec3 uEnvGround; uniform float uEnvFill;`)
+      .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+{
+  vec3 upW = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  float up = dot(normal, upW) * 0.5 + 0.5;
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * mix(uEnvGround, uEnvSky, up) * uEnvFill;
+}`)
+      .replace('#include <lights_lambert_pars_fragment>',
+        THREE.ShaderChunk.lights_lambert_pars_fragment.replace(WRAP_FROM, WRAP_TO))
+      .replace('#include <lights_lambert_fragment>', `
+{
+  vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  float ny = dot(normal, upV);
+  diffuseColor.rgb *= ny >= 0.0 ? mix(uFaceSide, uFaceTop, ny) : mix(uFaceSide, uFaceUnder, -ny);
+}
+#include <lights_lambert_fragment>`);
+  };
+  const key = material.customProgramCacheKey ? material.customProgramCacheKey() : '';
+  material.customProgramCacheKey = () => `${key}|env`;
+  material.needsUpdate = true;
+  return material;
+}
+
+/** The environment's material on everything under `root`; returns how many meshes changed. */
+export function envizeTree(root) {
+  if (!root) return 0;
+  let n = 0;
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material || o.userData.keepStandard) return;
+    if (Array.isArray(o.material)) {
+      o.material = o.material.map((m) => (m && m.isMeshStandardMaterial ? (n++, envMaterial(m)) : envStyle(m)));
+    } else if (o.material.isMeshStandardMaterial) {
+      o.material = envMaterial(o.material); n++;
+    } else envStyle(o.material);
   });
   return n;
 }

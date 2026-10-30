@@ -29,11 +29,14 @@ import { isMobile } from './quality.js';
 export const LEVELS = ['nominal', 'fair', 'serious', 'critical'];
 
 /** What each rung turns down. Scale multiplies the pixel ratio the tier allows. */
+// Resolution is the last thing to give (the owner, October 2026): a warm
+// phone first loses smoke, shadow redraws and frames, and only a serious one
+// draws fewer pixels.
 export const RUNGS = [
   { scale: 1, fill: 1, fps: 30, shadowEvery: 1 },
-  { scale: 0.85, fill: 0.6, fps: 30, shadowEvery: 3 },
-  { scale: 0.72, fill: 0.4, fps: 24, shadowEvery: 6 },
-  { scale: 0.6, fill: 0.25, fps: 20, shadowEvery: 0 },
+  { scale: 1, fill: 0.5, fps: 30, shadowEvery: 3 },
+  { scale: 0.85, fill: 0.35, fps: 24, shadowEvery: 6 },
+  { scale: 0.7, fill: 0.25, fps: 20, shadowEvery: 0 },
 ];
 
 export const heat = {

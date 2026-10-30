@@ -116,18 +116,28 @@ in `public/assets/characters/` are WebP: sixty-one PNGs were 149 MB of a
 
 A phone's power is fill: every full-screen pass at the pixel ratio, every
 PBR fragment, twenty screens of smoke. `docs/perf/HEAT.md` is the ledger.
-On a phone the ratio is 1.35 of the device's (was 1.5) with a
-contrast-adaptive sharpen in the grade pass (`uSharpen`, engine.js), the
-grade pass and the particles run at `mediump`, the rim light is not added,
-the VSM blur is four samples, the particle fill budget is fourteen screens
-and the interface's looping animations run in ten steps a second under
-`body.lean`. `src/core/heat.js` is the heat governor: the App Store build
+Render quality is the last thing to give (the owner, October 2026), so the
+environment pays instead: the ground, the town, the trees and the works are
+one diffuse-only material (`envizeTree` in `src/world/look.js`: Lambert with
+the wrapped sun, value by face and a sky fill standing in for the
+environment map, the town's burn channel carried across), the ground is
+three muted tones from the level's palette (`groundTones` in terrain.js:
+grass, earth, rock; earth-first on an arid map) with no texture at all, and
+the landmark keeps its standard material so the target stands apart. That
+bought the phone's pixel ratio back from 1.35 to 2.0 (`PHONE_RATIO`,
+engine.js) with a light sharpen (`uSharpen` 0.25). The grade pass and the
+particles run at `mediump`, the rim light is not added, the VSM blur is four
+samples, the particle fill budget is fourteen screens and the interface's
+looping animations run in ten steps a second under `body.lean`. This is
+phase one of the low-poly abstraction; phase two replaces the surveyed town
+with a themed, generated one under a hard triangle budget. `src/core/heat.js` is the heat governor: the App Store build
 reads the phone's `ProcessInfo.thermalState`, Low Power Mode and battery
 through `ios/App/App/ThermalPlugin.swift` (registered by
 `AppViewController`), and the web infers throttling from the frame
 governor's p80 at a steady load; each rung (`RUNGS`: nominal, fair,
-serious, critical) sets the engine's `heatScale`, the fill budget, the
-frame cap (`power.capFps`: 30, 30, 24, 20) and the shadow redraw cadence
+serious, critical) sets the engine's `heatScale` (1, 1, 0.85, 0.7:
+resolution is held through "fair"), the fill budget, the frame cap
+(`power.capFps`: 30, 30, 24, 20) and the shadow redraw cadence
 (`shadowEvery`), and Low Power Mode switches the saver on.
 `node tools/thermalprobe.mjs` plants a plugin on the page, walks the
 ladder and reads each rung back; `window.__heat.set(n)` forces a rung.
