@@ -665,10 +665,13 @@ export class Terrain {
     const dist = new Int16Array(N).fill(-1);
     const queue = [];
     for (let i = 0; i < N; i++) if (isWet(i)) { dist[i] = 0; queue.push(i); }
-    let flooded = 0;
+    let flooded = 0, raised = 0;
+    const surveyed = this.meta && this.meta.coastline === 'surveyed';
     for (let q = 0; q < queue.length; q++) {
       const i = queue[q];
-      if (dist[i] >= REACH) continue;
+      // (A surveyed map raises the whole low ground the water touches: a bank
+      // that stopped at the reach would leave a pit beside it.)
+      if (dist[i] >= REACH && !surveyed) continue;
       const v = (i / n) | 0, u = i - v * n;
       const nb = [];
       if (u > 0) nb.push(i - 1);
@@ -682,10 +685,24 @@ export class Terrain {
           const jx = -this.span + ju * cell, jz = this.span - jv * cell;
           if (this._pads.some((p) => Math.hypot(jx - p.cx, jz - p.cz) <= p.r)) continue;
         }
-        dist[j] = dist[i] + 1;
+        dist[j] = Math.min(dist[i] + 1, 32000);
+        queue.push(j);
+        // A surveyed shoreline is the shore. Low ground the survey calls land
+        // is raised to a bank above the sheet rather than flooded: the flood
+        // turned Pimlico's riverside, which the DEM has two metres under the
+        // Thames, into a river four hundred metres wide, left the Embankment
+        // road standing in it as an island, and met the country beyond the
+        // map three hundred metres from where the real river leaves it. At
+        // the map's own edge the far survey decides, so a creek the playfield
+        // mask stops short of still runs out to the water beyond.
+        if (surveyed) {
+          const jv = (j / n) | 0, ju = j - jv * n;
+          const jx = -this.span + ju * cell, jz = this.span - jv * cell;
+          const edge = this.span - Math.max(Math.abs(jx), Math.abs(jz)) < 60;
+          if (!(edge && this._farWet(jx, jz))) { h[j] = wl + 0.4; raised++; continue; }
+        }
         m[j * 3] = 1;
         flooded++;
-        queue.push(j);
       }
     }
 
@@ -694,13 +711,25 @@ export class Terrain {
     //    waterline partway across the cell, and the deeper the wet vertex the
     //    wider the strip that is actually under water — which on a two-cell
     //    river is the difference between a channel a boat fits in and none.
+    //    And where the water carries on past the map, the bed falls over the
+    //    last sixty metres to the far bed (`surfaceAt`, eleven metres down):
+    //    a river two metres deep at the boundary against eleven beyond it drew
+    //    a shallow-water stripe straight across the Thames along the edge.
     let sunk = 0;
     for (let i = 0; i < N; i++) {
-      if (isWet(i) && h[i] > wl - 2.4) { h[i] = wl - 2.4; sunk++; }
+      if (!isWet(i)) continue;
+      let floor = wl - 2.4;
+      if (this.farMask) {
+        const v = (i / n) | 0, u = i - v * n;
+        const x = -this.span + u * cell, z = this.span - v * cell;
+        const e = this.span - Math.max(Math.abs(x), Math.abs(z));
+        if (e < 60 && this._farWet(x, z)) floor -= 8.6 * THREE.MathUtils.smoothstep(60 - e, 0, 60);
+      }
+      if (h[i] > floor) { h[i] = floor; sunk++; }
     }
-    if (specks || flooded || sunk) {
+    if (specks || flooded || raised || sunk) {
       console.log(`[tumble] water reconciled: ${specks} specks (${speckCells} cells) dried, `
-        + `${flooded} cells flooded, ${sunk} wet cells sunk under the surface`);
+        + `${flooded} cells flooded, ${raised} raised to a bank, ${sunk} wet cells sunk under the surface`);
     }
   }
 

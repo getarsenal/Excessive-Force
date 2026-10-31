@@ -324,8 +324,12 @@ export function createWater(terrain, sunDirection, quality) {
   const step = (quality && quality.name === 'low') ? 3 : 2;
   const cell = (terrain.span * 2) / (n - 1);
 
-  // Grid of sample points at the decimated resolution.
-  const gn = Math.floor((n - 1) / step) + 1;
+  // Grid of sample points at the decimated resolution, the last row on the
+  // boundary however the step divides the grid: 511 cells taken two at a time
+  // stopped the sheet one cell short of the edge, and the river bed showed
+  // through as a sand-coloured line straight across every river leaving the
+  // map.
+  const gn = Math.ceil((n - 1) / step) + 1;
   const wet = new Uint8Array(gn * gn);
   for (let gz = 0; gz < gn; gz++) {
     for (let gx = 0; gx < gn; gx++) {
@@ -352,8 +356,8 @@ export function createWater(terrain, sunDirection, quality) {
     }
   }
 
-  const worldX = (gx) => -terrain.span + gx * step * cell;
-  const worldZ = (gz) => terrain.span - gz * step * cell;
+  const worldX = (gx) => -terrain.span + Math.min(n - 1, gx * step) * cell;
+  const worldZ = (gz) => terrain.span - Math.min(n - 1, gz * step) * cell;
 
   const vIndex = new Int32Array(gn * gn).fill(-1);
   const pos = [];
@@ -421,21 +425,31 @@ export function createWater(terrain, sunDirection, quality) {
   // picture, which is not.
   if (terrain.farMask) {
     const S = terrain.span, F = terrain.farSpan;
-    // On the same graded grid as the ground under it (see `gradedFrame`), and
-    // only where the cell is mostly water: a quad laid wherever any corner
-    // was wet spread every distant shore eighty-four metres over the land in
-    // a staircase.
+    // On the same graded grid as the ground under it (see `gradedFrame`),
+    // wherever any corner of the cell has its ground under the surface, so
+    // the ground draws the shore. Past the map dry country stands at least
+    // 2.5 m over the waterline (`surfaceAt`), so a sheet laid a cell over the
+    // bank is hidden under it, and the shoreline is where the sunk bed meets
+    // the surface. Deciding cell by cell whether the cell was mostly water
+    // drew every distant shore as a staircase of whole cells, twenty-four to
+    // eighty metres a step.
     const cs = gradedCoords(S, F);
     const DIV = cs.length - 1;
     const fx = (i) => cs[i];
     const fz = (j) => -cs[j];
     const fIndex = new Int32Array((DIV + 1) * (DIV + 1)).fill(-1);
+    const fDepth = new Float32Array((DIV + 1) * (DIV + 1)).fill(NaN);
+    const under = (i, j) => {
+      const k = j * (DIV + 1) + i;
+      if (Number.isNaN(fDepth[k])) fDepth[k] = level - terrain.surfaceAt(fx(i), fz(j));
+      return fDepth[k];
+    };
     const fVert = (i, j) => {
       const k = j * (DIV + 1) + i;
       if (fIndex[k] >= 0) return fIndex[k];
       const id = pos.length / 3;
       pos.push(fx(i), level, fz(j));
-      depth.push(40);
+      depth.push(Math.max(0, Math.min(40, under(i, j))));
       fIndex[k] = id;
       return id;
     };
@@ -446,13 +460,8 @@ export function createWater(terrain, sunDirection, quality) {
         // bed under it; a coarse quad laid across it would cover the map.
         if (Math.max(x0, x1) > -S && Math.min(x0, x1) < S
           && Math.max(z0, z1) > -S && Math.min(z0, z1) < S) continue;
-        let wetc = 0;
-        if (terrain._farWet(x0, z0)) wetc++;
-        if (terrain._farWet(x1, z0)) wetc++;
-        if (terrain._farWet(x1, z1)) wetc++;
-        if (terrain._farWet(x0, z1)) wetc++;
-        if (terrain._farWet((x0 + x1) / 2, (z0 + z1) / 2)) wetc += 2;
-        if (wetc < 3) continue;
+        if (under(i, j) <= 0 && under(i + 1, j) <= 0
+          && under(i + 1, j + 1) <= 0 && under(i, j + 1) <= 0) continue;
         const a = fVert(i, j), b = fVert(i + 1, j);
         const c = fVert(i + 1, j + 1), d = fVert(i, j + 1);
         index.push(a, c, d, a, b, c);

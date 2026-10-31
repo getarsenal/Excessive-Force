@@ -317,6 +317,7 @@ export function realNetwork(data, terrain, opts = {}) {
   // ground is a road through the roads it was built to pass over.
   const flyovers = dropDryFlyovers(nodes, edges, terrain);
   landBridges(edges, nodes, terrain);
+  const stranded = dropStrandedBridges(edges, nodes, terrain);
   // Whole roads before loose ends. A surveyed road arrives in pieces of a few
   // dozen metres, and a dead-end rule applied to pieces eats a long road one
   // bite at a time from its open end; applied to the road it has become, it
@@ -366,7 +367,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, welds: WELDS.slice(), ...ends, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
+      welded, snapped, welds: WELDS.slice(), ...ends, stranded, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -1391,6 +1392,46 @@ function landBridges(edges, nodes, terrain) {
       if (link) link.other = best;
     }
   }
+}
+
+/**
+ * A bridge that never reached a bank comes down.
+ *
+ * `landBridges` walks a dangling deck on to the bank, but not off the map:
+ * a crossing the boundary cuts in half (Vauxhall's, at Westminster's south
+ * edge) kept its half standing in the river, a road out over the water to
+ * nothing. A bridge that touches the edge over water goes, and a bridge piece with an end joined to nothing and still over water
+ * goes, and again, so the piece behind it, now dangling, goes too, until what
+ * is left of the crossing starts and ends on land.
+ */
+function dropStrandedBridges(edges, nodes, terrain) {
+  const dry = (x, z) => !terrain.isWater(x, z)
+    && terrain.heightAt(x, z) > terrain.waterLevel + 0.35;
+  let dropped = 0;
+  for (let pass = 0; pass < 40; pass++) {
+    const drop = new Set();
+    for (const e of edges) {
+      if (!e.bridge) continue;
+      // Reaching the map's edge over water is leaving the map: the survey's
+      // two carriageways, cut there, came back joined into one deck out to
+      // the boundary and back, with both its ends ashore.
+      if (e.pts.some((p) => terrain.span - Math.max(Math.abs(p.x), Math.abs(p.z)) < 30 && !dry(p.x, p.z))) {
+        drop.add(e);
+        continue;
+      }
+      for (const [key, tip] of [['a', e.pts[0]], ['b', e.pts[e.pts.length - 1]]]) {
+        const node = nodes[e[key]];
+        if (node && node.links.length <= 1 && !dry(tip.x, tip.z)) { drop.add(e); break; }
+      }
+    }
+    if (!drop.size) break;
+    dropped += drop.size;
+    const kept = edges.filter((e) => !drop.has(e));
+    edges.length = 0;
+    for (const e of kept) edges.push(e);
+    relink(nodes, edges);
+  }
+  return dropped;
 }
 
 /**
