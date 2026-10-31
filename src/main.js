@@ -55,7 +55,7 @@ import { damageBill, money } from './ui/bill.js';
 import { CollapseClip } from './ui/clip.js';
 import { Flags, FLAG_SITES } from './world/flags.js';
 import { cloudShadows, cloudUniforms } from './world/clouds.js';
-import { applyLook, applyWaterLook, stylizeTree, lookFor, climeOf, envizeTree, envStyle } from './world/look.js';
+import { applyLook, applyWaterLook, stylizeTree, lookFor, climeOf, envizeTree, envStyle, setWorldRim } from './world/look.js';
 import { Fires } from './fx/fires.js';
 import { CityFire } from './game/cityfire.js';
 import { TargetingPod } from './ui/tgp.js';
@@ -976,6 +976,8 @@ async function boot() {
   // the town and the works drawn diffuse-only, the landmark and the guns kept
   // standard so the target stands apart.
   const envN = envizeTree(terrain.group) + envizeTree(contextGroup) + envizeTree(fieldWorks.group);
+  // The abstract world's rim, lost in the fog over its last fifth.
+  if (abstractEnv && terrain.worldR) setWorldRim(terrain.worldR * 0.74, terrain.worldR * 0.99);
   envStyle(terrain.mesh.material);
   console.log(`[tumble] environment material on ${envN} meshes`);
   // Cloud shadows drifting over the ground and the town.

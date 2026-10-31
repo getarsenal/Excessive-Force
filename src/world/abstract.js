@@ -43,7 +43,7 @@ import { buildPrecinct } from './places.js';
 import { valueNoise } from './terrain.js';
 
 /** What the environment may cost, in triangles, everything but the target. */
-export const BUDGET = { buildings: 60000, trees: 34000, roads: 8000, far: 8000 };
+export const BUDGET = { buildings: 60000, trees: 28000, roads: 8000, countryHouses: 9000, countryTrees: 15000 };
 
 // ── The switch ───────────────────────────────────────────────────────────
 
@@ -268,6 +268,18 @@ export function buildAbstract(terrain, quality, opts = {}) {
   const inMark = (x, z, pad) => marks.some((l) => Math.abs(x - l.x) < l.w / 2 + pad && Math.abs(z - l.z) < l.d / 2 + pad);
   const inClearing = (x, z, pad = 0) => clearings.some((c) => (x - c.x) ** 2 + (z - c.z) ** 2 < (c.r + pad) ** 2);
   const onMap = (x, z) => Math.abs(x) < reach && Math.abs(z) < reach;
+  // One world to the fog (terrain `_skirt`): the map's own height and water on
+  // the map, the real far relief and the far water past it, meeting at the edge.
+  // What stands on the map is solid and burns (`plots`); past it the same
+  // buildings are scenery. Everything thins smoothly to the rim, with no line.
+  const onField = (x, z) => Math.abs(x) <= span && Math.abs(z) <= span;
+  const inside = (x, z) => Math.abs(x) < span - 4 && Math.abs(z) < span - 4;
+  const worldR = (terrain.worldR || span * 1.9) * 0.96;
+  const inWorld = (x, z) => Math.hypot(x, z) < worldR;
+  const groundAt = (x, z) => (onField(x, z) ? terrain.heightAt(x, z) : terrain.surfaceAt(x, z));
+  const wetAt = (x, z) => (onField(x, z) ? wet(x, z)
+    : (!!terrain._farWet?.(x, z) || terrain.surfaceAt(x, z) < wl + 0.5));
+  const falloff = (r) => 1 - 0.75 * THREE.MathUtils.smoothstep(r, span, worldR);
   /** Whether a straight road can run from a to b: on dry land, off the landmark, on the map. */
   const lineClear = (ax, az, bx, bz) => {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.ceil(L / 7));
@@ -341,7 +353,7 @@ export function buildAbstract(terrain, quality, opts = {}) {
     const ki = Math.round((k / RADIALS) * ringN) % ringN;
     let prev = ring[ki];
     if (prev < 0) continue;
-    for (let r = rRing + 90; r < reach; r += 90) {
+    for (let r = rRing + 90; r < reach * 1.42; r += 90) { // (a diagonal runs on to the square's edge)
       // Onto the outer ring where it crosses it.
       let ni = -1;
       if (outer.length && Math.abs(r - rOuter) < 46) {
@@ -389,6 +401,41 @@ export function buildAbstract(terrain, quality, opts = {}) {
     // Nodes nothing joined are dropped from the plan's count only: the
     // network is read by edges, and a node with no links is never walked.
   }
+  // Country roads to the fog, one down each avenue's line: from the town's
+  // furthest road node that way (the avenue's own end where it reached the
+  // edge) straight out, broken where it meets water and taken up again on the
+  // far bank. Scenery: the traffic keeps to the map's network.
+  const farRoads = [];
+  for (let k = 0; k < RADIALS; k++) {
+    const a = radialAngles[k], ux = Math.sin(a), uz = Math.cos(a);
+    let best = -1, bestR = 0;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n.links.length) continue;
+      const along = n.x * ux + n.z * uz, across = Math.abs(n.x * uz - n.z * ux);
+      if (along > bestR && across < Math.max(60, along * 0.18)) { best = i; bestR = along; }
+    }
+    if (best < 0) continue;
+    let pts = [{ x: nodes[best].x, z: nodes[best].z, y: groundAt(nodes[best].x, nodes[best].z) }];
+    const flush = () => {
+      if (pts.length >= 2) {
+        farRoads.push(pts);
+        for (let i = 0; i + 1 < pts.length; i++) {
+          segs.push({ ax: pts[i].x, az: pts[i].z, bx: pts[i + 1].x, bz: pts[i + 1].z, hw: HW.avenue });
+        }
+      }
+      pts = [];
+    };
+    for (let r = bestR + 40; r < worldR * 0.92; r += 40) {
+      // Bent onto the avenue's line over the first stretch, then along it.
+      const t = Math.min(1, (r - bestR) / 400);
+      const ox = nodes[best].x - ux * bestR, oz = nodes[best].z - uz * bestR;
+      const x = ux * r + ox * (1 - t), z = uz * r + oz * (1 - t);
+      if (wetAt(x, z)) { flush(); continue; }
+      pts.push({ x, z, y: groundAt(x, z) });
+    }
+    flush();
+  }
   const nearRoad = (x, z, pad) => segs.some((s) => segDist(x, z, s) < s.hw + pad);
 
   // ── The buildings.
@@ -402,8 +449,10 @@ export function buildAbstract(terrain, quality, opts = {}) {
     d = Math.atan2(Math.sin(d), Math.cos(d));
     return Math.abs(d) < 0.5;
   };
+  let countryTris = 0;
   const tryPlace = (x, z, w, d, yaw, floors, opt = {}) => {
-    if (plots.length >= 900 || buildTris > BUDGET.buildings) return false;
+    const scenery = !inside(x, z);
+    if (scenery ? countryTris > BUDGET.countryHouses : (plots.length >= 900 || buildTris > BUDGET.buildings)) return false;
     const r = { x, z, w, d, yaw };
     const c = Math.cos(yaw), s = Math.sin(yaw);
     const pts = [[0, 0]];
@@ -411,10 +460,11 @@ export function buildAbstract(terrain, quality, opts = {}) {
     let lo = Infinity, hi = -Infinity;
     for (const [u, v] of pts) {
       const px = x + u * c + v * s, pz = z - u * s + v * c;
-      if (!onMap(px, pz) || wet(px, pz) || inMark(px, pz, 12) || inClearing(px, pz, 4)) return false;
+      if (!(scenery ? inWorld(px, pz) && !inside(px, pz) : inside(px, pz))) return false;
+      if (wetAt(px, pz) || inMark(px, pz, 12) || inClearing(px, pz, 4)) return false;
       if (Math.hypot(px, pz) < EX + 6) return false;
       if (nearRoad(px, pz, 1.5)) return false;
-      const h = terrain.heightAt(px, pz);
+      const h = groundAt(px, pz);
       lo = Math.min(lo, h); hi = Math.max(hi, h);
     }
     if (hi - lo > (kitId === 'highland' ? 6 : 3.5)) return false;
@@ -429,8 +479,8 @@ export function buildAbstract(terrain, quality, opts = {}) {
     const add = (g, hex, jit = 1) => {
       const p = prep(g, hex, jit);
       p.rotateY(yaw); p.translate(x, base, z);
-      p.userData.plot = index;
-      buildTris += p.attributes.position.count / 3;
+      if (scenery) countryTris += p.attributes.position.count / 3;
+      else { p.userData.plot = index; buildTris += p.attributes.position.count / 3; }
       parts.push(p);
     };
     const tower = !!opt.tower;
@@ -460,7 +510,7 @@ export function buildAbstract(terrain, quality, opts = {}) {
       plot.flat = form !== 'dome'; plot.pitched = false;
       plot.top = top + (form === 'dome' ? Math.min(w, d) * 0.32 : 0.7);
     }
-    plots.push(plot);
+    if (!scenery) plots.push(plot);
     return true;
   };
 
@@ -506,9 +556,24 @@ export function buildAbstract(terrain, quality, opts = {}) {
   alongRoads((rm) => rm < band0);
   alongRoads((rm) => rm >= band0 && rm < band1);
   alongRoads((rm) => rm >= band1);
-  // Farms and outbuildings in the country, away from the roads.
-  for (let k = 0; k < 160 && plots.length < 900; k++) {
-    const a = R(0, Math.PI * 2), r = R(band1, reach);
+  // The country, from the town out to the fog, by one rule on and off the
+  // map: villages along the roads, and farms and hamlets where the noise
+  // says, thinning with distance.
+  for (const pts of farRoads) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i], b = pts[i + 1];
+      const L = Math.hypot(b.x - a.x, b.z - a.z), ux = (b.x - a.x) / L, uz = (b.z - a.z) / L;
+      const yaw = Math.atan2(-uz, ux);
+      for (const side of [-1, 1]) {
+        if (rng() > 0.45 * falloff(Math.hypot(a.x, a.z))) continue;
+        const w = R(9, 14), dd = R(7, 10), off = HW.avenue + 3.5 + dd / 2;
+        tryPlace(a.x + ux * L / 2 - uz * side * off, a.z + uz * L / 2 + ux * side * off, w, dd, yaw, rng() < 0.7 ? 1 : 2);
+      }
+    }
+  }
+  for (let k = 0; k < 3200; k++) {
+    const a = R(0, Math.PI * 2), r = Math.sqrt(R(band1 * band1, worldR * worldR));
+    if (rng() > falloff(r)) continue;
     const x = Math.sin(a) * r, z = Math.cos(a) * r;
     if (valueNoise(x * 0.004 + 3.1, z * 0.004 - 7.7) < 0.05) continue;
     tryPlace(x, z, R(8, 14), R(7, 11), R(0, Math.PI), rng() < 0.75 ? 1 : 2);
@@ -521,8 +586,8 @@ export function buildAbstract(terrain, quality, opts = {}) {
   const leafHex = leaf.getHex();
   let treeTris = 0, farTris = 0;
   const tree = (x, z, scale = 1, far = false) => {
-    if (far ? farTris > BUDGET.far : treeTris > BUDGET.trees) return false;
-    const y = terrain.heightAt(x, z) - 0.2;
+    if (far ? farTris > BUDGET.countryTrees : treeTris > BUDGET.trees) return false;
+    const y = groundAt(x, z) - 0.2;
     const s = scale * R(1.35, 2.0);
     const kind = K.tree;
     const jit = R(0.85, 1.12);
@@ -563,7 +628,7 @@ export function buildAbstract(terrain, quality, opts = {}) {
     return true;
   };
   const clearOf = (x, z, pad) => {
-    if (!onMap(x, z) || wet(x, z) || inMark(x, z, pad + 4) || inClearing(x, z, pad)) return false;
+    if (!inWorld(x, z) || wetAt(x, z) || inMark(x, z, pad + 4) || inClearing(x, z, pad)) return false;
     if (Math.hypot(x, z) < EX + 4) return false;
     if (nearRoad(x, z, pad)) return false;
     const r = { x, z, w: pad * 2, d: pad * 2, yaw: 0 };
@@ -588,8 +653,8 @@ export function buildAbstract(terrain, quality, opts = {}) {
   // Every candidate first, then placed in a shuffled order, so a budget that
   // runs out thins the woods everywhere rather than leaving one side bare.
   const cand = [];
-  for (let gz = -reach; gz < reach; gz += 11) {
-    for (let gx = -reach; gx < reach; gx += 11) {
+  for (let gz = -span; gz < span; gz += 11) {
+    for (let gx = -span; gx < span; gx += 11) {
       const x = gx + R(-4, 4), z = gz + R(-4, 4);
       const park = terrain.maskAt(x, z).park;
       const n = valueNoise(x * 0.009 + 11.3, z * 0.009 - 4.1) + park * 0.35;
@@ -602,13 +667,33 @@ export function buildAbstract(terrain, quality, opts = {}) {
     if (!clearOf(x, z, 3.5)) continue;
     if (!tree(x, z, 1)) break;
   }
+  // And on past the map the same woods, drawn so a clump is about the same
+  // size on the screen near or far: fewer the further out (the samples fall
+  // off with the square of the distance) and a little larger.
+  {
+    const ratio = worldR / span;
+    const far = [];
+    for (let k = 0; k < 9000; k++) {
+      const r = span * Math.pow(ratio, rng()), a = R(0, Math.PI * 2);
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      if (onField(x, z)) continue;
+      const n = valueNoise(x * 0.009 + 11.3, z * 0.009 - 4.1);
+      if (n < thresh) continue;
+      far.push([x, z, r]);
+    }
+    for (const [x, z, r] of far) {
+      if (!clearOf(x, z, 3.5)) continue;
+      if (!tree(x, z, 1 + 1.2 * THREE.MathUtils.smoothstep(r, span, worldR), true)) break;
+    }
+  }
   // Boulders: on the slopes, and a few lying out in the open, as the island does.
   const rock = tone ? tone.rock.getHex() : 0x8a8178;
   let rocks = 0;
-  for (let k = 0; k < 900 && rocks < 110; k++) {
-    const x = R(-reach, reach), z = R(-reach, reach);
-    const slope = Math.abs(terrain.heightAt(x + 6, z) - terrain.heightAt(x - 6, z))
-      + Math.abs(terrain.heightAt(x, z + 6) - terrain.heightAt(x, z - 6));
+  for (let k = 0; k < 1800 && rocks < 160; k++) {
+    const r = span * Math.pow(worldR / span, rng() * rng()), a = R(0, Math.PI * 2);
+    const x = Math.sin(a) * r, z = Math.cos(a) * r;
+    const slope = Math.abs(groundAt(x + 6, z) - groundAt(x - 6, z))
+      + Math.abs(groundAt(x, z + 6) - groundAt(x, z - 6));
     if (slope < 3 && rng() > 0.06) continue;
     if (!clearOf(x, z, 3)) continue;
     const s = R(1.2, 4.2) * (slope > 3 ? 1.2 : 1);
@@ -617,32 +702,16 @@ export function buildAbstract(terrain, quality, opts = {}) {
     for (let i = 0; i < p.count; i++) p.setXYZ(i, p.getX(i) * R(0.8, 1.3), p.getY(i) * R(0.55, 0.85), p.getZ(i) * R(0.8, 1.3));
     const q = prep(g, rock, R(0.9, 1.1));
     q.rotateY(R(0, Math.PI));
-    q.translate(x, terrain.heightAt(x, z) - s * 0.25, z);
+    q.translate(x, groundAt(x, z) - s * 0.25, z);
     props.add('rocks', q);
     rocks++;
   }
-  // Past the edge: a thin scatter of houses and trees out to the fog, so the
-  // town does not stop at a line.
-  let farN = 0;
-  for (let k = 0; k < 700 && farTris < BUDGET.far; k++) {
-    const a = R(0, Math.PI * 2), r = R(span * 1.02, span * 1.9);
-    const x = Math.sin(a) * r, z = Math.cos(a) * r;
-    const g0 = terrain.surfaceAt ? terrain.surfaceAt(x, z) : terrain.heightAt(x, z);
-    if (g0 < wl + 1 || terrain._farWet?.(x, z)) continue;
-    if (rng() < 0.45) {
-      const w = R(9, 16), d = R(8, 12), h = Math.round(R(1, kitId === 'temperate' ? 3 : 2)) * STOREY;
-      const g = prep(body(w, h, d), pick(K.walls), R(0.95, 1.05));
-      g.rotateY(R(0, Math.PI)); g.translate(x, g0 - 0.4, z);
-      farTris += g.attributes.position.count / 3;
-      props.add('far', g);
-    } else if (!tree(x, z, 1.3, true)) break;
-    farN++;
-  }
+  const farN = farRoads.length;
 
   // ── The roads, drawn: a ribbon a road and a disc at every junction.
   const roadGeo = [];
   const roadHex = K.road;
-  for (const e of edges) {
+  for (const e of [...edges, ...farRoads.map((pts) => ({ cls: 'avenue', pts }))]) {
     const hw = HW[e.cls];
     const pos = [];
     const P = e.pts;
@@ -719,7 +788,8 @@ export function buildAbstract(terrain, quality, opts = {}) {
   group.userData = {
     plots, cityMeshes, roofs, network: net, gridYaw: 0, layout: [], bridge: null, bridges: [],
     detail: { plan: `abstract (${kitId})`, real: 0, junctions, canopy: Math.round(treeTris / 40), tris: Math.round(total),
-      buildings: plots.length, rocks, far: farN, buildTris: Math.round(buildTris), treeTris: Math.round(treeTris), ...counts },
+      buildings: plots.length, rocks, farRoads: farN, buildTris: Math.round(buildTris), treeTris: Math.round(treeTris),
+      countryTris: Math.round(countryTris + farTris), worldR: Math.round(worldR), ...counts },
   };
   console.log(`[tumble] abstract town (${kitId}): ${plots.length} buildings, ${edges.length} roads, `
     + `${Math.round(total / 1000)}k triangles (buildings ${Math.round(buildTris / 1000)}k, trees ${Math.round(treeTris / 1000)}k), `

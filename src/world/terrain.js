@@ -55,7 +55,7 @@ export function groundTones(P) {
 }
 
 export class Terrain {
-  constructor(meta, heightData, maskData, quality, farData = null) {
+  constructor(meta, heightData, maskData, quality, farData = null, farHeightData = null) {
     this.meta = meta;
     this.size = meta.size;
     this.span = meta.spanMeters;
@@ -113,6 +113,18 @@ export class Terrain {
       // interpolated between samples (see `_farWet`).
       this.farMask = new Float32Array(fn * fn);
       for (let i = 0; i < fn * fn; i++) this.farMask[i] = farData[i * 4] / 255;
+    }
+
+    // The real relief past the map, in absolute metres like the playfield's.
+    this.farHeights = null;
+    if (farHeightData && meta.farHeight) {
+      const fh = meta.farHeight, fn = fh.size;
+      this.farHSize = fn; this.farHSpan = fh.span;
+      this.farHeights = new Float32Array(fn * fn);
+      const r = fh.max - fh.min;
+      for (let i = 0; i < fn * fn; i++) {
+        this.farHeights[i] = fh.min + ((farHeightData[i * 4] * 256 + farHeightData[i * 4 + 1]) / 65535) * r;
+      }
     }
 
     this.cellSize = (this.span * 2) / (n - 1);
@@ -834,7 +846,11 @@ export class Terrain {
     const ridge = valueNoise(x * 0.00062 + 11.3, z * 0.00062 - 4.7) * 2 - 1;
     const grain = valueNoise(x * 0.0021 - 3.1, z * 0.0021 + 8.9) * 2 - 1;
     const hill = (ridge * 0.72 + grain * 0.28) * this._farAmp;
-    let land = fall + hill * Math.min(1, out / (s * 0.45));
+    // In the abstract world, the real country (`farHeightAt`), met from the
+    // map's own edge over four hundred and fifty metres so there is no step.
+    let land = (this.abstract && this.farHeights)
+      ? h + (this.farHeightAt(x, z) + this._farOffset() - h) * THREE.MathUtils.smoothstep(out, 0, 450)
+      : fall + hill * Math.min(1, out / (s * 0.45));
     // Never below the river's own surface unless it is the river. The hills
     // out here are noise round a falling base, and on a mountain map they
     // reach a hundred metres down: at Machu Picchu the valley past the map
@@ -932,6 +948,35 @@ export class Terrain {
    * Is this point sea, lake or river, according to the survey of the country
    * beyond the map? False when the level carries no far mask.
    */
+  /** The baked real relief at (x, z), bilinear; the edge value past its square. */
+  farHeightAt(x, z) {
+    const n = this.farHSize, S = this.farHSpan, h = this.farHeights;
+    const u = THREE.MathUtils.clamp((x + S) / (S * 2) * (n - 1), 0, n - 1);
+    const v = THREE.MathUtils.clamp((S - z) / (S * 2) * (n - 1), 0, n - 1);
+    const x0 = Math.floor(u), z0 = Math.floor(v);
+    const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
+    const fx = u - x0, fz = v - z0;
+    return (h[z0 * n + x0] * (1 - fx) + h[z0 * n + x1] * fx) * (1 - fz)
+         + (h[z1 * n + x0] * (1 - fx) + h[z1 * n + x1] * fx) * fz;
+  }
+
+  /**
+   * What the far relief is off by at the map's edge: the playfield was
+   * dredged, padded and smoothed after it was cut and the far relief was
+   * not, so the two are a few metres apart there. The median difference
+   * round the edge, added to the far relief, so they meet.
+   */
+  _farOffset() {
+    if (this._farOff !== undefined) return this._farOff;
+    const s = this.span, d = [];
+    for (let k = 0; k < 64; k++) {
+      const t = -s + (k / 63) * 2 * s;
+      for (const [x, z] of [[t, -s], [t, s], [-s, t], [s, t]]) d.push(this.heightAt(x, z) - this.farHeightAt(x, z));
+    }
+    d.sort((a, b) => a - b);
+    return (this._farOff = d[d.length >> 1]);
+  }
+
   _farWet(x, z) {
     if (!this.farMask) return false;
     // Bilinear on the forty-metre samples and cut at a half, not the nearest
@@ -1145,7 +1190,7 @@ export class Terrain {
     // And coarser again, to ten metres a cell or more: a phone's ground was a
     // hundred and thirty thousand triangles, the abstract world's whole
     // budget, for relief the low-poly look draws in broad planes anyway.
-    while (this.abstract && this.cellSize < 10 && this.size > 65) this.coarsen();
+    while (this.abstract && this.cellSize < 12 && this.size > 65) this.coarsen();
     // Again, on the coarse grid. `coarsen` resamples the heights and the mask,
     // and a wet cell sunk under the surface at fine resolution averages back
     // up against its dry neighbours at coarse: Petronas went from nineteen
@@ -1198,17 +1243,16 @@ export class Terrain {
     });
     const G = this.tones || (this.tones = groundTones(P));
     const tmp = new THREE.Color();
-    const tmp2 = new THREE.Color();
 
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const h = this.heightAt(x, z);
-      pos.setY(i, h);
-
-      const m = this.maskAt(x, z);
+    /**
+     * The ground's colour at (x, z), its height `h`, the bake's mask `m`
+     * (water, road, park) and a height function to measure the slope by.
+     * One function for all of it: the playfield and, in the abstract world,
+     * the country out to the fog (`_skirt`), so nothing changes colour at the
+     * map's edge.
+     */
+    const toneAt = this._toneAt = (out, x, z, h, m, hAt) => {
       const broad = valueNoise(x * 0.0048, z * 0.0048);
-
       // Grass, or earth where the ground is worked: the streets, the yards
       // and the parcels a house stands on (the bake paints those at a third
       // of a street). On an arid map the other way round: earth, and grass
@@ -1223,29 +1267,35 @@ export class Terrain {
       } else {
         g = Math.max(1 - hard * 0.92, m.park);
       }
-      tmp.copy(G.earth).lerp(G.grass, g * (1 - m.water));
+      out.copy(G.earth).lerp(G.grass, g * (1 - m.water));
 
       // The water's margin, earth, ragged where the bank shelves (two octaves
       // of noise along it, wider on flat ground and a lip on a steep one), and
       // the bed under the water the same earth in shadow.
       const ripple = (valueNoise(x * 0.018 + 5.1, z * 0.018 - 2.3) - 0.5) * 2.4
                    + (valueNoise(x * 0.071 - 8.8, z * 0.071 + 4.4) - 0.5) * 0.9;
-      const slope = Math.abs(this.heightAt(x + 8, z) - this.heightAt(x - 8, z))
-                  + Math.abs(this.heightAt(x, z + 8) - this.heightAt(x, z - 8));
+      const slope = Math.abs(hAt(x + 8, z) - hAt(x - 8, z)) + Math.abs(hAt(x, z + 8) - hAt(x, z - 8));
       const shelf = THREE.MathUtils.clamp(1 - slope / 2.4, 0, 1);
       const margin = 1.1 + (1 - shelf) * 2.2;
       const wet = THREE.MathUtils.clamp(
         (this.waterLevel + margin + ripple * 0.5 - h) / (1.4 + (1 - shelf) * 2.0), 0, 1);
-      tmp.lerp(G.earth, Math.pow(wet, 1.3) * 0.9);
-      tmp.lerp(G.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
+      out.lerp(G.earth, Math.pow(wet, 1.3) * 0.9);
+      out.lerp(G.bed, THREE.MathUtils.clamp((this.waterLevel - h) / 2.6, 0, 1) * 0.9);
       // Rock past about twenty degrees: `slope` is the rise over sixteen
       // metres on both axes, so 5.5 is about twenty degrees and 14 forty-five.
       const steep = THREE.MathUtils.clamp((slope - 5.5) / 8.5, 0, 1);
-      if (steep > 0) tmp.lerp(G.rock, steep * 0.9);
-
+      if (steep > 0) out.lerp(G.rock, steep * 0.9);
       // The drift: a few per cent over a few hundred metres, no finer.
-      tmp.multiplyScalar(1 + broad * 0.08);
+      return out.multiplyScalar(1 + broad * 0.08);
+    };
+    const hHere = (x, z) => this.heightAt(x, z);
 
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const h = this.heightAt(x, z);
+      pos.setY(i, h);
+      toneAt(tmp, x, z, h, this.maskAt(x, z), hHere);
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
     geo.computeVertexNormals();
@@ -1277,6 +1327,18 @@ export class Terrain {
     // DEM's edge — so a full plane laid at the edge height covered the Thames
     // completely, and the river rendered as a strip of dry land. Cutting the
     // playfield out of it means the surround can never overlap anything inside.
+    // The abstract world (world/abstract.js) has one ground to the fog: the
+    // playfield, and round it a skirt of rings grown from the playfield's own
+    // edge (`_skirt`), coloured by the same `toneAt`. No apron, no ribbon, no
+    // baked distance tint: the fog does the distance.
+    if (this.abstract) {
+      const skirt = new THREE.Mesh(this._skirt(toneAt), new THREE.MeshLambertMaterial({ vertexColors: true }));
+      skirt.receiveShadow = this.mesh.receiveShadow;
+      this.group = new THREE.Group();
+      for (const m of splitMesh(skirt, this.span * 2.2)) { m.name = 'apron'; this.group.add(m); }
+      this.group.add(this.mesh);
+      return this.group;
+    }
     const edge = this.heightAt(this.span, 0);
     // Subdivided far more finely than it needs to be as a flat sheet, because
     // it is no longer flat: the river's channel is cut through it, and a cut
@@ -1429,6 +1491,106 @@ export class Terrain {
     if (ribbon) this.group.add(ribbon);
     this.group.add(this.mesh);
     return this.group;
+  }
+
+  /**
+   * The abstract world's ground past the map: rings round the playfield out
+   * to `worldR`, the first ring the playfield's own edge vertices, so the two
+   * meshes share every vertex on the seam. A ring's facets are the
+   * playfield's cell at the edge and grow six per cent a ring, so a facet is
+   * about the same size on the screen near or far: one level of detail as
+   * the eye has it, at a fraction of the triangles a uniform grid to the fog
+   * would cost. The rings go from the square to a circle over a span and a
+   * bit. Heights are `surfaceAt` (the real relief past the edge), colours
+   * `toneAt` (the playfield's own function), and the first ring copies the
+   * playfield's normals and colours so the light has no line to show.
+   */
+  _skirt(toneAt) {
+    const s = this.span, n = this.size, cell = this.cellSize;
+    const R = this.worldR = Math.min(5600, (this.farSpan || s * 7) * 0.92);
+    const pg = this.mesh.geometry, pp = pg.attributes.position, pn = pg.attributes.normal, pc = pg.attributes.color;
+    const T0 = -0.75 * Math.PI;
+    const tOf = (x, z) => { let a = Math.atan2(z, x) - T0; a %= Math.PI * 2; if (a < 0) a += Math.PI * 2; return a / (Math.PI * 2); };
+    const pos = [], col = [], loops = [];
+    const c = new THREE.Color();
+    const hAt = (x, z) => this.surfaceAt(x, z);
+    // Ring 0: the playfield's boundary, walked anticlockwise from (-s, -s).
+    const ring0 = [];
+    const idx = (i, j) => j * n + i;
+    for (let i = 0; i < n - 1; i++) ring0.push(idx(i, 0));
+    for (let j = 0; j < n - 1; j++) ring0.push(idx(n - 1, j));
+    for (let i = n - 1; i > 0; i--) ring0.push(idx(i, n - 1));
+    for (let j = n - 1; j > 0; j--) ring0.push(idx(0, j));
+    const first = [];
+    for (const k of ring0) {
+      const x = pp.getX(k), z = pp.getZ(k);
+      first.push({ v: pos.length / 3, t: tOf(x, z), k });
+      pos.push(x, pp.getY(k), z);
+      col.push(pc.getX(k), pc.getY(k), pc.getZ(k));
+    }
+    first.sort((a, b) => a.t - b.t);
+    loops.push(first);
+    // The rings out.
+    let d = 0, step = cell;
+    while (s + d < R) {
+      d = Math.min(R - s, d + step);
+      step *= 1.06;
+      const w = THREE.MathUtils.smoothstep(d, 0, s * 1.2);
+      const rC = (s + d) * 1.128;
+      const per = 8 * (s + d) * (1 - w) + Math.PI * 2 * rC * w;
+      const m = Math.max(96, Math.min(ring0.length, Math.round(per / step)));
+      const loop = [];
+      for (let q = 0; q < m; q++) {
+        const t = q / m, a = T0 + t * Math.PI * 2;
+        const dx = Math.cos(a), dz = Math.sin(a);
+        const sq = (s + d) / Math.max(Math.abs(dx), Math.abs(dz));
+        const r = sq + (rC - sq) * w;
+        const x = dx * r, z = dz * r;
+        const h = this.surfaceAt(x, z);
+        // The mask runs on from the edge and gives way to the far water.
+        const e = this.maskAt(x, z), f = THREE.MathUtils.smoothstep(d, 0, 200);
+        const wetFar = this.farMask && this._farWet(x, z) ? 1 : 0;
+        toneAt(c, x, z, h, { water: e.water + (wetFar - e.water) * f, road: 0, park: e.park * (1 - f) }, hAt);
+        loop.push({ v: pos.length / 3, t });
+        pos.push(x, h, z);
+        col.push(c.r, c.g, c.b);
+      }
+      loops.push(loop);
+    }
+    // Zip each ring to the next by the angle round, whatever their counts.
+    const index = [];
+    for (let L = 0; L + 1 < loops.length; L++) {
+      const A = loops[L], B = loops[L + 1];
+      let i = 0, j = 0;
+      const ta = (k) => (k < A.length ? A[k].t : A[k - A.length].t + 1);
+      const tb = (k) => (k < B.length ? B[k].t : B[k - B.length].t + 1);
+      const va = (k) => A[k % A.length].v, vb = (k) => B[k % B.length].v;
+      while (i < A.length || j < B.length) {
+        if (j >= B.length || (i < A.length && ta(i + 1) <= tb(j + 1))) {
+          index.push(va(i), va(i + 1), vb(j)); i++;
+        } else {
+          index.push(va(i), vb(j + 1), vb(j)); j++;
+        }
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(index);
+    geo.computeVertexNormals();
+    // Facing up, whichever way the zip wound them.
+    const nr = geo.attributes.normal;
+    let down = 0;
+    for (let k = 0; k < nr.count; k += 97) if (nr.getY(k) < 0) down++;
+    if (down > nr.count / 194) {
+      const ix = geo.index.array;
+      for (let k = 0; k < ix.length; k += 3) { const t = ix[k + 1]; ix[k + 1] = ix[k + 2]; ix[k + 2] = t; }
+      geo.computeVertexNormals();
+    }
+    // The seam: the playfield's own normals on its own vertices.
+    for (const f of first) nr.setXYZ(f.v, pn.getX(f.k), pn.getY(f.k), pn.getZ(f.k));
+    geo.computeBoundingSphere();
+    return geo;
   }
 
   _channelRibbon(edge, apronColour) {
@@ -1797,15 +1959,18 @@ export class Terrain {
 export async function loadTerrain(levelId, quality) {
   const base = `assets/terrain/${levelId}`;
   const meta = await fetch(`${base}.json`).then((r) => r.json());
-  const [height, mask, far] = await Promise.all([
+  const [height, mask, far, farh] = await Promise.all([
     loadImageData(`${base}_height.png`),
     loadImageData(`${base}_mask.png`),
     // The coastline of the country the level is standing in, out to seven
     // spans. Optional: a level baked before this existed simply has none, and
     // falls back to the edge-of-map guess it always used.
     meta.farSpan ? loadImageData(`${base}_far.png`).catch(() => null) : null,
+    // The real relief out there (tools/bake_terrain.py --far), which the
+    // abstract world's one ground runs on past the map's edge.
+    meta.farHeight ? loadImageData(`${base}_farh.png`).catch(() => null) : null,
   ]);
-  return new Terrain(meta, height, mask, quality, far);
+  return new Terrain(meta, height, mask, quality, far, farh);
 }
 
 /**

@@ -1771,7 +1771,72 @@ def bake(level_id: str, natural_water: bool = False):
     print(f"  wrote {size}x{size} height ({hmin:.1f}..{hmax:.1f} m) + mask + meta")
 
 
+# ── The country past the map ──────────────────────────────────────────────
+
+FAR_HEIGHT_SIZE = 320
+
+
+def bake_far_height(level_id: str):
+    """The real relief out to the fog, for the abstract world's one ground.
+
+    The playfield's DEM stops at the map's edge, and past it the ground was
+    noise round a falling base: a square of real hills inside a sheet of
+    invented ones, which is the seam the owner saw (October 2026). This cuts
+    the same Terrarium elevation a second time over the square the far water
+    already covers (`farSpan` either side, seven spans), at about forty metres
+    to the sample: as fine as anything a kilometre away needs. Absolute
+    metres, like the playfield's, so the two agree at the edge to within the
+    dredging and the pads; the loader blends across a band past it anyway.
+
+    Reads the level's own terrain JSON for where it is, so every level the
+    bake has written can be given its far country without its config:
+        python3.13 tools/bake_terrain.py --far westminster giza ...
+        python3.13 tools/bake_terrain.py --far            (every level baked)
+    """
+    meta_path = OUT_DIR / f"{level_id}.json"
+    meta = json.loads(meta_path.read_text())
+    span = float(meta["spanMeters"])
+    far = float(meta.get("farSpan") or span * 7.0)
+    lat, lon = float(meta["lat"]), float(meta["lon"])
+    # The zoom whose pixels are no larger than the samples we keep.
+    want = far * 2 / FAR_HEIGHT_SIZE
+    zoom = int(math.ceil(math.log2(156543.03392 * math.cos(math.radians(lat)) / want)))
+    zoom = max(8, min(13, zoom))
+    cfg = LEVELS.get(level_id, {})
+    flat = (cfg.get("dem") or {}).get("flat")
+    if flat is not None:
+        elev = np.full((FAR_HEIGHT_SIZE, FAR_HEIGHT_SIZE), float(flat))
+    else:
+        raw, _ = build_mosaic(lat, lon, far, zoom)
+        # The decode errors out of it, as the playfield's bake does.
+        lo = float(np.percentile(raw, 0.2))
+        hi = float(np.percentile(raw, 99.8))
+        pad = max(20.0, (hi - lo) * 0.25)
+        raw = np.clip(raw, lo - pad, hi + pad)
+        elev = resample(raw, FAR_HEIGHT_SIZE)
+    hmin, hmax = float(elev.min()), float(elev.max())
+    rng = max(hmax - hmin, 1.0)
+    q = np.clip(np.round((elev - hmin) / rng * 65535.0), 0, 65535).astype(np.uint32)
+    rgb = np.zeros((FAR_HEIGHT_SIZE, FAR_HEIGHT_SIZE, 3), dtype=np.uint8)
+    rgb[:, :, 0] = (q >> 8).astype(np.uint8)
+    rgb[:, :, 1] = (q & 0xFF).astype(np.uint8)
+    Image.fromarray(rgb).save(OUT_DIR / f"{level_id}_farh.png")
+    meta["farHeight"] = {"span": far, "size": FAR_HEIGHT_SIZE, "min": round(hmin, 3), "max": round(hmax, 3)}
+    meta_path.write_text(json.dumps(meta, indent=2) + "\n")
+    print(f"  far relief: {FAR_HEIGHT_SIZE}px over {far * 2 / 1000:.1f} km at z{zoom}, {hmin:.0f}..{hmax:.0f} m")
+
+
 if __name__ == "__main__":
-    targets = sys.argv[1:] or list(LEVELS)
+    args = sys.argv[1:]
+    if args and args[0] == "--far":
+        ids = args[1:] or sorted(p.stem for p in OUT_DIR.glob("*.json"))
+        for t in ids:
+            print(f"Far relief for {t}")
+            try:
+                bake_far_height(t)
+            except Exception as err:
+                print(f"  ! {t}: {err}")
+        sys.exit(0)
+    targets = args or list(LEVELS)
     for t in targets:
         bake(t)

@@ -317,7 +317,18 @@ const ENV_UNIFORMS = {
   uEnvSky: { value: new THREE.Color(0x9cc0ea) },
   uEnvGround: { value: new THREE.Color(0x7a6642) },
   uEnvFill: { value: 0.3 },
+  // The world's rim (the abstract world: terrain `_skirt`): from uRim0 to
+  // uRim1 metres out from the landmark everything goes to the fog's colour,
+  // whatever the camera's distance, so no view can find the edge.
+  uRim0: { value: 1e9 },
+  uRim1: { value: 2e9 },
 };
+
+/** Where the world ends (`ENV_UNIFORMS.uRim0/1`); a world without a rim never calls it. */
+export function setWorldRim(r0, r1) {
+  ENV_UNIFORMS.uRim0.value = r0;
+  ENV_UNIFORMS.uRim1.value = r1;
+}
 
 export function envMaterial(src) {
   if (!src || !src.isMeshStandardMaterial) return src;
@@ -340,10 +351,18 @@ export function envStyle(material) {
   material.onBeforeCompile = (shader, renderer) => {
     if (prev) prev(shader, renderer);
     Object.assign(shader.uniforms, STYLE_UNIFORMS, ENV_UNIFORMS);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vRimR;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvRimR = length((modelMatrix * vec4(transformed, 1.0)).xz);');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uWrap; uniform float uFaceTop; uniform float uFaceSide; uniform float uFaceUnder;
-uniform vec3 uEnvSky; uniform vec3 uEnvGround; uniform float uEnvFill;`)
+uniform vec3 uEnvSky; uniform vec3 uEnvGround; uniform float uEnvFill;
+uniform float uRim0; uniform float uRim1; varying float vRimR;`)
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+#ifdef USE_FOG
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, smoothstep(uRim0, uRim1, vRimR));
+#endif`)
       .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
 {
   vec3 upW = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
