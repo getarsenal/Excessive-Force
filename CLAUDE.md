@@ -141,20 +141,32 @@ two-storey cover round it, six avenues out (the first laid toward the
 level's own camera, the approach, where nothing over two storeys stands),
 a street grid square to it from the ring to past an outer ring, buildings
 fronting every road in the town band with a second row behind, tall
-anchors only well out and off the approach, farms, tree clumps, boulders on
-the slopes and a scatter past the edge. One theme per climate (`KITS`:
+anchors only well out and off the approach, farms, tree clumps and boulders
+on the slopes. There is no edge: it is one world and one level of detail to
+the fog. Past the map the ground follows the real far relief
+(`python3.13 tools/bake_terrain.py --far [ids]` writes `<level>_farh.png`
+from the public elevation tiles, seven spans wide; `terrain.farHeightAt`,
+blended into the map's own height over 450 m at the edge), drawn by
+`terrain._skirt`: one mesh grown out of the playfield's edge vertices, its
+facets six per cent wider a ring, the square rounded to a disc by 1.2
+spans, coloured by the same `toneAt` as the map, to `worldR` (5.6 km at
+most). The town's rule runs on across it as scenery with no physics:
+country roads down the avenues' lines from the town's furthest node that
+way (broken at water), villages along them, farms, trees and rocks thinning
+with distance (`falloff`), and everything fades into the fog colour toward
+the rim (`setWorldRim`, look.js). One theme per climate (`KITS`:
 temperate, nordic, mediterranean, tropical, desert, highland: walls, a
 window band of colour a storey, gabled, hipped, flat, domed or Tibetan
 roofs, broadleaf, conifer, umbrella pine or palm), flat-shaded colour, no
-textures, to a budget (`BUDGET`: buildings 60k, trees 34k, roads 8k, the
-scatter 8k). It publishes what the surveyed builder does (`plots`,
+textures, to a budget (`BUDGET`: buildings 60k, trees 28k, roads 8k, country
+houses 9k, country trees 15k). It publishes what the surveyed builder does (`plots`,
 burnable `cityMeshes` with each building's ranges, `roofs`, a `network`
 with `roadClearance` and `nodeClearance`), so the fire, the colliders, the
 garrison, the traffic, the checkpoint and the strike sites work unchanged;
 the terrain takes `abstract` (no survey street mask painted on the grass,
-the ground coarsened to ten metres a cell, a lighter apron). Westminster at
-the phone's tier: the environment 891k triangles to 186k (town 545k to
-64k, ground and apron 303k to 56k); `node tools/envbudget.mjs <level>`
+the ground coarsened to twelve metres a cell, the skirt for the apron).
+Westminster at the phone's tier: the environment 891k triangles to 210k
+(town 545k to 88k, ground and skirt 303k to 57k, works 65k); `node tools/envbudget.mjs <level>`
 (`ENV=survey` for the other) counts it by owner. A battle saved in one
 world is refused in the other and says so. The suite's survey-only tests
 (lamp posts, the river wall, the railway, street counts) carry an abstract
