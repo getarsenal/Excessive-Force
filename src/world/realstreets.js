@@ -326,6 +326,7 @@ export function realNetwork(data, terrain, opts = {}) {
   dissolveThroughNodes(nodes, edges, { surveyed: true, limit: -1 });
   dedupeEdges(nodes, edges, terrain);
   const ends = resolveDeadEnds(nodes, edges, terrain, { exclude, inReserved });
+  const orphans = dropOrphans(nodes, edges);
   const bridges = [];
   layDecks(edges, nodes, terrain, bridges);
   // Every bend that is not a junction is a bend in one road, whatever its
@@ -367,7 +368,7 @@ export function realNetwork(data, terrain, opts = {}) {
     pitch: 104, reach: terrain.span * 0.94,
     real: true,
     debug: { source: 'overture', streets: edges.length, blocks: blocks.length,
-      welded, snapped, welds: WELDS.slice(), ...ends, stranded, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
+      welded, snapped, welds: WELDS.slice(), ...ends, stranded, orphans, shadowed, ladders, folds, rounds, flyovers, duals, fixes, wetCut, bridges: bridges.length },
   };
   buildEdgeIndex(net);
   return net;
@@ -1392,6 +1393,47 @@ function landBridges(edges, nodes, terrain) {
       if (link) link.other = best;
     }
   }
+}
+
+/**
+ * A scrap of road joined to nothing comes up.
+ *
+ * What the water and the boundary cut off a surveyed plan: a hundred metres
+ * of avenue on a headland, a street ending at the map's edge at one end and
+ * the harbour at the other. Sydney had seven of them, each a road from
+ * nowhere to nowhere. A piece of three junctions or fewer and under 250 m
+ * goes; a longer road, or one carrying a bridge, stays.
+ */
+function dropOrphans(nodes, edges) {
+  const seen = new Uint8Array(nodes.length);
+  const drop = new Set();
+  for (let i = 0; i < nodes.length; i++) {
+    if (seen[i] || !nodes[i].links.length) continue;
+    const comp = [i], es = new Set();
+    seen[i] = 1;
+    for (let q = 0; q < comp.length; q++) {
+      for (const l of nodes[comp[q]].links) {
+        es.add(l.edge);
+        if (!seen[l.other]) { seen[l.other] = 1; comp.push(l.other); }
+      }
+    }
+    if (comp.length > 3) continue;
+    let len = 0, bridge = false;
+    for (const e of es) {
+      if (e.bridge) bridge = true;
+      for (let k = 0; k + 1 < e.pts.length; k++) {
+        len += Math.hypot(e.pts[k + 1].x - e.pts[k].x, e.pts[k + 1].z - e.pts[k].z);
+      }
+    }
+    if (bridge || len >= 250) continue;
+    for (const e of es) drop.add(e);
+  }
+  if (!drop.size) return 0;
+  const kept = edges.filter((e) => !drop.has(e));
+  edges.length = 0;
+  for (const e of kept) edges.push(e);
+  relink(nodes, edges);
+  return drop.size;
 }
 
 /**
