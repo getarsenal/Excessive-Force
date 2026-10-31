@@ -1,0 +1,18 @@
+The low-poly direction, October 2026: revert points (annotated tags on the remote).
+
+  pre-lowpoly     06a87b3  the last build before any of it: survey world, PBR environment, phone ratio 1.35
+  lowpoly-phase1  1f09fd6  one diffuse material on three ground tones, phone ratio 1.75, heat ladder holds resolution through fair
+  lowpoly-phase2  a81cf2f  the abstract world behind SETTINGS > WORLD (opt-in; the survey stays the default)
+  seamless-world  142006d  the abstract world has no edge: far relief for every level, the skirt, scenery to the fog
+
+What each step touches:
+  Phase one changes every player's picture (look.js envMaterial/envStyle, terrain.js groundTones,
+  engine.js PHONE_RATIO, heat.js RUNGS). Phase two and the seamless world change nothing unless
+  WORLD is set to ABSTRACT (tt.env or ?env=abstract).
+
+Reverting (no history rewritten; the work after the step stays in the log):
+  one step out:     git revert --no-edit <commits of that step>   then deploy as usual
+                    phase 1: 150b7da 479a89e 1f09fd6   phase 2: a81cf2f   seamless: 57f68c0 e6c46e0 142006d
+  everything back:  git checkout pre-lowpoly -- src tools public && git commit   (also takes back
+                    the later fixes in those files; prefer the step-by-step revert)
+  look only:        git worktree add /tmp/pre pre-lowpoly && (cd /tmp/pre && npm ci && npx vite --port 5178)
