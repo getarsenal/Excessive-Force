@@ -123,8 +123,12 @@ export function applyLook(engine, level, sky) {
   engine.ambient.intensity = L.ambientIntensity ?? 0.22;
   // The environment material's stand-in for the sky the standard materials
   // take from the environment map (see `envStyle`): the same sky and ground.
-  ENV_UNIFORMS.uEnvSky.value.setHex(L.hemiSky);
-  ENV_UNIFORMS.uEnvGround.value.setHex(L.hemiGround);
+  // Toward grey by two fifths: the environment map the standard material
+  // lit its shaded sides from is the whole sky, cloud and haze and ground,
+  // not the zenith's blue, and a wall in shade is a cool grey, not blue.
+  const grey = (c) => { const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; return c.lerp(new THREE.Color(l, l, l), 0.4); };
+  grey(ENV_UNIFORMS.uEnvSky.value.setHex(L.hemiSky));
+  grey(ENV_UNIFORMS.uEnvGround.value.setHex(L.hemiGround));
   // The sun carries the contrast: less fill and exposure, so the lit side
   // is bright and the shadow side is colour rather than grey. A look may
   // say otherwise (the range, lit by lamps).
@@ -319,7 +323,7 @@ const envTwins = new WeakMap();
 const ENV_UNIFORMS = {
   uEnvSky: { value: new THREE.Color(0x9cc0ea) },
   uEnvGround: { value: new THREE.Color(0x7a6642) },
-  uEnvFill: { value: 0.3 },
+  uEnvFill: { value: 0.45 },
   // The world's rim (the abstract world: terrain `_skirt`): from uRim0 to
   // uRim1 metres out from the landmark everything goes to the fog's colour,
   // whatever the camera's distance, so no view can find the edge.
@@ -328,6 +332,9 @@ const ENV_UNIFORMS = {
 };
 
 /** Where the world ends (`ENV_UNIFORMS.uRim0/1`); a world without a rim never calls it. */
+/** For the probes: the environment material's light, live. */
+if (typeof window !== 'undefined') window.__envLight = ENV_UNIFORMS;
+
 export function setWorldRim(r0, r1) {
   ENV_UNIFORMS.uRim0.value = r0;
   ENV_UNIFORMS.uRim1.value = r1;
@@ -335,6 +342,10 @@ export function setWorldRim(r0, r1) {
 
 export function envMaterial(src) {
   if (!src || !src.isMeshStandardMaterial) return src;
+  // Glass and metal keep the standard material: what they look like is the
+  // sky they reflect, and diffuse alone made a curtain wall a slab of flat
+  // saturated blue in the gunner's eye. They are a few draws of the town.
+  if (src.metalness >= 0.3) return src;
   let m = envTwins.get(src);
   if (m) return m;
   m = new THREE.MeshLambertMaterial();

@@ -398,7 +398,11 @@ export class Life {
     if (!g) return null;
     const img = g.createImageData(W, H);
     for (let y = 0; y < H; y++) {
-      const t = y / (H - 1);                      // 0 at the stern, 1 at the tail
+      // 0 at the stern, 1 at the tail. The canvas's bottom row is the stern:
+      // the texture is flipped on upload (v 1 is the top row) and the plane
+      // laid flat puts v 1 at z -1, the far end, so with the top row as the
+      // stern every wake's V opened toward the boat from a boat-length behind.
+      const t = 1 - y / (H - 1);
       const spread = 0.08 + 0.3 * t;              // the V's half-width, of the quad's; inside its edge
       const fade = Math.pow(1 - t, 2.2);
       for (let x = 0; x < W; x++) {

@@ -91,8 +91,13 @@ const GradeShader = {
       float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = mix(vec3(luma), col, uSaturation);
 
-      // Gentle S-curve about mid grey.
-      col = (col - 0.5) * uContrast + 0.5;
+      // Contrast as a power about mid grey (0.18 in linear light), so it
+      // scales a colour rather than subtracting from it. Taken as a line
+      // through 0.5 it took 0.026 off every channel, which in a wall in
+      // shade (0.03 red, 0.06 green, 0.14 blue) was nearly all of the red
+      // and green: the diffuse town's shaded faces came out pure blue in the
+      // gunner's eye.
+      col = 0.18 * pow(max(col, 0.0) / 0.18, vec3(uContrast));
 
       // Split tone: warm the highlights, cool the shadows. A single global warm
       // tint flattens the image; opposing the ends separates them.

@@ -3,13 +3,14 @@
 // the picture is the weapon's own model (rays from the camera over the
 // central part of the view against the unit's meshes, within ten metres),
 // plus whether the muzzle and the drawn impact are on the screen.
-//   node tools/layviews.mjs [level=westminster] [kinds=all]  -> /tmp/out/layview-<kind>.png, -zoom.png
+//   node tools/layviews.mjs [level=westminster] [kinds=all]  -> /tmp/out/layview-<kind>.png, -zoom.png (OUT= another directory)
 // Each kind is also zoomed through its sight (`def.sight.zoom`) and shot
 // again, and the trigger pulled: a gun's round, the machine gun's burst
 // (tracers fired), the Javelin's missile, each counted.
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
-mkdirSync('/tmp/out', { recursive: true });
+const OUTP = process.env.OUT || '/tmp/out';
+mkdirSync(OUTP, { recursive: true });
 const [level = 'westminster', kindsArg = 'all'] = process.argv.slice(2);
 const port = process.env.TT_PORT || 5177;
 const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu-sandbox', '--no-sandbox'] });
@@ -28,6 +29,7 @@ const kinds = await page.evaluate((arg) => {
 }, kindsArg);
 const list = kinds || ['m240', 'at4', 'gustaf', 'rpg32', 'javelin', 'm120', 'm119', 'm777', 'm109', 'stryker'];   // everything canLay allows
 const out = [];
+if (process.env.PICK) await page.evaluate(() => { window.__pickCentre = true; });
 for (const kind of list) {
   const r = await page.evaluate(async (kind) => {
     const B = window.battle, T = window.THREE, terrain = window.terrain, o = B.primary.origin;
@@ -62,11 +64,33 @@ for (const kind of list) {
     }
     const proj = (v) => { const q = v.clone().project(cam); return { x: Math.round((q.x + 1) / 2 * innerWidth), y: Math.round((1 - q.y) / 2 * innerHeight), on: Math.abs(q.x) < 1 && Math.abs(q.y) < 1 && q.z < 1 }; };
     const box = new T.Box3().setFromObject(u.model || u.group); const inside = box.containsPoint(cam.position);
-    const res = { kind, model: u.def.model, len: u.def.modelLength, eye: { offGun: +cam.position.distanceTo(u.pos).toFixed(1), up: +(cam.position.y - u.pos.y).toFixed(2), inside, modelTop: +(box.max.y - u.pos.y).toFixed(2) }, ownFrac: +(own / n).toFixed(2), muzzle: proj(L.from), impact: proj(L.impact), elevDeg: Math.round(L.elev * 180 / Math.PI), range: Math.round(L.range), masonry: L.masonry };
+    // PICK=1: what the centre of the view is, through to the third thing.
+    let pick;
+    if (window.__pickCentre) {
+      const rc = new T.Raycaster(); rc.setFromCamera({ x: 0, y: 0.08 }, cam);
+      pick = rc.intersectObjects(window.engine.scene.children, true).filter((h) => h.object.visible && h.object.isMesh).slice(0, 3).map((h) => {
+        let q = h.object, path = []; while (q && path.length < 4) { path.push(q.name || q.type); q = q.parent; }
+        const m = Array.isArray(h.object.material) ? h.object.material[0] : h.object.material;
+        const ca = h.object.geometry.attributes.color, f = h.face;
+        const vc = ca && f ? [ca.getX(f.a), ca.getY(f.a), ca.getZ(f.a)].map((v) => +v.toFixed(2)) : null;
+        return { d: +h.distance.toFixed(1), path: path.join('<'), mat: m.type, color: m.color?.getHexString(), map: !!m.map, vc, colorItem: ca?.itemSize, normalized: ca?.normalized, arr: ca?.array?.constructor?.name };
+      });
+    }
+    const res = { pick, kind, model: u.def.model, len: u.def.modelLength, eye: { offGun: +cam.position.distanceTo(u.pos).toFixed(1), up: +(cam.position.y - u.pos.y).toFixed(2), inside, modelTop: +(box.max.y - u.pos.y).toFixed(2) }, ownFrac: +(own / n).toFixed(2), muzzle: proj(L.from), impact: proj(L.impact), elevDeg: Math.round(L.elev * 180 / Math.PI), range: Math.round(L.range), masonry: L.masonry };
     return res;
   }, kind);
   await page.waitForTimeout(600);
-  await page.screenshot({ path: `/tmp/out/layview-${kind}.png`, timeout: 240000 }).catch((e) => { r.shotErr = String(e).slice(0, 80); });
+  await page.screenshot({ path: `${OUTP}/layview-${kind}.png`, timeout: 240000 }).catch((e) => { r.shotErr = String(e).slice(0, 80); });
+  // EVALS='["js", ...]': each run in the page in turn and the same view shot
+  // again, for taking a look apart one term at a time.
+  if (process.env.EVALS) {
+    const evals = JSON.parse(process.env.EVALS);
+    for (let e = 0; e < evals.length; e++) {
+      await page.evaluate((js) => { (0, eval)(js); window.__frame(); }, evals[e]);
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${OUTP}/layview-${kind}-e${e}.png`, timeout: 240000 }).catch(() => {});
+    }
+  }
   if (!r.noUnit) {
     // Through the sight, and the trigger pulled.
     const z = await page.evaluate(async () => {
@@ -88,7 +112,7 @@ for (const kind of list) {
       return { mag: window.__lay.mag(), fov: +cam.fov.toFixed(1), centred, fired, tracers: (B.tracerFX?.fired || 0) - tr0, shots: B.shotsFired, hand: B.handShots, sight: u.def.sight?.kind, fire: document.getElementById('lay-fire')?.textContent, hidden: document.getElementById('lay-zoom')?.hidden };
     });
     await page.waitForTimeout(300);
-    await page.screenshot({ path: `/tmp/out/layview-${kind}-zoom.png`, timeout: 240000 }).catch((e) => { z.shotErr = String(e).slice(0, 80); });
+    await page.screenshot({ path: `${OUTP}/layview-${kind}-zoom.png`, timeout: 240000 }).catch((e) => { z.shotErr = String(e).slice(0, 80); });
     r.zoom = z;
   }
   await page.evaluate(() => { const B = window.battle; const u = B.lay?.unit; window.__lay.exit(); if (u) B.removeUnit(u); });
