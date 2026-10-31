@@ -1484,6 +1484,25 @@ export class Terrain {
         ? (wild ? 0.85 : THREE.MathUtils.smoothstep(patch, 0.16, 0.30) * 0.4)
         : Math.min(1, 0.72 + rural * 0.28 + THREE.MathUtils.smoothstep(patch, 0.0, 0.25) * 0.2);
       at.copy(G.earth).lerp(G.grass, g);
+      // The map's own edge carried out and handed over to the country across
+      // three hundred metres, so a park at the boundary does not stop dead
+      // on a line against the earth past it (Sydney's Domain did). A street
+      // reaching the edge fades in sixty, or it ran on as a stripe of earth.
+      const out = Math.max(Math.abs(x), Math.abs(z)) - this.span;
+      if (out < 300) {
+        // Averaged over forty metres: a park's mask has a gap where each
+        // road crosses it, and the gap ran on as a stripe too.
+        let road = 0, park = 0;
+        for (let a = -1; a <= 1; a++) {
+          for (let b = -1; b <= 1; b++) {
+            const m = this.maskAt(x + a * 20, z + b * 20);
+            road += m.road / 9; park += m.park / 9;
+          }
+        }
+        toneAt(at2, x, z, Math.max(this.heightAt(x, z), this.waterLevel + 2.5),
+          { water: 0, road: road * (1 - THREE.MathUtils.smoothstep(out, 0, 60)), park }, hHere);
+        at.lerp(at2, 1 - THREE.MathUtils.smoothstep(out, 0, 300));
+      }
       // Down the channel: earth on the shore, the bed under the water.
       if (ch > 0) {
         at2.copy(G.earth).lerp(G.bed, THREE.MathUtils.smoothstep(ch, 0.55, 0.95));

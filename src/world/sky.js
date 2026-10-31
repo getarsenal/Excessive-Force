@@ -486,7 +486,10 @@ export function createWater(terrain, sunDirection, quality) {
       for (const r of [S, OUT]) {
         const [x, z] = ringAt(u, r);
         pos.push(x, level, z);
-        depth.push(r > S ? 40 : Math.max(0, level - terrain.heightAt(x, z)));
+        // At least four metres on the inner ring: a quad of the ring is
+        // kilometres long, and a corner on a dry headland at depth nought
+        // drew a pale shallow-water wedge out to sea from Sydney's corner.
+        depth.push(r > S ? 40 : Math.max(4, level - terrain.heightAt(x, z)));
       }
     }
     for (let k = 0; k < DIV * 4; k++) {
