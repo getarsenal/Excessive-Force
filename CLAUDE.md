@@ -298,6 +298,24 @@ a bed under it, and `createWater` lays the sheet on it — at the level's own
 waterline, which for a mountain is sixty metres out and invisible, where a
 second waterline in the same picture would not be.
 
+Where the map meets the country past it (October 2026, the owner's "hacked
+off islands and bridges that go nowhere"): on a surveyed coastline the water
+reconcile raises low land beside the water to a bank above the sheet rather
+than flooding it (Pimlico, two metres under the Thames in the DEM, flooded
+into a river 400 m wide with the Embankment standing in it as an island),
+except at the map's edge where the far survey has water; the bed falls to the
+far bed over the last sixty metres where the water runs on; the map's sheet
+reaches the boundary at every tier; the far sheet is laid wherever the ground
+dips under it, and that ground sinks by a smooth wetness (`_farWetness`), so
+the far shore is a contour, not a staircase; the ground past the edge starts
+in the edge's own tone and hands over to the country across 300 m. In the
+street plan a bridge that touches the edge over water comes down with every
+piece left dangling behind it (`dropStrandedBridges`: Vauxhall's two
+carriageways, cut, came back as one deck out and back), and a piece of three
+junctions or fewer under 250 m joined to nothing comes up (`dropOrphans`).
+`node tools/topview.mjs <level> <out> [dist] [x] [z]` looks straight down
+with the fog off.
+
 Every bake ends by checking itself against its own other half: the origin is
 not under water, the wet half of the map is the low half, nothing wet stands
 above its own surface, and the surveyed buildings are on the surveyed land.
