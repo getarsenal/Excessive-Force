@@ -66,9 +66,12 @@ export const LOOKS = {
     fog: 0xcbd8e8, sun: 0xffebd0, hemiSky: 0x9cbcff, hemiGround: 0x5a6a9a, ambient: 0x6e7aa0,
     shallow: 0x4e9aa4, deep: 0x255a78,
   },
+  // Dry air: a pale sky-grey haze, thinner than the others (`fogScale`). A
+  // sand-coloured one the colour of the ground took the far desert into the
+  // same beige and Giza's horizon was a wall a few hundred metres out.
   desert: {
     zenith: 0x1f55b8, mid: 0x66a2e8, horizon: 0xe6dfcc, ground: 0xc9ad7e,
-    fog: 0xdcd6c6, sun: 0xffe2b8, hemiSky: 0x8fb4ff, hemiGround: 0x7a6a8a, ambient: 0x7a7496,
+    fog: 0xd3d9dd, fogScale: 0.8, sun: 0xffe2b8, hemiSky: 0x8fb4ff, hemiGround: 0x7a6a8a, ambient: 0x7a7496,
     shallow: 0x5a8a78, deep: 0x2e5f70,
   },
   steppe: {
@@ -133,7 +136,7 @@ export function applyLook(engine, level, sky) {
   // A little thicker than the levels set it: that was tuned against a
   // beige fog that walled the view off, and sky-coloured air is aerial
   // perspective, the far country going blue the way it does from a hill.
-  engine.scene.fog.density *= 1.6;
+  engine.scene.fog.density *= 1.6 * (L.fogScale ?? 1);
   const u = sky.material.uniforms;
   u.uZenith.value.setHex(L.zenith);
   u.uMid.value.setHex(L.mid);

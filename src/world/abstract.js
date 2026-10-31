@@ -529,10 +529,23 @@ export function buildAbstract(terrain, quality, opts = {}) {
         while (t < e.len - 6) {
           const x0 = a.x + ux * t, z0 = a.z + uz * t, r0 = Math.hypot(x0, z0);
           const cover = r0 < band0, town = r0 < band1;
-          const w = cover ? R(8, 13) : town ? R(10, 18) : R(9, 13);
+          // Clusters and open stretches, not a row: where the noise is low a
+          // run of the road goes unbuilt. Every road lined end to end with
+          // the same box at the same setback read as a model railway, the
+          // Potala's ring and Giza's above all.
+          const lull = valueNoise(x0 * 0.013 + side * 5.7 + 7.1, z0 * 0.013 - 3.3);
+          // (`valueNoise` runs from -0.5 to 0.5: about a fifth of the ring
+          // and a quarter of the town's frontage open.)
+          if (lull < (cover ? -0.22 : town ? -0.17 : -1)) { t += R(12, 30); continue; }
+          let w = cover ? R(8, 13) : town ? R(10, 18) : R(9, 13);
+          if (town && !cover && rng() < 0.14) w *= R(1.5, 2.1);        // a terrace
           const dd = cover ? R(7, 10) : town ? R(9, 14) : R(8, 11);
-          const gap = cover ? R(2.5, 6) : town ? R(3, 9) : R(18, 60);
-          const off = HW[e.cls] + 3.5 + dd / 2;
+          const gap = cover ? R(2.5, 7) : town ? R(3, 11) : R(18, 60);
+          // Set back by a varying front yard, now and then a deep one, and a
+          // little off square to the road.
+          const yard = rng() < 0.15 ? R(4, 9) : R(0, 2.5);
+          const off = HW[e.cls] + 3.5 + dd / 2 + yard;
+          const skew = yaw + R(-0.07, 0.07);
           const cx = x0 + ux * w / 2 - uz * side * off, cz = z0 + uz * w / 2 + ux * side * off;
           let floors;
           if (cover) floors = rng() < 0.6 ? 1 : 2;
@@ -541,12 +554,18 @@ export function buildAbstract(terrain, quality, opts = {}) {
           const anchor = town && !cover && K.tower && r0 > rRing + 160 && !cameraLane(cx, cz) && rng() < 0.08;
           if (anchor) floors = Math.round(R(K.tower.floors[0], K.tower.floors[1]));
           if (cameraLane(cx, cz) && r0 < band1) floors = Math.min(floors, 2);
-          const placed = tryPlace(cx, cz, w, dd, yaw, floors, { tower: anchor });
-          // A second row behind the first, in town.
-          if (placed && town && !cover && rng() < 0.55) {
-            const off2 = off + dd / 2 + 3 + dd / 2;
+          const placed = tryPlace(cx, cz, w, dd, anchor ? yaw : skew, floors, { tower: anchor });
+          // A second row behind the first, in town; or an outbuilding at
+          // right angles behind it, round a yard.
+          if (placed && town && !cover && rng() < 0.5) {
+            const off2 = off + dd / 2 + 3 + dd / 2 + R(0, 4);
             tryPlace(x0 + ux * w / 2 - uz * side * off2, z0 + uz * w / 2 + ux * side * off2,
-              w * R(0.8, 1.05), dd, yaw, Math.max(1, floors - 1));
+              w * R(0.7, 1.05), dd, yaw + R(-0.1, 0.1), Math.max(1, floors - 1));
+          } else if (placed && rng() < 0.3) {
+            const ow = R(5, 8), od = R(4, 6), along = (rng() < 0.5 ? -1 : 1) * (w / 2 - ow / 2);
+            const off2 = off + dd / 2 + R(4, 7) + ow / 2;
+            tryPlace(cx + ux * along - uz * side * (off2 - off), cz + uz * along + ux * side * (off2 - off),
+              od, ow, skew + Math.PI / 2, 1);
           }
           t += w + gap;
         }
