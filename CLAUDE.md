@@ -142,7 +142,10 @@ landmark out: a ring road just outside its ground with dense one- and
 two-storey cover round it, six avenues out (the first laid toward the
 level's own camera, the approach, where nothing over two storeys stands),
 a street grid square to it from the ring to past an outer ring, buildings
-fronting every road in the town band with a second row behind, tall
+fronting the roads in clusters (a noise field leaves a fifth of the ring and
+a quarter of the town's frontage open; yards of varying depth, a few degrees
+off square, one town house in seven a flat-roofed terrace deep enough to put
+a gun on, a second row or an outbuilding round a yard behind), tall
 anchors only well out and off the approach, farms, tree clumps and boulders
 on the slopes. There is no edge: it is one world and one level of detail to
 the fog. Past the map the ground follows the real far relief
