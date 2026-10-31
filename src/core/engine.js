@@ -4,13 +4,14 @@ import { gpuProbe } from './gpuprobe.js';
 
 const COARSE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 /**
- * The pixel ratio a phone draws at, of its own: see `_pixelRatio`. 1.75 is
- * what phase one of the abstraction paid for: the environment's material cut
- * a fragment's cost by about a third (tools/powerbench.mjs at equal pixels,
- * October 2026), and 1.75 spends about that (1.68 times the pixels of 1.35).
- * 2.0 waits on phase two's cut to the town.
+ * The pixel ratio a phone draws at while it is cool: see `_pixelRatio`.
+ * Phase one of the abstraction cut a fragment's cost by about a third
+ * (tools/powerbench.mjs at equal pixels, October 2026), which bought 1.75;
+ * phase two cut the environment's triangles by four fifths and the works by
+ * two thirds. 2.0 is the nominal rung only: the heat ladder (core/heat.js)
+ * takes a warm phone back to 1.75 at "fair", where it was.
  */
-export const PHONE_RATIO = 1.75;
+export const PHONE_RATIO = 2.0;
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';

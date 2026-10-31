@@ -31,12 +31,15 @@ export const LEVELS = ['nominal', 'fair', 'serious', 'critical'];
 /** What each rung turns down. Scale multiplies the pixel ratio the tier allows. */
 // Resolution is the last thing to give (the owner, October 2026): a warm
 // phone first loses smoke, shadow redraws and frames, and only a serious one
-// draws fewer pixels.
+// draws fewer pixels than phones drew before the abstraction paid for more.
+// A cool phone draws at 2.0 (PHONE_RATIO); "fair" gives back the eighth that
+// was bought on top of 1.75, so a warm phone is where every phone was before
+// it, and serious and critical land where they always did (1.5 and 1.2).
 export const RUNGS = [
   { scale: 1, fill: 1, fps: 30, shadowEvery: 1 },
-  { scale: 1, fill: 0.5, fps: 30, shadowEvery: 3 },
-  { scale: 0.85, fill: 0.35, fps: 24, shadowEvery: 6 },
-  { scale: 0.7, fill: 0.25, fps: 20, shadowEvery: 0 },
+  { scale: 0.875, fill: 0.5, fps: 30, shadowEvery: 3 },
+  { scale: 0.75, fill: 0.35, fps: 24, shadowEvery: 6 },
+  { scale: 0.6, fill: 0.25, fps: 20, shadowEvery: 0 },
 ];
 
 export const heat = {

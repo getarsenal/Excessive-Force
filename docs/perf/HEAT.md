@@ -127,3 +127,19 @@ islands as the reference). Phase one, every level:
 
 Phase two replaces the surveyed town with a themed, generated settlement
 under a hard budget (150k triangles for everything but the target).
+
+### Phase two's spend: 2.0 while cool (October 2026)
+
+- **Cut:** the abstract world (SETTINGS › WORLD) brings Westminster's
+  environment at the phone's tier from 891k triangles to 164k; the enemy
+  works, on every map in both worlds, from 65k to 19k (a bay's sandbag wall
+  one swept profile, not a box a bag; banks one-sided).
+- **Spent on:** `PHONE_RATIO` 2.0, on the nominal rung only. It is about
+  31% more fill than 1.75, which phase two's cuts did not pay for in
+  fragments (they are vertex and draw savings), so the heat ladder holds the
+  line instead: `RUNGS` scale 1 / 0.875 / 0.75 / 0.6, a phone's ratio
+  2.0 / 1.75 / 1.5 / 1.2. A cool phone is sharper; "fair" is exactly where
+  every phone drew before; serious and critical are where they were.
+- **To watch on the device:** how soon a fight reaches "fair" at 2.0 against
+  1.75 (RECORD MY PLAY shows the rung); if it is within the first minute,
+  the extra eighth is buying nothing and 1.75 goes back.

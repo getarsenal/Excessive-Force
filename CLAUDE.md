@@ -126,8 +126,10 @@ grass, earth, rock; earth-first on an arid map; each held to a band of
 lightness in sRGB, so a desert palette's near-white paving does not wash
 the ground into the haze) with no texture at all, and
 the landmark keeps its standard material so the target stands apart. That
-bought the phone's pixel ratio back from 1.35 to 1.75 (`PHONE_RATIO`,
-engine.js; 2.0 waits on phase two) with a light sharpen (`uSharpen` 0.25). The grade pass and the
+bought the phone's pixel ratio back from 1.35 to 1.75, and phase two's cuts
+(the environment and the works) 2.0 while the phone is cool (`PHONE_RATIO`,
+engine.js; the heat ladder takes a warm one back to 1.75) with a light
+sharpen (`uSharpen` 0.25). The grade pass and the
 particles run at `mediump`, the rim light is not added, the VSM blur is four
 samples, the particle fill budget is fourteen screens and the interface's
 looping animations run in ten steps a second under `body.lean`.
@@ -165,8 +167,10 @@ with `roadClearance` and `nodeClearance`), so the fire, the colliders, the
 garrison, the traffic, the checkpoint and the strike sites work unchanged;
 the terrain takes `abstract` (no survey street mask painted on the grass,
 the ground coarsened to twelve metres a cell, the skirt for the apron).
-Westminster at the phone's tier: the environment 891k triangles to 210k
-(town 545k to 88k, ground and skirt 303k to 57k, works 65k); `node tools/envbudget.mjs <level>`
+Westminster at the phone's tier: the environment 891k triangles to 164k
+(town 545k to 88k, ground and skirt 303k to 57k, works 65k to 19k: a bay's
+sandbag wall is one swept profile, not a box a bag; `node
+tools/worksshot.mjs <level>` frames one); `node tools/envbudget.mjs <level>`
 (`ENV=survey` for the other) counts it by owner. A battle saved in one
 world is refused in the other and says so. The suite's survey-only tests
 (lamp posts, the river wall, the railway, street counts) carry an abstract
@@ -177,8 +181,9 @@ reads the phone's `ProcessInfo.thermalState`, Low Power Mode and battery
 through `ios/App/App/ThermalPlugin.swift` (registered by
 `AppViewController`), and the web infers throttling from the frame
 governor's p80 at a steady load; each rung (`RUNGS`: nominal, fair,
-serious, critical) sets the engine's `heatScale` (1, 1, 0.85, 0.7:
-resolution is held through "fair"), the fill budget, the frame cap
+serious, critical) sets the engine's `heatScale` (1, 0.875, 0.75, 0.6: a
+phone's ratio 2.0, 1.75, 1.5, 1.2, so "fair" is where every phone drew
+before), the fill budget, the frame cap
 (`power.capFps`: 30, 30, 24, 20) and the shadow redraw cadence
 (`shadowEvery`), and Low Power Mode switches the saver on.
 `node tools/thermalprobe.mjs` plants a plugin on the page, walks the

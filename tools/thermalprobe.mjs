@@ -42,9 +42,10 @@ out.nominal = await read('nominal');
 for (const t of ['fair', 'serious', 'critical', 'nominal']) { await page.evaluate((t) => window.__setThermal({ thermal: t }), t); await page.waitForTimeout(200); out[t + (t === 'nominal' ? '2' : '')] = await read(t); }
 await page.evaluate(() => window.__setThermal({ lowPower: true })); await page.waitForTimeout(200);
 out.lowPower = await read('lowpower');
-// Resolution goes last (core/heat.js): held through fair, which sheds the
-// smoke and the shadow redraws, and down from serious.
-const ok = out.fair.pixelRatio === out.nominal.pixelRatio && out.fair.fill < out.nominal.fill
+// Resolution goes last (core/heat.js): fair gives back only the eighth a cool
+// phone draws over 1.75 and sheds the smoke and the shadow redraws; serious
+// and critical go below.
+const ok = out.fair.pixelRatio <= out.nominal.pixelRatio && out.fair.pixelRatio >= out.nominal.pixelRatio * 0.86 && out.fair.fill < out.nominal.fill
   && out.serious.pixelRatio < out.fair.pixelRatio && out.serious.gapMs > out.nominal.gapMs && out.critical.shadowDrawsIn12 === 0
   && out.nominal2.pixelRatio === out.nominal.pixelRatio && out.lowPower.saver === true && out.fair.fill < out.nominal.fill;
 console.log(ok ? 'HEAT LADDER OK' : 'HEAT LADDER WRONG');
