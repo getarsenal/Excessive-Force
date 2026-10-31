@@ -464,36 +464,26 @@ function parapet(props, terrain, L, rng, courses) {
   // The spoil: low and sloped, the way earth thrown out of a hole lands.
   const BERM = [[2.9, -0.06], [1.9, 0.16], [1.15, 0.3], [0.62, 0.27], [0.56, -0.06]];
   const PARADOS = [[-0.7, -0.06], [-0.76, 0.2], [-1.35, 0.27], [-2.2, -0.06]];
-  sweep(props, terrain, 'stone', SPOIL, at, -half, half, BERM, rng);
-  sweep(props, terrain, 'stone', SPOIL, at, -half, half, PARADOS, rng);
+  sweep(props, terrain, 'stone', SPOIL, at, -half, half, BERM, rng, false, true);
+  sweep(props, terrain, 'stone', SPOIL, at, -half, half, PARADOS, rng, false, true);
   // The slot: dark floor from lip to lip, and duckboards down the middle of it.
   sweep(props, terrain, 'cut', CUT, at, -half - 0.3, half + 0.3, [[0.6, 0.02], [-0.74, 0.02]], rng, true);
   sweep(props, terrain, 'markings', BOARD, at, -half, half, [[0.12, 0.03], [-0.36, 0.03]], rng, true);
-  // The bags along the lip, laid in running bond and each a little off square
-  // the way they go up in a hurry. The crest is chest-high to the man on the
-  // fire step, and that is what he shoots over.
-  const n = Math.max(2, Math.floor(len / BAG_L));
-  const step = len / n;
-  for (let c = 0; c < courses; c++) {
-    const shift = (c % 2) * step / 2;
-    for (let i = 0; i < n - (c % 2); i++) {
-      const p = at(-half + shift + (i + 0.5) * step, 0.84 - c * 0.05);
-      const g = terrain.heightAt(p.x, p.z);
-      props.add('stone', bag(step * 0.96, BAG_H, BAG_D, p.x, g + 0.26 + BAG_H * 0.5 + c * BAG_H * 0.9, p.z,
-        yaw + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.24);
-    }
-  }
+  // The bags along the lip, as one wall swept along the bay with its crest a
+  // little lumpy, the way a row of filled bags lies: chest-high to the man
+  // on the fire step, and what he shoots over. A bag a box was most of the
+  // works' triangles, sixty-five thousand of them round Westminster, for a
+  // rhythm nobody sees from a gun line two hundred metres off.
+  const top = 0.26 + BAG_H * (courses * 0.9 + 0.1);
+  const WALL = [[1.06, 0.2], [0.98, top - 0.04], [0.84, top], [0.7, top - 0.04], [0.62, 0.2]];
+  sweep(props, terrain, 'stone', BAG, at, -half, half, WALL, rng, false, true, BAG_L * 2);
   // A traverse at the end of the bay: a block of bags across the slot, so one
   // shell takes one bay.
   if (L.traverse) {
-    for (let c = 0; c < courses + 1; c++) {
-      for (let k = 0; k < 3; k++) {
-        const p = at(half + 0.5, 0.45 - k * 0.55 + (c % 2) * 0.12);
-        const g = terrain.heightAt(p.x, p.z);
-        props.add('stone', bag(BAG_L, BAG_H, BAG_D, p.x, g + BAG_H * 0.5 + c * BAG_H * 0.9, p.z,
-          yaw + Math.PI / 2 + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.22);
-      }
-    }
+    const p = at(half + 0.5, -0.1);
+    const g = terrain.heightAt(p.x, p.z);
+    const h = BAG_H * (courses + 1) * 0.9;
+    props.add('stone', bag(BAG_D * 1.6, h, 1.9, p.x, g + h / 2, p.z, yaw), BAG, 0.84 + rng() * 0.22);
   }
 }
 
@@ -502,8 +492,8 @@ function parapet(props, terrain, L, rng, courses) {
  * it. `profile` is [[offset across the line, height over the ground]], walked
  * in order; `flat` lays a one-sided ribbon (a floor, a duckboard).
  */
-function sweep(props, terrain, bucket, colour, at, s0, s1, profile, rng, flat = false) {
-  const segs = Math.max(2, Math.round((s1 - s0) / 1.6));
+function sweep(props, terrain, bucket, colour, at, s0, s1, profile, rng, flat = false, up = false, every = 1.6) {
+  const segs = Math.max(2, Math.round((s1 - s0) / every));
   const rows = profile.length;
   const pos = [];
   const idx = [];
@@ -522,7 +512,24 @@ function sweep(props, terrain, bucket, colour, at, s0, s1, profile, rng, flat = 
       idx.push(a, b, c, b, e, c);
     }
   }
-  props.add(bucket, surface(pos, idx, !flat), colour, 0.94 + rng() * 0.1);
+  // `up`: one-sided, wound to face the sky. A bank or a wall is an arch over
+  // the ground, so its outside is all anyone sees; drawn both ways it was
+  // twice the triangles for faces under the grass.
+  props.add(bucket, up ? upward(surface(pos, idx, false)) : surface(pos, idx, !flat), colour, 0.94 + rng() * 0.1);
+}
+
+/** Wind a surface so its normals face the sky, on the whole. */
+function upward(g) {
+  const nm = g.attributes.normal;
+  let y = 0;
+  for (let i = 0; i < nm.count; i++) y += nm.getY(i);
+  if (y >= 0) return g;
+  const idx = g.index.array;
+  const flipped = [];
+  for (let i = 0; i < idx.length; i += 3) flipped.push(idx[i], idx[i + 2], idx[i + 1]);
+  g.setIndex(flipped);
+  g.computeVertexNormals();
+  return g;
 }
 
 /**
@@ -586,17 +593,32 @@ function gunPit(props, terrain, L, rng, courses) {
     fIdx.push(0, 1 + i, 1 + ((i + 1) % seg));
   }
   props.add('cut', surface(floor, fIdx, false), CUT, 1);
-  // The wall, in running bond, with a gap at the front for the barrel.
-  const around = Math.round((Math.PI * 2 * R) / BAG_L);
+  // The wall, one swept ring with a gap at the front for the barrel, its
+  // crest lumpy as the bay's is.
   const facing = (a) => { const o = a - yaw; return Math.abs(Math.atan2(Math.sin(o), Math.cos(o))); };
-  for (let c = 0; c < courses + 1; c++) {
-    for (let i = 0; i < around; i++) {
-      const a = ((i + (c % 2) * 0.5) / around) * Math.PI * 2;
-      if (facing(a) < 0.5) continue;
-      const [px, gy, pz] = ringAt(a, R - c * 0.04, 0);
-      props.add('stone', bag(BAG_L, BAG_H, BAG_D, px, gy + BAG_H * 0.5 + c * BAG_H * 0.9, pz,
-        a + Math.PI / 2 + (rng() - 0.5) * 0.1), BAG, 0.84 + rng() * 0.24);
+  {
+    const wallTop = BAG_H * (courses + 1) * 0.9;
+    const RING = [[R + 0.22, 0], [R + 0.12, wallTop - 0.04], [R, wallTop], [R - 0.12, wallTop - 0.04], [R - 0.22, 0]];
+    const wseg = 24;
+    const wpos = [], widx = [];
+    let prev = -1;
+    for (let i = 0; i <= wseg; i++) {
+      const a = (i / wseg) * Math.PI * 2;
+      if (facing(a) < 0.5) { prev = -1; continue; }
+      const base = wpos.length / 3;
+      for (const [r, h] of RING) {
+        const wob = h > 0.05 ? (rng() - 0.5) * 0.06 : 0;
+        wpos.push(...ringAt(a, r, h + wob));
+      }
+      if (prev >= 0) {
+        for (let k = 0; k < RING.length - 1; k++) {
+          const p0 = prev + k, p1 = prev + k + 1, q0 = base + k, q1 = base + k + 1;
+          widx.push(p0, p1, q0, p1, q1, q0);
+        }
+      }
+      prev = base;
     }
+    if (widx.length) props.add('stone', upward(surface(wpos, widx, false)), BAG, 0.84 + rng() * 0.24);
   }
   // The spoil banked against the outside, a ring of quads from the top of the
   // bags down to the grass.
@@ -611,7 +633,7 @@ function gunPit(props, terrain, L, rng, courses) {
       ...ringAt(a0, R + 1.7, -0.06), ...ringAt(a1, R + 1.7, -0.06));
     bIdx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3);
   }
-  if (bIdx.length) props.add('stone', surface(bank, bIdx, true), SPOIL, 0.95);
+  if (bIdx.length) props.add('stone', upward(surface(bank, bIdx, false)), SPOIL, 0.95);
   if (L.weapon === 'fieldgun') {
     // A long barrel over a shield on two wheels, laid along the pit's facing.
     props.add('metal', box(0.22, 0.22, 4.6, x + Math.sin(yaw) * 1.9, g + 1.15,
