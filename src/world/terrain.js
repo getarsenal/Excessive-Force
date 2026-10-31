@@ -898,17 +898,20 @@ export class Terrain {
     // the sample, so a hard step at its edge would draw every distant shore as
     // a cliff. Nine samples over a hundred and twenty metres give a shelf.
     if (this.farMask) {
-      let wetn = 0;
+      // How wet, smoothly: the survey's value interpolated between its
+      // forty-metre samples and averaged over a ninety-metre square, so the
+      // shore is a contour through a smooth field. Counting wet samples on a
+      // sixty-metre lattice drew every distant shore in blocks and steps.
+      let wet = 0;
       for (let a = -1; a <= 1; a++) {
-        for (let b = -1; b <= 1; b++) {
-          if (this._farWet(x + a * 60, z + b * 60)) wetn++;
-        }
+        for (let b = -1; b <= 1; b++) wet += this._farWetness(x + a * 30, z + b * 30);
       }
+      wet /= 9;
       // Mostly-wet neighbourhoods only. Any wet sample at all used to start
       // sinking the ground, which put every distant shore sixty metres
       // inland of where the survey has it, under the surround's own houses.
-      if (wetn > 2) {
-        const k = Math.min(1, (wetn - 2) / 5);
+      if (wet > 0.3) {
+        const k = THREE.MathUtils.smoothstep(wet, 0.3, 0.75);
         const bed = this.waterLevel - 11;
         // Only ever downward. Inland of the shore the country keeps its own
         // relief; over the water it is a bed.
@@ -1004,6 +1007,19 @@ export class Terrain {
     }
     d.sort((a, b) => a - b);
     return (this._farOff = d[d.length >> 1]);
+  }
+
+  /** The far survey's water at (x, z), 0 to 1, bilinear between its samples. */
+  _farWetness(x, z) {
+    const n = this.farSize, s = this.farSpan, m = this.farMask;
+    const u = (x + s) / (s * 2) * (n - 1);
+    const v = (s - z) / (s * 2) * (n - 1);
+    if (!m || u < 0 || v < 0 || u > n - 1 || v > n - 1) return 0;
+    const x0 = Math.floor(u), z0 = Math.floor(v);
+    const x1 = Math.min(x0 + 1, n - 1), z1 = Math.min(z0 + 1, n - 1);
+    const fx = u - x0, fz = v - z0;
+    return (m[z0 * n + x0] * (1 - fx) + m[z0 * n + x1] * fx) * (1 - fz)
+      + (m[z1 * n + x0] * (1 - fx) + m[z1 * n + x1] * fx) * fz;
   }
 
   _farWet(x, z) {
