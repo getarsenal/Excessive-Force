@@ -455,8 +455,12 @@ export function buildAbstract(terrain, quality, opts = {}) {
     if (scenery ? countryTris > BUDGET.countryHouses : (plots.length >= 900 || buildTris > BUDGET.buildings)) return false;
     const r = { x, z, w, d, yaw };
     const c = Math.cos(yaw), s = Math.sin(yaw);
+    // The centre and the outline every six metres or less: corners alone
+    // let a long terrace's middle sit across a curving road.
     const pts = [[0, 0]];
-    for (const u of [-1, 1]) for (const v of [-1, 1]) pts.push([u * w / 2, v * d / 2]);
+    const nu = Math.max(1, Math.ceil(w / 6)), nv = Math.max(1, Math.ceil(d / 6));
+    for (let i = 0; i <= nu; i++) for (const v of [-1, 1]) pts.push([(i / nu - 0.5) * w, v * d / 2]);
+    for (let j = 1; j < nv; j++) for (const u of [-1, 1]) pts.push([u * w / 2, (j / nv - 0.5) * d]);
     let lo = Infinity, hi = -Infinity;
     for (const [u, v] of pts) {
       const px = x + u * c + v * s, pz = z - u * s + v * c;
@@ -495,7 +499,7 @@ export function buildAbstract(terrain, quality, opts = {}) {
       const k = taper === 1 ? 1 : 1 - (1 - taper) * ((y0 + y1) / 2) / hBody;
       add(band(w * k, d * k, y0, y1), K.band, jit);
     }
-    let form = tower ? 'flat' : K.roof;
+    let form = tower || opt.flat ? 'flat' : K.roof;
     if (form === 'flat' && K.domes && !tower && rng() < K.domes && Math.min(w, d) < 14) form = 'dome';
     if (form === 'gable' || form === 'hip') {
       const rise = Math.min(w, d) * 0.32 * (K.pitch || 1);
@@ -538,8 +542,11 @@ export function buildAbstract(terrain, quality, opts = {}) {
           // and a quarter of the town's frontage open.)
           if (lull < (cover ? -0.22 : town ? -0.17 : -1)) { t += R(12, 30); continue; }
           let w = cover ? R(8, 13) : town ? R(10, 18) : R(9, 13);
-          if (town && !cover && rng() < 0.14) w *= R(1.5, 2.1);        // a terrace
-          const dd = cover ? R(7, 10) : town ? R(9, 14) : R(8, 11);
+          let dd = cover ? R(7, 10) : town ? R(9, 14) : R(8, 11);
+          // A terrace or a block, flat-roofed and deep enough to put a gun
+          // on: a gabled town's only deployable roofs were its few towers.
+          const terrace = town && !cover && rng() < 0.14;
+          if (terrace) { w *= R(1.5, 2.1); dd = Math.max(dd, 13); }
           const gap = cover ? R(2.5, 7) : town ? R(3, 11) : R(18, 60);
           // Set back by a varying front yard, now and then a deep one, and a
           // little off square to the road.
@@ -554,7 +561,8 @@ export function buildAbstract(terrain, quality, opts = {}) {
           const anchor = town && !cover && K.tower && r0 > rRing + 160 && !cameraLane(cx, cz) && rng() < 0.08;
           if (anchor) floors = Math.round(R(K.tower.floors[0], K.tower.floors[1]));
           if (cameraLane(cx, cz) && r0 < band1) floors = Math.min(floors, 2);
-          const placed = tryPlace(cx, cz, w, dd, anchor ? yaw : skew, floors, { tower: anchor });
+          if (terrace) floors = Math.max(floors, 2);
+          const placed = tryPlace(cx, cz, w, dd, anchor ? yaw : skew, floors, { tower: anchor, flat: terrace });
           // A second row behind the first, in town; or an outbuilding at
           // right angles behind it, round a yard.
           if (placed && town && !cover && rng() < 0.5) {
