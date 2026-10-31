@@ -14,5 +14,11 @@
   "coastline": "surveyed",
   "farSpan": 6300.0,
   "farWater": 0.3645,
-  "overtureRelease": "2026-08-19.0"
+  "overtureRelease": "2026-08-19.0",
+  "farHeight": {
+    "span": 6300.0,
+    "size": 320,
+    "min": -0.226,
+    "max": 447.08
+  }
 }
