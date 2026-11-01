@@ -316,7 +316,12 @@ far bed over the last sixty metres where the water runs on; the map's sheet
 reaches the boundary at every tier; the far sheet is laid wherever the ground
 dips under it, and that ground sinks by a smooth wetness (`_farWetness`), so
 the far shore is a contour, not a staircase; the ground past the edge starts
-in the edge's own tone and hands over to the country across 300 m. In the
+in the edge's own tone and hands over to the country across 300 m, and takes
+the same cloud shadows as the map's ground (and, where there is a shadow
+map, the town's shadows: the surround casts and takes them); the surveyed
+buildings whose centre is just past the edge, which the bake files in the
+map's list and the map skips, are built as surround boxes nearest-first
+(`edgeBoxes`, surround.js), so there is no bare strip round the map. In the
 street plan a bridge that touches the edge over water comes down with every
 piece left dangling behind it (`dropStrandedBridges`: Vauxhall's two
 carriageways, cut, came back as one deck out and back), and a piece of three
