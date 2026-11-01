@@ -980,14 +980,21 @@ async function boot() {
   if (abstractEnv && terrain.worldR) setWorldRim(terrain.worldR * 0.74, terrain.worldR * 0.99);
   envStyle(terrain.mesh.material);
   console.log(`[tumble] environment material on ${envN} meshes`);
-  // Cloud shadows drifting over the ground and the town.
+  // Cloud shadows drifting over the ground and the town, and over the
+  // country past the map's edge with the same strength as the map's own
+  // ground: drawn on the playfield alone, every cloud stopped dead on the
+  // boundary and the map read as a darker square in a paler country.
+  terrain.mesh.material.userData.clouded = true;
   cloudShadows(terrain.mesh.material, 0.30);
-  contextGroup?.traverse((o) => {
+  const cloud = (root, strength) => root?.traverse((o) => {
     if (o.isMesh && o.material && (o.material.isMeshStandardMaterial || o.material.isMeshLambertMaterial) && !o.material.userData.clouded) {
       o.material.userData.clouded = true;
-      cloudShadows(o.material, 0.26);
+      cloudShadows(o.material, strength);
     }
   });
+  cloud(terrain.group, 0.30);
+  cloud(contextGroup, 0.26);
+  cloud(fieldWorks.group, 0.26);
   // The shading (see world/look.js) on everything standing so far: the
   // ground, the town, the garrison, the works. The stones took theirs with
   // edges as they were built; the units take theirs as their models load.

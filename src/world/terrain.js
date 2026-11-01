@@ -1533,6 +1533,9 @@ export class Terrain {
     apronGeo.setAttribute('color', new THREE.BufferAttribute(apColors, 3));
     const apron = new THREE.Mesh(apronGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
     apron.position.y = edge - 0.4;
+    // It takes shadows as the map's ground does, or the town's shadows stop
+    // on the boundary in a straight line.
+    apron.receiveShadow = true;
     apron.frustumCulled = false;
     apron.renderOrder = -5;
 

@@ -28,7 +28,7 @@ import { PropSet, MATERIALS, cyl, addStreetFurniture, addBuildingDetail,
 import { buildPrecinct, buildOutskirts, fillOpenBlock, buildHorizon,
   buildRailway, BLOCK_PROGRAMMES } from './places.js';
 import { realNetwork, measureYaw } from './realstreets.js';
-import { buildSurround } from './surround.js';
+import { buildSurround, edgeBoxes } from './surround.js';
 import { buildStreetNetwork, buildStreetSurface, addStreetMarkings, buildDecks,
   addNetworkFurniture, halfWidth, blockInterior, quadFrame, quadPoint,
   GRID_YAW, ROAD_CLASS, SURFACE_LIFT, bearingNear } from './streets.js';
@@ -1417,7 +1417,7 @@ export function buildContext(terrain, quality, opts = {}) {
   // the right middle distance for a town that ends, and Southwark is not a
   // town that ends.
   const surround = city && city.outer
-    ? buildSurround(terrain, quality, city.outer, { inner: terrain.span })
+    ? buildSurround(terrain, quality, city.outer, { inner: terrain.span, edge: edgeBoxes(city.buildings, terrain.span) })
     : null;
   if (surround) {
     group.add(surround);

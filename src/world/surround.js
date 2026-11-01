@@ -26,10 +26,59 @@ import { splitMesh } from './detail.js';
 /** How much of the surround each tier draws, largest first. */
 const BUDGET = { low: 2200, medium: 4500, high: 7000, ultra: 9000 };
 
+/**
+ * The surveyed buildings that stand just past the edge, as surround boxes
+ * (x, z, w, d, yaw in degrees, height), nearest the edge first.
+ *
+ * The bake files a building whose outline comes within five per cent of the
+ * span of the map in the map's own list, and the map builds only those whose
+ * centre is on it: everything from the boundary to sixty metres out was in
+ * neither set, and every level had a bare strip of ground round its edge (a
+ * third of a thousand buildings at Agra) that drew the boundary as a line.
+ */
+export function edgeBoxes(buildings, inner) {
+  const out = [];
+  for (const b of buildings || []) {
+    const pts = b.pts;
+    if (!pts || pts.length < 3) continue;
+    let cx = 0, cz = 0;
+    for (const q of pts) { cx += q[0]; cz += q[1]; }
+    cx /= pts.length; cz /= pts.length;
+    const past = Math.max(Math.abs(cx), Math.abs(cz)) - inner;
+    if (past <= 0) continue;
+    // The tightest rectangle on one of the outline's own edges.
+    let best = null;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], c = pts[(i + 1) % pts.length];
+      const ex = c[0] - a[0], ez = c[1] - a[1], L = Math.hypot(ex, ez);
+      if (L < 0.4) continue;
+      const ux = ex / L, uz = ez / L;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (const q of pts) {
+        const u = q[0] * ux + q[1] * uz, v = -q[0] * uz + q[1] * ux;
+        u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+      }
+      const area = (u1 - u0) * (v1 - v0);
+      if (!best || area < best.area) best = { area, ux, uz, u0, u1, v0, v1 };
+    }
+    if (!best) continue;
+    const { ux, uz, u0, u1, v0, v1 } = best;
+    const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+    const w = u1 - u0, d = v1 - v0;
+    if (Math.min(w, d) < 2.5) continue;
+    out.push({ past, box: [cu * ux - cv * uz, cu * uz + cv * ux, w, d, Math.atan2(-uz, ux) * 180 / Math.PI, b.h || 9] });
+  }
+  out.sort((p, q) => p.past - q.past);
+  return out.flatMap((e) => e.box);
+}
+
 export function buildSurround(terrain, quality, outer, opts = {}) {
-  if (!outer || outer.length < 6) return null;
   const span = terrain.span;
   const inner = opts.inner ?? span;
+  // The strip just past the edge first: it is the nearest and most seen, and
+  // the budget below keeps the largest of the rest.
+  if (opts.edge?.length) outer = [...opts.edge, ...(outer || [])];
+  if (!outer || outer.length < 6) return null;
   const budget = BUDGET[quality.name] ?? 4500;
   const rng = mulberry32(0x5a1d0b0b);
 
@@ -141,8 +190,12 @@ function merge(geos, palette, rng, roughness) {
     BufferGeometryUtils.mergeGeometries(geos, false),
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness, metalness: 0.01 }),
   );
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
+  // Shadows like the town's, cast and taken: the town past the edge stood in
+  // full sun beside streets in the shadow of their own buildings, and that
+  // difference alone drew the boundary. The shadow map covers 680 m round
+  // the focus, so only the boxes near the edge are ever in it.
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   mesh.name = 'surround';
   return mesh;
 }
