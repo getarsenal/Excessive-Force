@@ -1255,7 +1255,19 @@ export class TestMenu {
           c.fastForward(20);
         } finally { b.invulnerable = inv; }
         const fired = b.garrison.mortarsFired - before;
-        assert(fired > 0, 'no mortar rounds were fired in 20 s with guns in range');
+        // Why not, when not: the tubes, the guns, and each tube's nearest gun
+        // with whether it has a solution on it.
+        const why = () => {
+          const g = b.garrison, us = b.units.filter((u) => u.alive);
+          const tubes = g.defenders.filter((d) => d.def.indirect);
+          const each = tubes.filter((d) => d.alive).map((d) => {
+            let near = null, nd = Infinity;
+            for (const u of us) { const q = d.pos.distanceTo(u.pos); if (q < nd) { nd = q; near = u; } }
+            return near ? `${Math.round(nd)}${g.mortarSolution(d, near.pos) ? '' : '!'}${d.suppressed > g.time ? 's' : ''}${d.pinned > g.time ? 'p' : ''}` : '-';
+          });
+          return `${tubes.filter((d) => d.alive).length}/${tubes.length} tubes, ${us.length} guns, nearest ${each.join(' ')}`;
+        };
+        assert(fired > 0, `no mortar rounds were fired in 20 s with guns in range (${why()})`);
         return `${fired} bombs`;
       }],
 
