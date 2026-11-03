@@ -1353,11 +1353,14 @@ export class HUD {
     // Three numbers, big: what came down, how long it took, what it cost.
     const hero = $('ec-hero');
     if (hero) {
+      // A million and up in short (3.48M): a third of a phone is eight
+      // characters, and 3,478,990 t ran out of tile and ended in an ellipsis.
+      const big = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e8 ? 0 : 2)}M` : Math.round(n).toLocaleString());
       const tiles = [
-        won ? ['DOWN', `${summary.score.toLocaleString()} t`]
+        won ? ['DOWN', `${big(summary.score)} t`]
           : ['STANDING', `${summary.heightStanding.toFixed(0)} m`],
         ['TIME', `${mins}:${String(secs).padStart(2, '0')}`],
-        ['SPENT', `$${summary.spent.toLocaleString()}`],
+        ['SPENT', `$${big(summary.spent)}`],
       ];
       hero.innerHTML = tiles.map(([k, v]) => `<div class="ec-tile"><b>${v}</b><span>${k}</span></div>`).join('');
     }
