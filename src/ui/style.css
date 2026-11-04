@@ -3079,7 +3079,13 @@ body.ended .bark, body.clear-view .bark { display: none; }
      reached the band the generals talk in. */
   #survey-key { left: var(--pad-l); top: calc(var(--hud-top) + 2 * var(--rail-step)); width: 140px; }
   #prompt { max-width: min(360px, calc(100vw - 2 * 300px)); }
-  .menu-inner { width: min(620px, 94vw); }
+  /* The stars beside the buttons, not over them: on a sideways phone a panel
+     above pushed SETTINGS into the home indicator. */
+  .menu-inner { width: min(760px, 94vw); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 16px; align-items: start; }
+  .menu-inner > * { grid-column: 2; }
+  .menu-inner > .menu-title { grid-column: 1 / -1; }
+  .menu-inner > .menu-stars { grid-column: 1; grid-row: 2 / span 6; margin: 0; }
+  .menu-inner > .menu-stars[hidden] ~ * { grid-column: 1 / -1; }
   .menu-grid { grid-template-columns: repeat(3, 1fr); }
   .menu-grid.quality { grid-template-columns: repeat(4, 1fr); }
   .menu-title { font-size: 22px; margin-bottom: 10px; }
