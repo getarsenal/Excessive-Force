@@ -4,6 +4,7 @@ import { UNITS, UNITS_BY_ID, makeInfantryMesh } from '../game/units.js';
 import { DEFENDER_TYPES } from '../game/defenders.js';
 import { LEVELS, LEVEL_ORDER } from '../game/levels.js';
 import { marksFor } from './levelselect.js';
+import { parOf } from '../game/par.js';
 import { lineOfSight } from '../structure/occupancy.js';
 import { solveArc } from '../game/projectiles.js';
 import { junctionRing, padRadius, halfWidth, bearingNear } from '../world/streets.js';
@@ -3156,17 +3157,18 @@ export class TestMenu {
 
         // And the marks read it. A run exactly on par takes the mark; one
         // round over does not.
-        const lv = LEVELS[b.level.id];
+        // Against par as played (game/par.js), which is what the marks read.
+        const lv = LEVELS[b.level.id], pp = parOf(lv);
         const at = (d) => marksFor(lv, {
-          shotsFired: lv.par.rounds + d, spent: lv.par.spend + d,
-          time: lv.par.minutes * 60 + d,
+          shotsFired: pp.rounds + d, spent: pp.spend + d,
+          time: pp.minutes * 60 + d,
           // Leverage is the one mark where over par is *under* the number.
-          leverage: lv.par.leverage - d,
+          leverage: pp.leverage - d,
         });
         const on = at(0), over = at(1);
         assert(on.length === 4 && on.every((m) => m.won), 'a run exactly on par took no mark');
         assert(over.every((m) => !m.won), 'a run over par took a mark anyway');
-        return `${LEVEL_ORDER.length} levels; ${b.level.id} par ${lv.par.rounds} rounds`;
+        return `${LEVEL_ORDER.length} levels; ${b.level.id} par ${pp.rounds} rounds`;
       }],
 
       ['no stone is ever drawn the size of a district', () => this._calm(() => {

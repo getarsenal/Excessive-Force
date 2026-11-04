@@ -1127,6 +1127,9 @@ async function boot() {
     picker,
     qualityId: quality.id,
   });
+  // No campaign stars on a Blitz (it has its own), in the studio or on a free
+  // run, so the pause menu does not list them (hud.js `_paintMenuStars`).
+  hud.noStars = !!(blitz || studioRun || freeRun);
   hud.audio = audio;
   attachUnitTips(hud, battle);
   // The collapse, filmed for the player to share. The game holds still while
@@ -1249,7 +1252,10 @@ async function boot() {
     const fresh = unlockedArt(loadProgress()).filter((a) => !artAtStart.has(a.id));
     for (const a of fresh) artAtStart.add(a.id);
     const newArt = fresh.map((a) => ({ name: a.name, img: artDataUrl(a) }));
-    return { stars: stars ? { labels: ['WIN', 'PAR', ch.label], ...stars } : null, op: opOut, newArt, buck };
+    // The par star says how many of the four this run took, so a missed one
+    // reads as "one short", with the four marks right under it.
+    const onPar = stars?.marks ?? null;
+    return { stars: stars ? { labels: ['WIN', onPar != null ? `PAR \u00b7 ${onPar} OF 4` : 'PAR', ch.label], ...stars } : null, op: opOut, newArt, buck };
   };
   // The win is written to the campaign once, whichever report shows it.
   let winRecorded = false;

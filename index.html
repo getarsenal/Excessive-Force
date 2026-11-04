@@ -235,6 +235,8 @@
     <div id="menu" hidden>
       <div class="menu-inner">
         <div class="menu-title">PAUSED</div>
+        <!-- The three stars and where this battle stands on each, filled when the menu opens. -->
+        <div class="menu-stars" id="menu-stars" hidden></div>
         <div class="menu-grid main">
           <button id="menu-resume">RESUME</button>
           <button id="menu-restart">RESTART</button>
@@ -320,14 +322,17 @@
           <!-- The three stars this battle can be closed with, and where it
                sits in its operation. -->
           <div class="ec-stars" id="ec-stars" hidden></div>
+          <!-- The four par marks, under the stars they decide: any two is
+               the second star. They were folded into the battle report, and
+               a run that missed the star never said why. -->
+          <div class="ec-marks" id="ec-marks" hidden></div>
           <div class="ec-buck" id="ec-buck" hidden></div>
           <div class="ec-op" id="ec-op" hidden></div>
           <!-- The pay: the rank bar and the total. The lines it is made of
                fold away below. -->
           <div class="ec-xp" id="ec-xp" hidden></div>
           <div class="ec-hero" id="ec-hero"></div>
-          <!-- The three marks. A contract is closed or it is not; these are how
-               well, and they are the reason to run one twice. -->
+          <!-- What the win bought. -->
           <div class="ec-badges">
             <div class="ec-release" id="ec-release" hidden></div>
             <div class="ec-art" id="ec-art" hidden></div>
@@ -345,7 +350,7 @@
             </details>
             <details class="ec-fold" id="ec-fold-report">
               <summary><span>BATTLE REPORT</span><b id="ec-fold-report-sum"></b></summary>
-              <div class="ec-fold-body"><div class="ec-marks" id="ec-marks" hidden></div><div class="ec-stats" id="ec-stats"></div></div>
+              <div class="ec-fold-body"><div class="ec-stats" id="ec-stats"></div></div>
             </details>
             <details class="ec-fold" id="ec-fold-bill" hidden>
               <summary><span>INSURANCE CLAIM</span><b id="ec-fold-bill-sum"></b></summary>

@@ -1,5 +1,6 @@
 import { CAST, DEFENDER_OF } from './cast.js';
 import { UNITS_BY_ID } from './units.js';
+import { parOf, shortMoney } from './par.js';
 
 /**
  * The campaign, as a campaign.
@@ -149,6 +150,28 @@ const CHALLENGES = {
 };
 const ROTA = ['clean', 'noair', 'hq', 'quick', 'sams', 'leverage', 'budget'];
 
+/**
+ * The clock and the budget challenges sized to the level. Six minutes and
+ * fourteen thousand dollars were one figure for every map, from a pillbox to
+ * the Potala: the clock is the measured floor's own minutes (the tight
+ * figure par used to ask, under par's own clock), the budget half of par's.
+ */
+function sized(key, level) {
+  const par = parOf(level);
+  if (!par) return {};
+  if (key === 'quick') {
+    const m = Math.max(4, par.base.minutes);
+    return { label: `UNDER ${m} MINUTES`, say: `${m} minutes. I have a tee time.`,
+      test: (s) => s.time > 0 && s.time <= m * 60 };
+  }
+  if (key === 'budget') {
+    const cap = Math.max(5000, Math.round(par.spend / 2 / 1000) * 1000);
+    return { label: `SPEND UNDER ${shortMoney(cap).toUpperCase()}`, say: `Under ${shortMoney(cap)}. Congress is watching. Mostly.`,
+      test: (s) => (s.spent || 0) <= cap };
+  }
+  return {};
+}
+
 export function challengeOf(id, level) {
   if (isBoss(id)) return { key: 'clean', ...CHALLENGES.clean };
   const at = Math.max(0, CAMPAIGN_ORDER.indexOf(id));
@@ -156,7 +179,7 @@ export function challengeOf(id, level) {
   for (let k = 0; k < ROTA.length; k++) {
     const key = ROTA[(seed + k) % ROTA.length];
     const c = CHALLENGES[key];
-    if (!c.needs || !level || c.needs(level)) return { key, ...c };
+    if (!c.needs || !level || c.needs(level)) return { key, ...c, ...sized(key, level) };
   }
   return { key: 'clean', ...CHALLENGES.clean };
 }
@@ -202,6 +225,8 @@ export function recordStars(id, won, summary, level, marks) {
     run: bits.map((b) => !!(got & b)),
     fresh: bits.map((b) => !!(got & b) && !(had & b)),
     have: bits.map((b) => !!((had | got) & b)),
+    // How many of the four par marks this run took, for the card to say.
+    marks: (marks || []).filter((m) => m.won).length,
   };
 }
 

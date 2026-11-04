@@ -5,6 +5,9 @@ import { power } from '../core/power.js';
 import { UNITS, UNITS_BY_ID, STRIKES, isLoiter } from '../game/units.js';
 import { access } from '../core/access.js';
 import { damageBill, money } from './bill.js';
+import { marksFor } from './levelselect.js';
+import { challengeOf, starsOf } from '../game/operations.js';
+import { shortMoney } from '../game/par.js';
 import { unitIcon } from './icons.js';
 import { renderXp } from './promotion.js';
 import { introsEnabled, setIntrosEnabled } from './standoff.js';
@@ -406,10 +409,50 @@ export class HUD {
     if (this.el.smokeBtn) this.el.smokeBtn.addEventListener('click', () => this.onSmoke());
   }
 
+  /**
+   * The stars, in the pause menu: what each asks and where this battle stands
+   * on it, live. Nowhere on the battle screen itself (the screen is for the
+   * fight), but one tap away all the time, and the same three the end card
+   * scores: the win, any two of the four par marks, the challenge.
+   */
+  _paintMenuStars() {
+    const el = document.getElementById('menu-stars');
+    const b = this.battle, lv = b?.level;
+    if (!el) return;
+    el.hidden = !lv || lv.sandbox || lv.id === 'tutorial' || !!this.noStars;
+    if (el.hidden) return;
+    const s = b.summary();
+    const held = starsOf(lv.id);
+    const ch = challengeOf(lv.id, lv);
+    const marks = marksFor(lv, s);
+    // Money short ($40k): a quarter of the menu is five or six characters.
+    const fmt = (m, v) => (m.unit === '$' ? shortMoney(v)
+      : m.unit === 's' ? `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`
+        : m.unit === 'x' ? `${v}\u00d7` : Number(v).toLocaleString());
+    // Rounds, budget and the clock only ever go up: over par is gone for this
+    // run. Leverage can come back.
+    const state = (m) => (m.won ? 'ok' : m.high ? 'short' : 'gone');
+    const onPar = marks.filter((m) => m.won).length;
+    const pct = Math.round(Math.min(1, (b.objectiveProgress || 0) / 0.9) * 100);
+    const chNow = ch.test(s);
+    // A challenge that is kept (no guns lost, no strikes, the clock, the
+    // budget) is held until it is broken; one that is done (the SAMs, the
+    // command post) is not there until it is done.
+    const keeps = ['clean', 'noair', 'quick', 'budget'].includes(ch.key);
+    const chWord = chNow ? (keeps ? 'ON TRACK' : 'DONE') : (keeps ? 'MISSED' : 'NOT YET');
+    const star = (i) => `<i class="ms-star${held[i] ? ' held' : ''}">\u2605</i>`;
+    el.innerHTML = `
+      <div class="ms-row">${star(0)}<b>WIN</b><span>Bring it down</span><em class="${pct >= 100 ? 'ok' : ''}">${pct}%</em></div>
+      <div class="ms-row">${star(1)}<b>PAR</b><span>Any two of the four</span><em class="${onPar >= 2 ? 'ok' : ''}">${onPar} of 4</em></div>
+      <div class="ms-marks">${marks.map((m) => `<div class="ms-mark ${state(m)}"><span>${m.label}</span><b>${fmt(m, m.got)}</b><em>${m.high ? '\u2265' : '\u2264'} ${fmt(m, m.par)}</em></div>`).join('')}</div>
+      <div class="ms-row">${star(2)}<b>CHALLENGE</b><span>${ch.label}</span><em class="${chNow ? 'ok' : keeps ? 'gone' : ''}">${chWord}</em></div>`;
+  }
+
   _setupMenu() {
     const btn = this.el.menuBtn, menu = this.el.menu;
     if (!btn || !menu) return;
     const open = (on) => {
+      if (on) this._paintMenuStars();
       menu.hidden = !on;
       this.onPause(on);
     };
@@ -1417,7 +1460,7 @@ export class HUD {
         return `<div class="ec-mark${m.won ? ' won' : ''}${m.best ? ' best' : ''}">`
           + `<span class="em-label">${m.label}</span>`
           + `<b class="em-got">${fmt(m.got)}</b>`
-          + `<span class="em-par">par ${m.high ? '\u2265' : ''}${fmt(m.par)}</span>`
+          + `<span class="em-par">par ${m.high ? '\u2265' : '\u2264'} ${fmt(m.par)}</span>`
           + `${m.best ? '<span class="em-best">BEST</span>' : ''}</div>`;
       }).join('');
     }

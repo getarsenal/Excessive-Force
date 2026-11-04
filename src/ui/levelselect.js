@@ -1,6 +1,7 @@
 import { LEVELS, DEFAULT_LEVEL, LEVEL_BLURB, levelList } from '../game/levels.js';
 import { suppressNextOpening } from './opening.js';
 import { noteRival } from '../game/rivals.js';
+import { parOf } from '../game/par.js';
 
 /**
  * The challenge a shared link carried in (`?level=…&c=rounds`), for this page
@@ -90,7 +91,8 @@ export function recordResult(levelId, won, summary) {
  * gravel from the top down.
  */
 export function marksFor(level, summary) {
-  const par = level?.par;
+  // Par as the game is played now (game/par.js), not the one perfect gun.
+  const par = parOf(level);
   if (!par || !summary) return [];
   return [
     { id: 'rounds', label: 'ROUNDS', par: par.rounds, got: summary.shotsFired,

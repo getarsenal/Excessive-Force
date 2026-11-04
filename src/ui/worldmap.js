@@ -1,4 +1,5 @@
 import { LEVELS } from '../game/levels.js';
+import { parOf } from '../game/par.js';
 import { loadProgress } from './levelselect.js';
 import {
   campaignState, objectivesFor, freeDeploy, setFreeDeploy, pendingBurn, markBurnSeen,
@@ -26,15 +27,15 @@ import { playHistory, showSessionCard } from './playmonitor.js';
  * sums that light them cannot drift apart.
  */
 const PAR_MARKS = [
-  { k: 'R', name: 'ROUNDS', what: 'Bring it down firing no more shells than par.',
+  { k: 'R', name: 'ROUNDS', what: 'Shells, rockets and bursts fired, all guns together.',
     best: (r) => r.bestShots ?? null, par: (p) => p.rounds, beat: (v, p) => v <= p.rounds, fmt: (v) => `${v}` },
-  { k: '$', name: 'BUDGET', what: 'Spend no more than par on guns and strikes.',
+  { k: '$', name: 'BUDGET', what: 'Money spent on guns and air strikes.',
     best: (r) => r.bestSpent ?? null, par: (p) => `$${p.spend.toLocaleString()}`, beat: (v, p) => v <= p.spend,
     fmt: (v) => `$${Math.round(v).toLocaleString()}` },
-  { k: 'T', name: 'CLOCK', what: 'Bring it down inside par time.',
+  { k: 'T', name: 'CLOCK', what: 'Time from the start to the win.',
     best: (r) => r.bestTime ?? null, par: (p) => `${p.minutes}:00`, beat: (v, p) => v <= p.minutes * 60,
     fmt: (v) => `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}` },
-  { k: 'L', name: 'LEVERAGE', what: 'Stone that fell for every stone you shot out. Find the load path.',
+  { k: 'L', name: 'LEVERAGE', what: 'Stone that fell for every tonne you shot. Hit what holds it up.',
     best: (r) => r.bestLeverage ?? null, par: (p) => `${p.leverage}\u00d7`, beat: (v, p) => v >= p.leverage,
     fmt: (v) => `${Math.round(v * 10) / 10}\u00d7` },
 ];
@@ -593,7 +594,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
     // Rounds and money beside the clock, and the par beside each of them.
     // A record that only says a contract was closed cannot tell a player they
     // have got better at it, which is the only reason to open one twice.
-    const par = lv.par;
+    const par = parOf(lv);
     // The four par marks, spelled out: the same four letters the contract
     // list lights, what each one asks, the par, and the best this player has
     // done. Shown before the first attempt as well, so the target is known
@@ -604,16 +605,10 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       return `<div class="wm-mark${beat ? ' beat' : ''}">
         <i class="wm-mark-k">${m.k}</i>
         <div class="wm-mark-body"><b>${m.name}</b><span>${m.what}</span></div>
-        <div class="wm-mark-fig"><em>par ${par ? m.par(par) : '—'}</em><b>${best != null ? m.fmt(best) : '—'}</b></div>
+        <div class="wm-mark-fig"><em>par ${m.k === 'L' ? '\u2265 ' : '\u2264 '}${par ? m.par(par) : '—'}</em><b>${best != null ? `best ${m.fmt(best)}` : '—'}</b></div>
       </div>`;
     }).join('');
-    void markRows;
-    // One line: the four pars, lit where this player has beaten them.
-    const record = `<div class="wm-parline">${PAR_MARKS.map((m) => {
-      const best = m.best(rec);
-      const beat = !!par && best != null && m.beat(best, par);
-      return `<span class="${beat ? 'beat' : ''}"><i>${m.k}</i>${par ? m.par(par) : '\u2014'}</span>`;
-    }).join('')}</div>`;
+
     const status = t.down ? 'closed' : (t.open ? 'active' : 'sealed');
     const stamp = t.down ? 'CLOSED' : (t.open ? 'ACTIVE' : 'SEALED');
     const cmdr = CAST[DEFENDER_OF[t.id]];
@@ -634,16 +629,9 @@ export async function showWorldMap({ current = null, canResume = false, view: st
             ${isBoss(t.id) ? `<div class="wm-boss">\u2620 BOSS \u00b7 ${warlordOf(t.id).rank} ${warlordOf(t.id).name} \u00b7 bring it down and destroy his bunker</div>` : ''}
             <p class="wm-doss-hint">${hintFor(lv)}</p>
             <details class="wm-more"><summary>BRIEFING</summary><p class="wm-doss-brief">${t.brief}</p></details>
-            <div class="wm-doss-cols">
-              <div>
-                <div class="wm-k">Stars</div>
-                <ul class="wm-doss-obj">${objectives}</ul>
-              </div>
-              <div>
-                <div class="wm-k">Par marks</div>
-                ${record}
-              </div>
-            </div>
+            <div class="wm-k">Stars</div>
+            <ul class="wm-doss-obj">${objectives}</ul>
+            ${par ? `<div class="wm-k">Par \u00b7 any two of the four</div><div class="wm-marks">${markRows}</div>` : ''}
             ${t.unlockLine ? `<div class="wm-release">${unlockIcon}<div><div class="wm-k">Win it for</div><div class="wm-rel-line">${t.unlockLine}</div>${unlockName ? `<div class="wm-rel-sub">${unlockName}</div>` : ''}</div></div>` : ''}
 
           </div>
@@ -832,7 +820,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       const rec = progress[t.id] || {};
       // The four par marks, as four letters: rounds, spend, time, leverage.
       // A closed contract that only said DOWN gave no reason to open it twice.
-      const par = (LEVELS[t.id] || {}).par;
+      const par = parOf(LEVELS[t.id]);
       const marks = t.down && par ? `<span class="ef-par">` + PAR_MARKS.map((m) => {
         const best = m.best(rec);
         const hit = best != null && m.beat(best, par);

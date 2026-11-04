@@ -2768,7 +2768,7 @@ body.clear-view #lensdirt { display: none; }
 .ec-tile span { font: 600 9px/1 var(--f-data); letter-spacing: 0.2em; color: var(--dim); }
 
 /* The marks, one row of three however narrow. */
-#endcard .ec-marks { margin: 10px 0 0; gap: 8px; flex-wrap: nowrap; }
+#endcard .ec-marks { margin: 4px 0 12px; gap: 8px; flex-wrap: nowrap; }
 #endcard .ec-mark { flex: 1 1 0; min-width: 0; padding: 8px 8px 7px; text-align: center; align-items: center; }
 #endcard .ec-mark .em-got { font-size: 15px; }
 #endcard .ec-mark .em-label { font-size: 8.5px; letter-spacing: 0.14em; }
@@ -3310,3 +3310,31 @@ body.lean .unit-card.selected { animation-timing-function: steps(13); }
 body.lean #tgp .tgp-box { animation-timing-function: steps(16); }
 body.lean #newsflash .nf-tick span { animation-timing-function: steps(440); }
 body.lean #studio .st-row button.st-rec.on { animation-timing-function: steps(14); }
+
+/* The four par marks on the dossier, in full: what each asks, the par, the
+   player's best. */
+.wm-marks { display: grid; gap: 6px; margin-top: 6px; }
+
+/* The stars in the pause menu (hud.js `_paintMenuStars`): three rows, the par
+   row's four marks under it, each with this battle's figure and its par.
+   Green on track, red gone for this run, the star gold where it is held. */
+.menu-stars { margin: -6px 0 16px; padding: 10px 12px; border: 1px solid #23303d; background: rgba(8, 13, 20, 0.72); text-align: left; display: grid; gap: 7px; }
+.menu-stars[hidden] { display: none; }
+.ms-row { display: grid; grid-template-columns: 18px auto 1fr auto; gap: 8px; align-items: baseline; font: 600 12px/1.2 var(--f-data); }
+.ms-row b { letter-spacing: 0.16em; color: #e8eef6; }
+.ms-row span { color: #9aa7b4; letter-spacing: 0.04em; min-width: 0; }
+.ms-row em { font-style: normal; color: #9aa7b4; letter-spacing: 0.1em; white-space: nowrap; }
+.ms-row em.ok { color: #6fd08c; }
+.ms-row em.gone { color: #e0685a; }
+.ms-star { font-style: normal; color: rgba(150, 168, 190, 0.45); }
+.ms-star.held { color: #ffc53d; }
+.ms-marks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: -2px 0 2px 26px; }
+.ms-mark { display: flex; flex-direction: column; gap: 2px; padding: 5px 4px; border: 1px solid #23303d; text-align: center; min-width: 0; }
+.ms-mark span { font: 600 10px/1 var(--f-data); letter-spacing: 0.12em; color: #8a98a6; }
+.ms-mark b { font: 700 13px/1.1 var(--f-data); color: #e8eef6; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-mark em { font: 600 10px/1 var(--f-data); font-style: normal; color: #8a98a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-mark.ok { border-color: rgba(111, 208, 140, 0.6); }
+.ms-mark.ok b { color: #6fd08c; }
+.ms-mark.gone { border-color: rgba(224, 104, 90, 0.55); }
+.ms-mark.gone b { color: #e0685a; }
+.wm-doss-obj + .wm-k { margin-top: 14px; }
