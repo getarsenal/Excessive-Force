@@ -721,7 +721,18 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   the shack, lets the MG at the drones, waits for the rebuild and reads
   the board.
 - `src/game/operations.js` the campaign's operations, stars, gating,
-  bosses and difficulty sawtooth · `src/game/doctrine.js` what stars buy ·
+  bosses and difficulty sawtooth · par (`src/game/par.js`, November 2026):
+  the level records keep the measured floor (one perfect gun on one face)
+  and `parOf` is what every screen and the star read, four times the
+  rounds, five times the spend, half as long again on the clock, leverage
+  as measured; the `quick` and `budget` challenges are sized to the level
+  (the floor's minutes, half of par's spend). The stars are read in three
+  places and none on the battle screen: the pause menu (`_paintMenuStars`,
+  hud.js: the win's progress, the four marks live, the challenge ON
+  TRACK / MISSED / DONE / NOT YET; beside the buttons on a sideways phone),
+  the end card (the four marks under the stars, PAR · n OF 4) and the
+  dossier (each mark, its par, the best); `node tools/starsshot.mjs
+  <level>` photographs all three · `src/game/doctrine.js` what stars buy ·
   `src/game/crews.js` and `src/ui/barks.js` named crews and their chatter ·
 - `src/structure/landmarks/kit.js` the landmark kit · `src/game/atlas*.js`
   the catalogue's places, specs and words ·
