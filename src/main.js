@@ -3878,6 +3878,7 @@ async function boot() {
     studio?.update(rawDt);
     const shake = engine.updateShake(rawDt, rig.distance);
     rig.update(rawDt, shake);
+    studio?.afterRig();
     layCamera(rawDt);
     placeSun();
     // The performance test (src/ui/perftest.js) measures the frame from here:

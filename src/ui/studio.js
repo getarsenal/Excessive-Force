@@ -70,7 +70,7 @@ export class Studio {
     Object.assign(this, o);
     this.active = false;
     this.speed = 1;
-    this.mode = 'free';           // free | follow
+    this.mode = 'free';           // free | follow | air
     this.armed = false;           // the next tap picks what to follow
     this.target = null;           // { kind, ref, name, point }
     this.orbitIx = 0;
@@ -87,6 +87,10 @@ export class Studio {
     this._baseFov = this.engine.camera.fov;
     this._baseHz = Math.round(1 / this.physics.fixedStep);
     this._v = new THREE.Vector3();
+    this._w = new THREE.Vector3();
+    this._last = new THREE.Vector3();   // where the followed thing was last frame
+    this._lastOk = false;
+    this._air = null;                   // the AIR camera's state (see _airCam)
     this._el();
   }
 
@@ -96,7 +100,7 @@ export class Studio {
     const $ = (id) => document.getElementById(id);
     this.el = {
       band: $('studio'), hint: $('studio-hint'),
-      follow: $('st-follow'), orbit: $('st-orbit'), dolly: $('st-dolly'),
+      follow: $('st-follow'), air: $('st-air'), orbit: $('st-orbit'), dolly: $('st-dolly'),
       lens: $('st-lens'), hud: $('st-hud'), enemy: $('st-enemy'), chase: $('st-chase'),
       snap: $('st-snap'), rec: $('st-rec'), save: $('st-save'),
       speeds: [...document.querySelectorAll('#studio [data-speed]')],
@@ -104,6 +108,7 @@ export class Studio {
     if (!this.el.band) return;
     const E = this.el;
     E.follow.addEventListener('click', () => this.followTap());
+    E.air?.addEventListener('click', () => this.airTap());
     E.orbit.addEventListener('click', () => this.orbitTap());
     E.dolly.addEventListener('click', () => this.dollyTap());
     E.lens.addEventListener('click', () => this.lensTap());
@@ -122,6 +127,7 @@ export class Studio {
       else if (k === 'BracketLeft') this.setSpeed(SPEEDS[Math.max(0, SPEEDS.indexOf(this.speed) - 1)]);
       else if (k === 'BracketRight') this.setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(this.speed) + 1)]);
       else if (k === 'KeyF') this.followTap();
+      else if (k === 'KeyG') this.airTap();
       else if (k === 'KeyO') this.orbitTap();
       else if (k === 'KeyC') this.chaseTap();
       else if (k === 'KeyB') this.dollyTap();
@@ -143,6 +149,10 @@ export class Studio {
     if (hold) hold.textContent = this.speed === 0 ? '▶' : '❚❚';
     E.follow.classList.toggle('on', this.mode === 'follow' || this.armed);
     E.follow.textContent = this.armed ? 'TAP IT' : this.mode === 'follow' ? 'FOLLOW ·' : 'FOLLOW';
+    if (E.air) {
+      E.air.classList.toggle('on', this.mode === 'air');
+      E.air.textContent = this.mode === 'air' ? 'AIR ·' : 'AIR';
+    }
     E.orbit.classList.toggle('on', this.orbitIx !== 0);
     E.orbit.textContent = ['ORBIT', 'ORBIT ·', 'ORBIT ··', 'ORBIT ·'][this.orbitIx];
     const d = this.dolly;
@@ -191,6 +201,7 @@ export class Studio {
     this.armed = false;
     this.mode = 'free';
     this.target = null;
+    this._air = null;
     this.orbitIx = 0;
     this.chaseIx = 0;
     this.dolly = { a: null, b: null, t: -1 };
@@ -252,6 +263,7 @@ export class Studio {
   // ── The camera.
 
   followTap() {
+    if (this.mode === 'air') this._leaveAir(null);
     if (this.armed) {
       // A second tap cycles through what is in the air and on the ground
       // rather than waiting for a finger on it.
@@ -512,19 +524,239 @@ export class Studio {
       if (d.t >= 1) { d.t = -1; d.a = d.b = null; R.enabled = true; this._hint('MOVE DONE'); this._paint(); }
       return;
     }
+    if (this.mode === 'air' && this.target) {
+      if (!this._alive(this.target)) this._airGone();
+      else this._airCam(dt);
+      return;
+    }
     if (this.mode === 'follow' && this.target) {
-      if (!this._alive(this.target)) {
-        this._hint(`${this.target.name} IS GONE · FREE CAMERA`);
-        this.mode = 'free'; this.target = null; this.chaseIx = 0; R.enabled = true; this._paint();
-      } else if (this.chaseIx && ['sortie', 'shell', 'missile', 'transport'].includes(this.target.kind)) {
-        this._chase(this.target, dt);
+      const t = this.target;
+      if (!this._alive(t)) {
+        this._gone(t);
+      } else if (this.chaseIx && ['sortie', 'shell', 'missile', 'transport'].includes(t.kind)) {
+        this._chase(t, dt);
       } else {
+        // A strike aircraft's work is its bomb: at the release the camera
+        // goes with the round, and holds where it lands (`_gone`). Riding on
+        // with the aircraft was the camera climbing away over the town with
+        // the strike happening a kilometre behind it. AIR stays with the
+        // aircraft.
+        if (t.kind === 'sortie') this._abortSaid(t);
+        const r = t.ref;
+        const round = t.kind === 'sortie' && r.released && !r.aborted && !r.loiter && !r.lift && !r.heli && !r.strafe ? this._roundOf(r) : null;
+        if (round) {
+          this._follow({ kind: 'shell', ref: round, name: r.def?.aircraft?.consumed ? 'THE MISSILE' : 'THE BOMB' });
+          this._hint(`${t.name} · ${r.def?.aircraft?.consumed ? 'THE MISSILE IS AWAY' : 'BOMB AWAY'} · THE CAMERA GOES WITH IT`);
+        }
         const p = this._position(this.target, this._v);
-        if (p) R.desiredTarget.copy(p);
+        if (p) { R.desiredTarget.copy(p); this._last.copy(p); this._lastOk = true; }
       }
     }
     const w = ORBIT_RATES[this.orbitIx];
     if (w) { R.desiredYaw += w * dt; R.yaw += w * dt; }
+  }
+
+  /**
+   * The followed thing has gone. A round has landed: hold on where it hit.
+   * A strike aircraft that was a round itself (the cruise missile) or let
+   * one go as it went: follow the round. Anything else: the free camera.
+   */
+  _gone(t) {
+    const R = this.rig;
+    if (t.kind === 'sortie') {
+      const round = this._roundOf(t.ref, true);
+      if (round) { this._follow({ kind: 'shell', ref: round, name: 'THE ROUND' }); return; }
+    }
+    if ((t.kind === 'shell' || t.kind === 'missile') && this._lastOk) {
+      this._follow({ kind: 'point', ref: null, name: 'WHERE IT LANDED', point: this._last.clone() });
+      this._hint(`${t.name} IS DOWN · HOLDING ON THE HIT · FOLLOW FOR THE FREE CAMERA`);
+      return;
+    }
+    this._hint(`${t.name} IS GONE · FREE CAMERA`);
+    this.mode = 'free'; this.target = null; this.chaseIx = 0; this._lastOk = false; R.enabled = true; this._paint();
+  }
+
+  /** A strike's own round in the air: the one nearest the aircraft, or any of its kind when the aircraft is gone. */
+  _roundOf(s, any = false) {
+    const list = this.battle.projectiles?.list || [];
+    const at = s.model?.position;
+    let best = null, bd = any ? Infinity : 120 * 120;
+    for (const p of list) {
+      if (p.hostile || !p.pos || p.strikeDef !== s.def) continue;
+      const d = at ? p.pos.distanceToSquared(at) : 0;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  /** Say once that the flak has driven it off, so a climb-out before the strike reads as what it is. */
+  _abortSaid(t) {
+    const r = t.ref;
+    if (t.abortSaid) return;
+    if (r.downed || r.loiter?.phase === 'down') { t.abortSaid = true; this._hint(`${t.name} IS SHOT DOWN`); return; }
+    if (r.aborted && !r.downed) { t.abortSaid = true; this._hint(`${t.name} IS HIT · ABORTING WITH ITS BOMB · KILL THE AA GUNS FIRST`); }
+    else if (r.dumping) { t.abortSaid = true; this._hint(`${t.name} IS HIT · DUMPING ITS LOAD`); }
+  }
+
+  // ── AIR: the camera on an aircraft, and nothing else.
+
+  /** Everything flying, newest of your own first, then theirs. */
+  _airborne() {
+    const B = this.battle, out = [];
+    const mine = (B.air?.sorties || []).filter((s) => s.model && !s.done);
+    for (let i = mine.length - 1; i >= 0; i--) out.push({ kind: 'sortie', ref: mine[i], name: mine[i].def?.name || 'AIRCRAFT' });
+    for (const p of B.airborne?.planes || []) if (this._pos3(p)) out.push({ kind: 'transport', ref: p, name: 'THEIR TRANSPORT' });
+    return out;
+  }
+
+  /**
+   * AIR on the band: straight onto the aircraft in the air (the one called
+   * last), and again for the next. One aircraft and already on it: off.
+   */
+  airTap() {
+    this.armed = false;
+    const list = this._airborne();
+    const on = this.mode === 'air' && this.target;
+    if (!list.length) {
+      if (on) this._leaveAir('NOTHING IN THE AIR · FREE CAMERA');
+      else this._hint('NOTHING IN THE AIR · CALL A STRIKE OR THE LIFT, THEN AIR');
+      this._paint();
+      return;
+    }
+    const i = on ? list.findIndex((c) => c.ref === this.target.ref) : -1;
+    if (on && list.length === 1 && i === 0) { this._leaveAir('FREE CAMERA'); this._tick(); return; }
+    this._enterAir(list[(i + 1) % list.length]);
+  }
+
+  _enterAir(c) {
+    this.target = c;
+    this.mode = 'air';
+    this.chaseIx = 0;
+    this.orbitIx = 0;
+    this.dolly.t = -1;
+    this.rig.enabled = false;
+    const m = c.ref?.model || c.ref?.grp || c.ref?.g || c.ref?.mesh;
+    let size = 12;
+    if (m) { const b = new THREE.Box3().setFromObject(m), v = b.getSize(this._w); if (isFinite(v.x)) size = Math.min(45, Math.max(6, Math.max(v.x, v.z) / 2)); }
+    this._air = { size, cam: null, off: null, look: null, lookOff: null, head: null, lastP: null, side: 0, phase: 'chase', t: 0, catch: 1, struck: false };
+    this._hint(`ON ${c.name} · AIR AGAIN FOR THE NEXT · FOLLOW TO LEAVE IT`);
+    this._tick();
+    this._paint();
+  }
+
+  /** Off the aircraft, the free camera on the ground under where it was looking. */
+  _leaveAir(msg) {
+    const R = this.rig, A = this._air, t = this.target;
+    this.mode = 'free'; this.target = null; this._air = null; R.enabled = true;
+    const aim = t?.ref?.target;
+    const at = aim || (A?.look ? A.look.clone() : null);
+    if (at) {
+      const g = R.groundHeight(at.x, at.z);
+      R.desiredTarget.set(at.x, Math.min(at.y, g + 40), at.z);
+      R.desiredDistance = Math.min(Math.max(R.distance, 120), 420);
+      R.desiredPitch = Math.max(0.35, R.pitch);
+    }
+    if (msg) this._hint(msg);
+    this._paint();
+  }
+
+  /** The aircraft has gone: onto the next one in the air, or back to the ground. */
+  _airGone() {
+    const name = this.target.name;
+    const next = this._airborne().filter((c) => c.ref !== this.target.ref);
+    if (next.length) { this._enterAir(next[0]); this._hint(`${name} IS GONE · ON ${next[0].name}`); return; }
+    this._leaveAir(`${name} IS GONE · FREE CAMERA`);
+  }
+
+  /**
+   * The AIR camera. Behind the aircraft and a little above and to one side,
+   * the offset carried with it (so a 230 m/s jet does not drag the camera
+   * out behind it), looking ahead along its line: on a strike run at a point
+   * between the aircraft and the aim, so both are in the frame. As it goes
+   * over the aim the camera lets it go: it stops where it is, turns onto the
+   * impact until the round has landed, then onto the aircraft climbing out,
+   * and catches it up again.
+   */
+  _airCam(dt) {
+    const A = this._air, t = this.target, r = t.ref;
+    const p = this._position(t, this._v);
+    if (!p) return;
+    this._abortSaid(t);
+    const P = p.clone();
+    // Its heading: the way it is moving, or the way it points while held.
+    if (!A.lastP) A.lastP = P.clone();
+    const mx = P.x - A.lastP.x, mz = P.z - A.lastP.z;
+    A.lastP.copy(P);
+    let hx, hz;
+    if (Math.hypot(mx, mz) > 0.02) { hx = mx; hz = mz; }
+    else if (r.dir) { hx = r.dir.x; hz = r.dir.z; }
+    else { const m = r.model || r.grp; const y = m ? m.rotation.y : 0; hx = Math.sin(y); hz = Math.cos(y); }
+    const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
+    if (!A.head) A.head = new THREE.Vector3(hx, 0, hz);
+    else { const k = 1 - Math.exp(-dt * 2.5); A.head.x += (hx - A.head.x) * k; A.head.z += (hz - A.head.z) * k; A.head.normalize(); }
+    const H = A.head, sx = -H.z, sz = H.x;
+    const cam = this.engine.camera;
+    if (!A.side) A.side = ((cam.position.x - P.x) * sx + (cam.position.z - P.z) * sz) >= 0 ? 1 : -1;
+    const back = 22 + A.size * 3.4, up = back * 0.3, side = back * 0.2 * A.side;
+    const offD = new THREE.Vector3(-H.x * back + sx * side, up, -H.z * back + sz * side);
+    // On a strike run: where it is going.
+    const striker = !r.loiter && !r.lift && !r.heli && !r.aborted && !r.downed && t.kind === 'sortie' && r.target;
+    const aim = striker && !A.struck ? r.target : null;
+    const ahead = new THREE.Vector3(P.x + H.x * back * 0.9, P.y - up * 0.4, P.z + H.z * back * 0.9);
+    let lookD = ahead;
+    if (aim) lookD = ahead.clone().lerp(aim, 0.55);
+    else if (r.loiter && r.target) lookD = ahead.clone().lerp(r.target, 0.35);
+    const k = 1 - Math.exp(-dt * 4);
+    if (!A.off) { A.off = offD.clone(); A.cam = P.clone().add(A.off); A.look = lookD.clone(); A.lookOff = lookD.clone().sub(P); }
+    A.t += dt;
+    if (A.phase === 'chase') {
+      // Over the aim with the round gone: let it go and turn to the strike.
+      if (aim && r.released && ((aim.x - P.x) * H.x + (aim.z - P.z) * H.z) < back * 0.3) {
+        A.phase = 'hold'; A.t = 0; A.landed = -1;
+        this._hint(`${t.name} OVER THE TARGET · WATCHING THE HIT`);
+      } else {
+        A.off.lerp(offD, k);
+        A.lookOff.lerp(lookD.clone().sub(P), k);
+        const want = P.clone().add(A.off);
+        // Catching up after a hold: from where the camera stood to the chase.
+        if (A.catch < 1) { A.catch = Math.min(1, A.catch + dt / 2.2); A.cam.lerp(want, ease(A.catch)); }
+        else A.cam.copy(want);
+        A.look.copy(P).add(A.lookOff);
+      }
+    }
+    if (A.phase === 'hold') {
+      A.look.lerp(r.target, 1 - Math.exp(-dt * 5));
+      const inAir = !!this._roundOf(r, true);
+      if (!inAir && A.landed < 0) A.landed = A.t;
+      if ((A.landed >= 0 && A.t - A.landed > 2.2) || A.t > 9) { A.phase = 'watch'; A.t = 0; A.struck = true; }
+    } else if (A.phase === 'watch') {
+      // The camera stands; the eye follows the aircraft away.
+      A.look.lerp(P, 1 - Math.exp(-dt * 6));
+      if (A.t > 1.8) {
+        A.phase = 'chase'; A.catch = 0;
+        A.lookOff = A.look.clone().sub(P);
+      }
+    }
+    // Never under the ground.
+    const g = this.rig.groundHeight(A.cam.x, A.cam.z);
+    if (A.cam.y < g + 8) A.cam.y = g + 8;
+    // The rig is told the same pose, so leaving AIR is a smooth hand-back;
+    // the camera itself is placed after the rig (`afterRig`), since the rig
+    // will not put a camera below the point it looks at.
+    const R = this.rig, d = A.cam.distanceTo(A.look) || 1;
+    R.target.copy(A.look); R.desiredTarget.copy(A.look);
+    R.distance = R.desiredDistance = d;
+    R.yaw = R.desiredYaw = Math.atan2(A.cam.x - A.look.x, A.cam.z - A.look.z);
+    R.pitch = R.desiredPitch = Math.max(R.orbitFloor, Math.asin(Math.max(-1, Math.min(1, (A.cam.y - A.look.y) / d))));
+  }
+
+  /** After the rig has placed the camera: AIR puts it exactly where it wants it. */
+  afterRig() {
+    if (!this.active || this.mode !== 'air' || !this._air?.cam) return;
+    if (document.body.classList.contains('laying')) return;
+    const cam = this.engine.camera;
+    cam.position.copy(this._air.cam);
+    cam.lookAt(this._air.look);
   }
 
   // ── The still and the clip.

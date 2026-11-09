@@ -969,8 +969,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   call a strike, all as in play, and STUDIO again closes it. Chips
   forty-four points a side: FOLLOW (a tap on a gun, an aircraft, a shell, the lift or the
   building; a gun with its card open needs no tap; a second tap cycles
-  through what is in the air and on the ground; a thing that dies hands
-  the camera back), ORBIT (slow, brisk, the other way), SET A / SET B /
+  through what is in the air and on the ground; a strike jet followed
+  hands the camera to its bomb at the release and the camera holds where
+  it lands, rather than riding the aircraft up and away from the hit; a
+  thing that dies hands the camera back), AIR (the camera on the aircraft
+  itself, the one called last, again for the next: behind it with the
+  offset carried along, looking between it and the aim; over the aim it
+  lets go, turns onto the impact until the round has landed, watches the
+  aircraft climb out and catches it up; it says when flak drives one off
+  with its bomb, which is the climb-out before the strike; placed after
+  the rig, `afterRig`; `node tools/followprobe.mjs` reads the flight
+  with and without it), ORBIT (slow, brisk, the other way), SET A / SET B /
   PLAY A→B (a move over eight seconds with the rig held), LENS
   (72/52/30/16°), HUD (the clear view, for the phone's own screen
   recorder; the band stays), the clock (▶/❚❚ a toggle, ¼, ½, 1, 2, 4,
