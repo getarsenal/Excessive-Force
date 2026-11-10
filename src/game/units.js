@@ -480,7 +480,7 @@ export const UNITS = [
     // `frac` is only for the card's bar.
     model: 'aircraft',
     strike: { strafe: true, frac: 0.03, minLen: 150, maxLen: 320, defaultLen: 240,
-      napalm: { cans: 4, roll: 72, width: 26, burn: 34, flame: 9, dps: 70, melt: 1 } },
+      napalm: { cans: 4, roll: 72, width: 26, burn: 34, flame: 12, dps: 70, melt: 1 } },
     aircraft: { kind: 'phantom', speed: 200, height: 60, clearance: 38, runIn: 2300 },
     range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
     projectile: { kind: 'bomb', speed: 200, gravity: 9.81, drag: 0.08, trail: 0 },

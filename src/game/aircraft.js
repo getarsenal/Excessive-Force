@@ -629,7 +629,8 @@ export class AirWing {
       pullUpAt: (startBack + len) / v + 0.6,
       climb: 0, roar: 0, life: 0,
       flak: opts.flak || 0,
-      hp: AIRFRAME.jet * 1.3, hits: 0, jink: 0, jinkAt: Math.random() * Math.PI * 2,
+      // Built to go in low through the flak, as the Warthog is.
+      hp: AIRFRAME.jet * 2.0, hits: 0, jink: 0, jinkAt: Math.random() * Math.PI * 2,
       napalm: { from, to, drops, n },
     };
     this.sorties.push(s);
@@ -640,7 +641,9 @@ export class AirWing {
   _napalmDrops(s) {
     const m = s.model, def = s.def, p = def.projectile;
     for (const d of s.napalm.drops) {
-      if (d.done || s.t < d.t) continue;
+      // Hit hard enough to go home, a pilot jettisons what is left: it all
+      // comes off at once, wherever that puts it.
+      if (d.done || (s.t < d.t && !s.aborted)) continue;
       d.done = true;
       s.released = true;
       // Flak walks the canisters off their marks as it walks a bomb.
@@ -1171,7 +1174,7 @@ export class AirWing {
         this._strafeFire(s);
       }
       // Napalm: the canisters off one after another, each at its own mark.
-      if (s.napalm && !s.aborted) this._napalmDrops(s);
+      if (s.napalm) this._napalmDrops(s);
       // Driven off: the bomb stays on the rail and the aircraft goes home.
       if (s.aborted && !s.released) s.released = true;
 

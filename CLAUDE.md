@@ -604,6 +604,42 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   calls both on a line through the landmark's foot and prints bites,
   stones and men (`SHOT=1` photographs the LANCE on open ground, wide and
   close); the studio's FOLLOW takes THE BEAM.
+- `src/game/napalm.js` NAPALM (the card `napalm`, `strike.napalm`):
+  drawn like the A-10's run (`strike.strafe` is what makes the line aim;
+  `air.call` sends a `napalm` strike to `_callNapalm` first). The F-4E
+  Phantom (`src/game/airframes/phantom.js`, SEA camouflage, the racks
+  `can0..3`) comes in level at the clearance over the run and ripples four
+  finless BLU-27s, each release solved for its own drop
+  (`_napalmDrops`), the first on the start of the line, the last a roll
+  short of the end; a pilot hit hard enough to go home jettisons what is
+  left. The canisters tumble (`Projectile.tumble`) and land through
+  `_strikeImpact`, which hands a napalm round to `battle._napalmCanister`:
+  `napalm.splash` lays a burn, a capsule `roll` metres on along the run
+  and `width` across that the front rolls out over a second, burning for
+  `burn` seconds. Once a burn (`_napalmSplash`): the town along it gutted,
+  dumps, SAM and HQ blasts, cars, char marks, and an undrawn smoke screen
+  (`smokes.place(..., { draw: false })`) the garrison cannot see through.
+  Every fifth of a second (`_tick`): a man in it has no cover and burns
+  (`dps`), the men round it are suppressed; stone inside the flames heats
+  by material (`RESIST`: thatch, brushwood, timber and lattice in seconds,
+  glass and gilding, iron and steel, then brick and stone over the half
+  minute, slower when thick, the Burj's CURTAIN, RAFT and SPINE never),
+  glows toward orange (`setStoneTint`, structure.js) and goes
+  (`destroyChunk`), a budget a tick, and survivors cool to soot; at the
+  foot of a wall that undercuts it and the support solver drops what
+  stood on it. Drawn: the flames are cards stood on the ground and turned
+  to the camera about their upright, one instanced draw (normal blending:
+  added light washed to cream in daylight), the burning ground a second
+  (additive), the rolling fireball the `plume` pool going to black, the
+  column the `smoke` pool, embers; the flash a pooled light, the grade
+  warmed by `napalm.glow` (main.js); `synth.whump` and a crackle of
+  `crack`s. `node tools/napalmprobe.mjs <level> [tier]` calls it on a line
+  across the view in front of the landmark (`LINE=foot` through its foot)
+  and steps the fight: canisters, men, flak, stones melted and down, the
+  worst fill; `QUIET=1 SHOT=1` photographs it rolling and burning, wide
+  and from the open side. Westminster at low: 4 canisters, worst fill 14
+  screens; on the foot of the Palace forty-odd stones melted brought eight
+  hundred down.
 - The street plan's templates, agreed with the owner in October 2026 and
   built in `src/world/streets.js` and `realstreets.js`: a junction of five
   arms or more, or of four roads (street or wider, no lane among them)

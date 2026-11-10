@@ -90,16 +90,14 @@ function paintPhantomSkin() {
   return tex;
 }
 
-/** The fin: camouflage, the tail code and the serial. */
+/** The fin's code and serial, on a clear ground: the fin's own paint shows round them. */
 const finSkin = () => cachedSkin('phantom-fin', paintFinSkin);
 function paintFinSkin() {
   if (typeof document === 'undefined') return null;
   const c = document.createElement('canvas');
   c.width = 256; c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = hex(TAN); g.fillRect(0, 0, 256, 256);
-  g.fillStyle = hex(GREEN); g.beginPath(); g.ellipse(70, 60, 90, 50, 0.4, 0, Math.PI * 2); g.fill();
-  g.fillStyle = hex(MEDIUM); g.beginPath(); g.ellipse(200, 210, 80, 60, -0.3, 0, Math.PI * 2); g.fill();
+  g.clearRect(0, 0, 256, 256);
   g.fillStyle = '#16170f';
   g.font = 'bold 96px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('EF', 128, 104);
@@ -144,6 +142,7 @@ export function makePhantom() {
   const surf = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.72, metalness: 0.2 });
   const tan = new THREE.MeshStandardMaterial({ color: TAN, roughness: 0.72, metalness: 0.2 });
   const green = new THREE.MeshStandardMaterial({ color: GREEN, roughness: 0.72, metalness: 0.2 });
+  const medium = new THREE.MeshStandardMaterial({ color: MEDIUM, roughness: 0.72, metalness: 0.2 });
   const belly = new THREE.MeshStandardMaterial({ color: BELLY, roughness: 0.6, metalness: 0.2 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x24261f, roughness: 0.5, metalness: 0.5 });
   const metal = new THREE.MeshStandardMaterial({ color: 0x6b6a66, roughness: 0.42, metalness: 0.8 });
@@ -202,20 +201,24 @@ export function makePhantom() {
     { z: -3.0, w: 0.56, h: 0.40, y: 0.72, n: 2.8 },
     { z: -5.4, w: 0.36, h: 0.3, y: 0.62, n: 2.6 },
     { z: -6.4, w: 0.12, h: 0.1, y: 0.58, n: 2.2 },
-  ], 10), tan, 0, 0, 0));
+  ], 10), green, 0, 0, 0));
 
   // Intakes: D-shaped, beside the back seat, the splitter plate stood off
   // the body ahead of each with its holes, the dark throat inside.
   for (const s of [-1, 1]) {
+    // Faired into the body: rounded on the outside, the top a shade under
+    // the fuselage's shoulder, running back and in to nothing over the wing.
     g.add(part(loft([
-      { z: 3.5, w: 0.84, h: 1.22, n: 3.2 },
-      { z: 2.2, w: 0.92, h: 1.3, n: 3.2 },
-      { z: -0.6, w: 0.9, h: 1.24, n: 3.2 },
-      { z: -2.6, w: 0.6, h: 0.9, n: 3.0 },
-    ], 10), tan, s * 1.02, -0.1, 0));
-    g.add(part(new THREE.BoxGeometry(0.66, 1.08, 0.08), black, s * 1.08, -0.1, 3.47));
-    g.add(part(new THREE.BoxGeometry(0.05, 1.28, 1.7), green, s * 0.66, -0.08, 3.5, 0, s * 0.06, 0));
-    g.add(part(new THREE.BoxGeometry(0.9, 0.05, 0.4), belly, s * 1.02, -0.75, 3.3));
+      { z: 3.4, w: 0.74, h: 1.06, y: 0.0, n: 2.6 },
+      { z: 2.4, w: 0.86, h: 1.12, y: -0.02, n: 2.7 },
+      { z: 0.4, w: 0.84, h: 1.06, y: -0.06, n: 2.7 },
+      { z: -1.6, w: 0.6, h: 0.84, y: -0.1, n: 2.6 },
+      { z: -3.2, w: 0.2, h: 0.4, y: -0.14, n: 2.4 },
+    ], 12), medium, s * 0.92, -0.16, 0));
+    g.add(part(new THREE.BoxGeometry(0.56, 0.9, 0.06), black, s * 0.98, -0.16, 3.38));
+    // The splitter plate stood off the body ahead of the mouth.
+    g.add(part(new THREE.BoxGeometry(0.035, 1.02, 1.3), medium, s * 0.64, -0.14, 3.35, 0, s * 0.05, 0));
+    g.add(part(new THREE.BoxGeometry(0.66, 0.04, 0.3), belly, s * 0.92, -0.68, 3.2));
   }
 
   // The wing: the inner panel flat with a straight trailing edge, the outer
@@ -234,7 +237,7 @@ export function makePhantom() {
   g.add(fin);
   const codeTex = finSkin();
   if (codeTex) {
-    const codeMat = new THREE.MeshStandardMaterial({ map: codeTex, roughness: 0.75 });
+    const codeMat = new THREE.MeshStandardMaterial({ map: codeTex, roughness: 0.75, transparent: true, alphaTest: 0.4, depthWrite: false });
     for (const side of [-1, 1]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), codeMat);
       p.position.set(side * 0.1, 0.66 + 1.4, -4.3 - 2.6);

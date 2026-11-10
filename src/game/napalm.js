@@ -92,10 +92,13 @@ const FLAME_FS = /* glsl */`
     float body = (1.0 - vUv.y) * 1.3 - x * x * 1.05 + (n - 0.5) * 1.1 + (n2 - 0.5) * 0.45;
     float a = smoothstep(0.02, 0.32, body) * smoothstep(0.0, 0.06, vUv.y) * vHeat;
     if (a < 0.004) discard;
-    float hot = clamp(body * 1.35, 0.0, 1.0);
-    vec3 col = mix(vec3(0.62, 0.07, 0.01), vec3(1.0, 0.42, 0.05), smoothstep(0.08, 0.5, hot));
-    col = mix(col, vec3(1.0, 0.84, 0.46), smoothstep(0.62, 1.0, hot));
-    gl_FragColor = vec4(col * 1.45, a);
+    float hot = clamp(body * 1.25, 0.0, 1.0);
+    // Deep red and smoky at the torn tips, burning orange through the body,
+    // a yellow core low down: solid, not added light, so a sunlit street
+    // does not wash it to cream.
+    vec3 col = mix(vec3(0.34, 0.05, 0.01), vec3(0.98, 0.34, 0.03), smoothstep(0.05, 0.45, hot));
+    col = mix(col, vec3(1.0, 0.66, 0.16), smoothstep(0.55, 0.95, hot));
+    gl_FragColor = vec4(col * 1.25, a * 0.92);
   }
 `;
 // ── The ground under the flames: a flat quad of embers and running jelly.
@@ -133,7 +136,7 @@ const GROUND_FS = /* glsl */`
 `;
 
 /** An instanced quad with its own attributes, `n` long. */
-function cards(n, attrs, vs, fs, renderOrder) {
+function cards(n, attrs, vs, fs, renderOrder, blending = THREE.AdditiveBlending) {
   const base = new THREE.PlaneGeometry(1, 1);
   const g = new THREE.InstancedBufferGeometry();
   g.index = base.index;
@@ -149,7 +152,7 @@ function cards(n, attrs, vs, fs, renderOrder) {
   const mat = new THREE.ShaderMaterial({
     vertexShader: vs, fragmentShader: fs,
     uniforms: { uTime: { value: 0 }, uCam: { value: new THREE.Vector3() } },
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    transparent: true, depthWrite: false, blending, side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(g, mat);
   mesh.frustumCulled = false;
@@ -166,7 +169,7 @@ export class Napalm {
     this.low = low;
     this.burns = [];
     this.time = 0;
-    this.flames = cards(low ? 200 : 420, [['aPos', 3], ['aSize', 3], ['aHeat', 1]], FLAME_VS, FLAME_FS, 13);
+    this.flames = cards(low ? 200 : 420, [['aPos', 3], ['aSize', 3], ['aHeat', 1]], FLAME_VS, FLAME_FS, 12, THREE.NormalBlending);
     this.ground = cards(low ? 70 : 140, [['aPos', 3], ['aShape', 4], ['aHeat', 1]], GROUND_VS, GROUND_FS, 7);
     this.scene.add(this.flames.mesh, this.ground.mesh);
     this._c = {
@@ -396,29 +399,31 @@ export class Napalm {
         const y = this._yAt(b, x, z, s);
         const fwd = 14 + Math.random() * 22;
         fx.plume.spawn({
-          x, y: y + 2 + Math.random() * 4, z,
-          vx: b.dx * fwd + (Math.random() - 0.5) * 6, vy: 10 + Math.random() * 14, vz: b.dz * fwd + (Math.random() - 0.5) * 6,
-          life: 7 + Math.random() * 5,
-          size0: 7 + Math.random() * 5, size1: 22 + Math.random() * 14,
+          x, y: y + 2 + Math.random() * 5, z,
+          vx: b.dx * fwd + (Math.random() - 0.5) * 6, vy: 13 + Math.random() * 17, vz: b.dz * fwd + (Math.random() - 0.5) * 6,
+          life: 8 + Math.random() * 6,
+          size0: 9 + Math.random() * 7, size1: 30 + Math.random() * 20,
           color0: C.hot, color1: C.burn, color2: Math.random() < 0.8 ? C.black : C.grey,
           cool: 0.1 + Math.random() * 0.1,
           drag: 1.4, grav: 5 + Math.random() * 3, turb: 3, spin: (Math.random() - 0.5) * 0.5, alpha: 0.96,
         });
       }
     }
-    // The column: black, thick and rising, as long as it burns.
-    b.smokeAcc += dt * (this.low ? 2.6 : 5.5) * Math.max(0.15, I);
+    // The column: black, thick and rising, as long as it burns, and heaviest
+    // in the first ten seconds while the jelly is fresh.
+    const fresh = b.age < 10 ? 1.8 : 1;
+    b.smokeAcc += dt * (this.low ? 3.2 : 6.5) * fresh * Math.max(0.15, I);
     while (b.smokeAcc >= 1) {
       b.smokeAcc -= 1;
       const s = Math.random() * b.front;
       const x = b.a.x + b.dx * s + (Math.random() - 0.5) * 6, z = b.a.z + b.dz * s + (Math.random() - 0.5) * 6;
       fx.smoke.spawn({
-        x, y: this._yAt(b, x, z, s) + b.N.flame * 0.8, z,
-        vx: (Math.random() - 0.5) * 2 + 1.4, vy: 9 + Math.random() * 7, vz: (Math.random() - 0.5) * 2 + 0.4,
-        life: 10 + Math.random() * 6,
-        size0: 7 + Math.random() * 4, size1: 26 + Math.random() * 16,
-        color0: C.black, color1: C.black, color2: C.grey, cool: 0.25,
-        drag: 0.6, grav: 1.2, turb: 2.4, spin: (Math.random() - 0.5) * 0.4, alpha: 0.88 * Math.max(0.35, I),
+        x, y: this._yAt(b, x, z, s) + b.N.flame * 0.7, z,
+        vx: (Math.random() - 0.5) * 2 + 1.4, vy: 11 + Math.random() * 9, vz: (Math.random() - 0.5) * 2 + 0.4,
+        life: 12 + Math.random() * 7,
+        size0: 8 + Math.random() * 5, size1: 32 + Math.random() * 20,
+        color0: C.burn, color1: C.black, color2: C.black, cool: 0.06,
+        drag: 0.5, grav: 1.6, turb: 2.4, spin: (Math.random() - 0.5) * 0.4, alpha: 0.95 * Math.max(0.35, I),
       });
     }
     // Embers going up in the heat, now and then.
