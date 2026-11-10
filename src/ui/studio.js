@@ -704,7 +704,12 @@ export class Studio {
     const aim = striker && !A.struck ? r.target : null;
     const ahead = new THREE.Vector3(P.x + H.x * back * 0.9, P.y - up * 0.4, P.z + H.z * back * 0.9);
     let lookD = ahead;
-    if (aim) lookD = ahead.clone().lerp(aim, 0.55);
+    // Between the two from far out; close in, ahead of it, so the
+    // aircraft stays in the frame until it goes over.
+    if (aim) {
+      const along = (aim.x - P.x) * H.x + (aim.z - P.z) * H.z;
+      lookD = ahead.clone().lerp(aim, 0.55 * Math.min(1, Math.max(0, (along - 120) / 480)));
+    }
     else if (r.loiter && r.target) lookD = ahead.clone().lerp(r.target, 0.35);
     const k = 1 - Math.exp(-dt * 4);
     if (!A.off) { A.off = offD.clone(); A.cam = P.clone().add(A.off); A.look = lookD.clone(); A.lookOff = lookD.clone().sub(P); }
