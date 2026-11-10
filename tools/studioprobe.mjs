@@ -156,7 +156,20 @@ r = await page.evaluate(async () => {
   const p = S.target?.ref?.model?.position; const moved = R.target.distanceTo(a);
   return { moved, gap: p ? R.desiredTarget.distanceTo(p) : -1, lag: p ? R.target.distanceTo(p) : -1 };
 });
-check(r.moved > 20 && r.gap < 1, `the focus moved ${r.moved.toFixed(0)} m with it, ${r.gap.toFixed(2)} m off the aircraft (${r.lag.toFixed(0)} m behind it)`);
+check(r.moved > 20 && r.gap < 1, `the focus moved ${r.moved.toFixed(0)} m with it, ${r.gap.toFixed(2)} m off the aircraft, or on its bomb once let go (${r.lag.toFixed(0)} m behind it)`);
+// AIR: straight onto the aircraft, the camera behind it.
+await page.evaluate(() => { const B = window.battle, o = B.primary.origin, T = window.THREE; B.callStrike('f15', new T.Vector3(o.x, B.originGround, o.z)); });
+await tap(page, '#st-air');
+r = await page.evaluate(async () => {
+  const S = window.__studio; await window.__drive(3);
+  const p = S.target?.ref?.model?.position, cam = window.__engine.camera;
+  return { mode: S.mode, kind: S.target?.kind, label: document.getElementById('st-air').textContent, d: p ? cam.position.distanceTo(p) : -1, on: p ? (() => { const v = p.clone().project(cam); return Math.abs(v.x) < 1 && Math.abs(v.y) < 1 && v.z < 1; })() : false };
+});
+check(r.mode === 'air' && r.kind === 'sortie' && r.d > 10 && r.d < 200 && r.on, `AIR rides the aircraft: ${r.d.toFixed(0)} m behind it, in the frame (${JSON.stringify(r)})`);
+await tap(page, '#st-follow');   // AIR off, FOLLOW armed
+await tap(page, '#st-follow');   // cycle onto something
+r = await page.evaluate(() => ({ mode: window.__studio.mode, air: document.getElementById('st-air').textContent }));
+check(r.mode === 'follow' && r.air === 'AIR', `FOLLOW takes the camera back from AIR (${JSON.stringify(r)})`);
 // Tap to follow: a tap on the landmark.
 await tap(page, '#st-follow');  // off
 await tap(page, '#st-follow');  // armed
