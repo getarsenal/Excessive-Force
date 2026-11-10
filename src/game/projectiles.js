@@ -329,6 +329,9 @@ export class Projectile {
     // A model that is the round (a cruise missile's airframe): flown by
     // the manager along the round and released at the impact.
     this.model = opts.model || null;
+    // A finless canister goes end over end: radians a second about its own
+    // lateral axis, on top of its path.
+    this.tumble = opts.tumble || 0;
     this.pos = opts.pos.clone();
     this.vel = opts.vel.clone();
     this.gravity = opts.gravity ?? 9.81;
@@ -630,6 +633,7 @@ export class ProjectileManager {
         // The airframe is the round: carried along it, nose on its path.
         p.model.position.copy(p.pos);
         this._along(p, p.model.quaternion);
+        if (p.tumble) p.model.rotateX(p.age * p.tumble);
         continue;
       }
       if (this._isBomb(p)) {

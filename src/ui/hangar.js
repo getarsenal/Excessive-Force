@@ -29,6 +29,7 @@ import { power } from '../core/power.js';
 export const FLEET_KINDS = [
   { kind: 'warthog', name: 'A-10C', full: 'Thunderbolt II' },
   { kind: 'eagle', name: 'F-15E', full: 'Strike Eagle' },
+  { kind: 'phantom', name: 'F-4E', full: 'Phantom II · napalm' },
   { kind: 'lancer', name: 'B-1B', full: 'Lancer' },
   { kind: 'apache', name: 'AH-64E', full: 'Apache' },
   { kind: 'ghostrider', name: 'AC-130J', full: 'Ghostrider' },

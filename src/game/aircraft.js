@@ -30,7 +30,7 @@ import { flyby, crack } from '../core/synth.js';
 
 /** The pitch of the roar for each airframe: the rocket clip slowed down. */
 /** Half-spans, for the vapour off the wings. */
-const WINGSPAN = { eagle: 6.5, lancer: 12, warthog: 8.5 };
+const WINGSPAN = { eagle: 6.5, lancer: 12, warthog: 8.5, phantom: 5.9 };
 const STRIKE_RATE = { lancer: 0.42, ghostrider: 0.38, apache: 0.3, tomahawk: 0.62, warthog: 0.48 };
 
 import { part, loft, twoTone, surface, solid, mirrorX, pair, engine, cachedSkin, bakeAirframe } from './airframes/geo.js';
@@ -447,11 +447,14 @@ export function makeAirframe(def) {
     case 'ghostrider': return makeGhostrider();
     case 'tomahawk': return makeTomahawk();
     case 'warthog': return makeWarthog();
+    case 'phantom': return makePhantom();
     default: return makeEagle({ store: a.store });
   }
 }
 
 export { makeLancer } from './airframes/lancer.js';
+export { makePhantom, makeCanister } from './airframes/phantom.js';
+import { makePhantom, makeCanister } from './airframes/phantom.js';
 import { makeLancer } from './airframes/lancer.js';
 
 /**
@@ -495,6 +498,7 @@ export class AirWing {
    */
   call(def, target, ceiling, opts = {}) {
     if (def.aircraft?.station) return this._callLoiter(def, target, ceiling, opts);
+    if (def.strike?.napalm) return this._callNapalm(def, target, ceiling, opts);
     if (def.strike?.strafe) return this._callStrafe(def, target, ceiling, opts);
     const a = def.aircraft;
     const p = def.projectile;
@@ -558,6 +562,108 @@ export class AirWing {
     };
     this.sorties.push(s);
     return s;
+  }
+
+  /**
+   * Napalm down a line: the F-4.
+   *
+   * The line as the gun run takes it (a tap is the default length through
+   * the point, away from the camera). The Phantom comes in low and level
+   * along it, at the clearance over whatever stands under the run, and lets
+   * its canisters go one after another so that each lands on its own mark:
+   * the first on the start of the line, the last far enough short of the end
+   * that its jelly, thrown on forward, finishes there. A canister has no fins
+   * and falls in a flat arc on the aircraft's speed; each release point is
+   * solved for its own drop, so a line over rising ground is still laid on
+   * the ground.
+   */
+  _callNapalm(def, target, ceiling, opts = {}) {
+    const a = def.aircraft, st = def.strike, N = st.napalm, p = def.projectile;
+    let from = target.clone();
+    let to = opts.to ? opts.to.clone() : null;
+    if (!to || Math.hypot(to.x - from.x, to.z - from.z) < 12) {
+      const dx = target.x - this.camera.position.x, dz = target.z - this.camera.position.z;
+      const l = Math.hypot(dx, dz) || 1;
+      const half = st.defaultLen / 2;
+      from = target.clone().set(target.x - dx / l * half, 0, target.z - dz / l * half);
+      to = target.clone().set(target.x + dx / l * half, 0, target.z + dz / l * half);
+    }
+    const len0 = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+    const len = THREE.MathUtils.clamp(len0, st.minLen, st.maxLen);
+    const dir = new THREE.Vector3((to.x - from.x) / len0, 0, (to.z - from.z) / len0);
+    to.set(from.x + dir.x * len, 0, from.z + dir.z * len);
+    const ground = (x, z) => (this.terrain ? this.terrain.heightAt(x, z) : 0);
+    from.y = ground(from.x, from.z);
+    to.y = ground(to.x, to.z);
+    const side = new THREE.Vector3(-dir.z, 0, dir.x);
+    // Low: the clearance over the tallest thing along the run, and over the
+    // line itself.
+    const top = Math.max(from.y, to.y, this.ceilingAlong(
+      from.x - dir.x * 900, from.z - dir.z * 900, to.x + dir.x * 600, to.z + dir.z * 600));
+    const alt = Math.max(top + a.clearance, Math.max(from.y, to.y) + a.height);
+    // The marks: the first on the start of the line, the last a roll short
+    // of the end.
+    const n = N.cans;
+    const lastAt = Math.max(0, len - N.roll * 0.75);
+    const v = a.speed;
+    const startBack = a.runIn;
+    const drops = [];
+    for (let k = 0; k < n; k++) {
+      const along = n > 1 ? (k / (n - 1)) * lastAt : 0;
+      const at = new THREE.Vector3(from.x + dir.x * along, 0, from.z + dir.z * along);
+      at.y = ground(at.x, at.z);
+      const rel = solveRelease(alt - at.y, v, p.gravity, p.drag || 0);
+      drops.push({ at, t: (startBack + along - rel.distance) / v, fall: rel.time, done: false, k });
+    }
+    const model = makeAirframe(def);
+    decorate(model, def.aircraft?.kind);
+    model.rotation.order = 'YXZ';
+    model.position.set(from.x - dir.x * startBack, alt, from.z - dir.z * startBack);
+    model.rotation.y = Math.atan2(dir.x, dir.z);
+    this.scene.add(model);
+    const mid = from.clone().lerp(to, 0.5);
+    const s = {
+      def, model, dir, side, alt, target: mid,
+      speed: v, t: 0, released: false,
+      releaseAt: drops[0].t, fall: drops[0].fall,
+      pullUpAt: (startBack + len) / v + 0.6,
+      climb: 0, roar: 0, life: 0,
+      flak: opts.flak || 0,
+      hp: AIRFRAME.jet * 1.3, hits: 0, jink: 0, jinkAt: Math.random() * Math.PI * 2,
+      napalm: { from, to, drops, n },
+    };
+    this.sorties.push(s);
+    return s;
+  }
+
+  /** The ripple: each canister off its rack when the aircraft reaches its release point. */
+  _napalmDrops(s) {
+    const m = s.model, def = s.def, p = def.projectile;
+    for (const d of s.napalm.drops) {
+      if (d.done || s.t < d.t) continue;
+      d.done = true;
+      s.released = true;
+      // Flak walks the canisters off their marks as it walks a bomb.
+      const at = d.at.clone();
+      if (s.jink > 0) { at.x += Math.cos(s.jinkAt) * s.jink; at.z += Math.sin(s.jinkAt) * s.jink; }
+      const rack = m.getObjectByName(`can${d.k}`);
+      const off = rack ? rack.position : { x: 0, y: -1.2, z: 0 };
+      if (rack) rack.visible = false;
+      // The rack's place on the airframe, turned with it.
+      const c = Math.cos(m.rotation.y), sn = Math.sin(m.rotation.y);
+      const pos = new THREE.Vector3(m.position.x + off.x * c + off.z * sn, m.position.y + off.y, m.position.z - off.x * sn + off.z * c);
+      const can = makeCanister();
+      can.position.copy(pos);
+      this.scene.add(can);
+      this.projectiles.fire({
+        pos, vel: new THREE.Vector3(s.dir.x * s.speed, -1.5, s.dir.z * s.speed),
+        gravity: p.gravity, kind: 'bomb', drag: p.drag || 0, speed: s.speed,
+        warhead: def.warhead, owner: null, target: at, trail: 0,
+        strikeDef: def, sortie: s, model: can, priority: true,
+        tumble: (Math.random() < 0.5 ? -1 : 1) * (2.5 + Math.random() * 3),
+      });
+      if (this.audio) this.audio.play('rocket', m.position, { rate: 0.5, gain: 0.25, rolloff: 700 });
+    }
   }
 
   /**
@@ -1064,11 +1170,13 @@ export class AirWing {
         s.released = true;
         this._strafeFire(s);
       }
+      // Napalm: the canisters off one after another, each at its own mark.
+      if (s.napalm && !s.aborted) this._napalmDrops(s);
       // Driven off: the bomb stays on the rail and the aircraft goes home.
       if (s.aborted && !s.released) s.released = true;
 
       // Let go.
-      if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli && !s.strafe) {
+      if (!s.released && s.t >= s.releaseAt && !s.lift && !s.heli && !s.strafe && !s.napalm) {
         s.released = true;
         // Where it actually goes. The aim point walks off by what the pilot
         // has been hit with on the way in, and a pilot under fire lets go

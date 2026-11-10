@@ -33,6 +33,20 @@ export function unitTipHTML(u, battle) {
   const need = battle ? Math.round(battle.unlockAt(u) * 100) : 0;
   const sealed = battle?.isReleased && !battle.isReleased(u);
   const lockLine = sealed ? 'Released by a later contract' : `Unlocks when the bar reads ${need}%`;
+  if (u.strike?.napalm) {
+    const N = u.strike.napalm;
+    return `
+    <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>
+    <div class="ut-blurb">${u.blurb}</div>
+    ${bar('Vs stone', 0.2)}
+    ${bar('Vs men', 1)}
+    ${bar('Fire', 1)}
+    <div class="ut-foot">
+      <span>a line you draw</span><span>${N.cans} canisters</span>
+      <span>burns ${N.burn} s</span>
+    </div>
+    ${unlocked ? '' : `<div class="ut-lock">${lockLine}</div>`}`;
+  }
   if (u.strike) {
     return `
     <div class="ut-head"><b>${u.full}</b><span>$${(battle ? battle.costOf(u) : u.cost).toLocaleString()}</span></div>

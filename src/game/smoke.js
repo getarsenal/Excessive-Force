@@ -19,8 +19,9 @@ export class SmokeScreens {
     this._c2 = new THREE.Color(0xb9b4ab);
   }
 
-  place(point, radius = 24, life = 28) {
-    this.list.push({ x: point.x, y: point.y, z: point.z, r: radius, life, age: 0, acc: 0 });
+  /** `opts.draw` false: a screen something else draws (napalm's black column). */
+  place(point, radius = 24, life = 28, opts = {}) {
+    this.list.push({ x: point.x, y: point.y, z: point.z, r: radius, life, age: 0, acc: 0, draw: opts.draw !== false });
   }
 
   get active() { return this.list.length > 0; }
@@ -53,6 +54,7 @@ export class SmokeScreens {
       const s = this.list[n];
       s.age += dt;
       if (s.age >= s.life) { this.list.splice(n, 1); continue; }
+      if (!s.draw) continue;
       const d = this._density(s);
       s.acc += dt * (4 + 22 * d);
       while (s.acc >= 1) {

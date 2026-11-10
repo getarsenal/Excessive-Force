@@ -1007,7 +1007,7 @@ async function boot() {
       // what the player wants next is the map it was standing over.
       if (battle.selectedUnitId) hud.closeDrawer();
       if (!battle.selectedUnitId) hud.hidePrompt();
-      else if (UNITS_BY_ID[id].strike?.strafe) hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and draw the path the beam will walk' : 'press and drag along the line to strafe', 4);
+      else if (UNITS_BY_ID[id].strike?.strafe) hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and draw the path the beam will walk' : UNITS_BY_ID[id].strike?.napalm ? 'press and drag the line the fire will burn' : 'press and drag along the line to strafe', 4);
       else if (UNITS_BY_ID[id].strike) hud.status('drag to aim the strike', 4);
       else hud.status(`${TAP} to deploy · drag for a line`, 4);
     },
@@ -1859,6 +1859,12 @@ async function boot() {
         break;
       case 'strikehit':
         hud.feed(`${data.def.name} ON TARGET — ${data.destroyed} STONES`, 'big');
+        break;
+      case 'napalm':
+        if (data.first) hud.feed('NAPALM ON THE LINE', 'big');
+        break;
+      case 'napalmdone':
+        hud.feed(`NAPALM BURNT OUT — ${data.melted} STONES MELTED · ${data.killed} OF THE GARRISON`, '');
         break;
       case 'megablast': {
         // Eleven tonnes of it: the screen goes white, time stumbles, and the
@@ -3121,7 +3127,9 @@ async function boot() {
         aiming.to = hit.point.clone();
         battle.showStrafe(aiming.at, aiming.to, aiming.def);
         const len = Math.hypot(aiming.to.x - aiming.at.x, aiming.to.z - aiming.at.z);
-        hud.status(len < 12 ? (aiming.def.strike.beam ? 'draw the path the beam will walk' : 'drag along the line to strafe') : `${aiming.def.strike.beam ? 'BEAM' : 'GUN RUN'} · ${Math.round(Math.min(len, aiming.def.strike.maxLen))} m`, 1.2);
+        const st = aiming.def.strike;
+        hud.status(len < 12 ? (st.beam ? 'draw the path the beam will walk' : st.napalm ? 'drag the line the fire will burn' : 'drag along the line to strafe')
+          : `${st.beam ? 'BEAM' : st.napalm ? 'NAPALM' : 'GUN RUN'} · ${Math.round(THREE.MathUtils.clamp(len, st.minLen || 0, st.maxLen))} m`, 1.2);
         return;
       }
       if (aiming.kind === 'strike') {
@@ -3241,6 +3249,7 @@ async function boot() {
       const id = row[n - 1];
       if (id && battle.selectUnit(id)) {
         hud.status(UNITS_BY_ID[id].strike?.beam ? 'press and draw the path the beam will walk'
+          : UNITS_BY_ID[id].strike?.napalm ? 'press and drag the line the fire will burn'
           : UNITS_BY_ID[id].strike?.strafe ? 'press and drag along the line to strafe'
           : UNITS_BY_ID[id].strike ? `${TAP} the target to call the strike` : `${TAP} the ground to deploy`, 4);
       }
@@ -3832,7 +3841,8 @@ async function boot() {
     {
       const frac = battle.primary ? Math.max(0, Math.min(1, 1 - battle.primary.monumentIntegrity)) : 0;
       engine.scene.fog.density = hazeBase * (1 + 0.6 * frac);
-      engine.gradePass.uniforms.uWarm.value = warmBase + 0.07 * frac;
+      // Napalm burning: the whole picture warms with it while the jelly lasts.
+      engine.gradePass.uniforms.uWarm.value = warmBase + 0.07 * frac + 0.09 * Math.min(1, battle.napalm?.glow || 0);
     }
     // Milestones on the way down: a flash on the bar, a line in the feed, a
     // nudge to the camera, and the enemy general with something to say.

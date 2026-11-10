@@ -30,6 +30,8 @@ import {
 import { TracerFX } from '../fx/tracers.js';
 import { AirWing } from './aircraft.js';
 import { Orbital } from './orbital.js';
+import { Napalm } from './napalm.js';
+import { whump } from '../core/synth.js';
 import { EnemyAirborne, ASSAULT } from './reinforce.js';
 import { HQ } from './hq.js';
 import { lineOfSight } from '../structure/occupancy.js';
@@ -217,6 +219,12 @@ export class Battle {
       beam.destroyed = (beam.destroyed || 0) + this.structures.reduce((n, st) => n + st.destroyedCount, 0) - before;
     };
     this.orbital.onShake = (a) => this.engine.addShake(a);
+    // Napalm (src/game/napalm.js): the burns, the flames and the melt; the
+    // battle's side of it is the `_napalm*` hooks below.
+    this.napalm = new Napalm({
+      scene: this.scene, terrain: this.terrain, fx: this.fx, audio: this.audio,
+      camera: this.camera, quality: this.quality, battle: this,
+    });
     this.orbital.onLand = (beam) => {
       const d = this.camera.position.distanceTo(beam.foot);
       const near = Math.max(0.3, Math.min(1, 1 - (d - 120) / 600));
@@ -3863,6 +3871,7 @@ export class Battle {
     let point = hit.point;
     const w = proj.warhead;
     const st = proj.strikeDef.strike;
+    if (st.napalm) { this._napalmCanister(hit); return; }
     const down = { x: 0, y: -1, z: 0 };
     // A penetrator goes in before it goes off. It carried no such thing: the
     // GBU-28 burst on the face it touched, and on the stupa at the summit of
@@ -4003,6 +4012,72 @@ export class Battle {
     // leaves; a bomb reports itself.
     if (proj.sortie) { proj.sortie.stones = (proj.sortie.stones || 0) + destroyed; proj.sortie.kills = (proj.sortie.kills || 0) + killed; }
     else this.onEvent('strikehit', { def: proj.strikeDef, point, destroyed, radius: rMax });
+  }
+
+  // ─────────────────────────────────────────────────────────────── napalm ──
+
+  /** A canister down: the burn, the whump, the shake. */
+  _napalmCanister(hit) {
+    const { proj } = hit;
+    const v = proj.vel;
+    const dir = Math.hypot(v.x, v.z) > 1 ? { x: v.x, z: v.z } : (proj.sortie?.dir || { x: 0, z: 1 });
+    const b = this.napalm.splash(hit.point, dir, proj.strikeDef, proj.sortie || null);
+    if (proj.sortie) proj.sortie.burns = (proj.sortie.burns || 0) + 1;
+    const d = this.camera.position.distanceTo(hit.point);
+    this.engine.addShake(THREE.MathUtils.clamp(70 / Math.max(d, 30), 0.08, 0.9));
+    if (this.audio) {
+      whump(this.audio, hit.point, 1);
+      const wait = Math.min(2600, (d / 343) * 1000);
+      const body = () => {
+        this.audio.play('explosion', hit.point, { rate: 0.38, gain: 0.55, rolloff: 1600 });
+        this.audio.rumble(0.8, hit.point);
+      };
+      if (wait > 60) setTimeout(body, wait); else body();
+    }
+    if (this.life) this.life.startle(hit.point.x, hit.point.z, 500);
+    this.onEvent('napalm', { def: proj.strikeDef, point: hit.point.clone(), first: (proj.sortie?.burns || 1) === 1 });
+    return b;
+  }
+
+  /**
+   * Once a burn, as it lands: the houses along it are gutted, the dumps go
+   * up, the flak and the launchers in it burn, the cars catch, the ground is
+   * charred, and the black smoke stands between the garrison and the guns.
+   */
+  _napalmSplash(b, centre) {
+    const step = 18;
+    let gutted = 0;
+    for (let s = 0; s <= b.roll + 0.1; s += step) {
+      const p = new THREE.Vector3(b.a.x + b.dx * s, b.a.y, b.a.z + b.dz * s);
+      p.y = this.terrain.heightAt(p.x, p.z);
+      if (this.cityFire) gutted += this.cityFire.blast(p, b.hw * 0.9, b.hw * 1.4);
+      if (this.stores) this.stores.blast(p, b.hw * 1.1);
+      this._samBlast(p, b.hw * 1.1, 6000);
+      if (this.craters && Math.random() < 0.6) this.craters.add(p.x + (Math.random() - 0.5) * b.hw, p.y, p.z + (Math.random() - 0.5) * b.hw, b.hw * 0.8);
+    }
+    if (gutted >= 4) this.onEvent('collateral', { n: gutted, point: centre });
+    this._streetBlast(centre, b.hw * 1.3, false);
+    if (this.smokes) this.smokes.place(centre, Math.max(18, b.roll * 0.5), b.life * 0.9, { draw: false });
+  }
+
+  /** Men burnt: the count and the pay, as any other kill. */
+  _napalmKills(n, point) {
+    this.defendersKilled += n;
+    this.money += n * MONEY_PER_DEFENDER;
+    this.onEvent('bounty', { point: point.clone(), amount: n * MONEY_PER_DEFENDER, kind: 'kill' });
+  }
+
+  /** A burn out. When the last of a sortie's is, the run reports itself. */
+  _napalmDone(b) {
+    const s = b.sortie;
+    if (!s) { this.onEvent('napalmdone', { def: b.def, melted: b.melted, killed: b.killed }); return; }
+    s.melted = (s.melted || 0) + b.melted;
+    s.burnKills = (s.burnKills || 0) + b.killed;
+    s.burnsOut = (s.burnsOut || 0) + 1;
+    const dropped = s.napalm ? s.napalm.drops.filter((d) => d.done).length : s.burns;
+    if (s.burnsOut >= (s.burns || 0) && s.burnsOut >= dropped) {
+      this.onEvent('napalmdone', { def: b.def, melted: s.melted, killed: s.burnKills });
+    }
   }
 
   _onImpact(hit) {
@@ -4266,7 +4341,7 @@ export class Battle {
     if (!this.audio || !this.projectiles) return;
     const now = this.elapsed;
     for (const p of this.projectiles.list) {
-      if (p._whistle || !p.strikeDef || p.kind !== 'bomb' || p.vel.y > -12) continue;
+      if (p._whistle || !p.strikeDef || p.strikeDef.strike?.napalm || p.kind !== 'bomb' || p.vel.y > -12) continue;
       const floor = p.target ? p.target.y : this.terrain.heightAt(p.pos.x, p.pos.z);
       const h = p.pos.y - floor;
       const v = -p.vel.y, g = p.drag > 0.08 ? 0 : (p.gravity ?? 9.81);
@@ -4294,6 +4369,7 @@ export class Battle {
       // rather than freezing in mid-air the moment the bar filled.
       this.air.update(dt);
       this.orbital.update(dt);
+      this.napalm.update(dt);
       if (this.sams) this.sams.update(dt, this.elapsed);
       if (this.hq) this.hq.update(dt);
       if (this.hv) this.hv.update(dt);
@@ -4332,6 +4408,7 @@ export class Battle {
     this._whistles();
     this.air.update(dt);
     this.orbital.update(dt);
+    this.napalm.update(dt);
     if (this.sams) this.sams.update(dt, this.elapsed);
     if (this.hq) this.hq.update(dt);
     if (this.hv) this.hv.update(dt);

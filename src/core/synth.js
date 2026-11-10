@@ -393,3 +393,39 @@ export function lasgun(audio, pos, dur = 8, size = 1, charge = 1.0) {
   const move = (p) => { if (!pan) return; const q = place(audio, p, 1400); pan.pan.value = q.pan; };
   return { stop, move };
 }
+
+/**
+ * Napalm going up: not a bang but a whump, the air pulled in and let go.
+ * A sub drop under a swell of low noise whose filter opens in a quarter of
+ * a second and closes again over two, the roar of it rolling off.
+ */
+export function whump(audio, pos, size = 1) {
+  if (!ok(audio)) return;
+  const c = audio.ctx;
+  const pl = place(audio, pos, 1100);
+  if (pl.gain < 0.01) return;
+  const t0 = c.currentTime + Math.min(3, pl.dist / 343);
+  try {
+    const dst = out(c, audio, pl.pan);
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(72, t0); o.frequency.exponentialRampToValueAtTime(26, t0 + 1.1);
+    og.gain.setValueAtTime(0.0001, t0);
+    og.gain.exponentialRampToValueAtTime(0.55 * size * pl.gain, t0 + 0.06);
+    og.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.4);
+    o.connect(og).connect(dst);
+    o.start(t0); o.stop(t0 + 1.5);
+    const n = c.createBufferSource(); n.buffer = noise(c);
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.9;
+    lp.frequency.setValueAtTime(160, t0);
+    lp.frequency.exponentialRampToValueAtTime(1500, t0 + 0.25);
+    lp.frequency.exponentialRampToValueAtTime(260, t0 + 2.6);
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(0.0001, t0);
+    ng.gain.exponentialRampToValueAtTime(0.7 * size * pl.gain, t0 + 0.14);
+    ng.gain.exponentialRampToValueAtTime(0.25 * size * pl.gain, t0 + 1.0);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 3.0);
+    n.connect(lp).connect(ng).connect(dst);
+    n.start(t0, Math.random()); n.stop(t0 + 3.1);
+  } catch { /* no audio */ }
+}

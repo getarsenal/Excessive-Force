@@ -2265,6 +2265,36 @@ export class Structure {
     if (dirty) dirty.add(entry); else entry.mesh.instanceColor.needsUpdate = true;
   }
 
+  /** A stone's own instance colour as it is now, [r, g, b], or null without meshes. */
+  stoneTint(i) {
+    if (!this.meshes) return null;
+    const entry = this.meshes[this.meshIndexOf[i]];
+    if (!entry) return null;
+    const a = entry.mesh.instanceColor.array, o = this.instanceIndexOf[i] * 3;
+    return [a[o], a[o + 1], a[o + 2]];
+  }
+
+  /**
+   * Set a stone's colour outright (napalm's red heat, then its soot). With
+   * `defer` the upload waits for `flushTint`, so a pass over many stones is
+   * one upload a mesh.
+   */
+  setStoneTint(i, r, g, b, defer = false) {
+    if (!this.meshes) return;
+    const entry = this.meshes[this.meshIndexOf[i]];
+    if (!entry) return;
+    const a = entry.mesh.instanceColor.array, o = this.instanceIndexOf[i] * 3;
+    a[o] = r; a[o + 1] = g; a[o + 2] = b;
+    if (defer) (this._tintDirty || (this._tintDirty = new Set())).add(entry);
+    else entry.mesh.instanceColor.needsUpdate = true;
+  }
+
+  flushTint() {
+    if (!this._tintDirty) return;
+    for (const e of this._tintDirty) e.mesh.instanceColor.needsUpdate = true;
+    this._tintDirty.clear();
+  }
+
   /** Remove a stone from the world entirely. */
   /** Is stone `i` still part of the world (standing, loose or fallen)? */
   isAlive(i) { return !!(this.flags[i] & ALIVE); }

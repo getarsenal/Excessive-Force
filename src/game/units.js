@@ -466,6 +466,29 @@ export const UNITS = [
     blurb: 'A gun run down the line you draw. Shreds a trench; barely chips a wall.',
   },
   {
+    id: 'napalm', name: 'F-4 NAPALM', full: 'F-4E Phantom II · four BLU-27 fire bombs', tier: 'AIR',
+    cost: 30000, unlockFrac: 0.08,
+    // Drawn like the gun run: press where the fire should start and drag
+    // along the line it should burn. The Phantom comes in low along it and
+    // ripples four finless canisters onto the line, and each throws its
+    // jelly on forward (`roll` metres, `width` across) to burn for `burn`
+    // seconds: the garrison in it has no cover, the flak pits and the
+    // launchers go, the houses along it are gutted, and stone in the flames
+    // heats until it lets go (napalm.js, by material: timber in seconds,
+    // steel in a few, stone over the half minute, at the foot of a wall
+    // where the jelly pools). `dps` is what it does to a man a second.
+    // `frac` is only for the card's bar.
+    model: 'aircraft',
+    strike: { strafe: true, frac: 0.03, minLen: 150, maxLen: 320, defaultLen: 240,
+      napalm: { cans: 4, roll: 72, width: 26, burn: 34, flame: 9, dps: 70, melt: 1 } },
+    aircraft: { kind: 'phantom', speed: 200, height: 60, clearance: 38, runIn: 2300 },
+    range: 2600, reload: 0, setup: 0, crew: 0, health: 1,
+    projectile: { kind: 'bomb', speed: 200, gravity: 9.81, drag: 0.08, trail: 0 },
+    warhead: { lethal: 0, radius: 14, power: 1200, fx: 1.0, kinetic: 0 },
+    dispersion: 0,
+    blurb: 'Low along the line you draw, four canisters of jellied fire. The trench line, the flak and the street burn; stone in the flames for long enough melts away at the foot.',
+  },
+  {
     id: 'f15', name: 'F-15E', full: 'F-15E Strike Eagle · GBU-12 500 lb', tier: 'AIR',
     cost: 100000, unlockFrac: 0.12,
     model: 'aircraft', strike: { frac: 0.10, maxR: 64, minR: 9, fx: 4.6, bite: 0.62, shock: 1.2 },
