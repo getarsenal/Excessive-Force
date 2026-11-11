@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
+import { BlockList, JOINT, MATERIALS as M, SHAPES } from '../builder.js';
 
 /**
  * The landmark kit: a building written as a list of parts.
@@ -189,9 +189,16 @@ class Kit {
         courses(y, y + h, c * (kind === 'dome' || kind === 'onion' || kind === 'bell' ? 0.6 : 1), (yy, ch, k) => {
           const t = (yy + ch / 2 - y) / h;
           const r = R * prof(t);
+          // Drawn as slopes where it draws in, square where it swells, and
+          // a point on top of anything that comes to one.
+          const falling = R * prof(Math.min(1, t + ch / h)) < r * 0.985;
           if (r <= wall * 1.1 || r < this.stone * 0.9) {
             const s = Math.max(r * 1.5, Math.min(this.stone * 0.8, R * 0.5));
-            B.add(cx, yy + ch / 2, cz, s / 2, B.shrink(ch / 2), s / 2, mat);
+            const pointed = kind !== 'dome' && kind !== 'round' && !(round && kind === 'flat');
+            B.withShape(pointed && yy + ch >= y + h - 0.001 ? SHAPES.CONE : SHAPES.CYL,
+              () => B.add(cx, yy + ch / 2, cz, s / 2, B.shrink(ch / 2), s / 2, mat));
+          } else if (falling) {
+            B.sloped(cx, cz, 2 * r, 2 * r, () => this.roundRing(cx, cz, yy, ch, r, wall, k, mat, sides), { round: true });
           } else {
             this.roundRing(cx, cz, yy, ch, r, wall, k, mat, sides);
           }
@@ -217,8 +224,11 @@ class Kit {
       const ww = Math.max(t0, w - 2 * shrinkW * i);
       const dd = Math.max(t0, d - 2 * shrinkD * i);
       if (!B) continue;
-      if (Math.min(ww, dd) <= t * 2.2) this.solid(cx, y + i * ch, cz, ww, ch, dd, mat, 1.2);
-      else B.ring(cx, cz, ww, dd, t, y + i * ch, ch, this.stone * 1.2, mat, i % 2);
+      // Drawn as slopes down every face that steps in (a gable's ends stay
+      // upright), so the roof reads as a pitch and not a staircase.
+      const fall = { fallX: shrinkW > 0, fallZ: shrinkD > 0 };
+      if (Math.min(ww, dd) <= t * 2.2) B.sloped(cx, cz, ww, dd, () => this.solid(cx, y + i * ch, cz, ww, ch, dd, mat, 1.2), fall);
+      else B.sloped(cx, cz, ww, dd, () => B.ring(cx, cz, ww, dd, t, y + i * ch, ch, this.stone * 1.2, mat, i % 2), fall);
     }
     this.peak(cx, y + h, cz);
     return y + h;
@@ -778,8 +788,8 @@ class Kit {
   roundColumn(x, z, y, h, r, mat) {
     const B = this.B;
     if (r * 2 < this.stone * 1.7) {
-      // Octagonal read at a distance: two crossed stones.
-      B.add(x, y + h / 2, z, B.shrink(r), B.shrink(h / 2), B.shrink(r), mat, 0);
+      // One stone, drawn round.
+      B.withShape(SHAPES.CYL, () => B.add(x, y + h / 2, z, B.shrink(r), B.shrink(h / 2), B.shrink(r), mat, 0));
       return;
     }
     this.disc(x, z, y, h, r, mat, 1.0);

@@ -584,6 +584,24 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   takes less of the haze (`uHeroFog`); `window.__heroLight` holds them
   live. The old rim was a second directional light on every PBR pixel and
   stays off on a phone; this is a few instructions on the landmark's own.
+  Stones come in shapes (builder.js `SHAPES`: box, four slopes, cone,
+  pyramid, cylinder), the picture only: the physics, the solver, damage
+  and the survey see a box whatever it is drawn as. Each structure draws
+  one instanced mesh per material and shape (`shapeGeometry`, the unit
+  models; a shaped material has `STONE_SHAPED` defined, which drops the
+  cube's edge term). A slope falls toward its local axis over its outer
+  half and is flat behind, so courses stepping in by about half their
+  thickness read as one pitch. The builder says it where it knows:
+  `B.sloped(cx, cz, w, d, fn, { round, fallX, fallZ, edge })` slopes every
+  stone `fn` lays in the outer part of a footprint away from its centre,
+  `B.withShape(SHAPES.X, fn)` fixes one; `spire`, `pinnacle` and `dome`
+  slope their courses and point their last stone, the kit's caps slope
+  their rings (a gable's ends stay upright) and point their tips, its thin
+  columns are cylinders. Roofs a landmark lays by hand are found at load
+  (`_autoSlopes`, structure.js): a stone of roofing (`AUTO_SLOPE`) whose
+  middle carries the course above and whose edge on one side does not is
+  drawn falling toward that edge. Neuschwanstein: 935 stones sloped, eleven
+  meshes. Sydney's leaning shells are not caught.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/orbital.js` the lasgun: the ORBIT cards (`laser`, `lance` in

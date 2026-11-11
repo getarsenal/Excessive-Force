@@ -163,8 +163,11 @@ export function buildTowerbridge(quality) {
       courses(TOWER.top, TOWER.roof, course, (y, h, c) => {
         const t = (y + h / 2 - TOWER.top) / (TOWER.roof - TOWER.top);
         const w = TOWER.w * (1 - t * 0.9), d = TOWER.d * (1 - t * 0.9);
-        if (w <= TOWER.wall * 2.3 || d <= TOWER.wall * 2.3) B.slab(0, y + h / 2, cz, Math.max(w, stone), h, Math.max(d, stone), stone, M.SLATE);
-        else B.ring(0, cz, w, d, TOWER.wall * 1.1, y, h, stone, M.SLATE, c % 2);
+        // Drawn as slopes: a pitched roof, not a staircase.
+        B.sloped(0, cz, w, d, () => {
+          if (w <= TOWER.wall * 2.3 || d <= TOWER.wall * 2.3) B.slab(0, y + h / 2, cz, Math.max(w, stone), h, Math.max(d, stone), stone, M.SLATE);
+          else B.ring(0, cz, w, d, TOWER.wall * 1.1, y, h, stone, M.SLATE, c % 2);
+        });
       });
       // Corner turrets with gilt finials.
       for (const sx of [-1, 1]) {

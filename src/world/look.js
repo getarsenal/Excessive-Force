@@ -269,13 +269,16 @@ ${edges ? 'varying vec3 vStoneLocal; uniform float uHeroLift; uniform float uHer
   float faceK = ny >= 0.0 ? mix(uFaceSide, uFaceTop, ny) : mix(uFaceSide, uFaceUnder, -ny);
   diffuseColor.rgb *= faceK;
   ${edges ? `
+#ifndef STONE_SHAPED
   vec3 a = abs(vStoneLocal);
   float mx = max(a.x, max(a.y, a.z));
   float mn = min(a.x, min(a.y, a.z));
   float s = a.x + a.y + a.z - mx - mn;
   float fw = fwidth(s);
   float edge = smoothstep(0.43 - fw, 0.5 - fw * 0.5, s) * (1.0 - smoothstep(0.012, 0.045, fw));
-  diffuseColor.rgb *= (1.0 + uEdge * edge) * uHeroLift;` : ''}
+  diffuseColor.rgb *= 1.0 + uEdge * edge;
+#endif
+  diffuseColor.rgb *= uHeroLift;` : ''}
 }
 #include <lights_physical_fragment>`);
     if (edges) {

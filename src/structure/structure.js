@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { MATERIALS, MATERIAL_PROPS } from './builder.js';
+import { MATERIALS, MATERIAL_PROPS, SHAPES, slopeToward } from './builder.js';
 import { Occupancy } from './occupancy.js';
 import { PhysicsWorld } from '../core/physics.js';
 import { surveyRamp } from '../core/access.js';
@@ -138,6 +138,88 @@ const TOPPLE_NUDGE = 1.6;
  * The instance colour supplies every variation; this is the same on all.
  */
 let STONE_TEX = null;
+/**
+ * The unit models a stone is drawn as, by `SHAPES` id, each filling the unit
+ * cube the instance matrix scales to the stone (see builder.js `SHAPES`).
+ * Built once and shared by every structure.
+ */
+const SHAPE_GEOS = new Map();
+/** The roofing materials whose hand-laid steps are drawn as slopes (`_autoSlopes`). */
+const AUTO_SLOPE = new Set([MATERIALS.SLATE, MATERIALS.SCOTSLATE, MATERIALS.COPPER, MATERIALS.GLAZE,
+  MATERIALS.RIDGE, MATERIALS.THATCH, MATERIALS.TILE, MATERIALS.GOLD]);
+function shapeGeometry(id) {
+  let g = SHAPE_GEOS.get(id);
+  if (g) return g;
+  if (id === SHAPES.CONE) g = new THREE.ConeGeometry(0.5, 1, 10);
+  else if (id === SHAPES.PYRAMID) g = new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4);
+  else if (id === SHAPES.CYL) g = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+  else if (id >= SHAPES.SLOPE_PX && id <= SHAPES.SLOPE_NZ) g = slopeGeometry(id);
+  else g = new THREE.BoxGeometry(1, 1, 1);
+  g.userData.keep = true;
+  SHAPE_GEOS.set(id, g);
+  return g;
+}
+
+/**
+ * A slope: falls toward local +z over the outer half (from the bottom of
+ * the outer face to the top at the middle), flat on top behind. Turned for
+ * the other three directions. Faces carry planar UVs so the stone texture
+ * lies on them as it does on a box.
+ */
+function slopeGeometry(id) {
+  // The profile in (z, y), extruded along x from -0.5 to 0.5.
+  const prof = [[-0.5, -0.5], [0.5, -0.5], [0.0, 0.5], [-0.5, 0.5]];
+  const pos = [], uv = [];
+  const tri = (a, b, c) => {
+    // Planar UVs off the face's dominant axis.
+    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+    const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+    for (const p of [a, b, c]) {
+      pos.push(p.x, p.y, p.z);
+      if (ax >= ay && ax >= az) uv.push(p.z + 0.5, p.y + 0.5);
+      else if (ay >= az) uv.push(p.x + 0.5, p.z + 0.5);
+      else uv.push(p.x + 0.5, p.y + 0.5);
+    }
+  };
+  const V = (x, z, y) => new THREE.Vector3(x, y, z);
+  // The two ends (the profile at x = -0.5 and +0.5).
+  for (const x of [-0.5, 0.5]) {
+    const P = prof.map(([z, y]) => V(x, z, y));
+    tri(P[0], P[1], P[2]); tri(P[0], P[2], P[3]);
+  }
+  // The four faces round the profile, each a quad between the two ends.
+  for (let i = 0; i < prof.length; i++) {
+    const [z0, y0] = prof[i], [z1, y1] = prof[(i + 1) % prof.length];
+    const a = V(-0.5, z0, y0), b = V(-0.5, z1, y1), c = V(0.5, z1, y1), d = V(0.5, z0, y0);
+    tri(a, b, c); tri(a, c, d);
+  }
+  let g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  // Outward, whatever order the triangles were written in: away from the
+  // solid's centre (it is convex).
+  const P = g.attributes.position.array;
+  const cx = 0, cy = -1 / 6, cz = -1 / 6;
+  for (let t = 0; t < P.length; t += 9) {
+    const ax = P[t], ay = P[t + 1], az = P[t + 2];
+    const ux = P[t + 3] - ax, uy = P[t + 4] - ay, uz = P[t + 5] - az;
+    const vx = P[t + 6] - ax, vy = P[t + 7] - ay, vz = P[t + 8] - az;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const mx = (ax + P[t + 3] + P[t + 6]) / 3 - cx, my = (ay + P[t + 4] + P[t + 7]) / 3 - cy, mz = (az + P[t + 5] + P[t + 8]) / 3 - cz;
+    if (nx * mx + ny * my + nz * mz < 0) {
+      for (let k = 0; k < 3; k++) { const tmp = P[t + 3 + k]; P[t + 3 + k] = P[t + 6 + k]; P[t + 6 + k] = tmp; }
+      const U = g.attributes.uv.array, o = (t / 3) * 2;
+      for (let k = 0; k < 2; k++) { const tmp = U[o + 2 + k]; U[o + 2 + k] = U[o + 4 + k]; U[o + 4 + k] = tmp; }
+    }
+  }
+  g.computeVertexNormals();
+  // Turned to fall the named way: +z as built.
+  if (id === SHAPES.SLOPE_NZ) g.rotateY(Math.PI);
+  else if (id === SHAPES.SLOPE_PX) g.rotateY(Math.PI / 2);
+  else if (id === SHAPES.SLOPE_NX) g.rotateY(-Math.PI / 2);
+  return g;
+}
+
 function stoneTexture() {
   if (STONE_TEX !== null) return STONE_TEX;
   if (typeof document === 'undefined') return (STONE_TEX = false);
@@ -202,6 +284,8 @@ export class Structure {
     this.hx = new Float32Array(n); this.hy = new Float32Array(n); this.hz = new Float32Array(n);
     this.ry = new Float32Array(n);
     this.mat = new Uint8Array(n);
+    /** What each stone is drawn as (builder.js `SHAPES`); the physics always has a box. */
+    this.shape = new Uint8Array(n);
     this.flags = new Uint8Array(n);
     this.health = new Float32Array(n);
     this.maxHealth = new Float32Array(n);
@@ -250,6 +334,7 @@ export class Structure {
       this.hx[i] = b.hx; this.hy[i] = b.hy; this.hz[i] = b.hz;
       this.ry[i] = b.ry || 0;
       this.mat[i] = b.mat;
+      this.shape[i] = b.shape || 0;
       this.tagOf[i] = b.tag;
 
       const props = MATERIAL_PROPS[b.mat];
@@ -345,6 +430,7 @@ export class Structure {
     this.footprint = { x0: fx0, x1: fx1, z0: fz0, z1: fz1 };
 
     this._buildAdjacency();
+    this._autoSlopes();
     this._groutOrphans();
     this._groutBearing();
     this._buildStaticBody();
@@ -576,6 +662,51 @@ export class Structure {
     }
 
     this._buildBands();
+  }
+
+  /**
+   * Roofs the builder laid by hand, drawn as slopes.
+   *
+   * The builder's own caps, spires and domes say what they are (builder.js
+   * `sloped`); most of the landmarks lay their roofs a stone at a time.
+   * A roof's step reads the same either way: a stone of roofing whose
+   * middle carries the course above and whose edge on one side does not.
+   * That stone is drawn as a slope falling toward its open edge. One open
+   * on two opposite sides (a ridge stone with the next course centred on
+   * it) or open all round (the top) stays a box. The picture only.
+   */
+  _autoSlopes() {
+    const ROOF = AUTO_SLOPE;
+    const ax = this._aabbX, az = this._aabbZ;
+    const covered = (i, x, z) => {
+      const top = this.py[i] + this.hy[i];
+      for (let a = this.adjStart[i]; a < this.adjStart[i + 1]; a++) {
+        const j = this.adjList[a];
+        if (this.py[j] <= this.py[i]) continue;
+        if (this.py[j] - this.hy[j] < top - this.hy[i] * 0.4) continue;
+        if (Math.abs(x - this.px[j]) <= ax[j] && Math.abs(z - this.pz[j]) <= az[j]) return true;
+      }
+      return false;
+    };
+    let n = 0;
+    for (let i = 0; i < this.count; i++) {
+      if (this.shape[i] || !ROOF.has(this.mat[i])) continue;
+      const x = this.px[i], z = this.pz[i];
+      if (!covered(i, x, z)) continue;
+      const ox = ax[i] * 0.75, oz = az[i] * 0.75;
+      const px = !covered(i, x + ox, z), nx = !covered(i, x - ox, z);
+      const pz = !covered(i, x, z + oz), nz = !covered(i, x, z - oz);
+      if ((px && nx) || (pz && nz)) continue;
+      let wx = 0, wz = 0;
+      if (px) wx = 1; else if (nx) wx = -1;
+      if (pz) wz = 1; else if (nz) wz = -1;
+      if (!wx && !wz) continue;
+      // A corner open both ways falls along its longer side's normal.
+      if (wx && wz) { if (ax[i] >= az[i]) wx = 0; else wz = 0; }
+      this.shape[i] = slopeToward(wx, wz, this.ry[i]);
+      n++;
+    }
+    this.autoSloped = n;
   }
 
   /**
@@ -1551,11 +1682,13 @@ export class Structure {
   }
 
   _buildMeshes() {
-    // One InstancedMesh per material; a unit cube scaled per instance.
+    // One InstancedMesh per material and shape; a unit model (a cube, a
+    // slope, a cone...) scaled per instance. Keyed material * 16 + shape.
     const byMat = new Map();
     for (let i = 0; i < this.count; i++) {
-      let arr = byMat.get(this.mat[i]);
-      if (!arr) byMat.set(this.mat[i], (arr = []));
+      const key = this.mat[i] * 16 + this.shape[i];
+      let arr = byMat.get(key);
+      if (!arr) byMat.set(key, (arr = []));
       arr.push(i);
     }
 
@@ -1564,10 +1697,11 @@ export class Structure {
     this.meshIndexOf = new Int32Array(this.count);
     this.instanceIndexOf = new Int32Array(this.count);
 
-    const geo = new THREE.BoxGeometry(1, 1, 1);
     const shadows = this.quality.shadowMapSize > 0;
 
-    for (const [matId, list] of byMat) {
+    for (const [key, list] of byMat) {
+      const matId = key >> 4, shapeId = key & 15;
+      const geo = shapeGeometry(shapeId);
       const props = MATERIAL_PROPS[matId];
       const material = new THREE.MeshStandardMaterial({
         // White base: the per-stone instanceColor below already carries the
@@ -1595,6 +1729,10 @@ export class Structure {
       const metalOrGlass = [MATERIALS.GLASS, MATERIALS.IRON, MATERIALS.STEEL, MATERIALS.GILT].includes(matId);
       const tex = metalOrGlass ? null : stoneTexture();
       if (tex) material.map = tex;
+      // A shaped stone has no cube's edges to catch: the edge term reads the
+      // unit cube's corners from the vertex and would draw lines across a
+      // slope or round a cone.
+      if (shapeId) material.defines = { ...(material.defines || {}), STONE_SHAPED: '' };
       // Every stone with its edges caught (see world/look.js).
       stylize(material, { edges: true });
 
@@ -1653,7 +1791,7 @@ export class Structure {
       // Rewritten when stone is scorched or falls, so not static.
       mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
 
-      this.meshes.push({ mesh, list, matId });
+      this.meshes.push({ mesh, list, matId, shapeId });
       this.group.add(mesh);
     }
 

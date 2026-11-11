@@ -303,6 +303,28 @@ export const MATERIAL_PROPS = {
  */
 export const JOINT = 0.015;
 
+/**
+ * What a stone is drawn as (November 2026; the owner, against LEGO's
+ * Architecture boxes, whose pieces come in hundreds of shapes where ours
+ * were all cubes). Only the picture: every stone is still a box to the
+ * physics, the support solver, damage and the survey, so a shape costs
+ * nothing anywhere but the draw. A slope falls toward its named local axis
+ * over its outer half and is flat behind, so a roof of courses that each
+ * step in by about half their own thickness reads as one pitch rather than
+ * a staircase; a cone and a pyramid are a spire's point, round and square;
+ * a cylinder a column or a turret's core.
+ */
+export const SHAPES = { BOX: 0, SLOPE_PX: 1, SLOPE_NX: 2, SLOPE_PZ: 3, SLOPE_NZ: 4, CONE: 5, CYL: 6, PYRAMID: 7 };
+
+/** The slope that falls along a world direction, for a stone yawed `ry`. */
+export function slopeToward(wx, wz, ry = 0) {
+  const c = Math.cos(ry), s = Math.sin(ry);
+  // Into the stone's own frame (three's rotation about +Y, inverted).
+  const lx = wx * c - wz * s, lz = wx * s + wz * c;
+  if (Math.abs(lx) >= Math.abs(lz)) return lx >= 0 ? SHAPES.SLOPE_PX : SHAPES.SLOPE_NX;
+  return lz >= 0 ? SHAPES.SLOPE_PZ : SHAPES.SLOPE_NZ;
+}
+
 export class BlockList {
   constructor() {
     /** flat block records: {x,y,z, hx,hy,hz, ry, mat, tag} */
@@ -322,6 +344,40 @@ export class BlockList {
     this.joint = JOINT;
     /** Arches: see `hold`. */
     this.holds = null;
+    /** The shape the next stones are drawn as: a number, or a function of the stone (see `sloped`). */
+    this._shape = null;
+  }
+
+  /** Lay the stones `fn` adds drawn as `shape` (SHAPES). */
+  withShape(shape, fn) {
+    const prev = this._shape;
+    this._shape = shape;
+    try { fn(); } finally { this._shape = prev; }
+  }
+
+  /**
+   * Lay a roof or a tapering cap: every stone `fn` adds in the outer part of
+   * the footprint (`edge`, a fraction of the half-width out from the
+   * centre) is drawn as a slope falling away from (cx, cz): square to the
+   * nearer face of a `w` x `d` rectangle, or along the radius when `round`.
+   * `fallX`/`fallZ` false keeps that pair of faces upright (a gable's ends).
+   * The stones further in, which the next course covers or which make a
+   * flat top, stay boxes.
+   */
+  sloped(cx, cz, w, d, fn, { round = false, fallX = true, fallZ = true, edge = 0.5 } = {}) {
+    const hw = Math.max(0.01, w / 2), hd = Math.max(0.01, d / 2);
+    return this.withShape((x, y, z, hx, hy, hz, ry) => {
+      const ox = x - cx, oz = z - cz;
+      if (round) {
+        const r = Math.hypot(ox, oz);
+        if (r < hw * edge || r < 1e-3) return SHAPES.BOX;
+        return slopeToward(ox / r, oz / r, ry);
+      }
+      const nx = Math.abs(ox) / hw, nz = Math.abs(oz) / hd;
+      if (Math.max(nx, nz) < edge) return SHAPES.BOX;
+      if (nx >= nz) return fallX ? slopeToward(Math.sign(ox) || 1, 0, ry) : SHAPES.BOX;
+      return fallZ ? slopeToward(0, Math.sign(oz) || 1, ry) : SHAPES.BOX;
+    }, fn);
   }
 
   /**
@@ -385,7 +441,9 @@ export class BlockList {
     if (hx <= 0.01 || hy <= 0.01 || hz <= 0.01) return;
     // An opening is simply masonry that was never laid.
     if (this._omit && this._omit(x, y, z)) return;
-    this.blocks.push({ x, y, z, hx, hy, hz, ry, mat, tag: this._tag || null });
+    const sh = this._shape;
+    const shape = sh == null ? 0 : typeof sh === 'function' ? sh(x, y, z, hx, hy, hz, ry) : sh;
+    this.blocks.push({ x, y, z, hx, hy, hz, ry, mat, tag: this._tag || null, shape });
   }
 
   /**
@@ -567,11 +625,14 @@ export class BlockList {
       // a straight cone.
       const w = baseW + (topW - baseW) * Math.pow(t, 0.86);
       const wall = Math.max(stone * 0.55, w * wallFrac * (1 - t * 0.35));
+      // Drawn as slopes down its faces, and a point on the last stone.
+      const last = y + h >= y1 - 0.001;
       if (w <= wall * 2.1) {
-        this.slab(cx, y + h / 2, cz, w, h, w, stone, mat);
+        if (last && Math.round(w / stone) <= 1) this.withShape(SHAPES.PYRAMID, () => this.slab(cx, y + h / 2, cz, w, h, w, stone, mat));
+        else this.sloped(cx, cz, w, w, () => this.slab(cx, y + h / 2, cz, w, h, w, stone, mat));
       } else {
-        this.ring(cx, cz, w, w, wall, y, h, stone, mat, course % 2,
-          relief ? (x, z) => relief(x, z, y, course) : null);
+        this.sloped(cx, cz, w, w, () => this.ring(cx, cz, w, w, wall, y, h, stone, mat, course % 2,
+          relief ? (x, z) => relief(x, z, y, course) : null));
       }
       y += h;
       course++;
@@ -585,7 +646,9 @@ export class BlockList {
     for (let i = 0; i < courses; i++) {
       const t = i / courses;
       const w = baseW * (1 - t * 0.82);
-      this.slab(cx, y0 + (i + 0.5) * ch, cz, w, ch, w, stone, mat);
+      // Sloped down its faces, the last stone a point.
+      if (i === courses - 1 && Math.round(w / stone) <= 1) this.withShape(SHAPES.PYRAMID, () => this.slab(cx, y0 + (i + 0.5) * ch, cz, w, ch, w, stone, mat));
+      else this.sloped(cx, cz, w, w, () => this.slab(cx, y0 + (i + 0.5) * ch, cz, w, ch, w, stone, mat));
     }
   }
 
@@ -687,14 +750,21 @@ export class BlockList {
       const t = (y + h / 2 - y0) / height;
       const r = maxR * profile(t);
 
+      // Where the shell draws in (the next course is narrower) it is drawn
+      // as slopes; where it still swells, as an onion's lower half does, the
+      // stones stay square.
+      const rNext = maxR * profile(Math.min(1, (y + h * 1.5 - y0) / height));
+      const falling = rNext < r * 0.985;
       if (r <= wall * 1.15) {
         // Near the apex the ring closes up; lay it solid.
         const w = Math.max(r * 2, stone * 0.7);
-        this.slab(cx, y + h / 2, cz, w, h, w, stone, mat);
+        if (Math.round(w / stone) <= 1 && y + h >= y0 + height - 0.001) this.withShape(SHAPES.CONE, () => this.slab(cx, y + h / 2, cz, w, h, w, stone, mat));
+        else this.sloped(cx, cz, w, w, () => this.slab(cx, y + h / 2, cz, w, h, w, stone, mat), { round: true });
       } else {
         const sides = Math.max(10, Math.round((2 * Math.PI * r) / stone));
         const rot = (course % 2) * (Math.PI / sides);
-        this.polyRing(cx, cz, BlockList.circle(r, sides, rot), wall, y, h, stone, mat);
+        const lay = () => this.polyRing(cx, cz, BlockList.circle(r, sides, rot), wall, y, h, stone, mat);
+        if (falling) this.sloped(cx, cz, 2 * (r + wall / 2), 2 * (r + wall / 2), lay, { round: true }); else lay();
       }
       y += h;
       course++;
