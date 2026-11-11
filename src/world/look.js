@@ -215,7 +215,19 @@ const STYLE_UNIFORMS = {
   uFaceSide: { value: 0.90 },    // …sides…
   uFaceUnder: { value: 0.72 },   // …undersides
   uEdge: { value: 0.07 },        // the caught edge on a stone
+  // The landmark is the hero of every picture (`edges` materials only: the
+  // structures' stone). A shade brighter than the town round it, a warm
+  // rim where its forms turn away from the eye, so every edge is drawn
+  // against what is behind it, and less of the haze, so it stands out of
+  // the distance instead of into it: the box art's studio light, at a few
+  // instructions on the landmark's own pixels and no extra light.
+  uHeroLift: { value: 1.07 },
+  uHeroRim: { value: 0.32 },
+  uHeroRimCol: { value: new THREE.Color(1.0, 0.86, 0.66) },
+  uHeroFog: { value: 0.55 },
 };
+/** For the probes and a console: the hero light, live. */
+if (typeof window !== 'undefined') window.__heroLight = STYLE_UNIFORMS;
 
 const WRAP_FROM = 'float dotNL = saturate( dot( geometryNormal, directLight.direction ) );';
 const WRAP_TO = 'float dotNL = saturate( ( dot( geometryNormal, directLight.direction ) + uWrap ) / ( 1.0 + uWrap ) );';
@@ -245,7 +257,7 @@ export function stylize(material, { edges = false } = {}) {
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uWrap; uniform float uFaceTop; uniform float uFaceSide; uniform float uFaceUnder; uniform float uEdge;
-${edges ? 'varying vec3 vStoneLocal;' : ''}`)
+${edges ? 'varying vec3 vStoneLocal; uniform float uHeroLift; uniform float uHeroRim; uniform vec3 uHeroRimCol; uniform float uHeroFog;' : ''}`)
       // Wrapped diffuse for the sun and every other direct light.
       .replace('#include <lights_physical_pars_fragment>',
         THREE.ShaderChunk.lights_physical_pars_fragment.replace(WRAP_FROM, WRAP_TO))
@@ -263,9 +275,20 @@ ${edges ? 'varying vec3 vStoneLocal;' : ''}`)
   float s = a.x + a.y + a.z - mx - mn;
   float fw = fwidth(s);
   float edge = smoothstep(0.43 - fw, 0.5 - fw * 0.5, s) * (1.0 - smoothstep(0.012, 0.045, fw));
-  diffuseColor.rgb *= 1.0 + uEdge * edge;` : ''}
+  diffuseColor.rgb *= (1.0 + uEdge * edge) * uHeroLift;` : ''}
 }
 #include <lights_physical_fragment>`);
+    if (edges) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <opaque_fragment>', `
+{
+  float fres = 1.0 - saturate(dot(normal, normalize(vViewPosition)));
+  outgoingLight += uHeroRimCol * (fres * fres * fres) * uHeroRim;
+}
+#include <opaque_fragment>`)
+        .replace('#include <fog_fragment>', THREE.ShaderChunk.fog_fragment
+          .replace('gl_FragColor.rgb = mix(', 'fogFactor *= uHeroFog;\n\tgl_FragColor.rgb = mix('));
+    }
   };
   const key = material.customProgramCacheKey ? material.customProgramCacheKey() : '';
   material.customProgramCacheKey = () => `${key}|style${edges ? 'E' : ''}`;

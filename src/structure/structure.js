@@ -8,6 +8,8 @@ import { stylize } from '../world/look.js';
 // The solver may take about a fifth of the frame: a solve that cost N ms is
 // not run again for N × SOLVE_BUDGET ms (see solveStability).
 const SOLVE_BUDGET = 4;
+/** How far a stone's colour may wander from its material's: 1 was the old speckle. */
+const TONE = 0.25;
 
 /**
  * A destructible masonry structure.
@@ -1616,12 +1618,19 @@ export class Structure {
         c.setHex(props.color);
         c.getHSL(hsl);
 
-        // Per-stone tonal *and* hue variation. Value alone reads as plastic
-        // lit badly; a few degrees of hue scatter reads as quarried stone.
+        // Per-stone variation, held to a whisper (November 2026, the owner
+        // against the LEGO boxes). It was a few degrees of hue, saturation
+        // from 0.78 to 1.4 times and value from 0.86 to 1.16 times, which read
+        // as quarried stone up close and as speckle from the battle's camera:
+        // walls, trim and roofs mottled into one tone. A model reads by a
+        // few colours each with a job, wall and trim and roof and accent, so
+        // the material carries the colour and the stone barely moves it; the
+        // shading that is structure (the occlusion and the weathering below)
+        // stays. `TONE` is the one knob.
         const r1 = hash01(i), r2 = hash01(i * 2654435761 + 7);
-        hsl.h = (hsl.h + (r1 - 0.5) * 0.035 + 1) % 1;
-        hsl.s = THREE.MathUtils.clamp(hsl.s * (0.78 + r2 * 0.62), 0, 1);
-        hsl.l = THREE.MathUtils.clamp(hsl.l * (0.86 + r1 * 0.30), 0, 1);
+        hsl.h = (hsl.h + (r1 - 0.5) * 0.035 * TONE + 1) % 1;
+        hsl.s = THREE.MathUtils.clamp(hsl.s * (1 + (r2 - 0.4) * 0.62 * TONE), 0, 1);
+        hsl.l = THREE.MathUtils.clamp(hsl.l * (1 + (r1 - 0.47) * 0.30 * TONE), 0, 1);
 
         // Ambient occlusion, free: a stone's neighbour count already says how
         // enclosed it is. Deep-set stones in a reveal or an arcade darken,

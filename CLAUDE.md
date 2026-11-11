@@ -575,6 +575,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   patches the guards out and in on the same frame and counts the white rim
   pixels either way. Specular fireflies are a shader question before they
   are a lighting one: look at the dots at one-to-one first.
+  The landmark reads like the box art of a model (November 2026, the owner
+  against LEGO's Architecture boxes): a stone's colour barely wanders from
+  its material's (`TONE` in structure.js, 0.25 of the old speckle; the
+  occlusion and weathering stay), and the structures' own shader
+  (`stylize` with `edges`) lifts it a shade over the town (`uHeroLift`),
+  draws a warm rim where its forms turn from the eye (`uHeroRim`) and
+  takes less of the haze (`uHeroFog`); `window.__heroLight` holds them
+  live. The old rim was a second directional light on every PBR pixel and
+  stays off on a phone; this is a few instructions on the landmark's own.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/orbital.js` the lasgun: the ORBIT cards (`laser`, `lance` in
