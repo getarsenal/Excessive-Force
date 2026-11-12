@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
+import { BlockList, JOINT, MATERIALS as M, SHAPES } from '../builder.js';
 
 /**
  * Tower Bridge, London.
@@ -33,8 +33,12 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * twentieth of the structure — which is what carries the Redeemer's arms.
  * The chains hang on hangers from the deck, as the real ones nearly do.
  *
- * LIMESTONE for the facing, STEEL for the walkways and chains, IRONWORK for
- * the decks and the bascule leaves, SLATE roofs, GILT finials.
+ * LIMESTONE for the facing; the steel in the blue it has worn since 1977
+ * (BLUEIRON for the walkways' frames and the decks' edges, BLUERAIL for the
+ * chains and hangers), the walkways' sides white lattice (TRUSS), the
+ * roadway dark (ROADIRON); the caps in the box art's sand green (SAGE),
+ * GILT finials. Every one is the physical twin of the material it
+ * replaced (builder.js), so the bridge stands and falls as it did.
  */
 
 const S = 1.6;
@@ -106,7 +110,7 @@ export function buildTowerbridge(quality) {
           B.ring(tx, tz, ABUT_TOWER.w, ABUT_TOWER.w, 1.4, y, h, stone, M.LIMESTONE, c % 2, () => (y + h > DECK + ABUT_TOWER.h - 1.0 ? 0.35 : 0));
         });
       });
-      B.pinnacle(tx, tz, DECK + ABUT_TOWER.h, 5.0, ABUT_TOWER.w + 0.6, stone, M.SLATE);
+      B.pinnacle(tx, tz, DECK + ABUT_TOWER.h, 5.0, ABUT_TOWER.w + 0.6, stone, M.SAGE);
     }
   };
   B.section('abutments', () => { abutment(0); abutment(S_ABUT_Z0); });
@@ -165,16 +169,23 @@ export function buildTowerbridge(quality) {
         const w = TOWER.w * (1 - t * 0.9), d = TOWER.d * (1 - t * 0.9);
         // Drawn as slopes: a pitched roof, not a staircase.
         B.sloped(0, cz, w, d, () => {
-          if (w <= TOWER.wall * 2.3 || d <= TOWER.wall * 2.3) B.slab(0, y + h / 2, cz, Math.max(w, stone), h, Math.max(d, stone), stone, M.SLATE);
-          else B.ring(0, cz, w, d, TOWER.wall * 1.1, y, h, stone, M.SLATE, c % 2);
+          if (w <= TOWER.wall * 2.3 || d <= TOWER.wall * 2.3) B.slab(0, y + h / 2, cz, Math.max(w, stone), h, Math.max(d, stone), stone, M.SAGE);
+          else B.ring(0, cz, w, d, TOWER.wall * 1.1, y, h, stone, M.SAGE, c % 2);
         });
       });
-      // Corner turrets with gilt finials.
+      // The gilt finial on the apex: a collar and a spike.
+      B.add(0, TOWER.roof + 0.4, cz, 0.7, 0.4, 0.7, M.GILT);
+      B.withShape(SHAPES.CONE, () => B.add(0, TOWER.roof + 0.8 + 2.0, cz, 0.45, 2.0, 0.45, M.GILT));
+      // Corner turrets: a stone shaft, a pointed sand-green cap, and a gilt
+      // spike on top, as the box draws them.
       for (const sx of [-1, 1]) {
         for (const sz of [-1, 1]) {
           const tx = sx * (hw - 1.8), tz = cz + sz * (hd - 1.8);
-          B.pinnacle(tx, tz, TOWER.top, TOWER.turret - TOWER.top, 3.6, stone * 0.9, M.LIMESTONE);
-          B.slab(tx, (TOWER.turret + TOWER.finial) / 2, tz, 1.0, TOWER.finial - TOWER.turret, 1.0, 1.2, M.GILT);
+          const shaftTop = TOWER.top + 5.0;
+          courses(TOWER.top, shaftTop, course, (y, h) => B.slab(tx, y + h / 2, tz, 3.2, h, 3.2, stone * 0.9, M.LIMESTONE));
+          B.pinnacle(tx, tz, shaftTop, TOWER.turret + 1.0 - shaftTop, 3.8, stone * 0.9, M.SAGE);
+          B.add(tx, TOWER.turret + 1.0 + 0.3, tz, 0.55, 0.3, 0.55, M.GILT);
+          B.withShape(SHAPES.CONE, () => B.add(tx, TOWER.turret + 1.6 + 1.4, tz, 0.35, 1.4, 0.35, M.GILT));
         }
       }
     });
@@ -204,7 +215,9 @@ export function buildTowerbridge(quality) {
       const rise = CAMBER * Math.min(k, n - 1 - k);
       for (let l = 0; l < LANES; l++) {
         const x = -DECK_W / 2 + (l + 0.5) * lw;
-        B.add(x, DECK - PLATE_T / 2 + rise, z, B.shrink(lw / 2), B.shrink(PLATE_T / 2), B.shrink(pl / 2), mat);
+        // The roadway dark, its edges the bridge's blue.
+        const m = mat === M.IRONWORK ? (l === 0 || l === LANES - 1 ? M.BLUEIRON : M.ROADIRON) : mat;
+        B.add(x, DECK - PLATE_T / 2 + rise, z, B.shrink(lw / 2), B.shrink(PLATE_T / 2), B.shrink(pl / 2), m);
       }
     }
   };
@@ -232,12 +245,12 @@ export function buildTowerbridge(quality) {
           const x = sx * CHAIN.x;
           // The hanger, from the deck to the link.
           const hangerTop = y - CHAIN.t / 2;
-          B.add(x, (DECK + hangerTop) / 2, z, 0.2, (hangerTop - DECK) / 2 - 0.01, 0.2, M.RAILING);
+          B.add(x, (DECK + hangerTop) / 2, z, 0.2, (hangerTop - DECK) / 2 - 0.01, 0.2, M.BLUERAIL);
           // RAILING, not STEEL: a chain is in tension and nothing may rest on
           // it. As a stack of steel links it was a bearing path from the tower
           // top down to the abutment, and the top of a tower cut clean through
           // stood on its own chains.
-          B.add(x, y, z, CHAIN.t / 2, CHAIN.t / 2, B.shrink(seg / 2), M.RAILING);
+          B.add(x, y, z, CHAIN.t / 2, CHAIN.t / 2, B.shrink(seg / 2), M.BLUERAIL);
         }
       }
     };
@@ -256,11 +269,11 @@ export function buildTowerbridge(quality) {
       for (let k = 0; k < n; k++) {
         const z = z0 + (k + 0.5) * pl;
         const f = WALK.floor + CAMBER * Math.min(k, n - 1 - k);   // cambered, as the deck is
-        B.add(x, f + WALK.t / 2, z, B.shrink(WALK.w / 2), B.shrink(WALK.t / 2), B.shrink(pl / 2), M.STEEL);
+        B.add(x, f + WALK.t / 2, z, B.shrink(WALK.w / 2), B.shrink(WALK.t / 2), B.shrink(pl / 2), M.BLUEIRON);
         for (const side of [-1, 1]) {
-          B.add(x + side * (WALK.w / 2 - 0.2), f + WALK.t + WALK.rail / 2, z, 0.18, B.shrink(WALK.rail / 2), B.shrink(pl / 2) - 0.05, M.RAILING);
+          B.add(x + side * (WALK.w / 2 - 0.2), f + WALK.t + WALK.rail / 2, z, 0.18, B.shrink(WALK.rail / 2), B.shrink(pl / 2) - 0.05, M.TRUSS);
         }
-        B.add(x, f + WALK.t + WALK.rail + 0.3, z, B.shrink(WALK.w / 2 + 0.2), 0.3, B.shrink(pl / 2), M.STEEL);
+        B.add(x, f + WALK.t + WALK.rail + 0.3, z, B.shrink(WALK.w / 2 + 0.2), 0.3, B.shrink(pl / 2), M.BLUEIRON);
       }
     }
   });

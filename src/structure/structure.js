@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { MATERIALS, MATERIAL_PROPS, SHAPES, slopeToward } from './builder.js';
+import { MATERIALS, MATERIAL_PROPS, SHAPES, slopeToward, cornerToward } from './builder.js';
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
 import { Occupancy } from './occupancy.js';
 import { PhysicsWorld } from '../core/physics.js';
 import { surveyRamp } from '../core/access.js';
@@ -146,7 +147,7 @@ let STONE_TEX = null;
 const SHAPE_GEOS = new Map();
 /** The roofing materials whose hand-laid steps are drawn as slopes (`_autoSlopes`). */
 const AUTO_SLOPE = new Set([MATERIALS.SLATE, MATERIALS.SCOTSLATE, MATERIALS.COPPER, MATERIALS.GLAZE,
-  MATERIALS.RIDGE, MATERIALS.THATCH, MATERIALS.TILE, MATERIALS.GOLD]);
+  MATERIALS.RIDGE, MATERIALS.THATCH, MATERIALS.TILE, MATERIALS.GOLD, MATERIALS.SAGE]);
 function shapeGeometry(id) {
   let g = SHAPE_GEOS.get(id);
   if (g) return g;
@@ -154,70 +155,76 @@ function shapeGeometry(id) {
   else if (id === SHAPES.PYRAMID) g = new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4);
   else if (id === SHAPES.CYL) g = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
   else if (id >= SHAPES.SLOPE_PX && id <= SHAPES.SLOPE_NZ) g = slopeGeometry(id);
+  else if (id >= SHAPES.CORNER_PXPZ && id <= SHAPES.CORNER_NXNZ) g = cornerGeometry(id);
   else g = new THREE.BoxGeometry(1, 1, 1);
   g.userData.keep = true;
   SHAPE_GEOS.set(id, g);
   return g;
 }
 
+/** A convex solid through `pts`, with planar UVs off each face's dominant axis. */
+function convexShape(pts) {
+  const g = new ConvexGeometry(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const P = g.attributes.position.array, N = g.attributes.normal.array;
+  const uv = new Float32Array((P.length / 3) * 2);
+  for (let v = 0; v < P.length / 3; v++) {
+    const ax = Math.abs(N[v * 3]), ay = Math.abs(N[v * 3 + 1]), az = Math.abs(N[v * 3 + 2]);
+    const x = P[v * 3], y = P[v * 3 + 1], z = P[v * 3 + 2];
+    if (ax >= ay && ax >= az) { uv[v * 2] = z + 0.5; uv[v * 2 + 1] = y + 0.5; }
+    else if (ay >= az) { uv[v * 2] = x + 0.5; uv[v * 2 + 1] = z + 0.5; }
+    else { uv[v * 2] = x + 0.5; uv[v * 2 + 1] = y + 0.5; }
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return g;
+}
+const BOTTOM = [[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5]];
+
 /**
  * A slope: falls toward local +z over the outer half (from the bottom of
  * the outer face to the top at the middle), flat on top behind. Turned for
- * the other three directions. Faces carry planar UVs so the stone texture
- * lies on them as it does on a box.
+ * the other three directions.
  */
 function slopeGeometry(id) {
-  // The profile in (z, y), extruded along x from -0.5 to 0.5.
-  const prof = [[-0.5, -0.5], [0.5, -0.5], [0.0, 0.5], [-0.5, 0.5]];
-  const pos = [], uv = [];
-  const tri = (a, b, c) => {
-    // Planar UVs off the face's dominant axis.
-    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
-    const ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
-    for (const p of [a, b, c]) {
-      pos.push(p.x, p.y, p.z);
-      if (ax >= ay && ax >= az) uv.push(p.z + 0.5, p.y + 0.5);
-      else if (ay >= az) uv.push(p.x + 0.5, p.z + 0.5);
-      else uv.push(p.x + 0.5, p.y + 0.5);
-    }
-  };
-  const V = (x, z, y) => new THREE.Vector3(x, y, z);
-  // The two ends (the profile at x = -0.5 and +0.5).
-  for (const x of [-0.5, 0.5]) {
-    const P = prof.map(([z, y]) => V(x, z, y));
-    tri(P[0], P[1], P[2]); tri(P[0], P[2], P[3]);
-  }
-  // The four faces round the profile, each a quad between the two ends.
-  for (let i = 0; i < prof.length; i++) {
-    const [z0, y0] = prof[i], [z1, y1] = prof[(i + 1) % prof.length];
-    const a = V(-0.5, z0, y0), b = V(-0.5, z1, y1), c = V(0.5, z1, y1), d = V(0.5, z0, y0);
-    tri(a, b, c); tri(a, c, d);
-  }
-  let g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  // Outward, whatever order the triangles were written in: away from the
-  // solid's centre (it is convex).
-  const P = g.attributes.position.array;
-  const cx = 0, cy = -1 / 6, cz = -1 / 6;
-  for (let t = 0; t < P.length; t += 9) {
-    const ax = P[t], ay = P[t + 1], az = P[t + 2];
-    const ux = P[t + 3] - ax, uy = P[t + 4] - ay, uz = P[t + 5] - az;
-    const vx = P[t + 6] - ax, vy = P[t + 7] - ay, vz = P[t + 8] - az;
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-    const mx = (ax + P[t + 3] + P[t + 6]) / 3 - cx, my = (ay + P[t + 4] + P[t + 7]) / 3 - cy, mz = (az + P[t + 5] + P[t + 8]) / 3 - cz;
-    if (nx * mx + ny * my + nz * mz < 0) {
-      for (let k = 0; k < 3; k++) { const tmp = P[t + 3 + k]; P[t + 3 + k] = P[t + 6 + k]; P[t + 6 + k] = tmp; }
-      const U = g.attributes.uv.array, o = (t / 3) * 2;
-      for (let k = 0; k < 2; k++) { const tmp = U[o + 2 + k]; U[o + 2 + k] = U[o + 4 + k]; U[o + 4 + k] = tmp; }
-    }
-  }
-  g.computeVertexNormals();
-  // Turned to fall the named way: +z as built.
+  const g = convexShape([...BOTTOM, [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0], [-0.5, 0.5, 0]]);
   if (id === SHAPES.SLOPE_NZ) g.rotateY(Math.PI);
   else if (id === SHAPES.SLOPE_PX) g.rotateY(Math.PI / 2);
   else if (id === SHAPES.SLOPE_NX) g.rotateY(-Math.PI / 2);
   return g;
+}
+
+/** A hip corner: falls toward +x and +z at once over the outer halves; turned for the others. */
+function cornerGeometry(id) {
+  const g = convexShape([...BOTTOM, [-0.5, 0.5, -0.5], [0, 0.5, -0.5], [0, 0.5, 0], [-0.5, 0.5, 0]]);
+  // rotateY(t): (x, z) -> (x cos t + z sin t, -x sin t + z cos t).
+  if (id === SHAPES.CORNER_PXNZ) g.rotateY(Math.PI / 2);
+  else if (id === SHAPES.CORNER_NXNZ) g.rotateY(Math.PI);
+  else if (id === SHAPES.CORNER_NXPZ) g.rotateY(-Math.PI / 2);
+  return g;
+}
+
+let _lattice = null;
+/**
+ * A panel of lattice girder: a frame and a double X in white on nothing,
+ * cut out by alpha. Each face of a TRUSS stone wears one panel, so a
+ * walkway's side reads as the open lattice it is from any distance.
+ */
+function latticeTexture() {
+  if (_lattice || typeof document === 'undefined') return _lattice;
+  const S = 128, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, S, S);
+  g.strokeStyle = '#ffffff'; g.lineCap = 'square';
+  g.lineWidth = 14; g.strokeRect(7, 7, S - 14, S - 14);
+  g.lineWidth = 9;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(S, S); g.moveTo(S, 0); g.lineTo(0, S); g.stroke();
+  g.lineWidth = 6;
+  g.beginPath(); g.moveTo(S / 2, 0); g.lineTo(S, S / 2); g.lineTo(S / 2, S); g.lineTo(0, S / 2); g.closePath(); g.stroke();
+  _lattice = new THREE.CanvasTexture(c);
+  _lattice.colorSpace = THREE.SRGBColorSpace;
+  _lattice.anisotropy = 4;
+  _lattice.userData.keep = true;
+  return _lattice;
 }
 
 function stoneTexture() {
@@ -701,8 +708,13 @@ export class Structure {
       if (px) wx = 1; else if (nx) wx = -1;
       if (pz) wz = 1; else if (nz) wz = -1;
       if (!wx && !wz) continue;
-      // A corner open both ways falls along its longer side's normal.
-      if (wx && wz) { if (ax[i] >= az[i]) wx = 0; else wz = 0; }
+      // A corner open both ways is the hip's corner, where the stone is
+      // square to the world; otherwise it falls along its longer side's normal.
+      if (wx && wz) {
+        const k = cornerToward(wx, wz, this.ry[i]);
+        if (k != null) { this.shape[i] = k; n++; continue; }
+        if (ax[i] >= az[i]) wx = 0; else wz = 0;
+      }
       this.shape[i] = slopeToward(wx, wz, this.ry[i]);
       n++;
     }
@@ -1727,8 +1739,16 @@ export class Structure {
       // The stone's face: grain and a mortar line, on anything that is
       // masonry rather than metal or glass.
       const metalOrGlass = [MATERIALS.GLASS, MATERIALS.IRON, MATERIALS.STEEL, MATERIALS.GILT].includes(matId);
-      const tex = metalOrGlass ? null : stoneTexture();
+      const painted = [MATERIALS.BLUEIRON, MATERIALS.BLUERAIL, MATERIALS.TRUSS].includes(matId);
+      const tex = metalOrGlass || painted ? null : stoneTexture();
       if (tex) material.map = tex;
+      // Painted steel: a little sheen, no stone grain. The lattice is cut out.
+      if (painted) { material.roughness = 0.55; material.metalness = 0.15; }
+      if (matId === MATERIALS.TRUSS) {
+        material.map = latticeTexture();
+        material.alphaTest = 0.5;
+        material.side = THREE.DoubleSide;
+      }
       // A shaped stone has no cube's edges to catch: the edge term reads the
       // unit cube's corners from the vertex and would draw lines across a
       // slope or round a cone.

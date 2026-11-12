@@ -49,6 +49,11 @@ export const MATERIALS = {
   AZURE: 33,     // turquoise glazed tile: the domes and portals of Samarkand
   ROSE: 34,      // Jaipur's pink-washed sandstone: the Hawa Mahal
   COPPER: 35,    // weathered copper roofing, the bright green of verdigris
+  BLUEIRON: 36,  // ironwork painted Tower Bridge's sky blue: the decks' girders, the walkways
+  BLUERAIL: 37,  // the same blue on what nothing may rest on: the chains and hangers
+  TRUSS: 38,     // white-painted lattice girder, drawn as a lattice: the walkways' sides
+  SAGE: 39,      // slate roofing in the box art's sand green: Tower Bridge's caps
+  ROADIRON: 40,  // deck ironwork under its asphalt, dark grey: Tower Bridge's roadway
 };
 
 /**
@@ -287,6 +292,15 @@ export const MATERIAL_PROPS = {
   [MATERIALS.AZURE]:     { density: 2.40, strength: 1.00, toughness: 100, color: 0x2b9bb3, structural: true },
   [MATERIALS.ROSE]:      { density: 2.30, strength: 0.82, toughness: 84,  color: 0xd98266, structural: true },
   [MATERIALS.COPPER]:    { density: 2.60, strength: 0.70, toughness: 70,  color: 0x5fa38a, structural: true },
+  // The box-art colours (November 2026): each the physical twin of what it
+  // replaces, so a level repainted in them stands and falls exactly as it
+  // did. The blue Tower Bridge has worn since 1977, the white of its
+  // lattice, and the sand green its caps are drawn in on the box.
+  [MATERIALS.BLUEIRON]:  { density: 7.20, strength: 14.0, toughness: 260, color: 0x6fb0d4, structural: true },
+  [MATERIALS.BLUERAIL]:  { density: 7.20, strength: 14.0, toughness: 260, color: 0x6fb0d4, structural: false },
+  [MATERIALS.TRUSS]:     { density: 7.20, strength: 14.0, toughness: 260, color: 0xe6eaec, structural: false },
+  [MATERIALS.SAGE]:      { density: 2.70, strength: 0.55, toughness: 55,  color: 0x8fab9b, structural: true },
+  [MATERIALS.ROADIRON]:  { density: 7.20, strength: 14.0, toughness: 260, color: 0x50555b, structural: true },
 };
 
 
@@ -314,7 +328,28 @@ export const JOINT = 0.015;
  * a staircase; a cone and a pyramid are a spire's point, round and square;
  * a cylinder a column or a turret's core.
  */
-export const SHAPES = { BOX: 0, SLOPE_PX: 1, SLOPE_NX: 2, SLOPE_PZ: 3, SLOPE_NZ: 4, CONE: 5, CYL: 6, PYRAMID: 7 };
+export const SHAPES = { BOX: 0, SLOPE_PX: 1, SLOPE_NX: 2, SLOPE_PZ: 3, SLOPE_NZ: 4, CONE: 5, CYL: 6, PYRAMID: 7,
+  // A hip's corner: falling both ways at once, so a roof's corners are not
+  // notched where one slope stopped and the next began.
+  CORNER_PXPZ: 8, CORNER_PXNZ: 9, CORNER_NXPZ: 10, CORNER_NXNZ: 11 };
+
+/**
+ * The hip corner that falls along world (sx, 0) and (0, sz), for a stone
+ * yawed `ry`; null when the yaw is not a quarter turn, so the two falls are
+ * not along the stone's own axes.
+ */
+export function cornerToward(sx, sz, ry = 0) {
+  const c = Math.cos(ry), s = Math.sin(ry);
+  if (Math.min(Math.abs(c), Math.abs(s)) > 0.05) return null;
+  // Each world fall into the stone's frame; a quarter turn sends it to an axis.
+  let lx = 0, lz = 0;
+  for (const [wx, wz] of [[sx, 0], [0, sz]]) {
+    const ax = wx * c - wz * s, az = wx * s + wz * c;
+    if (Math.abs(ax) > 0.5) lx = Math.sign(ax); else lz = Math.sign(az);
+  }
+  if (!lx || !lz) return null;
+  return lx > 0 ? (lz > 0 ? SHAPES.CORNER_PXPZ : SHAPES.CORNER_PXNZ) : (lz > 0 ? SHAPES.CORNER_NXPZ : SHAPES.CORNER_NXNZ);
+}
 
 /** The slope that falls along a world direction, for a stone yawed `ry`. */
 export function slopeToward(wx, wz, ry = 0) {
@@ -375,6 +410,15 @@ export class BlockList {
       }
       const nx = Math.abs(ox) / hw, nz = Math.abs(oz) / hd;
       if (Math.max(nx, nz) < edge) return SHAPES.BOX;
+      // A stone that reaches both edges is the hip's corner.
+      if (fallX && fallZ) {
+        const c = Math.abs(Math.cos(ry)), sn = Math.abs(Math.sin(ry));
+        const ex = hx * c + hz * sn, ez = hx * sn + hz * c;
+        if (Math.abs(ox) + ex >= hw * 0.97 && Math.abs(oz) + ez >= hd * 0.97) {
+          const k = cornerToward(Math.sign(ox) || 1, Math.sign(oz) || 1, ry);
+          if (k != null) return k;
+        }
+      }
       if (nx >= nz) return fallX ? slopeToward(Math.sign(ox) || 1, 0, ry) : SHAPES.BOX;
       return fallZ ? slopeToward(0, Math.sign(oz) || 1, ry) : SHAPES.BOX;
     }, fn);

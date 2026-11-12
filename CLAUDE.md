@@ -600,8 +600,17 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   columns are cylinders. Roofs a landmark lays by hand are found at load
   (`_autoSlopes`, structure.js): a stone of roofing (`AUTO_SLOPE`) whose
   middle carries the course above and whose edge on one side does not is
-  drawn falling toward that edge. Neuschwanstein: 935 stones sloped, eleven
-  meshes. Sydney's leaning shells are not caught.
+  drawn falling toward that edge, and one open on two adjacent sides is a
+  hip's corner (`CORNER_*`, falling both ways; `cornerToward`), so a roof
+  is not notched at its corners. Neuschwanstein: 935 stones sloped, eleven
+  meshes. Sydney's leaning shells are not caught. The slopes and corners
+  are convex hulls (`convexShape`) with planar UVs. Tower Bridge is the
+  first landmark dressed like its box: twin materials that only change the
+  colour (builder.js: BLUEIRON, BLUERAIL, TRUSS, SAGE, ROADIRON, each the
+  physical copy of what it replaced, so it stands and falls as before),
+  the TRUSS drawn as a cut-out lattice (`latticeTexture`), sand-green caps,
+  turrets of a stone shaft, a pointed cap and a gilt spike, a gilt finial
+  on each apex.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/orbital.js` the lasgun: the ORBIT cards (`laser`, `lance` in
