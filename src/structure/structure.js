@@ -147,7 +147,7 @@ let STONE_TEX = null;
 const SHAPE_GEOS = new Map();
 /** The roofing materials whose hand-laid steps are drawn as slopes (`_autoSlopes`). */
 const AUTO_SLOPE = new Set([MATERIALS.SLATE, MATERIALS.SCOTSLATE, MATERIALS.COPPER, MATERIALS.GLAZE,
-  MATERIALS.RIDGE, MATERIALS.THATCH, MATERIALS.TILE, MATERIALS.GOLD, MATERIALS.SAGE]);
+  MATERIALS.RIDGE, MATERIALS.THATCH, MATERIALS.TILE, MATERIALS.GOLD, MATERIALS.SAGE, MATERIALS.DARKSLATE]);
 function shapeGeometry(id) {
   let g = SHAPE_GEOS.get(id);
   if (g) return g;

@@ -54,6 +54,7 @@ export const MATERIALS = {
   TRUSS: 38,     // white-painted lattice girder, drawn as a lattice: the walkways' sides
   SAGE: 39,      // slate roofing in the box art's sand green: Tower Bridge's caps
   ROADIRON: 40,  // deck ironwork under its asphalt, dark grey: Tower Bridge's roadway
+  DARKSLATE: 41, // slate drawn as the box draws Neuschwanstein's roofs: near black
 };
 
 /**
@@ -301,6 +302,7 @@ export const MATERIAL_PROPS = {
   [MATERIALS.TRUSS]:     { density: 7.20, strength: 14.0, toughness: 260, color: 0xe6eaec, structural: false },
   [MATERIALS.SAGE]:      { density: 2.70, strength: 0.55, toughness: 55,  color: 0x8fab9b, structural: true },
   [MATERIALS.ROADIRON]:  { density: 7.20, strength: 14.0, toughness: 260, color: 0x50555b, structural: true },
+  [MATERIALS.DARKSLATE]: { density: 2.70, strength: 0.55, toughness: 55,  color: 0x464b53, structural: true },
 };
 
 

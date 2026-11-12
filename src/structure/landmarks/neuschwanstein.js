@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
+import { BlockList, JOINT, MATERIALS as M, SHAPES } from '../builder.js';
 
 /**
  * Neuschwanstein, over Hohenschwangau.
@@ -28,7 +28,10 @@ import { BlockList, JOINT, MATERIALS as M } from '../builder.js';
  * counterweight that does not.
  *
  * MARBLE for the white limestone, REDSTONE for the gatehouse's brick,
- * CONCRETE for the grey footing in the rock, SLATE roofs, GILT finials.
+ * CONCRETE for the grey footing in the rock, the roofs near black
+ * (DARKSLATE, slate's twin), GILT finials. Dressed as the box draws it
+ * (November 2026): slim round turrets on the corners under tall black
+ * needles, a gold course under each, a gilt point on top.
  */
 
 // In plan, a little over one and a half times life: the ridge is the
@@ -64,8 +67,8 @@ const BLOCKS = [
   { tag: 'gatehouse', x0: 31, x1: 52, z0: -32, z1: 1, top: 16.0, found: -16, roof: 6.0, rows: [3.5, 9.0], mat: 'REDSTONE' },
   { tag: 'gatehouse', x0: 46, x1: 52, z0: -32, z1: -26, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true, battlement: true },
   { tag: 'gatehouse', x0: 46, x1: 52, z0: -5, z1: 1, top: 21.0, found: -16, roof: 4.0, rows: [3.5, 9.0, 15.0], mat: 'REDSTONE', tower: true, battlement: true },
-  { tag: 'knightshouse', x0: -32, x1: -6, z0: -18, z1: -2, top: 15.0, found: -12, roof: 8.0, rows: [3.5, 9.0], mat: 'MARBLE' },
-  { tag: 'bower', x0: -22, x1: 3, z0: 11, z1: 27, top: 13.0, found: -6, roof: 5.0, rows: [3.5, 8.5], mat: 'MARBLE' },
+  { tag: 'knightshouse', x0: -32, x1: -6, z0: -18, z1: -2, top: 15.0, found: -12, roof: 8.0, rows: [3.5, 9.0], mat: 'MARBLE', turrets: 'small' },
+  { tag: 'bower', x0: -22, x1: 3, z0: 11, z1: 27, top: 13.0, found: -6, roof: 5.0, rows: [3.5, 8.5], mat: 'MARBLE', turrets: 'small' },
 ];
 // The north tower: round, at the Palas's north-east corner.
 const NORTH = { x: -29, z: -1, r: 4.6, top: 55.0, roof: 65.0, found: -14, rows: [10, 20, 30, 40, 48] };
@@ -134,10 +137,10 @@ export function buildNeuschwanstein(quality) {
       const short = Math.min(ww, dd);
       if (short <= thick * 2.6) {
         const along = ww >= dd;
-        B.slab(cx, y + rc * 0.6, cz, along ? ww : short * 1.1, rc * 1.2, along ? short * 1.1 : dd, stone * 1.2, M.SLATE);
+        B.slab(cx, y + rc * 0.6, cz, along ? ww : short * 1.1, rc * 1.2, along ? short * 1.1 : dd, stone * 1.2, M.DARKSLATE);
         return;
       }
-      B.ring(cx, cz, ww, dd, thick, y, rc, stone * 1.3, M.SLATE, c % 2 ? 0.5 : 0);
+      B.ring(cx, cz, ww, dd, thick, y, rc, stone * 1.3, M.DARKSLATE, c % 2 ? 0.5 : 0);
       ww -= 2 * step * (rc / rise); dd -= 2 * step * (rc / rise);
       y += rc; c++;
     }
@@ -194,13 +197,21 @@ export function buildNeuschwanstein(quality) {
       roof(cx, cz, w, d, b.top, b.roof);
     }
     if (b.turrets) {
-      // Slender corner turrets on the Palas, standing on its wall-head.
+      // Slender round turrets on the corners, standing on the wall-head: a
+      // shaft, a gold course, a tall black needle and a gilt point.
+      const big = b.turrets !== 'small';
+      const shaft = big ? 10.0 : 5.5, needle = big ? 10.0 : 6.5, R = big ? 1.7 : 1.3;
       for (const [ex, ez] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
         const tx = cx + ex * (w / 2 - WALL * 0.7), tz = cz + ez * (d / 2 - WALL * 0.7);
-        courses(b.top, b.top + 8.0, course, (y, h, c) => {
-          B.polyRing(tx, tz, BlockList.circle(1.6, 8, (c % 2) * (Math.PI / 8)), 1.0, y, h, stone * 0.8, mat, 0);
+        courses(b.top, b.top + shaft, course, (y, h, c, n) => {
+          const last = y + h >= b.top + shaft - 0.01;
+          B.polyRing(tx, tz, BlockList.circle(R, 8, (c % 2) * (Math.PI / 8)), 1.0, y, h, stone * 0.8, last ? M.GOLD : mat, 0);
         });
-        B.spire(tx, tz, b.top + 8.0, b.top + 13.0, 3.6, 0.8, course * 0.8, stone * 0.7, M.SLATE, 0.6);
+        // A disc to stand the needle on, then the needle: round courses
+        // drawn as slopes, closing to a point.
+        B.slab(tx, b.top + shaft + course * 0.25, tz, R * 2 + 0.6, course * 0.5, R * 2 + 0.6, stone, M.DARKSLATE);
+        B.dome(tx, tz, b.top + shaft + course * 0.5, needle, R + 0.4, 0.7, course * 0.8, stone * 0.7, M.DARKSLATE, (t) => Math.pow(Math.max(0, 1 - t), 1.15));
+        B.withShape(SHAPES.CONE, () => B.add(tx, b.top + shaft + course * 0.5 + needle + 0.9, tz, 0.22, 0.9, 0.22, M.GILT));
       }
     }
   };
@@ -245,7 +256,8 @@ export function buildNeuschwanstein(quality) {
       }
     });
     B.slab(cx, NORTH.top + course * 0.3, cz, NORTH.r * 1.3, course * 0.6, NORTH.r * 1.3, stone * 1.2, M.MARBLE);
-    B.spire(cx, cz, NORTH.top + course * 0.6, NORTH.roof, NORTH.r * 2 + 1.0, 0.8, course * 0.8, stone * 0.8, M.SLATE, 0.55);
+    // A round needle, as the box draws it, on the round shaft.
+    B.dome(cx, cz, NORTH.top + course * 0.6, NORTH.roof - NORTH.top - course * 0.6, NORTH.r + 0.5, 1.2, course * 0.8, stone * 0.8, M.DARKSLATE, (t) => Math.pow(Math.max(0, 1 - t), 1.1));
     B.pinnacle(cx, cz, NORTH.roof, 2.4, 1.0, stone * 0.6, M.GILT);
   });
 

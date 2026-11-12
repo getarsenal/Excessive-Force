@@ -610,7 +610,11 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   physical copy of what it replaced, so it stands and falls as before),
   the TRUSS drawn as a cut-out lattice (`latticeTexture`), sand-green caps,
   turrets of a stone shaft, a pointed cap and a gilt spike, a gilt finial
-  on each apex.
+  on each apex. Neuschwanstein the second: near-black roofs (DARKSLATE),
+  round turrets on the Palas, the Knights' House and the Bower under tall
+  needles (`B.dome` with a cone profile: round sloped courses and a cone
+  point) with a gold course under each and a gilt point, the north
+  tower's square spire a round needle; 13,379 stones, none loose.
   `src/fx/contactshadows.js` grounds the guns where there is no shadow map;
   the grade pass in `src/core/engine.js` is also the output pass.
 - `src/game/orbital.js` the lasgun: the ORBIT cards (`laser`, `lance` in
