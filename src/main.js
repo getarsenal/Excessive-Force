@@ -1225,8 +1225,7 @@ async function boot() {
       const bossName = LEVELS[o.boss]?.target || o.boss.toUpperCase();
       const left = o.battles.filter((b) => !b.boss && !b.won).length;
       const line = o.done ? (level.id === o.boss ? 'OPERATION COMPLETE' : '')
-        : boss.needStars ? `BOSS LOCKED · ${boss.needStars} MORE ★ IN THIS OPERATION`
-          : boss.open ? `BOSS UNLOCKED · ${bossName}`
+        : boss.open ? `BOSS UNLOCKED · ${bossName}`
             : `${left} TO GO, THEN THE BOSS · ${bossName}`;
       opOut = { name: o.name, total: st.total, line,
         pips: o.battles.map((b) => ({ won: b.won, boss: b.boss, here: b.id === level.id, stars: b.stars.filter(Boolean).length })) };
@@ -1308,7 +1307,7 @@ async function boot() {
     // is paid the first time it is won.
     const weeklyFirst = weekly ? markWeekly(weekly.week, won, sum) : false;
     return award({
-      won, sum, level: level.id, ribbons, marks: extra.marks || [], feats: extra.feats || [],
+      won, sum, level: level.id, ribbons, marks: extra.marks || [], feats: extra.feats || [], stars: extra.stars || null,
       daily: !!dailyBanked, streak: dailyBanked || 0, weekly: weeklyFirst ? weekly.rule.name : null,
       stats: { ...runStats, burnt: battle.cityFire?.burnt || 0, dumps: battle.stores?.blown || 0 },
     });
@@ -1988,7 +1987,7 @@ async function boot() {
           const th = freeRun ? null : recordTheatre(level.id, true, sum, marks);
           if (th) seasonRun(th);
           const feats = awardMedals(sum);
-          banked = { sum, marks, feats, stars: th?.stars || null, xp: payOut(true, sum, { marks, feats }) };
+          banked = { sum, marks, feats, stars: th?.stars || null, xp: payOut(true, sum, { marks, feats, stars: th?.stars }) };
           // The board (rivals.js), when anyone has challenged this phone here.
           const board = boardFor(level.id, loadProgress()[level.id]?.bestShots || sum.shotsFired);
           if (board.length > 1) {
@@ -2047,7 +2046,7 @@ async function boot() {
           hideNewsflash();
           const feats = awardMedals(sum);
           hud.showEnd('win', sum, {
-            xp: payOut(true, sum, { marks, feats }),
+            xp: payOut(true, sum, { marks, feats, stars: th?.stars }),
             medals: feats,
             title: 'Flattened',
             sub: `${level.subtitle} · nothing left standing`,

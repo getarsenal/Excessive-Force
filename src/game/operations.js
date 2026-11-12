@@ -18,8 +18,11 @@ import { parOf, shortMoney } from './par.js';
  *
  * Three stars a battle, banked across runs so no single run has to be perfect:
  * the win, the par (two of the four marks), and the battle's own challenge.
- * The boss opens on four battles won and six stars of the twelve, which is a
- * nudge back to a battle already won rather than a wall. The catalogue's
+ * Stars are a reward, never a gate (November 2026, the owner): bring the
+ * building down and the next battle opens, the boss opens on its four
+ * battles won, the wall on every boss down; the par and challenge stars pay
+ * XP the first time they are taken (progress.js `award`) and buy DOCTRINE.
+ * The catalogue's
  * fifty-nine maps are side operations, opened seven at a time as each boss
  * falls.
  *
@@ -240,8 +243,6 @@ export function totalStars(prog) {
   return n;
 }
 
-export const BOSS_STARS = 6;      // of an operation's twelve, to open its boss
-export const FINALE_STARS = 60;   // of the campaign's 120, to open the wall
 export const SIDE_PER_BOSS = 7;   // side ops opened by each boss that falls
 
 /**
@@ -261,17 +262,16 @@ export function operationsState(prog, free = false) {
   let bossesDown = 0;
   for (let k = 0; k < ops.length; k++) {
     const o = ops[k];
-    o.open = free || k === 0 || (ops[k - 1].done && (!o.finale || total >= FINALE_STARS));
-    if (o.finale && !free) o.open = ops.slice(0, -1).every((p) => p.done) && total >= FINALE_STARS;
+    o.open = free || k === 0 || ops[k - 1].done;
+    if (o.finale && !free) o.open = ops.slice(0, -1).every((p) => p.done);
     const n = o.battles.length;
     for (let i = 0; i < n; i++) {
       const b = o.battles[i];
       if (free || b.won) { b.open = true; continue; }
       if (!o.open) continue;
       if (b.boss) {
-        const four = o.battles.slice(0, n - 1).every((x) => x.won);
-        b.open = four && (o.finale || o.opStars >= BOSS_STARS);
-        b.needStars = four && !b.open ? BOSS_STARS - o.opStars : 0;
+        // Wins in its own operation, nothing else.
+        b.open = o.battles.slice(0, n - 1).every((x) => x.won);
       } else {
         b.open = i === 0 || o.battles[i - 1].won;
       }

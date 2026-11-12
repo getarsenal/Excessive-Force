@@ -387,6 +387,9 @@ export function bootCampXp() {
  * @param {number} [r.streak]
  * @returns the report: lines of XP, totals, grades crossed, medals and orders won
  */
+/** What a star past the win pays: the first time, and on a run that takes it again. */
+export const STAR_XP = { par: 1500, challenge: 2000, again: 300 };
+
 export function award(r) {
   const c = career();
   const sum = r.sum || {};
@@ -404,6 +407,13 @@ export function award(r) {
     add(`DEMOLITION · ${Math.round(sum.score || 0).toLocaleString()} t`, tonXp);
     add(`DEFENDERS · ${sum.defendersKilled || 0}`, Math.min(2000, (sum.defendersKilled || 0) * 4));
     for (const m of r.marks || []) if (m.won) add(`MARK · ${m.label}`, 250);
+    // The stars past the win open nothing: they pay. Big the first time a
+    // battle gives one up, a token on every run that takes it again.
+    const sr = r.stars;
+    if (r.won && sr?.run) {
+      if (sr.run[1]) add(sr.fresh[1] ? '★ PAR STAR' : '★ PAR AGAIN', sr.fresh[1] ? STAR_XP.par : STAR_XP.again, sr.fresh[1] ? 'gold' : '');
+      if (sr.run[2]) add(sr.fresh[2] ? '★ CHALLENGE STAR' : '★ CHALLENGE AGAIN', sr.fresh[2] ? STAR_XP.challenge : STAR_XP.again, sr.fresh[2] ? 'gold' : '');
+    }
     // The first win of the day pays the run twice.
     const day = today();
     if (r.won && c.firstWin !== day) {

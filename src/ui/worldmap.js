@@ -705,7 +705,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       goBtn.className = 'ef-go sealed';
       const ob = t && opFor(t.id)?.battles.find((b) => b.id === t.id);
       goBtn.innerHTML = !t ? 'CHOOSE A TARGET'
-        : ob?.needStars ? `SEALED <em>${ob.needStars} more \u2605 in this operation opens the boss</em>`
+        : ob?.boss ? 'SEALED <em>win every battle in this operation</em>'
           : operationOf(t.id) ? 'SEALED <em>win the battle before it</em>'
             : 'SEALED <em>beat another boss to open more side operations</em>';
       return;
@@ -790,7 +790,7 @@ export async function showWorldMap({ current = null, canResume = false, view: st
       + `<div class="ef-op-pips">${o.battles.map((b) => {
         const lv = LEVELS[b.id] || {};
         const cls = `${b.won ? 'won' : ''}${b.open ? ' open' : ''}${b.boss ? ' boss' : ''}${b.id === t.id ? ' here' : ''}`;
-        const sub = b.boss && b.needStars ? `NEED ${b.needStars}\u2605` : b.stars.filter(Boolean).length ? '\u2605'.repeat(b.stars.filter(Boolean).length) : (b.open ? 'OPEN' : '');
+        const sub = b.stars.filter(Boolean).length ? '\u2605'.repeat(b.stars.filter(Boolean).length) : (b.open ? 'OPEN' : '');
         // A fifth of a phone takes a city, not an address: the shortest part
         // of the place ("Agra, Uttar Pradesh" is AGRA; "Red Square, Moscow"
         // MOSCOW), the whole of it on the button's label.

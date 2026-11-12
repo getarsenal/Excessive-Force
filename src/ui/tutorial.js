@@ -264,7 +264,7 @@ export class Tutorial {
       { ch: 5, el: '#dock-menu', title: 'MENU', ok: true,
         text: 'RESUME, RESTART and MAIN MENU; SETTINGS holds sound, OPTICS (thermal and night vision, or T), accessibility and quality. Leave mid-fight and the battle is saved: CONTINUE picks it up.' },
       { ch: 5, el: null, title: 'STARS', ok: true,
-        text: 'Every battle has three stars: win it, beat two of its par marks, and its own challenge. The campaign is eight operations of four battles and a boss; six stars in an operation open its boss. Stars also buy DOCTRINE: permanent upgrades, refundable any time.',
+        text: 'Every battle has three stars: win it, beat two of its par marks, and its own challenge. Winning is what moves you on: eight operations of four battles and a boss, the boss open once the four are won. The other stars pay extra XP and buy DOCTRINE: permanent upgrades, refundable any time.',
         say: 'Stars. Like a hotel, but for destruction. Collect them. I want a five-star war.' },
       { ch: 5, el: '.integrity-wrap', title: 'BRING IT DOWN',
         text: 'Keep firing until it falls. Every battle pays XP toward your next rank, won or not; Boot Camp pays your first.',

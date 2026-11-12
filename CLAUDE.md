@@ -221,7 +221,9 @@ building dry, and a level there is new rows in three files, not a module.
 
 The campaign is eight operations of four battles and a boss, then the
 Great Wall (`src/game/operations.js`): stars per battle (win, par, the
-battle's challenge), six of an operation's twelve to open its boss, a boss
+battle's challenge; a reward, never a gate: the par and challenge stars pay
+XP, `STAR_XP` in progress.js, and buy doctrine), a win opens the next
+battle, an operation's four battles won open its boss, a boss
 is won only with the warlord's bunker (the command post) destroyed, and
 the catalogue opens as side operations, seven per boss. The original
 sixteen, in suite order: `westminster`, `paris`, `agra`, `giza`,
