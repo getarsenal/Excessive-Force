@@ -985,7 +985,15 @@ Read `docs/NEW_MAP_PLAYBOOK.md`. The `new-map` skill walks the steps.
   pieces awake and physics at 1.5 s a simulated second; now about four
   hundred and 0.5 s. `KINDS=m777,m777,m119 node tools/perfprobe.mjs
   saintsava 240 20 60` runs that fight and says what the moving bodies are
-  (sections by size, stones, asleep, slow, fast, frozen low, culled) ·
+  (sections by size, stones, asleep, slow, fast, frozen low, culled).
+  The world's y is the real elevation, so a height test in the physics is
+  taken from the map's own ground: `cullRunaways` deletes what leaves the
+  map between `minElevation - 240` and `maxElevation + 900` (`runFloor`,
+  `runCeiling` in main.js); its old fixed 900 m ceiling deleted every stone
+  freed on Baalbek, the Potala, Machu Picchu and eight other high maps the
+  instant it came loose, so the building went to dust and nothing fell.
+  `node tools/dustprobe.mjs <level> [units] [seconds] [tier]` counts every
+  stone deleted by the path that deleted it against the stones freed to fall ·
   SEASONS (`src/game/seasons.js`): every six weeks a themed run of eight
   catalogue landmarks, open to all while it runs, stars counted once per
   landmark at its best, three tiers paid once (`grant` in progress.js: XP,

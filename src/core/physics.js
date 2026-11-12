@@ -1038,7 +1038,7 @@ export class PhysicsWorld {
    * Nothing legitimate in this game moves faster than a rocket, so anything
    * that does is clamped, and anything that has left the map is removed.
    */
-  cullRunaways(bounds) {
+  cullRunaways(bounds, floor = -240, ceiling = 900) {
     if (this.dead) return 0;
     const dead = [];
     let clamped = 0;
@@ -1055,7 +1055,7 @@ export class PhysicsWorld {
       }
       const t = body.translation();
       if (!isFinite(t.x) || !isFinite(t.y) || !isFinite(t.z)
-          || t.y < -240 || t.y > 900
+          || t.y < floor || t.y > ceiling
           || Math.abs(t.x) > bounds || Math.abs(t.z) > bounds) {
         dead.push(body);
       }

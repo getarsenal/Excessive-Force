@@ -333,6 +333,12 @@ async function boot() {
 
   await progress(18, `surveying ${level.name.split(',')[1]?.trim() || level.name}`);
   const terrain = await loadTerrain(level.terrain, quality);
+  // The heights a stone may reach before it counts as gone off the map, from
+  // the map's own ground: the world's y is the real elevation, and a fixed
+  // ceiling of 900 m deleted every stone freed on a map higher than that
+  // (Baalbek, Potala, Machu Picchu) the moment it came loose.
+  const runFloor = (terrain.meta?.minElevation ?? 0) - 240;
+  const runCeiling = (terrain.meta?.maxElevation ?? 0) + 900;
   // A level may dictate its own ground palette. Giza is desert: the default
   // London greens and brick dust make the plateau read as the Home Counties
   // with a pyramid on it.
@@ -3510,7 +3516,7 @@ async function boot() {
       physics.step(step);
       physics.recycleSettled(quality.settleFrames);
       physics.auditFrozen();
-      physics.cullRunaways(terrain.span * 1.6);
+      physics.cullRunaways(terrain.span * 1.6, runFloor, runCeiling);
       for (const s of structures) {
         s.solveStability(); s.maintainIslands(step); s.tickLean(step); s.syncTransforms();
       }
@@ -3780,7 +3786,7 @@ async function boot() {
       physics.step(dt);
       physics.recycleSettled(quality.settleFrames);
       physics.auditFrozen();
-      physics.cullRunaways(terrain.span * 1.6);
+      physics.cullRunaways(terrain.span * 1.6, runFloor, runCeiling);
       for (const s of structures) { s.solveStability(false, quality.solveGap || 0); s.maintainIslands(dt); s.tickLean(dt); }
     }
     physMs = physMs * 0.9 + (performance.now() - pStart) * 0.1;
