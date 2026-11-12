@@ -1,4 +1,4 @@
-import { BlockList, MATERIALS as M } from '../builder.js';
+import { BlockList, MATERIALS as M, SHAPES } from '../builder.js';
 
 /**
  * The Elizabeth Tower, built from its real dimensions.
@@ -482,7 +482,7 @@ export function buildElizabethTower(quality) {
       });
     // Finial and cross, each piece standing on the one below.
     B.slab(0, SPIRE_TOP - 2.7, 0, 1.6, 1.4, 1.6, 0.7 * s, M.GILT);
-    B.slab(0, SPIRE_TOP - 1.1, 0, 0.7, 1.8, 0.7, 0.6 * s, M.GILT);
+    B.withShape(SHAPES.CONE, () => B.slab(0, SPIRE_TOP - 1.1, 0, 0.7, 1.8, 0.7, 0.6 * s, M.GILT));
     B.slab(0, SPIRE_TOP - 0.04, 0, 1.5, 0.32, 0.32, 0.5 * s, M.GILT);
 
     // Corner pinnacles around the spire base, on the belfry roof.
@@ -666,8 +666,11 @@ export function buildPalaceWing(quality) {
       for (let i = 0; i < roofSteps; i++) {
         const t = i / roofSteps;
         const w = inner * (1 - t * 0.92);
-        B.slab(0, height + (i + 0.5) * (ROOF_H / roofSteps), z0 + len / 2,
-          w, ROOF_H / roofSteps, len - 3.4, stone * 1.2, M.SLATE);
+        // Drawn as a pitch: the outermost column of each step slopes down
+        // to the eaves, the gable ends stay upright.
+        const col = w / Math.max(1, Math.round(w / (stone * 1.2)));
+        B.sloped(0, z0 + len / 2, w, len - 3.4, () => B.slab(0, height + (i + 0.5) * (ROOF_H / roofSteps), z0 + len / 2,
+          w, ROOF_H / roofSteps, len - 3.4, stone * 1.2, M.SLATE), { fallZ: false, edge: Math.max(0.5, 1 - 2 * col / w) });
       }
     });
     // Victoria Tower-ish pinnacles, on the parapet.
